@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+import sys
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -26,6 +28,10 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee.http_clients._base import HttpClient
+
+
+if sys.platform == 'win32' and sys.version_info >= (3, 12):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 @pytest.fixture
