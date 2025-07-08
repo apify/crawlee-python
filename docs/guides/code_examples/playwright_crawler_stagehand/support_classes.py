@@ -33,9 +33,6 @@ class CrawleeStagehandPage:
 
     def __getattr__(self, name: str) -> Any:
         """Delegate all other methods to the underlying StagehandPage."""
-        if name == 'goto':
-            # This case will never be called since goto is defined above
-            return self.goto
         return getattr(self._page, name)
 
     async def __aenter__(self) -> CrawleeStagehandPage:

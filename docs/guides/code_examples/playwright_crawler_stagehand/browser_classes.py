@@ -86,7 +86,10 @@ class StagehandPlugin(PlaywrightBrowserPlugin):
             raise RuntimeError('Playwright browser plugin is not initialized.')
 
         browser = PlaywrightPersistentBrowser(
-            self._playwright.chromium, self._user_data_dir, self._browser_launch_options
+            # Stagehand can run only on a Chromium-based browser.
+            self._playwright.chromium,
+            self._user_data_dir,
+            self._browser_launch_options,
         )
 
         # Return custom controller with Stagehand
