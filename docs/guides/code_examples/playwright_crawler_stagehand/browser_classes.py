@@ -3,23 +3,22 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, cast
 
-from stagehand.browser import cleanup_browser_resources, connect_local_browser
+from stagehand.context import StagehandContext
 from typing_extensions import override
 
 from crawlee.browsers import (
     PlaywrightBrowserController,
     PlaywrightBrowserPlugin,
+    PlaywrightPersistentBrowser,
 )
 
 from .support_classes import CrawleeStagehandPage
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
-    from types import TracebackType
 
-    from playwright.async_api import Browser, BrowserContext, Page
+    from playwright.async_api import Page
     from stagehand import Stagehand
-    from stagehand.context import StagehandContext
 
     from crawlee.proxy_configuration import ProxyInfo
 
@@ -27,13 +26,13 @@ if TYPE_CHECKING:
 class StagehandBrowserController(PlaywrightBrowserController):
     @override
     def __init__(
-        self, browser: BrowserContext, stagehand_context: StagehandContext, **kwargs: Any
+        self, browser: PlaywrightPersistentBrowser, stagehand: Stagehand, **kwargs: Any
     ) -> None:
         # Initialize with browser context instead of browser instance
-        super().__init__(cast('Browser', browser), **kwargs)
+        super().__init__(browser, **kwargs)
 
-        self._browser_context = browser
-        self._stagehand_context = stagehand_context
+        self._stagehand = stagehand
+        self._stagehand_context: StagehandContext | None = None
 
     @override
     async def new_page(
@@ -41,11 +40,29 @@ class StagehandBrowserController(PlaywrightBrowserController):
         browser_new_context_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> Page:
-        # Create new page through StagehandContext instead of browser context
+        # Initialize browser context if not already done
+        if not self._browser_context:
+            self._browser_context = await self._create_browser_context(
+                browser_new_context_options=browser_new_context_options,
+                proxy_info=proxy_info,
+            )
+
+        # Initialize Stagehand context if not already done
+        if not self._stagehand_context:
+            self._stagehand_context = await StagehandContext.init(
+                self._browser_context, self._stagehand
+            )
+
+        # Create a new page using Stagehand context
         page = await self._stagehand_context.new_page()
 
-        # Track the page for proper lifecycle management
-        self._pages.append(page)
+        pw_page = page._page  # noqa: SLF001
+
+        # Handle page close event
+        pw_page.on(event='close', f=self._on_page_close)
+
+        # Update internal state
+        self._pages.append(pw_page)
         self._last_page_opened_at = datetime.now(timezone.utc)
 
         self._total_opened_pages += 1
@@ -62,47 +79,20 @@ class StagehandPlugin(PlaywrightBrowserPlugin):
         super().__init__(**kwargs)
 
         self._stagehand = stagehand
-        self._temp_user_data_dir = None
-
-    @override
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        exc_traceback: TracebackType | None,
-    ) -> None:
-        await super().__aexit__(exc_type, exc_value, exc_traceback)
-        # Clean up temporary browser resources created by Stagehand
-        if self._temp_user_data_dir:
-            await cleanup_browser_resources(  # type: ignore[unreachable]
-                None, None, None, self._temp_user_data_dir, self._stagehand.logger
-            )
 
     @override
     async def new_browser(self) -> StagehandBrowserController:
         if not self._playwright:
             raise RuntimeError('Playwright browser plugin is not initialized.')
 
-        # Connect to local browser with Stagehand capabilities
-        connect_result = await connect_local_browser(
-            self._playwright,
-            self._browser_launch_options,
-            self._stagehand,
-            self._stagehand.logger,
+        browser = PlaywrightPersistentBrowser(
+            self._playwright.chromium, self._user_data_dir, self._browser_launch_options
         )
 
-        # Unpack the connection result
-        (_, persist_context, stagehand_context, page, self._temp_user_data_dir) = (
-            connect_result
-        )
-
-        # Close the initial page as we'll create new ones through the controller
-        await page.close()
-
-        # Return custom controller that uses StagehandContext
+        # Return custom controller with Stagehand
         return StagehandBrowserController(
-            browser=persist_context,
-            stagehand_context=stagehand_context,
+            browser=browser,
+            stagehand=self._stagehand,
             header_generator=None,
             fingerprint_generator=None,
         )

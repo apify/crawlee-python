@@ -29,9 +29,9 @@ You need to register with [Google AI Studio](https://aistudio.google.com/) and n
 
 To integrate Stagehand with Crawlee, you need to create wrapper classes that allow <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink> to manage the Playwright lifecycle.
 
-Create a custom Stagehand subclass that overrides the `init` method to prevent Stagehand from launching its own Playwright instance.
+Create `CrawleeStagehand` - a custom Stagehand subclass that overrides the `init` method to prevent Stagehand from launching its own Playwright instance.
 
-Create a wrapper class for `StagehandPage` that implements the [Playwright Page](https://playwright.dev/python/docs/next/api/class-page) behavior expected by <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.
+Create `CrawleeStagehandPage` - a wrapper class for `StagehandPage` that implements the [Playwright Page](https://playwright.dev/python/docs/next/api/class-page) behavior expected by <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.
 
 <CodeBlock className="language-python" title="support_classes.py">
     {SupportClasses}
@@ -41,9 +41,9 @@ Create a wrapper class for `StagehandPage` that implements the [Playwright Page]
 
 You need to create a custom browser plugin and controller that properly initialize Stagehand and obtain browser pages from `StagehandContext`.
 
-Create a subclass of <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink> that manages the Stagehand instance lifecycle and connects to the local browser with Stagehand capabilities.
+Create `StagehandPlugin` - a subclass of <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink> that holds the Stagehand instance and creates `PlaywrightPersistentBrowser` instances.
 
-Create a subclass of <ApiLink to="class/PlaywrightBrowserController">`PlaywrightBrowserController`</ApiLink> that uses `StagehandContext` to create new pages instead of the standard Playwright browser context.
+Create `StagehandBrowserController` - a subclass of <ApiLink to="class/PlaywrightBrowserController">`PlaywrightBrowserController`</ApiLink> that lazily initializes `StagehandContext` and creates new pages with AI capabilities on demand.
 
 <CodeBlock className="language-python" title="browser_classes.py">
     {BrowserClasses}
