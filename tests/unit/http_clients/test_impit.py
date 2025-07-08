@@ -177,7 +177,6 @@ async def test_compressed_chunked_stream(http_client: ImpitHttpClient, server_ur
     async with http_client.stream(str(server_url / 'get_compressed')) as response:
         assert response.status_code == 200
         async for chunk in response.read_stream():
-            print(chunk)
             content_body += chunk
 
     assert content_body == HELLO_WORLD * 1000
