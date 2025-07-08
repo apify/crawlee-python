@@ -29,6 +29,7 @@ crawler_choices = cookiecutter_json['crawler_type']
 http_client_choices = cookiecutter_json['http_client']
 package_manager_choices = cookiecutter_json['package_manager']
 default_start_url = cookiecutter_json['start_url']
+default_enable_apify_integration = cookiecutter_json['enable_apify_integration']
 default_install_project = cookiecutter_json['install_project']
 
 
@@ -160,7 +161,7 @@ def create(
     install_project: bool | None = typer.Option(
         None,
         '--install/--no-install',
-        show_default=True,
+        show_default=False,
         help='Should the project be installed now? If not given, you will be prompted.',
     ),
 ) -> None:
@@ -187,11 +188,13 @@ def create(
 
         # Ask about Apify integration if not explicitly configured
         if enable_apify_integration is None:
-            enable_apify_integration = _prompt_bool('Should Apify integration be set up for you?', default=False)
+            enable_apify_integration = _prompt_bool(
+                'Should Apify integration be set up for you?', default=default_enable_apify_integration
+            )
 
         # Ask about installing the project
         if install_project is None:
-            install_project = _prompt_bool('Should the project be installed now?', default=True)
+            install_project = _prompt_bool('Should the project be installed now?', default=default_install_project)
 
         if all(
             [
