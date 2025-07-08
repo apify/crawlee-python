@@ -55,16 +55,10 @@ class _ImpitResponse:
         return HttpHeaders(dict(self._response.headers))
 
     def read(self) -> bytes:
-        if not self._response.is_closed:
-            raise RuntimeError('Use `read_stream` to read the body of the Response received from the `stream` method')
         return self._response.content
 
     async def read_stream(self) -> AsyncIterator[bytes]:
-        if self._response.is_stream_consumed:
-            raise RuntimeError('Stream is already consumed.')
-        else:
-            async for chunk in self._response.aiter_bytes():
-                yield chunk
+        yield self.read()
 
 
 @docs_group('Classes')
@@ -194,7 +188,7 @@ class ImpitHttpClient(HttpClient):
             url=url,
             content=payload,
             headers=dict(headers) if headers else None,
-            stream=True,  # type: ignore[call-arg] # waiting for merge https://github.com/apify/impit/pull/207
+            # stream=True,  # type: ignore[call-arg] # waiting for merge https://github.com/apify/impit/pull/207
         )
         try:
             yield _ImpitResponse(response)
