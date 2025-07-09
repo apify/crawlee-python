@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Add `retire_browser_after_page_count` parameter for `BrowserPool` ([#1266](https://github.com/apify/crawlee-python/pull/1266)) ([603aa2b](https://github.com/apify/crawlee-python/commit/603aa2b192ef4bc42d88244bd009fffdb0614c06)) by [@Mantisus](https://github.com/Mantisus)
 - Add utility for load and parse Sitemap and `SitemapRequestLoader` ([#1169](https://github.com/apify/crawlee-python/pull/1169)) ([66599f8](https://github.com/apify/crawlee-python/commit/66599f8d085f3a8622e130019b6fdce2325737de)) by [@Mantisus](https://github.com/Mantisus), closes [#1161](https://github.com/apify/crawlee-python/issues/1161)
 - Add periodic status logging and `status_message_callback` parameter for customization ([#1265](https://github.com/apify/crawlee-python/pull/1265)) ([b992fb2](https://github.com/apify/crawlee-python/commit/b992fb2a457dedd20fc3014d7a4a8afe14602342)) by [@Mantisus](https://github.com/Mantisus), closes [#96](https://github.com/apify/crawlee-python/issues/96)
+- Add crawlee-cli option to skip project installation ([#1294](https://github.com/apify/crawlee-python/pull/1294)) ([4d5aef0](https://github.com/apify/crawlee-python/commit/4d5aef05613d10c1442fe449d1cf0f63392c98e3)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1122](https://github.com/apify/crawlee-python/issues/1122)
 
 ### 🐛 Bug Fixes
 
