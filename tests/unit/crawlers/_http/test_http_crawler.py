@@ -240,7 +240,7 @@ async def test_sending_payload_as_raw_data(http_client: HttpClient, server_url: 
 
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
-        response = json.loads(context.http_response.read())
+        response = json.loads(await context.http_response.read())
         # The post endpoint returns the provided payload in the response.
         responses.append(response)
 
@@ -271,7 +271,7 @@ async def test_sending_payload_as_form_data(http_client: HttpClient, server_url:
 
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
-        response = json.loads(context.http_response.read())
+        response = json.loads(await context.http_response.read())
         # The /post endpoint returns the provided payload in the response.
         responses.append(response)
 
@@ -297,7 +297,7 @@ async def test_sending_payload_as_json(http_client: HttpClient, server_url: URL)
 
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
-        response = json.loads(context.http_response.read())
+        response = json.loads(await context.http_response.read())
         # The /post endpoint returns the provided payload in the response.
         responses.append(response)
 
@@ -324,7 +324,7 @@ async def test_sending_url_query_params(http_client: HttpClient, server_url: URL
 
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
-        response = json.loads(context.http_response.read())
+        response = json.loads(await context.http_response.read())
         # The /get endpoint returns the provided query parameters in the response.
         responses.append(response)
 
@@ -397,7 +397,7 @@ async def test_isolation_cookies(http_client: HttpClient, server_url: URL) -> No
         sessions_cookies[context.session.id] = {
             cookie['name']: cookie['value'] for cookie in context.session.cookies.get_cookies_as_dicts()
         }
-        response_data = json.loads(context.http_response.read())
+        response_data = json.loads(await context.http_response.read())
         response_cookies[context.session.id] = response_data.get('cookies')
 
         if context.request.user_data.get('retire_session'):

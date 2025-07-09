@@ -46,7 +46,7 @@ async def main() -> None:
             raise RuntimeError('Session not found')
 
         # Parse the API response containing authentication tokens and user data
-        data = json.loads(context.http_response.read())
+        data = json.loads(await context.http_response.read())
 
         # Extract authentication data from the response
         token = data['token']

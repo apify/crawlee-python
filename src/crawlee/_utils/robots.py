@@ -57,7 +57,9 @@ class RobotsTxtFile:
             proxy_info: Optional `ProxyInfo` to be used when fetching the robots.txt file. If None, no proxy is used.
         """
         response = await http_client.send_request(url, proxy_info=proxy_info)
-        body = b'User-agent: *\nAllow: /' if is_status_code_client_error(response.status_code) else response.read()
+        body = (
+            b'User-agent: *\nAllow: /' if is_status_code_client_error(response.status_code) else await response.read()
+        )
 
         robots = Protego.parse(body.decode('utf-8'))
 

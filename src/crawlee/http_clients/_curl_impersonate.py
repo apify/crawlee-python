@@ -85,7 +85,7 @@ class _CurlImpersonateResponse:
     def headers(self) -> HttpHeaders:
         return HttpHeaders({key: value for key, value in self._response.headers.items() if value})
 
-    def read(self) -> bytes:
+    async def read(self) -> bytes:
         if self._response.astream_task:
             raise RuntimeError('Use `read_stream` to read the body of the Response received from the `stream` method')
         return self._response.content

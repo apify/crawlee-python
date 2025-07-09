@@ -331,7 +331,7 @@ async def test_send_request_works(server_url: URL, method: HttpMethod, path: str
     async def handler(context: BasicCrawlingContext) -> None:
         response = await context.send_request(str(server_url / path), method=method, payload=payload)
 
-        response_data['body'] = json.loads(response.read())
+        response_data['body'] = json.loads(await response.read())
         response_data['headers'] = response.headers
 
     await crawler.run(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
