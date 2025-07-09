@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from typing import Annotated, cast
 
+from click import Choice
+
 try:
     import inquirer
     import typer
@@ -133,22 +135,26 @@ def create(
         '--crawler-type',
         '--template',
         show_default=False,
+        click_type=Choice(crawler_choices),
         help='The library that will be used for crawling in your crawler. If none is given, you will be prompted.',
     ),
     http_client: str | None = typer.Option(
         None,
         show_default=False,
+        click_type=Choice(http_client_choices),
         help='The library that will be used to make HTTP requests in your crawler. '
         'If none is given, you will be prompted.',
     ),
     package_manager: str | None = typer.Option(
         default=None,
         show_default=False,
+        click_type=Choice(package_manager_choices),
         help='Package manager to be used in the new project. If none is given, you will be prompted.',
     ),
     start_url: str | None = typer.Option(
         default=None,
         show_default=False,
+        metavar='[START_URL]',
         help='The URL where crawling should start. If none is given, you will be prompted.',
     ),
     *,
