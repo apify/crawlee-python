@@ -4,8 +4,9 @@
     "crawler_type": ["beautifulsoup", "parsel", "playwright", "playwright-camoufox"],
     "__crawler_type": "{{ cookiecutter.crawler_type|lower|replace('-', '_') }}",
     "http_client": ["httpx", "curl-impersonate"],
-    "package_manager": ["poetry", "pip", "uv", "manual"],
+    "package_manager": ["poetry", "pip", "uv"],
     "enable_apify_integration": false,
+    "install_project": true,
     "start_url": "https://crawlee.dev",
     "_jinja2_env_vars": {
         "line_statement_prefix": "# %"

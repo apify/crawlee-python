@@ -30,6 +30,7 @@ def test_create_interactive(mock_cookiecutter: Mock, monkeypatch: pytest.MonkeyP
             readchar.key.ENTER,
             readchar.key.ENTER,
             readchar.key.ENTER,
+            readchar.key.ENTER,
         ]
     )
     monkeypatch.setattr(target=readchar, name='readkey', value=lambda: next(mock_input))
@@ -47,6 +48,7 @@ def test_create_interactive(mock_cookiecutter: Mock, monkeypatch: pytest.MonkeyP
             'http_client': 'httpx',
             'enable_apify_integration': False,
             'start_url': 'https://crawlee.dev',
+            'install_project': True,
         },
     )
 
@@ -57,6 +59,7 @@ def test_create_interactive_non_default_template(mock_cookiecutter: Mock, monkey
             *'my_project',
             readchar.key.ENTER,
             readchar.key.DOWN,
+            readchar.key.ENTER,
             readchar.key.ENTER,
             readchar.key.ENTER,
             readchar.key.ENTER,
@@ -79,6 +82,7 @@ def test_create_interactive_non_default_template(mock_cookiecutter: Mock, monkey
             'http_client': 'httpx',
             'enable_apify_integration': False,
             'start_url': 'https://crawlee.dev',
+            'install_project': True,
         },
     )
 
@@ -98,6 +102,7 @@ def test_create_non_interactive(mock_cookiecutter: Mock) -> None:
             '--start-url',
             'https://yr.no',
             '--no-apify',
+            '--no-install',
         ],
     )
 
@@ -111,6 +116,7 @@ def test_create_non_interactive(mock_cookiecutter: Mock) -> None:
             'http_client': 'curl-impersonate',
             'start_url': 'https://yr.no',
             'enable_apify_integration': False,
+            'install_project': False,
         },
     )
 
@@ -144,6 +150,7 @@ def test_create_existing_folder(
             '--start-url',
             'https://yr.no',
             '--no-apify',
+            '--install',
         ],
     )
     assert 'existing_project already exists' in result.output
@@ -158,6 +165,7 @@ def test_create_existing_folder(
             'http_client': 'curl-impersonate',
             'start_url': 'https://yr.no',
             'enable_apify_integration': False,
+            'install_project': True,
         },
     )
 
@@ -170,6 +178,7 @@ def test_create_existing_folder_interactive(
             *'existing_project',
             readchar.key.ENTER,
             *'my_project',
+            readchar.key.ENTER,
             readchar.key.ENTER,
             readchar.key.ENTER,
             readchar.key.ENTER,
@@ -196,6 +205,7 @@ def test_create_existing_folder_interactive(
             'http_client': 'httpx',
             'start_url': 'https://crawlee.dev',
             'enable_apify_integration': False,
+            'install_project': True,
         },
     )
 
@@ -210,6 +220,7 @@ def test_create_existing_folder_interactive_multiple_attempts(
             *'existing_project_2',
             readchar.key.ENTER,
             *'my_project',
+            readchar.key.ENTER,
             readchar.key.ENTER,
             readchar.key.ENTER,
             readchar.key.ENTER,
@@ -237,5 +248,6 @@ def test_create_existing_folder_interactive_multiple_attempts(
             'http_client': 'httpx',
             'start_url': 'https://crawlee.dev',
             'enable_apify_integration': False,
+            'install_project': True,
         },
     )
