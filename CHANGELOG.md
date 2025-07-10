@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Add utility for load and parse Sitemap and `SitemapRequestLoader` ([#1169](https://github.com/apify/crawlee-python/pull/1169)) ([66599f8](https://github.com/apify/crawlee-python/commit/66599f8d085f3a8622e130019b6fdce2325737de)) by [@Mantisus](https://github.com/Mantisus), closes [#1161](https://github.com/apify/crawlee-python/issues/1161)
 - Add periodic status logging and `status_message_callback` parameter for customization ([#1265](https://github.com/apify/crawlee-python/pull/1265)) ([b992fb2](https://github.com/apify/crawlee-python/commit/b992fb2a457dedd20fc3014d7a4a8afe14602342)) by [@Mantisus](https://github.com/Mantisus), closes [#96](https://github.com/apify/crawlee-python/issues/96)
 - Add crawlee-cli option to skip project installation ([#1294](https://github.com/apify/crawlee-python/pull/1294)) ([4d5aef0](https://github.com/apify/crawlee-python/commit/4d5aef05613d10c1442fe449d1cf0f63392c98e3)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1122](https://github.com/apify/crawlee-python/issues/1122)
+- Improve `Crawlee` CLI help text ([#1297](https://github.com/apify/crawlee-python/pull/1297)) ([afbe10f](https://github.com/apify/crawlee-python/commit/afbe10f15d93353f5bc551bf9f193414179d0dd7)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1295](https://github.com/apify/crawlee-python/issues/1295)
 
 ### 🐛 Bug Fixes
 
@@ -20,6 +21,7 @@ All notable changes to this project will be documented in this file.
 
 - [**breaking**] Introduce new storage client system ([#1194](https://github.com/apify/crawlee-python/pull/1194)) ([de1c03f](https://github.com/apify/crawlee-python/commit/de1c03f70dbd4ae1773fd49c632b3cfcfab82c26)) by [@vdusek](https://github.com/vdusek), closes [#92](https://github.com/apify/crawlee-python/issues/92), [#147](https://github.com/apify/crawlee-python/issues/147), [#783](https://github.com/apify/crawlee-python/issues/783), [#1247](https://github.com/apify/crawlee-python/issues/1247)
 - [**breaking**] Split `BrowserType` literal into two different literals based on context ([#1070](https://github.com/apify/crawlee-python/pull/1070)) ([72b5698](https://github.com/apify/crawlee-python/commit/72b5698fa0647ea02b08da5651736cc37c4c0f6a)) by [@Pijukatel](https://github.com/Pijukatel)
+- [**breaking**] Change method `HttpResponse.read` from sync to async ([#1296](https://github.com/apify/crawlee-python/pull/1296)) ([83fa8a4](https://github.com/apify/crawlee-python/commit/83fa8a416b6d2d4e27c678b9bf99bd1b8799f57b)) by [@Mantisus](https://github.com/Mantisus)
 
 
 <!-- git-cliff-unreleased-end -->
