@@ -8,10 +8,10 @@ from warcio.warcwriter import WARCWriter
 from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
 
 
-def archive_response(context: ParselCrawlingContext, writer: WARCWriter) -> None:
+async def archive_response(context: ParselCrawlingContext, writer: WARCWriter) -> None:
     """Helper function for archiving response in WARC format."""
     # Create WARC records for response
-    response_body = context.http_response.read()
+    response_body = await context.http_response.read()
     response_payload_stream = io.BytesIO(response_body)
 
     response_headers = StatusAndHeaders(
@@ -51,7 +51,7 @@ async def main() -> None:
         @crawler.router.default_handler
         async def request_handler(context: ParselCrawlingContext) -> None:
             context.log.info(f'Archiving {context.request.url} ...')
-            archive_response(context=context, writer=writer)
+            await archive_response(context=context, writer=writer)
             await context.enqueue_links(strategy='same-domain')
 
         await crawler.run(['https://crawlee.dev/'])

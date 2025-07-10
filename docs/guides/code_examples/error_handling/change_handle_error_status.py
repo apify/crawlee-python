@@ -30,7 +30,7 @@ async def main() -> None:
             response = await context.send_request(
                 'https://placeholder.org/refresh', headers=headers
             )
-            data = json.loads(response.read())
+            data = json.loads(await response.read())
             # Add the new token to our `Request` headers
             new_headers = {
                 **context.request.headers,

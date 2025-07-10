@@ -672,14 +672,14 @@ async def test_send_request(server_url: URL) -> None:
     @crawler.pre_navigation_hook
     async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
         send_request_response = await context.send_request(str(server_url / 'user-agent'))
-        check_data['pre_send_request'] = dict(json.loads(send_request_response.read()))
+        check_data['pre_send_request'] = dict(json.loads(await send_request_response.read()))
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         response = await context.response.text()
         check_data['default'] = dict(json.loads(response))
         send_request_response = await context.send_request(str(server_url / 'user-agent'))
-        check_data['send_request'] = dict(json.loads(send_request_response.read()))
+        check_data['send_request'] = dict(json.loads(await send_request_response.read()))
 
     await crawler.run([str(server_url / 'user-agent')])
 
@@ -703,7 +703,7 @@ async def test_send_request_with_client(server_url: URL) -> None:
         response = await context.response.text()
         check_data['default'] = dict(json.loads(response))
         send_request_response = await context.send_request(str(server_url / 'user-agent'))
-        check_data['send_request'] = dict(json.loads(send_request_response.read()))
+        check_data['send_request'] = dict(json.loads(await send_request_response.read()))
 
     await crawler.run([str(server_url / 'user-agent')])
 

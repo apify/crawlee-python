@@ -121,6 +121,8 @@ dataset = await Dataset.open(
 The `persist_storage` and `persist_metadata` fields have been removed from the `Configuration` class.
 Persistence is now determined solely by the storage client class you use.
 
+The `read` method for `HttpResponse` has been changed from synchronous to asynchronous.
+
 ### Storage client instance behavior
 
 Instance caching is implemented for the storage open methods: `Dataset.open()`, `KeyValueStore.open()`,

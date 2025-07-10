@@ -35,7 +35,7 @@ class HttpResponse(Protocol):
     def headers(self) -> HttpHeaders:
         """The HTTP headers received in the response."""
 
-    def read(self) -> bytes:
+    async def read(self) -> bytes:
         """Read the entire content of the response body.
 
         This method loads the complete response body into memory at once. It should be used

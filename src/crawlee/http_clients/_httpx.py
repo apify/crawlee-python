@@ -46,10 +46,10 @@ class _HttpxResponse:
     def headers(self) -> HttpHeaders:
         return HttpHeaders(dict(self._response.headers))
 
-    def read(self) -> bytes:
+    async def read(self) -> bytes:
         if not self._response.is_closed:
             raise RuntimeError('Use `read_stream` to read the body of the Response received from the `stream` method')
-        return self._response.read()
+        return await self._response.aread()
 
     async def read_stream(self) -> AsyncIterator[bytes]:
         if self._response.is_stream_consumed:
