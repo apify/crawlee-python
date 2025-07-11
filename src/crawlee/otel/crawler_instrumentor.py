@@ -148,5 +148,5 @@ class CrawlerInstrumentor(BaseInstrumentor):
             wrap_function_wrapper(_class, method, wrapper)
 
     def _uninstrument(self, **_: Any) -> None:
-        for _class, method, wrapper in self._instrumented:  # noqa: B007
+        for _class, method, __ in self._instrumented:
             unwrap(_class, method)

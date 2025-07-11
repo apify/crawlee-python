@@ -1,7 +1,7 @@
 ---
-id: otel
+id: trace-and-optimize-crawlers
 title: Trace and optimize crawlers
-description: How to instrument crawlers with OpenTelemetry
+description: Learn how to instrument your crawlers with OpenTelemetry to trace request handling, identify bottlenecks, monitor performance, and visualize telemetry data using Jaeger for performance optimization.
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
@@ -12,7 +12,6 @@ import InstrumentCrawler from '!!raw-loader!./code_examples/open_telemetry/instr
 [OpenTelemtery](https://opentelemetry.io/) is a collection of APIs, SDKs, and tools to instrument, generate, collect, and export telemetry data (metrics, logs, and traces) to help you analyze your software’s performance and behavior. In the context of crawler development, it can be used to better understand how the crawler internally works, identify bottlenecks, debug, log metrics, and more. The topic described in this guide requires at least a basic understanding of OpenTelemetry. A good place to start is [What is open telemetry](https://opentelemetry.io/docs/what-is-opentelemetry/).
 
 In this guide, it will be shown how to set up OpenTelemetry and instrument a specific crawler to see traces of individual requests that are being processed by the crawler. OpenTelemetry on its own does not provide out of the box tool for convenient visualisation of the exported data (apart from printing to the console), but there are several good available tools to do that. In this guide, we will use [Jaeger](https://www.jaegertracing.io/) to visualise the telemetry data. To better understand concepts such as exporter, collector, and visualisation backend, please refer to the [OpenTelemetry documentation](https://opentelemetry.io/docs/collector/).
-
 
 ## Set up the Jaeger
 
@@ -47,7 +46,6 @@ You can use different tools to consume the OpenTelemetry data that might better 
 ## Customize the instrumentation
 
 You can customize the <ApiLink to="class/CrawlerInstrumentor">`CrawlerInstrumentor`</ApiLink>. Depending on the arguments used during its initialization, the instrumentation will be applied to different parts ot the Crawlee code. By default, it instruments some functions that can give quite a good picture of each individual request handling. To turn this default instrumentation off, you can pass `request_handling_instrumentation=False` during initialization. You can also extend instrumentation by passing `instrument_classes=[...]` initialization argument that contains classes you want to be auto-instrumented. All their public methods will be automatically instrumented. Bear in mind that instrumentation has some runtime costs as well. The more instrumentation is used, the more overhead it will add to the crawler execution.
-
 
 You can also create your instrumentation by selecting only the methods you want to instrument. For more details, see the <ApiLink to="class/CrawlerInstrumentor">`CrawlerInstrumentor`</ApiLink> source code and the [Python documentation for OpenTelemetry](https://opentelemetry.io/docs/languages/python/).
 
