@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - Add periodic status logging and `status_message_callback` parameter for customization ([#1265](https://github.com/apify/crawlee-python/pull/1265)) ([b992fb2](https://github.com/apify/crawlee-python/commit/b992fb2a457dedd20fc3014d7a4a8afe14602342)) by [@Mantisus](https://github.com/Mantisus), closes [#96](https://github.com/apify/crawlee-python/issues/96)
 - Add crawlee-cli option to skip project installation ([#1294](https://github.com/apify/crawlee-python/pull/1294)) ([4d5aef0](https://github.com/apify/crawlee-python/commit/4d5aef05613d10c1442fe449d1cf0f63392c98e3)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1122](https://github.com/apify/crawlee-python/issues/1122)
 - Improve `Crawlee` CLI help text ([#1297](https://github.com/apify/crawlee-python/pull/1297)) ([afbe10f](https://github.com/apify/crawlee-python/commit/afbe10f15d93353f5bc551bf9f193414179d0dd7)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1295](https://github.com/apify/crawlee-python/issues/1295)
+- Add basic `OpenTelemetry` instrumentation ([#1255](https://github.com/apify/crawlee-python/pull/1255)) ([a92d8b3](https://github.com/apify/crawlee-python/commit/a92d8b3f843ee795bba7e14710bb1faa1fdbf292)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1254](https://github.com/apify/crawlee-python/issues/1254)
 
 ### 🐛 Bug Fixes
 
