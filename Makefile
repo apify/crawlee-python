@@ -34,8 +34,8 @@ unit-tests:
 	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
 
 unit-tests-cov:
-	uv run pytest --numprocesses=1 -vv --cov=src/crawlee tests/unit -m "run_alone"
-	uv run pytest --numprocesses=auto -vv --cov=src/crawlee --cov-append --cov-report=html tests/unit -m "not run_alone"
+	uv run pytest --numprocesses=1 -vv --cov=src/crawlee tests/unit -m "run_alone" --timeout=120
+	uv run pytest --numprocesses=auto -vv --cov=src/crawlee --cov-append --cov-report=html tests/unit -m "not run_alone" --timeout=120
 
 e2e-templates-tests $(args):
 	uv run pytest --numprocesses=$(E2E_TESTS_CONCURRENCY) -vv tests/e2e/project_template "$(args)"
