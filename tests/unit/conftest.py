@@ -175,7 +175,14 @@ def server_url(http_server: TestServer) -> URL:
 @pytest.fixture
 def redirect_http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator[TestServer]:
     """Create and start an HTTP test server."""
-    config = Config(app=app, lifespan='off', loop='asyncio', port=unused_tcp_port_factory())
+    config = Config(
+        app=app,
+        lifespan='off',
+        loop='asyncio',
+        port=unused_tcp_port_factory(),
+        timeout_keep_alive=5,
+        timeout_graceful_shutdown=10,
+    )
     server = TestServer(config=config)
     yield from serve_in_thread(server)
 
