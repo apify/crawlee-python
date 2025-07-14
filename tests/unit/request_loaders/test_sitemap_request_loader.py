@@ -1,6 +1,7 @@
 import base64
 import gzip
 
+import pytest
 from yarl import URL
 
 from crawlee.http_clients._base import HttpClient
@@ -85,6 +86,7 @@ async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL, h
     assert await sitemap_loader.is_finished()
 
 
+@pytest.mark.run_alone
 async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], max_buffer_size=2, http_client=http_client)
