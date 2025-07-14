@@ -12,7 +12,7 @@ async def main() -> None:
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
-        response = context.http_response.read().decode('utf-8')
+        response = (await context.http_response.read()).decode('utf-8')
         context.log.info(f'Response: {response}')  # To see the response in the logs.
 
     # Prepare a POST request to the form endpoint.

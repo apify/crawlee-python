@@ -96,7 +96,7 @@ async def test_common_headers_and_user_agent(server_url: URL, header_network: di
     client = HttpxHttpClient()
 
     response = await client.send_request(str(server_url / 'headers'))
-    response_headers = json.loads(response.read().decode())
+    response_headers = json.loads((await response.read()).decode())
 
     assert 'accept' in response_headers
     assert response_headers['accept'] in get_available_header_values(header_network, {'Accept', 'accept'})
@@ -164,7 +164,7 @@ async def test_stream_error_for_read(http_client: HttpxHttpClient, server_url: U
         assert response.status_code == 200
 
         with pytest.raises(RuntimeError):
-            response.read()
+            await response.read()
 
 
 async def test_send_request_error_for_read_stream(http_client: HttpxHttpClient, server_url: URL) -> None:

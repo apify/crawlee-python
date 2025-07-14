@@ -21,7 +21,7 @@ class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup, Tag]):
 
     @override
     async def parse(self, response: HttpResponse) -> BeautifulSoup:
-        return BeautifulSoup(response.read(), features=self._parser)
+        return BeautifulSoup(await response.read(), features=self._parser)
 
     @override
     async def parse_text(self, text: str) -> BeautifulSoup:

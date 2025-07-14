@@ -139,7 +139,7 @@ async def test_stream_error_for_read(http_client: ImpitHttpClient, server_url: U
         assert response.status_code == 200
 
         with pytest.raises(RuntimeError):
-            response.read()
+            await response.read()
 
 
 async def test_send_request_error_for_read_stream(http_client: ImpitHttpClient, server_url: URL) -> None:
