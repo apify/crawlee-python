@@ -51,7 +51,7 @@ async def main() -> None:
         context.log.info(f'Playwright page title: {playwright_title}')
 
         # Use AI-powered extraction with natural language
-        gemini_title = await page.extract('Extract title page')
+        gemini_title = await page.extract('Extract page title')
         context.log.info(f'Gemini page title: {gemini_title}')
 
         await context.enqueue_links()
