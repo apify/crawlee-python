@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Add crawlee-cli option to skip project installation ([#1294](https://github.com/apify/crawlee-python/pull/1294)) ([4d5aef0](https://github.com/apify/crawlee-python/commit/4d5aef05613d10c1442fe449d1cf0f63392c98e3)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1122](https://github.com/apify/crawlee-python/issues/1122)
 - Improve `Crawlee` CLI help text ([#1297](https://github.com/apify/crawlee-python/pull/1297)) ([afbe10f](https://github.com/apify/crawlee-python/commit/afbe10f15d93353f5bc551bf9f193414179d0dd7)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1295](https://github.com/apify/crawlee-python/issues/1295)
 - Add basic `OpenTelemetry` instrumentation ([#1255](https://github.com/apify/crawlee-python/pull/1255)) ([a92d8b3](https://github.com/apify/crawlee-python/commit/a92d8b3f843ee795bba7e14710bb1faa1fdbf292)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1254](https://github.com/apify/crawlee-python/issues/1254)
+- Add `ImpitHttpClient` http-client client using the `impit` library ([#1151](https://github.com/apify/crawlee-python/pull/1151)) ([0d0d268](https://github.com/apify/crawlee-python/commit/0d0d2681a4379c0e7ba54c49c86dabfef641610f)) by [@Mantisus](https://github.com/Mantisus)
 
 ### 🐛 Bug Fixes
 
