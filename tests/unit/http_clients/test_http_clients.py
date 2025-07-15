@@ -8,7 +8,7 @@ from curl_cffi import CurlHttpVersion
 
 from crawlee import Request
 from crawlee.errors import ProxyError
-from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient
+from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient, ImpitHttpClient
 from crawlee.statistics import Statistics
 from tests.unit.server_endpoints import HELLO_WORLD
 
@@ -33,6 +33,7 @@ async def http_client(request: SubRequest) -> AsyncGenerator[HttpClient]:
     [
         pytest.param(CurlImpersonateHttpClient(http_version=CurlHttpVersion.V1_1), id='curl'),
         pytest.param(HttpxHttpClient(http1=True, http2=False), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
     ],
     indirect=['http_client'],
 )
@@ -46,11 +47,11 @@ async def test_http_1(http_client: HttpClient, server_url: URL) -> None:
     [
         pytest.param(CurlImpersonateHttpClient(http_version=CurlHttpVersion.V2_0), id='curl'),
         pytest.param(HttpxHttpClient(http1=False, http2=True), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
     ],
     indirect=['http_client'],
 )
 async def test_http_2(http_client: HttpClient) -> None:
-    http_client = HttpxHttpClient(http2=True)
     response = await http_client.send_request('https://apify.com/')
     assert response.http_version == 'HTTP/2'
 
@@ -59,8 +60,9 @@ async def test_http_2(http_client: HttpClient) -> None:
 @pytest.mark.parametrize(
     'http_client',
     [
-        pytest.param(CurlImpersonateHttpClient(http_version=CurlHttpVersion.V1_1), id='curl'),
-        pytest.param(HttpxHttpClient(http2=False), id='httpx'),
+        pytest.param(CurlImpersonateHttpClient(), id='curl'),
+        pytest.param(HttpxHttpClient(), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
     ],
     indirect=['http_client'],
 )
@@ -82,8 +84,9 @@ async def test_crawl_with_proxy(
 @pytest.mark.parametrize(
     'http_client',
     [
-        pytest.param(CurlImpersonateHttpClient(http_version=CurlHttpVersion.V1_1), id='curl'),
-        pytest.param(HttpxHttpClient(http2=False), id='httpx'),
+        pytest.param(CurlImpersonateHttpClient(), id='curl'),
+        pytest.param(HttpxHttpClient(), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
     ],
     indirect=['http_client'],
 )
@@ -103,8 +106,9 @@ async def test_crawl_with_proxy_disabled(
 @pytest.mark.parametrize(
     'http_client',
     [
-        pytest.param(CurlImpersonateHttpClient(http_version=CurlHttpVersion.V1_1), id='curl'),
-        pytest.param(HttpxHttpClient(http2=False), id='httpx'),
+        pytest.param(CurlImpersonateHttpClient(), id='curl'),
+        pytest.param(HttpxHttpClient(), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
     ],
     indirect=['http_client'],
 )
@@ -123,8 +127,9 @@ async def test_send_request_with_proxy(
 @pytest.mark.parametrize(
     'http_client',
     [
-        pytest.param(CurlImpersonateHttpClient(http_version=CurlHttpVersion.V1_1), id='curl'),
-        pytest.param(HttpxHttpClient(http2=False), id='httpx'),
+        pytest.param(CurlImpersonateHttpClient(), id='curl'),
+        pytest.param(HttpxHttpClient(), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
     ],
     indirect=['http_client'],
 )
@@ -141,8 +146,9 @@ async def test_send_request_with_proxy_disabled(
 @pytest.mark.parametrize(
     'http_client',
     [
-        pytest.param(CurlImpersonateHttpClient(http_version=CurlHttpVersion.V1_1), id='curl'),
-        pytest.param(HttpxHttpClient(http2=False), id='httpx'),
+        pytest.param(CurlImpersonateHttpClient(), id='curl'),
+        pytest.param(HttpxHttpClient(), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
     ],
     indirect=['http_client'],
 )
@@ -159,8 +165,9 @@ async def test_crawl_allow_redirects_by_default(http_client: HttpClient, server_
 @pytest.mark.parametrize(
     'http_client',
     [
-        pytest.param(CurlImpersonateHttpClient(allow_redirects=False, http_version=CurlHttpVersion.V1_1), id='curl'),
-        pytest.param(HttpxHttpClient(follow_redirects=False, http2=False), id='httpx'),
+        pytest.param(CurlImpersonateHttpClient(allow_redirects=False), id='curl'),
+        pytest.param(HttpxHttpClient(follow_redirects=False), id='httpx'),
+        pytest.param(ImpitHttpClient(follow_redirects=False), id='impit'),
     ],
     indirect=['http_client'],
 )
@@ -179,8 +186,9 @@ async def test_crawl_allow_redirects_false(http_client: HttpClient, server_url: 
 @pytest.mark.parametrize(
     'http_client',
     [
-        pytest.param(CurlImpersonateHttpClient(http_version=CurlHttpVersion.V1_1), id='curl'),
-        pytest.param(HttpxHttpClient(http2=False), id='httpx'),
+        pytest.param(CurlImpersonateHttpClient(), id='curl'),
+        pytest.param(HttpxHttpClient(), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
     ],
     indirect=['http_client'],
 )
@@ -198,6 +206,7 @@ async def test_send_request_allow_redirects_by_default(http_client: HttpClient, 
     [
         pytest.param(CurlImpersonateHttpClient(allow_redirects=False, http_version=CurlHttpVersion.V1_1), id='curl'),
         pytest.param(HttpxHttpClient(follow_redirects=False, http2=False), id='httpx'),
+        pytest.param(ImpitHttpClient(follow_redirects=False), id='impit'),
     ],
     indirect=['http_client'],
 )
@@ -214,8 +223,9 @@ async def test_send_request_allow_redirects_false(http_client: HttpClient, serve
 @pytest.mark.parametrize(
     'http_client',
     [
-        pytest.param(CurlImpersonateHttpClient(allow_redirects=False, http_version=CurlHttpVersion.V1_1), id='curl'),
-        pytest.param(HttpxHttpClient(follow_redirects=False, http2=False), id='httpx'),
+        pytest.param(CurlImpersonateHttpClient(), id='curl'),
+        pytest.param(HttpxHttpClient(), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
     ],
     indirect=['http_client'],
 )
@@ -233,8 +243,9 @@ async def test_stream(http_client: HttpClient, server_url: URL) -> None:
 @pytest.mark.parametrize(
     'http_client',
     [
-        pytest.param(CurlImpersonateHttpClient(allow_redirects=False, http_version=CurlHttpVersion.V1_1), id='curl'),
-        pytest.param(HttpxHttpClient(follow_redirects=False, http2=False), id='httpx'),
+        pytest.param(CurlImpersonateHttpClient(), id='curl'),
+        pytest.param(HttpxHttpClient(), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
     ],
     indirect=['http_client'],
 )
@@ -254,8 +265,9 @@ async def test_stream_error_double_read_stream(http_client: HttpClient, server_u
 @pytest.mark.parametrize(
     'http_client',
     [
-        pytest.param(CurlImpersonateHttpClient(allow_redirects=False, http_version=CurlHttpVersion.V1_1), id='curl'),
-        pytest.param(HttpxHttpClient(follow_redirects=False, http2=False), id='httpx'),
+        pytest.param(CurlImpersonateHttpClient(), id='curl'),
+        pytest.param(HttpxHttpClient(), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
     ],
     indirect=['http_client'],
 )
@@ -270,8 +282,9 @@ async def test_stream_error_for_read(http_client: HttpClient, server_url: URL) -
 @pytest.mark.parametrize(
     'http_client',
     [
-        pytest.param(CurlImpersonateHttpClient(allow_redirects=False, http_version=CurlHttpVersion.V1_1), id='curl'),
-        pytest.param(HttpxHttpClient(follow_redirects=False, http2=False), id='httpx'),
+        pytest.param(CurlImpersonateHttpClient(), id='curl'),
+        pytest.param(HttpxHttpClient(), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
     ],
     indirect=['http_client'],
 )
@@ -286,8 +299,9 @@ async def test_send_request_error_for_read_stream(http_client: HttpClient, serve
 @pytest.mark.parametrize(
     'http_client',
     [
-        pytest.param(CurlImpersonateHttpClient(allow_redirects=False, http_version=CurlHttpVersion.V1_1), id='curl'),
-        pytest.param(HttpxHttpClient(follow_redirects=False, http2=False), id='httpx'),
+        pytest.param(CurlImpersonateHttpClient(), id='curl'),
+        pytest.param(HttpxHttpClient(), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
     ],
     indirect=['http_client'],
 )
@@ -303,8 +317,9 @@ async def test_send_crawl_error_for_read_stream(http_client: HttpClient, server_
 @pytest.mark.parametrize(
     'http_client',
     [
-        pytest.param(CurlImpersonateHttpClient(allow_redirects=False, http_version=CurlHttpVersion.V1_1), id='curl'),
-        pytest.param(HttpxHttpClient(follow_redirects=False, http2=False), id='httpx'),
+        pytest.param(CurlImpersonateHttpClient(), id='curl'),
+        pytest.param(HttpxHttpClient(), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
     ],
 )
 async def test_reuse_context_manager(http_client: HttpClient, server_url: URL) -> None:
@@ -322,8 +337,9 @@ async def test_reuse_context_manager(http_client: HttpClient, server_url: URL) -
 @pytest.mark.parametrize(
     'http_client',
     [
-        pytest.param(CurlImpersonateHttpClient(allow_redirects=False, http_version=CurlHttpVersion.V1_1), id='curl'),
-        pytest.param(HttpxHttpClient(follow_redirects=False, http2=False), id='httpx'),
+        pytest.param(CurlImpersonateHttpClient(), id='curl'),
+        pytest.param(HttpxHttpClient(), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
     ],
     indirect=['http_client'],
 )
@@ -337,3 +353,23 @@ async def test_work_after_cleanup(http_client: HttpClient, server_url: URL) -> N
     # After cleanup, the client should still work
     response = await http_client.send_request(str(server_url))
     assert response.status_code == 200
+
+
+@pytest.mark.parametrize(
+    'http_client',
+    [
+        pytest.param(CurlImpersonateHttpClient(), id='curl'),
+        pytest.param(HttpxHttpClient(), id='httpx'),
+        pytest.param(ImpitHttpClient(), id='impit'),
+    ],
+    indirect=['http_client'],
+)
+async def test_compressed_chunked_stream(http_client: HttpClient, server_url: URL) -> None:
+    content_body: bytes = b''
+
+    async with http_client.stream(str(server_url / 'get_compressed')) as response:
+        assert response.status_code == 200
+        async for chunk in response.read_stream():
+            content_body += chunk
+
+    assert content_body == HELLO_WORLD * 1000

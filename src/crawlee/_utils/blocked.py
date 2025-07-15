@@ -21,6 +21,8 @@ ROTATE_PROXY_ERRORS = [
     'ERR_PROXY_CONNECTION_FAILED',
     'ERR_TUNNEL_CONNECTION_FAILED',
     'Proxy responded with',
+    'unsuccessful tunnel',
+    'TunnelUnsuccessful',
 ]
 """
 Content of proxy errors that should trigger a retry, as the proxy is likely getting blocked / is malfunctioning.
