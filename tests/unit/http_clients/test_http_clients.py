@@ -8,7 +8,7 @@ from curl_cffi import CurlHttpVersion
 
 from crawlee import Request
 from crawlee.errors import ProxyError
-from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient, ImpitHttpClient
+from crawlee.http_clients import CurlImpersonateHttpClient, HttpClient, HttpxHttpClient, ImpitHttpClient
 from crawlee.statistics import Statistics
 from tests.unit.server_endpoints import HELLO_WORLD
 
@@ -18,14 +18,25 @@ if TYPE_CHECKING:
     from _pytest.fixtures import SubRequest
     from yarl import URL
 
-    from crawlee.http_clients import HttpClient
     from crawlee.proxy_configuration import ProxyInfo
+
+_DEFAULT_CLIENTS = [
+    pytest.param(CurlImpersonateHttpClient, id='curl'),
+    pytest.param(HttpxHttpClient, id='httpx'),
+    pytest.param(ImpitHttpClient, id='impit'),
+]
 
 
 @pytest.fixture
 async def http_client(request: SubRequest) -> AsyncGenerator[HttpClient]:
-    async with request.param as client:
-        yield client
+    """Helper fixture to reduce code duplication.
+
+    If clients are not initialized, create their default instances.
+    Return client in active context, leave the context after the test."""
+
+    client = request.param if isinstance(request.param, HttpClient) else request.param()
+    async with client as _:
+        yield _
 
 
 @pytest.mark.parametrize(
@@ -59,11 +70,7 @@ async def test_http_2(http_client: HttpClient) -> None:
 @pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 @pytest.mark.parametrize(
     'http_client',
-    [
-        pytest.param(CurlImpersonateHttpClient(), id='curl'),
-        pytest.param(HttpxHttpClient(), id='httpx'),
-        pytest.param(ImpitHttpClient(), id='impit'),
-    ],
+    _DEFAULT_CLIENTS,
     indirect=['http_client'],
 )
 async def test_crawl_with_proxy(
@@ -83,11 +90,7 @@ async def test_crawl_with_proxy(
 @pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 @pytest.mark.parametrize(
     'http_client',
-    [
-        pytest.param(CurlImpersonateHttpClient(), id='curl'),
-        pytest.param(HttpxHttpClient(), id='httpx'),
-        pytest.param(ImpitHttpClient(), id='impit'),
-    ],
+    _DEFAULT_CLIENTS,
     indirect=['http_client'],
 )
 async def test_crawl_with_proxy_disabled(
@@ -105,11 +108,7 @@ async def test_crawl_with_proxy_disabled(
 @pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 @pytest.mark.parametrize(
     'http_client',
-    [
-        pytest.param(CurlImpersonateHttpClient(), id='curl'),
-        pytest.param(HttpxHttpClient(), id='httpx'),
-        pytest.param(ImpitHttpClient(), id='impit'),
-    ],
+    _DEFAULT_CLIENTS,
     indirect=['http_client'],
 )
 async def test_send_request_with_proxy(
@@ -126,11 +125,7 @@ async def test_send_request_with_proxy(
 @pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 @pytest.mark.parametrize(
     'http_client',
-    [
-        pytest.param(CurlImpersonateHttpClient(), id='curl'),
-        pytest.param(HttpxHttpClient(), id='httpx'),
-        pytest.param(ImpitHttpClient(), id='impit'),
-    ],
+    _DEFAULT_CLIENTS,
     indirect=['http_client'],
 )
 async def test_send_request_with_proxy_disabled(
@@ -145,11 +140,7 @@ async def test_send_request_with_proxy_disabled(
 
 @pytest.mark.parametrize(
     'http_client',
-    [
-        pytest.param(CurlImpersonateHttpClient(), id='curl'),
-        pytest.param(HttpxHttpClient(), id='httpx'),
-        pytest.param(ImpitHttpClient(), id='impit'),
-    ],
+    _DEFAULT_CLIENTS,
     indirect=['http_client'],
 )
 async def test_crawl_allow_redirects_by_default(http_client: HttpClient, server_url: URL) -> None:
@@ -185,11 +176,7 @@ async def test_crawl_allow_redirects_false(http_client: HttpClient, server_url: 
 
 @pytest.mark.parametrize(
     'http_client',
-    [
-        pytest.param(CurlImpersonateHttpClient(), id='curl'),
-        pytest.param(HttpxHttpClient(), id='httpx'),
-        pytest.param(ImpitHttpClient(), id='impit'),
-    ],
+    _DEFAULT_CLIENTS,
     indirect=['http_client'],
 )
 async def test_send_request_allow_redirects_by_default(http_client: HttpClient, server_url: URL) -> None:
@@ -204,8 +191,8 @@ async def test_send_request_allow_redirects_by_default(http_client: HttpClient, 
 @pytest.mark.parametrize(
     'http_client',
     [
-        pytest.param(CurlImpersonateHttpClient(allow_redirects=False, http_version=CurlHttpVersion.V1_1), id='curl'),
-        pytest.param(HttpxHttpClient(follow_redirects=False, http2=False), id='httpx'),
+        pytest.param(CurlImpersonateHttpClient(allow_redirects=False), id='curl'),
+        pytest.param(HttpxHttpClient(follow_redirects=False), id='httpx'),
         pytest.param(ImpitHttpClient(follow_redirects=False), id='impit'),
     ],
     indirect=['http_client'],
@@ -222,11 +209,7 @@ async def test_send_request_allow_redirects_false(http_client: HttpClient, serve
 
 @pytest.mark.parametrize(
     'http_client',
-    [
-        pytest.param(CurlImpersonateHttpClient(), id='curl'),
-        pytest.param(HttpxHttpClient(), id='httpx'),
-        pytest.param(ImpitHttpClient(), id='impit'),
-    ],
+    _DEFAULT_CLIENTS,
     indirect=['http_client'],
 )
 async def test_stream(http_client: HttpClient, server_url: URL) -> None:
@@ -242,11 +225,7 @@ async def test_stream(http_client: HttpClient, server_url: URL) -> None:
 
 @pytest.mark.parametrize(
     'http_client',
-    [
-        pytest.param(CurlImpersonateHttpClient(), id='curl'),
-        pytest.param(HttpxHttpClient(), id='httpx'),
-        pytest.param(ImpitHttpClient(), id='impit'),
-    ],
+    _DEFAULT_CLIENTS,
     indirect=['http_client'],
 )
 async def test_stream_error_double_read_stream(http_client: HttpClient, server_url: URL) -> None:
@@ -264,11 +243,7 @@ async def test_stream_error_double_read_stream(http_client: HttpClient, server_u
 
 @pytest.mark.parametrize(
     'http_client',
-    [
-        pytest.param(CurlImpersonateHttpClient(), id='curl'),
-        pytest.param(HttpxHttpClient(), id='httpx'),
-        pytest.param(ImpitHttpClient(), id='impit'),
-    ],
+    _DEFAULT_CLIENTS,
     indirect=['http_client'],
 )
 async def test_stream_error_for_read(http_client: HttpClient, server_url: URL) -> None:
@@ -281,11 +256,7 @@ async def test_stream_error_for_read(http_client: HttpClient, server_url: URL) -
 
 @pytest.mark.parametrize(
     'http_client',
-    [
-        pytest.param(CurlImpersonateHttpClient(), id='curl'),
-        pytest.param(HttpxHttpClient(), id='httpx'),
-        pytest.param(ImpitHttpClient(), id='impit'),
-    ],
+    _DEFAULT_CLIENTS,
     indirect=['http_client'],
 )
 async def test_send_request_error_for_read_stream(http_client: HttpClient, server_url: URL) -> None:
@@ -298,11 +269,7 @@ async def test_send_request_error_for_read_stream(http_client: HttpClient, serve
 
 @pytest.mark.parametrize(
     'http_client',
-    [
-        pytest.param(CurlImpersonateHttpClient(), id='curl'),
-        pytest.param(HttpxHttpClient(), id='httpx'),
-        pytest.param(ImpitHttpClient(), id='impit'),
-    ],
+    _DEFAULT_CLIENTS,
     indirect=['http_client'],
 )
 async def test_send_crawl_error_for_read_stream(http_client: HttpClient, server_url: URL) -> None:
@@ -323,7 +290,6 @@ async def test_send_crawl_error_for_read_stream(http_client: HttpClient, server_
     ],
 )
 async def test_reuse_context_manager(http_client: HttpClient, server_url: URL) -> None:
-    http_client = CurlImpersonateHttpClient()
     async with http_client:
         response = await http_client.send_request(str(server_url))
         assert response.status_code == 200
@@ -336,11 +302,7 @@ async def test_reuse_context_manager(http_client: HttpClient, server_url: URL) -
 
 @pytest.mark.parametrize(
     'http_client',
-    [
-        pytest.param(CurlImpersonateHttpClient(), id='curl'),
-        pytest.param(HttpxHttpClient(), id='httpx'),
-        pytest.param(ImpitHttpClient(), id='impit'),
-    ],
+    _DEFAULT_CLIENTS,
     indirect=['http_client'],
 )
 async def test_work_after_cleanup(http_client: HttpClient, server_url: URL) -> None:
@@ -357,11 +319,7 @@ async def test_work_after_cleanup(http_client: HttpClient, server_url: URL) -> N
 
 @pytest.mark.parametrize(
     'http_client',
-    [
-        pytest.param(CurlImpersonateHttpClient(), id='curl'),
-        pytest.param(HttpxHttpClient(), id='httpx'),
-        pytest.param(ImpitHttpClient(), id='impit'),
-    ],
+    _DEFAULT_CLIENTS,
     indirect=['http_client'],
 )
 async def test_compressed_chunked_stream(http_client: HttpClient, server_url: URL) -> None:
