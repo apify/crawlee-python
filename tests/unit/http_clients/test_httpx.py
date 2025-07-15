@@ -24,6 +24,10 @@ async def http_client() -> AsyncGenerator[HttpClient]:
 
 
 async def test_common_headers_and_user_agent(server_url: URL, header_network: dict) -> None:
+    """Test that the relevant headers use header values from header generator instead of default Https headers.
+
+    Httpx uses own headers by default which is not desired as it could increase blocking chances.
+    """
     client = HttpxHttpClient()
 
     response = await client.send_request(str(server_url / 'headers'))
