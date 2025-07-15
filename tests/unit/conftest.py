@@ -14,7 +14,7 @@ from uvicorn.config import Config
 
 from crawlee import service_locator
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_network
-from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient
+from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient, ImpitHttpClient
 from crawlee.proxy_configuration import ProxyInfo
 from crawlee.storages import KeyValueStore
 from tests.unit.server import TestServer, app, serve_in_thread
@@ -175,7 +175,16 @@ def server_url(http_server: TestServer) -> URL:
 @pytest.fixture
 def redirect_http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator[TestServer]:
     """Create and start an HTTP test server."""
-    config = Config(app=app, lifespan='off', loop='asyncio', port=unused_tcp_port_factory())
+    config = Config(
+        app=app,
+        lifespan='off',
+        loop='asyncio',
+        port=unused_tcp_port_factory(),
+        limit_max_requests=100,
+        timeout_graceful_shutdown=10,
+        log_level='error',
+        access_log=False,
+    )
     server = TestServer(config=config)
     yield from serve_in_thread(server)
 
@@ -190,9 +199,12 @@ def redirect_server_url(redirect_http_server: TestServer) -> URL:
     params=[
         pytest.param('curl', id='curl'),
         pytest.param('httpx', id='httpx'),
+        pytest.param('impit', id='impit'),
     ]
 )
 async def http_client(request: pytest.FixtureRequest) -> HttpClient:
     if request.param == 'curl':
         return CurlImpersonateHttpClient(http_version=CurlHttpVersion.V1_1)
+    if request.param == 'impit':
+        return ImpitHttpClient(http3=False)
     return HttpxHttpClient(http2=False)

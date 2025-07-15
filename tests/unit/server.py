@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import gzip
 import json
+import sys
 import threading
 import time
 from collections.abc import Awaitable, Callable, Coroutine, Iterator
@@ -116,6 +118,7 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         'json': hello_world_json,
         'xml': hello_world_xml,
         'robots.txt': robots_txt,
+        'get_compressed': get_compressed,
     }
     path = URL(scope['path']).parts[1]
     # Route requests to appropriate handlers
@@ -385,6 +388,19 @@ async def robots_txt(_scope: dict[str, Any], _receive: Receive, send: Send) -> N
     await send_html_response(send, ROBOTS_TXT)
 
 
+async def get_compressed(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Return large gzip compressed content."""
+
+    await send(
+        {
+            'type': 'http.response.start',
+            'status': 200,
+            'headers': [[b'content-encoding', b'gzip']],
+        }
+    )
+    await send({'type': 'http.response.body', 'body': gzip.compress(HELLO_WORLD * 1000)})
+
+
 class TestServer(Server):
     """A test HTTP server implementation based on Uvicorn Server."""
 
@@ -438,6 +454,14 @@ class TestServer(Server):
             self.restart_requested.clear()
             await self.shutdown()
             await self.startup()
+
+    def run(self, sockets: list[socket] | None = None) -> None:
+        """Run the server."""
+        # Set the event loop policy in thread with server for Windows and Python 3.12+.
+        # This is necessary because there are problems with closing connections when using `ProactorEventLoop`
+        if sys.version_info >= (3, 12) and sys.platform == 'win32':
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        super().run(sockets=sockets)
 
 
 def serve_in_thread(server: TestServer) -> Iterator[TestServer]:
