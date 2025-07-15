@@ -11,12 +11,14 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
 import BsCurlImpersonateExample from '!!raw-loader!roa-loader!./code_examples/http_clients/curl_impersonate_example.py';
 import BsHttpxExample from '!!raw-loader!roa-loader!./code_examples/http_clients/httpx_example.py';
+import BsImpitExample from '!!raw-loader!roa-loader!./code_examples/http_clients/impit_example.py';
+
 
 HTTP clients are utilized by the HTTP-based crawlers (e.g. <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>) to communicate with web servers. They use external HTTP libraries for communication, rather than a browser. Examples of such libraries include [httpx](https://pypi.org/project/httpx/), [aiohttp](https://pypi.org/project/aiohttp/) or [curl-cffi](https://pypi.org/project/curl-cffi/). After retrieving page content, an HTML parsing library is typically used to facilitate data extraction. Examples of such libraries are [beautifulsoup](https://pypi.org/project/beautifulsoup4/), [parsel](https://pypi.org/project/parsel/), [selectolax](https://pypi.org/project/selectolax/) or [pyquery](https://pypi.org/project/pyquery/). These crawlers are faster than browser-based crawlers but they cannot execute client-side JavaScript.
 
 ## How to switch between HTTP clients
 
-In Crawlee we currently have two HTTP clients: <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>, which uses the `httpx` library, and <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, which uses the `curl-cffi` library. You can switch between them by setting the `http_client` parameter in the Crawler class. The default HTTP client is <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>. Below are examples of how to set the HTTP client for the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>.
+In Crawlee we currently have three HTTP clients: <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>, which uses the `httpx` library, <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, which uses the `curl-cffi` library, and <ApiLink to="class/ImpitHttpClient">`ImpitHttpClient`</ApiLink>, which uses the `impit` library. You can switch between them by setting the `http_client` parameter in the Crawler class. The default HTTP client is <ApiLink to="class/ImpitHttpClient">`ImpitHttpClient`</ApiLink>. Below are examples of how to set the HTTP client for the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>.
 
 <Tabs>
     <TabItem value="BeautifulSoupHttpxExample" label="BeautifulSoupCrawler with HTTPX">
@@ -29,11 +31,24 @@ In Crawlee we currently have two HTTP clients: <ApiLink to="class/HttpxHttpClien
             {BsCurlImpersonateExample}
         </RunnableCodeBlock>
     </TabItem>
+    <TabItem value="BeautifulSoupImpitExample" label="BeautifulSoupCrawler with Impit">
+        <RunnableCodeBlock className="language-python" language="python">
+            {BsImpitExample}
+        </RunnableCodeBlock>
+    </TabItem>
 </Tabs>
 
 ### Installation
 
-Since <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink> is the default HTTP client, you don't need to install additional packages to use it. If you want to use <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, you need to install `crawlee` with the `curl-impersonate` extra.
+Since <ApiLink to="class/ImpitHttpClient">`ImpitHttpClient`</ApiLink> is the default HTTP client, you don't need to install additional packages to use it. If you want to use <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>, you need to install `crawlee` with the `httpx` extra. If you want to use <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, you need to install `crawlee` with the `curl-impersonate` extra.
+
+for HttpxHttpClient
+
+```sh
+python -m pip install 'crawlee[httpx]'
+```
+
+for CurlImpersonateHttpClient
 
 ```sh
 python -m pip install 'crawlee[curl-impersonate]'

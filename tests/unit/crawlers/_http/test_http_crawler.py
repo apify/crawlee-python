@@ -512,7 +512,16 @@ async def test_store_complex_cookies(server_url: URL) -> None:
             'http_only': False,
         }
 
+        # Some clients may ignore `.` at the beginning of the domain
+        # https://www.rfc-editor.org/rfc/rfc6265#section-4.1.2.3
         assert session_cookies_dict['domain'] == {
+            'name': 'domain',
+            'value': '6',
+            'domain': {server_url.host},
+            'path': '/',
+            'secure': False,
+            'http_only': False,
+        } or {
             'name': 'domain',
             'value': '6',
             'domain': f'.{server_url.host}',

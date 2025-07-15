@@ -56,7 +56,7 @@ from crawlee.errors import (
     UserDefinedErrorHandlerError,
 )
 from crawlee.events._types import Event, EventCrawlerStatusData
-from crawlee.http_clients import HttpxHttpClient
+from crawlee.http_clients import ImpitHttpClient
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics, StatisticsState
@@ -368,7 +368,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             set(ignore_http_error_status_codes) if ignore_http_error_status_codes else set()
         )
 
-        self._http_client = http_client or HttpxHttpClient()
+        self._http_client = http_client or ImpitHttpClient()
 
         # Request router setup
         self._router: Router[TCrawlingContext] | None = None
