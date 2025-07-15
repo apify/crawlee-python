@@ -4,6 +4,7 @@ import asyncio
 import base64
 import gzip
 import json
+import sys
 import threading
 import time
 from collections.abc import Awaitable, Callable, Coroutine, Iterator
@@ -453,6 +454,12 @@ class TestServer(Server):
             self.restart_requested.clear()
             await self.shutdown()
             await self.startup()
+
+    def run(self, sockets: list[socket] | None = None) -> None:
+        """Run the server in a separate thread."""
+        if sys.version_info >= (3, 12) and sys.platform == 'win32':
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        super().run(sockets=sockets)
 
 
 def serve_in_thread(server: TestServer) -> Iterator[TestServer]:

@@ -180,11 +180,8 @@ def redirect_http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator
         lifespan='off',
         loop='asyncio',
         port=unused_tcp_port_factory(),
-        timeout_keep_alive=1,
         limit_max_requests=100,
-        timeout_graceful_shutdown=5,
-        workers=1,
-        backlog=1024,
+        timeout_graceful_shutdown=10,
         log_level='error',
         access_log=False,
     )

@@ -208,7 +208,7 @@ known-first-party = ["crawlee"]
 addopts = "-ra"
 asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
-timeout = 1200
+timeout = 300
 markers = [
     "run_alone: marks tests that must run in isolation",
 ]
