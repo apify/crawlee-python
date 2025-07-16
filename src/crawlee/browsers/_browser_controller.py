@@ -5,6 +5,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
+from crawlee._utils.docs import docs_group
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from datetime import datetime, timedelta
@@ -15,6 +17,7 @@ if TYPE_CHECKING:
     from crawlee.proxy_configuration import ProxyInfo
 
 
+@docs_group('Browser management')
 class BrowserController(ABC):
     """An abstract base class for managing browser instance and their pages."""
 

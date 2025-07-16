@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-@docs_group('Classes')
+@docs_group('Browser management')
 class BrowserPool:
     """Manage a pool of browsers and pages, handling their lifecycle and resource allocation.
 

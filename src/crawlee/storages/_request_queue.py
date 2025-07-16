@@ -28,7 +28,7 @@ logger = getLogger(__name__)
 T = TypeVar('T')
 
 
-@docs_group('Classes')
+@docs_group('Storages')
 class RequestQueue(Storage, RequestManager):
     """Request queue is a storage for managing HTTP requests.
 

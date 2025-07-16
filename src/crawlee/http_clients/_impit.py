@@ -67,7 +67,7 @@ class _ImpitResponse:
                 yield chunk
 
 
-@docs_group('Classes')
+@docs_group('HTTP clients')
 class ImpitHttpClient(HttpClient):
     """HTTP client based on the `impit` library.
 

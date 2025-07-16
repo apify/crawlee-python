@@ -22,7 +22,7 @@ def fingerprint_browser_type_from_playwright_browser_type(
     raise ValueError(f'Unsupported browser type: {playwright_browser_type}')
 
 
-@docs_group('Classes')
+@docs_group('Others')
 class HeaderGenerator:
     """Generate realistic looking or browser-like HTTP headers."""
 

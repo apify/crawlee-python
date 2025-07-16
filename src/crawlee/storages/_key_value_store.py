@@ -35,7 +35,7 @@ class AutosavedValue(RootModel):
     root: dict[str, JsonSerializable]
 
 
-@docs_group('Classes')
+@docs_group('Storages')
 class KeyValueStore(Storage):
     """Key-value store is a storage for reading and writing data records with unique key identifiers.
 

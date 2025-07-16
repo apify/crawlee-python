@@ -15,13 +15,13 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpResponse
 
 
-@docs_group('Abstract classes')
+@docs_group('HTTP parsers')
 class AbstractHttpParser(Generic[TParseResult, TSelectResult], ABC):
-    """Parser used for parsing http response and inspecting parsed result to find links or detect blocking."""
+    """Parser used for parsing HTTP response and inspecting parsed result to find links or detect blocking."""
 
     @abstractmethod
     async def parse(self, response: HttpResponse) -> TParseResult:
-        """Parse http response.
+        """Parse HTTP response.
 
         Args:
             response: HTTP response to be parsed.

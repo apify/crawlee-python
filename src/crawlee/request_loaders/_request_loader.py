@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from crawlee.storage_clients.models import ProcessedRequest
 
 
-@docs_group('Abstract classes')
+@docs_group('Request loaders')
 class RequestLoader(ABC):
     """An abstract class defining the interface for classes that provide access to a read-only stream of requests.
 

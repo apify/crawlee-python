@@ -3,7 +3,26 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Literal, TypeVar
 
-GroupName = Literal['Classes', 'Abstract classes', 'Data structures', 'Event payloads', 'Errors', 'Functions']
+GroupName = Literal[
+    'Autoscaling',
+    'Browser management',
+    'Configuration',
+    'Crawlers',
+    'Crawling contexts',
+    'Errors',
+    'Event data',
+    'Event managers',
+    'Functions',
+    'HTTP clients',
+    'HTTP parsers',
+    'Others',
+    'Request loaders',
+    'Session management',
+    'Statistics',
+    'Storage clients',
+    'Storage data',
+    'Storages',
+]
 
 T = TypeVar('T', bound=Callable[..., Any])
 

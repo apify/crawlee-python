@@ -11,7 +11,7 @@ from ._key_value_store_client import FileSystemKeyValueStoreClient
 from ._request_queue_client import FileSystemRequestQueueClient
 
 
-@docs_group('Classes')
+@docs_group('Storage clients')
 class FileSystemStorageClient(StorageClient):
     """File system implementation of the storage client.
 

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-@docs_group('Data structures')
+@docs_group('Session management')
 class Session:
     """Represent a single user session, managing cookies, error states, and usage limits.
 

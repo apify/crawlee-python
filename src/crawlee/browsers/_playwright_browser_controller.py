@@ -27,7 +27,7 @@ from logging import getLogger
 logger = getLogger(__name__)
 
 
-@docs_group('Classes')
+@docs_group('Browser management')
 class PlaywrightBrowserController(BrowserController):
     """Controller for managing Playwright browser instances and their pages.
 

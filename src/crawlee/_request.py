@@ -138,7 +138,7 @@ class RequestOptions(TypedDict):
     no_retry: NotRequired[bool]
 
 
-@docs_group('Data structures')
+@docs_group('Storage data')
 class Request(BaseModel):
     """Represents a request in the Crawlee framework, containing the necessary information for crawling operations.
 

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
+from crawlee._utils.docs import docs_group
 from crawlee.crawlers._abstract_http import AbstractHttpParser
 from crawlee.crawlers._types import BlockedInfo
 
@@ -13,10 +14,12 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpResponse
 
 
+@docs_group('HTTP parsers')
 class NoParser(AbstractHttpParser[bytes, bytes]):
-    """Dummy parser for backwards compatibility.
+    """A no-op parser that returns raw response content without any processing.
 
-    To enable using `HttpCrawler` without need for additional specific parser.
+    This is useful when you only need the raw response data and don't require HTML
+    parsing, link extraction, or content selection functionality.
     """
 
     @override

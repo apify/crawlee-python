@@ -29,7 +29,7 @@ class AdaptiveContextError(RuntimeError):
 
 
 @dataclass(frozen=True)
-@docs_group('Data structures')
+@docs_group('Crawling contexts')
 class AdaptivePlaywrightCrawlingContext(
     Generic[TStaticParseResult, TStaticSelectResult], ParsedHttpCrawlingContext[TStaticParseResult]
 ):
@@ -200,7 +200,7 @@ class AdaptivePlaywrightCrawlingContext(
 
 
 @dataclass(frozen=True)
-@docs_group('Data structures')
+@docs_group('Crawling contexts')
 class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
     """A wrapper around BasicCrawlingContext or AdaptivePlaywrightCrawlingContext.
 

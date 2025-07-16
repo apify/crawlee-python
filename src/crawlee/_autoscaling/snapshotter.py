@@ -28,7 +28,7 @@ logger = getLogger(__name__)
 T = TypeVar('T')
 
 
-@docs_group('Classes')
+@docs_group('Autoscaling')
 class Snapshotter:
     """Monitors and logs system resource usage at predefined intervals for performance optimization.
 

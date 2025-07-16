@@ -65,7 +65,7 @@ def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
     return dict(sorted_headers)
 
 
-@docs_group('Data structures')
+@docs_group('Others')
 class HttpHeaders(RootModel, Mapping[str, str]):
     """A dictionary-like object representing HTTP headers."""
 
@@ -103,7 +103,7 @@ class HttpHeaders(RootModel, Mapping[str, str]):
         return len(self.root)
 
 
-@docs_group('Data structures')
+@docs_group('Configuration')
 class ConcurrencySettings:
     """Concurrency settings for AutoscaledPool."""
 
@@ -507,7 +507,7 @@ class SendRequestFunction(Protocol):
         """
 
 
-@docs_group('Data structures')
+@docs_group('Others')
 @dataclasses.dataclass
 class PageSnapshot:
     """Snapshot of a crawled page."""
@@ -547,7 +547,7 @@ class UseStateFunction(Protocol):
 
 
 @dataclass(frozen=True)
-@docs_group('Data structures')
+@docs_group('Crawling contexts')
 class BasicCrawlingContext:
     """Basic crawling context.
 
