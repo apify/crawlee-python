@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Improve `Crawlee` CLI help text ([#1297](https://github.com/apify/crawlee-python/pull/1297)) ([afbe10f](https://github.com/apify/crawlee-python/commit/afbe10f15d93353f5bc551bf9f193414179d0dd7)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1295](https://github.com/apify/crawlee-python/issues/1295)
 - Add basic `OpenTelemetry` instrumentation ([#1255](https://github.com/apify/crawlee-python/pull/1255)) ([a92d8b3](https://github.com/apify/crawlee-python/commit/a92d8b3f843ee795bba7e14710bb1faa1fdbf292)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1254](https://github.com/apify/crawlee-python/issues/1254)
 - Add `ImpitHttpClient` http-client client using the `impit` library ([#1151](https://github.com/apify/crawlee-python/pull/1151)) ([0d0d268](https://github.com/apify/crawlee-python/commit/0d0d2681a4379c0e7ba54c49c86dabfef641610f)) by [@Mantisus](https://github.com/Mantisus)
+- Prevent overloading system memory when running locally ([#1270](https://github.com/apify/crawlee-python/pull/1270)) ([30de3bd](https://github.com/apify/crawlee-python/commit/30de3bd7722cbc34db9fc582b4bda7dc2dfa90ff)) by [@janbuchar](https://github.com/janbuchar), closes [#1232](https://github.com/apify/crawlee-python/issues/1232)
 
 ### 🐛 Bug Fixes
 
