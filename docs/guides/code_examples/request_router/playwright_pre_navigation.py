@@ -44,12 +44,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def default_handler(context: PlaywrightCrawlingContext) -> None:
-        # Wait for page to load
-        await context.page.wait_for_load_state('networkidle')
-
-        # Extract page title
         title = await context.page.title()
-
         await context.push_data(
             {
                 'url': context.request.url,
@@ -57,7 +52,7 @@ async def main() -> None:
             }
         )
 
-    await crawler.run(['https://warehouse-theme-metal.myshopify.com/'])
+    await crawler.run(['https://crawlee.dev/'])
 
 
 if __name__ == '__main__':
