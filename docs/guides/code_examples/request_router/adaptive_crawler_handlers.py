@@ -29,11 +29,11 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def default_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        # Extract title using the unified context interface
+        # Extract title using the unified context interface.
         title_tag = context.parsed_content.find('title')
         title = title_tag.get_text() if title_tag else None
 
-        # Extract other data consistently across both modes
+        # Extract other data consistently across both modes.
         links = [a.get('href') for a in context.parsed_content.find_all('a', href=True)]
 
         await context.push_data(
