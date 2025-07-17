@@ -15,7 +15,7 @@ async def main() -> None:
     # for parsing static content.
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         max_requests_per_crawl=10,  # Limit the max requests per crawl.
-        playwright_crawler_specific_kwargs={'headless': False}
+        playwright_crawler_specific_kwargs={'headless': False},
     )
 
     @crawler.router.default_handler
