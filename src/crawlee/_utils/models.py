@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from contextlib import suppress
 from datetime import timedelta
-from typing import Annotated, Any, Callable
+from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import PlainSerializer, TypeAdapter, ValidationError, WrapValidator
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 """Utility types for Pydantic models."""
 

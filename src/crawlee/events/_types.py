@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Coroutine
 from enum import Enum
-from typing import Annotated, Any, TypeVar, Union
+from typing import Annotated, Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,6 +30,9 @@ class Event(str, Enum):
     BROWSER_CLOSED = 'browserClosed'
     PAGE_CREATED = 'pageCreated'
     PAGE_CLOSED = 'pageClosed'
+
+    # State events
+    CRAWLER_STATUS = 'crawlerStatus'
 
 
 @docs_group('Event payloads')
@@ -79,20 +82,40 @@ class EventExitData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-EventData = Union[EventPersistStateData, EventSystemInfoData, EventMigratingData, EventAbortingData, EventExitData]
+@docs_group('Event payloads')
+class EventCrawlerStatusData(BaseModel):
+    """Data for the crawler status event."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    message: str
+    """A message describing the current status of the crawler."""
+
+    crawler_id: int
+    """The ID of the crawler that emitted the event."""
+
+
+EventData = (
+    EventPersistStateData
+    | EventSystemInfoData
+    | EventMigratingData
+    | EventAbortingData
+    | EventExitData
+    | EventCrawlerStatusData
+)
 """A helper type for all possible event payloads"""
 
 WrappedListener = Callable[..., Coroutine[Any, Any, None]]
 
 TEvent = TypeVar('TEvent')
-EventListener = Union[
+EventListener = (
     Callable[
         [TEvent],
-        Union[None, Coroutine[Any, Any, None]],
-    ],
-    Callable[
+        None | Coroutine[Any, Any, None],
+    ]
+    | Callable[
         [],
-        Union[None, Coroutine[Any, Any, None]],
-    ],
-]
+        None | Coroutine[Any, Any, None],
+    ]
+)
 """An event listener function - it can be both sync and async and may accept zero or one argument."""

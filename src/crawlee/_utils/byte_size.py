@@ -73,6 +73,10 @@ class ByteSize:
             return self.bytes == other.bytes
         return NotImplemented
 
+    def __hash__(self) -> int:
+        """Return hash based on the bytes value."""
+        return hash(self.bytes)
+
     def __lt__(self, other: object) -> bool:
         if isinstance(other, ByteSize):
             return self.bytes < other.bytes

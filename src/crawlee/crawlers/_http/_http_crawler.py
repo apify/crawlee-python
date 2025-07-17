@@ -36,7 +36,7 @@ class HttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[bytes], bytes, b
         # Extract data from the page.
         data = {
             'url': context.request.url,
-            'response': context.http_response.read().decode()[:100],
+            'response': (await context.http_response.read()).decode()[:100],
         }
 
         # Push the extracted data to the default dataset.

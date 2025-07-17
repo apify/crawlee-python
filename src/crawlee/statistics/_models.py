@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator, computed_field
 from typing_extensions import override
@@ -90,12 +90,12 @@ class StatisticsState(BaseModel):
     def request_total_duration(self) -> timedelta:
         return self.request_total_finished_duration + self.request_total_failed_duration
 
-    @computed_field(alias='requestAvgFailedDurationMillis', return_type=Optional[timedelta_ms])  # type: ignore[prop-decorator]
+    @computed_field(alias='requestAvgFailedDurationMillis', return_type=timedelta_ms | None)  # type: ignore[prop-decorator]
     @property
     def request_avg_failed_duration(self) -> timedelta | None:
         return (self.request_total_failed_duration / self.requests_failed) if self.requests_failed else None
 
-    @computed_field(alias='requestAvgFinishedDurationMillis', return_type=Optional[timedelta_ms])  # type: ignore[prop-decorator]
+    @computed_field(alias='requestAvgFinishedDurationMillis', return_type=timedelta_ms | None)  # type: ignore[prop-decorator]
     @property
     def request_avg_finished_duration(self) -> timedelta | None:
         return (self.request_total_finished_duration / self.requests_finished) if self.requests_finished else None

@@ -266,3 +266,8 @@ class SessionCookies:
         other_keys = {(cookie.name, cookie.value, cookie.domain, cookie.path) for cookie in other.jar}
 
         return self_keys == other_keys
+
+    def __hash__(self) -> int:
+        """Return hash based on the cookies key attributes."""
+        cookie_tuples = frozenset((cookie.name, cookie.value, cookie.domain, cookie.path) for cookie in self._jar)
+        return hash(cookie_tuples)

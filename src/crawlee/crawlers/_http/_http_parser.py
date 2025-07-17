@@ -21,7 +21,7 @@ class NoParser(AbstractHttpParser[bytes, bytes]):
 
     @override
     async def parse(self, response: HttpResponse) -> bytes:
-        return response.read()
+        return await response.read()
 
     @override
     async def parse_text(self, text: str) -> bytes:

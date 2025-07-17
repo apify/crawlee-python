@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from curl_cffi import CurlInfo
 from curl_cffi.const import CurlHttpVersion
@@ -85,7 +85,7 @@ class _CurlImpersonateResponse:
     def headers(self) -> HttpHeaders:
         return HttpHeaders({key: value for key, value in self._response.headers.items() if value})
 
-    def read(self) -> bytes:
+    async def read(self) -> bytes:
         if self._response.astream_task:
             raise RuntimeError('Use `read_stream` to read the body of the Response received from the `stream` method')
         return self._response.content
@@ -137,7 +137,7 @@ class CurlImpersonateHttpClient(HttpClient):
         )
         self._async_session_kwargs = async_session_kwargs
 
-        self._client_by_proxy_url = dict[Optional[str], AsyncSession]()
+        self._client_by_proxy_url = dict[str | None, AsyncSession]()
 
     @override
     async def crawl(

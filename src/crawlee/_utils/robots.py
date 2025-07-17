@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from protego import Protego
 from yarl import URL
 
+from crawlee._utils.sitemap import Sitemap
 from crawlee._utils.web import is_status_code_client_error
 
 if TYPE_CHECKING:
@@ -15,9 +16,13 @@ if TYPE_CHECKING:
 
 
 class RobotsTxtFile:
-    def __init__(self, url: str, robots: Protego) -> None:
+    def __init__(
+        self, url: str, robots: Protego, http_client: HttpClient | None = None, proxy_info: ProxyInfo | None = None
+    ) -> None:
         self._robots = robots
         self._original_url = URL(url).origin()
+        self._http_client = http_client
+        self._proxy_info = proxy_info
 
     @classmethod
     async def from_content(cls, url: str, content: str) -> Self:
@@ -52,11 +57,13 @@ class RobotsTxtFile:
             proxy_info: Optional `ProxyInfo` to be used when fetching the robots.txt file. If None, no proxy is used.
         """
         response = await http_client.send_request(url, proxy_info=proxy_info)
-        body = b'User-agent: *\nAllow: /' if is_status_code_client_error(response.status_code) else response.read()
+        body = (
+            b'User-agent: *\nAllow: /' if is_status_code_client_error(response.status_code) else await response.read()
+        )
 
         robots = Protego.parse(body.decode('utf-8'))
 
-        return cls(url, robots)
+        return cls(url, robots, http_client=http_client, proxy_info=proxy_info)
 
     def is_allowed(self, url: str, user_agent: str = '*') -> bool:
         """Check if the given URL is allowed for the given user agent.
@@ -83,3 +90,16 @@ class RobotsTxtFile:
         """
         crawl_delay = self._robots.crawl_delay(user_agent)
         return int(crawl_delay) if crawl_delay is not None else None
+
+    async def parse_sitemaps(self) -> Sitemap:
+        """Parse the sitemaps from the robots.txt file and return a `Sitemap` instance."""
+        sitemaps = self.get_sitemaps()
+        if not self._http_client:
+            raise ValueError('HTTP client is required to parse sitemaps.')
+
+        return await Sitemap.load(sitemaps, self._http_client, self._proxy_info)
+
+    async def parse_urls_from_sitemaps(self) -> list[str]:
+        """Parse the sitemaps in the robots.txt file and return a list URLs."""
+        sitemap = await self.parse_sitemaps()
+        return sitemap.urls

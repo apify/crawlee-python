@@ -28,6 +28,11 @@ class BrowserController(ABC):
 
     @property
     @abstractmethod
+    def total_opened_pages(self) -> int:
+        """Return the total number of pages opened since the browser was launched."""
+
+    @property
+    @abstractmethod
     def pages_count(self) -> int:
         """Return the number of currently open pages."""
 
