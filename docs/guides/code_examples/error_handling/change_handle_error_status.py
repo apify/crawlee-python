@@ -32,11 +32,9 @@ async def main() -> None:
             )
             data = json.loads(await response.read())
             # Add the new token to our `Request` headers
-            new_headers = {
-                **context.request.headers,
-                'authorization': f'Bearer {data["access_token"]}',
-            }
-            context.request.headers = HttpHeaders(new_headers)
+            context.request.headers |= HttpHeaders(
+                {'authorization': f'Bearer {data["access_token"]}'},
+            )
             # Trigger a retry with our updated headers
             raise HttpStatusCodeError('Unauthorized', status_code=UNAUTHORIZED_CODE)
 

@@ -20,11 +20,8 @@ async def main() -> None:
     @crawler.pre_navigation_hook
     async def common_setup(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
         # This runs for both HTTP and browser requests
-        context.request.headers = HttpHeaders(
-            {
-                **context.request.headers,
-                'Accept': 'text/html,application/xhtml+xml',
-            },
+        context.request.headers |= HttpHeaders(
+            {'Accept': 'text/html,application/xhtml+xml'},
         )
 
     # Playwright-specific pre-navigation hook (only when using browser)

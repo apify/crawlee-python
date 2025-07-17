@@ -43,6 +43,8 @@ The default handler processes all requests that either lack a label or have a la
 
 Applications requiring explicit control over router configuration or router reuse across multiple crawler instances can create custom <ApiLink to="class/Router">`Router`</ApiLink> instances. Custom routers provide complete control over request routing configuration and enable modular application architecture. Router instances can be configured independently and attached to your crawler instances as needed.
 
+You can also implement a custom request router class from scratch or by inheriting from <ApiLink to="class/Router">`Router`</ApiLink>. This allows you to define custom routing logic or manage request handlers in a different way.
+
 <RunnableCodeBlock className="language-python" language="python">
     {CustomRouterDefaultOnly}
 </RunnableCodeBlock>

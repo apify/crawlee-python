@@ -6,11 +6,11 @@ description: An overview of the core components of the Crawlee library and its a
 
 import ApiLink from '@site/src/components/ApiLink';
 
-Crawlee is a modern and modular web scraping framework. It is designed for both HTTP and browser-based scraping. In this guide, we will provide a high-level overview of its architecture and the main components that make up the system.
+Crawlee is a modern and modular web scraping framework. It is designed for both HTTP-only and browser-based scraping. In this guide, we will provide a high-level overview of its architecture and the main components that make up the system.
 
 ## Crawler
 
-The core component of Crawlee is the crawler, which orchestrates the crawling process and takes care of all other components. It manages storages, executes user-defined request handlers, handles retries, manages concurrency, and coordinates all other components. All crawlers inherit from the <ApiLink to="class/BasicCrawler">`BasicCrawler`</ApiLink> class, which provides the basic functionality. There are two main groups of specialized crawlers: HTTP crawlers and browser crawlers.
+The main user-facing component of Crawlee is the crawler, which orchestrates the crawling process and takes care of all other components. It manages storages, executes user-defined request handlers, handles retries, manages concurrency, and coordinates all other components. All crawlers inherit from the <ApiLink to="class/BasicCrawler">`BasicCrawler`</ApiLink> class, which provides the basic functionality. There are two main groups of specialized crawlers: HTTP crawlers and browser crawlers.
 
 :::info
 
@@ -83,11 +83,11 @@ Browser crawlers use a real browser to render pages, enabling scraping of sites 
 
 ### Adaptive crawler
 
-The <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> sits between HTTP and browser crawlers. It can automatically decide whether to use HTTP or browser crawling for each request based on heuristics or user configuration. This allows for optimal performance and compatibility. You can learn more about adaptive crawling in the [Adaptive Playwright crawler guide](./adaptive-playwright-crawler).
+The <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> sits between HTTP and browser crawlers. It can automatically decide whether to use HTTP or browser crawling for each request based on heuristics or user configuration. This allows for optimal performance and compatibility. It also provides a uniform interface for both crawling types (modes). You can learn more about adaptive crawling in the [Adaptive Playwright crawler guide](./adaptive-playwright-crawler).
 
 ## Crawling contexts
 
-Crawling contexts are objects that encapsulate the state and data for each request being processed by the crawler. They provide access to the request, response, session, and helper methods for handling the request. Crawling contexts are used to pass data between different parts of the crawler and to manage the lifecycle of each request. These contexts are provided to user-defined request handlers, which can then use them to access request data, response data, and other information related to the request.
+Crawling contexts are objects that encapsulate the state and data for each request being processed by the crawler. They provide access to the request, response, session, and helper methods for handling the request. Crawling contexts are used to pass data between different parts of the crawler and to manage the lifecycle of each request. These contexts are provided to user-defined request handlers, which can then use them to access request data, response data, or use helper methods to interact with storages, and extract and enqueue new requests.
 
 ```mermaid
 ---
@@ -102,45 +102,25 @@ classDiagram
 %% Classes
 %% ========================
 
-class BasicCrawlingContext {
-    <<dataclass>>
-}
+class BasicCrawlingContext
 
-class HttpCrawlingContext {
-    <<dataclass>>
-}
+class HttpCrawlingContext
 
-class HttpCrawlingResult {
-    <<dataclass>>
-}
+class HttpCrawlingResult
 
-class ParsedHttpCrawlingContext {
-    <<dataclass>>
-}
+class ParsedHttpCrawlingContext
 
-class ParselCrawlingContext {
-    <<dataclass>>
-}
+class ParselCrawlingContext
 
-class BeautifulSoupCrawlingContext {
-    <<dataclass>>
-}
+class BeautifulSoupCrawlingContext
 
-class PlaywrightPreNavCrawlingContext {
-    <<dataclass>>
-}
+class PlaywrightPreNavCrawlingContext
 
-class PlaywrightCrawlingContext {
-    <<dataclass>>
-}
+class PlaywrightCrawlingContext
 
-class AdaptivePlaywrightPreNavCrawlingContext {
-    <<dataclass>>
-}
+class AdaptivePlaywrightPreNavCrawlingContext
 
-class AdaptivePlaywrightCrawlingContext {
-    <<dataclass>>
-}
+class AdaptivePlaywrightCrawlingContext
 
 %% ========================
 %% Inheritance arrows
@@ -184,9 +164,9 @@ Storages are the components that manage data in Crawlee. They provide a way to s
 
 Crawlee provides three built-in storage types for managing data:
 
-- <ApiLink to="class/Dataset">`Dataset`</ApiLink> - Append-only, tabular storage that stores structured results (e.g., scraped data).
-- <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink> - Stores arbitrary data like JSON documents, images, configs, or state.
-- <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> - Manages pending and handled requests.
+- <ApiLink to="class/Dataset">`Dataset`</ApiLink> - Append-only, tabular storage for structured data. It is ideal for storing scraping results.
+- <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink> - Storage for arbitrary data like JSON documents, images or configs. It supports get and set operations with key-value pairs; updates are only possible by replacement.
+- <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> - A managed queue for pending and completed requests, with automatic deduplication and dynamic addition of new items. It is used to track URLs for crawling.
 
 See the [Storages guide](./storages) for more details.
 
@@ -295,7 +275,7 @@ See the [Request router guide](./request-router) for detailed information and ex
 
 ## Service locator
 
-The <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> is a central registry for global services in Crawlee. It manages and provides access to core services throughout the framework, ensuring consistent configuration across all components. The service locator acts as a dependency injection container that coordinates three essential services:
+The <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> is a central registry for global services in Crawlee. It manages and provides access to core services throughout the framework, ensuring consistent configuration across all components. The service locator coordinates these three services:
 
 - <ApiLink to="class/Configuration">`Configuration`</ApiLink> - Application-wide settings and parameters that control various aspects of Crawlee behavior.
 - <ApiLink to="class/StorageClient">`StorageClient`</ApiLink> - Backend implementation for data storage across datasets, key-value stores, and request queues.
@@ -315,9 +295,9 @@ Request loaders provide a subset of <ApiLink to="class/RequestQueue">`RequestQue
 
 ### Request managers
 
-<ApiLink to="class/RequestManager">`RequestManager`</ApiLink> extends `RequestLoader` with write capabilities for adding and reclaiming requests, providing full request management functionality. <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> is the primary concrete implementation of `RequestManager`.
+<ApiLink to="class/RequestManager">`RequestManager`</ApiLink> extends <ApiLink to="class/RequestLoader">`RequestLoader`</ApiLink> with write capabilities for adding and reclaiming requests, providing full request management functionality. <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> is the primary concrete implementation of <ApiLink to="class/RequestManager">`RequestManager`</ApiLink>.
 
-<ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> combines a read-only `RequestLoader` with a writable `RequestManager`, transferring requests from the loader to the manager for hybrid scenarios. This is useful when you want to start with a predefined set of URLs (from a file or sitemap) but also need to add new requests dynamically during crawling. The tandem first processes all requests from the loader, then handles any additional requests added to the manager.
+<ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> combines a read-only `RequestLoader` with a writable <ApiLink to="class/RequestManager">`RequestManager`</ApiLink>, transferring requests from the loader to the manager for hybrid scenarios. This is useful when you want to start with a predefined set of URLs (from a file or sitemap) but also need to add new requests dynamically during crawling. The tandem first processes all requests from the loader, then handles any additional requests added to the manager.
 
 Request loaders are useful when you need to start with a predefined set of URLs. The tandem approach allows processing requests from static sources (like files or sitemaps) while maintaining the ability to add new requests dynamically.
 

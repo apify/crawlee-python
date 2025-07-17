@@ -12,9 +12,8 @@ async def main() -> None:
     @crawler.pre_navigation_hook
     async def setup_request(context: BasicCrawlingContext) -> None:
         # Add custom headers before making the request
-        context.request.headers = HttpHeaders(
+        context.request.headers |= HttpHeaders(
             {
-                **context.request.headers,
                 'User-Agent': 'Crawlee Bot 1.0',
                 'Accept': 'text/html,application/xhtml+xml',
             },
