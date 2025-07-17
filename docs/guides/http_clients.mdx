@@ -46,9 +46,9 @@ class ImpitHttpClient
 %% Inheritance arrows
 %% ========================
 
-HttpClient <|-- HttpxHttpClient
-HttpClient <|-- CurlImpersonateHttpClient
-HttpClient <|-- ImpitHttpClient
+HttpClient --|> HttpxHttpClient
+HttpClient --|> CurlImpersonateHttpClient
+HttpClient --|> ImpitHttpClient
 ```
 
 ## Switching between HTTP clients

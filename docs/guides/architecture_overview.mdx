@@ -57,12 +57,12 @@ class AdaptivePlaywrightCrawler
 %% Inheritance arrows
 %% ========================
 
-BasicCrawler <|-- AbstractHttpCrawler
-BasicCrawler <|-- PlaywrightCrawler
-BasicCrawler <|-- AdaptivePlaywrightCrawler
-AbstractHttpCrawler <|-- HttpCrawler
-AbstractHttpCrawler <|-- ParselCrawler
-AbstractHttpCrawler <|-- BeautifulSoupCrawler
+BasicCrawler --|> AbstractHttpCrawler
+BasicCrawler --|> PlaywrightCrawler
+BasicCrawler --|> AdaptivePlaywrightCrawler
+AbstractHttpCrawler --|> HttpCrawler
+AbstractHttpCrawler --|> ParselCrawler
+AbstractHttpCrawler --|> BeautifulSoupCrawler
 ```
 
 ### HTTP crawlers
@@ -221,9 +221,9 @@ class RequestQueue
 %% Inheritance arrows
 %% ========================
 
-Storage <|-- Dataset
-Storage <|-- KeyValueStore
-Storage <|-- RequestQueue
+Storage --|> Dataset
+Storage --|> KeyValueStore
+Storage --|> RequestQueue
 ```
 
 ## Storage clients
@@ -267,9 +267,9 @@ class ApifyStorageClient
 %% Inheritance arrows
 %% ========================
 
-StorageClient <|-- MemoryStorageClient
-StorageClient <|-- FileSystemStorageClient
-StorageClient <|-- ApifyStorageClient
+StorageClient --|> MemoryStorageClient
+StorageClient --|> FileSystemStorageClient
+StorageClient --|> ApifyStorageClient
 ```
 
 Storage clients can be registered globally with the <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> (you will learn more about the <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> in the next section), passed directly to crawlers, or specified when opening individual storage instances. You can also create custom storage clients by implementing the <ApiLink to="class/StorageClient">`StorageClient`</ApiLink> interface.
@@ -381,8 +381,8 @@ class ApifyEventManager
 %% Inheritance arrows
 %% ========================
 
-EventManager <|-- LocalEventManager
-EventManager <|-- ApifyEventManager
+EventManager --|> LocalEventManager
+EventManager --|> ApifyEventManager
 ```
 
 ## Session management

@@ -56,9 +56,9 @@ class ApifyStorageClient
 %% Inheritance arrows
 %% ========================
 
-StorageClient <|-- MemoryStorageClient
-StorageClient <|-- FileSystemStorageClient
-StorageClient <|-- ApifyStorageClient
+StorageClient --|> MemoryStorageClient
+StorageClient --|> FileSystemStorageClient
+StorageClient --|> ApifyStorageClient
 ```
 
 ### Memory storage client

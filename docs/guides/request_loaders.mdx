@@ -12,7 +12,7 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 import RlBasicExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/rl_basic_example.py';
 import SitemapExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/sitemap_example.py';
 import RlTandemExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/rl_tandem_example.py';
-import TlExplicitTandemExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/rl_tandem_example_explicit.py';
+import RlExplicitTandemExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/rl_tandem_example_explicit.py';
 import SitemapTandemExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/sitemap_tandem_example.py';
 import SitemapExplicitTandemExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/sitemap_tandem_example_explicit.py';
 
@@ -89,13 +89,13 @@ class RequestManagerTandem
 %% Inheritance arrows
 %% ========================
 
-Storage <|-- RequestQueue
-RequestManager <|-- RequestQueue
+Storage --|> RequestQueue
+RequestManager --|> RequestQueue
 
-RequestLoader <|-- RequestManager
-RequestLoader <|-- RequestList
-RequestLoader <|-- SitemapRequestLoader
-RequestManager <|-- RequestManagerTandem
+RequestLoader --|> RequestManager
+RequestLoader --|> RequestList
+RequestLoader --|> SitemapRequestLoader
+RequestManager --|> RequestManagerTandem
 ```
 
 ## Request loaders
@@ -137,7 +137,7 @@ This section describes the combination of the <ApiLink to="class/RequestList">`R
 <Tabs groupId="request_manager_tandem">
     <TabItem value="request_manager_tandem_explicit" label="Explicit usage">
         <RunnableCodeBlock className="language-python" language="python">
-            {TlExplicitTandemExample}
+            {RlExplicitTandemExample}
         </RunnableCodeBlock>
     </TabItem>
     <TabItem value="request_manager_tandem_helper" label="Using to_tandem helper" default>

@@ -54,10 +54,10 @@ class BeautifulSoupCrawler
 %% Inheritance arrows
 %% ========================
 
-BasicCrawler <|-- AbstractHttpCrawler
-AbstractHttpCrawler <|-- HttpCrawler
-AbstractHttpCrawler <|-- ParselCrawler
-AbstractHttpCrawler <|-- BeautifulSoupCrawler
+BasicCrawler --|> AbstractHttpCrawler
+AbstractHttpCrawler --|> HttpCrawler
+AbstractHttpCrawler --|> ParselCrawler
+AbstractHttpCrawler --|> BeautifulSoupCrawler
 ```
 
 ## BeautifulSoupCrawler
