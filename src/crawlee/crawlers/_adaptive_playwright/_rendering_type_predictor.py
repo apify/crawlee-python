@@ -18,7 +18,7 @@ RenderingType = Literal['static', 'client only']
 FeatureVector = tuple[float, float]
 
 
-@docs_group('Others')
+@docs_group('Other')
 @dataclass(frozen=True)
 class RenderingTypePrediction:
     """Rendering type recommendation with detection probability recommendation."""
@@ -32,7 +32,7 @@ class RenderingTypePrediction:
     One represents no confidence in `rendering_type` recommendation."""
 
 
-@docs_group('Others')
+@docs_group('Other')
 class RenderingTypePredictor(ABC):
     """Stores rendering type for previously crawled URLs and predicts the rendering type for unvisited urls."""
 
@@ -54,7 +54,7 @@ class RenderingTypePredictor(ABC):
         """
 
 
-@docs_group('Others')
+@docs_group('Other')
 class DefaultRenderingTypePredictor(RenderingTypePredictor):
     """Stores rendering type for previously crawled URLs and predicts the rendering type for unvisited urls.
 

@@ -22,7 +22,7 @@ __all__ = ['ProxyConfiguration', 'ProxyInfo']
 
 
 @dataclass
-@docs_group('Others')
+@docs_group('Other')
 class ProxyInfo:
     """Provides information about a proxy connection that is used for requests."""
 

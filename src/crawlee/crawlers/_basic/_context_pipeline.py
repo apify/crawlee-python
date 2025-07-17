@@ -53,7 +53,7 @@ class _Middleware(Generic[TMiddlewareCrawlingContext, TCrawlingContext]):
             raise RuntimeError('The middleware yielded more than once')
 
 
-@docs_group('Others')
+@docs_group('Other')
 class ContextPipeline(Generic[TCrawlingContext]):
     """Encapsulates the logic of gradually enhancing the crawling context with additional information and utilities.
 

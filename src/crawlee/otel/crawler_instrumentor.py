@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from crawlee.crawlers import BasicCrawlingContext
 
 
-@docs_group('Others')
+@docs_group('Other')
 class CrawlerInstrumentor(BaseInstrumentor):
     """Helper class for instrumenting crawlers with OpenTelemetry."""
 

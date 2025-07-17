@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from crawlee.statistics import Statistics
 
 
-@docs_group('Others')
+@docs_group('Other')
 class HttpResponse(Protocol):
     """Define the interface that any HTTP response object must implement."""
 

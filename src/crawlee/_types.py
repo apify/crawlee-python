@@ -65,7 +65,7 @@ def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
     return dict(sorted_headers)
 
 
-@docs_group('Others')
+@docs_group('Other')
 class HttpHeaders(RootModel, Mapping[str, str]):
     """A dictionary-like object representing HTTP headers."""
 
@@ -507,7 +507,7 @@ class SendRequestFunction(Protocol):
         """
 
 
-@docs_group('Others')
+@docs_group('Other')
 @dataclasses.dataclass
 class PageSnapshot:
     """Snapshot of a crawled page."""

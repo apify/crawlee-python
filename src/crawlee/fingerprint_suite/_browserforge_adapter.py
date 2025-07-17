@@ -177,7 +177,7 @@ class PatchedFingerprintGenerator(bf_FingerprintGenerator):
         self.header_generator = PatchedHeaderGenerator(**header_kwargs)
 
 
-@docs_group('Others')
+@docs_group('Other')
 class BrowserforgeFingerprintGenerator(FingerprintGenerator):
     """`FingerprintGenerator` adapter for fingerprint generator from `browserforge`.
 

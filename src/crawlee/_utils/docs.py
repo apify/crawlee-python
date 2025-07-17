@@ -15,7 +15,7 @@ GroupName = Literal[
     'Functions',
     'HTTP clients',
     'HTTP parsers',
-    'Others',
+    'Other',
     'Request loaders',
     'Session management',
     'Statistics',
