@@ -1,11 +1,13 @@
-# ruff: noqa: TRY301, FBT002, UP007
+# ruff: noqa: FBT002
 from __future__ import annotations
 
 import importlib.resources
 import json
 import sys
 from pathlib import Path
-from typing import Annotated, Optional, cast
+from typing import Annotated, cast
+
+from click import Choice
 
 try:
     import inquirer
@@ -22,13 +24,15 @@ except ModuleNotFoundError as exc:
 cli = typer.Typer(no_args_is_help=True)
 
 template_directory = importlib.resources.files('crawlee') / 'project_template'
-with open(str(template_directory / 'cookiecutter.json')) as f:
+with (template_directory / 'cookiecutter.json').open() as f:
     cookiecutter_json = json.load(f)
 
 crawler_choices = cookiecutter_json['crawler_type']
 http_client_choices = cookiecutter_json['http_client']
 package_manager_choices = cookiecutter_json['package_manager']
 default_start_url = cookiecutter_json['start_url']
+default_enable_apify_integration = cookiecutter_json['enable_apify_integration']
+default_install_project = cookiecutter_json['install_project']
 
 
 @cli.callback(invoke_without_command=True)
@@ -44,7 +48,7 @@ def callback(
 ) -> None:
     """Crawlee is a web scraping and browser automation library."""
     if version:
-        from crawlee import __version__
+        from crawlee import __version__  # noqa: PLC0415
 
         typer.echo(__version__)
 
@@ -120,40 +124,51 @@ def _prompt_bool(message: str, *, default: bool) -> bool:
 
 @cli.command()
 def create(
-    project_name: Optional[str] = typer.Argument(
+    project_name: str | None = typer.Argument(
         default=None,
         show_default=False,
         help='The name of the project and the directory that will be created to contain it. '
         'If none is given, you will be prompted.',
     ),
-    crawler_type: Optional[str] = typer.Option(
+    crawler_type: str | None = typer.Option(
         None,
         '--crawler-type',
         '--template',
         show_default=False,
+        click_type=Choice(crawler_choices),
         help='The library that will be used for crawling in your crawler. If none is given, you will be prompted.',
     ),
-    http_client: Optional[str] = typer.Option(
+    http_client: str | None = typer.Option(
         None,
         show_default=False,
+        click_type=Choice(http_client_choices),
         help='The library that will be used to make HTTP requests in your crawler. '
         'If none is given, you will be prompted.',
     ),
-    package_manager: Optional[str] = typer.Option(
+    package_manager: str | None = typer.Option(
         default=None,
         show_default=False,
+        click_type=Choice(package_manager_choices),
         help='Package manager to be used in the new project. If none is given, you will be prompted.',
     ),
-    start_url: Optional[str] = typer.Option(
+    start_url: str | None = typer.Option(
         default=None,
         show_default=False,
+        metavar='[START_URL]',
         help='The URL where crawling should start. If none is given, you will be prompted.',
     ),
-    enable_apify_integration: Optional[bool] = typer.Option(
+    *,
+    enable_apify_integration: bool | None = typer.Option(
         None,
         '--apify/--no-apify',
         show_default=False,
         help='Should Apify integration be set up for you? If not given, you will be prompted.',
+    ),
+    install_project: bool | None = typer.Option(
+        None,
+        '--install/--no-install',
+        show_default=False,
+        help='Should the project be installed now? If not given, you will be prompted.',
     ),
 ) -> None:
     """Bootstrap a new Crawlee project."""
@@ -179,7 +194,13 @@ def create(
 
         # Ask about Apify integration if not explicitly configured
         if enable_apify_integration is None:
-            enable_apify_integration = _prompt_bool('Should Apify integration be set up for you?', default=False)
+            enable_apify_integration = _prompt_bool(
+                'Should Apify integration be set up for you?', default=default_enable_apify_integration
+            )
+
+        # Ask about installing the project
+        if install_project is None:
+            install_project = _prompt_bool('Should the project be installed now?', default=default_install_project)
 
         if all(
             [
@@ -189,6 +210,7 @@ def create(
                 package_manager,
                 start_url,
                 enable_apify_integration is not None,
+                install_project is not None,
             ]
         ):
             package_name = project_name.replace('-', '_')
@@ -212,6 +234,7 @@ def create(
                             'http_client': http_client,
                             'enable_apify_integration': enable_apify_integration,
                             'start_url': start_url,
+                            'install_project': install_project,
                         },
                     )
                 except Exception as exc:
@@ -228,21 +251,29 @@ def create(
 
             typer.echo(f'Your project "{project_name}" was created.')
 
-            if package_manager == 'manual':
+            if install_project:
+                if package_manager == 'pip':
+                    typer.echo(
+                        f'To run it, navigate to the directory: "cd {project_name}", '
+                        f'activate the virtual environment in ".venv" ("source .venv/bin/activate") '
+                        f'and run your project using "python -m {package_name}".'
+                    )
+                else:
+                    typer.echo(
+                        f'To run it, navigate to the directory: "cd {project_name}", '
+                        f'and run it using "{package_manager} run python -m {package_name}".'
+                    )
+            elif package_manager == 'pip':
                 typer.echo(
                     f'To run it, navigate to the directory: "cd {project_name}", '
                     f'install the dependencies listed in "requirements.txt" '
                     f'and run it using "python -m {package_name}".'
                 )
-            elif package_manager == 'pip':
+            else:
+                install_command = 'sync' if package_manager == 'uv' else 'install'
                 typer.echo(
                     f'To run it, navigate to the directory: "cd {project_name}", '
-                    f'activate the virtual environment in ".venv" ("source .venv/bin/activate") '
-                    f'and run your project using "python -m {package_name}".'
-                )
-            elif package_manager in {'poetry', 'uv'}:
-                typer.echo(
-                    f'To run it, navigate to the directory: "cd {project_name}", '
+                    f'install the project using "{package_manager} {install_command}", '
                     f'and run it using "{package_manager} run python -m {package_name}".'
                 )
 

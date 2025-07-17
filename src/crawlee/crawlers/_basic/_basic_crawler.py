@@ -9,12 +9,12 @@ import tempfile
 import threading
 import traceback
 from asyncio import CancelledError
-from collections.abc import AsyncGenerator, Awaitable, Iterable, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Sequence
 from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Union, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, cast
 from urllib.parse import ParseResult, urlparse
 from weakref import WeakKeyDictionary
 
@@ -25,7 +25,7 @@ from yarl import URL
 
 from crawlee import EnqueueStrategy, Glob, RequestTransformAction, service_locator
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
-from crawlee._log_config import configure_logger, get_configured_log_level
+from crawlee._log_config import configure_logger, get_configured_log_level, string_to_log_level
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._types import (
     BasicCrawlingContext,
@@ -33,11 +33,14 @@ from crawlee._types import (
     GetKeyValueStoreFromRequestHandlerFunction,
     HttpHeaders,
     HttpPayload,
+    LogLevel,
     RequestHandlerRunResult,
     SendRequestFunction,
     SkippedReason,
 )
 from crawlee._utils.docs import docs_group
+from crawlee._utils.file import export_csv_to_stream, export_json_to_stream
+from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
@@ -52,6 +55,7 @@ from crawlee.errors import (
     SessionError,
     UserDefinedErrorHandlerError,
 )
+from crawlee.events._types import Event, EventCrawlerStatusData
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
@@ -73,8 +77,10 @@ if TYPE_CHECKING:
         ConcurrencySettings,
         EnqueueLinksFunction,
         ExtractLinksFunction,
+        GetDataKwargs,
         HttpMethod,
         JsonSerializable,
+        PushDataKwargs,
     )
     from crawlee.configuration import Configuration
     from crawlee.events import EventManager
@@ -85,12 +91,11 @@ if TYPE_CHECKING:
     from crawlee.statistics import FinalStatistics
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients.models import DatasetItemsListPage
-    from crawlee.storages._dataset import ExportDataCsvKwargs, ExportDataJsonKwargs, GetDataKwargs, PushDataKwargs
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 TRequestIterator = TypeVar('TRequestIterator', str, Request)
-ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Union[Request, None]]]
+ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Request | None]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 SkippedRequestCallback = Callable[[str, SkippedReason], Awaitable[None]]
 
@@ -189,6 +194,15 @@ class _BasicCrawlerOptions(TypedDict):
     """If set to `True`, the crawler will automatically try to fetch the robots.txt file for each domain,
     and skip those that are not allowed. This also prevents disallowed URLs to be added via `EnqueueLinksFunction`."""
 
+    status_message_logging_interval: NotRequired[timedelta]
+    """Interval for logging the crawler status messages."""
+
+    status_message_callback: NotRequired[
+        Callable[[StatisticsState, StatisticsState | None, str], Awaitable[str | None]]
+    ]
+    """Allows overriding the default status message. The default status message is provided in the parameters.
+    Returning `None` suppresses the status message."""
+
 
 class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], TypedDict):
     """Generic options the `BasicCrawler` constructor."""
@@ -271,6 +285,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         configure_logging: bool = True,
         statistics_log_format: Literal['table', 'inline'] = 'table',
         respect_robots_txt_file: bool = False,
+        status_message_logging_interval: timedelta = timedelta(seconds=10),
+        status_message_callback: Callable[[StatisticsState, StatisticsState | None, str], Awaitable[str | None]]
+        | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -289,7 +306,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             max_request_retries: Specifies the maximum number of retries allowed for a request if its processing fails.
                 This includes retries due to navigation errors or errors thrown from user-supplied functions
                 (`request_handler`, `pre_navigation_hooks` etc.).
-
                 This limit does not apply to retries triggered by session rotation (see `max_session_rotations`).
             max_requests_per_crawl: Maximum number of pages to open during a crawl. The crawl stops upon reaching
                 this limit. Setting this value can help avoid infinite loops in misconfigured crawlers. `None` means
@@ -298,7 +314,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 `max_requests_per_crawl` is achieved.
             max_session_rotations: Maximum number of session rotations per request. The crawler rotates the session
                 if a proxy error occurs or if the website blocks the request.
-
                 The session rotations are not counted towards the `max_request_retries` limit.
             max_crawl_depth: Specifies the maximum crawl depth. If set, the crawler will stop processing links beyond
                 this depth. The crawl depth starts at 0 for initial requests and increases with each subsequent level
@@ -322,6 +337,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             respect_robots_txt_file: If set to `True`, the crawler will automatically try to fetch the robots.txt file
                 for each domain, and skip those that are not allowed. This also prevents disallowed URLs to be added
                 via `EnqueueLinksFunction`
+            status_message_logging_interval: Interval for logging the crawler status messages.
+            status_message_callback: Allows overriding the default status message. The default status message is
+                provided in the parameters. Returning `None` suppresses the status message.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -365,6 +383,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._failed_request_handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._on_skipped_request: SkippedRequestCallback | None = None
         self._abort_on_error = abort_on_error
+
+        # Crawler callbacks
+        self._status_message_callback = status_message_callback
 
         # Context of each request with matching result of request handler.
         # Inheritors can use this to override the result of individual request handler runs in `_run_request_handler`.
@@ -426,6 +447,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             is_task_ready_function=self.__is_task_ready_function,
             run_task_function=self.__run_task_function,
         )
+        self._crawler_state_rec_task = RecurringTask(
+            func=self._crawler_state_task, delay=status_message_logging_interval
+        )
+        self._previous_crawler_state: TStatisticsState | None = None
 
         # State flags
         self._keep_alive = keep_alive
@@ -630,6 +655,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         except CancelledError:
             pass
         finally:
+            await self._crawler_state_rec_task.stop()
             if threading.current_thread() is threading.main_thread():
                 with suppress(NotImplementedError):
                     asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
@@ -661,6 +687,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def _run_crawler(self) -> None:
         event_manager = service_locator.get_event_manager()
 
+        self._crawler_state_rec_task.start()
+
         # Collect the context managers to be entered. Context managers that are already active are excluded,
         # as they were likely entered by the caller, who will also be responsible for exiting them.
         contexts_to_enter = [
@@ -686,6 +714,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self,
         requests: Sequence[str | Request],
         *,
+        forefront: bool = False,
         batch_size: int = 1000,
         wait_time_between_batches: timedelta = timedelta(0),
         wait_for_all_requests_to_be_added: bool = False,
@@ -695,6 +724,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Args:
             requests: A list of requests to add to the queue.
+            forefront: If True, add requests to the forefront of the queue.
             batch_size: The number of requests to add in one batch.
             wait_time_between_batches: Time to wait between adding batches.
             wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
@@ -719,17 +749,21 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         request_manager = await self.get_request_manager()
 
-        await request_manager.add_requests_batched(
+        await request_manager.add_requests(
             requests=allowed_requests,
+            forefront=forefront,
             batch_size=batch_size,
             wait_time_between_batches=wait_time_between_batches,
             wait_for_all_requests_to_be_added=wait_for_all_requests_to_be_added,
             wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
         )
 
-    async def _use_state(self, default_value: dict[str, JsonSerializable] | None = None) -> dict[str, JsonSerializable]:
-        store = await self.get_key_value_store()
-        return await store.get_auto_saved_value(self._CRAWLEE_STATE_KEY, default_value)
+    async def _use_state(
+        self,
+        default_value: dict[str, JsonSerializable] | None = None,
+    ) -> dict[str, JsonSerializable]:
+        kvs = await self.get_key_value_store()
+        return await kvs.get_auto_saved_value(self._CRAWLEE_STATE_KEY, default_value)
 
     async def _save_crawler_state(self) -> None:
         store = await self.get_key_value_store()
@@ -763,81 +797,32 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         dataset_id: str | None = None,
         dataset_name: str | None = None,
     ) -> None:
-        """Export data from a `Dataset`.
+        """Export all items from a Dataset to a JSON or CSV file.
 
-        This helper method simplifies the process of exporting data from a `Dataset`. It opens the specified
-        one and then exports the data based on the provided parameters. If you need to pass options
-        specific to the output format, use the `export_data_csv` or `export_data_json` method instead.
+        This method simplifies the process of exporting data collected during crawling. It automatically
+        determines the export format based on the file extension (`.json` or `.csv`) and handles
+        the conversion of `Dataset` items to the appropriate format.
 
         Args:
-            path: The destination path.
-            dataset_id: The ID of the `Dataset`.
-            dataset_name: The name of the `Dataset`.
+            path: The destination file path. Must end with '.json' or '.csv'.
+            dataset_id: The ID of the Dataset to export from. If None, uses `name` parameter instead.
+            dataset_name: The name of the Dataset to export from. If None, uses `id` parameter instead.
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
 
         path = path if isinstance(path, Path) else Path(path)
-        destination = path.open('w', newline='')
+        dst = path.open('w', newline='')
 
         if path.suffix == '.csv':
-            await dataset.write_to_csv(destination)
+            await export_csv_to_stream(dataset.iterate_items(), dst)
         elif path.suffix == '.json':
-            await dataset.write_to_json(destination)
+            await export_json_to_stream(dataset.iterate_items(), dst)
         else:
             raise ValueError(f'Unsupported file extension: {path.suffix}')
 
-    async def export_data_csv(
-        self,
-        path: str | Path,
-        *,
-        dataset_id: str | None = None,
-        dataset_name: str | None = None,
-        **kwargs: Unpack[ExportDataCsvKwargs],
-    ) -> None:
-        """Export data from a `Dataset` to a CSV file.
-
-        This helper method simplifies the process of exporting data from a `Dataset` in csv format. It opens
-        the specified one and then exports the data based on the provided parameters.
-
-        Args:
-            path: The destination path.
-            content_type: The output format.
-            dataset_id: The ID of the `Dataset`.
-            dataset_name: The name of the `Dataset`.
-            kwargs: Extra configurations for dumping/writing in csv format.
-        """
-        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
-        path = path if isinstance(path, Path) else Path(path)
-
-        return await dataset.write_to_csv(path.open('w', newline=''), **kwargs)
-
-    async def export_data_json(
-        self,
-        path: str | Path,
-        *,
-        dataset_id: str | None = None,
-        dataset_name: str | None = None,
-        **kwargs: Unpack[ExportDataJsonKwargs],
-    ) -> None:
-        """Export data from a `Dataset` to a JSON file.
-
-        This helper method simplifies the process of exporting data from a `Dataset` in json format. It opens the
-        specified one and then exports the data based on the provided parameters.
-
-        Args:
-            path: The destination path
-            dataset_id: The ID of the `Dataset`.
-            dataset_name: The name of the `Dataset`.
-            kwargs: Extra configurations for dumping/writing in json format.
-        """
-        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
-        path = path if isinstance(path, Path) else Path(path)
-
-        return await dataset.write_to_json(path.open('w', newline=''), **kwargs)
-
     async def _push_data(
         self,
-        data: JsonSerializable,
+        data: list[dict[str, Any]] | dict[str, Any],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
@@ -921,7 +906,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                         '`transform_request_function` arguments when `requests` is provided.'
                     )
                 # Add directly passed requests.
-                await context.add_requests(requests or list[Union[str, Request]](), **kwargs)
+                await context.add_requests(requests or list[str | Request](), **kwargs)
             else:
                 # Add requests from extracted links.
                 await context.add_requests(
@@ -1229,7 +1214,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 if self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth:
                     requests.append(dst_request)
 
-            await request_manager.add_requests_batched(requests)
+            await request_manager.add_requests(requests)
 
         for push_data_call in result.push_data_calls:
             await self._push_data(**push_data_call)
@@ -1522,3 +1507,53 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
         """
         return await RobotsTxtFile.find(url, self._http_client)
+
+    def _log_status_message(self, message: str, level: LogLevel = 'DEBUG') -> None:
+        """Log a status message for the crawler.
+
+        Args:
+            message: The status message to log.
+            level: The logging level for the message.
+        """
+        log_level = string_to_log_level(level)
+        self.log.log(log_level, message)
+
+    async def _crawler_state_task(self) -> None:
+        """Emit a persist state event with the given migration status."""
+        event_manager = service_locator.get_event_manager()
+
+        current_state = self.statistics.state
+
+        if (
+            failed_requests := (
+                current_state.requests_failed - (self._previous_crawler_state or current_state).requests_failed
+            )
+            > 0
+        ):
+            message = f'Experiencing problems, {failed_requests} failed requests since last status update.'
+        else:
+            request_manager = await self.get_request_manager()
+            total_count = await request_manager.get_total_count()
+            if total_count is not None and total_count > 0:
+                pages_info = f'{self._statistics.state.requests_finished}/{total_count}'
+            else:
+                pages_info = str(self._statistics.state.requests_finished)
+
+            message = (
+                f'Crawled {pages_info} pages, {self._statistics.state.requests_failed} failed requests, '
+                f'desired concurrency {self._autoscaled_pool.desired_concurrency}.'
+            )
+
+        if self._status_message_callback:
+            new_message = await self._status_message_callback(current_state, self._previous_crawler_state, message)
+            if new_message:
+                message = new_message
+                self._log_status_message(message, level='INFO')
+        else:
+            self._log_status_message(message, level='INFO')
+
+        event_manager.emit(
+            event=Event.CRAWLER_STATUS, event_data=EventCrawlerStatusData(message=message, crawler_id=id(self))
+        )
+
+        self._previous_crawler_state = current_state

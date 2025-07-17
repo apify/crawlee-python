@@ -124,6 +124,10 @@ class RequestList(RequestLoader):
         return self._name
 
     @override
+    async def get_handled_count(self) -> int:
+        return self._handled_count
+
+    @override
     async def get_total_count(self) -> int:
         return self._assumed_total_count
 
@@ -158,10 +162,6 @@ class RequestList(RequestLoader):
         self._handled_count += 1
         state = await self._get_state()
         state.in_progress.remove(request.id)
-
-    @override
-    async def get_handled_count(self) -> int:
-        return self._handled_count
 
     async def _ensure_next_request(self) -> None:
         state = await self._get_state()

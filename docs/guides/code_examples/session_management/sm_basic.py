@@ -30,7 +30,7 @@ async def main() -> None:
         # and `context.proxy_info`.
         response = await context.send_request(context.request.url)
 
-        page_content = response.read().decode()
+        page_content = (await response.read()).decode()
         title_match = re.search(r'<title(?:.*?)>(.*?)</title>', page_content)
 
         if context.session and (title := title_match.group(1) if title_match else None):

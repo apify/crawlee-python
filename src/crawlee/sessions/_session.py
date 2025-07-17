@@ -89,6 +89,28 @@ class Session:
             return NotImplemented
         return self.get_state(as_dict=True) == other.get_state(as_dict=True)
 
+    def __hash__(self) -> int:
+        """Return hash based on the session state."""
+        state = self.get_state(as_dict=True)
+        hashable_items = list[tuple[str, int]]()
+
+        # Convert dict to tuple of sorted items for consistent hashing. Exclude non-hashable values like cookies
+        # and convert them to their string representation.
+        for key, value in sorted(state.items()):
+            if key == 'cookies':
+                # Use hash of the cookies object if it has __hash__ method.
+                hashable_items.append((key, hash(self._cookies)))
+            elif isinstance(value, (list, dict)):
+                # Convert collections to tuples for hashing.
+                if isinstance(value, list):
+                    hashable_items.append((key, hash(tuple(value))))
+                else:
+                    hashable_items.append((key, hash(tuple(sorted(value.items())))))
+            else:
+                hashable_items.append((key, hash(value)))
+
+        return hash(tuple(hashable_items))
+
     @property
     def id(self) -> str:
         """Get the session ID."""
@@ -147,7 +169,7 @@ class Session:
 
     def get_state(self, *, as_dict: bool = False) -> SessionModel | dict:
         """Retrieve the current state of the session either as a model or as a dictionary."""
-        from ._models import SessionModel
+        from ._models import SessionModel  # noqa: PLC0415
 
         model = SessionModel(
             id=self._id,

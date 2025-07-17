@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import TYPE_CHECKING, Annotated
 
 from pydantic import AliasChoices, BeforeValidator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from crawlee._types import LogLevel
 from crawlee._utils.docs import docs_group
 from crawlee._utils.models import timedelta_ms
 
@@ -62,7 +63,7 @@ class Configuration(BaseSettings):
     https://playwright.dev/docs/api/class-browsertype#browser-type-launch."""
 
     log_level: Annotated[
-        Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        LogLevel,
         Field(
             validation_alias=AliasChoices(
                 'apify_log_level',
@@ -73,42 +74,6 @@ class Configuration(BaseSettings):
     ] = 'INFO'
     """The logging level."""
 
-    default_dataset_id: Annotated[
-        str,
-        Field(
-            validation_alias=AliasChoices(
-                'actor_default_dataset_id',
-                'apify_default_dataset_id',
-                'crawlee_default_dataset_id',
-            )
-        ),
-    ] = 'default'
-    """The default `Dataset` ID. This option is utilized by the storage client."""
-
-    default_key_value_store_id: Annotated[
-        str,
-        Field(
-            validation_alias=AliasChoices(
-                'actor_default_key_value_store_id',
-                'apify_default_key_value_store_id',
-                'crawlee_default_key_value_store_id',
-            )
-        ),
-    ] = 'default'
-    """The default `KeyValueStore` ID. This option is utilized by the storage client."""
-
-    default_request_queue_id: Annotated[
-        str,
-        Field(
-            validation_alias=AliasChoices(
-                'actor_default_request_queue_id',
-                'apify_default_request_queue_id',
-                'crawlee_default_request_queue_id',
-            )
-        ),
-    ] = 'default'
-    """The default `RequestQueue` ID. This option is utilized by the storage client."""
-
     purge_on_start: Annotated[
         bool,
         Field(
@@ -118,21 +83,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = True
-    """Whether to purge the storage on the start. This option is utilized by the `MemoryStorageClient`."""
-
-    write_metadata: Annotated[bool, Field(alias='crawlee_write_metadata')] = True
-    """Whether to write the storage metadata. This option is utilized by the `MemoryStorageClient`."""
-
-    persist_storage: Annotated[
-        bool,
-        Field(
-            validation_alias=AliasChoices(
-                'apify_persist_storage',
-                'crawlee_persist_storage',
-            )
-        ),
-    ] = True
-    """Whether to persist the storage. This option is utilized by the `MemoryStorageClient`."""
+    """Whether to purge the storage on the start. This option is utilized by the storage clients."""
 
     persist_state_interval: Annotated[
         timedelta_ms,
@@ -239,7 +190,7 @@ class Configuration(BaseSettings):
             ),
         ),
     ] = './storage'
-    """The path to the storage directory. This option is utilized by the `MemoryStorageClient`."""
+    """The path to the storage directory. This option is utilized by the storage clients."""
 
     headless: Annotated[
         bool,
@@ -263,7 +214,8 @@ class Configuration(BaseSettings):
         Mostly for the backwards compatibility. It is recommended to use the `service_locator.get_configuration()`
         instead.
         """
-        from crawlee import service_locator
+        # Import here to avoid circular imports.
+        from crawlee import service_locator  # noqa: PLC0415
 
         config = service_locator.get_configuration()
 

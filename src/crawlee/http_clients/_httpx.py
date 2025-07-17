@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 from typing_extensions import override
@@ -46,10 +46,10 @@ class _HttpxResponse:
     def headers(self) -> HttpHeaders:
         return HttpHeaders(dict(self._response.headers))
 
-    def read(self) -> bytes:
+    async def read(self) -> bytes:
         if not self._response.is_closed:
             raise RuntimeError('Use `read_stream` to read the body of the Response received from the `stream` method')
-        return self._response.read()
+        return await self._response.aread()
 
     async def read_stream(self) -> AsyncIterator[bytes]:
         if self._response.is_stream_consumed:
@@ -136,7 +136,7 @@ class HttpxHttpClient(HttpClient):
 
         self._transport: _HttpxTransport | None = None
 
-        self._client_by_proxy_url = dict[Optional[str], httpx.AsyncClient]()
+        self._client_by_proxy_url = dict[str | None, httpx.AsyncClient]()
 
     @override
     async def crawl(

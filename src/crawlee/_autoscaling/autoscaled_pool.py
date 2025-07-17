@@ -7,14 +7,14 @@ import math
 from contextlib import suppress
 from datetime import timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from crawlee._types import ConcurrencySettings
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable
+    from collections.abc import Awaitable, Callable
 
     from crawlee._autoscaling import SystemStatus
 

@@ -10,6 +10,10 @@
 </h1>
 
 <p align=center>
+    <a href="https://trendshift.io/repositories/11169" target="_blank"><img src="https://trendshift.io/api/badge/repositories/11169" alt="apify%2Fcrawlee-python | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+</p>
+
+<p align=center>
     <a href="https://badge.fury.io/py/crawlee" rel="nofollow">
         <img src="https://badge.fury.io/py/crawlee.svg" alt="PyPI version" style="max-width: 100%;">
     </a>

@@ -1,0 +1,89 @@
+---
+id: creating-web-archive
+title: Creating web archive
+description: How to create a Web ARChive (WARC) with Crawlee
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import CodeBlock from '@theme/CodeBlock';
+
+import PlaywrightCrawlerRecordThroughProxy from '!!raw-loader!./code_examples/creating_web_archive/simple_pw_through_proxy_pywb_server.py';
+import ParselCrawlerRecordManual from '!!raw-loader!./code_examples/creating_web_archive/manual_archiving_parsel_crawler.py';
+import PlaywrightCrawlerRecordManual from '!!raw-loader!./code_examples/creating_web_archive/manual_archiving_playwright_crawler.py';
+
+Archiving webpages is one of the tasks that a web crawler can be used for. There are various use cases, such as archiving for future reference, speeding up web crawler development, creating top-level regression tests for web crawlers and so on.
+
+There are various existing libraries of web archives with massive amount of data stored during their years of existence, for example [Wayback Machine](https://web.archive.org/) or [Common Crawl](https://commoncrawl.org/). There are also dedicated tools for archiving web pages, to name some: simple browser extensions such as [Archive Webpage](https://archiveweb.page/), open source tools such as [pywb](https://pypi.org/project/pywb/) or [warcio](https://pypi.org/project/warcio/), or even web crawlers specialized in archiving such as [Browsertrix](https://webrecorder.net/browsertrix/).
+
+The common file format used for archiving is [WARC](https://www.iso.org/standard/68004.html). Crawlee does not offer any out-of-the-box functionality to create WARC files, but in this guide, we will show examples of approaches that can be easily used in your use case to create WARC files with Crawlee.
+
+## Crawling through proxy recording server
+
+This approach can be especially attractive as it does not require almost any code change to the crawler itself and the correct WARC creation is done by code from well maintained [pywb](https://pypi.org/project/pywb/) package. The trick is to run a properly configured [wayback proxy server](https://pywb.readthedocs.io/en/latest/manual/usage.html#using-pywb-recorder), use it as a proxy for the crawler and record any traffic. Another advantage of this approach is that it is language agnostic. This way, you can record both your Python-based crawler and your JavaScript-based crawler. This is very straightforward and a good place to start.
+
+This approach expects that you have already created your crawler, and that you just want to archive all the pages it is visiting during its crawl.
+
+Install [pywb](https://pypi.org/project/pywb/) which will allow you to use `wb-manager` and `wayback` commands.
+Create a new collection that will be used for this archiving session and start the wayback server:
+```bash
+wb-manager init example-collection
+wayback --record --live -a --auto-interval 10 --proxy example-collection --proxy-record
+```
+Instead of passing many configuration  arguments to `wayback` command, you can configure the server by adding configuration options to `config.yaml`. See the details in the [documentation](https://pywb.readthedocs.io/en/latest/manual/configuring.html#configuring-the-web-archive).
+
+### Configure the crawler
+
+Now you should use this locally hosted server as a proxy in your crawler. There are two more steps before starting the crawler:
+ - Make the crawler use the proxy server.
+ - Deal with the [pywb Certificate Authority](https://pywb.readthedocs.io/en/latest/manual/configuring.html#https-proxy-and-pywb-certificate-authority).
+
+For example, in <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, this is the simplest setup, which takes the shortcut and ignores the CA-related errors:
+
+<CodeBlock className="language-python">
+    {PlaywrightCrawlerRecordThroughProxy}
+</CodeBlock>
+
+After you run the crawler you will be able to see the archived data in the wayback collection directory for example `.../collections/example-collection/archive`. You can then access the recorded pages directly in the proxy recording server or use it with any other WARC-compatible tool.
+
+## Manual WARC creation
+
+A different approach is to create WARC files manually in the crawler, which gives you full control over the WARC files. This is way more complex and low-level approach as you have to ensure that all the relevant data is collected, and correctly stored and that the archiving functions are called at the right time. This is by no means a trivial task and the example archiving functions below are just the most simple examples that will be insufficient for many real-world use cases. You will need to extend and improve them to properly fit your specific needs.
+
+### Simple crawlers
+
+With non-browser crawlers such as <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> you will not be able to create high fidelity archive of the page as you will be missing all the JavaScript dynamic content. However, you can still create a WARC file with the HTML content of the page, which can be sufficient for some use cases. Let's take a look at the example below:
+<CodeBlock className="language-python">
+    {ParselCrawlerRecordManual}
+</CodeBlock>
+
+The example above is calling an archiving function on each request using the `request_handler`.
+
+### Browser-based crawlers
+
+With browser crawlers such as <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> you should be able to create high fidelity archive of a web page. Let's take a look at the example below:
+
+<CodeBlock className="language-python">
+    {PlaywrightCrawlerRecordManual}
+</CodeBlock>
+
+The example above is adding an archiving callback on each response in the pre_navigation `archiving_hook`. This ensures that additional resources requested by the browser are also archived.
+
+## Using the archived data
+
+In the following section, we will describe an example use case how you can use the recorded WARC files to speed up the development of your web crawler. The idea is to use the archived data as a source of responses for your crawler so that you can test it against the real data without having to crawl the web again.
+
+It is assumed that you already have the WARC files. If not, please read the previous sections on how to create them first.
+
+Let's use pywb again. This time we will not use it as a recording server, but as a proxy server that will serve the previously archived pages to your crawler in development.
+
+```bash
+wb-manager init example-collection
+wb-manager add example-collection /your_path_to_warc_file/example.warc.gz
+wayback --proxy example-collection
+```
+
+Previous commands start the wayback server that allows crawler requests to be served from the archived pages in the `example-collection` instead of sending requests to the real website. This is again [proxy mode of the wayback server](https://pywb.readthedocs.io/en/latest/manual/usage.html#http-s-proxy-mode-access), but without recording capability. Now you need to [configure your crawler](#configure-the-crawler) to use this proxy server, which was already described above. Once everything is finished, you can just run your crawler, and it will crawl the offline archived version of the website from your WARC file.
+
+You can also manually browse the archived pages in the wayback server by going to the locally hosted server and entering the collection and URL of the archived page, for example: `http://localhost:8080/example-collection/https:/crawlee.dev/`. The wayback server will serve the page from the WARC file if it exists, or it will return a 404 error if it does not. For more detail about the server please refer to the [pywb documentation](https://pywb.readthedocs.io/en/latest/manual/usage.html#getting-started).
+
+If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord](https://discord.com/invite/jyEM2PRvMU) community.

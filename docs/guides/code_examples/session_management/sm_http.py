@@ -26,7 +26,7 @@ async def main() -> None:
     # based on the response content and potential blocking
     @crawler.router.default_handler
     async def default_handler(context: HttpCrawlingContext) -> None:
-        page_content = context.http_response.read().decode()
+        page_content = (await context.http_response.read()).decode()
         title_match = re.search(r'<title(?:.*?)>(.*?)</title>', page_content)
 
         if context.session and (title := title_match.group(1) if title_match else None):
