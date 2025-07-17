@@ -29,6 +29,7 @@ def event_system_data_info() -> EventSystemInfoData:
         memory_info=MemoryInfo(
             total_size=ByteSize.from_gb(8),
             current_size=ByteSize.from_gb(4),
+            system_wide_used_size=ByteSize.from_gb(5),
         ),
     )
 
@@ -50,6 +51,28 @@ def test_snapshot_memory(snapshotter: Snapshotter, event_system_data_info: Event
     snapshotter._snapshot_memory(event_system_data_info)
     assert len(snapshotter._memory_snapshots) == 1
     assert snapshotter._memory_snapshots[0].current_size == event_system_data_info.memory_info.current_size
+
+
+def test_snapshot_memory_with_memory_info_sets_system_wide_fields(snapshotter: Snapshotter) -> None:
+    memory_info = MemoryInfo(
+        total_size=ByteSize.from_gb(16),
+        current_size=ByteSize.from_gb(4),
+        system_wide_used_size=ByteSize.from_gb(12),
+    )
+
+    event_data = EventSystemInfoData(
+        cpu_info=CpuInfo(used_ratio=0.5),
+        memory_info=memory_info,
+    )
+
+    snapshotter._snapshot_memory(event_data)
+
+    assert len(snapshotter._memory_snapshots) == 1
+    memory_snapshot = snapshotter._memory_snapshots[0]
+
+    # Test that system-wide fields are properly set
+    assert memory_snapshot.system_wide_used_size == memory_info.system_wide_used_size
+    assert memory_snapshot.system_wide_memory_size == memory_info.total_size
 
 
 def test_snapshot_event_loop(snapshotter: Snapshotter) -> None:
@@ -254,7 +277,10 @@ async def test_snapshots_time_ordered(snapshotter: Snapshotter) -> None:
         return EventSystemInfoData(
             cpu_info=CpuInfo(used_ratio=0.5, created_at=creation_time),
             memory_info=MemoryInfo(
-                current_size=ByteSize(bytes=1), created_at=creation_time, total_size=ByteSize(bytes=2)
+                current_size=ByteSize(bytes=1),
+                created_at=creation_time,
+                total_size=ByteSize(bytes=2),
+                system_wide_used_size=ByteSize.from_gb(5),
             ),
         )
 

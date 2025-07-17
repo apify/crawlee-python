@@ -59,6 +59,14 @@ class MemoryInfo(MemoryUsageInfo):
     ]
     """Total memory available in the system."""
 
+    system_wide_used_size: Annotated[
+        ByteSize,
+        PlainValidator(ByteSize.validate),
+        PlainSerializer(lambda size: size.bytes),
+        Field(alias='systemWideUsedSize'),
+    ]
+    """Total memory used by all processes system-wide (including non-crawlee processes)."""
+
 
 def get_cpu_info() -> CpuInfo:
     """Retrieve the current CPU usage.
@@ -89,11 +97,12 @@ def get_memory_info() -> MemoryInfo:
         with suppress(psutil.NoSuchProcess):
             current_size_bytes += _get_used_memory(child.memory_full_info())
 
-    total_size_bytes = psutil.virtual_memory().total
+    vm = psutil.virtual_memory()
 
     return MemoryInfo(
-        total_size=ByteSize(total_size_bytes),
+        total_size=ByteSize(vm.total),
         current_size=ByteSize(current_size_bytes),
+        system_wide_used_size=ByteSize(vm.total - vm.available),
     )
 
 
