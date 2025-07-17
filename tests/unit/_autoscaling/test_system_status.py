@@ -212,3 +212,42 @@ def test_client_overloaded(
 
     # Ratio of overloaded snapshots is 2/3 (2 minutes out of 3)
     assert system_status._is_client_overloaded().is_overloaded == is_overloaded
+
+
+def test_memory_overloaded_system_wide(snapshotter: Snapshotter, now: datetime) -> None:
+    """Test that system-wide memory overload is detected when system-wide memory utilization exceeds threshold."""
+    system_status = SystemStatus(
+        snapshotter,
+        max_snapshot_age=timedelta(minutes=1),
+        memory_overload_threshold=0.5,  # Set high threshold so process memory won't trigger overload
+    )
+
+    # Add memory snapshots with system-wide memory usage above threshold (97%)
+    system_status._snapshotter._memory_snapshots = Snapshotter._get_sorted_list_by_created_at(
+        [
+            MemorySnapshot(
+                current_size=ByteSize.from_gb(1),  # Process memory is low
+                max_memory_size=ByteSize.from_gb(8),  # Max memory is high
+                max_used_memory_ratio=0.8,  # Ratio is fine
+                created_at=now - timedelta(minutes=1),
+                system_wide_used_size=ByteSize.from_gb(31),  # System-wide used is high
+                system_wide_memory_size=ByteSize.from_gb(32),  # System-wide total (31/32 = 96.875% < 97%)
+            ),
+            MemorySnapshot(
+                current_size=ByteSize.from_gb(1),  # Process memory is low
+                max_memory_size=ByteSize.from_gb(8),  # Max memory is high
+                max_used_memory_ratio=0.8,  # Ratio is fine
+                created_at=now,
+                system_wide_used_size=ByteSize.from_gb(31.5),  # System-wide used is high
+                system_wide_memory_size=ByteSize.from_gb(32),  # System-wide total (31.5/32 = 98.4% > 97%)
+            ),
+        ]
+    )
+
+    memory_info = system_status._is_memory_overloaded()
+
+    # Should be overloaded due to system-wide memory usage exceeding 97% threshold
+    assert memory_info.is_overloaded is True
+    # The actual ratio should be 1.0 (the entire time period from first to second snapshot is overloaded)
+    assert memory_info.actual_ratio == 1.0
+    assert memory_info.limit_ratio == 0.5
