@@ -33,7 +33,7 @@ async def main() -> None:
     # Create crawler with the custom router
     crawler = ParselCrawler(
         request_handler=router,
-        max_requests_per_crawl=10,
+        max_requests_per_crawl=10,  # Limit the max requests per crawl.
     )
 
     # Start crawling

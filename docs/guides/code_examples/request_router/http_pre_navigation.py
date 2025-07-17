@@ -1,16 +1,24 @@
 import asyncio
 
+from crawlee import HttpHeaders
 from crawlee.crawlers import BasicCrawlingContext, ParselCrawler, ParselCrawlingContext
 
 
 async def main() -> None:
-    crawler = ParselCrawler()
+    crawler = ParselCrawler(
+        max_requests_per_crawl=10,  # Limit the max requests per crawl.
+    )
 
     @crawler.pre_navigation_hook
     async def setup_request(context: BasicCrawlingContext) -> None:
         # Add custom headers before making the request
-        context.request.headers['User-Agent'] = 'Crawlee Bot 1.0'
-        context.request.headers['Accept'] = 'text/html,application/xhtml+xml'
+        context.request.headers = HttpHeaders(
+            {
+                **context.request.headers,
+                'User-Agent': 'Crawlee Bot 1.0',
+                'Accept': 'text/html,application/xhtml+xml',
+            },
+        )
 
     @crawler.router.default_handler
     async def default_handler(context: ParselCrawlingContext) -> None:

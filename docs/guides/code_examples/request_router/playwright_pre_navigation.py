@@ -8,7 +8,9 @@ from crawlee.crawlers import (
 
 
 async def main() -> None:
-    crawler = PlaywrightCrawler(max_requests_per_crawl=5)
+    crawler = PlaywrightCrawler(
+        max_requests_per_crawl=10,  # Limit the max requests per crawl.
+    )
 
     @crawler.pre_navigation_hook
     async def setup_page(context: PlaywrightPreNavCrawlingContext) -> None:

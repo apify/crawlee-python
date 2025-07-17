@@ -5,7 +5,9 @@ from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
 
 async def main() -> None:
     # Create a crawler instance
-    crawler = ParselCrawler(max_requests_per_crawl=10)
+    crawler = ParselCrawler(
+        max_requests_per_crawl=10,  # Limit the max requests per crawl.
+    )
 
     # Use the crawler's built-in router to define a default handler
     @crawler.router.default_handler

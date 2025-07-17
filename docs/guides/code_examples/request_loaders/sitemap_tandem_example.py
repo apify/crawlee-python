@@ -23,7 +23,10 @@ async def main() -> None:
         request_manager = await sitemap_loader.to_tandem()
 
         # Create a crawler and pass the request manager to it.
-        crawler = ParselCrawler(request_manager=request_manager)
+        crawler = ParselCrawler(
+            request_manager=request_manager,
+            max_requests_per_crawl=10,  # Limit the max requests per crawl.
+        )
 
         @crawler.router.default_handler
         async def handler(context: ParselCrawlingContext) -> None:

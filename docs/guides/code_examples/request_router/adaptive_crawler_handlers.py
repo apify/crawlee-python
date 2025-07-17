@@ -1,5 +1,6 @@
 import asyncio
 
+from crawlee import HttpHeaders
 from crawlee.crawlers import (
     AdaptivePlaywrightCrawler,
     AdaptivePlaywrightCrawlingContext,
@@ -12,14 +13,19 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context
 
 async def main() -> None:
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
-        max_requests_per_crawl=5,
+        max_requests_per_crawl=10,  # Limit the max requests per crawl.
     )
 
     # Common pre-navigation hook (runs for all requests)
     @crawler.pre_navigation_hook
     async def common_setup(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
         # This runs for both HTTP and browser requests
-        context.request.headers['Accept'] = 'text/html,application/xhtml+xml'
+        context.request.headers = HttpHeaders(
+            {
+                **context.request.headers,
+                'Accept': 'text/html,application/xhtml+xml',
+            },
+        )
 
     # Playwright-specific pre-navigation hook (only when using browser)
     @crawler.pre_navigation_hook(playwright_only=True)

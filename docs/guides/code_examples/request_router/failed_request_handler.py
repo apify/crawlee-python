@@ -6,7 +6,7 @@ from crawlee.crawlers import BasicCrawlingContext, ParselCrawler, ParselCrawling
 async def main() -> None:
     # Create a crawler instance with retry settings
     crawler = ParselCrawler(
-        max_requests_per_crawl=10,
+        max_requests_per_crawl=10,  # Limit the max requests per crawl.
         max_request_retries=2,  # Allow 2 retries before failing
     )
 

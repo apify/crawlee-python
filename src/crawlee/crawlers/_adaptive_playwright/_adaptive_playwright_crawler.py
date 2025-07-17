@@ -99,7 +99,8 @@ class AdaptivePlaywrightCrawler(
     from crawlee.crawlers import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlingContext
 
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
-        max_requests_per_crawl=5, playwright_crawler_specific_kwargs={'browser_type': 'chromium'}
+        max_requests_per_crawl=10,  # Limit the max requests per crawl.
+        playwright_crawler_specific_kwargs={'browser_type': 'chromium'},
     )
 
     @crawler.router.default_handler

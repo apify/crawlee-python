@@ -9,7 +9,9 @@ TOO_MANY_REQUESTS = 429
 
 async def main() -> None:
     # Create a crawler instance
-    crawler = ParselCrawler(max_requests_per_crawl=10)
+    crawler = ParselCrawler(
+        max_requests_per_crawl=10,  # Limit the max requests per crawl.
+    )
 
     @crawler.router.default_handler
     async def default_handler(context: ParselCrawlingContext) -> None:
