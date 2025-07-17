@@ -131,9 +131,7 @@ class RecoverableState(Generic[TStateModel]):
         if self._key_value_store is None:
             raise RuntimeError('Recoverable state has not yet been initialized')
 
-        return (
-            await self._key_value_store.get_value(self._persist_state_key) is not None
-        )  # TODO do not fetch the whole record
+        return await self._key_value_store.record_exists(self._persist_state_key)
 
     async def reset(self) -> None:
         """Reset the state to the default values and clear any persisted state.
