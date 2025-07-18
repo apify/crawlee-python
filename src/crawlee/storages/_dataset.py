@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@docs_group('Classes')
+@docs_group('Storages')
 class Dataset(Storage):
     """Dataset is a storage for managing structured tabular data.
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
+from crawlee._utils.docs import docs_group
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from types import TracebackType
@@ -13,6 +15,7 @@ if TYPE_CHECKING:
     from crawlee.browsers._types import BrowserType
 
 
+@docs_group('Browser management')
 class BrowserPlugin(ABC):
     """An abstract base class for browser plugins.
 

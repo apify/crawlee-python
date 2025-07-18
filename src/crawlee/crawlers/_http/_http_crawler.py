@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from crawlee.crawlers import BasicCrawlerOptions
 
 
-@docs_group('Classes')
+@docs_group('Crawlers')
 class HttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[bytes], bytes, bytes]):
     """Specific version of generic `AbstractHttpCrawler`.
 
@@ -36,7 +36,7 @@ class HttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[bytes], bytes, b
         # Extract data from the page.
         data = {
             'url': context.request.url,
-            'response': context.http_response.read().decode()[:100],
+            'response': (await context.http_response.read()).decode()[:100],
         }
 
         # Push the extracted data to the default dataset.

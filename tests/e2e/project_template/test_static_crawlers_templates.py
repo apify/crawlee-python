@@ -61,8 +61,8 @@ async def test_static_crawler_actor_at_apify(
             'http_client': http_client,
             'enable_apify_integration': True,
             'start_url': default_start_url,
+            'install_project': False,
         },
-        accept_hooks=False,  # Do not install the newly created environment.
         output_dir=tmp_path,
     )
 

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-@docs_group('Classes')
+@docs_group('Browser management')
 class PlaywrightPersistentBrowser(Browser):
     """A wrapper for Playwright's `Browser` that operates with a persistent context.
 

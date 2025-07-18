@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from parsel import Selector
 from typing_extensions import override
 
+from crawlee._utils.docs import docs_group
 from crawlee.crawlers._abstract_http import AbstractHttpParser
 
 if TYPE_CHECKING:
@@ -14,12 +15,14 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpResponse
 
 
+@docs_group('HTTP parsers')
 class ParselParser(AbstractHttpParser[Selector, Selector]):
     """Parser for parsing HTTP response using Parsel."""
 
     @override
     async def parse(self, response: HttpResponse) -> Selector:
-        return await asyncio.to_thread(lambda: Selector(body=response.read()))
+        response_body = await response.read()
+        return await asyncio.to_thread(lambda: Selector(body=response_body))
 
     @override
     async def parse_text(self, text: str) -> Selector:

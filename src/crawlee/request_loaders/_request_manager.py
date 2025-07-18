@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from crawlee._request import Request
 
 
-@docs_group('Abstract classes')
+@docs_group('Request loaders')
 class RequestManager(RequestLoader, ABC):
     """Base class that extends `RequestLoader` with the capability to enqueue new requests and reclaim failed ones."""
 

@@ -41,7 +41,7 @@ class PlaywrightHttpResponse:
     headers: HttpHeaders
     _content: bytes
 
-    def read(self) -> bytes:
+    async def read(self) -> bytes:
         return self._content
 
     async def read_stream(self) -> AsyncGenerator[bytes, None]:

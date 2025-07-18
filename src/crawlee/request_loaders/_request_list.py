@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from crawlee._request import Request
 
 
-@docs_group('Classes')
+@docs_group('Request loaders')
 class RequestList(RequestLoader):
     """Represents a (potentially very large) list of URLs to crawl.
 

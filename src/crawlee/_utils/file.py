@@ -163,7 +163,7 @@ async def export_csv_to_stream(
     dst: TextIO,
     **kwargs: Unpack[ExportDataCsvKwargs],
 ) -> None:
-    writer = csv.writer(dst, **kwargs)
+    writer = csv.writer(dst, **kwargs)  # type: ignore[arg-type]
     write_header = True
 
     # Iterate over the dataset and write to CSV.

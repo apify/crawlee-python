@@ -34,9 +34,45 @@ Crawlee's storage system consists of two main layers:
 
 For more information about storage clients and their configuration, see the [Storage clients guide](./storage-clients).
 
+```mermaid
+---
+config:
+    class:
+        hideEmptyMembersBox: true
+---
+
+classDiagram
+
+%% ========================
+%% Abstract classes
+%% ========================
+
+class Storage {
+    <<abstract>>
+}
+
+%% ========================
+%% Specific classes
+%% ========================
+
+class Dataset
+
+class KeyValueStore
+
+class RequestQueue
+
+%% ========================
+%% Inheritance arrows
+%% ========================
+
+Storage --|> Dataset
+Storage --|> KeyValueStore
+Storage --|> RequestQueue
+```
+
 ## Request queue
 
-The <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> is the primary storage for URLs in Crawlee, especially useful for deep crawling. It supports dynamic addition and removal of URLs, making it ideal for recursive tasks where URLs are discovered and added during the crawling process (e.g., following links across multiple pages). Each Crawlee project has a **default request queue**, which can be used to store URLs during a specific run. The <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> is highly useful for large-scale and complex crawls.
+The <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> is the primary storage for URLs in Crawlee, especially useful for deep crawling. It supports dynamic addition of URLs, making it ideal for recursive tasks where URLs are discovered and added during the crawling process (e.g., following links across multiple pages). Each Crawlee project has a **default request queue**, which can be used to store URLs during a specific run.
 
 The following code demonstrates the usage of the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>:
 
@@ -185,4 +221,6 @@ Note that purging behavior may vary between storage client implementations. For 
 
 ## Conclusion
 
-This guide introduced you to the different storage types available in Crawlee and how to interact with them. You learned how to manage requests using the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> and store and retrieve scraping results using the <ApiLink to="class/Dataset">`Dataset`</ApiLink> and <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>. You also discovered how to use helper functions to simplify interactions with these storages. Finally, you learned how to clean up storages before starting a crawler run. If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!
+This guide introduced you to the different storage types available in Crawlee and how to interact with them. You learned how to manage requests using the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> and store and retrieve scraping results using the <ApiLink to="class/Dataset">`Dataset`</ApiLink> and <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>. You also discovered how to use helper functions to simplify interactions with these storages. Finally, you learned how to clean up storages before starting a crawler run.
+
+If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!

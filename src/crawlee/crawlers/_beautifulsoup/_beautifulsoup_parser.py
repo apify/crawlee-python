@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Literal
 from bs4 import BeautifulSoup, Tag
 from typing_extensions import override
 
+from crawlee._utils.docs import docs_group
 from crawlee.crawlers._abstract_http import AbstractHttpParser
 
 if TYPE_CHECKING:
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpResponse
 
 
+@docs_group('HTTP parsers')
 class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup, Tag]):
     """Parser for parsing HTTP response using `BeautifulSoup`."""
 
@@ -21,7 +23,7 @@ class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup, Tag]):
 
     @override
     async def parse(self, response: HttpResponse) -> BeautifulSoup:
-        return BeautifulSoup(response.read(), features=self._parser)
+        return BeautifulSoup(await response.read(), features=self._parser)
 
     @override
     async def parse_text(self, text: str) -> BeautifulSoup:

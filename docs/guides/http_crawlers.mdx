@@ -1,38 +1,101 @@
 ---
 id: http-crawlers
 title: HTTP crawlers
-description: Crawlee supports multiple HTTP crawlers that can be used to extract data from server-rendered webpages.
+description: Learn about Crawlee's HTTP crawlers including BeautifulSoup, Parsel, and raw HTTP crawlers for efficient server-rendered content extraction without JavaScript execution.
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-Generic class <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> is parent to <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> and <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> and it could be used as parent for your crawler with custom content parsing requirements.
+import BeautifulSoupExample from '!!raw-loader!roa-loader!./code_examples/http_crawlers/beautifulsoup_example.py';
+import ParselExample from '!!raw-loader!roa-loader!./code_examples/http_crawlers/parsel_example.py';
+import HttpExample from '!!raw-loader!roa-loader!./code_examples/http_crawlers/http_example.py';
 
-It already includes almost all the functionality to crawl webpages and the only missing part is the parser that should be used to parse HTTP responses, and a context dataclass that defines what context helpers will be available to user handler functions.
+HTTP crawlers are ideal for extracting data from server-rendered websites that don't require JavaScript execution. These crawlers make requests via HTTP clients to fetch HTML content and then parse it using various parsing libraries. For client-side rendered content, where you need to execute JavaScript consider using [Playwright crawler](https://crawlee.dev/python/docs/guides/playwright-crawler) instead.
 
-## `BeautifulSoupCrawler`
+## Overview
 
-<ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> uses <ApiLink to="class/BeautifulSoupParser">`BeautifulSoupParser`</ApiLink> to parse the HTTP response and makes it available in <ApiLink to="class/BeautifulSoupCrawlingContext">`BeautifulSoupCrawlingContext`</ApiLink> in the `.soup` or `.parsed_content` attribute.
+All HTTP crawlers share a common architecture built around the <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> base class. The main differences lie in the parsing strategy and the context provided to request handlers. There are <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>, and <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink>. It can also be extended to create custom crawlers with specialized parsing requirements. They use HTTP clients to fetch page content and parsing libraries to extract data from the HTML, check out the [HTTP clients guide](./http-clients) to learn about the HTTP clients used by these crawlers, how to switch between them, and how to create custom HTTP clients tailored to your specific requirements.
 
-## `ParselCrawler`
+```mermaid
+---
+config:
+    class:
+        hideEmptyMembersBox: true
+---
 
-<ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> uses <ApiLink to="class/ParselParser">`ParselParser`</ApiLink> to parse the HTTP response and makes it available in <ApiLink to="class/ParselCrawlingContext">`ParselCrawlingContext`</ApiLink> in the `.selector` or `.parsed_content` attribute.
+classDiagram
 
-## `HttpCrawler`
+%% ========================
+%% Abstract classes
+%% ========================
 
-<ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> uses <ApiLink to="class/NoParser">`NoParser`</ApiLink> that does not parse the HTTP response at all and is to be used if no parsing is required.
+class BasicCrawler {
+    <<abstract>>
+}
 
-## Creating your own HTTP crawler
+class AbstractHttpCrawler {
+    <<abstract>>
+}
 
-### Why?
+%% ========================
+%% Specific classes
+%% ========================
 
-In case you want to use some custom parser for parsing HTTP responses, and the rest of the <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> functionality suit your needs.
+class HttpCrawler
 
-### How?
+class ParselCrawler
 
-You need to define at least 2 new classes and decide what will be the type returned by the parser's `parse` method.
-Parser will inherit from <ApiLink to="class/AbstractHttpParser">`AbstractHttpParser`</ApiLink> and it will need to implement all it's abstract methods. Crawler will inherit from <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> and it will need to implement all it's abstract methods. Newly defined parser is then used in the `parser` argument of `AbstractHttpCrawler.__init__` method.
+class BeautifulSoupCrawler
 
-To get better idea and as an example please see one of our own HTTP-based crawlers mentioned above.
+%% ========================
+%% Inheritance arrows
+%% ========================
+
+BasicCrawler --|> AbstractHttpCrawler
+AbstractHttpCrawler --|> HttpCrawler
+AbstractHttpCrawler --|> ParselCrawler
+AbstractHttpCrawler --|> BeautifulSoupCrawler
+```
+
+## BeautifulSoupCrawler
+
+The <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> uses the [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) library for HTML parsing. It provides fault-tolerant parsing that handles malformed HTML, automatic character encoding detection, and supports CSS selectors, tag navigation, and custom search functions. Use this crawler when working with imperfect HTML structures, when you prefer BeautifulSoup's intuitive API, or when prototyping web scraping solutions.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {BeautifulSoupExample}
+</RunnableCodeBlock>
+
+## ParselCrawler
+
+The <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> uses the [Parsel](https://parsel.readthedocs.io/) library, which provides XPath 1.0 and CSS selector support built on `lxml` for high performance. It includes built-in regex support for pattern matching, proper XML namespace handling, and offers better performance than BeautifulSoup while maintaining a clean API. Use this crawler when you need XPath functionality, require high-performance parsing, or need to extract data using regular expressions.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {ParselExample}
+</RunnableCodeBlock>
+
+## HttpCrawler
+
+The <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> provides direct access to HTTP response body and headers without automatic parsing, offering maximum performance with no parsing overhead. It supports any content type (JSON, XML, binary) and allows complete control over response processing, including memory-efficient handling of large responses. Use this crawler when working with non-HTML content, requiring maximum performance, implementing custom parsing logic, or needing access to raw response data.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {HttpExample}
+</RunnableCodeBlock>
+
+## Creating custom HTTP crawler
+
+While the built-in crawlers cover most use cases, you might need a custom HTTP crawler for specialized parsing requirements. To create a custom HTTP crawler, inherit directly from <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink>. This approach requires implementing:
+
+1. **Custom parser class**: Inherit from <ApiLink to="class/AbstractHttpParser">`AbstractHttpParser`</ApiLink>.
+2. **Custom context class**: Define what data and helpers are available to handlers.
+3. **Custom crawler class**: Tie everything together.
+
+This approach is recommended when you need tight integration between parsing and the crawling context, or when you're building a reusable crawler for a specific technology or format.
+
+## Conclusion
+
+This guide provided a comprehensive overview of HTTP crawlers in Crawlee. You learned about the three main crawler types - <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> for fault-tolerant HTML parsing, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> for high-performance extraction with XPath and CSS selectors, and <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> for raw response processing. You also discovered how to create custom crawlers for specific use cases.
+
+If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!

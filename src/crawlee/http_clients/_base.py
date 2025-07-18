@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from crawlee.statistics import Statistics
 
 
-@docs_group('Data structures')
+@docs_group('Other')
 class HttpResponse(Protocol):
     """Define the interface that any HTTP response object must implement."""
 
@@ -35,7 +35,7 @@ class HttpResponse(Protocol):
     def headers(self) -> HttpHeaders:
         """The HTTP headers received in the response."""
 
-    def read(self) -> bytes:
+    async def read(self) -> bytes:
         """Read the entire content of the response body.
 
         This method loads the complete response body into memory at once. It should be used
@@ -59,7 +59,7 @@ class HttpResponse(Protocol):
 
 
 @dataclass(frozen=True)
-@docs_group('Data structures')
+@docs_group('Crawling contexts')
 class HttpCrawlingResult:
     """Result of an HTTP-only crawl.
 
@@ -71,7 +71,7 @@ class HttpCrawlingResult:
     """The HTTP response received from the server."""
 
 
-@docs_group('Abstract classes')
+@docs_group('HTTP clients')
 class HttpClient(ABC):
     """An abstract base class for HTTP clients used in crawlers (`BasicCrawler` subclasses)."""
 

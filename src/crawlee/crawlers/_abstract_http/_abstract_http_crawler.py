@@ -32,7 +32,7 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 
 
-@docs_group('Abstract classes')
+@docs_group('Crawlers')
 class AbstractHttpCrawler(
     Generic[TCrawlingContext, TParseResult, TSelectResult], BasicCrawler[TCrawlingContext, StatisticsState], ABC
 ):

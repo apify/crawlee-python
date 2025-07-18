@@ -52,7 +52,7 @@ class RequestProcessingRecord:
         return max(0, self._runs - 1)
 
 
-@docs_group('Classes')
+@docs_group('Statistics')
 class Statistics(Generic[TStatisticsState]):
     """A class for collecting, tracking, and logging runtime statistics for requests.
 

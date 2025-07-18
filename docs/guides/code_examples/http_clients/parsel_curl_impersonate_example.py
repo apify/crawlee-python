@@ -1,17 +1,17 @@
 import asyncio
 
-from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
-from crawlee.http_clients import HttpxHttpClient
+from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
+from crawlee.http_clients import CurlImpersonateHttpClient
 
 
 async def main() -> None:
-    http_client = HttpxHttpClient(
-        # Optional additional keyword arguments for `httpx.AsyncClient`.
+    http_client = CurlImpersonateHttpClient(
+        # Optional additional keyword arguments for `curl_cffi.requests.AsyncSession`.
         timeout=10,
-        follow_redirects=True,
+        impersonate='chrome131',
     )
 
-    crawler = BeautifulSoupCrawler(
+    crawler = ParselCrawler(
         http_client=http_client,
         # Limit the crawl to max requests. Remove or increase it for crawling all links.
         max_requests_per_crawl=10,
@@ -19,7 +19,7 @@ async def main() -> None:
 
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
-    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+    async def request_handler(context: ParselCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
         # Enqueue all links from the page.
@@ -28,7 +28,7 @@ async def main() -> None:
         # Extract data from the page.
         data = {
             'url': context.request.url,
-            'title': context.soup.title.string if context.soup.title else None,
+            'title': context.selector.css('title::text').get(),
         }
 
         # Push the extracted data to the default dataset.
