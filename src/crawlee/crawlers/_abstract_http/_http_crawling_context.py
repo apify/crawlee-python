@@ -14,7 +14,7 @@ TSelectResult = TypeVar('TSelectResult')
 
 
 @dataclass(frozen=True)
-@docs_group('Data structures')
+@docs_group('Crawling contexts')
 class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
     """The crawling context used by the `AbstractHttpCrawler`."""
 
@@ -30,7 +30,7 @@ class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
 
 
 @dataclass(frozen=True)
-@docs_group('Data structures')
+@docs_group('Crawling contexts')
 class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
     """The crawling context used by `AbstractHttpCrawler`.
 

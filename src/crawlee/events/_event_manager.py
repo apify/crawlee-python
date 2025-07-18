@@ -51,7 +51,7 @@ class EventManagerOptions(TypedDict):
     """Optional timeout for canceling pending event listeners if they exceed this duration."""
 
 
-@docs_group('Classes')
+@docs_group('Event managers')
 class EventManager:
     """Manage events and their listeners, enabling registration, emission, and execution control.
 

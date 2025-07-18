@@ -218,7 +218,6 @@ class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], T
     """A custom `Statistics` instance, allowing the use of non-default configuration."""
 
 
-@docs_group('Data structures')
 class BasicCrawlerOptions(
     Generic[TCrawlingContext, TStatisticsState],
     _BasicCrawlerOptions,
@@ -230,7 +229,7 @@ class BasicCrawlerOptions(
     """
 
 
-@docs_group('Classes')
+@docs_group('Crawlers')
 class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     """A basic web crawler providing a framework for crawling websites.
 

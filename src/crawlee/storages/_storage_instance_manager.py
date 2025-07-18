@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, TypeVar, cast
 
-from crawlee._utils.docs import docs_group
 from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
 
 from ._base import Storage
@@ -20,7 +19,6 @@ ClientOpener = Callable[..., Awaitable[StorageClientType]]
 """Type alias for the client opener function."""
 
 
-@docs_group('Classes')
 class StorageInstanceManager:
     """Manager for caching and managing storage instances.
 

@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
-@docs_group('Data structures')
+@docs_group('Session management')
 class CookieParam(TypedDict, total=False):
     """Dictionary representation of cookies for `SessionCookies.set` method."""
 
@@ -54,7 +54,7 @@ class PlaywrightCookieParam(TypedDict, total=False):
     sameSite: NotRequired[Literal['Lax', 'None', 'Strict']]
 
 
-@docs_group('Data structures')
+@docs_group('Session management')
 class SessionCookies:
     """Storage cookies for session with browser-compatible serialization and deserialization."""
 

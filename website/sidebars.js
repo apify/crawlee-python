@@ -24,6 +24,7 @@ module.exports = {
         {
             type: 'category',
             label: 'Guides',
+            collapsed: true,
             link: {
                 type: 'generated-index',
                 title: 'Guides',
@@ -40,6 +41,7 @@ module.exports = {
         {
             type: 'category',
             label: 'Deployment',
+            collapsed: true,
             link: {
                 type: 'generated-index',
                 title: 'Deployment guides',
@@ -73,6 +75,7 @@ module.exports = {
         {
             type: 'category',
             label: 'Examples',
+            collapsed: true,
             link: {
                 type: 'generated-index',
                 title: 'Examples',
@@ -105,6 +108,7 @@ module.exports = {
         {
             type: 'category',
             label: 'Upgrading',
+            collapsed: true,
             link: {
                 type: 'generated-index',
                 title: 'Upgrading',

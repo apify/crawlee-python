@@ -3,7 +3,7 @@ from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 
 async def main() -> None:
     crawler = PlaywrightCrawler(
-        max_requests_per_crawl=5,  # Limit the crawl to 5 requests at most.
+        max_requests_per_crawl=10,  # Limit the max requests per crawl.
         headless=False,  # Show the browser window.
         browser_type='firefox',  # Use the Firefox browser.
     )
