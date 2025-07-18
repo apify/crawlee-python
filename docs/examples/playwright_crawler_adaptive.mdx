@@ -1,6 +1,6 @@
 ---
 id: adaptive-playwright-crawler
-title: AdaptivePlaywrightCrawler
+title: Adaptive Playwright crawler
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
@@ -13,7 +13,7 @@ It uses a more limited crawling context interface so that it is able to switch t
 
 A [pre-navigation hook](/python/docs/guides/adaptive-playwright-crawler#page-configuration-with-pre-navigation-hooks) can be used to perform actions before navigating to the URL. This hook provides further flexibility in controlling environment and preparing for navigation. Hooks will be executed both for the pages crawled by HTTP-bases sub crawler and playwright based sub crawler. Use `playwright_only=True` to mark hooks that should be executed only for playwright sub crawler.
 
-For more detailed description please see [AdaptivePlaywrightCrawler guide](/python/docs/guides/adaptive-playwright-crawler 'AdaptivePlaywrightCrawler guide')
+For more detailed description please see [Adaptive Playwright crawler guide](/python/docs/guides/adaptive-playwright-crawler)
 
 <RunnableCodeBlock className="language-python" language="python">
     {AdaptivePlaywrightCrawlerExample}
