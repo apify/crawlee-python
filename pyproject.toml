@@ -239,6 +239,7 @@ module = [
     "apify_fingerprint_datapoints", # Untyped and stubs not available
     "camoufox",                     # Example code shows integration of camoufox and crawlee.
     "fastapi",                      # Example code shows running in webserver.
+    "stagehand.*",                  # Example code shows integration of Stagehand and crawlee.
     "starlette.*",                  # Example code shows running in webserver.
     "flask",                        # Example code shows deploy on Google Cloud.
     "functions_framework",          # Example code shows deploy on Google Cloud.

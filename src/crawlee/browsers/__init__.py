@@ -18,9 +18,7 @@ with _try_import(__name__, 'PlaywrightBrowserController'):
     from ._playwright_browser_controller import PlaywrightBrowserController
 with _try_import(__name__, 'PlaywrightBrowserPlugin'):
     from ._playwright_browser_plugin import PlaywrightBrowserPlugin
+with _try_import(__name__, 'PlaywrightPersistentBrowser'):
+    from ._playwright_browser import PlaywrightPersistentBrowser
 
-__all__ = [
-    'BrowserPool',
-    'PlaywrightBrowserController',
-    'PlaywrightBrowserPlugin',
-]
+__all__ = ['BrowserPool', 'PlaywrightBrowserController', 'PlaywrightBrowserPlugin', 'PlaywrightPersistentBrowser']
