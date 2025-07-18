@@ -35,7 +35,7 @@ class _AutoscaledPoolRun:
         self.result: asyncio.Future = asyncio.Future()
 
 
-@docs_group('Classes')
+@docs_group('Autoscaling')
 class AutoscaledPool:
     """Manages a pool of asynchronous resource-intensive tasks that are executed in parallel.
 

@@ -13,7 +13,7 @@ from crawlee._utils.urls import validate_http_url
 KvsValueType = TypeVar('KvsValueType', default=Any)
 
 
-@docs_group('Data structures')
+@docs_group('Storage data')
 class StorageMetadata(BaseModel):
     """Represents the base model for storage metadata.
 
@@ -38,7 +38,7 @@ class StorageMetadata(BaseModel):
     """The timestamp when the storage was last modified."""
 
 
-@docs_group('Data structures')
+@docs_group('Storage data')
 class DatasetMetadata(StorageMetadata):
     """Model for a dataset metadata."""
 
@@ -48,14 +48,14 @@ class DatasetMetadata(StorageMetadata):
     """The number of items in the dataset."""
 
 
-@docs_group('Data structures')
+@docs_group('Storage data')
 class KeyValueStoreMetadata(StorageMetadata):
     """Model for a key-value store metadata."""
 
     model_config = ConfigDict(populate_by_name=True)
 
 
-@docs_group('Data structures')
+@docs_group('Storage data')
 class RequestQueueMetadata(StorageMetadata):
     """Model for a request queue metadata."""
 
@@ -77,7 +77,7 @@ class RequestQueueMetadata(StorageMetadata):
     """The total number of requests that have been added to the queue."""
 
 
-@docs_group('Data structures')
+@docs_group('Storage data')
 class KeyValueStoreRecordMetadata(BaseModel):
     """Model for a key-value store record metadata."""
 
@@ -99,7 +99,7 @@ class KeyValueStoreRecordMetadata(BaseModel):
     """The size of the record in bytes."""
 
 
-@docs_group('Data structures')
+@docs_group('Storage data')
 class KeyValueStoreRecord(KeyValueStoreRecordMetadata, Generic[KvsValueType]):
     """Model for a key-value store record."""
 
@@ -109,7 +109,7 @@ class KeyValueStoreRecord(KeyValueStoreRecordMetadata, Generic[KvsValueType]):
     """The value of the record."""
 
 
-@docs_group('Data structures')
+@docs_group('Storage data')
 class DatasetItemsListPage(BaseModel):
     """Model for a single page of dataset items returned from a collection list method."""
 
@@ -134,7 +134,7 @@ class DatasetItemsListPage(BaseModel):
     """The list of dataset items returned on this page."""
 
 
-@docs_group('Data structures')
+@docs_group('Storage data')
 class ProcessedRequest(BaseModel):
     """Represents a processed request."""
 
@@ -146,7 +146,7 @@ class ProcessedRequest(BaseModel):
     was_already_handled: Annotated[bool, Field(alias='wasAlreadyHandled')]
 
 
-@docs_group('Data structures')
+@docs_group('Storage data')
 class UnprocessedRequest(BaseModel):
     """Represents an unprocessed request."""
 
@@ -157,7 +157,7 @@ class UnprocessedRequest(BaseModel):
     method: Annotated[HttpMethod | None, Field()] = None
 
 
-@docs_group('Data structures')
+@docs_group('Storage data')
 class AddRequestsResponse(BaseModel):
     """Model for a response to add requests to a queue.
 

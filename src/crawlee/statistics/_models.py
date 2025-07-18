@@ -14,7 +14,7 @@ from crawlee._utils.models import timedelta_ms
 
 
 @dataclass(frozen=True)
-@docs_group('Data structures')
+@docs_group('Statistics')
 class FinalStatistics:
     """Statistics about a crawler run."""
 
@@ -45,7 +45,7 @@ class FinalStatistics:
         )
 
 
-@docs_group('Data structures')
+@docs_group('Statistics')
 class StatisticsState(BaseModel):
     """Statistic data about a crawler run."""
 

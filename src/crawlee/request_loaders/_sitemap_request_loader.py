@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-@docs_group('Classes')
+@docs_group('Request loaders')
 class SitemapRequestLoader(RequestLoader):
     """A request loader that reads URLs from sitemap(s).
 

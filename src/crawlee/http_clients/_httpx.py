@@ -81,7 +81,7 @@ class _HttpxTransport(httpx.AsyncHTTPTransport):
         return response
 
 
-@docs_group('Classes')
+@docs_group('HTTP clients')
 class HttpxHttpClient(HttpClient):
     """HTTP client based on the `HTTPX` library.
 

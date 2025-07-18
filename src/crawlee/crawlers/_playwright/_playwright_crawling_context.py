@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
-@docs_group('Data structures')
+@docs_group('Crawling contexts')
 class PlaywrightCrawlingContext(PlaywrightPreNavCrawlingContext):
     """The crawling context used by the `PlaywrightCrawler`.
 

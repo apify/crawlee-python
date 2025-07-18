@@ -53,7 +53,7 @@ if TYPE_CHECKING:
     from crawlee.browsers._types import BrowserType
 
 
-@docs_group('Classes')
+@docs_group('Crawlers')
 class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]):
     """A web crawler that leverages the `Playwright` browser automation library.
 
@@ -508,7 +508,6 @@ class _PlaywrightCrawlerAdditionalOptions(TypedDict):
     """Whether to run the browser in headless mode. This option should not be used if `browser_pool` is provided."""
 
 
-@docs_group('Data structures')
 class PlaywrightCrawlerOptions(
     Generic[TCrawlingContext, TStatisticsState],
     _PlaywrightCrawlerAdditionalOptions,

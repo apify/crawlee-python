@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
 
-@docs_group('Classes')
+@docs_group('Configuration')
 class ServiceLocator:
     """Service locator for managing the services used by Crawlee.
 
