@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-@docs_group('Classes')
+@docs_group('Event managers')
 class LocalEventManager(EventManager):
     """Event manager for local environments.
 

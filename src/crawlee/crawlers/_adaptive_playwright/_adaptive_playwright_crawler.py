@@ -83,7 +83,7 @@ class _NonPersistentStatistics(Statistics):
         self._active = False
 
 
-@docs_group('Classes')
+@docs_group('Crawlers')
 class AdaptivePlaywrightCrawler(
     Generic[TStaticCrawlingContext, TStaticParseResult, TStaticSelectResult],
     BasicCrawler[AdaptivePlaywrightCrawlingContext, AdaptivePlaywrightCrawlerStatisticState],

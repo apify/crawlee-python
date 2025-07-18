@@ -10,7 +10,7 @@ from ._utils import html_to_text
 
 
 @dataclass(frozen=True)
-@docs_group('Data structures')
+@docs_group('Crawling contexts')
 class BeautifulSoupCrawlingContext(ParsedHttpCrawlingContext[BeautifulSoup]):
     """The crawling context used by the `BeautifulSoupCrawler`.
 

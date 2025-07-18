@@ -100,7 +100,7 @@ class _CurlImpersonateResponse:
             yield chunk
 
 
-@docs_group('Classes')
+@docs_group('HTTP clients')
 class CurlImpersonateHttpClient(HttpClient):
     """HTTP client based on the `curl-cffi` library.
 

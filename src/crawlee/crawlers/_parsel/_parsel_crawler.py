@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from crawlee.crawlers._abstract_http import ParsedHttpCrawlingContext
 
 
-@docs_group('Classes')
+@docs_group('Crawlers')
 class ParselCrawler(AbstractHttpCrawler[ParselCrawlingContext, Selector, Selector]):
     """A web crawler for performing HTTP requests and parsing HTML/XML content.
 

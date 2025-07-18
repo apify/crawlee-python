@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from crawlee.crawlers import BasicCrawlerOptions
 
 
-@docs_group('Classes')
+@docs_group('Crawlers')
 class HttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[bytes], bytes, bytes]):
     """Specific version of generic `AbstractHttpCrawler`.
 

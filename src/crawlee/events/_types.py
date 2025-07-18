@@ -11,6 +11,7 @@ from crawlee._utils.models import timedelta_secs
 from crawlee._utils.system import CpuInfo, MemoryUsageInfo
 
 
+@docs_group('Event data')
 class Event(str, Enum):
     """Names of all possible events that can be emitted using an `EventManager`."""
 
@@ -35,7 +36,7 @@ class Event(str, Enum):
     CRAWLER_STATUS = 'crawlerStatus'
 
 
-@docs_group('Event payloads')
+@docs_group('Event data')
 class EventPersistStateData(BaseModel):
     """Data for the persist state event."""
 
@@ -44,7 +45,7 @@ class EventPersistStateData(BaseModel):
     is_migrating: Annotated[bool, Field(alias='isMigrating')]
 
 
-@docs_group('Event payloads')
+@docs_group('Event data')
 class EventSystemInfoData(BaseModel):
     """Data for the system info event."""
 
@@ -57,7 +58,7 @@ class EventSystemInfoData(BaseModel):
     ]
 
 
-@docs_group('Event payloads')
+@docs_group('Event data')
 class EventMigratingData(BaseModel):
     """Data for the migrating event."""
 
@@ -68,21 +69,21 @@ class EventMigratingData(BaseModel):
     time_remaining: Annotated[timedelta_secs | None, Field(alias='timeRemainingSecs')] = None
 
 
-@docs_group('Event payloads')
+@docs_group('Event data')
 class EventAbortingData(BaseModel):
     """Data for the aborting event."""
 
     model_config = ConfigDict(populate_by_name=True)
 
 
-@docs_group('Event payloads')
+@docs_group('Event data')
 class EventExitData(BaseModel):
     """Data for the exit event."""
 
     model_config = ConfigDict(populate_by_name=True)
 
 
-@docs_group('Event payloads')
+@docs_group('Event data')
 class EventCrawlerStatusData(BaseModel):
     """Data for the crawler status event."""
 

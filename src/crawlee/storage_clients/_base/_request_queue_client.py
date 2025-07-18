@@ -3,8 +3,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-from crawlee._utils.docs import docs_group
-
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -12,7 +10,6 @@ if TYPE_CHECKING:
     from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, RequestQueueMetadata
 
 
-@docs_group('Abstract classes')
 class RequestQueueClient(ABC):
     """An abstract class for request queue resource clients.
 

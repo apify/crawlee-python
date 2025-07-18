@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 __all__ = ['Configuration']
 
 
-@docs_group('Data structures')
+@docs_group('Configuration')
 class Configuration(BaseSettings):
     """Configuration settings for the Crawlee project.
 

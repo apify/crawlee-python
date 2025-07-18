@@ -24,7 +24,7 @@ logger = getLogger(__name__)
 CreateSessionFunctionType = Callable[[], Session]
 
 
-@docs_group('Classes')
+@docs_group('Session management')
 class SessionPool:
     """A pool of sessions that are managed, rotated, and persisted based on usage and age.
 

@@ -10,12 +10,15 @@ from typing import TYPE_CHECKING, Any
 from playwright.async_api import Browser
 from typing_extensions import override
 
+from crawlee._utils.docs import docs_group
+
 if TYPE_CHECKING:
     from playwright.async_api import BrowserContext, BrowserType, CDPSession, Page
 
 logger = getLogger(__name__)
 
 
+@docs_group('Browser management')
 class PlaywrightPersistentBrowser(Browser):
     """A wrapper for Playwright's `Browser` that operates with a persistent context.
 

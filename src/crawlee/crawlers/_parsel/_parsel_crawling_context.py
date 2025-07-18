@@ -10,7 +10,7 @@ from ._utils import html_to_text
 
 
 @dataclass(frozen=True)
-@docs_group('Data structures')
+@docs_group('Crawling contexts')
 class ParselCrawlingContext(ParsedHttpCrawlingContext[Selector]):
     """The crawling context used by the `ParselCrawler`.
 
