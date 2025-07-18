@@ -31,7 +31,7 @@ from crawlee.fingerprint_suite import (
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
 from crawlee.fingerprint_suite._header_generator import fingerprint_browser_type_from_playwright_browser_type
-from crawlee.http_clients import HttpxHttpClient
+from crawlee.http_clients import ImpitHttpClient
 from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import Statistics
@@ -694,9 +694,7 @@ async def test_send_request_with_client(server_url: URL) -> None:
     """Check that the persist context works with fingerprints."""
     check_data: dict[str, Any] = {}
 
-    crawler = PlaywrightCrawler(
-        http_client=HttpxHttpClient(header_generator=None, headers={'user-agent': 'My User-Agent'})
-    )
+    crawler = PlaywrightCrawler(http_client=ImpitHttpClient(headers={'user-agent': 'My User-Agent'}))
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:

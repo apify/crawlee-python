@@ -1,13 +1,13 @@
 import asyncio
 import re
 
-from crawlee.http_clients import HttpxHttpClient
+from crawlee.http_clients import ImpitHttpClient
 from crawlee.request_loaders import SitemapRequestLoader
 
 
 async def main() -> None:
     # Create an HTTP client for fetching sitemaps
-    async with HttpxHttpClient() as http_client:
+    async with ImpitHttpClient() as http_client:
         # Create a sitemap request loader with URL filtering
         sitemap_loader = SitemapRequestLoader(
             sitemap_urls=['https://crawlee.dev/sitemap.xml'],

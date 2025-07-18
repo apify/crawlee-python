@@ -7,6 +7,8 @@ from apify import Actor
 from crawlee.http_clients import CurlImpersonateHttpClient
 # % elif cookiecutter.http_client == 'httpx'
 from crawlee.http_clients import HttpxHttpClient
+# % elif cookiecutter.http_client == 'impit'
+from crawlee.http_clients import ImpitHttpClient
 # % endif
 
 from .routes import router
@@ -17,6 +19,8 @@ from .routes import router
 http_client=CurlImpersonateHttpClient(),
 # % elif cookiecutter.http_client == 'httpx'
 http_client=HttpxHttpClient(),
+# % elif cookiecutter.http_client == 'impit'
+http_client=ImpitHttpClient(),
 # % endif
 # % endblock
 # % endfilter
