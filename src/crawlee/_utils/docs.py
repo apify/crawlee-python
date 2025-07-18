@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Literal, TypeVar
 
+# The order of the rendered API groups is defined in the docusaurus-plugin-typedoc-api.
 GroupName = Literal[
     'Autoscaling',
     'Browser management',
@@ -15,13 +16,13 @@ GroupName = Literal[
     'Functions',
     'HTTP clients',
     'HTTP parsers',
-    'Other',
     'Request loaders',
     'Session management',
     'Statistics',
     'Storage clients',
     'Storage data',
     'Storages',
+    'Other',
 ]
 
 T = TypeVar('T', bound=Callable[..., Any])
