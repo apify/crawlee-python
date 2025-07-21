@@ -119,9 +119,9 @@ class RequestList(RequestLoader):
             next_unique_key = self._next[0].unique_key if self._next[0] is not None else None
             if next_unique_key != unique_key_to_check:
                 raise RuntimeError(
-                    f'Mismatch at index {
+                    f"""Mismatch at index {
                         self._state.current_value.next_index
-                    } in persisted requests - Expected unique key `{unique_key_to_check}`, got `{next_unique_key}`'
+                    } in persisted requests - Expected unique key `{unique_key_to_check}`, got `{next_unique_key}`"""
                 )
 
         return self._state.current_value
