@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from collections.abc import AsyncIterable, AsyncIterator, Iterable
+from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Iterable
 from logging import getLogger
 from typing import Annotated
 
@@ -25,7 +25,7 @@ class RequestListState(BaseModel):
 
 
 class RequestListData(BaseModel):
-    requests: Annotated[Iterable[Request], Field()]
+    requests: Annotated[list[Request], Field()]
 
 
 @docs_group('Classes')
@@ -51,13 +51,13 @@ class RequestList(RequestLoader):
                 If specified, the request data will be stored in the KeyValueStore to make sure that they don't change
                 over time. This is useful if the `requests` iterator pulls the data dynamically.
         """
-        from crawlee._utils.recoverable_state import RecoverableState
+        from crawlee._utils.recoverable_state import RecoverableState  # noqa: PLC0415
 
         self._name = name
         self._handled_count = 0
         self._assumed_total_count = 0
 
-        self._next: Request | None = None
+        self._next: tuple[Request | None, Request | None] = (None, None)
 
         if persist_state_key is None and name is not None:
             persist_state_key = f'SDK_REQUEST_LIST_STATE-{name}'
@@ -108,14 +108,20 @@ class RequestList(RequestLoader):
 
                 self._requests = self._iterate_in_threadpool(self._requests_data.current_value.requests)
 
-        for _ in range(0, self._state.current_value.next_index):
+        for _ in range(self._state.current_value.next_index):
             with contextlib.suppress(StopAsyncIteration):
                 await self._requests.__anext__()
 
         if (unique_key_to_check := self._state.current_value.next_unique_key) is not None:
             await self._ensure_next_request()
-            if self._next is None or self._next.unique_key != unique_key_to_check:
-                raise RuntimeError()
+
+            next_unique_key = self._next[0].unique_key if self._next[0] is not None else None
+            if next_unique_key != unique_key_to_check:
+                raise RuntimeError(
+                    f'Mismatch at index {
+                        self._state.current_value.next_index
+                    } in persisted requests - Expected unique key `{unique_key_to_check}`, got `{next_unique_key}`'
+                )
 
         return self._state.current_value
 
@@ -134,7 +140,7 @@ class RequestList(RequestLoader):
     @override
     async def is_empty(self) -> bool:
         await self._ensure_next_request()
-        return self._next is None
+        return self._next[0] is None
 
     @override
     async def is_finished(self) -> bool:
@@ -145,15 +151,19 @@ class RequestList(RequestLoader):
     async def fetch_next_request(self) -> Request | None:
         await self._ensure_next_request()
 
-        if self._next is None:
+        if self._next[0] is None:
             return None
 
         state = await self._get_state()
-        state.in_progress.add(self._next.id)
+        state.in_progress.add(self._next[0].id)
         self._assumed_total_count += 1
 
-        next_request = self._next
-        self._next = None
+        next_request = self._next[0]
+        if next_request is not None:
+            state.next_index += 1
+
+        self._next = (self._next[1], None)
+        await self._ensure_next_request()
 
         return next_request
 
@@ -169,15 +179,23 @@ class RequestList(RequestLoader):
         if self._requests_lock is None:
             self._requests_lock = asyncio.Lock()
 
-        try:
-            async with self._requests_lock:
-                if self._next is None:
-                    self._next = self._transform_request(await self._requests.__anext__())
-        except StopAsyncIteration:
-            self._next = None
-        else:
-            state.next_index += 1
-            state.next_unique_key = self._next.unique_key
+        async with self._requests_lock:
+            if None in self._next:
+                if self._next[0] is None:
+                    to_enqueue = [item async for item in self._dequeue_requests(2)]
+                    self._next = (to_enqueue[0], to_enqueue[1])
+                else:
+                    to_enqueue = [item async for item in self._dequeue_requests(1)]
+                    self._next = (self._next[0], to_enqueue[0])
+
+                state.next_unique_key = self._next[1].unique_key if self._next[1] is not None else None
+
+    async def _dequeue_requests(self, count: int) -> AsyncGenerator[Request | None]:
+        for _ in range(count):
+            try:
+                yield self._transform_request(await self._requests.__anext__())
+            except StopAsyncIteration:  # noqa: PERF203
+                yield None
 
     async def _iterate_in_threadpool(self, iterable: Iterable[str | Request]) -> AsyncIterator[str | Request]:
         """Inspired by a function of the same name from encode/starlette."""
