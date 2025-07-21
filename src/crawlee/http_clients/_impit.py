@@ -134,7 +134,7 @@ class ImpitHttpClient(HttpClient):
                 content=request.payload,
                 headers=dict(request.headers) if request.headers else None,
             )
-        except (TransportError, HTTPError) as exc:  # type: ignore[misc] # waiting for merge https://github.com/apify/impit/pull/207
+        except (TransportError, HTTPError) as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
             raise
@@ -166,7 +166,7 @@ class ImpitHttpClient(HttpClient):
             response = await client.request(
                 method=method, url=url, content=payload, headers=dict(headers) if headers else None
             )
-        except (TransportError, HTTPError) as exc:  # type: ignore[misc] # waiting for merge https://github.com/apify/impit/pull/207
+        except (TransportError, HTTPError) as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
             raise
@@ -193,7 +193,7 @@ class ImpitHttpClient(HttpClient):
             url=url,
             content=payload,
             headers=dict(headers) if headers else None,
-            stream=True,  # type: ignore[call-arg] # waiting for merge https://github.com/apify/impit/pull/207
+            stream=True,
         )
         try:
             yield _ImpitResponse(response)
@@ -232,7 +232,7 @@ class ImpitHttpClient(HttpClient):
         return client
 
     @staticmethod
-    def _is_proxy_error(error: RuntimeError) -> bool:
+    def _is_proxy_error(error: HTTPError) -> bool:
         """Determine whether the given error is related to a proxy issue.
 
         Check if the error message contains known proxy-related error keywords.
