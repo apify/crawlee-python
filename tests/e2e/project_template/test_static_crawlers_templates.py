@@ -30,6 +30,7 @@ from tests.e2e.project_template.utils import patch_crawlee_version_in_project
     [
         pytest.param('httpx', marks=pytest.mark.httpx),
         pytest.param('curl-impersonate', marks=pytest.mark.curl_impersonate),
+        pytest.param('impit', marks=pytest.mark.impit),
     ],
 )
 @pytest.mark.parametrize(

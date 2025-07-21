@@ -1,0 +1,66 @@
+---
+id: playwright-crawler-stagehand
+title: Playwright with Stagehand
+description: How to integrate Stagehand AI-powered automation with PlaywrightCrawler.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import CodeBlock from '@theme/CodeBlock';
+
+import SupportClasses from '!!raw-loader!./code_examples/playwright_crawler_stagehand/support_classes.py';
+import BrowserClasses from '!!raw-loader!./code_examples/playwright_crawler_stagehand/browser_classes.py';
+import StagehandRun from '!!raw-loader!./code_examples/playwright_crawler_stagehand/stagehand_run.py';
+
+[Stagehand](https://docs.stagehand.dev/) is a framework that combines [Playwright](https://playwright.dev/python/) with AI-driven natural language understanding and decision-making capabilities. With Stagehand, you can use natural language instructions to interact with web pages instead of writing complex selectors and automation logic.
+
+Stagehand supports multiple AI models through [`LiteLLM`](https://docs.litellm.ai/docs/). This guide demonstrates how to integrate Stagehand with <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> using [Gemini](https://ai.google.dev/gemini-api/docs) as the AI model provider.
+
+:::info
+
+This guide is based on stagehand-python v0.4.0 with local configuration settings and may not be compatible with newer versions.
+
+:::
+
+## Get Gemini API key
+
+You need to register with [Google AI Studio](https://aistudio.google.com/) and navigate to [Get API key](https://aistudio.google.com/app/apikey) to obtain your API key.
+
+## Create support classes for Stagehand
+
+To integrate Stagehand with Crawlee, you need to create wrapper classes that allow <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink> to manage the Playwright lifecycle.
+
+Create `CrawleeStagehand` - a custom Stagehand subclass that overrides the `init` method to prevent Stagehand from launching its own Playwright instance.
+
+Create `CrawleeStagehandPage` - a wrapper class for `StagehandPage` that implements the [Playwright Page](https://playwright.dev/python/docs/next/api/class-page) behavior expected by <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.
+
+<CodeBlock className="language-python" title="support_classes.py">
+    {SupportClasses}
+</CodeBlock>
+
+## Create browser integration classes
+
+You need to create a custom browser plugin and controller that properly initialize Stagehand and obtain browser pages from `StagehandContext`.
+
+Create `StagehandPlugin` - a subclass of <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink> that holds the Stagehand instance and creates `PlaywrightPersistentBrowser` instances.
+
+Create `StagehandBrowserController` - a subclass of <ApiLink to="class/PlaywrightBrowserController">`PlaywrightBrowserController`</ApiLink> that lazily initializes `StagehandContext` and creates new pages with AI capabilities on demand.
+
+<CodeBlock className="language-python" title="browser_classes.py">
+    {BrowserClasses}
+</CodeBlock>
+
+## Create a crawler
+
+Now you can create a <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> that uses Stagehand's AI capabilities to interact with web pages using natural language commands:
+
+<CodeBlock className="language-python" title="stagehand_run.py">
+    {StagehandRun}
+</CodeBlock>
+
+The integration works through several key components:
+- `CrawleeStagehand` prevents Stagehand from launching its own Playwright instance, allowing Crawlee to manage the browser lifecycle
+- `StagehandPlugin` extends the Playwright browser plugin to create Stagehand-enabled browser instances
+- `StagehandBrowserController` uses `StagehandContext` to create pages with AI capabilities
+- `CrawleeStagehandPage` provides interface compatibility between Stagehand pages and Crawlee's expectations
+
+In the request handler, you can use natural language commands like `page.extract('Extract title page')` to perform intelligent data extraction without writing complex selectors.
