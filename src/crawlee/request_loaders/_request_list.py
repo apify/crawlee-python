@@ -73,6 +73,7 @@ class RequestList(RequestLoader):
 
         self._requests_data = RecoverableState(
             default_state=RequestListData(requests=[]),
+            # With request data persistence enabled, a snapshot of the requests will be done on initialization
             persistence_enabled='explicit_only' if self._persist_request_data else False,
             persist_state_key=persist_requests_key or '',
             logger=logger,

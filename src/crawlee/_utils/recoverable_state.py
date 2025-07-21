@@ -43,13 +43,14 @@ class RecoverableState(Generic[TStateModel]):
 
         Args:
             default_state: The default state model instance to use when no persisted state is found.
-                           A deep copy is made each time the state is used.
+                A deep copy is made each time the state is used.
             persist_state_key: The key under which the state is stored in the KeyValueStore
-            persistence_enabled: Flag to enable or disable state persistence
+            persistence_enabled: Flag to enable or disable state persistence. Use 'explicit_only' if you want to be able
+                to save the state manually, but without any automatic persistence.
             persist_state_kvs_name: The name of the KeyValueStore to use for persistence.
-                                    If neither a name nor and id are supplied, the default store will be used.
+                If neither a name nor and id are supplied, the default store will be used.
             persist_state_kvs_id: The identifier of the KeyValueStore to use for persistence.
-                                    If neither a name nor and id are supplied, the default store will be used.
+                If neither a name nor and id are supplied, the default store will be used.
             logger: A logger instance for logging operations related to state persistence
         """
         self._default_state = default_state
