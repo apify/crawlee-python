@@ -231,10 +231,12 @@ class AutoscaledPool:
                 elif not await self._is_task_ready_function():
                     logger.debug('Not scheduling new task - no task is ready')
                 else:
-                    logger.debug('Scheduling a new task')
-                    worker_task = asyncio.create_task(self._worker_task(), name='autoscaled pool worker task')
-                    worker_task.add_done_callback(lambda task: self._reap_worker_task(task, run))
-                    run.worker_tasks.append(worker_task)
+                    new_task_count = math.ceil((self.desired_concurrency - self.current_concurrency) / 3)
+                    logger.debug(f'Scheduling a new {new_task_count} tasks')
+                    for _ in range(new_task_count):
+                        worker_task = asyncio.create_task(self._worker_task(), name='autoscaled pool worker task')
+                        worker_task.add_done_callback(lambda task: self._reap_worker_task(task, run))
+                        run.worker_tasks.append(worker_task)
 
                     if math.isfinite(self._max_tasks_per_minute):
                         await asyncio.sleep(60 / self._max_tasks_per_minute)
