@@ -12,6 +12,7 @@ def pytest_configure(config: Config) -> None:
     for marker in [
         'httpx',
         'curl_impersonate',
+        'impit',
         'playwright',
         'playwright_camoufox',
         'parsel',
