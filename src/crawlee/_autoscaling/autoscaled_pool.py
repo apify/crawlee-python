@@ -243,6 +243,9 @@ class AutoscaledPool:
 
                 with suppress(asyncio.TimeoutError):
                     await asyncio.wait_for(run.worker_tasks_updated.wait(), timeout=0.5)
+
+                # Do not run without sleep to avoid burning resources in too frequent management loop.
+                await asyncio.sleep(0.1)
         finally:
             if finished:
                 logger.debug('`is_finished_function` reports that we are finished')
