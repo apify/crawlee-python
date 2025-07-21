@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Literal, TypeVar
 
-# The order of the rendered API groups is defined in the docusaurus-plugin-typedoc-api.
+# The order of the rendered API groups is defined in the website/docusaurus.config.js file.
 GroupName = Literal[
     'Autoscaling',
     'Browser management',
