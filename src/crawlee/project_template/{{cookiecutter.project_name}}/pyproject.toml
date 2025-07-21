@@ -5,6 +5,8 @@
 # % endif
 # % if cookiecutter.http_client == 'curl-impersonate'
 # % do extras.append('curl-impersonate')
+# % elif cookiecutter.http_client == 'impit'
+# % do extras.append('impit')
 # % endif
 
 [project]
