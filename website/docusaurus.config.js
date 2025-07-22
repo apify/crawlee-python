@@ -4,16 +4,24 @@ const path = require('path');
 const { externalLinkProcessor } = require('./tools/utils/externalLink');
 
 const GROUP_ORDER = [
-    'Classes',
-    'Abstract classes',
-    'Data structures',
+    'Autoscaling',
+    'Browser management',
+    'Configuration',
+    'Crawlers',
+    'Crawling contexts',
     'Errors',
+    'Event data',
+    'Event managers',
     'Functions',
-    'Constructors',
-    'Methods',
-    'Properties',
-    'Constants',
-    'Enumeration Members',
+    'HTTP clients',
+    'HTTP parsers',
+    'Request loaders',
+    'Session management',
+    'Statistics',
+    'Storage clients',
+    'Storage data',
+    'Storages',
+    'Other',
 ];
 
 const groupSort = (g1, g2) => {
