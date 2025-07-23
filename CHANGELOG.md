@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Prevent overloading system memory when running locally ([#1270](https://github.com/apify/crawlee-python/pull/1270)) ([30de3bd](https://github.com/apify/crawlee-python/commit/30de3bd7722cbc34db9fc582b4bda7dc2dfa90ff)) by [@janbuchar](https://github.com/janbuchar), closes [#1232](https://github.com/apify/crawlee-python/issues/1232)
 - Expose `PlaywrightPersistentBrowser` class ([#1314](https://github.com/apify/crawlee-python/pull/1314)) ([b5fa955](https://github.com/apify/crawlee-python/commit/b5fa95508d7c099ff3a342577f338439283a975f)) by [@Mantisus](https://github.com/Mantisus)
 - Add `impit` option for Crawlee CLI ([#1312](https://github.com/apify/crawlee-python/pull/1312)) ([508d7ce](https://github.com/apify/crawlee-python/commit/508d7ce4d998f37ab2adcf9c057c3c635a69f863)) by [@Mantisus](https://github.com/Mantisus)
+- Persist RequestList state ([#1274](https://github.com/apify/crawlee-python/pull/1274)) ([cc68014](https://github.com/apify/crawlee-python/commit/cc680147ba3cc8b35b9da70274e53e6f5dd92434)) by [@janbuchar](https://github.com/janbuchar), closes [#99](https://github.com/apify/crawlee-python/issues/99)
 
 ### 🐛 Bug Fixes
 
