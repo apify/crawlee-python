@@ -89,16 +89,20 @@ class RequestList(RequestLoader):
         self._requests_lock: asyncio.Lock | None = None
 
     async def _get_state(self) -> RequestListState:
+        # If state is already initialized, we are done
         if self._state.is_initialized:
             return self._state.current_value
 
+        # Initialize recoverable state
         await self._state.initialize()
         await self._requests_data.initialize()
 
-        if self._persist_request_data:
-            if self._requests_lock is None:
-                self._requests_lock = asyncio.Lock()
+        # Initialize lock if necessary
+        if self._requests_lock is None:
+            self._requests_lock = asyncio.Lock()
 
+        # If the RequestList is configured to persist request data, ensure that a copy of request data is used
+        if self._persist_request_data:
             async with self._requests_lock:
                 if not await self._requests_data.has_persisted_state():
                     self._requests_data.current_value.requests = [
@@ -107,12 +111,17 @@ class RequestList(RequestLoader):
                     ]
                     await self._requests_data.persist_state()
 
-                self._requests = self._iterate_in_threadpool(self._requests_data.current_value.requests)
+                self._requests = self._iterate_in_threadpool(
+                    self._requests_data.current_value.requests[self._state.current_value.next_index :]
+                )
+        # If not using persistent request data, advance the request iterator
+        else:
+            async with self._requests_lock:
+                for _ in range(self._state.current_value.next_index):
+                    with contextlib.suppress(StopAsyncIteration):
+                        await self._requests.__anext__()
 
-        for _ in range(self._state.current_value.next_index):
-            with contextlib.suppress(StopAsyncIteration):
-                await self._requests.__anext__()
-
+        # Check consistency of the stored state and the request iterator
         if (unique_key_to_check := self._state.current_value.next_unique_key) is not None:
             await self._ensure_next_request()
 
@@ -162,6 +171,7 @@ class RequestList(RequestLoader):
         next_request = self._next[0]
         if next_request is not None:
             state.next_index += 1
+            state.next_unique_key = self._next[1].unique_key if self._next[1] is not None else None
 
         self._next = (self._next[1], None)
         await self._ensure_next_request()
@@ -175,8 +185,6 @@ class RequestList(RequestLoader):
         state.in_progress.remove(request.id)
 
     async def _ensure_next_request(self) -> None:
-        state = await self._get_state()
-
         if self._requests_lock is None:
             self._requests_lock = asyncio.Lock()
 
@@ -188,8 +196,6 @@ class RequestList(RequestLoader):
                 else:
                     to_enqueue = [item async for item in self._dequeue_requests(1)]
                     self._next = (self._next[0], to_enqueue[0])
-
-                state.next_unique_key = self._next[1].unique_key if self._next[1] is not None else None
 
     async def _dequeue_requests(self, count: int) -> AsyncGenerator[Request | None]:
         for _ in range(count):

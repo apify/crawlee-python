@@ -122,11 +122,60 @@ async def test_requests_restoration_without_state() -> None:
     assert len(list(spy)) == 3
 
 
+async def test_state_restoration() -> None:
+    """Test that persisted processing state is properly restored on subsequent RequestList creation."""
+    persist_state_key = 'test_state_restoration'
+    urls = [
+        'https://restore1.placeholder.com',
+        'https://restore2.placeholder.com',
+        'https://restore3.placeholder.com',
+        'https://restore4.placeholder.com',
+    ]
+
+    # Create first request list and process one request
+    request_list_1 = RequestList(
+        urls,
+        persist_state_key=persist_state_key,
+    )
+
+    first_request = await request_list_1.fetch_next_request()
+    assert first_request is not None
+    assert first_request.url == 'https://restore1.placeholder.com'
+    await request_list_1.mark_request_as_handled(first_request)
+    await request_list_1._state.persist_state()
+
+    # Create second request list with same persist key (simulating restart)
+    request_list_2 = RequestList(
+        urls,
+        persist_state_key=persist_state_key,
+    )
+
+    # Should be able to continue where the previous instance left off
+    next_request = await request_list_2.fetch_next_request()
+    assert next_request is not None
+    assert next_request.url == 'https://restore2.placeholder.com'
+    await request_list_2.mark_request_as_handled(next_request)
+
+    next_request = await request_list_2.fetch_next_request()
+    assert next_request is not None
+    assert next_request.url == 'https://restore3.placeholder.com'
+    await request_list_2.mark_request_as_handled(next_request)
+
+    next_request = await request_list_2.fetch_next_request()
+    assert next_request is not None
+    assert next_request.url == 'https://restore4.placeholder.com'
+    await request_list_2.mark_request_as_handled(next_request)
+
+
 async def test_requests_and_state_restoration() -> None:
     """Test that persisted request data and processing state is properly restored on subsequent RequestList creation."""
     persist_requests_key = 'test_requests_restoration'
     persist_state_key = 'test_state_restoration'
-    urls = ['https://restore1.placeholder.com', 'https://restore2.placeholder.com']
+    urls = [
+        'https://restore1.placeholder.com',
+        'https://restore2.placeholder.com',
+        'https://restore3.placeholder.com',
+    ]
 
     # Create first request list and process one request
     request_list_1 = RequestList(
@@ -153,6 +202,11 @@ async def test_requests_and_state_restoration() -> None:
     next_request = await request_list_2.fetch_next_request()
     assert next_request is not None
     assert next_request.url == 'https://restore2.placeholder.com'
+    await request_list_2.mark_request_as_handled(next_request)
+
+    next_request = await request_list_2.fetch_next_request()
+    assert next_request is not None
+    assert next_request.url == 'https://restore3.placeholder.com'
     await request_list_2.mark_request_as_handled(next_request)
 
     # Make sure that the second instance did not consume the input iterator
