@@ -66,16 +66,18 @@ For detailed installation instructions see the [Setting up](https://crawlee.dev/
 
 ### With Crawlee CLI
 
-The quickest way to get started with Crawlee is by using the Crawlee CLI and selecting one of the prepared templates. First, ensure you have [Pipx](https://pipx.pypa.io/) installed:
+The quickest way to get started with Crawlee is by using the Crawlee CLI and selecting one of the prepared templates. First, ensure you have [uv](https://pypi.org/project/uv/) installed:
 
 ```sh
-pipx --help
+uv --help
 ```
+
+If [uv](https://pypi.org/project/uv/) is not installed, follow the official [installation guide](https://docs.astral.sh/uv/getting-started/installation/).
 
 Then, run the CLI and choose from the available templates:
 
 ```sh
-pipx run 'crawlee[cli]' create my-crawler
+uvx 'crawlee[cli]' create my-crawler
 ```
 
 If you already have `crawlee` installed, you can spin it up by running:
