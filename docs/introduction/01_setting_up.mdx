@@ -103,20 +103,20 @@ python -m pip install 'crawlee[beautifulsoup,curl-impersonate]'
 
 The quickest way to get started with Crawlee is by using the Crawlee CLI and selecting one of the prepared templates. The CLI helps you set up a new project in seconds.
 
-### Using Crawlee CLI with Pipx
+### Using Crawlee CLI with uv
 
-First, ensure you have Pipx installed. You can check if Pipx is installed by running:
+First, ensure you have [uv](https://pypi.org/project/uv/) installed. You can check if it is installed by running:
 
 ```sh
-pipx --version
+uv --version
 ```
 
-If Pipx is not installed, follow the official [installation guide](https://pipx.pypa.io/stable/installation/).
+If [uv](https://pypi.org/project/uv/) is not installed, follow the official [installation guide](https://docs.astral.sh/uv/getting-started/installation/).
 
-Then, run the Crawlee CLI using Pipx and choose from the available templates:
+Then, run the Crawlee CLI using `uvx` and choose from the available templates:
 
 ```sh
-pipx run 'crawlee[cli]' create my-crawler
+uvx 'crawlee[cli]' create my-crawler
 ```
 
 ### Using Crawlee CLI directly
