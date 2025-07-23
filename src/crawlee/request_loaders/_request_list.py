@@ -159,6 +159,7 @@ class RequestList(RequestLoader):
 
     @override
     async def fetch_next_request(self) -> Request | None:
+        await self._get_state()
         await self._ensure_next_request()
 
         if self._next[0] is None:
@@ -185,6 +186,8 @@ class RequestList(RequestLoader):
         state.in_progress.remove(request.id)
 
     async def _ensure_next_request(self) -> None:
+        await self._get_state()
+
         if self._requests_lock is None:
             self._requests_lock = asyncio.Lock()
 
