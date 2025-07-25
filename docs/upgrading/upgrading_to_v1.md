@@ -174,3 +174,25 @@ destination you choose.
 - The `set_metadata` method has been removed.
 - `resource_directory` from `RequestQueueMetadata` removed – use `path_to_...` property.
 - `RequestQueueHead` model replaced with `RequestQueueHeadWithLocks`.
+
+## New default HTTP client
+
+In v1.0, Crawlee introduces a new default HTTP client: `ImpitHttpClient`, based on the [impit](https://apify.github.io/impit/) library, replacing `httpx` as the default HTTP client.
+
+If you want to continue using `HttpxHttpClient`, you can install Crawlee with the `httpx` extension:
+
+```bash
+pip install 'crawlee[httpx]'
+```
+
+You can then use it like this:
+
+```python
+from crawlee.crawlers import HttpCrawler
+from crawlee.http_clients import HttpxHttpClient
+
+client = HttpxHttpClient()
+crawler = HttpCrawler(http_client=client)
+```
+
+You can learn more about available HTTP clients and usage examples in the [HTTP clients guide](https://crawlee.dev/python/docs/guides/http-clients).
