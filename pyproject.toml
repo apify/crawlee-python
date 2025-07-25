@@ -37,7 +37,7 @@ dependencies = [
     "colorama>=0.4.0",
     "impit>=0.4.2",
     "more-itertools>=10.2.0",
-    "protego>=0.4.0",
+    "protego>=0.5.0",
     "psutil>=6.0.0",
     "pydantic-settings>=2.2.0,<2.7.0",
     "pydantic>=2.8.0,!=2.10.0,!=2.10.1,!=2.10.2",
@@ -246,7 +246,6 @@ module = [
     "jaro",                         # Untyped and stubs not available
     "litestar",                     # Example code shows deploy on Google Cloud Run.
     "loguru",                       # Example code shows integration of loguru and crawlee for JSON logging.
-    "protego",                      # Untyped and stubs not available
     "sklearn.linear_model",         # Untyped and stubs not available
     "sortedcollections",            # Untyped and stubs not available
     "cookiecutter.*",               # Untyped and stubs not available

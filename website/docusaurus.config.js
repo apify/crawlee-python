@@ -4,16 +4,24 @@ const path = require('path');
 const { externalLinkProcessor } = require('./tools/utils/externalLink');
 
 const GROUP_ORDER = [
-    'Classes',
-    'Abstract classes',
-    'Data structures',
+    'Autoscaling',
+    'Browser management',
+    'Configuration',
+    'Crawlers',
+    'Crawling contexts',
     'Errors',
+    'Event data',
+    'Event managers',
     'Functions',
-    'Constructors',
-    'Methods',
-    'Properties',
-    'Constants',
-    'Enumeration Members',
+    'HTTP clients',
+    'HTTP parsers',
+    'Request loaders',
+    'Session management',
+    'Statistics',
+    'Storage clients',
+    'Storage data',
+    'Storages',
+    'Other',
 ];
 
 const groupSort = (g1, g2) => {
@@ -91,10 +99,6 @@ module.exports = {
                         return `https://github.com/apify/crawlee-python/edit/master/website/${doc.versionDocsDirPath}/${doc.docPath}`;
                     },
                 },
-                // blog: {
-                //     blogTitle: 'Crawlee Blog - learn how to build better scrapers',
-                //     blogDescription: 'Guides and tutorials on using Crawlee, the most reliable open-source web scraping and browser automation library for JavaScript and Node.js developers.',
-                // },
                 theme: {
                     customCss: '/src/css/custom.css',
                 },
@@ -158,6 +162,17 @@ module.exports = {
             'docusaurus-gtm-plugin',
             {
                 id: 'GTM-5P7MCS7',
+            },
+        ],
+        [
+            '@signalwire/docusaurus-plugin-llms-txt',
+            {
+                enableDescriptions: false,
+                content: {
+                    includeVersionedDocs: false,
+                    enableLlmsFullTxt: true,
+                    relativePaths: false,
+                },
             },
         ],
         async function runnableCodeBlock() {

@@ -3,7 +3,7 @@ import React from 'react';
 import CopyButton from '../CopyButton';
 import styles from './HomepageCliExample.module.css';
 
-const cliCommand = `pipx run 'crawlee[cli]' create my-crawler`;
+const cliCommand = `uvx 'crawlee[cli]' create my-crawler`;
 
 export default function CliExample() {
     return (

@@ -31,7 +31,6 @@ HeaderGeneratorOptions(browsers=['chrome'])
 HeaderGeneratorOptions(browsers=['safari'])
 ```
 
-
 ## Storage clients
 
 In v1.0, we are introducing a new storage clients system. We have completely reworked their interface,

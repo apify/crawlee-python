@@ -693,7 +693,7 @@ requires-dist = [
     { name = "parsel", marker = "extra == 'parsel'", specifier = ">=1.10.0" },
     { name = "playwright", marker = "extra == 'adaptive-crawler'", specifier = ">=1.27.0" },
     { name = "playwright", marker = "extra == 'playwright'", specifier = ">=1.27.0" },
-    { name = "protego", specifier = ">=0.4.0" },
+    { name = "protego", specifier = ">=0.5.0" },
     { name = "psutil", specifier = ">=6.0.0" },
     { name = "pydantic", specifier = ">=2.8.0,!=2.10.0,!=2.10.1,!=2.10.2" },
     { name = "pydantic-settings", specifier = ">=2.2.0,<2.7.0" },
@@ -1217,7 +1217,7 @@ name = "importlib-metadata"
 version = "8.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp" },
+    { name = "zipp", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000", size = 56641, upload-time = "2025-04-27T15:29:01.736Z" }
 wheels = [
