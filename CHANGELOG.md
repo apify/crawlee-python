@@ -28,6 +28,7 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Introduce new storage client system ([#1194](https://github.com/apify/crawlee-python/pull/1194)) ([de1c03f](https://github.com/apify/crawlee-python/commit/de1c03f70dbd4ae1773fd49c632b3cfcfab82c26)) by [@vdusek](https://github.com/vdusek), closes [#92](https://github.com/apify/crawlee-python/issues/92), [#147](https://github.com/apify/crawlee-python/issues/147), [#783](https://github.com/apify/crawlee-python/issues/783), [#1247](https://github.com/apify/crawlee-python/issues/1247)
 - [**breaking**] Split `BrowserType` literal into two different literals based on context ([#1070](https://github.com/apify/crawlee-python/pull/1070)) ([72b5698](https://github.com/apify/crawlee-python/commit/72b5698fa0647ea02b08da5651736cc37c4c0f6a)) by [@Pijukatel](https://github.com/Pijukatel)
 - [**breaking**] Change method `HttpResponse.read` from sync to async ([#1296](https://github.com/apify/crawlee-python/pull/1296)) ([83fa8a4](https://github.com/apify/crawlee-python/commit/83fa8a416b6d2d4e27c678b9bf99bd1b8799f57b)) by [@Mantisus](https://github.com/Mantisus)
+- [**breaking**] Replace `HttpxHttpClient` with `ImpitHttpClient` as default HTTP client ([#1307](https://github.com/apify/crawlee-python/pull/1307)) ([c803a97](https://github.com/apify/crawlee-python/commit/c803a976776a76846866d533e3a3ee8144e248c4)) by [@Mantisus](https://github.com/Mantisus), closes [#1079](https://github.com/apify/crawlee-python/issues/1079)
 
 
 <!-- git-cliff-unreleased-end -->
