@@ -33,11 +33,9 @@ keywords = [
     "scraping",
 ]
 dependencies = [
-    "apify_fingerprint_datapoints>=0.0.2",
-    "browserforge>=1.2.3",
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
-    "httpx[brotli,http2,zstd]>=0.27.0",
+    "impit>=0.4.2",
     "more-itertools>=10.2.0",
     "protego>=0.5.0",
     "psutil>=6.0.0",
@@ -52,18 +50,20 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-all = ["crawlee[adaptive-crawler,beautifulsoup,cli,curl-impersonate,parsel,playwright,otel]"]
+all = ["crawlee[adaptive-crawler,beautifulsoup,cli,curl-impersonate,httpx,parsel,playwright,otel]"]
 adaptive-crawler = [
     "jaro-winkler>=2.0.3",
     "playwright>=1.27.0",
     "scikit-learn>=1.6.0",
+    "apify_fingerprint_datapoints>=0.0.2",
+    "browserforge>=1.2.3"
 ]
 beautifulsoup = ["beautifulsoup4[lxml]>=4.12.0", "html5lib>=1.0"]
-cli = ["cookiecutter>=2.6.0", "inquirer>=3.3.0", "rich>=13.9.0", "typer>=0.12.0","impit>=0.4.0"]
+cli = ["cookiecutter>=2.6.0", "inquirer>=3.3.0", "rich>=13.9.0", "typer>=0.12.0"]
 curl-impersonate = ["curl-cffi>=0.9.0"]
-impit = ["impit>=0.4.0"]
+httpx = ["httpx[brotli,http2,zstd]>=0.27.0", "apify_fingerprint_datapoints>=0.0.2", "browserforge>=1.2.3"]
 parsel = ["parsel>=1.10.0"]
-playwright = ["playwright>=1.27.0"]
+playwright = ["playwright>=1.27.0", "apify_fingerprint_datapoints>=0.0.2", "browserforge>=1.2.3"]
 otel = [
     "opentelemetry-api>=1.34.1",
     "opentelemetry-distro[otlp]>=0.54",

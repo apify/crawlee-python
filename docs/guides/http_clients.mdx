@@ -36,24 +36,24 @@ class HttpClient {
 %% Specific classes
 %% ========================
 
+class ImpitHttpClient
+
 class HttpxHttpClient
 
 class CurlImpersonateHttpClient
-
-class ImpitHttpClient
 
 %% ========================
 %% Inheritance arrows
 %% ========================
 
+HttpClient --|> ImpitHttpClient
 HttpClient --|> HttpxHttpClient
 HttpClient --|> CurlImpersonateHttpClient
-HttpClient --|> ImpitHttpClient
 ```
 
 ## Switching between HTTP clients
 
-Crawlee currently provides three main HTTP clients: <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>, which uses the `httpx` library, <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, which uses the `curl-cffi` library, and <ApiLink to="class/ImpitHttpClient">`ImpitHttpClient`</ApiLink>, which uses the `impit` library. You can switch between them by setting the `http_client` parameter when initializing a crawler class. The default HTTP client is <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>.
+Crawlee currently provides three main HTTP clients: <ApiLink to="class/ImpitHttpClient">`ImpitHttpClient`</ApiLink>, which uses the `impit` library, <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>, which uses the `httpx` library with `browserforge` for custom HTTP headers and fingerprints, and <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, which uses the `curl-cffi` library. You can switch between them by setting the `http_client` parameter when initializing a crawler class. The default HTTP client is <ApiLink to="class/ImpitHttpClient">`ImpitHttpClient`</ApiLink>. For more details on anti-blocking features, see our [avoid getting blocked guide](./avoid-blocking).
 
 Below are examples of how to configure the HTTP client for the <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>:
 
@@ -77,7 +77,7 @@ Below are examples of how to configure the HTTP client for the <ApiLink to="clas
 
 ## Installation requirements
 
-Since <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink> is the default HTTP client, it's included with the base Crawlee installation and requires no additional packages.
+Since <ApiLink to="class/ImpitHttpClient">`ImpitHttpClient`</ApiLink> is the default HTTP client, it's included with the base Crawlee installation and requires no additional packages.
 
 For <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, you need to install Crawlee with the `curl-impersonate` extra:
 
@@ -85,10 +85,10 @@ For <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</A
 python -m pip install 'crawlee[curl-impersonate]'
 ```
 
-For <ApiLink to="class/ImpitHttpClient">`ImpitHttpClient`</ApiLink>, you need to install Crawlee with the `impit` extra:
+For <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>, you need to install Crawlee with the `httpx` extra:
 
 ```sh
-python -m pip install 'crawlee[impit]'
+python -m pip install 'crawlee[httpx]'
 ```
 
 Alternatively, you can install all available extras to get access to all HTTP clients and features:
