@@ -104,7 +104,7 @@ async def test_handles_client_errors(
         request_handler=mock_request_handler,
         additional_http_error_status_codes=additional_http_error_status_codes,
         ignore_http_error_status_codes=ignore_http_error_status_codes,
-        max_request_retries=3,
+        max_request_retries=2,
     )
 
     await crawler.add_requests([str(server_url / 'status/402')])
@@ -230,7 +230,7 @@ async def test_http_status_statistics(crawler: HttpCrawler, server_url: URL) -> 
         '200': 10,
         '403': 100,  # block errors change session and retry
         '402': 10,  # client errors are not retried by default
-        '500': 30,  # server errors are retried by default
+        '500': 40,  # server errors are retried by default
     }
 
 
@@ -558,7 +558,7 @@ async def test_error_snapshot_through_statistics(server_url: URL) -> None:
         kvs_content[key_info.key] = await kvs.get_value(key_info.key)
 
     # One error, three time retried.
-    assert crawler.statistics.error_tracker.total == 3
+    assert crawler.statistics.error_tracker.total == 4
     assert crawler.statistics.error_tracker.unique_error_count == 1
     assert len(kvs_content) == 1
     assert key_info.key.endswith('.html')

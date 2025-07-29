@@ -871,7 +871,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if max_request_retries is None:
             max_request_retries = self._max_request_retries
 
-        return (context.request.retry_count + 1) < max_request_retries
+        return context.request.retry_count < max_request_retries
 
     async def _check_url_after_redirects(self, context: TCrawlingContext) -> AsyncGenerator[TCrawlingContext, None]:
         """Ensure that the `loaded_url` still matches the enqueue strategy after redirects.

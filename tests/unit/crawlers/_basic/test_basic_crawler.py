@@ -18,7 +18,7 @@ import pytest
 
 from crawlee import ConcurrencySettings, Glob, service_locator
 from crawlee._request import Request
-from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpHeaders, HttpMethod
+from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpMethod
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
@@ -126,11 +126,12 @@ async def test_retries_failed_requests() -> None:
         'http://c.com/',
         'http://b.com/',
         'http://b.com/',
+        'http://b.com/',
     ]
 
 
 async def test_respects_no_retry() -> None:
-    crawler = BasicCrawler(max_request_retries=3)
+    crawler = BasicCrawler(max_request_retries=2)
     calls = list[str]()
 
     @crawler.router.default_handler
@@ -152,7 +153,7 @@ async def test_respects_no_retry() -> None:
 
 
 async def test_respects_request_specific_max_retries() -> None:
-    crawler = BasicCrawler(max_request_retries=1)
+    crawler = BasicCrawler(max_request_retries=0)
     calls = list[str]()
 
     @crawler.router.default_handler
@@ -164,15 +165,13 @@ async def test_respects_request_specific_max_retries() -> None:
         [
             'http://a.com/',
             'http://b.com/',
-            Request.from_url(url='http://c.com/', user_data={'__crawlee': {'maxRetries': 4}}),
+            Request.from_url(url='http://c.com/', user_data={'__crawlee': {'maxRetries': 1}}),
         ]
     )
 
     assert calls == [
         'http://a.com/',
         'http://b.com/',
-        'http://c.com/',
-        'http://c.com/',
         'http://c.com/',
         'http://c.com/',
     ]
@@ -184,12 +183,11 @@ async def test_calls_error_handler() -> None:
     class Call:
         url: str
         error: Exception
-        custom_retry_count: int
 
     # List to store the information of calls to the error handler.
     calls = list[Call]()
 
-    crawler = BasicCrawler(max_request_retries=3)
+    crawler = BasicCrawler(max_request_retries=2)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -198,34 +196,19 @@ async def test_calls_error_handler() -> None:
 
     @crawler.error_handler
     async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request:
-        # Retrieve or initialize the headers, and extract the current custom retry count.
-        headers = context.request.headers or HttpHeaders()
-        custom_retry_count = int(headers.get('custom_retry_count', '0'))
-
         # Append the current call information.
-        calls.append(Call(context.request.url, error, custom_retry_count))
-
-        # Update the request to include an incremented custom retry count in the headers and return it.
-        request = context.request.model_dump()
-        request['headers'] = HttpHeaders({'custom_retry_count': str(custom_retry_count + 1)})
-        return Request.model_validate(request)
+        calls.append(Call(context.request.url, error))
+        return context.request
 
     await crawler.run(['http://a.com/', 'http://b.com/', 'http://c.com/'])
 
     # Verify that the error handler was called twice
     assert len(calls) == 2
 
-    # Check the first call...
-    first_call = calls[0]
-    assert first_call.url == 'http://b.com/'
-    assert isinstance(first_call.error, RuntimeError)
-    assert first_call.custom_retry_count == 0
-
-    # Check the second call...
-    second_call = calls[1]
-    assert second_call.url == 'http://b.com/'
-    assert isinstance(second_call.error, RuntimeError)
-    assert second_call.custom_retry_count == 1
+    # Check calls
+    for error_call in calls:
+        assert error_call.url == 'http://b.com/'
+        assert isinstance(error_call.error, RuntimeError)
 
 
 async def test_calls_error_handler_for_sesion_errors() -> None:
@@ -559,7 +542,7 @@ async def test_session_rotation() -> None:
 
 
 async def test_final_statistics() -> None:
-    crawler = BasicCrawler(max_request_retries=3)
+    crawler = BasicCrawler(max_request_retries=2)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
