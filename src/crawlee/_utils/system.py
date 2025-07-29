@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import os
+import sys
 from contextlib import suppress
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import Annotated, Any
+from typing import Annotated
 
 import psutil
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
@@ -12,6 +13,24 @@ from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidat
 from crawlee._utils.byte_size import ByteSize
 
 logger = getLogger(__name__)
+
+if sys.platform == 'linux':
+    """Get the most suitable available used memory metric.
+
+    `Proportional Set Size (PSS)`, is the amount of own memory and memory shared with other processes, accounted in a
+    way that the shared amount is divided evenly between the processes that share it. Available on Linux. Suitable for
+    avoiding overestimation by counting the same shared memory used by children processes multiple times.
+
+    `Resident Set Size (RSS)` is the non-swapped physical memory a process has used; it includes shared memory. It
+    should be available everywhere.
+    """
+
+    def _get_used_memory(process: psutil.Process) -> int:
+        return int(process.memory_full_info().pss)
+else:
+
+    def _get_used_memory(process: psutil.Process) -> int:
+        return int(process.memory_info().rss)
 
 
 class CpuInfo(BaseModel):
@@ -88,14 +107,14 @@ def get_memory_info() -> MemoryInfo:
     current_process = psutil.Process(os.getpid())
 
     # Retrieve estimated memory usage of the current process.
-    current_size_bytes = int(_get_used_memory(current_process.memory_full_info()))
+    current_size_bytes = _get_used_memory(current_process)
 
     # Sum memory usage by all children processes, try to exclude shared memory from the sum if allowed by OS.
     for child in current_process.children(recursive=True):
         # Ignore any NoSuchProcess exception that might occur if a child process ends before we retrieve
         # its memory usage.
         with suppress(psutil.NoSuchProcess):
-            current_size_bytes += _get_used_memory(child.memory_full_info())
+            current_size_bytes += _get_used_memory(child)
 
     vm = psutil.virtual_memory()
 
@@ -104,20 +123,3 @@ def get_memory_info() -> MemoryInfo:
         current_size=ByteSize(current_size_bytes),
         system_wide_used_size=ByteSize(vm.total - vm.available),
     )
-
-
-def _get_used_memory(memory_full_info: Any) -> int:
-    """Get the most suitable available used memory metric.
-
-    `Proportional Set Size (PSS)`, is the amount of own memory and memory shared with other processes, accounted in a
-    way that the shared amount is divided evenly between the processes that share it. Available on Linux. Suitable for
-    avoiding overestimation by counting the same shared memory used by children processes multiple times.
-
-    `Resident Set Size (RSS)` is the non-swapped physical memory a process has used; it includes shared memory. It
-    should be available everywhere.
-    """
-    try:
-        # Linux
-        return int(memory_full_info.pss)
-    except AttributeError:
-        return int(memory_full_info.rss)
