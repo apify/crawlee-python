@@ -174,6 +174,7 @@ destination you choose.
 - The `set_metadata` method has been removed.
 - `resource_directory` from `RequestQueueMetadata` removed – use `path_to_...` property.
 - `RequestQueueHead` model replaced with `RequestQueueHeadWithLocks`.
+- The `stats` field was removed from `RequestQueueMetadata` as it wasn't used for anything.
 
 ## New default HTTP client
 
