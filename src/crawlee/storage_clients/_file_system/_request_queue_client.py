@@ -18,6 +18,7 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import atomic_write, json_dumps
 from crawlee._utils.recoverable_state import RecoverableState
 from crawlee.storage_clients._base import RequestQueueClient
+from crawlee.storage_clients._base._request_queue_client_cached import RequestQueueClientCached
 from crawlee.storage_clients.models import (
     AddRequestsResponse,
     ProcessedRequest,
@@ -55,7 +56,7 @@ class RequestQueueState(BaseModel):
     """Set of request IDs that have been handled."""
 
 
-class FileSystemRequestQueueClient(RequestQueueClient):
+class FileSystemRequestQueueClient(RequestQueueClientCached):
     """A file system implementation of the request queue client.
 
     This client persists requests to the file system as individual JSON files, making it suitable for scenarios

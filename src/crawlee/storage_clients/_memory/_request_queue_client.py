@@ -11,6 +11,7 @@ from typing_extensions import override
 from crawlee import Request
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.storage_clients._base import RequestQueueClient
+from crawlee.storage_clients._base._request_queue_client_cached import RequestQueueClientCached
 from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, RequestQueueMetadata
 
 if TYPE_CHECKING:
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class MemoryRequestQueueClient(RequestQueueClient):
+class MemoryRequestQueueClient(RequestQueueClientCached):
     """Memory implementation of the request queue client.
 
     No data is persisted between process runs, which means all requests are lost when the program terminates.
