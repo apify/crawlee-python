@@ -1,0 +1,197 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.sql import text
+from typing_extensions import override
+
+from crawlee._utils.docs import docs_group
+from crawlee.configuration import Configuration
+from crawlee.storage_clients._base import StorageClient
+
+from ._dataset_client import SQLDatasetClient
+from ._db_models import Base
+from ._key_value_store_client import SQLKeyValueStoreClient
+from ._request_queue_client import SQLRequestQueueClient
+
+if TYPE_CHECKING:
+    from types import TracebackType
+
+    from crawlee.storage_clients._base import (
+        DatasetClient,
+        KeyValueStoreClient,
+        RequestQueueClient,
+    )
+
+
+@docs_group('Classes')
+class SQLStorageClient(StorageClient):
+    """SQL implementation of the storage client.
+
+    This storage client provides access to datasets, key-value stores, and request queues that persist data
+    to a SQL database using SQLAlchemy 2+ with Pydantic dataclasses for type safety. Data is stored in
+    normalized relational tables, providing ACID compliance, concurrent access safety, and the ability to
+    query data using SQL.
+
+    The SQL implementation supports various database backends including PostgreSQL, MySQL, SQLite, and others
+    supported by SQLAlchemy. It provides durability, consistency, and supports concurrent access from multiple
+    processes through database-level locking mechanisms.
+
+    This implementation is ideal for production environments where data persistence, consistency, and
+    concurrent access are critical requirements.
+    """
+
+    _DB_NAME = 'crawlee.db'
+    """Default database name if not specified in connection string."""
+
+    def __init__(
+        self,
+        *,
+        connection_string: str | None = None,
+        engine: AsyncEngine | None = None,
+    ) -> None:
+        """Initialize the SQL storage client.
+
+        Args:
+            connection_string: Database connection string (e.g., "sqlite+aiosqlite:///crawlee.db").
+                If not provided, defaults to SQLite database in the storage directory.
+            engine: Pre-configured AsyncEngine instance. If provided, connection_string is ignored.
+        """
+        if engine is not None and connection_string is not None:
+            raise ValueError('Either connection_string or engine must be provided, not both.')
+
+        self._connection_string = connection_string
+        self._engine = engine
+        self._initialized = False
+
+    def _get_or_create_engine(self, configuration: Configuration) -> AsyncEngine:
+        """Get or create the database engine based on configuration."""
+        if self._engine is not None:
+            return self._engine
+
+        if self._connection_string is not None:
+            connection_string = self._connection_string
+        else:
+            # Create SQLite database in the storage directory
+            storage_dir = Path(configuration.storage_dir)
+            if not storage_dir.exists():
+                storage_dir.mkdir(parents=True, exist_ok=True)
+
+            db_path = storage_dir / self._DB_NAME
+
+            connection_string = f'sqlite+aiosqlite:///{db_path}'
+
+        self._engine = create_async_engine(
+            connection_string, future=True, pool_size=5, max_overflow=10, pool_timeout=30, pool_recycle=600, echo=False
+        )
+        return self._engine
+
+    async def initialize(self, configuration: Configuration) -> None:
+        """Initialize the database schema.
+
+        This method creates all necessary tables if they don't exist.
+        Should be called before using the storage client.
+        """
+        if not self._initialized:
+            engine = self._get_or_create_engine(configuration)
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+                if 'sqlite' in str(engine.url):
+                    await conn.execute(text('PRAGMA journal_mode=WAL'))
+                    await conn.execute(text('PRAGMA synchronous=NORMAL'))
+                    await conn.execute(text('PRAGMA cache_size=10000'))
+                    await conn.execute(text('PRAGMA temp_store=MEMORY'))
+                    await conn.execute(text('PRAGMA mmap_size=268435456'))
+                    await conn.execute(text('PRAGMA foreign_keys=ON'))
+                    await conn.execute(text('PRAGMA busy_timeout=30000'))
+            self._initialized = True
+
+    async def close(self) -> None:
+        """Close the database connection pool."""
+        if self._engine is not None:
+            await self._engine.dispose()
+        self._engine = None
+
+    def create_session(self) -> AsyncSession:
+        """Create a new database session.
+
+        Returns:
+            A new AsyncSession instance.
+        """
+        session = async_sessionmaker(self._engine, expire_on_commit=False, autoflush=False)
+        return session()
+
+    @override
+    async def create_dataset_client(
+        self,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        configuration: Configuration | None = None,
+    ) -> DatasetClient:
+        configuration = configuration or Configuration.get_global_configuration()
+        await self.initialize(configuration)
+
+        client = await SQLDatasetClient.open(
+            id=id,
+            name=name,
+            storage_client=self,
+        )
+
+        await self._purge_if_needed(client, configuration)
+        return client
+
+    @override
+    async def create_kvs_client(
+        self,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        configuration: Configuration | None = None,
+    ) -> KeyValueStoreClient:
+        configuration = configuration or Configuration.get_global_configuration()
+        await self.initialize(configuration)
+
+        client = await SQLKeyValueStoreClient.open(
+            id=id,
+            name=name,
+            storage_client=self,
+        )
+
+        await self._purge_if_needed(client, configuration)
+        return client
+
+    @override
+    async def create_rq_client(
+        self,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        configuration: Configuration | None = None,
+    ) -> RequestQueueClient:
+        configuration = configuration or Configuration.get_global_configuration()
+        await self.initialize(configuration)
+
+        client = await SQLRequestQueueClient.open(
+            id=id,
+            name=name,
+            storage_client=self,
+        )
+
+        await self._purge_if_needed(client, configuration)
+        return client
+
+    async def __aenter__(self) -> SQLStorageClient:
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
+        """Async context manager exit."""
+        await self.close()

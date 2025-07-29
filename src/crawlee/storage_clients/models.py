@@ -20,7 +20,7 @@ class StorageMetadata(BaseModel):
     It contains common fields shared across all specific storage types.
     """
 
-    model_config = ConfigDict(populate_by_name=True, extra='allow')
+    model_config = ConfigDict(populate_by_name=True, extra='allow', from_attributes=True)
 
     id: Annotated[str, Field(alias='id')]
     """The unique identifier of the storage."""
@@ -42,7 +42,7 @@ class StorageMetadata(BaseModel):
 class DatasetMetadata(StorageMetadata):
     """Model for a dataset metadata."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
     item_count: Annotated[int, Field(alias='itemCount')]
     """The number of items in the dataset."""
@@ -52,14 +52,14 @@ class DatasetMetadata(StorageMetadata):
 class KeyValueStoreMetadata(StorageMetadata):
     """Model for a key-value store metadata."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
 
 @docs_group('Data structures')
 class RequestQueueMetadata(StorageMetadata):
     """Model for a request queue metadata."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
     had_multiple_clients: Annotated[bool, Field(alias='hadMultipleClients')]
     """Indicates whether the queue has been accessed by multiple clients (consumers)."""
@@ -81,7 +81,7 @@ class RequestQueueMetadata(StorageMetadata):
 class KeyValueStoreRecordMetadata(BaseModel):
     """Model for a key-value store record metadata."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
     key: Annotated[str, Field(alias='key')]
     """The key of the record.
@@ -103,7 +103,7 @@ class KeyValueStoreRecordMetadata(BaseModel):
 class KeyValueStoreRecord(KeyValueStoreRecordMetadata, Generic[KvsValueType]):
     """Model for a key-value store record."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
     value: Annotated[KvsValueType, Field(alias='value')]
     """The value of the record."""
@@ -113,7 +113,7 @@ class KeyValueStoreRecord(KeyValueStoreRecordMetadata, Generic[KvsValueType]):
 class DatasetItemsListPage(BaseModel):
     """Model for a single page of dataset items returned from a collection list method."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
     count: Annotated[int, Field(default=0)]
     """The number of objects returned on this page."""
@@ -138,7 +138,7 @@ class DatasetItemsListPage(BaseModel):
 class ProcessedRequest(BaseModel):
     """Represents a processed request."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
     id: Annotated[str, Field(alias='requestId')]
     unique_key: Annotated[str, Field(alias='uniqueKey')]
@@ -150,7 +150,7 @@ class ProcessedRequest(BaseModel):
 class UnprocessedRequest(BaseModel):
     """Represents an unprocessed request."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
     unique_key: Annotated[str, Field(alias='uniqueKey')]
     url: Annotated[str, BeforeValidator(validate_http_url), Field()]
@@ -166,7 +166,7 @@ class AddRequestsResponse(BaseModel):
     encountered issues during processing.
     """
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
     processed_requests: Annotated[list[ProcessedRequest], Field(alias='processedRequests')]
     """Successfully processed requests, including information about whether they were
