@@ -14,16 +14,24 @@ All notable changes to this project will be documented in this file.
 - Improve `Crawlee` CLI help text ([#1297](https://github.com/apify/crawlee-python/pull/1297)) ([afbe10f](https://github.com/apify/crawlee-python/commit/afbe10f15d93353f5bc551bf9f193414179d0dd7)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1295](https://github.com/apify/crawlee-python/issues/1295)
 - Add basic `OpenTelemetry` instrumentation ([#1255](https://github.com/apify/crawlee-python/pull/1255)) ([a92d8b3](https://github.com/apify/crawlee-python/commit/a92d8b3f843ee795bba7e14710bb1faa1fdbf292)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1254](https://github.com/apify/crawlee-python/issues/1254)
 - Add `ImpitHttpClient` http-client client using the `impit` library ([#1151](https://github.com/apify/crawlee-python/pull/1151)) ([0d0d268](https://github.com/apify/crawlee-python/commit/0d0d2681a4379c0e7ba54c49c86dabfef641610f)) by [@Mantisus](https://github.com/Mantisus)
+- Prevent overloading system memory when running locally ([#1270](https://github.com/apify/crawlee-python/pull/1270)) ([30de3bd](https://github.com/apify/crawlee-python/commit/30de3bd7722cbc34db9fc582b4bda7dc2dfa90ff)) by [@janbuchar](https://github.com/janbuchar), closes [#1232](https://github.com/apify/crawlee-python/issues/1232)
+- Expose `PlaywrightPersistentBrowser` class ([#1314](https://github.com/apify/crawlee-python/pull/1314)) ([b5fa955](https://github.com/apify/crawlee-python/commit/b5fa95508d7c099ff3a342577f338439283a975f)) by [@Mantisus](https://github.com/Mantisus)
+- Add `impit` option for Crawlee CLI ([#1312](https://github.com/apify/crawlee-python/pull/1312)) ([508d7ce](https://github.com/apify/crawlee-python/commit/508d7ce4d998f37ab2adcf9c057c3c635a69f863)) by [@Mantisus](https://github.com/Mantisus)
+- Persist RequestList state ([#1274](https://github.com/apify/crawlee-python/pull/1274)) ([cc68014](https://github.com/apify/crawlee-python/commit/cc680147ba3cc8b35b9da70274e53e6f5dd92434)) by [@janbuchar](https://github.com/janbuchar), closes [#99](https://github.com/apify/crawlee-python/issues/99)
 
 ### 🐛 Bug Fixes
 
 - Use `perf_counter_ns` for request duration tracking ([#1260](https://github.com/apify/crawlee-python/pull/1260)) ([9e92f6b](https://github.com/apify/crawlee-python/commit/9e92f6b54400ce5004fbab770e2e4ac42f73148f)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1256](https://github.com/apify/crawlee-python/issues/1256)
+- Fix memory estimation not working on MacOS ([#1330](https://github.com/apify/crawlee-python/pull/1330)) ([ab020eb](https://github.com/apify/crawlee-python/commit/ab020eb821a75723225b652d64babd84c368183f)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1329](https://github.com/apify/crawlee-python/issues/1329)
+- Fix retry count to not count the original request ([#1328](https://github.com/apify/crawlee-python/pull/1328)) ([74fa1d9](https://github.com/apify/crawlee-python/commit/74fa1d936cb3c29cf62d87862a96b4266694af2f)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1326](https://github.com/apify/crawlee-python/issues/1326)
+- [**breaking**] Remove unused &quot;stats&quot; field from RequestQueueMetadata ([#1331](https://github.com/apify/crawlee-python/pull/1331)) ([0a63bef](https://github.com/apify/crawlee-python/commit/0a63bef514b0bdcd3d6f208b386f706d0fe561e6)) by [@vdusek](https://github.com/vdusek)
 
 ### Refactor
 
 - [**breaking**] Introduce new storage client system ([#1194](https://github.com/apify/crawlee-python/pull/1194)) ([de1c03f](https://github.com/apify/crawlee-python/commit/de1c03f70dbd4ae1773fd49c632b3cfcfab82c26)) by [@vdusek](https://github.com/vdusek), closes [#92](https://github.com/apify/crawlee-python/issues/92), [#147](https://github.com/apify/crawlee-python/issues/147), [#783](https://github.com/apify/crawlee-python/issues/783), [#1247](https://github.com/apify/crawlee-python/issues/1247)
 - [**breaking**] Split `BrowserType` literal into two different literals based on context ([#1070](https://github.com/apify/crawlee-python/pull/1070)) ([72b5698](https://github.com/apify/crawlee-python/commit/72b5698fa0647ea02b08da5651736cc37c4c0f6a)) by [@Pijukatel](https://github.com/Pijukatel)
 - [**breaking**] Change method `HttpResponse.read` from sync to async ([#1296](https://github.com/apify/crawlee-python/pull/1296)) ([83fa8a4](https://github.com/apify/crawlee-python/commit/83fa8a416b6d2d4e27c678b9bf99bd1b8799f57b)) by [@Mantisus](https://github.com/Mantisus)
+- [**breaking**] Replace `HttpxHttpClient` with `ImpitHttpClient` as default HTTP client ([#1307](https://github.com/apify/crawlee-python/pull/1307)) ([c803a97](https://github.com/apify/crawlee-python/commit/c803a976776a76846866d533e3a3ee8144e248c4)) by [@Mantisus](https://github.com/Mantisus), closes [#1079](https://github.com/apify/crawlee-python/issues/1079)
 
 
 <!-- git-cliff-unreleased-end -->

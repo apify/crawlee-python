@@ -56,7 +56,7 @@ from crawlee.errors import (
     UserDefinedErrorHandlerError,
 )
 from crawlee.events._types import Event, EventCrawlerStatusData
-from crawlee.http_clients import HttpxHttpClient
+from crawlee.http_clients import ImpitHttpClient
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics, StatisticsState
@@ -218,7 +218,6 @@ class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], T
     """A custom `Statistics` instance, allowing the use of non-default configuration."""
 
 
-@docs_group('Data structures')
 class BasicCrawlerOptions(
     Generic[TCrawlingContext, TStatisticsState],
     _BasicCrawlerOptions,
@@ -230,7 +229,7 @@ class BasicCrawlerOptions(
     """
 
 
-@docs_group('Classes')
+@docs_group('Crawlers')
 class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     """A basic web crawler providing a framework for crawling websites.
 
@@ -368,7 +367,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             set(ignore_http_error_status_codes) if ignore_http_error_status_codes else set()
         )
 
-        self._http_client = http_client or HttpxHttpClient()
+        self._http_client = http_client or ImpitHttpClient()
 
         # Request router setup
         self._router: Router[TCrawlingContext] | None = None
@@ -856,7 +855,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if max_request_retries is None:
             max_request_retries = self._max_request_retries
 
-        return (context.request.retry_count + 1) < max_request_retries
+        return context.request.retry_count < max_request_retries
 
     async def _check_url_after_redirects(self, context: TCrawlingContext) -> AsyncGenerator[TCrawlingContext, None]:
         """Ensure that the `loaded_url` still matches the enqueue strategy after redirects.

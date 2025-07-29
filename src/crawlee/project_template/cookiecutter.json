@@ -3,7 +3,7 @@
     "__package_name": "{{ cookiecutter.project_name|lower|replace('-', '_') }}",
     "crawler_type": ["beautifulsoup", "parsel", "playwright", "playwright-camoufox"],
     "__crawler_type": "{{ cookiecutter.crawler_type|lower|replace('-', '_') }}",
-    "http_client": ["httpx", "curl-impersonate"],
+    "http_client": ["impit", "httpx", "curl-impersonate"],
     "package_manager": ["poetry", "pip", "uv"],
     "enable_apify_integration": false,
     "install_project": true,

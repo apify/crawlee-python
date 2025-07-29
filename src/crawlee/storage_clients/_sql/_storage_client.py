@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     )
 
 
-@docs_group('Classes')
+@docs_group('Storage clients')
 class SQLStorageClient(StorageClient):
     """SQL implementation of the storage client.
 

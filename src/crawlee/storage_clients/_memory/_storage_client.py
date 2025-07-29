@@ -11,7 +11,7 @@ from ._key_value_store_client import MemoryKeyValueStoreClient
 from ._request_queue_client import MemoryRequestQueueClient
 
 
-@docs_group('Classes')
+@docs_group('Storage clients')
 class MemoryStorageClient(StorageClient):
     """Memory implementation of the storage client.
 

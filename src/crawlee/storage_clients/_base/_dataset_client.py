@@ -3,8 +3,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-from crawlee._utils.docs import docs_group
-
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
     from typing import Any
@@ -12,7 +10,6 @@ if TYPE_CHECKING:
     from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 
-@docs_group('Abstract classes')
 class DatasetClient(ABC):
     """An abstract class for dataset storage clients.
 

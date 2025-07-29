@@ -21,7 +21,7 @@ from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPi
 from crawlee.errors import SessionError
 from crawlee.fingerprint_suite import DefaultFingerprintGenerator, FingerprintGenerator, HeaderGeneratorOptions
 from crawlee.fingerprint_suite._header_generator import fingerprint_browser_type_from_playwright_browser_type
-from crawlee.http_clients import HttpxHttpClient
+from crawlee.http_clients import ImpitHttpClient
 from crawlee.sessions._cookies import PlaywrightCookieParam
 from crawlee.statistics import StatisticsState
 
@@ -53,7 +53,7 @@ if TYPE_CHECKING:
     from crawlee.browsers._types import BrowserType
 
 
-@docs_group('Classes')
+@docs_group('Crawlers')
 class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]):
     """A web crawler that leverages the `Playwright` browser automation library.
 
@@ -473,7 +473,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         Args:
             url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
         """
-        http_client = HttpxHttpClient() if isinstance(self._http_client, PlaywrightHttpClient) else self._http_client
+        http_client = ImpitHttpClient() if isinstance(self._http_client, PlaywrightHttpClient) else self._http_client
 
         return await RobotsTxtFile.find(url, http_client=http_client)
 
@@ -508,7 +508,6 @@ class _PlaywrightCrawlerAdditionalOptions(TypedDict):
     """Whether to run the browser in headless mode. This option should not be used if `browser_pool` is provided."""
 
 
-@docs_group('Data structures')
 class PlaywrightCrawlerOptions(
     Generic[TCrawlingContext, TStatisticsState],
     _PlaywrightCrawlerAdditionalOptions,

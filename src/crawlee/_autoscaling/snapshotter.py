@@ -15,7 +15,7 @@ from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
-from crawlee._utils.system import get_memory_info
+from crawlee._utils.system import MemoryInfo, get_memory_info
 from crawlee.events._types import Event, EventSystemInfoData
 
 if TYPE_CHECKING:
@@ -28,7 +28,7 @@ logger = getLogger(__name__)
 T = TypeVar('T')
 
 
-@docs_group('Classes')
+@docs_group('Autoscaling')
 class Snapshotter:
     """Monitors and logs system resource usage at predefined intervals for performance optimization.
 
@@ -273,7 +273,13 @@ class Snapshotter:
             max_memory_size=self._max_memory_size,
             max_used_memory_ratio=self._max_used_memory_ratio,
             created_at=event_data.memory_info.created_at,
+            system_wide_used_size=None,
+            system_wide_memory_size=None,
         )
+
+        if isinstance(memory_info := event_data.memory_info, MemoryInfo):
+            snapshot.system_wide_used_size = memory_info.system_wide_used_size
+            snapshot.system_wide_memory_size = memory_info.total_size
 
         snapshots = cast('list[Snapshot]', self._memory_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)

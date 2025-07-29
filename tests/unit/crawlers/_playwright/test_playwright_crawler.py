@@ -31,7 +31,7 @@ from crawlee.fingerprint_suite import (
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
 from crawlee.fingerprint_suite._header_generator import fingerprint_browser_type_from_playwright_browser_type
-from crawlee.http_clients import HttpxHttpClient
+from crawlee.http_clients import ImpitHttpClient
 from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import Statistics
@@ -150,7 +150,7 @@ async def test_enqueue_links_with_transform_request_function(server_url: URL) ->
 
 
 async def test_nonexistent_url_invokes_error_handler() -> None:
-    crawler = PlaywrightCrawler(max_request_retries=4, request_handler=mock.AsyncMock())
+    crawler = PlaywrightCrawler(max_request_retries=3, request_handler=mock.AsyncMock())
 
     error_handler = mock.AsyncMock(return_value=None)
     crawler.error_handler(error_handler)
@@ -617,7 +617,7 @@ async def test_error_snapshot_through_statistics(server_url: URL) -> None:
             assert kvs_content[key_info.key] == HELLO_WORLD.decode('utf-8')
 
     # Three errors twice retried errors, but only 2 unique -> 4 (2 x (html and jpg)) artifacts expected.
-    assert crawler.statistics.error_tracker.total == 3 * max_retries
+    assert crawler.statistics.error_tracker.total == 3 * (max_retries + 1)
     assert crawler.statistics.error_tracker.unique_error_count == 2
     assert len(list(kvs_content.keys())) == 4
 
@@ -694,9 +694,7 @@ async def test_send_request_with_client(server_url: URL) -> None:
     """Check that the persist context works with fingerprints."""
     check_data: dict[str, Any] = {}
 
-    crawler = PlaywrightCrawler(
-        http_client=HttpxHttpClient(header_generator=None, headers={'user-agent': 'My User-Agent'})
-    )
+    crawler = PlaywrightCrawler(http_client=ImpitHttpClient(headers={'user-agent': 'My User-Agent'}))
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:

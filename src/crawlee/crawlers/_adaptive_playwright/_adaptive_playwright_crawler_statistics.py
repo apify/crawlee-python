@@ -8,7 +8,7 @@ from crawlee._utils.docs import docs_group
 from crawlee.statistics import StatisticsState
 
 
-@docs_group('Data structures')
+@docs_group('Statistics')
 class AdaptivePlaywrightCrawlerStatisticState(StatisticsState):
     """Statistic data about a crawler run with additional information related to adaptive crawling."""
 

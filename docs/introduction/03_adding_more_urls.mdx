@@ -43,7 +43,7 @@ The <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> function 
 When you're just testing your code or when your crawler could potentially find millions of links, it's very useful to set a maximum limit of crawled pages. The option is called <ApiLink to="class/BasicCrawlerOptions#max_requests_per_crawl">`max_requests_per_crawl`</ApiLink>, is available in all crawlers, and you can set it like this:
 
 ```python
-crawler = BeautifulSoupCrawler(max_requests_per_crawl=20)
+crawler = BeautifulSoupCrawler(max_requests_per_crawl=10)
 ```
 
 This means that no new requests will be started after the 20th request is finished. The actual number of processed requests might be a little higher thanks to parallelization, because the running requests won't be forcefully aborted. It's not even possible in most cases.

@@ -246,7 +246,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     had_multiple_clients=False,
                     handled_request_count=0,
                     pending_request_count=0,
-                    stats={},
                     total_request_count=0,
                 )
                 client = cls(

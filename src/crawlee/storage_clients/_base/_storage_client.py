@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ._request_queue_client import RequestQueueClient
 
 
-@docs_group('Abstract classes')
+@docs_group('Storage clients')
 class StorageClient(ABC):
     """Base class for storage clients.
 

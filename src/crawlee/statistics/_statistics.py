@@ -52,7 +52,7 @@ class RequestProcessingRecord:
         return max(0, self._runs - 1)
 
 
-@docs_group('Classes')
+@docs_group('Statistics')
 class Statistics(Generic[TStatisticsState]):
     """A class for collecting, tracking, and logging runtime statistics for requests.
 
@@ -67,7 +67,7 @@ class Statistics(Generic[TStatisticsState]):
     def __init__(
         self,
         *,
-        persistence_enabled: bool = False,
+        persistence_enabled: bool | Literal['explicit_only'] = False,
         persist_state_kvs_name: str | None = None,
         persist_state_key: str | None = None,
         log_message: str = 'Statistics',
