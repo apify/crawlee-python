@@ -52,6 +52,7 @@ class PlaywrightCookieParam(TypedDict, total=False):
     httpOnly: NotRequired[bool]
     expires: NotRequired[float]
     sameSite: NotRequired[Literal['Lax', 'None', 'Strict']]
+    partitionKey: NotRequired[str | None]
 
 
 @docs_group('Data structures')
