@@ -70,9 +70,6 @@ class RequestQueueMetadata(StorageMetadata):
     pending_request_count: Annotated[int, Field(alias='pendingRequestCount')]
     """The number of requests that are still pending in the queue."""
 
-    stats: Annotated[dict, Field(alias='stats')]
-    """Statistics about the request queue, TODO?"""
-
     total_request_count: Annotated[int, Field(alias='totalRequestCount')]
     """The total number of requests that have been added to the queue."""
 
