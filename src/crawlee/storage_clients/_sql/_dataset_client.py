@@ -17,6 +17,8 @@ from ._db_models import DatasetItemDB, DatasetMetadataDB
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     from ._storage_client import SQLStorageClient
 
 logger = getLogger(__name__)
@@ -46,6 +48,10 @@ class SQLDatasetClient(DatasetClient):
         """
         self._orm_metadata = orm_metadata
         self._storage_client = storage_client
+
+    def create_session(self) -> AsyncSession:
+        """Create a new SQLAlchemy session for this key-value store."""
+        return self._storage_client.create_session()
 
     @override
     async def get_metadata(self) -> DatasetMetadata:
@@ -85,7 +91,9 @@ class SQLDatasetClient(DatasetClient):
                 await client._update_metadata(update_accessed_at=True)
 
             else:
-                orm_metadata = await session.get(DatasetMetadataDB, name)
+                stmt = select(DatasetMetadataDB).where(DatasetMetadataDB.name == name)
+                result = await session.execute(stmt)
+                orm_metadata = result.scalar_one_or_none()
                 if orm_metadata:
                     client = cls(
                         orm_metadata=orm_metadata,
@@ -116,15 +124,15 @@ class SQLDatasetClient(DatasetClient):
 
     @override
     async def drop(self) -> None:
-        async with self._storage_client.create_session() as session:
-            dataset_db = await session.get(DatasetItemDB, self._orm_metadata.id)
+        async with self.create_session() as session:
+            dataset_db = await session.get(DatasetMetadataDB, self._orm_metadata.id)
             if dataset_db:
                 await session.delete(dataset_db)
                 await session.commit()
 
     @override
     async def purge(self) -> None:
-        async with self._storage_client.create_session() as session:
+        async with self.create_session() as session:
             stmt = delete(DatasetItemDB).where(DatasetItemDB.dataset_id == self._orm_metadata.id)
             await session.execute(stmt)
 
@@ -149,10 +157,13 @@ class SQLDatasetClient(DatasetClient):
                 )
             )
 
-        async with self._storage_client.create_session() as session:
+        async with self.create_session() as session:
             session.add_all(db_items)
             self._orm_metadata.item_count += len(data)
-            await self._update_metadata(update_modified_at=True)
+            await self._update_metadata(
+                update_accessed_at=True,
+                update_modified_at=True,
+            )
 
             await session.commit()
 
@@ -199,7 +210,7 @@ class SQLDatasetClient(DatasetClient):
 
         stmt = stmt.offset(offset).limit(limit)
 
-        async with self._storage_client.create_session() as session:
+        async with self.create_session() as session:
             result = await session.execute(stmt)
             db_items = result.scalars().all()
 
@@ -256,7 +267,7 @@ class SQLDatasetClient(DatasetClient):
 
         stmt = stmt.offset(offset).limit(limit)
 
-        async with self._storage_client.create_session() as session:
+        async with self.create_session() as session:
             result = await session.execute(stmt)
             db_items = result.scalars().all()
 

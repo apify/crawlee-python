@@ -18,6 +18,8 @@ from ._db_models import KeyValueStoreMetadataDB, KeyValueStoreRecordDB
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     from ._storage_client import SQLStorageClient
 
 
@@ -59,6 +61,10 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
 
         self._storage_client = storage_client
         """The storage client used to access the SQL database."""
+
+    async def create_session(self) -> AsyncSession:
+        """Create a new SQLAlchemy session for this key-value store."""
+        return self._storage_client.create_session()
 
     @override
     async def get_metadata(self) -> KeyValueStoreMetadata:

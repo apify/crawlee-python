@@ -19,12 +19,6 @@ from ._request_queue_client import SQLRequestQueueClient
 if TYPE_CHECKING:
     from types import TracebackType
 
-    from crawlee.storage_clients._base import (
-        DatasetClient,
-        KeyValueStoreClient,
-        RequestQueueClient,
-    )
-
 
 @docs_group('Storage clients')
 class SQLStorageClient(StorageClient):
@@ -66,6 +60,15 @@ class SQLStorageClient(StorageClient):
         self._engine = engine
         self._initialized = False
 
+        self._default_flag = self._engine is None and self._connection_string is None
+
+    @property
+    def engine(self) -> AsyncEngine:
+        """Get the SQLAlchemy AsyncEngine instance."""
+        if self._engine is None:
+            raise ValueError('Engine is not initialized. Call initialize() before accessing the engine.')
+        return self._engine
+
     def _get_or_create_engine(self, configuration: Configuration) -> AsyncEngine:
         """Get or create the database engine based on configuration."""
         if self._engine is not None:
@@ -98,7 +101,7 @@ class SQLStorageClient(StorageClient):
             engine = self._get_or_create_engine(configuration)
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
-                if 'sqlite' in str(engine.url):
+                if self._default_flag:
                     await conn.execute(text('PRAGMA journal_mode=WAL'))
                     await conn.execute(text('PRAGMA synchronous=NORMAL'))
                     await conn.execute(text('PRAGMA cache_size=10000'))
@@ -130,7 +133,7 @@ class SQLStorageClient(StorageClient):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
-    ) -> DatasetClient:
+    ) -> SQLDatasetClient:
         configuration = configuration or Configuration.get_global_configuration()
         await self.initialize(configuration)
 
@@ -150,7 +153,7 @@ class SQLStorageClient(StorageClient):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
-    ) -> KeyValueStoreClient:
+    ) -> SQLKeyValueStoreClient:
         configuration = configuration or Configuration.get_global_configuration()
         await self.initialize(configuration)
 
@@ -170,7 +173,7 @@ class SQLStorageClient(StorageClient):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
-    ) -> RequestQueueClient:
+    ) -> SQLRequestQueueClient:
         configuration = configuration or Configuration.get_global_configuration()
         await self.initialize(configuration)
 
