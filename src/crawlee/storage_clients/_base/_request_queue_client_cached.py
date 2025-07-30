@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+import logging
 from abc import ABC
 from typing import TYPE_CHECKING, Any
 
@@ -16,6 +17,8 @@ if TYPE_CHECKING:
 
 
 from cachetools import LRUCache
+
+logger = logging.getLogger(__name__)
 
 
 class RequestQueueClientCached(RequestQueueClient):
@@ -62,17 +65,30 @@ class RequestQueueClientCached(RequestQueueClient):
         """
 
         # Should we cache full request or just unique key? Probably full as other attributes might be relevant
+        alread_handled = []
         if deduplicate:
             new_requests = []
             for request in requests:
                 if request.id not in self.add_request_cache:
                     new_requests.append(request)
                     self.add_request_cache.add(request.id)
+                else:
+                    alread_handled.append(ProcessedRequest(
+                        id=request.id,
+                        unique_key=request.unique_key,
+                        was_already_present=True,  # This we know
+                        was_already_handled=False,  # This we have no clue
+                    ))
+
             _requests: Sequence[Request] = new_requests
+            logger.warning(f"Deduplication: original: {len(requests)}, deduplicated: {len(_requests)}")
         else:
             _requests = requests
             self.add_request_cache.update({request.id for request in requests})
-        return await object.__getattribute__(self, "add_batch_of_requests")(requests=tuple(_requests), forefront=forefront)
+
+        response = await object.__getattribute__(self, "add_batch_of_requests")(requests=tuple(_requests), forefront=forefront)
+        response.processed_requests.extend(alread_handled)
+        return response
 
     async def reclaim_request_cached(
         self,
