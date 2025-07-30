@@ -247,9 +247,7 @@ async def test_metadata_record_updates(kvs_client: SQLKeyValueStoreClient) -> No
     assert metadata.accessed_at > accessed_after_read
 
     async with kvs_client.create_session() as session:
-        stmt = select(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.id == metadata.id)
-        result = await session.execute(stmt)
-        orm_metadata = result.scalar_one_or_none()
+        orm_metadata = await session.get(KeyValueStoreMetadataDB, metadata.id)
         assert orm_metadata is not None
         assert orm_metadata.created_at.replace(tzinfo=timezone.utc) == metadata.created_at
         assert orm_metadata.accessed_at.replace(tzinfo=timezone.utc) == metadata.accessed_at

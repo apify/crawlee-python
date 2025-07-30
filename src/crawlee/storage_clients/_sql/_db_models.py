@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime  # noqa: TC003
-from typing import Any
 
 from sqlalchemy import (
     JSON,
@@ -41,7 +40,6 @@ class RequestQueueMetadataDB(StorageMetadataDB, Base):  # type: ignore[valid-typ
     had_multiple_clients: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     handled_request_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     pending_request_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    stats: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default={})
     total_request_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     requests: Mapped[list[RequestDB]] = relationship(back_populates='queue', cascade='all, delete-orphan')

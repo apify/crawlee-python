@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import SQLStorageClient
 from crawlee.storage_clients._sql._db_models import DatasetItemDB, DatasetMetadataDB
-from crawlee.storage_clients.models import DatasetMetadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -101,10 +100,10 @@ async def test_tables_and_metadata_record(configuration: Configuration) -> None:
             stmt = select(DatasetMetadataDB).where(DatasetMetadataDB.name == 'new_dataset')
             result = await session.execute(stmt)
             orm_metadata = result.scalar_one_or_none()
-            metadata = DatasetMetadata.model_validate(orm_metadata)
-            assert metadata.id == client_metadata.id
-            assert metadata.name == 'new_dataset'
-            assert metadata.item_count == 0
+            assert orm_metadata is not None
+            assert orm_metadata.id == client_metadata.id
+            assert orm_metadata.name == 'new_dataset'
+            assert orm_metadata.item_count == 0
 
         await client.drop()
 
@@ -201,11 +200,11 @@ async def test_metadata_recaord_updates(dataset_client: SQLDatasetClient) -> Non
     # Verify metadata file is updated on disk
     async with dataset_client.create_session() as session:
         orm_metadata = await session.get(DatasetMetadataDB, metadata.id)
-        record_metadata = DatasetMetadata.model_validate(orm_metadata)
-        record_metadata.item_count = 1
-        assert record_metadata.created_at.replace(tzinfo=timezone.utc) == initial_created
-        assert record_metadata.accessed_at.replace(tzinfo=timezone.utc) == metadata.accessed_at
-        assert record_metadata.modified_at.replace(tzinfo=timezone.utc) == metadata.modified_at
+        assert orm_metadata is not None
+        orm_metadata.item_count = 1
+        assert orm_metadata.created_at.replace(tzinfo=timezone.utc) == initial_created
+        assert orm_metadata.accessed_at.replace(tzinfo=timezone.utc) == metadata.accessed_at
+        assert orm_metadata.modified_at.replace(tzinfo=timezone.utc) == metadata.modified_at
 
 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:

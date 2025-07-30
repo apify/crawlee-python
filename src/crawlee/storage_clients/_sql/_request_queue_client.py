@@ -27,6 +27,8 @@ from ._db_models import RequestDB, RequestQueueMetadataDB
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     from ._storage_client import SQLStorageClient
 
 
@@ -96,6 +98,10 @@ class SQLRequestQueueClient(RequestQueueClient):
 
         self._lock = asyncio.Lock()
 
+    def create_session(self) -> AsyncSession:
+        """Create a new SQLAlchemy session for this key-value store."""
+        return self._storage_client.create_session()
+
     @override
     async def get_metadata(self) -> RequestQueueMetadata:
         return RequestQueueMetadata.model_validate(self._orm_metadata)
@@ -152,7 +158,6 @@ class SQLRequestQueueClient(RequestQueueClient):
                         had_multiple_clients=False,
                         handled_request_count=0,
                         pending_request_count=0,
-                        stats={},
                         total_request_count=0,
                     )
                     orm_metadata = RequestQueueMetadataDB(**metadata.model_dump())
@@ -200,6 +205,8 @@ class SQLRequestQueueClient(RequestQueueClient):
             await self._update_metadata(update_modified_at=True, update_accessed_at=True)
 
             self._is_empty_cache = None
+
+            await session.merge(self._orm_metadata)
             await session.commit()
 
         # Clear recoverable state
@@ -304,11 +311,10 @@ class SQLRequestQueueClient(RequestQueueClient):
                 self._request_cache_needs_refresh = True
 
             try:
+                await session.merge(self._orm_metadata)
                 await session.commit()
             except SQLAlchemyError as e:
                 logger.warning(f'Failed to commit session: {e}')
-                await session.rollback()
-                input()
                 processed_requests.clear()
                 unprocessed_requests.extend(
                     [
@@ -346,6 +352,7 @@ class SQLRequestQueueClient(RequestQueueClient):
             state.in_progress_requests.add(request.id)
 
             await self._update_metadata(update_accessed_at=True)
+            await session.merge(self._orm_metadata)
             await session.commit()
 
             return request
@@ -404,7 +411,7 @@ class SQLRequestQueueClient(RequestQueueClient):
             self._orm_metadata.pending_request_count -= 1
 
             await self._update_metadata(update_modified_at=True, update_accessed_at=True)
-
+            await session.merge(self._orm_metadata)
             await session.commit()
 
         return ProcessedRequest(
@@ -460,7 +467,7 @@ class SQLRequestQueueClient(RequestQueueClient):
                 self._request_cache.append(request)
 
             await self._update_metadata(update_modified_at=True, update_accessed_at=True)
-
+            await session.merge(self._orm_metadata)
             await session.commit()
 
             return ProcessedRequest(
@@ -495,6 +502,11 @@ class SQLRequestQueueClient(RequestQueueClient):
             result = await session.execute(stmt)
             unhandled_count = result.scalar()
             self._is_empty_cache = unhandled_count == 0
+
+            await self._update_metadata(update_accessed_at=True)
+            await session.merge(self._orm_metadata)
+            await session.commit()
+
             return self._is_empty_cache
 
     async def _refresh_cache(self) -> None:

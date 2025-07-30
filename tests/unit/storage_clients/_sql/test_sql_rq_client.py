@@ -2,19 +2,26 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import timezone
 from typing import TYPE_CHECKING
 
 import pytest
+from sqlalchemy import inspect, select
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from crawlee import Request
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import FileSystemStorageClient
+from crawlee.storage_clients import SQLStorageClient
+from crawlee.storage_clients._sql._db_models import RequestDB, RequestQueueMetadataDB
+from crawlee.storage_clients.models import RequestQueueMetadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
     from pathlib import Path
 
-    from crawlee.storage_clients._file_system import FileSystemRequestQueueClient
+    from sqlalchemy import Connection
+
+    from crawlee.storage_clients._sql import SQLRequestQueueClient
 
 
 @pytest.fixture
@@ -25,38 +32,84 @@ def configuration(tmp_path: Path) -> Configuration:
 
 
 @pytest.fixture
-async def rq_client(configuration: Configuration) -> AsyncGenerator[FileSystemRequestQueueClient, None]:
-    """A fixture for a file system request queue client."""
-    client = await FileSystemStorageClient().create_rq_client(
-        name='test_request_queue',
-        configuration=configuration,
-    )
-    yield client
-    await client.drop()
+async def rq_client(configuration: Configuration) -> AsyncGenerator[SQLRequestQueueClient, None]:
+    """A fixture for a SQL request queue client."""
+    async with SQLStorageClient() as storage_client:
+        client = await storage_client.create_rq_client(
+            name='test_request_queue',
+            configuration=configuration,
+        )
+        yield client
+        await client.drop()
 
 
-async def test_file_and_directory_creation(configuration: Configuration) -> None:
-    """Test that file system RQ creates proper files and directories."""
-    client = await FileSystemStorageClient().create_rq_client(
-        name='new_request_queue',
-        configuration=configuration,
-    )
-
-    # Verify files were created
-    assert client.path_to_rq.exists()
-    assert client.path_to_metadata.exists()
-
-    # Verify metadata file structure
-    with client.path_to_metadata.open() as f:
-        metadata = json.load(f)
-        assert metadata['id'] == (await client.get_metadata()).id
-        assert metadata['name'] == 'new_request_queue'
-
-    await client.drop()
+# Helper function that allows you to use inspect with an asynchronous engine
+def get_tables(sync_conn: Connection) -> list[str]:
+    inspector = inspect(sync_conn)
+    return inspector.get_table_names()
 
 
-async def test_request_file_persistence(rq_client: FileSystemRequestQueueClient) -> None:
-    """Test that requests are properly persisted to files."""
+async def test_create_tables_with_connection_string(configuration: Configuration, tmp_path: Path) -> None:
+    """Test that SQL dataset client creates tables with a connection string."""
+    storage_dir = tmp_path / 'test_table.db'
+
+    async with SQLStorageClient(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_client:
+        await storage_client.create_rq_client(
+            name='test_request_queue',
+            configuration=configuration,
+        )
+
+        async with storage_client.engine.begin() as conn:
+            tables = await conn.run_sync(get_tables)
+            assert 'request_queue_metadata' in tables
+            assert 'request' in tables
+
+
+async def test_create_tables_with_engine(configuration: Configuration, tmp_path: Path) -> None:
+    """Test that SQL dataset client creates tables with a pre-configured engine."""
+    storage_dir = tmp_path / 'test_table.db'
+
+    engine = create_async_engine(f'sqlite+aiosqlite:///{storage_dir}', future=True, echo=False)
+
+    async with SQLStorageClient(engine=engine) as storage_client:
+        await storage_client.create_rq_client(
+            name='test_request_queue',
+            configuration=configuration,
+        )
+
+        async with engine.begin() as conn:
+            tables = await conn.run_sync(get_tables)
+            assert 'request_queue_metadata' in tables
+            assert 'request' in tables
+
+
+async def test_tables_and_metadata_record(configuration: Configuration) -> None:
+    """Test that SQL dataset creates proper tables and metadata records."""
+    async with SQLStorageClient() as storage_client:
+        client = await storage_client.create_rq_client(
+            name='test_request_queue',
+            configuration=configuration,
+        )
+
+        client_metadata = await client.get_metadata()
+
+        async with storage_client.engine.begin() as conn:
+            tables = await conn.run_sync(get_tables)
+            assert 'request_queue_metadata' in tables
+            assert 'request' in tables
+
+        async with client.create_session() as session:
+            stmt = select(RequestQueueMetadataDB).where(RequestQueueMetadataDB.name == 'test_request_queue')
+            result = await session.execute(stmt)
+            orm_metadata = result.scalar_one_or_none()
+            metadata = RequestQueueMetadata.model_validate(orm_metadata)
+            assert metadata.id == client_metadata.id
+            assert metadata.name == 'test_request_queue'
+
+        await client.drop()
+
+
+async def test_request_records_persistence(rq_client: SQLRequestQueueClient) -> None:
     requests = [
         Request.from_url('https://example.com/1'),
         Request.from_url('https://example.com/2'),
@@ -65,38 +118,41 @@ async def test_request_file_persistence(rq_client: FileSystemRequestQueueClient)
 
     await rq_client.add_batch_of_requests(requests)
 
-    # Verify request files are created
-    request_files = list(rq_client.path_to_rq.glob('*.json'))
-    # Should have 3 request files + 1 metadata file
-    assert len(request_files) == 4
-    assert rq_client.path_to_metadata in request_files
+    metadata_client = await rq_client.get_metadata()
 
-    # Verify actual request file content
-    data_files = [f for f in request_files if f != rq_client.path_to_metadata]
-    assert len(data_files) == 3
-
-    for req_file in data_files:
-        with req_file.open() as f:
-            request_data = json.load(f)
-            assert 'url' in request_data
-            assert request_data['url'].startswith('https://example.com/')
+    async with rq_client.create_session() as session:
+        stmt = select(RequestDB).where(RequestDB.queue_id == metadata_client.id)
+        result = await session.execute(stmt)
+        db_requests = result.scalars().all()
+        assert len(db_requests) == 3
+    for db_request in db_requests:
+        request = json.loads(db_request.data)
+        assert request['url'] in ['https://example.com/1', 'https://example.com/2', 'https://example.com/3']
 
 
-async def test_drop_removes_directory(rq_client: FileSystemRequestQueueClient) -> None:
-    """Test that drop removes the entire RQ directory from disk."""
+async def test_drop_removes_records(rq_client: SQLRequestQueueClient) -> None:
+    """Test that drop removes all records from the database."""
     await rq_client.add_batch_of_requests([Request.from_url('https://example.com')])
+    metadata = await rq_client.get_metadata()
+    async with rq_client.create_session() as session:
+        stmt = select(RequestDB).where(RequestDB.queue_id == metadata.id)
+        result = await session.execute(stmt)
+        records = result.scalars().all()
+        assert len(records) == 1
 
-    rq_path = rq_client.path_to_rq
-    assert rq_path.exists()
-
-    # Drop the request queue
     await rq_client.drop()
 
-    assert not rq_path.exists()
+    async with rq_client.create_session() as session:
+        stmt = select(RequestDB).where(RequestDB.queue_id == metadata.id)
+        result = await session.execute(stmt)
+        records = result.scalars().all()
+        assert len(records) == 0
+        db_metadata = await session.get(RequestQueueMetadataDB, metadata.id)
+        assert db_metadata is None
 
 
-async def test_metadata_file_updates(rq_client: FileSystemRequestQueueClient) -> None:
-    """Test that metadata file is updated correctly after operations."""
+async def test_metadata_record_updates(rq_client: SQLRequestQueueClient) -> None:
+    """Test that metadata record updates correctly after operations."""
     # Record initial timestamps
     metadata = await rq_client.get_metadata()
     initial_created = metadata.created_at
@@ -129,45 +185,45 @@ async def test_metadata_file_updates(rq_client: FileSystemRequestQueueClient) ->
     assert metadata.modified_at > initial_modified
     assert metadata.accessed_at > accessed_after_read
 
-    # Verify metadata file is updated on disk
-    with rq_client.path_to_metadata.open() as f:
-        metadata_json = json.load(f)
-        assert metadata_json['total_request_count'] == 1
+    async with rq_client.create_session() as session:
+        orm_metadata = await session.get(RequestQueueMetadataDB, metadata.id)
+        assert orm_metadata is not None
+        assert orm_metadata.created_at.replace(tzinfo=timezone.utc) == metadata.created_at
+        assert orm_metadata.accessed_at.replace(tzinfo=timezone.utc) == metadata.accessed_at
+        assert orm_metadata.modified_at.replace(tzinfo=timezone.utc) == metadata.modified_at
 
 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
-    """Test that requests persist correctly when reopening the same RQ."""
-    storage_client = FileSystemStorageClient()
+    """Test that data persists correctly when reopening the same dataset."""
+    async with SQLStorageClient() as storage_client:
+        original_client = await storage_client.create_rq_client(
+            name='persistence-test',
+            configuration=configuration,
+        )
 
-    # Create RQ and add requests
-    original_client = await storage_client.create_rq_client(
-        name='persistence-test',
-        configuration=configuration,
-    )
+        test_requests = [
+            Request.from_url('https://example.com/1'),
+            Request.from_url('https://example.com/2'),
+        ]
+        await original_client.add_batch_of_requests(test_requests)
 
-    test_requests = [
-        Request.from_url('https://example.com/1'),
-        Request.from_url('https://example.com/2'),
-    ]
-    await original_client.add_batch_of_requests(test_requests)
+        rq_id = (await original_client.get_metadata()).id
 
-    rq_id = (await original_client.get_metadata()).id
+        # Reopen by ID and verify data persists
+        reopened_client = await storage_client.create_rq_client(
+            id=rq_id,
+            configuration=configuration,
+        )
 
-    # Reopen by ID and verify requests persist
-    reopened_client = await storage_client.create_rq_client(
-        id=rq_id,
-        configuration=configuration,
-    )
+        metadata = await reopened_client.get_metadata()
+        assert metadata.total_request_count == 2
 
-    metadata = await reopened_client.get_metadata()
-    assert metadata.total_request_count == 2
+        # Fetch requests to verify they're still there
+        request1 = await reopened_client.fetch_next_request()
+        request2 = await reopened_client.fetch_next_request()
 
-    # Fetch requests to verify they're still there
-    request1 = await reopened_client.fetch_next_request()
-    request2 = await reopened_client.fetch_next_request()
+        assert request1 is not None
+        assert request2 is not None
+        assert {request1.url, request2.url} == {'https://example.com/1', 'https://example.com/2'}
 
-    assert request1 is not None
-    assert request2 is not None
-    assert {request1.url, request2.url} == {'https://example.com/1', 'https://example.com/2'}
-
-    await reopened_client.drop()
+        await reopened_client.drop()
