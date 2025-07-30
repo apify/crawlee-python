@@ -11,30 +11,34 @@ from sqlalchemy import (
     LargeBinary,
     String,
 )
-from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    """Base class for all database models for correct type annotations."""
 
 
 class StorageMetadataDB:
     """Base database model for storage metadata."""
 
     id: Mapped[str] = mapped_column(String(20), nullable=False, primary_key=True)
-    name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    name: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     accessed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     modified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
-class DatasetMetadataDB(StorageMetadataDB, Base):  # type: ignore[valid-type,misc]
+class DatasetMetadataDB(StorageMetadataDB, Base):
     __tablename__ = 'dataset_metadata'
 
     item_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    items: Mapped[list[DatasetItemDB]] = relationship(back_populates='dataset', cascade='all, delete-orphan')
+    items: Mapped[list[DatasetItemDB]] = relationship(
+        back_populates='dataset', cascade='all, delete-orphan', lazy='select'
+    )
 
 
-class RequestQueueMetadataDB(StorageMetadataDB, Base):  # type: ignore[valid-type,misc]
+class RequestQueueMetadataDB(StorageMetadataDB, Base):
     __tablename__ = 'request_queue_metadata'
 
     had_multiple_clients: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -42,60 +46,62 @@ class RequestQueueMetadataDB(StorageMetadataDB, Base):  # type: ignore[valid-typ
     pending_request_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     total_request_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    requests: Mapped[list[RequestDB]] = relationship(back_populates='queue', cascade='all, delete-orphan')
+    requests: Mapped[list[RequestDB]] = relationship(
+        back_populates='queue', cascade='all, delete-orphan', lazy='select'
+    )
 
 
-class KeyValueStoreMetadataDB(StorageMetadataDB, Base):  # type: ignore[valid-type,misc]
+class KeyValueStoreMetadataDB(StorageMetadataDB, Base):
     __tablename__ = 'kvs_metadata'
 
-    records: Mapped[list[KeyValueStoreRecordDB]] = relationship(back_populates='kvs', cascade='all, delete-orphan')
+    records: Mapped[list[KeyValueStoreRecordDB]] = relationship(
+        back_populates='kvs', cascade='all, delete-orphan', lazy='select'
+    )
 
 
-class KeyValueStoreRecordDB(Base):  # type: ignore[valid-type,misc]
+class KeyValueStoreRecordDB(Base):
     """Database model for key-value store records."""
 
     __tablename__ = 'kvs_record'
 
-    kvs_id: Mapped[str] = mapped_column(String(255), ForeignKey('kvs_metadata.id'), primary_key=True, index=True)
-
+    kvs_id: Mapped[str] = mapped_column(
+        String(255), ForeignKey('kvs_metadata.id', ondelete='CASCADE'), primary_key=True, index=True
+    )
     key: Mapped[str] = mapped_column(String(255), primary_key=True)
     value: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
-
     content_type: Mapped[str] = mapped_column(String(100), nullable=False)
     size: Mapped[int | None] = mapped_column(Integer, nullable=False, default=0)
 
     kvs: Mapped[KeyValueStoreMetadataDB] = relationship(back_populates='records')
 
 
-class DatasetItemDB(Base):  # type: ignore[valid-type,misc]
+class DatasetItemDB(Base):
     """Database model for dataset items."""
 
     __tablename__ = 'dataset_item'
 
     order_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    dataset_id: Mapped[str] = mapped_column(String(20), ForeignKey('dataset_metadata.id'), index=True)
+    dataset_id: Mapped[str] = mapped_column(
+        String(20), ForeignKey('dataset_metadata.id', ondelete='CASCADE'), index=True
+    )
     data: Mapped[str] = mapped_column(JSON, nullable=False)
-
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     dataset: Mapped[DatasetMetadataDB] = relationship(back_populates='items')
 
 
-class RequestDB(Base):  # type: ignore[valid-type,misc]
+class RequestDB(Base):
     """Database model for requests in the request queue."""
 
     __tablename__ = 'request'
 
     request_id: Mapped[str] = mapped_column(String(20), primary_key=True)
     queue_id: Mapped[str] = mapped_column(
-        String(20), ForeignKey('request_queue_metadata.id'), index=True, primary_key=True
+        String(20), ForeignKey('request_queue_metadata.id', ondelete='CASCADE'), index=True, primary_key=True
     )
 
     data: Mapped[str] = mapped_column(JSON, nullable=False)
-    unique_key: Mapped[str] = mapped_column(String(512), nullable=False)
-
+    unique_key: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
     sequence_number: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
-
-    is_handled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_handled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
 
     queue: Mapped[RequestQueueMetadataDB] = relationship(back_populates='requests')

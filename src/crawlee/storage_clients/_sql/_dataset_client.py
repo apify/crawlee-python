@@ -154,7 +154,6 @@ class SQLDatasetClient(DatasetClient):
                 DatasetItemDB(
                     dataset_id=self._orm_metadata.id,
                     data=json_item,
-                    created_at=datetime.now(timezone.utc),
                 )
             )
 
@@ -207,7 +206,7 @@ class SQLDatasetClient(DatasetClient):
         if skip_empty:
             stmt = stmt.where(DatasetItemDB.data != '"{}"')
 
-        stmt = stmt.order_by(DatasetItemDB.created_at.desc()) if desc else stmt.order_by(DatasetItemDB.created_at.asc())
+        stmt = stmt.order_by(DatasetItemDB.order_id.desc()) if desc else stmt.order_by(DatasetItemDB.order_id.asc())
 
         stmt = stmt.offset(offset).limit(limit)
 
@@ -264,7 +263,7 @@ class SQLDatasetClient(DatasetClient):
         if skip_empty:
             stmt = stmt.where(DatasetItemDB.data != '"{}"')
 
-        stmt = stmt.order_by(DatasetItemDB.created_at.desc()) if desc else stmt.order_by(DatasetItemDB.created_at.asc())
+        stmt = stmt.order_by(DatasetItemDB.order_id.desc()) if desc else stmt.order_by(DatasetItemDB.order_id.asc())
 
         stmt = stmt.offset(offset).limit(limit)
 
