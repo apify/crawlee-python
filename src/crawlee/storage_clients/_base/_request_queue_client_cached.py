@@ -8,18 +8,68 @@ from typing import TYPE_CHECKING, Any
 from crawlee._utils import requests
 from crawlee.events import Event, EventSystemInfoData
 from crawlee.storage_clients._base import RequestQueueClient
-from crawlee.storage_clients.models import ProcessedRequest
+from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, RequestQueueMetadata
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee import Request
-    from crawlee.storage_clients.models import AddRequestsResponse, RequestQueueMetadata
+
 
 
 from cachetools import LRUCache
 
 logger = logging.getLogger(__name__)
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from typing import Annotated, Any, Generic
+
+from datetime import datetime
+from typing import Annotated, Any, Generic
+
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from typing_extensions import TypeVar
+
+from crawlee._types import HttpMethod
+from crawlee._utils.docs import docs_group
+from crawlee._utils.urls import validate_http_url
+
+class ProcessedRequest(BaseModel):
+    """Represents a processed request."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: Annotated[str, Field(alias='requestId')]
+    unique_key: Annotated[str, Field(alias='uniqueKey')]
+    was_already_present: Annotated[bool, Field(alias='wasAlreadyPresent')]
+    was_already_handled: Annotated[bool, Field(alias='wasAlreadyHandled')]
+
+
+class UnprocessedRequest(BaseModel):
+    """Represents an unprocessed request."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    unique_key: Annotated[str, Field(alias='uniqueKey')]
+    url: Annotated[str, BeforeValidator(validate_http_url), Field()]
+    method: Annotated[HttpMethod | None, Field()] = None
+
+class AddRequestsResponse(BaseModel):
+    """Model for a response to add requests to a queue.
+
+    Contains detailed information about the processing results when adding multiple requests
+    to a queue. This includes which requests were successfully processed and which ones
+    encountered issues during processing.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    processed_requests: Annotated[list[ProcessedRequest], Field(alias='processedRequests')]
+    """Successfully processed requests, including information about whether they were
+    already present in the queue and whether they had been handled previously."""
+
+    unprocessed_requests: Annotated[list[UnprocessedRequest], Field(alias='unprocessedRequests')]
+    """Requests that could not be processed, typically due to validation errors or other issues."""
+
 
 
 class RequestQueueClientCached(RequestQueueClient):
@@ -82,12 +132,16 @@ class RequestQueueClientCached(RequestQueueClient):
                     ))
 
             _requests: Sequence[Request] = new_requests
-            logger.warning(f"Deduplication: original: {len(requests)}, deduplicated: {len(_requests)}")
+            #logger.warning(f"Deduplication: original: {len(requests)}, deduplicated: {len(_requests)}")
         else:
             _requests = requests
             self.add_request_cache.update({request.id for request in requests})
 
-        response = await object.__getattribute__(self, "add_batch_of_requests")(requests=tuple(_requests), forefront=forefront)
+        if len(_requests)==0:
+            logger.warning(f"Deduplication: original: {len(requests)}, deduplicated: {len(_requests)}")
+            response = AddRequestsResponse.model_validate({'processedRequests': [],'unprocessedRequests': []})
+        else:
+            response = await object.__getattribute__(self, "add_batch_of_requests")(requests=tuple(_requests), forefront=forefront)
         response.processed_requests.extend(alread_handled)
         return response
 
