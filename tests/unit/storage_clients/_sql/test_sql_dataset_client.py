@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def configuration(tmp_path: Path) -> Configuration:
+    """Temporary configuration for tests."""
     return Configuration(
         crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
     )
@@ -128,7 +129,7 @@ async def test_record_and_content_verification(dataset_client: SQLDatasetClient)
         saved_item = json.loads(records[0].data)
         assert saved_item == item
 
-    # Test multiple items file creation
+    # Test pushing multiple items and verify total count
     items = [{'id': 1, 'name': 'Item 1'}, {'id': 2, 'name': 'Item 2'}, {'id': 3, 'name': 'Item 3'}]
     await dataset_client.push_data(items)
 
@@ -163,8 +164,8 @@ async def test_drop_removes_records(dataset_client: SQLDatasetClient) -> None:
         assert metadata is None
 
 
-async def test_metadata_recaord_updates(dataset_client: SQLDatasetClient) -> None:
-    """Test that metadata file is updated correctly after operations."""
+async def test_metadata_record_updates(dataset_client: SQLDatasetClient) -> None:
+    """Test that metadata record is updated correctly after operations."""
     # Record initial timestamps
     metadata = await dataset_client.get_metadata()
     initial_created = metadata.created_at
@@ -197,7 +198,7 @@ async def test_metadata_recaord_updates(dataset_client: SQLDatasetClient) -> Non
     assert metadata.modified_at > initial_modified
     assert metadata.accessed_at > accessed_after_get
 
-    # Verify metadata file is updated on disk
+    # Verify metadata record is updated in db
     async with dataset_client.create_session() as session:
         orm_metadata = await session.get(DatasetMetadataDB, metadata.id)
         assert orm_metadata is not None

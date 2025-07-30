@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def configuration(tmp_path: Path) -> Configuration:
+    """Temporary configuration for tests."""
     return Configuration(
         crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
     )
@@ -50,7 +51,7 @@ def get_tables(sync_conn: Connection) -> list[str]:
 
 
 async def test_create_tables_with_connection_string(configuration: Configuration, tmp_path: Path) -> None:
-    """Test that SQL dataset client creates tables with a connection string."""
+    """Test that SQL request queue client creates tables with a connection string."""
     storage_dir = tmp_path / 'test_table.db'
 
     async with SQLStorageClient(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_client:
@@ -66,7 +67,7 @@ async def test_create_tables_with_connection_string(configuration: Configuration
 
 
 async def test_create_tables_with_engine(configuration: Configuration, tmp_path: Path) -> None:
-    """Test that SQL dataset client creates tables with a pre-configured engine."""
+    """Test that SQL request queue client creates tables with a pre-configured engine."""
     storage_dir = tmp_path / 'test_table.db'
 
     engine = create_async_engine(f'sqlite+aiosqlite:///{storage_dir}', future=True, echo=False)
@@ -84,7 +85,7 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
 
 
 async def test_tables_and_metadata_record(configuration: Configuration) -> None:
-    """Test that SQL dataset creates proper tables and metadata records."""
+    """Test that SQL request queue creates proper tables and metadata records."""
     async with SQLStorageClient() as storage_client:
         client = await storage_client.create_rq_client(
             name='test_request_queue',
@@ -110,6 +111,7 @@ async def test_tables_and_metadata_record(configuration: Configuration) -> None:
 
 
 async def test_request_records_persistence(rq_client: SQLRequestQueueClient) -> None:
+    """Test that all added requests are persisted and can be retrieved from the database."""
     requests = [
         Request.from_url('https://example.com/1'),
         Request.from_url('https://example.com/2'),
@@ -194,7 +196,7 @@ async def test_metadata_record_updates(rq_client: SQLRequestQueueClient) -> None
 
 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
-    """Test that data persists correctly when reopening the same dataset."""
+    """Test that data persists correctly when reopening the same request queue."""
     async with SQLStorageClient() as storage_client:
         original_client = await storage_client.create_rq_client(
             name='persistence-test',
