@@ -8,12 +8,13 @@ from typing import TYPE_CHECKING, Any
 from crawlee._utils import requests
 from crawlee.events import Event, EventSystemInfoData
 from crawlee.storage_clients._base import RequestQueueClient
+from crawlee.storage_clients.models import ProcessedRequest
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee import Request
-    from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, RequestQueueMetadata
+    from crawlee.storage_clients.models import AddRequestsResponse, RequestQueueMetadata
 
 
 from cachetools import LRUCache
