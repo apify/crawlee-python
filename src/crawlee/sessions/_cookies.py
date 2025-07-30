@@ -221,7 +221,10 @@ class SessionCookies:
     def set_cookies_from_playwright_format(self, pw_cookies: list[PlaywrightCookieParam]) -> None:
         """Set cookies from playwright format."""
         for pw_cookie in pw_cookies:
-            cookie_param = self._from_playwright(pw_cookie)
+            # Remove Chromium internal fields (e.g., _crHasCrossSiteAncestor)
+            cookie_param = {k: v for k, v in self.from_playwright(pw_cookie).items() if not k.startswith('')}
+            # Remove unsupported Playwright field
+            cookie_param.pop('partitionKey', None)
             self.set(**cookie_param)
         self._jar.clear_expired_cookies()
 
