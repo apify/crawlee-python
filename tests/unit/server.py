@@ -351,7 +351,7 @@ async def set_complex_cookies(send: Send) -> None:
         [b'set-cookie', b'basic=1; Path=/; HttpOnly; SameSite=Lax'],
         [b'set-cookie', b'withpath=2; Path=/html; SameSite=None'],
         [b'set-cookie', b'strict=3; Path=/; SameSite=Strict'],
-        [b'set-cookie', b'secure=4; Path=/; HttpOnly; Secure; SameSite=Strict'],
+        [b'set-cookie', b'secure=4; Path=/; HttpOnly; Secure; SameSite=Strict; Partitioned'],
         [b'set-cookie', b'short=5; Path=/;'],
         [b'set-cookie', b'domain=6; Path=/; Domain=.127.0.0.1;'],
     ]

@@ -93,6 +93,7 @@ class SessionCookies:
         http_only: bool = False,
         secure: bool = False,
         same_site: Literal['Lax', 'None', 'Strict'] | None = None,
+        **_kwargs: Any,  # Unknown parameters will be ignored.
     ) -> None:
         """Create and store a cookie with modern browser attributes.
 
