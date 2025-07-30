@@ -132,3 +132,40 @@ def test_store_multidomain_cookies() -> None:
 
     assert check_cookies['test.io'] == ('a', '1')
     assert check_cookies['notest.io'] == ('a', '2')
+
+
+def test_set_cookies_from_playwright_format_with_unsupported_fields() -> None:
+    """Test that setting cookies from Playwright format ignores unsupported fields."""
+    session_cookies = SessionCookies()
+
+    # This cookie contains unsupported fields that should be ignored.
+    # We use a dict here because the extra fields are not part of the PlaywrightCookieParam TypedDict.
+    pw_cookies: list[PlaywrightCookieParam] = [
+        {  # type: ignore
+            'name': 'test_cookie',
+            'value': 'test_value',
+            'domain': 'example.com',
+            'path': '/',
+            'expires': 1735689600,
+            'httpOnly': True,
+            'secure': True,
+            'sameSite': 'Strict',
+            'partitionKey': 'some_key',  # This should be ignored.
+            '_crHasCrossSiteAncestor': True,  # This should be ignored.
+        }
+    ]
+
+    # This call should not raise a TypeError.
+    session_cookies.set_cookies_from_playwright_format(pw_cookies)
+
+    # Check that the cookie was set correctly.
+    cookies = list(session_cookies.jar)
+    assert len(cookies) == 1
+    cookie = cookies[0]
+    assert cookie.name == 'test_cookie'
+    assert cookie.value == 'test_value'
+
+    # Check that the unsupported attributes were not set.
+    # The `has_nonstandard_attr` method is the correct way to check for custom attributes.
+    assert not cookie.has_nonstandard_attr('partitionKey')
+    assert not cookie.has_nonstandard_attr('_crHasCrossSiteAncestor')
