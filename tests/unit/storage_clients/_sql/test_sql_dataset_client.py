@@ -97,7 +97,7 @@ async def test_tables_and_metadata_record(configuration: Configuration) -> None:
             assert 'dataset_item' in tables
             assert 'dataset_metadata' in tables
 
-        async with client.create_session() as session:
+        async with client.get_session() as session:
             stmt = select(DatasetMetadataDB).where(DatasetMetadataDB.name == 'new_dataset')
             result = await session.execute(stmt)
             orm_metadata = result.scalar_one_or_none()
@@ -121,7 +121,7 @@ async def test_record_and_content_verification(dataset_client: SQLDatasetClient)
     assert metadata.modified_at is not None
     assert metadata.accessed_at is not None
 
-    async with dataset_client.create_session() as session:
+    async with dataset_client.get_session() as session:
         stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
@@ -133,7 +133,7 @@ async def test_record_and_content_verification(dataset_client: SQLDatasetClient)
     items = [{'id': 1, 'name': 'Item 1'}, {'id': 2, 'name': 'Item 2'}, {'id': 3, 'name': 'Item 3'}]
     await dataset_client.push_data(items)
 
-    async with dataset_client.create_session() as session:
+    async with dataset_client.get_session() as session:
         stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
@@ -146,7 +146,7 @@ async def test_drop_removes_records(dataset_client: SQLDatasetClient) -> None:
 
     client_metadata = await dataset_client.get_metadata()
 
-    async with dataset_client.create_session() as session:
+    async with dataset_client.get_session() as session:
         stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == client_metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
@@ -155,7 +155,7 @@ async def test_drop_removes_records(dataset_client: SQLDatasetClient) -> None:
     # Drop the dataset
     await dataset_client.drop()
 
-    async with dataset_client.create_session() as session:
+    async with dataset_client.get_session() as session:
         stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == client_metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
@@ -199,13 +199,13 @@ async def test_metadata_record_updates(dataset_client: SQLDatasetClient) -> None
     assert metadata.accessed_at > accessed_after_get
 
     # Verify metadata record is updated in db
-    async with dataset_client.create_session() as session:
+    async with dataset_client.get_session() as session:
         orm_metadata = await session.get(DatasetMetadataDB, metadata.id)
         assert orm_metadata is not None
         orm_metadata.item_count = 1
-        assert orm_metadata.created_at.replace(tzinfo=timezone.utc) == initial_created
-        assert orm_metadata.accessed_at.replace(tzinfo=timezone.utc) == metadata.accessed_at
-        assert orm_metadata.modified_at.replace(tzinfo=timezone.utc) == metadata.modified_at
+        assert orm_metadata.created_at == initial_created
+        assert orm_metadata.accessed_at == metadata.accessed_at
+        assert orm_metadata.modified_at == metadata.modified_at
 
 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:

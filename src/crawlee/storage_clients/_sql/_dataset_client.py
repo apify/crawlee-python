@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
@@ -39,23 +40,34 @@ class SQLDatasetClient(DatasetClient):
     def __init__(
         self,
         *,
-        orm_metadata: DatasetMetadataDB,
+        metadata: DatasetMetadata,
         storage_client: SQLStorageClient,
     ) -> None:
         """Initialize a new instance.
 
         Preferably use the `SqlDatasetClient.open` class method to create a new instance.
         """
-        self._orm_metadata = orm_metadata
+        self._metadata = metadata
         self._storage_client = storage_client
 
-    def create_session(self) -> AsyncSession:
-        """Create a new SQLAlchemy session for this key-value store."""
+    def get_session(self) -> AsyncSession:
+        """Create a new SQLAlchemy session for this dataset."""
         return self._storage_client.create_session()
+
+    @asynccontextmanager
+    async def get_autocommit_session(self) -> AsyncIterator[AsyncSession]:
+        """Create a new SQLAlchemy autocommit session to insert, delete, or modify data."""
+        async with self.get_session() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception as e:
+                logger.warning(f'Error occurred during session transaction: {e}')
+                await session.rollback()
 
     @override
     async def get_metadata(self) -> DatasetMetadata:
-        return DatasetMetadata.model_validate(self._orm_metadata)
+        return self._metadata
 
     @classmethod
     async def open(
@@ -79,44 +91,38 @@ class SQLDatasetClient(DatasetClient):
             ValueError: If a dataset with the specified ID is not found.
         """
         async with storage_client.create_session() as session:
+            orm_metadata: DatasetMetadataDB | None = None
             if id:
                 orm_metadata = await session.get(DatasetMetadataDB, id)
                 if not orm_metadata:
                     raise ValueError(f'Dataset with ID "{id}" not found.')
-
-                client = cls(
-                    orm_metadata=orm_metadata,
-                    storage_client=storage_client,
-                )
-                await client._update_metadata(update_accessed_at=True)
-
             else:
                 stmt = select(DatasetMetadataDB).where(DatasetMetadataDB.name == name)
                 result = await session.execute(stmt)
                 orm_metadata = result.scalar_one_or_none()
-                if orm_metadata:
-                    client = cls(
-                        orm_metadata=orm_metadata,
-                        storage_client=storage_client,
-                    )
-                    await client._update_metadata(update_accessed_at=True)
 
-                else:
-                    now = datetime.now(timezone.utc)
-                    metadata = DatasetMetadata(
-                        id=crypto_random_object_id(),
-                        name=name,
-                        created_at=now,
-                        accessed_at=now,
-                        modified_at=now,
-                        item_count=0,
-                    )
-                    orm_metadata = DatasetMetadataDB(**metadata.model_dump())
-                    client = cls(
-                        orm_metadata=orm_metadata,
-                        storage_client=storage_client,
-                    )
-                    session.add(orm_metadata)
+            if orm_metadata:
+                client = cls(
+                    metadata=DatasetMetadata.model_validate(orm_metadata),
+                    storage_client=storage_client,
+                )
+                await client._update_metadata(session, update_accessed_at=True)
+            else:
+                now = datetime.now(timezone.utc)
+                metadata = DatasetMetadata(
+                    id=crypto_random_object_id(),
+                    name=name,
+                    created_at=now,
+                    accessed_at=now,
+                    modified_at=now,
+                    item_count=0,
+                )
+
+                client = cls(
+                    metadata=metadata,
+                    storage_client=storage_client,
+                )
+                session.add(DatasetMetadataDB(**metadata.model_dump()))
 
             await session.commit()
 
@@ -124,22 +130,17 @@ class SQLDatasetClient(DatasetClient):
 
     @override
     async def drop(self) -> None:
-        async with self.create_session() as session:
-            dataset_db = await session.get(DatasetMetadataDB, self._orm_metadata.id)
-            if dataset_db:
-                await session.delete(dataset_db)
-                await session.commit()
+        stmt = delete(DatasetMetadataDB).where(DatasetMetadataDB.id == self._metadata.id)
+        async with self.get_autocommit_session() as autocommit:
+            await autocommit.execute(stmt)
 
     @override
     async def purge(self) -> None:
-        async with self.create_session() as session:
-            stmt = delete(DatasetItemDB).where(DatasetItemDB.dataset_id == self._orm_metadata.id)
-            await session.execute(stmt)
+        stmt = delete(DatasetItemDB).where(DatasetItemDB.dataset_id == self._metadata.id)
+        async with self.get_autocommit_session() as autocommit:
+            await autocommit.execute(stmt)
 
-            self._orm_metadata.item_count = 0
-            await self._update_metadata(update_accessed_at=True, update_modified_at=True)
-            await session.merge(self._orm_metadata)
-            await session.commit()
+            await self._update_metadata(autocommit, new_item_count=0, update_accessed_at=True, update_modified_at=True)
 
     @override
     async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
@@ -152,20 +153,16 @@ class SQLDatasetClient(DatasetClient):
             json_item = json.dumps(item, default=str, ensure_ascii=False)
             db_items.append(
                 DatasetItemDB(
-                    dataset_id=self._orm_metadata.id,
+                    dataset_id=self._metadata.id,
                     data=json_item,
                 )
             )
 
-        async with self.create_session() as session:
-            session.add_all(db_items)
-            self._orm_metadata.item_count += len(data)
+        async with self.get_autocommit_session() as autocommit:
+            autocommit.add_all(db_items)
             await self._update_metadata(
-                update_accessed_at=True,
-                update_modified_at=True,
+                autocommit, update_accessed_at=True, update_modified_at=True, delta_item_count=len(data)
             )
-            await session.merge(self._orm_metadata)
-            await session.commit()
 
     @override
     async def get_data(
@@ -201,7 +198,7 @@ class SQLDatasetClient(DatasetClient):
                 f'{self.__class__.__name__} client.'
             )
 
-        stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == self._orm_metadata.id)
+        stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == self._metadata.id)
 
         if skip_empty:
             stmt = stmt.where(DatasetItemDB.data != '"{}"')
@@ -210,12 +207,11 @@ class SQLDatasetClient(DatasetClient):
 
         stmt = stmt.offset(offset).limit(limit)
 
-        async with self.create_session() as session:
+        async with self.get_session() as session:
             result = await session.execute(stmt)
             db_items = result.scalars().all()
 
-            await self._update_metadata(update_accessed_at=True)
-            await session.merge(self._orm_metadata)
+            await self._update_metadata(session, update_accessed_at=True)
             await session.commit()
 
         items = [json.loads(db_item.data) for db_item in db_items]
@@ -225,7 +221,7 @@ class SQLDatasetClient(DatasetClient):
             desc=desc,
             limit=limit or 0,
             offset=offset or 0,
-            total=self._orm_metadata.item_count,
+            total=self._metadata.item_count,
         )
 
     @override
@@ -258,7 +254,7 @@ class SQLDatasetClient(DatasetClient):
                 f'by the {self.__class__.__name__} client.'
             )
 
-        stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == self._orm_metadata.id)
+        stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == self._metadata.id)
 
         if skip_empty:
             stmt = stmt.where(DatasetItemDB.data != '"{}"')
@@ -267,12 +263,11 @@ class SQLDatasetClient(DatasetClient):
 
         stmt = stmt.offset(offset).limit(limit)
 
-        async with self.create_session() as session:
+        async with self.get_session() as session:
             result = await session.execute(stmt)
             db_items = result.scalars().all()
 
-            await self._update_metadata(update_accessed_at=True)
-            await session.merge(self._orm_metadata)
+            await self._update_metadata(session, update_accessed_at=True)
             await session.commit()
 
         items = [json.loads(db_item.data) for db_item in db_items]
@@ -281,20 +276,40 @@ class SQLDatasetClient(DatasetClient):
 
     async def _update_metadata(
         self,
+        session: AsyncSession,
         *,
+        new_item_count: int | None = None,
         update_accessed_at: bool = False,
         update_modified_at: bool = False,
+        delta_item_count: int | None = None,
     ) -> None:
         """Update the KVS metadata in the database.
 
         Args:
             session: The SQLAlchemy AsyncSession to use for the update.
+            new_item_count: If provided, update the item count to this value.
             update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
             update_modified_at: If True, update the `modified_at` timestamp to the current time.
+            delta_item_count: If provided, increment the item count by this value.
         """
         now = datetime.now(timezone.utc)
+        values_to_set: dict[str, Any] = {}
 
         if update_accessed_at:
-            self._orm_metadata.accessed_at = now
+            self._metadata.accessed_at = now
+            values_to_set['accessed_at'] = now
         if update_modified_at:
-            self._orm_metadata.modified_at = now
+            self._metadata.modified_at = now
+            values_to_set['modified_at'] = now
+
+        if new_item_count is not None:
+            self._metadata.item_count = new_item_count
+            values_to_set['item_count'] = new_item_count
+
+        if delta_item_count:
+            self._metadata.item_count += delta_item_count
+            values_to_set['item_count'] = DatasetMetadataDB.item_count + self._metadata.item_count
+
+        if values_to_set:
+            stmt = update(DatasetMetadataDB).where(DatasetMetadataDB.id == self._metadata.id).values(**values_to_set)
+            await session.execute(stmt)

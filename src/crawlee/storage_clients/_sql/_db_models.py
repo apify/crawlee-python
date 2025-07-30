@@ -1,17 +1,31 @@
 from __future__ import annotations
 
-from datetime import datetime  # noqa: TC003
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     JSON,
     Boolean,
-    DateTime,
     ForeignKey,
     Integer,
     LargeBinary,
     String,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.types import DateTime, TypeDecorator
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Dialect
+
+
+class AwareDateTime(TypeDecorator):
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_result_value(self, value: datetime | None, _dialect: Dialect) -> datetime | None:
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
 
 
 class Base(DeclarativeBase):
@@ -23,9 +37,9 @@ class StorageMetadataDB:
 
     id: Mapped[str] = mapped_column(String(20), nullable=False, primary_key=True)
     name: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
-    accessed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    modified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accessed_at: Mapped[datetime] = mapped_column(AwareDateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(AwareDateTime, nullable=False)
+    modified_at: Mapped[datetime] = mapped_column(AwareDateTime, nullable=False)
 
 
 class DatasetMetadataDB(StorageMetadataDB, Base):
