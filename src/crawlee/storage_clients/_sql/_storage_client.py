@@ -60,6 +60,7 @@ class SQLStorageClient(StorageClient):
         self._engine = engine
         self._initialized = False
 
+        # Default flag to indicate if the default database should be created
         self._default_flag = self._engine is None and self._connection_string is None
 
     @property
@@ -101,10 +102,11 @@ class SQLStorageClient(StorageClient):
             engine = self._get_or_create_engine(configuration)
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
+                # Set SQLite pragmas for performance and consistency
                 if self._default_flag:
                     await conn.execute(text('PRAGMA journal_mode=WAL'))
                     await conn.execute(text('PRAGMA synchronous=NORMAL'))
-                    await conn.execute(text('PRAGMA cache_size=10000'))
+                    await conn.execute(text('PRAGMA cache_size=100000'))
                     await conn.execute(text('PRAGMA temp_store=MEMORY'))
                     await conn.execute(text('PRAGMA mmap_size=268435456'))
                     await conn.execute(text('PRAGMA foreign_keys=ON'))

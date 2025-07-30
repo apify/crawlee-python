@@ -138,6 +138,7 @@ class SQLDatasetClient(DatasetClient):
 
             self._orm_metadata.item_count = 0
             await self._update_metadata(update_accessed_at=True, update_modified_at=True)
+            await session.merge(self._orm_metadata)
             await session.commit()
 
     @override
@@ -164,7 +165,7 @@ class SQLDatasetClient(DatasetClient):
                 update_accessed_at=True,
                 update_modified_at=True,
             )
-
+            await session.merge(self._orm_metadata)
             await session.commit()
 
     @override
@@ -215,7 +216,7 @@ class SQLDatasetClient(DatasetClient):
             db_items = result.scalars().all()
 
             await self._update_metadata(update_accessed_at=True)
-
+            await session.merge(self._orm_metadata)
             await session.commit()
 
         items = [json.loads(db_item.data) for db_item in db_items]
@@ -272,7 +273,7 @@ class SQLDatasetClient(DatasetClient):
             db_items = result.scalars().all()
 
             await self._update_metadata(update_accessed_at=True)
-
+            await session.merge(self._orm_metadata)
             await session.commit()
 
         items = [json.loads(db_item.data) for db_item in db_items]

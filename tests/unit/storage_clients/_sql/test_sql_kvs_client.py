@@ -2,19 +2,25 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import timezone
 from typing import TYPE_CHECKING
 
 import pytest
+from sqlalchemy import inspect, select
+from sqlalchemy.ext.asyncio import create_async_engine
 
-from crawlee._consts import METADATA_FILENAME
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import FileSystemStorageClient
+from crawlee.storage_clients import SQLStorageClient
+from crawlee.storage_clients._sql._db_models import KeyValueStoreMetadataDB, KeyValueStoreRecordDB
+from crawlee.storage_clients.models import KeyValueStoreMetadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
     from pathlib import Path
 
-    from crawlee.storage_clients._file_system import FileSystemKeyValueStoreClient
+    from sqlalchemy import Connection
+
+    from crawlee.storage_clients._sql import SQLKeyValueStoreClient
 
 
 @pytest.fixture
@@ -25,130 +31,189 @@ def configuration(tmp_path: Path) -> Configuration:
 
 
 @pytest.fixture
-async def kvs_client(configuration: Configuration) -> AsyncGenerator[FileSystemKeyValueStoreClient, None]:
-    """A fixture for a file system key-value store client."""
-    client = await FileSystemStorageClient().create_kvs_client(
-        name='test_kvs',
-        configuration=configuration,
-    )
-    yield client
-    await client.drop()
+async def kvs_client(configuration: Configuration) -> AsyncGenerator[SQLKeyValueStoreClient, None]:
+    """A fixture for a SQL key-value store client."""
+    async with SQLStorageClient() as storage_client:
+        client = await storage_client.create_kvs_client(
+            name='test_kvs',
+            configuration=configuration,
+        )
+        yield client
+        await client.drop()
 
 
-async def test_file_and_directory_creation(configuration: Configuration) -> None:
-    """Test that file system KVS creates proper files and directories."""
-    client = await FileSystemStorageClient().create_kvs_client(
-        name='new_kvs',
-        configuration=configuration,
-    )
-
-    # Verify files were created
-    assert client.path_to_kvs.exists()
-    assert client.path_to_metadata.exists()
-
-    # Verify metadata file structure
-    with client.path_to_metadata.open() as f:
-        metadata = json.load(f)
-        assert metadata['id'] == (await client.get_metadata()).id
-        assert metadata['name'] == 'new_kvs'
-
-    await client.drop()
+# Helper function that allows you to use inspect with an asynchronous engine
+def get_tables(sync_conn: Connection) -> list[str]:
+    inspector = inspect(sync_conn)
+    return inspector.get_table_names()
 
 
-async def test_value_file_creation_and_content(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test that values are properly persisted to files with correct content and metadata."""
+async def test_create_tables_with_connection_string(configuration: Configuration, tmp_path: Path) -> None:
+    """Test that SQL dataset client creates tables with a connection string."""
+    storage_dir = tmp_path / 'test_table.db'
+
+    async with SQLStorageClient(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_client:
+        await storage_client.create_kvs_client(
+            name='new_kvs',
+            configuration=configuration,
+        )
+
+        async with storage_client.engine.begin() as conn:
+            tables = await conn.run_sync(get_tables)
+            assert 'kvs_metadata' in tables
+            assert 'kvs_record' in tables
+
+
+async def test_create_tables_with_engine(configuration: Configuration, tmp_path: Path) -> None:
+    """Test that SQL dataset client creates tables with a pre-configured engine."""
+    storage_dir = tmp_path / 'test_table.db'
+
+    engine = create_async_engine(f'sqlite+aiosqlite:///{storage_dir}', future=True, echo=False)
+
+    async with SQLStorageClient(engine=engine) as storage_client:
+        await storage_client.create_kvs_client(
+            name='new_kvs',
+            configuration=configuration,
+        )
+
+        async with engine.begin() as conn:
+            tables = await conn.run_sync(get_tables)
+            assert 'kvs_metadata' in tables
+            assert 'kvs_record' in tables
+
+
+async def test_tables_and_metadata_record(configuration: Configuration) -> None:
+    """Test that SQL dataset creates proper tables and metadata records."""
+    async with SQLStorageClient() as storage_client:
+        client = await storage_client.create_kvs_client(
+            name='new_kvs',
+            configuration=configuration,
+        )
+
+        client_metadata = await client.get_metadata()
+
+        async with storage_client.engine.begin() as conn:
+            tables = await conn.run_sync(get_tables)
+            assert 'kvs_metadata' in tables
+            assert 'kvs_record' in tables
+
+        async with client.create_session() as session:
+            stmt = select(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.name == 'new_kvs')
+            result = await session.execute(stmt)
+            orm_metadata = result.scalar_one_or_none()
+            metadata = KeyValueStoreMetadata.model_validate(orm_metadata)
+            assert metadata.id == client_metadata.id
+            assert metadata.name == 'new_kvs'
+
+        await client.drop()
+
+
+async def test_value_record_creation(kvs_client: SQLKeyValueStoreClient) -> None:
+    """Test that key-value store client can create a record."""
     test_key = 'test-key'
     test_value = 'Hello, world!'
     await kvs_client.set_value(key=test_key, value=test_value)
-
-    # Check if the files were created
-    key_path = kvs_client.path_to_kvs / test_key
-    key_metadata_path = kvs_client.path_to_kvs / f'{test_key}.{METADATA_FILENAME}'
-    assert key_path.exists()
-    assert key_metadata_path.exists()
-
-    # Check file content
-    content = key_path.read_text(encoding='utf-8')
-    assert content == test_value
-
-    # Check record metadata file
-    with key_metadata_path.open() as f:
-        metadata = json.load(f)
-        assert metadata['key'] == test_key
-        assert metadata['content_type'] == 'text/plain; charset=utf-8'
-        assert metadata['size'] == len(test_value.encode('utf-8'))
+    async with kvs_client.create_session() as session:
+        stmt = select(KeyValueStoreRecordDB).where(KeyValueStoreRecordDB.key == test_key)
+        result = await session.execute(stmt)
+        record = result.scalar_one_or_none()
+        assert record is not None
+        assert record.key == test_key
+        assert record.content_type == 'text/plain; charset=utf-8'
+        assert record.size == len(test_value.encode('utf-8'))
+        assert record.value == test_value.encode('utf-8')
 
 
-async def test_binary_data_persistence(kvs_client: FileSystemKeyValueStoreClient) -> None:
+async def test_binary_data_persistence(kvs_client: SQLKeyValueStoreClient) -> None:
     """Test that binary data is stored correctly without corruption."""
     test_key = 'test-binary'
     test_value = b'\x00\x01\x02\x03\x04'
     await kvs_client.set_value(key=test_key, value=test_value)
 
-    # Verify binary file exists
-    key_path = kvs_client.path_to_kvs / test_key
-    assert key_path.exists()
+    async with kvs_client.create_session() as session:
+        stmt = select(KeyValueStoreRecordDB).where(KeyValueStoreRecordDB.key == test_key)
+        result = await session.execute(stmt)
+        record = result.scalar_one_or_none()
+        assert record is not None
+        assert record.key == test_key
+        assert record.content_type == 'application/octet-stream'
+        assert record.size == len(test_value)
+        assert record.value == test_value
 
-    # Verify binary content is preserved
-    content = key_path.read_bytes()
-    assert content == test_value
-
-    # Verify retrieval works correctly
-    record = await kvs_client.get_value(key=test_key)
-    assert record is not None
-    assert record.value == test_value
-    assert record.content_type == 'application/octet-stream'
+    verify_record = await kvs_client.get_value(key=test_key)
+    assert verify_record is not None
+    assert verify_record.value == test_value
+    assert verify_record.content_type == 'application/octet-stream'
 
 
-async def test_json_serialization_to_file(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test that JSON objects are properly serialized to files."""
+async def test_json_serialization_to_record(kvs_client: SQLKeyValueStoreClient) -> None:
+    """Test that JSON objects are properly serialized to records."""
     test_key = 'test-json'
     test_value = {'name': 'John', 'age': 30, 'items': [1, 2, 3]}
     await kvs_client.set_value(key=test_key, value=test_value)
 
-    # Check if file content is valid JSON
-    key_path = kvs_client.path_to_kvs / test_key
-    with key_path.open() as f:
-        file_content = json.load(f)
-        assert file_content == test_value
+    async with kvs_client.create_session() as session:
+        stmt = select(KeyValueStoreRecordDB).where(KeyValueStoreRecordDB.key == test_key)
+        result = await session.execute(stmt)
+        record = result.scalar_one_or_none()
+        assert record is not None
+        assert record.key == test_key
+        assert json.loads(record.value.decode('utf-8')) == test_value
 
 
-async def test_file_deletion_on_value_delete(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test that deleting a value removes its files from disk."""
+async def test_record_deletion_on_value_delete(kvs_client: SQLKeyValueStoreClient) -> None:
+    """Test that deleting a value removes its record from the database."""
     test_key = 'test-delete'
     test_value = 'Delete me'
 
     # Set a value
     await kvs_client.set_value(key=test_key, value=test_value)
 
-    # Verify files exist
-    key_path = kvs_client.path_to_kvs / test_key
-    metadata_path = kvs_client.path_to_kvs / f'{test_key}.{METADATA_FILENAME}'
-    assert key_path.exists()
-    assert metadata_path.exists()
+    async with kvs_client.create_session() as session:
+        stmt = select(KeyValueStoreRecordDB).where(KeyValueStoreRecordDB.key == test_key)
+        result = await session.execute(stmt)
+        record = result.scalar_one_or_none()
+        assert record is not None
+        assert record.key == test_key
+        assert record.value == test_value.encode('utf-8')
 
     # Delete the value
     await kvs_client.delete_value(key=test_key)
 
-    # Verify files were deleted
-    assert not key_path.exists()
-    assert not metadata_path.exists()
+    # Verify record was deleted
+    async with kvs_client.create_session() as session:
+        stmt = select(KeyValueStoreRecordDB).where(KeyValueStoreRecordDB.key == test_key)
+        result = await session.execute(stmt)
+        record = result.scalar_one_or_none()
+        assert record is None
 
 
-async def test_drop_removes_directory(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test that drop removes the entire store directory from disk."""
+async def test_drop_removes_records(kvs_client: SQLKeyValueStoreClient) -> None:
+    """Test that drop removes all records from the database."""
     await kvs_client.set_value(key='test', value='test-value')
 
-    assert kvs_client.path_to_kvs.exists()
+    client_metadata = await kvs_client.get_metadata()
+
+    async with kvs_client.create_session() as session:
+        stmt = select(KeyValueStoreRecordDB).where(KeyValueStoreRecordDB.key == 'test')
+        result = await session.execute(stmt)
+        record = result.scalar_one_or_none()
+        assert record is not None
 
     # Drop the store
     await kvs_client.drop()
 
-    assert not kvs_client.path_to_kvs.exists()
+    async with kvs_client.create_session() as session:
+        stmt = select(KeyValueStoreRecordDB).where(KeyValueStoreRecordDB.key == 'test')
+        result = await session.execute(stmt)
+        record = result.scalar_one_or_none()
+        assert record is None
+        metadata = await session.get(KeyValueStoreMetadataDB, client_metadata.id)
+        assert metadata is None
 
 
-async def test_metadata_file_updates(kvs_client: FileSystemKeyValueStoreClient) -> None:
-    """Test that read/write operations properly update metadata file timestamps."""
+async def test_metadata_record_updates(kvs_client: SQLKeyValueStoreClient) -> None:
+    """Test that read/write operations properly update metadata record timestamps."""
     # Record initial timestamps
     metadata = await kvs_client.get_metadata()
     initial_created = metadata.created_at
@@ -181,31 +246,38 @@ async def test_metadata_file_updates(kvs_client: FileSystemKeyValueStoreClient) 
     assert metadata.modified_at > initial_modified
     assert metadata.accessed_at > accessed_after_read
 
+    async with kvs_client.create_session() as session:
+        stmt = select(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.id == metadata.id)
+        result = await session.execute(stmt)
+        orm_metadata = result.scalar_one_or_none()
+        assert orm_metadata is not None
+        assert orm_metadata.created_at.replace(tzinfo=timezone.utc) == metadata.created_at
+        assert orm_metadata.accessed_at.replace(tzinfo=timezone.utc) == metadata.accessed_at
+        assert orm_metadata.modified_at.replace(tzinfo=timezone.utc) == metadata.modified_at
+
 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
-    """Test that data persists correctly when reopening the same KVS."""
-    storage_client = FileSystemStorageClient()
+    """Test that data persists correctly when reopening the same dataset."""
+    async with SQLStorageClient() as storage_client:
+        original_client = await storage_client.create_kvs_client(
+            name='persistence-test',
+            configuration=configuration,
+        )
 
-    # Create KVS and add data
-    original_client = await storage_client.create_kvs_client(
-        name='persistence-test',
-        configuration=configuration,
-    )
+        test_key = 'persistent-key'
+        test_value = 'persistent-value'
+        await original_client.set_value(key=test_key, value=test_value)
 
-    test_key = 'persistent-key'
-    test_value = 'persistent-value'
-    await original_client.set_value(key=test_key, value=test_value)
+        kvs_id = (await original_client.get_metadata()).id
 
-    kvs_id = (await original_client.get_metadata()).id
+        # Reopen by ID and verify data persists
+        reopened_client = await storage_client.create_kvs_client(
+            id=kvs_id,
+            configuration=configuration,
+        )
 
-    # Reopen by ID and verify data persists
-    reopened_client = await storage_client.create_kvs_client(
-        id=kvs_id,
-        configuration=configuration,
-    )
+        record = await reopened_client.get_value(key=test_key)
+        assert record is not None
+        assert record.value == test_value
 
-    record = await reopened_client.get_value(key=test_key)
-    assert record is not None
-    assert record.value == test_value
-
-    await reopened_client.drop()
+        await reopened_client.drop()

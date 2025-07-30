@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import timezone
 from typing import TYPE_CHECKING
 
 import pytest
@@ -105,6 +106,8 @@ async def test_tables_and_metadata_record(configuration: Configuration) -> None:
             assert metadata.name == 'new_dataset'
             assert metadata.item_count == 0
 
+        await client.drop()
+
 
 async def test_record_and_content_verification(dataset_client: SQLDatasetClient) -> None:
     """Test that dataset client can push data and verify its content."""
@@ -177,9 +180,9 @@ async def test_metadata_recaord_updates(dataset_client: SQLDatasetClient) -> Non
 
     # Verify timestamps
     metadata = await dataset_client.get_metadata()
-    assert metadata.created_at == initial_created
-    assert metadata.accessed_at > initial_accessed
-    assert metadata.modified_at == initial_modified
+    assert metadata.created_at.replace(tzinfo=timezone.utc) == initial_created
+    assert metadata.accessed_at.replace(tzinfo=timezone.utc) > initial_accessed
+    assert metadata.modified_at.replace(tzinfo=timezone.utc) == initial_modified
 
     accessed_after_get = metadata.accessed_at
 
@@ -200,6 +203,9 @@ async def test_metadata_recaord_updates(dataset_client: SQLDatasetClient) -> Non
         orm_metadata = await session.get(DatasetMetadataDB, metadata.id)
         record_metadata = DatasetMetadata.model_validate(orm_metadata)
         record_metadata.item_count = 1
+        assert record_metadata.created_at.replace(tzinfo=timezone.utc) == initial_created
+        assert record_metadata.accessed_at.replace(tzinfo=timezone.utc) == metadata.accessed_at
+        assert record_metadata.modified_at.replace(tzinfo=timezone.utc) == metadata.modified_at
 
 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:

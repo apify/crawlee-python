@@ -62,7 +62,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
         self._storage_client = storage_client
         """The storage client used to access the SQL database."""
 
-    async def create_session(self) -> AsyncSession:
+    def create_session(self) -> AsyncSession:
         """Create a new SQLAlchemy session for this key-value store."""
         return self._storage_client.create_session()
 
@@ -190,20 +190,22 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
             else:
                 session.add(record_db)
             self._update_metadata(update_accessed_at=True, update_modified_at=True)
+            await session.merge(self._orm_metadata)
             await session.commit()
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
         # Update the metadata to record access
         async with self._storage_client.create_session() as session:
-            self._update_metadata(update_accessed_at=True)
-
             stmt = select(KeyValueStoreRecordDB).where(
                 KeyValueStoreRecordDB.kvs_id == self._orm_metadata.id, KeyValueStoreRecordDB.key == key
             )
             result = await session.execute(stmt)
             record_db = result.scalar_one_or_none()
 
+            self._update_metadata(update_accessed_at=True)
+
+            await session.merge(self._orm_metadata)
             await session.commit()
 
         if not record_db:
@@ -252,6 +254,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
             # Update metadata if we actually deleted something
             if result.rowcount > 0:
                 self._update_metadata(update_accessed_at=True, update_modified_at=True)
+                await session.merge(self._orm_metadata)
 
             await session.commit()
 
@@ -281,6 +284,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
             result = await session.execute(stmt)
 
             self._update_metadata(update_accessed_at=True)
+            await session.merge(self._orm_metadata)
             await session.commit()
 
             for row in result:
@@ -300,6 +304,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
             result = await session.execute(stmt)
 
             self._update_metadata(update_accessed_at=True)
+            await session.merge(self._orm_metadata)
             await session.commit()
 
             return result.scalar_one_or_none() is not None
