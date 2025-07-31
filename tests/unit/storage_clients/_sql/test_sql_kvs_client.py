@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import timezone
 from typing import TYPE_CHECKING
 
 import pytest
@@ -98,7 +97,7 @@ async def test_tables_and_metadata_record(configuration: Configuration) -> None:
             assert 'kvs_metadata' in tables
             assert 'kvs_record' in tables
 
-        async with client.create_session() as session:
+        async with client.get_session() as session:
             stmt = select(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.name == 'new_kvs')
             result = await session.execute(stmt)
             orm_metadata = result.scalar_one_or_none()
@@ -114,7 +113,7 @@ async def test_value_record_creation(kvs_client: SQLKeyValueStoreClient) -> None
     test_key = 'test-key'
     test_value = 'Hello, world!'
     await kvs_client.set_value(key=test_key, value=test_value)
-    async with kvs_client.create_session() as session:
+    async with kvs_client.get_session() as session:
         stmt = select(KeyValueStoreRecordDB).where(KeyValueStoreRecordDB.key == test_key)
         result = await session.execute(stmt)
         record = result.scalar_one_or_none()
@@ -131,7 +130,7 @@ async def test_binary_data_persistence(kvs_client: SQLKeyValueStoreClient) -> No
     test_value = b'\x00\x01\x02\x03\x04'
     await kvs_client.set_value(key=test_key, value=test_value)
 
-    async with kvs_client.create_session() as session:
+    async with kvs_client.get_session() as session:
         stmt = select(KeyValueStoreRecordDB).where(KeyValueStoreRecordDB.key == test_key)
         result = await session.execute(stmt)
         record = result.scalar_one_or_none()
@@ -153,7 +152,7 @@ async def test_json_serialization_to_record(kvs_client: SQLKeyValueStoreClient) 
     test_value = {'name': 'John', 'age': 30, 'items': [1, 2, 3]}
     await kvs_client.set_value(key=test_key, value=test_value)
 
-    async with kvs_client.create_session() as session:
+    async with kvs_client.get_session() as session:
         stmt = select(KeyValueStoreRecordDB).where(KeyValueStoreRecordDB.key == test_key)
         result = await session.execute(stmt)
         record = result.scalar_one_or_none()
@@ -170,7 +169,7 @@ async def test_record_deletion_on_value_delete(kvs_client: SQLKeyValueStoreClien
     # Set a value
     await kvs_client.set_value(key=test_key, value=test_value)
 
-    async with kvs_client.create_session() as session:
+    async with kvs_client.get_session() as session:
         stmt = select(KeyValueStoreRecordDB).where(KeyValueStoreRecordDB.key == test_key)
         result = await session.execute(stmt)
         record = result.scalar_one_or_none()
@@ -182,7 +181,7 @@ async def test_record_deletion_on_value_delete(kvs_client: SQLKeyValueStoreClien
     await kvs_client.delete_value(key=test_key)
 
     # Verify record was deleted
-    async with kvs_client.create_session() as session:
+    async with kvs_client.get_session() as session:
         stmt = select(KeyValueStoreRecordDB).where(KeyValueStoreRecordDB.key == test_key)
         result = await session.execute(stmt)
         record = result.scalar_one_or_none()
@@ -195,7 +194,7 @@ async def test_drop_removes_records(kvs_client: SQLKeyValueStoreClient) -> None:
 
     client_metadata = await kvs_client.get_metadata()
 
-    async with kvs_client.create_session() as session:
+    async with kvs_client.get_session() as session:
         stmt = select(KeyValueStoreRecordDB).where(KeyValueStoreRecordDB.key == 'test')
         result = await session.execute(stmt)
         record = result.scalar_one_or_none()
@@ -204,7 +203,7 @@ async def test_drop_removes_records(kvs_client: SQLKeyValueStoreClient) -> None:
     # Drop the store
     await kvs_client.drop()
 
-    async with kvs_client.create_session() as session:
+    async with kvs_client.get_session() as session:
         stmt = select(KeyValueStoreRecordDB).where(KeyValueStoreRecordDB.key == 'test')
         result = await session.execute(stmt)
         record = result.scalar_one_or_none()
@@ -247,12 +246,12 @@ async def test_metadata_record_updates(kvs_client: SQLKeyValueStoreClient) -> No
     assert metadata.modified_at > initial_modified
     assert metadata.accessed_at > accessed_after_read
 
-    async with kvs_client.create_session() as session:
+    async with kvs_client.get_session() as session:
         orm_metadata = await session.get(KeyValueStoreMetadataDB, metadata.id)
         assert orm_metadata is not None
-        assert orm_metadata.created_at.replace(tzinfo=timezone.utc) == metadata.created_at
-        assert orm_metadata.accessed_at.replace(tzinfo=timezone.utc) == metadata.accessed_at
-        assert orm_metadata.modified_at.replace(tzinfo=timezone.utc) == metadata.modified_at
+        assert orm_metadata.created_at == metadata.created_at
+        assert orm_metadata.accessed_at == metadata.accessed_at
+        assert orm_metadata.modified_at == metadata.modified_at
 
 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:

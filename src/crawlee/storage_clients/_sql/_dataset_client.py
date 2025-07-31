@@ -50,6 +50,10 @@ class SQLDatasetClient(DatasetClient):
         self._metadata = metadata
         self._storage_client = storage_client
 
+    @override
+    async def get_metadata(self) -> DatasetMetadata:
+        return self._metadata
+
     def get_session(self) -> AsyncSession:
         """Create a new SQLAlchemy session for this dataset."""
         return self._storage_client.create_session()
@@ -64,10 +68,6 @@ class SQLDatasetClient(DatasetClient):
             except Exception as e:
                 logger.warning(f'Error occurred during session transaction: {e}')
                 await session.rollback()
-
-    @override
-    async def get_metadata(self) -> DatasetMetadata:
-        return self._metadata
 
     @classmethod
     async def open(
@@ -124,6 +124,7 @@ class SQLDatasetClient(DatasetClient):
                 )
                 session.add(DatasetMetadataDB(**metadata.model_dump()))
 
+            # Commit the insert or update metadata to the database
             await session.commit()
 
             return client
@@ -212,6 +213,8 @@ class SQLDatasetClient(DatasetClient):
             db_items = result.scalars().all()
 
             await self._update_metadata(session, update_accessed_at=True)
+
+            # Commit updates to the metadata
             await session.commit()
 
         items = [json.loads(db_item.data) for db_item in db_items]
@@ -268,6 +271,8 @@ class SQLDatasetClient(DatasetClient):
             db_items = result.scalars().all()
 
             await self._update_metadata(session, update_accessed_at=True)
+
+            # Commit updates to the metadata
             await session.commit()
 
         items = [json.loads(db_item.data) for db_item in db_items]

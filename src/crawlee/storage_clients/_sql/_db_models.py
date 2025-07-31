@@ -36,7 +36,7 @@ class StorageMetadataDB:
     """Base database model for storage metadata."""
 
     id: Mapped[str] = mapped_column(String(20), nullable=False, primary_key=True)
-    name: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    name: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True, unique=True)
     accessed_at: Mapped[datetime] = mapped_column(AwareDateTime, nullable=False)
     created_at: Mapped[datetime] = mapped_column(AwareDateTime, nullable=False)
     modified_at: Mapped[datetime] = mapped_column(AwareDateTime, nullable=False)
