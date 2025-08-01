@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import pytest
@@ -33,7 +34,7 @@ def configuration(tmp_path: Path) -> Configuration:
 @pytest.fixture
 async def kvs_client(configuration: Configuration) -> AsyncGenerator[SQLKeyValueStoreClient, None]:
     """A fixture for a SQL key-value store client."""
-    async with SQLStorageClient() as storage_client:
+    async with SQLStorageClient(accessed_modified_update_interval=timedelta(seconds=0)) as storage_client:
         client = await storage_client.create_kvs_client(
             name='test_kvs',
             configuration=configuration,

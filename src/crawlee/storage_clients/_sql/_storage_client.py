@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -47,6 +48,7 @@ class SQLStorageClient(StorageClient):
         *,
         connection_string: str | None = None,
         engine: AsyncEngine | None = None,
+        accessed_modified_update_interval: timedelta = timedelta(seconds=1),
     ) -> None:
         """Initialize the SQL storage client.
 
@@ -54,6 +56,9 @@ class SQLStorageClient(StorageClient):
             connection_string: Database connection string (e.g., "sqlite+aiosqlite:///crawlee.db").
                 If not provided, defaults to SQLite database in the storage directory.
             engine: Pre-configured AsyncEngine instance. If provided, connection_string is ignored.
+            accessed_modified_update_interval: Minimum interval between updates of accessed_at and modified_at
+                timestamps in metadata tables. Used to reduce frequency of timestamp updates during frequent
+                read/write operations. Default is 1 second.
         """
         if engine is not None and connection_string is not None:
             raise ValueError('Either connection_string or engine must be provided, not both.')
@@ -61,6 +66,8 @@ class SQLStorageClient(StorageClient):
         self._connection_string = connection_string
         self._engine = engine
         self._initialized = False
+
+        self._accessed_modified_update_interval = accessed_modified_update_interval
 
         # Default flag to indicate if the default database should be created
         self._default_flag = self._engine is None and self._connection_string is None
@@ -75,6 +82,10 @@ class SQLStorageClient(StorageClient):
     def get_default_flag(self) -> bool:
         """Check if the default database should be created."""
         return self._default_flag
+
+    def get_accessed_modified_update_interval(self) -> timedelta:
+        """Get the interval for accessed and modified updates."""
+        return self._accessed_modified_update_interval
 
     def _get_or_create_engine(self, configuration: Configuration) -> AsyncEngine:
         """Get or create the database engine based on configuration."""

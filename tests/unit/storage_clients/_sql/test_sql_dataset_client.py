@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import timezone
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import pytest
@@ -39,7 +39,7 @@ def get_tables(sync_conn: Connection) -> list[str]:
 @pytest.fixture
 async def dataset_client(configuration: Configuration) -> AsyncGenerator[SQLDatasetClient, None]:
     """A fixture for a SQL dataset client."""
-    async with SQLStorageClient() as storage_client:
+    async with SQLStorageClient(accessed_modified_update_interval=timedelta(seconds=0)) as storage_client:
         client = await storage_client.create_dataset_client(
             name='test_dataset',
             configuration=configuration,
@@ -180,9 +180,9 @@ async def test_metadata_record_updates(dataset_client: SQLDatasetClient) -> None
 
     # Verify timestamps
     metadata = await dataset_client.get_metadata()
-    assert metadata.created_at.replace(tzinfo=timezone.utc) == initial_created
-    assert metadata.accessed_at.replace(tzinfo=timezone.utc) > initial_accessed
-    assert metadata.modified_at.replace(tzinfo=timezone.utc) == initial_modified
+    assert metadata.created_at == initial_created
+    assert metadata.accessed_at > initial_accessed
+    assert metadata.modified_at == initial_modified
 
     accessed_after_get = metadata.accessed_at
 

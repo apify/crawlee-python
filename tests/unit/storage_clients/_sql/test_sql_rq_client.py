@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import timezone
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import pytest
@@ -35,7 +35,7 @@ def configuration(tmp_path: Path) -> Configuration:
 @pytest.fixture
 async def rq_client(configuration: Configuration) -> AsyncGenerator[SQLRequestQueueClient, None]:
     """A fixture for a SQL request queue client."""
-    async with SQLStorageClient() as storage_client:
+    async with SQLStorageClient(accessed_modified_update_interval=timedelta(seconds=0)) as storage_client:
         client = await storage_client.create_rq_client(
             name='test_request_queue',
             configuration=configuration,
@@ -190,9 +190,9 @@ async def test_metadata_record_updates(rq_client: SQLRequestQueueClient) -> None
     async with rq_client.get_session() as session:
         orm_metadata = await session.get(RequestQueueMetadataDB, metadata.id)
         assert orm_metadata is not None
-        assert orm_metadata.created_at.replace(tzinfo=timezone.utc) == metadata.created_at
-        assert orm_metadata.accessed_at.replace(tzinfo=timezone.utc) == metadata.accessed_at
-        assert orm_metadata.modified_at.replace(tzinfo=timezone.utc) == metadata.modified_at
+        assert orm_metadata.created_at == metadata.created_at
+        assert orm_metadata.accessed_at == metadata.accessed_at
+        assert orm_metadata.modified_at == metadata.modified_at
 
 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:

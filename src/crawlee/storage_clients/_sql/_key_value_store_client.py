@@ -7,7 +7,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import delete, select, text, update
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
@@ -66,6 +66,12 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
 
         self._storage_client = storage_client
         """The storage client used to access the SQL database."""
+
+        self._last_accessed_at: datetime | None = None
+        self._last_modified_at: datetime | None = None
+
+        self._accessed_modified_update_interval = storage_client.get_accessed_modified_update_interval()
+        """Interval for updating metadata in the database."""
 
     @override
     async def get_metadata(self) -> KeyValueStoreMetadata:
@@ -223,12 +229,17 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
         # A race condition is possible if several clients work with one kvs.
         # Unfortunately, there is no implementation of atomic Upsert that is independent of specific dialects.
         # https://docs.sqlalchemy.org/en/20/orm/queryguide/dml.html#orm-upsert-statements
-        async with self.get_autocommit_session() as autocommit:
-            result = await autocommit.execute(stmt)
+        async with self.get_session() as session:
+            result = await session.execute(stmt)
             if result.rowcount == 0:
-                autocommit.add(record_db)
+                session.add(record_db)
 
-            await self._update_metadata(autocommit, update_accessed_at=True, update_modified_at=True)
+            await self._update_metadata(session, update_accessed_at=True, update_modified_at=True)
+            try:
+                await session.commit()
+            except IntegrityError:
+                # Race condition when attempting to INSERT the same key. Ignore duplicates.
+                await session.rollback()
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
@@ -239,10 +250,11 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
             result = await session.execute(stmt)
             record_db = result.scalar_one_or_none()
 
-            await self._update_metadata(session, update_accessed_at=True)
+            updated = await self._update_metadata(session, update_accessed_at=True)
 
             # Commit updates to the metadata
-            await session.commit()
+            if updated:
+                await session.commit()
 
         if not record_db:
             return None
@@ -325,10 +337,11 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
                     size=row.size,
                 )
 
-            await self._update_metadata(session, update_accessed_at=True)
+            updated = await self._update_metadata(session, update_accessed_at=True)
 
             # Commit updates to the metadata
-            await session.commit()
+            if updated:
+                await session.commit()
 
     @override
     async def record_exists(self, *, key: str) -> bool:
@@ -339,8 +352,11 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
             # Check if record exists
             result = await session.execute(stmt)
 
-            await self._update_metadata(session, update_accessed_at=True)
-            await session.commit()
+            updated = await self._update_metadata(session, update_accessed_at=True)
+
+            # Commit updates to the metadata
+            if updated:
+                await session.commit()
 
             return result.scalar_one_or_none() is not None
 
@@ -354,7 +370,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
         *,
         update_accessed_at: bool = False,
         update_modified_at: bool = False,
-    ) -> None:
+    ) -> bool:
         """Update the KVS metadata in the database.
 
         Args:
@@ -365,11 +381,21 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
         now = datetime.now(timezone.utc)
         values_to_set: dict[str, Any] = {}
 
-        if update_accessed_at:
+        if update_accessed_at and (
+            self._last_accessed_at is None or (now - self._last_accessed_at) > self._accessed_modified_update_interval
+        ):
             values_to_set['accessed_at'] = now
-        if update_modified_at:
+            self._last_accessed_at = now
+
+        if update_modified_at and (
+            self._last_modified_at is None or (now - self._last_modified_at) > self._accessed_modified_update_interval
+        ):
             values_to_set['modified_at'] = now
+            self._last_modified_at = now
 
         if values_to_set:
             stmt = update(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.id == self._id).values(**values_to_set)
             await session.execute(stmt)
+            return True
+
+        return False

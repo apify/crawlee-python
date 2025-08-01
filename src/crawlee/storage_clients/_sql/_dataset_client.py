@@ -54,6 +54,10 @@ class SQLDatasetClient(DatasetClient):
         self._id = id
         self._storage_client = storage_client
 
+        self._last_accessed_at: datetime | None = None
+        self._last_modified_at: datetime | None = None
+        self._accessed_modified_update_interval = storage_client.get_accessed_modified_update_interval()
+
     @override
     async def get_metadata(self) -> DatasetMetadata:
         async with self.get_session() as session:
@@ -241,10 +245,11 @@ class SQLDatasetClient(DatasetClient):
             result = await session.execute(stmt)
             db_items = result.scalars().all()
 
-            await self._update_metadata(session, update_accessed_at=True)
+            updated = await self._update_metadata(session, update_accessed_at=True)
 
             # Commit updates to the metadata
-            await session.commit()
+            if updated:
+                await session.commit()
 
         items = [json.loads(db_item.data) for db_item in db_items]
         metadata = await self.get_metadata()
@@ -300,10 +305,11 @@ class SQLDatasetClient(DatasetClient):
             result = await session.execute(stmt)
             db_items = result.scalars().all()
 
-            await self._update_metadata(session, update_accessed_at=True)
+            updated = await self._update_metadata(session, update_accessed_at=True)
 
             # Commit updates to the metadata
-            await session.commit()
+            if updated:
+                await session.commit()
 
         items = [json.loads(db_item.data) for db_item in db_items]
         for item in items:
@@ -317,7 +323,7 @@ class SQLDatasetClient(DatasetClient):
         update_accessed_at: bool = False,
         update_modified_at: bool = False,
         delta_item_count: int | None = None,
-    ) -> None:
+    ) -> bool:
         """Update the KVS metadata in the database.
 
         Args:
@@ -330,10 +336,17 @@ class SQLDatasetClient(DatasetClient):
         now = datetime.now(timezone.utc)
         values_to_set: dict[str, Any] = {}
 
-        if update_accessed_at:
+        if update_accessed_at and (
+            self._last_accessed_at is None or (now - self._last_accessed_at) > self._accessed_modified_update_interval
+        ):
             values_to_set['accessed_at'] = now
-        if update_modified_at:
+            self._last_accessed_at = now
+
+        if update_modified_at and (
+            self._last_modified_at is None or (now - self._last_modified_at) > self._accessed_modified_update_interval
+        ):
             values_to_set['modified_at'] = now
+            self._last_modified_at = now
 
         if new_item_count is not None:
             values_to_set['item_count'] = new_item_count
@@ -343,3 +356,6 @@ class SQLDatasetClient(DatasetClient):
         if values_to_set:
             stmt = update(DatasetMetadataDB).where(DatasetMetadataDB.id == self._id).values(**values_to_set)
             await session.execute(stmt)
+            return True
+
+        return False

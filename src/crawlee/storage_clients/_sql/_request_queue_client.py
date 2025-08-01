@@ -89,6 +89,10 @@ class SQLRequestQueueClient(RequestQueueClient):
         self._is_empty_cache: bool | None = None
         """Cache for is_empty result: None means unknown, True/False is cached state."""
 
+        self._last_accessed_at: datetime | None = None
+        self._last_modified_at: datetime | None = None
+        self._accessed_modified_update_interval = storage_client.get_accessed_modified_update_interval()
+
         self._state = RecoverableState[RequestQueueState](
             default_state=RequestQueueState(),
             persist_state_key='request_queue_state',
@@ -404,10 +408,11 @@ class SQLRequestQueueClient(RequestQueueClient):
                 logger.warning(f'Request with ID "{request_id}" not found in the queue.')
                 return None
 
-            await self._update_metadata(session, update_accessed_at=True)
+            updated = await self._update_metadata(session, update_accessed_at=True)
 
             # Commit updates to the metadata
-            await session.commit()
+            if updated:
+                await session.commit()
 
         request = Request.model_validate_json(request_db.data)
 
@@ -554,10 +559,11 @@ class SQLRequestQueueClient(RequestQueueClient):
                 raise ValueError(f'Request queue with ID "{self._id}" not found.')
 
             self._is_empty_cache = metadata_orm.pending_request_count == 0
-            await self._update_metadata(session, update_accessed_at=True)
+            updated = await self._update_metadata(session, update_accessed_at=True)
 
             # Commit updates to the metadata
-            await session.commit()
+            if updated:
+                await session.commit()
 
         return self._is_empty_cache
 
@@ -601,7 +607,7 @@ class SQLRequestQueueClient(RequestQueueClient):
         update_had_multiple_clients: bool = False,
         update_accessed_at: bool = False,
         update_modified_at: bool = False,
-    ) -> None:
+    ) -> bool:
         """Update the request queue metadata in the database.
 
         Args:
@@ -619,11 +625,17 @@ class SQLRequestQueueClient(RequestQueueClient):
         now = datetime.now(timezone.utc)
         values_to_set: dict[str, Any] = {}
 
-        if update_accessed_at:
+        if update_accessed_at and (
+            self._last_accessed_at is None or (now - self._last_accessed_at) > self._accessed_modified_update_interval
+        ):
             values_to_set['accessed_at'] = now
+            self._last_accessed_at = now
 
-        if update_modified_at:
+        if update_modified_at and (
+            self._last_modified_at is None or (now - self._last_modified_at) > self._accessed_modified_update_interval
+        ):
             values_to_set['modified_at'] = now
+            self._last_modified_at = now
 
         if update_had_multiple_clients:
             values_to_set['had_multiple_clients'] = True
@@ -652,3 +664,6 @@ class SQLRequestQueueClient(RequestQueueClient):
         if values_to_set:
             stmt = update(RequestQueueMetadataDB).where(RequestQueueMetadataDB.id == self._id).values(**values_to_set)
             await session.execute(stmt)
+            return True
+
+        return False
