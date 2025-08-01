@@ -128,7 +128,7 @@ class SQLRequestQueueClient(RequestQueueClient):
             return RequestQueueMetadata.model_validate(orm_metadata)
 
     def get_session(self) -> AsyncSession:
-        """Create a new SQLAlchemy session for thi s request queue."""
+        """Create a new SQLAlchemy session for this request queue."""
         return self._storage_client.create_session()
 
     @asynccontextmanager
