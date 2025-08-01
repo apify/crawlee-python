@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select, text, update
+from sqlalchemy.exc import SQLAlchemyError
 from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
@@ -37,22 +38,30 @@ class SQLDatasetClient(DatasetClient):
     locking mechanisms.
     """
 
+    _DEFAULT_NAME_DB = 'default'
+    """Default dataset name used when no name is provided."""
+
     def __init__(
         self,
         *,
-        metadata: DatasetMetadata,
+        id: str,
         storage_client: SQLStorageClient,
     ) -> None:
         """Initialize a new instance.
 
         Preferably use the `SqlDatasetClient.open` class method to create a new instance.
         """
-        self._metadata = metadata
+        self._id = id
         self._storage_client = storage_client
 
     @override
     async def get_metadata(self) -> DatasetMetadata:
-        return self._metadata
+        async with self.get_session() as session:
+            orm_metadata: DatasetMetadataDB | None = await session.get(DatasetMetadataDB, self._id)
+            if not orm_metadata:
+                raise ValueError(f'Dataset with ID "{self._id}" not found.')
+
+            return DatasetMetadata.model_validate(orm_metadata)
 
     def get_session(self) -> AsyncSession:
         """Create a new SQLAlchemy session for this dataset."""
@@ -65,8 +74,9 @@ class SQLDatasetClient(DatasetClient):
             try:
                 yield session
                 await session.commit()
-            except Exception as e:
+            except SQLAlchemyError as e:
                 logger.warning(f'Error occurred during session transaction: {e}')
+                # Rollback the session in case of an error
                 await session.rollback()
 
     @classmethod
@@ -97,13 +107,14 @@ class SQLDatasetClient(DatasetClient):
                 if not orm_metadata:
                     raise ValueError(f'Dataset with ID "{id}" not found.')
             else:
-                stmt = select(DatasetMetadataDB).where(DatasetMetadataDB.name == name)
+                search_name = name or cls._DEFAULT_NAME_DB
+                stmt = select(DatasetMetadataDB).where(DatasetMetadataDB.name == search_name)
                 result = await session.execute(stmt)
                 orm_metadata = result.scalar_one_or_none()
 
             if orm_metadata:
                 client = cls(
-                    metadata=DatasetMetadata.model_validate(orm_metadata),
+                    id=orm_metadata.id,
                     storage_client=storage_client,
                 )
                 await client._update_metadata(session, update_accessed_at=True)
@@ -119,25 +130,43 @@ class SQLDatasetClient(DatasetClient):
                 )
 
                 client = cls(
-                    metadata=metadata,
+                    id=metadata.id,
                     storage_client=storage_client,
                 )
                 session.add(DatasetMetadataDB(**metadata.model_dump()))
 
-            # Commit the insert or update metadata to the database
-            await session.commit()
+            try:
+                # Commit the insert or update metadata to the database
+                await session.commit()
+            except SQLAlchemyError:
+                # Attempt to open simultaneously by different clients.
+                # The commit that created the record has already been executed, make rollback and get by name.
+                await session.rollback()
+                search_name = name or cls._DEFAULT_NAME_DB
+                stmt = select(DatasetMetadataDB).where(DatasetMetadataDB.name == search_name)
+                result = await session.execute(stmt)
+                orm_metadata = result.scalar_one_or_none()
+                if not orm_metadata:
+                    raise ValueError(f'Dataset with Name "{search_name}" not found.') from None
+                client = cls(
+                    id=orm_metadata.id,
+                    storage_client=storage_client,
+                )
 
             return client
 
     @override
     async def drop(self) -> None:
-        stmt = delete(DatasetMetadataDB).where(DatasetMetadataDB.id == self._metadata.id)
+        stmt = delete(DatasetMetadataDB).where(DatasetMetadataDB.id == self._id)
         async with self.get_autocommit_session() as autocommit:
+            if self._storage_client.get_default_flag():
+                # foreign_keys=ON is set at the connection level. Required for cascade deletion.
+                await autocommit.execute(text('PRAGMA foreign_keys=ON'))
             await autocommit.execute(stmt)
 
     @override
     async def purge(self) -> None:
-        stmt = delete(DatasetItemDB).where(DatasetItemDB.dataset_id == self._metadata.id)
+        stmt = delete(DatasetItemDB).where(DatasetItemDB.dataset_id == self._id)
         async with self.get_autocommit_session() as autocommit:
             await autocommit.execute(stmt)
 
@@ -154,7 +183,7 @@ class SQLDatasetClient(DatasetClient):
             json_item = json.dumps(item, default=str, ensure_ascii=False)
             db_items.append(
                 DatasetItemDB(
-                    dataset_id=self._metadata.id,
+                    dataset_id=self._id,
                     data=json_item,
                 )
             )
@@ -199,7 +228,7 @@ class SQLDatasetClient(DatasetClient):
                 f'{self.__class__.__name__} client.'
             )
 
-        stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == self._metadata.id)
+        stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == self._id)
 
         if skip_empty:
             stmt = stmt.where(DatasetItemDB.data != '"{}"')
@@ -218,13 +247,14 @@ class SQLDatasetClient(DatasetClient):
             await session.commit()
 
         items = [json.loads(db_item.data) for db_item in db_items]
+        metadata = await self.get_metadata()
         return DatasetItemsListPage(
             items=items,
             count=len(items),
             desc=desc,
             limit=limit or 0,
             offset=offset or 0,
-            total=self._metadata.item_count,
+            total=metadata.item_count,
         )
 
     @override
@@ -257,7 +287,7 @@ class SQLDatasetClient(DatasetClient):
                 f'by the {self.__class__.__name__} client.'
             )
 
-        stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == self._metadata.id)
+        stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == self._id)
 
         if skip_empty:
             stmt = stmt.where(DatasetItemDB.data != '"{}"')
@@ -301,20 +331,15 @@ class SQLDatasetClient(DatasetClient):
         values_to_set: dict[str, Any] = {}
 
         if update_accessed_at:
-            self._metadata.accessed_at = now
             values_to_set['accessed_at'] = now
         if update_modified_at:
-            self._metadata.modified_at = now
             values_to_set['modified_at'] = now
 
         if new_item_count is not None:
-            self._metadata.item_count = new_item_count
             values_to_set['item_count'] = new_item_count
-
-        if delta_item_count:
-            self._metadata.item_count += delta_item_count
-            values_to_set['item_count'] = DatasetMetadataDB.item_count + self._metadata.item_count
+        elif delta_item_count:
+            values_to_set['item_count'] = DatasetMetadataDB.item_count + delta_item_count
 
         if values_to_set:
-            stmt = update(DatasetMetadataDB).where(DatasetMetadataDB.id == self._metadata.id).values(**values_to_set)
+            stmt = update(DatasetMetadataDB).where(DatasetMetadataDB.id == self._id).values(**values_to_set)
             await session.execute(stmt)

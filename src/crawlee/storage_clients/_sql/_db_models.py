@@ -3,19 +3,23 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import (
-    JSON,
-    Boolean,
-    ForeignKey,
-    Integer,
-    LargeBinary,
-    String,
-)
+from sqlalchemy import JSON, Boolean, ForeignKey, Index, Integer, LargeBinary, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import DateTime, TypeDecorator
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Dialect
+
+
+class NameDefaultNone(TypeDecorator):
+    impl = String(100)
+    cache_ok = True
+
+    def process_bind_param(self, value: str | None, _dialect: Dialect) -> str | None:
+        return 'default' if value is None else value
+
+    def process_result_value(self, value: str | None, _dialect: Dialect) -> str | None:
+        return None if value == 'default' else value
 
 
 class AwareDateTime(TypeDecorator):
@@ -36,7 +40,7 @@ class StorageMetadataDB:
     """Base database model for storage metadata."""
 
     id: Mapped[str] = mapped_column(String(20), nullable=False, primary_key=True)
-    name: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True, unique=True)
+    name: Mapped[str | None] = mapped_column(NameDefaultNone, nullable=False, index=True, unique=True)
     accessed_at: Mapped[datetime] = mapped_column(AwareDateTime, nullable=False)
     created_at: Mapped[datetime] = mapped_column(AwareDateTime, nullable=False)
     modified_at: Mapped[datetime] = mapped_column(AwareDateTime, nullable=False)
@@ -96,7 +100,9 @@ class DatasetItemDB(Base):
 
     order_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     dataset_id: Mapped[str] = mapped_column(
-        String(20), ForeignKey('dataset_metadata.id', ondelete='CASCADE'), index=True
+        String(20),
+        ForeignKey('dataset_metadata.id', ondelete='CASCADE'),
+        index=True,
     )
     data: Mapped[str] = mapped_column(JSON, nullable=False)
 
@@ -107,15 +113,19 @@ class RequestDB(Base):
     """Database model for requests in the request queue."""
 
     __tablename__ = 'request'
+    __table_args__ = (
+        Index('idx_queue_handled_seq', 'queue_id', 'is_handled', 'sequence_number'),
+        Index('idx_queue_unique_key', 'queue_id', 'unique_key'),
+    )
 
     request_id: Mapped[str] = mapped_column(String(20), primary_key=True)
     queue_id: Mapped[str] = mapped_column(
-        String(20), ForeignKey('request_queue_metadata.id', ondelete='CASCADE'), index=True, primary_key=True
+        String(20), ForeignKey('request_queue_metadata.id', ondelete='CASCADE'), primary_key=True
     )
 
     data: Mapped[str] = mapped_column(JSON, nullable=False)
-    unique_key: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
-    sequence_number: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
-    is_handled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    unique_key: Mapped[str] = mapped_column(String(512), nullable=False)
+    sequence_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_handled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     queue: Mapped[RequestQueueMetadataDB] = relationship(back_populates='requests')

@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select, text, update
+from sqlalchemy.exc import SQLAlchemyError
 from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
@@ -48,24 +49,32 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
     for development environments where you want to easily inspect the stored data between runs.
     """
 
+    _DEFAULT_NAME_DB = 'default'
+    """Default dataset name used when no name is provided."""
+
     def __init__(
         self,
         *,
         storage_client: SQLStorageClient,
-        metadata: KeyValueStoreMetadata,
+        id: str,
     ) -> None:
         """Initialize a new instance.
 
         Preferably use the `SQLKeyValueStoreClient.open` class method to create a new instance.
         """
-        self._metadata = metadata
+        self._id = id
 
         self._storage_client = storage_client
         """The storage client used to access the SQL database."""
 
     @override
     async def get_metadata(self) -> KeyValueStoreMetadata:
-        return self._metadata
+        async with self.get_session() as session:
+            orm_metadata: KeyValueStoreMetadataDB | None = await session.get(KeyValueStoreMetadataDB, self._id)
+            if not orm_metadata:
+                raise ValueError(f'Key-value store with ID "{self._id}" not found.')
+
+            return KeyValueStoreMetadata.model_validate(orm_metadata)
 
     def get_session(self) -> AsyncSession:
         """Create a new SQLAlchemy session for this key-value store."""
@@ -78,7 +87,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
             try:
                 yield session
                 await session.commit()
-            except Exception as e:
+            except SQLAlchemyError as e:
                 logger.warning(f'Error occurred during session transaction: {e}')
                 # Rollback the session in case of an error
                 await session.rollback()
@@ -115,12 +124,13 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
                 if not orm_metadata:
                     raise ValueError(f'Key-value store with ID "{id}" not found.')
             else:
-                stmt = select(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.name == name)
+                search_name = name or cls._DEFAULT_NAME_DB
+                stmt = select(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.name == search_name)
                 result = await session.execute(stmt)
                 orm_metadata = result.scalar_one_or_none()
             if orm_metadata:
                 client = cls(
-                    metadata=KeyValueStoreMetadata.model_validate(orm_metadata),
+                    id=orm_metadata.id,
                     storage_client=storage_client,
                 )
                 await client._update_metadata(session, update_accessed_at=True)
@@ -134,26 +144,42 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
                     modified_at=now,
                 )
                 client = cls(
-                    metadata=metadata,
+                    id=metadata.id,
                     storage_client=storage_client,
                 )
-                orm_metadata = KeyValueStoreMetadataDB(**metadata.model_dump())
-                session.add(orm_metadata)
+                session.add(KeyValueStoreMetadataDB(**metadata.model_dump()))
 
-            # Commit the insert or update metadata to the database
-            await session.commit()
-
+            try:
+                # Commit the insert or update metadata to the database
+                await session.commit()
+            except SQLAlchemyError:
+                # Attempt to open simultaneously by different clients.
+                # The commit that created the record has already been executed, make rollback and get by name.
+                await session.rollback()
+                search_name = name or cls._DEFAULT_NAME_DB
+                stmt = select(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.name == search_name)
+                result = await session.execute(stmt)
+                orm_metadata = result.scalar_one_or_none()
+                if not orm_metadata:
+                    raise ValueError(f'Key-value store with Name "{search_name}" not found.') from None
+                client = cls(
+                    id=orm_metadata.id,
+                    storage_client=storage_client,
+                )
             return client
 
     @override
     async def drop(self) -> None:
-        stmt = delete(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.id == self._metadata.id)
+        stmt = delete(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.id == self._id)
         async with self.get_autocommit_session() as autosession:
+            if self._storage_client.get_default_flag():
+                # foreign_keys=ON is set at the connection level. Required for cascade deletion.
+                await autosession.execute(text('PRAGMA foreign_keys=ON'))
             await autosession.execute(stmt)
 
     @override
     async def purge(self) -> None:
-        stmt = delete(KeyValueStoreRecordDB).filter_by(kvs_id=self._metadata.id)
+        stmt = delete(KeyValueStoreRecordDB).filter_by(kvs_id=self._id)
         async with self.get_autocommit_session() as autosession:
             await autosession.execute(stmt)
 
@@ -181,7 +207,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
 
         size = len(value_bytes)
         record_db = KeyValueStoreRecordDB(
-            kvs_id=self._metadata.id,
+            kvs_id=self._id,
             key=key,
             value=value_bytes,
             content_type=content_type,
@@ -190,7 +216,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
 
         stmt = (
             update(KeyValueStoreRecordDB)
-            .where(KeyValueStoreRecordDB.kvs_id == self._metadata.id, KeyValueStoreRecordDB.key == key)
+            .where(KeyValueStoreRecordDB.kvs_id == self._id, KeyValueStoreRecordDB.key == key)
             .values(value=value_bytes, content_type=content_type, size=size)
         )
 
@@ -207,7 +233,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
         stmt = select(KeyValueStoreRecordDB).where(
-            KeyValueStoreRecordDB.kvs_id == self._metadata.id, KeyValueStoreRecordDB.key == key
+            KeyValueStoreRecordDB.kvs_id == self._id, KeyValueStoreRecordDB.key == key
         )
         async with self.get_session() as session:
             result = await session.execute(stmt)
@@ -255,7 +281,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
     @override
     async def delete_value(self, *, key: str) -> None:
         stmt = delete(KeyValueStoreRecordDB).where(
-            KeyValueStoreRecordDB.kvs_id == self._metadata.id, KeyValueStoreRecordDB.key == key
+            KeyValueStoreRecordDB.kvs_id == self._id, KeyValueStoreRecordDB.key == key
         )
         async with self.get_autocommit_session() as autocommit:
             # Delete the record if it exists
@@ -277,7 +303,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
         # Build query for record metadata
         stmt = (
             select(KeyValueStoreRecordDB.key, KeyValueStoreRecordDB.content_type, KeyValueStoreRecordDB.size)
-            .where(KeyValueStoreRecordDB.kvs_id == self._metadata.id)
+            .where(KeyValueStoreRecordDB.kvs_id == self._id)
             .order_by(KeyValueStoreRecordDB.key)
         )
 
@@ -307,7 +333,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
     @override
     async def record_exists(self, *, key: str) -> bool:
         stmt = select(KeyValueStoreRecordDB.key).where(
-            KeyValueStoreRecordDB.kvs_id == self._metadata.id, KeyValueStoreRecordDB.key == key
+            KeyValueStoreRecordDB.kvs_id == self._id, KeyValueStoreRecordDB.key == key
         )
         async with self.get_session() as session:
             # Check if record exists
@@ -340,16 +366,10 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
         values_to_set: dict[str, Any] = {}
 
         if update_accessed_at:
-            self._metadata.accessed_at = now
             values_to_set['accessed_at'] = now
         if update_modified_at:
-            self._metadata.modified_at = now
             values_to_set['modified_at'] = now
 
         if values_to_set:
-            stmt = (
-                update(KeyValueStoreMetadataDB)
-                .where(KeyValueStoreMetadataDB.id == self._metadata.id)
-                .values(**values_to_set)
-            )
+            stmt = update(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.id == self._id).values(**values_to_set)
             await session.execute(stmt)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.sql import text
 from typing_extensions import override
 
@@ -18,6 +18,8 @@ from ._request_queue_client import SQLRequestQueueClient
 
 if TYPE_CHECKING:
     from types import TracebackType
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @docs_group('Storage clients')
@@ -70,6 +72,10 @@ class SQLStorageClient(StorageClient):
             raise ValueError('Engine is not initialized. Call initialize() before accessing the engine.')
         return self._engine
 
+    def get_default_flag(self) -> bool:
+        """Check if the default database should be created."""
+        return self._default_flag
+
     def _get_or_create_engine(self, configuration: Configuration) -> AsyncEngine:
         """Get or create the database engine based on configuration."""
         if self._engine is not None:
@@ -88,7 +94,15 @@ class SQLStorageClient(StorageClient):
             connection_string = f'sqlite+aiosqlite:///{db_path}'
 
         self._engine = create_async_engine(
-            connection_string, future=True, pool_size=5, max_overflow=10, pool_timeout=30, pool_recycle=600, echo=False
+            connection_string,
+            future=True,
+            pool_size=5,
+            max_overflow=10,
+            pool_timeout=30,
+            pool_recycle=600,
+            pool_pre_ping=True,
+            echo=False,
+            connect_args={'timeout': 30},
         )
         return self._engine
 
@@ -101,7 +115,6 @@ class SQLStorageClient(StorageClient):
         if not self._initialized:
             engine = self._get_or_create_engine(configuration)
             async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
                 # Set SQLite pragmas for performance and consistency
                 if self._default_flag:
                     await conn.execute(text('PRAGMA journal_mode=WAL'))
@@ -111,6 +124,7 @@ class SQLStorageClient(StorageClient):
                     await conn.execute(text('PRAGMA mmap_size=268435456'))
                     await conn.execute(text('PRAGMA foreign_keys=ON'))
                     await conn.execute(text('PRAGMA busy_timeout=30000'))
+                await conn.run_sync(Base.metadata.create_all)
             self._initialized = True
 
     async def close(self) -> None:

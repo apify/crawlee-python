@@ -99,7 +99,7 @@ async def test_tables_and_metadata_record(configuration: Configuration) -> None:
             assert 'request_queue_metadata' in tables
             assert 'request' in tables
 
-        async with client.create_session() as session:
+        async with client.get_session() as session:
             stmt = select(RequestQueueMetadataDB).where(RequestQueueMetadataDB.name == 'test_request_queue')
             result = await session.execute(stmt)
             orm_metadata = result.scalar_one_or_none()
@@ -122,7 +122,7 @@ async def test_request_records_persistence(rq_client: SQLRequestQueueClient) -> 
 
     metadata_client = await rq_client.get_metadata()
 
-    async with rq_client.create_session() as session:
+    async with rq_client.get_session() as session:
         stmt = select(RequestDB).where(RequestDB.queue_id == metadata_client.id)
         result = await session.execute(stmt)
         db_requests = result.scalars().all()
@@ -136,7 +136,7 @@ async def test_drop_removes_records(rq_client: SQLRequestQueueClient) -> None:
     """Test that drop removes all records from the database."""
     await rq_client.add_batch_of_requests([Request.from_url('https://example.com')])
     metadata = await rq_client.get_metadata()
-    async with rq_client.create_session() as session:
+    async with rq_client.get_session() as session:
         stmt = select(RequestDB).where(RequestDB.queue_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
@@ -144,7 +144,7 @@ async def test_drop_removes_records(rq_client: SQLRequestQueueClient) -> None:
 
     await rq_client.drop()
 
-    async with rq_client.create_session() as session:
+    async with rq_client.get_session() as session:
         stmt = select(RequestDB).where(RequestDB.queue_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
@@ -187,7 +187,7 @@ async def test_metadata_record_updates(rq_client: SQLRequestQueueClient) -> None
     assert metadata.modified_at > initial_modified
     assert metadata.accessed_at > accessed_after_read
 
-    async with rq_client.create_session() as session:
+    async with rq_client.get_session() as session:
         orm_metadata = await session.get(RequestQueueMetadataDB, metadata.id)
         assert orm_metadata is not None
         assert orm_metadata.created_at.replace(tzinfo=timezone.utc) == metadata.created_at
