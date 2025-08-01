@@ -31,22 +31,23 @@ logger = getLogger(__name__)
 class SQLKeyValueStoreClient(KeyValueStoreClient):
     """SQL implementation of the key-value store client.
 
-    This client persists data to a SQL database, making it suitable for scenarios where data needs to
-    survive process restarts. Keys are mapped to rows in a database table.
+    This client persists key-value data to a SQL database with transaction support and
+    concurrent access safety. Keys are mapped to rows in database tables with proper indexing
+    for efficient retrieval.
 
-    Binary data is stored as-is, while JSON and text data are stored in human-readable format.
-    The implementation automatically handles serialization based on the content type and
-    maintains metadata about each record.
+    The key-value store data is stored in SQL database tables following the pattern:
+    - `kvs_metadata` table: Contains store metadata (id, name, timestamps)
+    - `kvs_record` table: Contains individual key-value pairs with binary value storage, content type, and size
+        information
 
-    This implementation is ideal for long-running crawlers where persistence is important and
-    for development environments where you want to easily inspect the stored data between runs.
+    Values are serialized based on their type: JSON objects are stored as formatted JSON,
+    text values as UTF-8 encoded strings, and binary data as-is in the `LargeBinary` column.
+    The implementation automatically handles content type detection and maintains metadata
+    about each record including size and MIME type information.
 
-    Binary data is stored as-is, while JSON and text data are stored in human-readable format.
-    The implementation automatically handles serialization based on the content type and
-    maintains metadata about each record.
-
-    This implementation is ideal for long-running crawlers where persistence is important and
-    for development environments where you want to easily inspect the stored data between runs.
+    All database operations are wrapped in transactions with proper error handling and rollback
+    mechanisms. The client supports atomic upsert operations and handles race conditions when
+    multiple clients access the same store using composite primary keys (kvs_id, key).
     """
 
     _DEFAULT_NAME_DB = 'default'
@@ -67,14 +68,15 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
         self._storage_client = storage_client
         """The storage client used to access the SQL database."""
 
+        # Time tracking to reduce database writes during frequent operation
         self._last_accessed_at: datetime | None = None
         self._last_modified_at: datetime | None = None
-
         self._accessed_modified_update_interval = storage_client.get_accessed_modified_update_interval()
-        """Interval for updating metadata in the database."""
 
     @override
     async def get_metadata(self) -> KeyValueStoreMetadata:
+        """Get the metadata for this key-value store."""
+        # The database is a single place of truth
         async with self.get_session() as session:
             orm_metadata: KeyValueStoreMetadataDB | None = await session.get(KeyValueStoreMetadataDB, self._id)
             if not orm_metadata:
@@ -176,6 +178,10 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
 
     @override
     async def drop(self) -> None:
+        """Delete this key-value store and all its records from the database.
+
+        This operation is irreversible. Uses CASCADE deletion to remove all related records.
+        """
         stmt = delete(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.id == self._id)
         async with self.get_autocommit_session() as autosession:
             if self._storage_client.get_default_flag():
@@ -185,6 +191,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
 
     @override
     async def purge(self) -> None:
+        """Remove all items from this key-value store while keeping the key-value store structure."""
         stmt = delete(KeyValueStoreRecordDB).filter_by(kvs_id=self._id)
         async with self.get_autocommit_session() as autosession:
             await autosession.execute(stmt)
@@ -193,6 +200,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
 
     @override
     async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
+        """Set a value in the key-value store."""
         # Special handling for None values
         if value is None:
             content_type = 'application/x-none'  # Special content type to identify None values
@@ -243,6 +251,8 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
+        """Get a value from the key-value store."""
+        # Query the record by key
         stmt = select(KeyValueStoreRecordDB).where(
             KeyValueStoreRecordDB.kvs_id == self._id, KeyValueStoreRecordDB.key == key
         )
@@ -292,6 +302,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
 
     @override
     async def delete_value(self, *, key: str) -> None:
+        """Delete a value from the key-value store."""
         stmt = delete(KeyValueStoreRecordDB).where(
             KeyValueStoreRecordDB.kvs_id == self._id, KeyValueStoreRecordDB.key == key
         )
@@ -312,6 +323,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
         exclusive_start_key: str | None = None,
         limit: int | None = None,
     ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
+        """Iterate over the existing keys in the key-value store."""
         # Build query for record metadata
         stmt = (
             select(KeyValueStoreRecordDB.key, KeyValueStoreRecordDB.content_type, KeyValueStoreRecordDB.size)
@@ -345,6 +357,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
 
     @override
     async def record_exists(self, *, key: str) -> bool:
+        """Check if a record with the given key exists in the key-value store."""
         stmt = select(KeyValueStoreRecordDB.key).where(
             KeyValueStoreRecordDB.kvs_id == self._id, KeyValueStoreRecordDB.key == key
         )

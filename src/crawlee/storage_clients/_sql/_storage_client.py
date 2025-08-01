@@ -28,16 +28,14 @@ class SQLStorageClient(StorageClient):
     """SQL implementation of the storage client.
 
     This storage client provides access to datasets, key-value stores, and request queues that persist data
-    to a SQL database using SQLAlchemy 2+ with Pydantic dataclasses for type safety. Data is stored in
-    normalized relational tables, providing ACID compliance, concurrent access safety, and the ability to
-    query data using SQL.
+    to a SQL database using SQLAlchemy 2+. Each storage type uses two tables: one for metadata and one for
+    records/items.
 
-    The SQL implementation supports various database backends including PostgreSQL, MySQL, SQLite, and others
-    supported by SQLAlchemy. It provides durability, consistency, and supports concurrent access from multiple
-    processes through database-level locking mechanisms.
+    The client accepts either a database connection string or a pre-configured AsyncEngine. If neither is
+    provided, it creates a default SQLite database 'crawlee.db' in the storage directory.
 
-    This implementation is ideal for production environments where data persistence, consistency, and
-    concurrent access are critical requirements.
+    Database schema is automatically created during initialization. SQLite databases receive performance
+    optimizations including WAL mode and increased cache size.
     """
 
     _DB_NAME = 'crawlee.db'
@@ -67,9 +65,10 @@ class SQLStorageClient(StorageClient):
         self._engine = engine
         self._initialized = False
 
+        # Minimum interval to reduce database load from frequent concurrent metadata updates
         self._accessed_modified_update_interval = accessed_modified_update_interval
 
-        # Default flag to indicate if the default database should be created
+        # Flag needed to apply optimizations only for default database
         self._default_flag = self._engine is None and self._connection_string is None
 
     @property
@@ -80,7 +79,7 @@ class SQLStorageClient(StorageClient):
         return self._engine
 
     def get_default_flag(self) -> bool:
-        """Check if the default database should be created."""
+        """Check if the default database is being used."""
         return self._default_flag
 
     def get_accessed_modified_update_interval(self) -> timedelta:
@@ -102,6 +101,7 @@ class SQLStorageClient(StorageClient):
 
             db_path = storage_dir / self._DB_NAME
 
+            # Create connection string with path to default database
             connection_string = f'sqlite+aiosqlite:///{db_path}'
 
         self._engine = create_async_engine(
@@ -128,13 +128,13 @@ class SQLStorageClient(StorageClient):
             async with engine.begin() as conn:
                 # Set SQLite pragmas for performance and consistency
                 if self._default_flag:
-                    await conn.execute(text('PRAGMA journal_mode=WAL'))
-                    await conn.execute(text('PRAGMA synchronous=NORMAL'))
-                    await conn.execute(text('PRAGMA cache_size=100000'))
-                    await conn.execute(text('PRAGMA temp_store=MEMORY'))
-                    await conn.execute(text('PRAGMA mmap_size=268435456'))
-                    await conn.execute(text('PRAGMA foreign_keys=ON'))
-                    await conn.execute(text('PRAGMA busy_timeout=30000'))
+                    await conn.execute(text('PRAGMA journal_mode=WAL'))  # Better concurrency
+                    await conn.execute(text('PRAGMA synchronous=NORMAL'))  # Balanced safety/speed
+                    await conn.execute(text('PRAGMA cache_size=100000'))  # 100MB cache
+                    await conn.execute(text('PRAGMA temp_store=MEMORY'))  # Memory temp storage
+                    await conn.execute(text('PRAGMA mmap_size=268435456'))  # 256MB memory mapping
+                    await conn.execute(text('PRAGMA foreign_keys=ON'))  # Enforce constraints
+                    await conn.execute(text('PRAGMA busy_timeout=30000'))  # 30s busy timeout
                 await conn.run_sync(Base.metadata.create_all)
             self._initialized = True
 
@@ -161,6 +161,16 @@ class SQLStorageClient(StorageClient):
         name: str | None = None,
         configuration: Configuration | None = None,
     ) -> SQLDatasetClient:
+        """Create or open a SQL dataset client.
+
+        Args:
+            id: Specific dataset ID to open. If provided, name is ignored.
+            name: Dataset name to open or create. Uses 'default' if not specified.
+            configuration: Configuration object. Uses global config if not provided.
+
+        Returns:
+            Configured dataset client ready for use.
+        """
         configuration = configuration or Configuration.get_global_configuration()
         await self.initialize(configuration)
 
@@ -181,6 +191,16 @@ class SQLStorageClient(StorageClient):
         name: str | None = None,
         configuration: Configuration | None = None,
     ) -> SQLKeyValueStoreClient:
+        """Create or open a SQL key-value store client.
+
+        Args:
+            id: Specific store ID to open. If provided, name is ignored.
+            name: Store name to open or create. Uses 'default' if not specified.
+            configuration: Configuration object. Uses global config if not provided.
+
+        Returns:
+            Configured key-value store client ready for use.
+        """
         configuration = configuration or Configuration.get_global_configuration()
         await self.initialize(configuration)
 
@@ -201,6 +221,16 @@ class SQLStorageClient(StorageClient):
         name: str | None = None,
         configuration: Configuration | None = None,
     ) -> SQLRequestQueueClient:
+        """Create or open a SQL request queue client.
+
+        Args:
+            id: Specific queue ID to open. If provided, name is ignored.
+            name: Queue name to open or create. Uses 'default' if not specified.
+            configuration: Configuration object. Uses global config if not provided.
+
+        Returns:
+            Configured request queue client ready for use.
+        """
         configuration = configuration or Configuration.get_global_configuration()
         await self.initialize(configuration)
 

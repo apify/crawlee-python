@@ -29,13 +29,16 @@ logger = getLogger(__name__)
 class SQLDatasetClient(DatasetClient):
     """SQL implementation of the dataset client.
 
-    This client persists dataset items to a SQL database with proper transaction handling and
-    concurrent access safety. Items are stored in a normalized table structure with automatic
-    ordering preservation and efficient querying capabilities.
+    This client persists dataset items to a SQL database using two tables for storage
+    and retrieval. Items are stored as JSON with automatic ordering preservation.
 
-    The SQL implementation provides ACID compliance, supports complex queries, and allows
-    multiple processes to safely access the same dataset concurrently through database-level
-    locking mechanisms.
+    The dataset data is stored in SQL database tables following the pattern:
+    - `dataset_metadata` table: Contains dataset metadata (id, name, timestamps, item_count)
+    - `dataset_item` table: Contains individual items with JSON data and auto-increment ordering
+
+    Items are serialized to JSON with `default=str` to handle non-serializable types like datetime
+    objects. The `order_id` auto-increment primary key ensures insertion order is preserved.
+    All operations are wrapped in database transactions with CASCADE deletion support.
     """
 
     _DEFAULT_NAME_DB = 'default'
@@ -54,12 +57,15 @@ class SQLDatasetClient(DatasetClient):
         self._id = id
         self._storage_client = storage_client
 
+        # Time tracking to reduce database writes during frequent operation
         self._last_accessed_at: datetime | None = None
         self._last_modified_at: datetime | None = None
         self._accessed_modified_update_interval = storage_client.get_accessed_modified_update_interval()
 
     @override
     async def get_metadata(self) -> DatasetMetadata:
+        """Get dataset metadata from the database."""
+        # The database is a single place of truth
         async with self.get_session() as session:
             orm_metadata: DatasetMetadataDB | None = await session.get(DatasetMetadataDB, self._id)
             if not orm_metadata:
@@ -91,7 +97,7 @@ class SQLDatasetClient(DatasetClient):
         name: str | None,
         storage_client: SQLStorageClient,
     ) -> SQLDatasetClient:
-        """Open or create a SQL dataset client.
+        """Open an existing dataset or create a new one.
 
         Args:
             id: The ID of the dataset to open. If provided, searches for existing dataset by ID.
@@ -161,6 +167,10 @@ class SQLDatasetClient(DatasetClient):
 
     @override
     async def drop(self) -> None:
+        """Delete this dataset and all its items from the database.
+
+        This operation is irreversible. Uses CASCADE deletion to remove all related items.
+        """
         stmt = delete(DatasetMetadataDB).where(DatasetMetadataDB.id == self._id)
         async with self.get_autocommit_session() as autocommit:
             if self._storage_client.get_default_flag():
@@ -170,6 +180,10 @@ class SQLDatasetClient(DatasetClient):
 
     @override
     async def purge(self) -> None:
+        """Remove all items from this dataset while keeping the dataset structure.
+
+        Resets item_count to 0 and deletes all records from dataset_item table.
+        """
         stmt = delete(DatasetItemDB).where(DatasetItemDB.dataset_id == self._id)
         async with self.get_autocommit_session() as autocommit:
             await autocommit.execute(stmt)
@@ -178,12 +192,14 @@ class SQLDatasetClient(DatasetClient):
 
     @override
     async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
+        """Add new items to the dataset."""
         if not isinstance(data, list):
             data = [data]
 
         db_items: list[DatasetItemDB] = []
 
         for item in data:
+            # Serialize with default=str to handle non-serializable types like datetime
             json_item = json.dumps(item, default=str, ensure_ascii=False)
             db_items.append(
                 DatasetItemDB(
@@ -235,8 +251,10 @@ class SQLDatasetClient(DatasetClient):
         stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == self._id)
 
         if skip_empty:
+            # Skip items that are empty JSON objects
             stmt = stmt.where(DatasetItemDB.data != '"{}"')
 
+        # Apply ordering by insertion order (order_id)
         stmt = stmt.order_by(DatasetItemDB.order_id.desc()) if desc else stmt.order_by(DatasetItemDB.order_id.asc())
 
         stmt = stmt.offset(offset).limit(limit)
@@ -251,6 +269,7 @@ class SQLDatasetClient(DatasetClient):
             if updated:
                 await session.commit()
 
+        # Deserialize JSON items
         items = [json.loads(db_item.data) for db_item in db_items]
         metadata = await self.get_metadata()
         return DatasetItemsListPage(
@@ -276,6 +295,7 @@ class SQLDatasetClient(DatasetClient):
         skip_empty: bool = False,
         skip_hidden: bool = False,
     ) -> AsyncIterator[dict[str, Any]]:
+        """Iterate over dataset items with optional filtering and ordering."""
         # Check for unsupported arguments and log a warning if found.
         unsupported_args: dict[str, Any] = {
             'clean': clean,
@@ -295,10 +315,12 @@ class SQLDatasetClient(DatasetClient):
         stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == self._id)
 
         if skip_empty:
+            # Skip items that are empty JSON objects
             stmt = stmt.where(DatasetItemDB.data != '"{}"')
 
         stmt = stmt.order_by(DatasetItemDB.order_id.desc()) if desc else stmt.order_by(DatasetItemDB.order_id.asc())
 
+        # Apply ordering by insertion order (order_id)
         stmt = stmt.offset(offset).limit(limit)
 
         async with self.get_session() as session:
@@ -311,6 +333,7 @@ class SQLDatasetClient(DatasetClient):
             if updated:
                 await session.commit()
 
+        # Deserialize and yield items
         items = [json.loads(db_item.data) for db_item in db_items]
         for item in items:
             yield item
@@ -324,14 +347,14 @@ class SQLDatasetClient(DatasetClient):
         update_modified_at: bool = False,
         delta_item_count: int | None = None,
     ) -> bool:
-        """Update the KVS metadata in the database.
+        """Update the dataset metadata in the database.
 
         Args:
             session: The SQLAlchemy AsyncSession to use for the update.
-            new_item_count: If provided, update the item count to this value.
-            update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
-            update_modified_at: If True, update the `modified_at` timestamp to the current time.
-            delta_item_count: If provided, increment the item count by this value.
+            new_item_count: If provided, set item count to this value.
+            update_accessed_at: If True, update the accessed_at timestamp.
+            update_modified_at: If True, update the modified_at timestamp.
+            delta_item_count: If provided, add this value to the current item count.
         """
         now = datetime.now(timezone.utc)
         values_to_set: dict[str, Any] = {}
@@ -351,6 +374,7 @@ class SQLDatasetClient(DatasetClient):
         if new_item_count is not None:
             values_to_set['item_count'] = new_item_count
         elif delta_item_count:
+            # Use database-level for atomic updates
             values_to_set['item_count'] = DatasetMetadataDB.item_count + delta_item_count
 
         if values_to_set:

@@ -50,13 +50,22 @@ class RequestQueueState(BaseModel):
 class SQLRequestQueueClient(RequestQueueClient):
     """SQL implementation of the request queue client.
 
-    This client persists requests to a SQL database with proper transaction handling and
-    concurrent access safety. Requests are stored in a normalized table structure with
-    sequence-based ordering and efficient querying capabilities.
+    This client persists requests to a SQL database with transaction handling and
+    concurrent access safety. Requests are stored with sequence-based ordering and
+    efficient querying capabilities.
 
     The implementation uses negative sequence numbers for forefront (high-priority) requests
     and positive sequence numbers for regular requests, allowing for efficient single-query
-    ordering. A cache mechanism reduces database queries for better performance.
+    ordering. A cache mechanism reduces database queries.
+
+    The request queue data is stored in SQL database tables following the pattern:
+    - `request_queue_metadata` table: Contains queue metadata (id, name, timestamps, request counts, multi-client flag)
+    - `request` table: Contains individual requests with JSON data, unique keys for deduplication, sequence numbers for
+        ordering, and processing status flags
+
+    Requests are serialized to JSON for storage and maintain proper ordering through sequence
+    numbers. The implementation provides concurrent access safety through transaction
+    handling, locking mechanisms, and optimized database indexes for efficient querying.
     """
 
     _DEFAULT_NAME_DB = 'default'
@@ -109,6 +118,8 @@ class SQLRequestQueueClient(RequestQueueClient):
 
     @override
     async def get_metadata(self) -> RequestQueueMetadata:
+        """Get the metadata for this request queue."""
+        # The database is a single place of truth
         async with self.get_session() as session:
             orm_metadata: RequestQueueMetadataDB | None = await session.get(RequestQueueMetadataDB, self._id)
             if not orm_metadata:
@@ -117,7 +128,7 @@ class SQLRequestQueueClient(RequestQueueClient):
             return RequestQueueMetadata.model_validate(orm_metadata)
 
     def get_session(self) -> AsyncSession:
-        """Create a new SQLAlchemy session for this key-value store."""
+        """Create a new SQLAlchemy session for thi s request queue."""
         return self._storage_client.create_session()
 
     @asynccontextmanager
@@ -140,15 +151,19 @@ class SQLRequestQueueClient(RequestQueueClient):
         name: str | None,
         storage_client: SQLStorageClient,
     ) -> SQLRequestQueueClient:
-        """Open or create a SQL request queue client.
+        """Open an existing request queue or create a new one.
+
+        This method first tries to find an existing queue by ID or name.
+        If found, it returns a client for that queue. If not found, it creates
+        a new queue with the specified parameters.
 
         Args:
-            id: The ID of the request queue to open. If provided, searches for existing queue by ID.
-            name: The name of the request queue to open. If not provided, uses the default queue.
+            id: The ID of the request queue to open. Takes precedence over name.
+            name: The name of the request queue to open. Uses 'default' if None.
             storage_client: The SQL storage client used to access the database.
 
         Returns:
-            An instance for the opened or created storage client.
+            An instance for the opened or created request queue.
 
         Raises:
             ValueError: If a queue with the specified ID is not found.
@@ -215,6 +230,10 @@ class SQLRequestQueueClient(RequestQueueClient):
 
     @override
     async def drop(self) -> None:
+        """Delete this request queue and all its records from the database.
+
+        This operation is irreversible. Uses CASCADE deletion to remove all related records.
+        """
         stmt = delete(RequestQueueMetadataDB).where(RequestQueueMetadataDB.id == self._id)
         async with self.get_autocommit_session() as autocommit:
             if self._storage_client.get_default_flag():
@@ -232,6 +251,7 @@ class SQLRequestQueueClient(RequestQueueClient):
 
     @override
     async def purge(self) -> None:
+        """Purge all requests from this request queue."""
         stmt = delete(RequestDB).where(RequestDB.queue_id == self._id)
         async with self.get_autocommit_session() as autocommit:
             # Delete all requests for this queue
@@ -262,6 +282,7 @@ class SQLRequestQueueClient(RequestQueueClient):
         if not requests:
             return AddRequestsResponse(processed_requests=[], unprocessed_requests=[])
 
+        # Clear empty cache since we're adding requests
         self._is_empty_cache = None
         processed_requests = []
         unprocessed_requests = []
