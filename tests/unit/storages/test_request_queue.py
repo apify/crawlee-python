@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from crawlee.storage_clients import StorageClient
 
 
-@pytest.fixture(params=['sql'])
+@pytest.fixture(params=['memory', 'file_system', 'sql'])
 def storage_client(request: pytest.FixtureRequest) -> StorageClient:
     """Parameterized fixture to test with different storage clients."""
     if request.param == 'memory':
