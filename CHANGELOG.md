@@ -3,11 +3,10 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.6.12 - **not yet released**
+## 0.6.13 - **not yet released**
 
 ### 🚀 Features
 
-- Add `retire_browser_after_page_count` parameter for `BrowserPool` ([#1266](https://github.com/apify/crawlee-python/pull/1266)) ([603aa2b](https://github.com/apify/crawlee-python/commit/603aa2b192ef4bc42d88244bd009fffdb0614c06)) by [@Mantisus](https://github.com/Mantisus)
 - Add utility for load and parse Sitemap and `SitemapRequestLoader` ([#1169](https://github.com/apify/crawlee-python/pull/1169)) ([66599f8](https://github.com/apify/crawlee-python/commit/66599f8d085f3a8622e130019b6fdce2325737de)) by [@Mantisus](https://github.com/Mantisus), closes [#1161](https://github.com/apify/crawlee-python/issues/1161)
 - Add periodic status logging and `status_message_callback` parameter for customization ([#1265](https://github.com/apify/crawlee-python/pull/1265)) ([b992fb2](https://github.com/apify/crawlee-python/commit/b992fb2a457dedd20fc3014d7a4a8afe14602342)) by [@Mantisus](https://github.com/Mantisus), closes [#96](https://github.com/apify/crawlee-python/issues/96)
 - Add crawlee-cli option to skip project installation ([#1294](https://github.com/apify/crawlee-python/pull/1294)) ([4d5aef0](https://github.com/apify/crawlee-python/commit/4d5aef05613d10c1442fe449d1cf0f63392c98e3)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1122](https://github.com/apify/crawlee-python/issues/1122)
@@ -21,10 +20,10 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
-- Use `perf_counter_ns` for request duration tracking ([#1260](https://github.com/apify/crawlee-python/pull/1260)) ([9e92f6b](https://github.com/apify/crawlee-python/commit/9e92f6b54400ce5004fbab770e2e4ac42f73148f)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1256](https://github.com/apify/crawlee-python/issues/1256)
 - Fix memory estimation not working on MacOS ([#1330](https://github.com/apify/crawlee-python/pull/1330)) ([ab020eb](https://github.com/apify/crawlee-python/commit/ab020eb821a75723225b652d64babd84c368183f)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1329](https://github.com/apify/crawlee-python/issues/1329)
 - Fix retry count to not count the original request ([#1328](https://github.com/apify/crawlee-python/pull/1328)) ([74fa1d9](https://github.com/apify/crawlee-python/commit/74fa1d936cb3c29cf62d87862a96b4266694af2f)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1326](https://github.com/apify/crawlee-python/issues/1326)
 - [**breaking**] Remove unused &quot;stats&quot; field from RequestQueueMetadata ([#1331](https://github.com/apify/crawlee-python/pull/1331)) ([0a63bef](https://github.com/apify/crawlee-python/commit/0a63bef514b0bdcd3d6f208b386f706d0fe561e6)) by [@vdusek](https://github.com/vdusek)
+- Ignore unknown parameters passed in cookies ([#1336](https://github.com/apify/crawlee-python/pull/1336)) ([50d3ef7](https://github.com/apify/crawlee-python/commit/50d3ef7540551383d26d40f3404b435bde35b47d)) by [@Mantisus](https://github.com/Mantisus), closes [#1333](https://github.com/apify/crawlee-python/issues/1333)
 
 ### Refactor
 
@@ -35,6 +34,20 @@ All notable changes to this project will be documented in this file.
 
 
 <!-- git-cliff-unreleased-end -->
+## [0.6.12](https://github.com/apify/crawlee-python/releases/tag/v0.6.12) (2025-07-30)
+
+### 🚀 Features
+
+- Add `retire_browser_after_page_count` parameter for `BrowserPool` ([#1266](https://github.com/apify/crawlee-python/pull/1266)) ([603aa2b](https://github.com/apify/crawlee-python/commit/603aa2b192ef4bc42d88244bd009fffdb0614c06)) by [@Mantisus](https://github.com/Mantisus)
+
+### 🐛 Bug Fixes
+
+- Use `perf_counter_ns` for request duration tracking ([#1260](https://github.com/apify/crawlee-python/pull/1260)) ([9e92f6b](https://github.com/apify/crawlee-python/commit/9e92f6b54400ce5004fbab770e2e4ac42f73148f)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1256](https://github.com/apify/crawlee-python/issues/1256)
+- Fix memory estimation not working on MacOS (#1330) ([8558954](https://github.com/apify/crawlee-python/commit/8558954feeb7d5e91378186974a29851fedae9c8)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1329](https://github.com/apify/crawlee-python/issues/1329)
+- Fix retry count to not count the original request (#1328) ([1aff3aa](https://github.com/apify/crawlee-python/commit/1aff3aaf0cdbe452a3731192449a445e5b2d7a63)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1326](https://github.com/apify/crawlee-python/issues/1326)
+- Ignore unknown parameters passed in cookies (#1336) ([0f2610c](https://github.com/apify/crawlee-python/commit/0f2610c0ee1154dc004de60fc57fe7c9f478166a)) by [@Mantisus](https://github.com/Mantisus), closes [#1333](https://github.com/apify/crawlee-python/issues/1333)
+
+
 ## [0.6.11](https://github.com/apify/crawlee-python/releases/tag/v0.6.11) (2025-06-23)
 
 ### 🚀 Features
