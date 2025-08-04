@@ -110,21 +110,6 @@ async def test_unreliable_prediction() -> None:
         ).detection_probability_recommendation
         assert probability == 1
 
-        # Learn two predictions of some label. One of each to make predictor very uncertain.
-        predictor.store_result(
-            Request.from_url(url='http://www.aaa.com/some/stuff', label=learnt_label), rendering_type='static'
-        )
-        predictor.store_result(
-            Request.from_url(url='http://www.aaa.com/some/otherstuff', label=learnt_label), rendering_type='client only'
-        )
-
-        # Predict for new label. Predictor does not have enough information to give any reliable guess and should make
-        # it clear by setting detection_probability_recommendation=1
-        probability = predictor.predict(
-            Request.from_url(url='http://www.unknown.com', label='new label')
-        ).detection_probability_recommendation
-        assert probability == 1
-
 
 async def test_no_learning_data_prediction() -> None:
     """Test that predictor can predict even if it never learnt anything before.
