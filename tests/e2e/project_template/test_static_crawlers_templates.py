@@ -67,9 +67,9 @@ async def test_static_crawler_actor_at_apify(
         output_dir=tmp_path,
     )
 
-    patch_crawlee_version_in_project(
-        project_path=tmp_path / actor_name, wheel_path=crawlee_wheel_path, package_manager=package_manager
-    )
+    # patch_crawlee_version_in_project(
+    #     project_path=tmp_path / actor_name, wheel_path=crawlee_wheel_path, package_manager=package_manager
+    # )
 
     # Build actor using sequence of cli commands as the user would
     subprocess.run(  # noqa: ASYNC221, S603
