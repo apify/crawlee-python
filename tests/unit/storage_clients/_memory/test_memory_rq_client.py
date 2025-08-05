@@ -81,3 +81,14 @@ async def test_memory_metadata_updates(rq_client: MemoryRequestQueueClient) -> N
     assert metadata.created_at == initial_created
     assert metadata.modified_at > initial_modified
     assert metadata.accessed_at > accessed_after_read
+
+
+async def test_memory_metadata_stats(rq_client: MemoryRequestQueueClient) -> None:
+    """Test that metadata contains stats."""
+    # Record initial timestamps
+    stats = (await rq_client.get_metadata()).stats
+    assert stats.delete_count == 0
+    assert stats.head_item_read_count == 0
+    assert stats.read_count == 0
+    assert stats.storage_bytes == 0
+    assert stats.write_count == 0

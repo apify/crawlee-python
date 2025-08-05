@@ -73,6 +73,28 @@ class RequestQueueMetadata(StorageMetadata):
     total_request_count: Annotated[int, Field(alias='totalRequestCount')]
     """The total number of requests that have been added to the queue."""
 
+    stats: Annotated[RequestQueueStats, Field(alias='stats', default_factory=RequestQueueStats)]
+    """Additional optional statistics about the request queue."""
+
+class RequestQueueStats(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    delete_count: Annotated[int, Field(alias='deleteCount', default=0)]
+    """"The number of request queue deletes."""
+
+    head_item_read_count: Annotated[int, Field(alias='headItemReadCount', default=0)]
+    """The number of request queue head reads."""
+
+    read_count: Annotated[int, Field(alias='readCount', default=0)]
+    """The number of request queue reads."""
+
+    storage_bytes: Annotated[int, Field(alias='storageBytes', default=0)]
+    """Storage size in Bytes."""
+
+    write_count: Annotated[int, Field(alias='writeCount', default=0)]
+    """The number of request queue writes."""
+
+
 
 @docs_group('Storage data')
 class KeyValueStoreRecordMetadata(BaseModel):
