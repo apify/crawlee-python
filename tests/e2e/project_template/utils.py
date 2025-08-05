@@ -95,7 +95,7 @@ def _patch_crawlee_version_in_pyproject_toml_based_project(project_path: Path, w
                         # version, make sure that one is patched as well.
                         # f'RUN pip install ./{wheel_path.name}{crawlee_extras} --force-reinstall\n',
                         # f'RUN {package_manager} add ./{wheel_path.name}{crawlee_extras}\n',
-                        f'RUN {package_manager} lock\n',
+                        # f'RUN {package_manager} lock\n',
                     ]
                 )
     with dockerfile_path.open('w') as f:
