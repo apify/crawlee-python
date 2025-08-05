@@ -45,10 +45,10 @@ def _patch_crawlee_version_in_requirements_txt_based_project(project_path: Path,
             if line.startswith('COPY requirements.txt ./'):
                 modified_lines.extend(
                     [
-                        f'COPY {wheel_path.name} ./\n',
+                        # f'COPY {wheel_path.name} ./\n',
                         # If no crawlee version bump, pip might be lazy and take existing pre-installed crawlee version,
                         # make sure that one is patched as well.
-                        f'RUN pip install ./{wheel_path.name}{crawlee_extras} --force-reinstall\n',
+                        # f'RUN pip install ./{wheel_path.name}{crawlee_extras} --force-reinstall\n',
                     ]
                 )
     with dockerfile_path.open('w') as f:
@@ -90,11 +90,11 @@ def _patch_crawlee_version_in_pyproject_toml_based_project(project_path: Path, w
                 # and so the absolute path(in the container) is generated when running `add` command in the container.
                 modified_lines.extend(
                     [
-                        f'COPY {wheel_path.name} ./\n',
+                        # f'COPY {wheel_path.name} ./\n',
                         # If no crawlee version bump, poetry might be lazy and take existing pre-installed crawlee
                         # version, make sure that one is patched as well.
-                        f'RUN pip install ./{wheel_path.name}{crawlee_extras} --force-reinstall\n',
-                        f'RUN {package_manager} add ./{wheel_path.name}{crawlee_extras}\n',
+                        # f'RUN pip install ./{wheel_path.name}{crawlee_extras} --force-reinstall\n',
+                        # f'RUN {package_manager} add ./{wheel_path.name}{crawlee_extras}\n',
                         f'RUN {package_manager} lock\n',
                     ]
                 )
