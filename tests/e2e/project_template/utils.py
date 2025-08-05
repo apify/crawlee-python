@@ -29,10 +29,10 @@ def _patch_crawlee_version_in_requirements_txt_based_project(project_path: Path,
     with requirements_path.open() as f:
         modified_lines = []
         for line in f:
-            if 'crawlee' in line:
-                modified_lines.append(f'./{wheel_path.name}{crawlee_extras}\n')
-            else:
-                modified_lines.append(line)
+            # if 'crawlee' in line:
+                # modified_lines.append(f'./{wheel_path.name}{crawlee_extras}\n')
+            # else:
+            modified_lines.append(line)
     with requirements_path.open('w') as f:
         f.write(''.join(modified_lines))
 
@@ -42,7 +42,7 @@ def _patch_crawlee_version_in_requirements_txt_based_project(project_path: Path,
         modified_lines = []
         for line in f:
             modified_lines.append(line)
-            if line.startswith('COPY requirements.txt ./'):
+            if line.startswith('COPY') and 'requirements.txt' in line:
                 modified_lines.extend(
                     [
                         # f'COPY {wheel_path.name} ./\n',
@@ -69,7 +69,7 @@ def _patch_crawlee_version_in_pyproject_toml_based_project(project_path: Path, w
         modified_lines = []
         for line in f:
             modified_lines.append(line)
-            if line.startswith('COPY pyproject.toml'):
+            if line.startswith('COPY') and 'pyproject.toml' in line:
                 if 'uv.lock' in line:
                     package_manager = 'uv'
                 elif 'poetry.lock' in line:
