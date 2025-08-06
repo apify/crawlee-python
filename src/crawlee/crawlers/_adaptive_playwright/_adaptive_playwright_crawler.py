@@ -205,6 +205,7 @@ class AdaptivePlaywrightCrawler(
 
         self._additional_context_managers = [
             *self._additional_context_managers,
+            self.rendering_type_predictor,
             static_crawler.statistics,
             playwright_crawler.statistics,
             playwright_crawler._browser_pool,  # noqa: SLF001 # Intentional access to private member.

@@ -81,6 +81,8 @@ class _SimpleRenderingTypePredictor(RenderingTypePredictor):
         rendering_types: Iterator[RenderingType] | None = None,
         detection_probability_recommendation: None | Iterator[float] = None,
     ) -> None:
+        super().__init__()
+
         self._rendering_types = rendering_types or cycle(['static'])
         self._detection_probability_recommendation = detection_probability_recommendation or cycle([1])
 
