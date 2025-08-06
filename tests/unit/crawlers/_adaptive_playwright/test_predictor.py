@@ -154,12 +154,19 @@ async def test_persistent_prediction() -> None:
     assert persisted_data['model']['is_fitted'] is True
 
 
-async def test_persistent_prediction_recovery() -> None:
+@pytest.mark.parametrize(
+    ('persistence_enabled', 'same_result'),
+    [
+        pytest.param(True, True, id='with persistence'),
+        pytest.param(False, False, id='without persistence'),
+    ],
+)
+async def test_persistent_prediction_recovery(*, persistence_enabled: bool, same_result: bool) -> None:
     """Test that the model and resources is recovered from KeyValueStore."""
     persist_key = 'test-persistent-state-recovery'
 
     async with DefaultRenderingTypePredictor(
-        detection_ratio=0.01, persistence_enabled=True, persist_state_key=persist_key
+        detection_ratio=0.01, persistence_enabled=persistence_enabled, persist_state_key=persist_key
     ) as predictor:
         # Learn some data
         predictor.store_result(
@@ -177,10 +184,17 @@ async def test_persistent_prediction_recovery() -> None:
             Request.from_url(url='http://www.aaa.com/some/stuff', label='some label')
         )
 
-    assert (
-        before_recover_prediction.detection_probability_recommendation
-        == after_recover_prediction.detection_probability_recommendation
-    )
+    # If persistence is enabled, the predicted results must be the same.
+    if same_result:
+        assert (
+            before_recover_prediction.detection_probability_recommendation
+            == after_recover_prediction.detection_probability_recommendation
+        )
+    else:
+        assert (
+            before_recover_prediction.detection_probability_recommendation
+            != after_recover_prediction.detection_probability_recommendation
+        )
 
 
 @pytest.mark.parametrize(

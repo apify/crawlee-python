@@ -120,7 +120,11 @@ class DefaultRenderingTypePredictor(RenderingTypePredictor):
     """
 
     def __init__(
-        self, detection_ratio: float = 0.1, *, persistence_enabled: bool = False, persist_state_key: str | None = None
+        self,
+        detection_ratio: float = 0.1,
+        *,
+        persistence_enabled: bool = False,
+        persist_state_key: str = 'rendering-type-predictor-state',
     ) -> None:
         """Initialize a new instance.
 
@@ -148,7 +152,7 @@ class DefaultRenderingTypePredictor(RenderingTypePredictor):
             default_state=RenderingTypePredictorState(
                 model=LogisticRegression(max_iter=1000), labels_coefficients=defaultdict(lambda: n + 2)
             ),
-            persist_state_key=persist_state_key or 'rendering-type-predictor-state',
+            persist_state_key=persist_state_key,
             persistence_enabled=persistence_enabled,
             logger=logger,
         )
