@@ -184,8 +184,10 @@ class SitemapRequestLoader(RequestLoader):
                     if isinstance(item, SitemapUrl):
                         url = item.loc
 
+                        state = await self._get_state()
+
                         # Skip if already processed
-                        if url in self._state.current_value.current_sitemap_processed_urls:
+                        if url in state.current_sitemap_processed_urls:
                             continue
 
                         # Check if URL should be included
@@ -196,19 +198,21 @@ class SitemapRequestLoader(RequestLoader):
                         await self._queue_has_capacity.wait()
 
                         async with self._queue_lock:
-                            self._state.current_value.url_queue.append(url)
-                            self._state.current_value.current_sitemap_processed_urls.add(url)
-                            self._state.current_value.total_count += 1
-                            if len(self._state.current_value.url_queue) >= self._max_buffer_size:
+                            state = await self._get_state()
+                            state.url_queue.append(url)
+                            state.current_sitemap_processed_urls.add(url)
+                            state.total_count += 1
+                            if len(state.url_queue) >= self._max_buffer_size:
                                 # Notify that the queue is full
                                 self._queue_has_capacity.clear()
 
                 # Clear current sitemap after processing
-                self._state.current_value.in_progress_sitemap_url = None
-                self._state.current_value.current_sitemap_processed_urls.clear()
+                state = await self._get_state()
+                state.in_progress_sitemap_url = None
+                state.current_sitemap_processed_urls.clear()
 
             # Mark as completed after processing all sitemap urls
-            self._state.current_value.completed = True
+            state.completed = True
 
         except Exception:
             logger.exception('Error loading sitemaps')
