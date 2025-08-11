@@ -112,9 +112,11 @@ async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -
     assert await sitemap_loader.is_finished()
 
 
-async def test_create_persist_state_for_sitemap_loading(server_url: URL, http_client: HttpClient) -> None:
+async def test_create_persist_state_for_sitemap_loading(
+    server_url: URL, http_client: HttpClient, key_value_store: KeyValueStore
+) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
-    persist_key = f'create_persist_state_{id(http_client)}'
+    persist_key = 'create_persist_state'
     sitemap_loader = SitemapRequestLoader(
         [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, persist_enabled=True
     )
@@ -122,19 +124,17 @@ async def test_create_persist_state_for_sitemap_loading(server_url: URL, http_cl
 
     await sitemap_loader.close()
 
-    kvs = await KeyValueStore.open()
-
-    state_data = await kvs.get_value(persist_key)
+    state_data = await key_value_store.get_value(persist_key)
 
     assert state_data is not None
     assert state_data['handledCount'] == 0
 
-    await kvs.delete_value(persist_key)
 
-
-async def test_data_persistence_for_sitemap_loading(server_url: URL, http_client: HttpClient) -> None:
+async def test_data_persistence_for_sitemap_loading(
+    server_url: URL, http_client: HttpClient, key_value_store: KeyValueStore
+) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
-    persist_key = f'data_persist_state_{id(http_client)}'
+    persist_key = 'data_persist_state'
     sitemap_loader = SitemapRequestLoader(
         [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, persist_enabled=True
     )
@@ -142,24 +142,19 @@ async def test_data_persistence_for_sitemap_loading(server_url: URL, http_client
 
     await sitemap_loader.close()
 
-    kvs = await KeyValueStore.open()
-
-    state_data = await kvs.get_value(persist_key)
+    state_data = await key_value_store.get_value(persist_key)
 
     assert state_data is not None
     assert state_data['handledCount'] == 0
     assert state_data['totalCount'] == 5
     assert len(state_data['urlQueue']) == 5
 
-    await kvs.delete_value(persist_key)
-
 
 async def test_recovery_data_persistence_for_sitemap_loading(
-    server_url: URL,
-    http_client: HttpClient,
+    server_url: URL, http_client: HttpClient, key_value_store: KeyValueStore
 ) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
-    persist_key = f'recovery_persist_state_{id(http_client)}'
+    persist_key = 'recovery_persist_state'
     sitemap_loader = SitemapRequestLoader(
         [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, persist_enabled=True
     )
@@ -172,9 +167,7 @@ async def test_recovery_data_persistence_for_sitemap_loading(
 
     await sitemap_loader.close()
 
-    kvs = await KeyValueStore.open()
-
-    state_data = await kvs.get_value(persist_key)
+    state_data = await key_value_store.get_value(persist_key)
 
     assert state_data is not None
     next_item_in_kvs = state_data['urlQueue'][0]
@@ -187,5 +180,3 @@ async def test_recovery_data_persistence_for_sitemap_loading(
 
     assert item is not None
     assert item.url == next_item_in_kvs
-
-    await kvs.delete_value(persist_key)
