@@ -6,6 +6,7 @@ from yarl import URL
 
 from crawlee.http_clients._base import HttpClient
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
+from crawlee.storages import KeyValueStore
 
 BASIC_SITEMAP = """
 <?xml version="1.0" encoding="UTF-8"?>
@@ -109,3 +110,76 @@ async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -
     await sitemap_loader.mark_request_as_handled(item)
 
     assert await sitemap_loader.is_finished()
+
+
+async def test_create_persist_state_for_sitemap_loading(server_url: URL, http_client: HttpClient) -> None:
+    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+    persist_key = 'test_sitemap_loader'
+    sitemap_loader = SitemapRequestLoader(
+        [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, persist_enabled=True
+    )
+    assert await sitemap_loader.is_finished() is False
+
+    await sitemap_loader.close()
+
+    kvs = await KeyValueStore.open()
+
+    state_data = await kvs.get_value(persist_key)
+
+    assert state_data is not None
+    assert state_data['handledCount'] == 0
+
+
+async def test_data_persistence_for_sitemap_loading(server_url: URL, http_client: HttpClient) -> None:
+    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+    persist_key = 'test_sitemap_loader'
+    sitemap_loader = SitemapRequestLoader(
+        [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, persist_enabled=True
+    )
+    await asyncio.sleep(0.1)
+
+    await sitemap_loader.close()
+
+    kvs = await KeyValueStore.open()
+
+    state_data = await kvs.get_value(persist_key)
+
+    assert state_data is not None
+    assert state_data['handledCount'] == 0
+    assert state_data['totalCount'] == 5
+    assert len(state_data['urlQueue']) == 5
+
+
+async def test_recovery_data_persistence_for_sitemap_loading(
+    server_url: URL,
+    http_client: HttpClient,
+) -> None:
+    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+    persist_key = 'test_sitemap_loader'
+    sitemap_loader = SitemapRequestLoader(
+        [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, persist_enabled=True
+    )
+    await asyncio.sleep(0.1)
+
+    item = await sitemap_loader.fetch_next_request()
+
+    assert item is not None
+    await sitemap_loader.mark_request_as_handled(item)
+
+    await sitemap_loader.close()
+
+    kvs = await KeyValueStore.open()
+
+    state_data = await kvs.get_value(persist_key)
+
+    assert state_data is not None
+    next_item_in_kvs = state_data['urlQueue'][0]
+
+    sitemap_loader = SitemapRequestLoader(
+        [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, persist_enabled=True
+    )
+    await asyncio.sleep(0.1)
+    item = await sitemap_loader.fetch_next_request()
+
+    assert item is not None
+    assert item.url == next_item_in_kvs
