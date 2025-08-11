@@ -129,6 +129,8 @@ async def test_create_persist_state_for_sitemap_loading(server_url: URL, http_cl
     assert state_data is not None
     assert state_data['handledCount'] == 0
 
+    await kvs.delete_value(persist_key)
+
 
 async def test_data_persistence_for_sitemap_loading(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
@@ -148,6 +150,8 @@ async def test_data_persistence_for_sitemap_loading(server_url: URL, http_client
     assert state_data['handledCount'] == 0
     assert state_data['totalCount'] == 5
     assert len(state_data['urlQueue']) == 5
+
+    await kvs.delete_value(persist_key)
 
 
 async def test_recovery_data_persistence_for_sitemap_loading(
@@ -183,3 +187,5 @@ async def test_recovery_data_persistence_for_sitemap_loading(
 
     assert item is not None
     assert item.url == next_item_in_kvs
+
+    await kvs.delete_value(persist_key)
