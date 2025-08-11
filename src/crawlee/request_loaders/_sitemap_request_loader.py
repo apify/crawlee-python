@@ -80,7 +80,10 @@ class SitemapRequestLoader(RequestLoader):
             exclude: List of glob or regex patterns to exclude URLs.
             max_buffer_size: Maximum number of URLs to buffer in memory.
             http_client: the instance of `HttpClient` to use for fetching sitemaps.
-            persist_state_key: Key in key-value store for persisting.
+            persist_state_key: Key in key-value store for persisting state. Each SitemapRequestLoader
+                instance must use a unique key to avoid conflicts when multiple loaders run
+                concurrently. Sharing the same key between instances will cause state corruption
+                and unpredictable behavior.
             persist_enabled: Flag to enable/disable persistence.
         """
         self._http_client = http_client
