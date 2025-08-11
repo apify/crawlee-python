@@ -114,7 +114,7 @@ async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -
 
 async def test_create_persist_state_for_sitemap_loading(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
-    persist_key = 'test_sitemap_loader'
+    persist_key = f'test_sitemap_loader_{id(http_client)}'
     sitemap_loader = SitemapRequestLoader(
         [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, persist_enabled=True
     )
@@ -132,7 +132,7 @@ async def test_create_persist_state_for_sitemap_loading(server_url: URL, http_cl
 
 async def test_data_persistence_for_sitemap_loading(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
-    persist_key = 'test_sitemap_loader'
+    persist_key = f'test_sitemap_loader_{id(http_client)}'
     sitemap_loader = SitemapRequestLoader(
         [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, persist_enabled=True
     )
@@ -155,7 +155,7 @@ async def test_recovery_data_persistence_for_sitemap_loading(
     http_client: HttpClient,
 ) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
-    persist_key = 'test_sitemap_loader'
+    persist_key = f'test_sitemap_loader_{id(http_client)}'
     sitemap_loader = SitemapRequestLoader(
         [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, persist_enabled=True
     )
