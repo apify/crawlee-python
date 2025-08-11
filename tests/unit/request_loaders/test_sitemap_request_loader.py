@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import gzip
 
@@ -50,7 +51,8 @@ def encode_base64(data: bytes) -> str:
 async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client)
-
+    # Give time to load
+    await asyncio.sleep(0.1)
     while not await sitemap_loader.is_finished():
         item = await sitemap_loader.fetch_next_request()
         assert item is not None
@@ -66,6 +68,8 @@ async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> No
 async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client)
+    # Give time to load
+    await asyncio.sleep(0.1)
 
     items = []
 
@@ -88,6 +92,8 @@ async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL, h
 async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], max_buffer_size=2, http_client=http_client)
+    # Give time to load
+    await asyncio.sleep(0.1)
 
     item = await sitemap_loader.fetch_next_request()
     assert item is not None

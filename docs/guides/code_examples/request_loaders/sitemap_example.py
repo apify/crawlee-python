@@ -17,6 +17,7 @@ async def main() -> None:
             max_buffer_size=500,  # Buffer up to 500 URLs in memory
         )
 
+        await asyncio.sleep(0.1)  # Allow some time for the loader to start
         while request := await sitemap_loader.fetch_next_request():
             # Do something with it...
 
