@@ -5,15 +5,16 @@ title: Upgrading to v1
 
 This page summarizes the breaking changes between Crawlee for Python v0.6 and v1.0.
 
-## Distinct use of word `browser` in similar contexts
+## Terminology change: "browser" in different contexts
 
-Two different contexts:
-- Playwright related browser
-- fingerprinting related browser
+The word "browser" is now used distinctly in two contexts:
 
-Type of `HeaderGeneratorOptions.browsers` changed from `Literal['chromium', 'firefox', 'webkit', 'edge']` to `Literal['chrome', 'firefox', 'safari', 'edge']` as it is related to the fingerprinting context and not to the Playwright context.
+- **Playwright context** - Refers to Playwright-supported browsers (`chromium`, `firefox`, `webkit`, `edge`).
+- **Fingerprinting context** - Refers to browsers supported by fingerprint generation (`chrome`, `firefox`, `safari`, `edge`).
 
-Before:
+The type of `HeaderGeneratorOptions.browsers` has changed accordingly:
+
+**Before (v0.6):**
 
 ```python
 from crawlee.fingerprint_suite import HeaderGeneratorOptions
@@ -22,7 +23,7 @@ HeaderGeneratorOptions(browsers=['chromium'])
 HeaderGeneratorOptions(browsers=['webkit'])
 ```
 
-Now:
+**Now (v1.0):**
 
 ```python
 from crawlee.fingerprint_suite import HeaderGeneratorOptions
@@ -31,162 +32,17 @@ HeaderGeneratorOptions(browsers=['chrome'])
 HeaderGeneratorOptions(browsers=['safari'])
 ```
 
-## Storage clients
-
-In v1.0, we are introducing a new storage clients system. We have completely reworked their interface,
-making it much simpler to write your own storage clients. This allows you to easily store your request queues,
-key-value stores, and datasets in various destinations.
-
-### New storage clients
-
-Previously, the `MemoryStorageClient` handled both in-memory storage and file system persistence, depending
-on configuration. In v1.0, we've split this into two dedicated classes:
-
-- `MemoryStorageClient` - stores all data in memory only.
-- `FileSystemStorageClient` - persists data on the file system, with in-memory caching for improved performance.
-
-For details about the new interface, see the `BaseStorageClient` documentation. You can also check out
-the [Storage clients guide](https://crawlee.dev/python/docs/guides/) for more information on available
-storage clients and instructions on writing your own.
-
-### Memory storage client
-
-Before:
-
-```python
-from crawlee.configuration import Configuration
-from crawlee.storage_clients import MemoryStorageClient
-
-configuration = Configuration(persist_storage=False)
-storage_client = MemoryStorageClient.from_config(configuration)
-```
-
-Now:
-
-```python
-from crawlee.storage_clients import MemoryStorageClient
-
-storage_client = MemoryStorageClient()
-```
-
-### File-system storage client
-
-Before:
-
-```python
-from crawlee.configuration import Configuration
-from crawlee.storage_clients import MemoryStorageClient
-
-configuration = Configuration(persist_storage=True)
-storage_client = MemoryStorageClient.from_config(configuration)
-```
-
-Now:
-
-```python
-from crawlee.storage_clients import FileSystemStorageClient
-
-storage_client = FileSystemStorageClient()
-```
-
-The way you register storage clients remains the same:
-
-```python
-from crawlee import service_locator
-from crawlee.crawlers import ParselCrawler
-from crawlee.storage_clients import MemoryStorageClient
-from crawlee.storages import Dataset
-
-# Create custom storage client, MemoryStorageClient for example.
-storage_client = MemoryStorageClient()
-
-# Register it globally via the service locator.
-service_locator.set_storage_client(storage_client)
-
-# Or pass it directly to the crawler, it will be registered globally
-# to the service locator under the hood.
-crawler = ParselCrawler(storage_client=storage_client)
-
-# Or just provide it when opening a storage (e.g. dataset), it will be used
-# for this storage only, not globally.
-dataset = await Dataset.open(
-    name='my_dataset',
-    storage_client=storage_client,
-)
-```
-
-### Breaking changes
-
-The `persist_storage` and `persist_metadata` fields have been removed from the `Configuration` class.
-Persistence is now determined solely by the storage client class you use.
-
-The `read` method for `HttpResponse` has been changed from synchronous to asynchronous.
-
-### Storage client instance behavior
-
-Instance caching is implemented for the storage open methods: `Dataset.open()`, `KeyValueStore.open()`,
-and `RequestQueue.open()`. This means that when you call these methods with the same arguments,
-the same instance is returned each time.
-
-In contrast, when using client methods such as `StorageClient.open_dataset_client()`, each call creates
-a new `DatasetClient` instance, even if the arguments are identical. These methods do not use instance caching.
-
-This usage pattern is not common, and it is generally recommended to open storages using the standard storage
-open methods rather than the storage client methods.
-
-### Writing custom storage clients
-
-The storage client interface has been fully reworked. Collection storage clients have been removed - now there is
-one storage client class per storage type (`RequestQueue`, `KeyValueStore`, and `Dataset`). Writing your own storage
-clients is now much simpler, allowing you to store your request queues, key-value stores, and datasets in any
-destination you choose.
-
-## Dataset
-
-- There are a few new methods:
-  - `get_metadata`
-  - `purge`
-  - `list_items`
-- The `from_storage_object` method has been removed - use the `open` method with `name` or `id` instead.
-- The `get_info` and `storage_object` properties have been replaced by the new `get_metadata` method.
-- The `set_metadata` method has been removed.
-- The `write_to_json` and `write_to_csv` methods have been removed - use `export_to` instead.
-
-## Key-value store
-
-- There are a few new methods:
-  - `get_metadata`
-  - `purge`
-  - `delete_value`
-  - `list_keys`
-- The `from_storage_object` method has been removed - use the `open` method with `name` or `id` instead.
-- The `get_info` and `storage_object` properties have been replaced by the new `get_metadata` method.
-- The `set_metadata` method has been removed.
-
-## Request queue
-
-- There are a few new methods:
-  - `get_metadata`
-  - `purge`
-  - `add_requests` (renamed from `add_requests_batched`)
-- The `from_storage_object` method has been removed - use the `open` method with `name` or `id` instead.
-- The `get_info` and `storage_object` properties have been replaced by the new `get_metadata` method.
-- The `set_metadata` method has been removed.
-- `resource_directory` from `RequestQueueMetadata` removed – use `path_to_...` property.
-- `RequestQueueHead` model replaced with `RequestQueueHeadWithLocks`.
-- The `stats` field was removed from `RequestQueueMetadata` as it wasn't used for anything.
-
 ## New default HTTP client
 
-In v1.0, Crawlee introduces a new default HTTP client: `ImpitHttpClient`, based on the [impit](https://apify.github.io/impit/) library, replacing `httpx` as the default HTTP client.
+Crawlee v1.0 now uses `ImpitHttpClient` (based on [impit](https://apify.github.io/impit/) library) as the **default HTTP client**, replacing `ImpitHttpClient` (based on [httpx](https://www.python-httpx.org/) library).
 
-If you want to continue using `HttpxHttpClient`, you can install Crawlee with the `httpx` extension:
+If you want to keep using `HttpxHttpClient`, install Crawlee with `httpx` extra, e.g. using pip:
 
 ```bash
 pip install 'crawlee[httpx]'
 ```
 
-You can then use it like this:
+And then provide the HTTP client explicitly to the crawler:
 
 ```python
 from crawlee.crawlers import HttpCrawler
@@ -196,4 +52,186 @@ client = HttpxHttpClient()
 crawler = HttpCrawler(http_client=client)
 ```
 
-You can learn more about available HTTP clients and usage examples in the [HTTP clients guide](https://crawlee.dev/python/docs/guides/http-clients).
+See the [HTTP clients guide](https://crawlee.dev/python/docs/guides/http-clients) for all options.
+
+## Changes in storages
+
+In Crawlee v1.0, the `Dataset`, `KeyValueStore`, and `RequestQueue` storage APIs have been updated for consistency and simplicity. Below is a detailed overview of what's new, what's changed, and what's been removed.
+
+See the [Storages guide](https://crawlee.dev/python/docs/guides/storages) for more details.
+
+### Dataset
+
+The `Dataset` API now includes several new methods, such as:
+
+- `get_metadata` - retrieves metadata information for the dataset.
+- `purge` - completely clears the dataset, including all items (keeps the metadata only).
+- `list_items` - returns the dataset's items in a list format.
+
+Some older methods have been removed or replaced:
+
+- `from_storage_object` constructor has been removed. You should now use the `open` method with either a `name` or `id` parameter.
+- `get_info` method and the `storage_object` property have been replaced by the new `get_metadata` method.
+- `set_metadata` method has been removed.
+- `write_to_json` and `write_to_csv` methods have been removed; instead, use the `export_to` method for exporting data in different formats.
+
+### Key-value store
+
+The `KeyValueStore` API now includes several new methods, such as:
+
+- `get_metadata` - retrieves metadata information for the key-value store.
+- `purge` - completely clears the key-value store, removing all keys and values (keeps the metadata only).
+- `delete_value` - deletes a specific key and its associated value.
+- `list_keys` - lists all keys in the key-value store.
+
+Some older methods have been removed or replaced:
+
+- `from_storage_object` - removed; use the `open` method with either a `name` or `id` instead.
+- `get_info` and `storage_object` - replaced by the new `get_metadata` method.
+- `set_metadata` method has been removed.
+
+### Request queue
+
+The `RequestQueue` API now includes several new methods, such as:
+
+- `get_metadata` - retrieves metadata information for the request queue.
+- `purge` - completely clears the request queue, including all pending and processed requests (keeps the metadata only).
+- `add_requests` - replaces the previous `add_requests_batched` method, offering the same functionality under a simpler name.
+
+Some older methods have been removed or replaced:
+
+- `from_storage_object` - removed; use the `open` method with either a `name` or `id` instead.
+- `get_info` and `storage_object` - replaced by the new `get_metadata` method.
+- `set_metadata` method has been removed.
+
+Some changes in the related model classes:
+
+- `resource_directory` in `RequestQueueMetadata` - removed; use the corresponding `path_to_*` property instead.
+- `stats` field in `RequestQueueMetadata` - removed as it was unused.
+- `RequestQueueHead` - replaced by `RequestQueueHeadWithLocks`.
+
+## New architecture of storage clients
+
+In v1.0, the storage client system has been completely reworked to simplify implementation and make custom storage clients easier to write.
+
+See the [Storage clients guide](https://crawlee.dev/python/docs/guides/storage-clients) for more details.
+
+### New dedicated storage clients
+
+Previously, `MemoryStorageClient` handled both in-memory storage and optional file system persistence. This has now been split into two distinct storage clients:
+
+- **`MemoryStorageClient`** - Stores all data in memory only.
+- **`FileSystemStorageClient`** - Persists data on the file system, with in-memory caching for better performance.
+
+**Before (v0.6):**
+
+```python
+from crawlee.configuration import Configuration
+from crawlee.storage_clients import MemoryStorageClient
+
+# In-memory only
+configuration = Configuration(persist_storage=False)
+storage_client = MemoryStorageClient.from_config(configuration)
+
+# File-system persistence
+configuration = Configuration(persist_storage=True)
+storage_client = MemoryStorageClient.from_config(configuration)
+```
+
+**Now (v1.0):**
+
+```python
+from crawlee.storage_clients import MemoryStorageClient, FileSystemStorageClient
+
+# In-memory only
+storage_client = MemoryStorageClient()
+
+# File-system persistence
+storage_client = FileSystemStorageClient()
+```
+
+### Registering a storage client
+
+The way you register a storage client remains unchanged:
+
+```python
+from crawlee import service_locator
+from crawlee.crawlers import ParselCrawler
+from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storages import Dataset
+
+# Create custom storage client
+storage_client = MemoryStorageClient()
+
+# Then register it globally
+service_locator.set_storage_client(storage_client)
+
+# Or use it for a single crawler only
+crawler = ParselCrawler(storage_client=storage_client)
+
+# Or use it for a single storage only
+dataset = await Dataset.open(
+    name='my_dataset',
+    storage_client=storage_client,
+)
+```
+
+### Instance caching
+
+Instance caching of `Dataset.open`, `KeyValueStore.open`, and `RequestQueue.open` now return the same instance for the same arguments. Direct calls to `StorageClient.open_*` always return new instances.
+
+### Writing custom storage clients
+
+The interface for custom storage clients has been simplified:
+
+- One storage client per storage type (`RequestQueue`, `KeyValueStore`, `Dataset`).
+- Collection storage clients have been removed.
+- The number of methods that have to be implemented have been reduced.
+
+## Other smaller updates
+
+There are more smaller updates.
+
+### Python version support
+
+We drop support for Python 3.9. The minimum supported version is now Python 3.10.
+
+### Changes in Configuration
+
+The fields `persist_storage` and `persist_metadata` have been removed from the `Configuration`. Persistence is now determined only by which storage client class you use.
+
+### Changes in HttpResponse
+
+The method `HttpResponse.read` is now asynchronous. This affects all HTTP-based crawlers.
+
+**Before (v0.6):**
+
+```python
+from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
+
+async def main() -> None:
+    crawler = ParselCrawler()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        content = context.http_response.read()
+        # ...
+
+    await crawler.run(['https://crawlee.dev/'])
+```
+
+**Now (v1.0):**
+
+```python
+from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
+
+async def main() -> None:
+    crawler = ParselCrawler()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        content = await context.http_response.read()
+        # ...
+
+    await crawler.run(['https://crawlee.dev/'])
+```
