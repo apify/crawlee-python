@@ -34,7 +34,7 @@ HeaderGeneratorOptions(browsers=['safari'])
 
 ## New default HTTP client
 
-Crawlee v1.0 now uses `ImpitHttpClient` (based on [impit](https://apify.github.io/impit/) library) as the **default HTTP client**, replacing `ImpitHttpClient` (based on [httpx](https://www.python-httpx.org/) library).
+Crawlee v1.0 now uses `ImpitHttpClient` (based on [impit](https://apify.github.io/impit/) library) as the **default HTTP client**, replacing `HttpxHttpClient` (based on [httpx](https://www.python-httpx.org/) library).
 
 If you want to keep using `HttpxHttpClient`, install Crawlee with `httpx` extra, e.g. using pip:
 
