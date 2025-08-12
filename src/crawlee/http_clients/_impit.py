@@ -193,6 +193,7 @@ class ImpitHttpClient(HttpClient):
             url=url,
             content=payload,
             headers=dict(headers) if headers else None,
+            timeout=timeout.total_seconds() if timeout else None,
             stream=True,
         )
         try:
