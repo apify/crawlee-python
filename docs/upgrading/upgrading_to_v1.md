@@ -214,6 +214,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
+        # highlight-next-line
         content = context.http_response.read()
         # ...
 
@@ -230,6 +231,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
+        # highlight-next-line
         content = await context.http_response.read()
         # ...
 
