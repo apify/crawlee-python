@@ -20,11 +20,15 @@ async def main() -> None:
         # Allow some time for the loader to fetch the sitemap and extract some URLs
         await asyncio.sleep(1)
 
-        while request := await sitemap_loader.fetch_next_request():
-            # Do something with it...
+        # We work with the loader until we process all relevant links from the sitemap.
+        while not await sitemap_loader.is_finished():
+            if request := await sitemap_loader.fetch_next_request():
+                # Do something with it...
 
-            # And mark it as handled.
-            await sitemap_loader.mark_request_as_handled(request)
+                # And mark it as handled.
+                await sitemap_loader.mark_request_as_handled(request)
+            else:
+                await asyncio.sleep(0.01)
 
 
 if __name__ == '__main__':
