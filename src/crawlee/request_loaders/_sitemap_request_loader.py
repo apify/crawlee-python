@@ -65,6 +65,9 @@ class SitemapRequestLoader(RequestLoader):
 
     The loader fetches and parses sitemaps in the background, allowing crawling to start
     before all URLs are loaded. It supports filtering URLs using glob and regex patterns.
+
+    The loader supports state persistence, allowing it to resume from where it left off
+    after interruption when a `persist_state_key` is provided during initialization.
     """
 
     def __init__(
