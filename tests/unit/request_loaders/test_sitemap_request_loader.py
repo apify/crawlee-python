@@ -117,9 +117,7 @@ async def test_create_persist_state_for_sitemap_loading(
 ) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
     persist_key = 'create_persist_state'
-    sitemap_loader = SitemapRequestLoader(
-        [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, persist_enabled=True
-    )
+    sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, persist_state_key=persist_key)
     assert await sitemap_loader.is_finished() is False
 
     await sitemap_loader.close()
@@ -135,9 +133,7 @@ async def test_data_persistence_for_sitemap_loading(
 ) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
     persist_key = 'data_persist_state'
-    sitemap_loader = SitemapRequestLoader(
-        [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, persist_enabled=True
-    )
+    sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, persist_state_key=persist_key)
     await asyncio.sleep(0.1)
 
     await sitemap_loader.close()
@@ -155,9 +151,7 @@ async def test_recovery_data_persistence_for_sitemap_loading(
 ) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
     persist_key = 'recovery_persist_state'
-    sitemap_loader = SitemapRequestLoader(
-        [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, persist_enabled=True
-    )
+    sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, persist_state_key=persist_key)
     await asyncio.sleep(0.1)
 
     item = await sitemap_loader.fetch_next_request()
@@ -172,9 +166,7 @@ async def test_recovery_data_persistence_for_sitemap_loading(
     assert state_data is not None
     next_item_in_kvs = state_data['urlQueue'][0]
 
-    sitemap_loader = SitemapRequestLoader(
-        [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, persist_enabled=True
-    )
+    sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, persist_state_key=persist_key)
     await asyncio.sleep(0.1)
     item = await sitemap_loader.fetch_next_request()
 

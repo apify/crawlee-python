@@ -30,25 +30,33 @@ logger = getLogger(__name__)
 
 
 class SitemapRequestLoaderState(BaseModel):
-    """State for sitemap request loader persistence."""
+    """State model for persisting sitemap request loader data."""
 
     model_config = ConfigDict(populate_by_name=True)
 
-    # URL queue and processing state
     url_queue: Annotated[deque[str], Field(alias='urlQueue')]
+    """Queue of URLs extracted from sitemaps and ready for processing."""
+
     in_progress: Annotated[set[str], Field(alias='inProgress')] = set()
+    """Set of request IDs currently being processed."""
 
-    # Sitemap state
     pending_sitemap_urls: Annotated[deque[str], Field(alias='pendingSitemapUrls')]
-    in_progress_sitemap_url: Annotated[str | None, Field(alias='inProgressSitemapUrl')] = None
-    # URLs from the current sitemap that have been processed (for resuming within a sitemap)
-    current_sitemap_processed_urls: Annotated[set[str], Field(alias='currentSitemapProcessedUrls')] = set()
-    # Flag indicating if the sitemaps have been fully processed
-    completed: Annotated[bool, Field(alias='sitemapCompleted')] = False
+    """Queue of sitemap URLs that need to be fetched and processed."""
 
-    # Counters
+    in_progress_sitemap_url: Annotated[str | None, Field(alias='inProgressSitemapUrl')] = None
+    """The sitemap URL currently being processed."""
+
+    current_sitemap_processed_urls: Annotated[set[str], Field(alias='currentSitemapProcessedUrls')] = set()
+    """URLs from the current sitemap that have been added to the queue."""
+
+    completed: Annotated[bool, Field(alias='sitemapCompleted')] = False
+    """Whether all sitemaps have been fully processed."""
+
     total_count: Annotated[int, Field(alias='totalCount')] = 0
+    """Total number of URLs found and added to the queue from all processed sitemaps."""
+
     handled_count: Annotated[int, Field(alias='handledCount')] = 0
+    """Number of URLs that have been successfully handled."""
 
 
 @docs_group('Request loaders')
@@ -68,8 +76,7 @@ class SitemapRequestLoader(RequestLoader):
         include: list[re.Pattern[Any] | Glob] | None = None,
         exclude: list[re.Pattern[Any] | Glob] | None = None,
         max_buffer_size: int = 200,
-        persist_state_key: str = 'SITEMAP_REQUEST_LOADER_STATE',
-        persist_enabled: bool = False,
+        persist_state_key: str | None = None,
     ) -> None:
         """Initialize the sitemap request loader.
 
@@ -80,11 +87,9 @@ class SitemapRequestLoader(RequestLoader):
             exclude: List of glob or regex patterns to exclude URLs.
             max_buffer_size: Maximum number of URLs to buffer in memory.
             http_client: the instance of `HttpClient` to use for fetching sitemaps.
-            persist_state_key: Key in key-value store for persisting state. Each SitemapRequestLoader
-                instance must use a unique key to avoid conflicts when multiple loaders run
-                concurrently. Sharing the same key between instances will cause state corruption
-                and unpredictable behavior.
-            persist_enabled: Flag to enable/disable persistence.
+            persist_state_key: A key for persisting the loader's state in the KeyValueStore.
+                When provided, allows resuming from where it left off after interruption.
+                If None, no state persistence occurs.
         """
         self._http_client = http_client
         self._sitemap_urls = sitemap_urls
@@ -104,8 +109,8 @@ class SitemapRequestLoader(RequestLoader):
                 url_queue=deque(),
                 pending_sitemap_urls=deque(),
             ),
-            persistence_enabled=persist_enabled,
-            persist_state_key=persist_state_key,
+            persistence_enabled=bool(persist_state_key),
+            persist_state_key=persist_state_key or '',
             logger=logger,
         )
 
