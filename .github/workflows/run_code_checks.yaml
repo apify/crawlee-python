@@ -36,6 +36,7 @@ jobs:
       httpbin_url: ${{ secrets.APIFY_HTTPBIN_TOKEN && format('https://httpbin.apify.actor?token={0}', secrets.APIFY_HTTPBIN_TOKEN) || 'https://httpbin.org'}}
     with:
       python-versions: '["3.10", "3.11", "3.12", "3.13"]'
+      os: '["ubuntu-latest", "windows-latest", "macos-latest"]'
 
   docs_check:
     name: Docs check
