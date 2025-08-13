@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, TypedDict
@@ -199,6 +200,7 @@ class ImpitHttpClient(HttpClient):
         try:
             yield _ImpitResponse(response)
         finally:
+            await asyncio.sleep(0.01)
             response.close()
 
     def _get_client(self, proxy_url: str | None, cookie_jar: CookieJar | None) -> AsyncClient:
