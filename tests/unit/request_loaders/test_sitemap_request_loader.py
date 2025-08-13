@@ -49,11 +49,21 @@ def encode_base64(data: bytes) -> str:
     return base64.b64encode(data).decode('utf-8')
 
 
+async def wait_for_sitemap_loader_not_empty(sitemap_loader: SitemapRequestLoader) -> None:
+    """
+    Wait for the sitemap loader to have at least one URL available for processing.
+    """
+
+    while await sitemap_loader.is_empty() and not await sitemap_loader.is_finished():  # noqa: ASYNC110
+        await asyncio.sleep(0.1)
+
+
 async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client)
+
     # Give time to load
-    await asyncio.sleep(0.2)
+    await asyncio.wait_for(wait_for_sitemap_loader_not_empty(sitemap_loader), timeout=2)
 
     while not await sitemap_loader.is_finished():
         item = await sitemap_loader.fetch_next_request()
@@ -70,8 +80,9 @@ async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> No
 async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client)
+
     # Give time to load
-    await asyncio.sleep(0.2)
+    await asyncio.wait_for(wait_for_sitemap_loader_not_empty(sitemap_loader), timeout=2)
 
     items = []
 
@@ -95,7 +106,7 @@ async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], max_buffer_size=2, http_client=http_client)
     # Give time to load
-    await asyncio.sleep(0.2)
+    await asyncio.wait_for(wait_for_sitemap_loader_not_empty(sitemap_loader), timeout=2)
 
     item = await sitemap_loader.fetch_next_request()
     assert item is not None
@@ -135,7 +146,8 @@ async def test_data_persistence_for_sitemap_loading(
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
     persist_key = 'data_persist_state'
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, persist_state_key=persist_key)
-    await asyncio.sleep(0.2)
+    # Give time to load
+    await asyncio.wait_for(wait_for_sitemap_loader_not_empty(sitemap_loader), timeout=2)
 
     await sitemap_loader.close()
 
@@ -153,7 +165,8 @@ async def test_recovery_data_persistence_for_sitemap_loading(
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
     persist_key = 'recovery_persist_state'
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, persist_state_key=persist_key)
-    await asyncio.sleep(0.2)
+    # Give time to load
+    await asyncio.wait_for(wait_for_sitemap_loader_not_empty(sitemap_loader), timeout=2)
 
     item = await sitemap_loader.fetch_next_request()
 
@@ -168,7 +181,8 @@ async def test_recovery_data_persistence_for_sitemap_loading(
     next_item_in_kvs = state_data['urlQueue'][0]
 
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, persist_state_key=persist_key)
-    await asyncio.sleep(0.2)
+    # Give time to load
+    await asyncio.wait_for(wait_for_sitemap_loader_not_empty(sitemap_loader), timeout=2)
     item = await sitemap_loader.fetch_next_request()
 
     assert item is not None
