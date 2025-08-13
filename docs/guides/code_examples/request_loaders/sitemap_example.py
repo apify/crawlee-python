@@ -17,9 +17,6 @@ async def main() -> None:
             max_buffer_size=500,  # Buffer up to 500 URLs in memory
         )
 
-        # Allow some time for the loader to fetch the sitemap and extract some URLs
-        await asyncio.sleep(1)
-
         # We work with the loader until we process all relevant links from the sitemap.
         while not await sitemap_loader.is_finished():
             if request := await sitemap_loader.fetch_next_request():
