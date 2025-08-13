@@ -30,8 +30,12 @@ async def main() -> None:
             persist_state_key='my-persist-state',
         ) as sitemap_loader,
     ):
-        # Allow some time for the loader to fetch the sitemap and extract some URLs
-        await asyncio.sleep(1)
+        # Wait for the sitemap loader to fetch and parse the sitemap URLs.
+        # Sitemap loading happens asynchronously in the background, so we need to wait
+        # until at least one URL becomes available for processing.
+        while await sitemap_loader.is_empty() and not await sitemap_loader.is_finished():
+            logger.info('Sitemap is still being loaded and parsed, waiting for URLs...')
+            await asyncio.sleep(0.2)
 
         # We receive only one request.
         # Each time you run it, it will be a new request until you exhaust the sitemap.
