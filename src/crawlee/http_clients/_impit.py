@@ -199,7 +199,7 @@ class ImpitHttpClient(HttpClient):
         try:
             yield _ImpitResponse(response)
         finally:
-            await response.aclose()
+            response.close()
 
     def _get_client(self, proxy_url: str | None, cookie_jar: CookieJar | None) -> AsyncClient:
         """Retrieve or create an HTTP client for the given proxy URL.
