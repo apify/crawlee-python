@@ -283,7 +283,6 @@ class SitemapRequestLoader(RequestLoader):
         """Abort the sitemap loading process."""
         if self._loading_task and not self._loading_task.done():
             self._loading_task.cancel()
-            await asyncio.sleep(0.01)  # Allow time for cancellation
             with suppress(asyncio.CancelledError):
                 await self._loading_task
 
