@@ -122,20 +122,27 @@ class SitemapRequestLoader(RequestLoader):
 
     async def _get_state(self) -> SitemapRequestLoaderState:
         """Initialize and return the current state."""
-        if self._state.is_initialized:
+        async with self._queue_lock:
+            if self._state.is_initialized:
+                return self._state.current_value
+
+            await self._state.initialize()
+
+            # Initialize pending sitemaps on first run
+            has_sitemap_for_processing = (
+                self._state.current_value.pending_sitemap_urls or self._state.current_value.in_progress_sitemap_url
+            )
+            if not has_sitemap_for_processing and not self._state.current_value.completed:
+                self._state.current_value.pending_sitemap_urls.extend(self._sitemap_urls)
+
+            if (
+                self._state.current_value.url_queue
+                and len(self._state.current_value.url_queue) >= self._max_buffer_size
+            ):
+                # Notify that the queue is full
+                self._queue_has_capacity.clear()
+
             return self._state.current_value
-
-        await self._state.initialize()
-
-        # Initialize pending sitemaps on first run
-        if not self._state.current_value.pending_sitemap_urls and not self._state.current_value.completed:
-            self._state.current_value.pending_sitemap_urls.extend(self._sitemap_urls)
-
-        if self._state.current_value.url_queue and len(self._state.current_value.url_queue) >= self._max_buffer_size:
-            # Notify that the queue is full
-            self._queue_has_capacity.clear()
-
-        return self._state.current_value
 
     def _check_url_patterns(
         self,
@@ -208,8 +215,8 @@ class SitemapRequestLoader(RequestLoader):
                         # Check if we have capacity in the queue
                         await self._queue_has_capacity.wait()
 
+                        state = await self._get_state()
                         async with self._queue_lock:
-                            state = await self._get_state()
                             state.url_queue.append(url)
                             state.current_sitemap_processed_urls.add(url)
                             state.total_count += 1
