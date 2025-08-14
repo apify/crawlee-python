@@ -38,7 +38,7 @@ class SitemapRequestLoaderState(BaseModel):
     """Queue of URLs extracted from sitemaps and ready for processing."""
 
     in_progress: Annotated[set[str], Field(alias='inProgress')] = set()
-    """Set of request IDs currently being processed."""
+    """Set of request URLs currently being processed."""
 
     pending_sitemap_urls: Annotated[deque[str], Field(alias='pendingSitemapUrls')]
     """Queue of sitemap URLs that need to be fetched and processed."""
@@ -134,6 +134,10 @@ class SitemapRequestLoader(RequestLoader):
             )
             if not has_sitemap_for_processing and not self._state.current_value.completed:
                 self._state.current_value.pending_sitemap_urls.extend(self._sitemap_urls)
+
+            if self._state.current_value.in_progress:
+                self._state.current_value.url_queue.extendleft(self._state.current_value.in_progress)
+                self._state.current_value.in_progress.clear()
 
             if (
                 self._state.current_value.url_queue
@@ -271,7 +275,7 @@ class SitemapRequestLoader(RequestLoader):
             url = state.url_queue.popleft()
 
             request = Request.from_url(url)
-            state.in_progress.add(request.id)
+            state.in_progress.add(request.url)
             if len(state.url_queue) < self._max_buffer_size:
                 self._queue_has_capacity.set()
 
@@ -281,8 +285,8 @@ class SitemapRequestLoader(RequestLoader):
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         """Mark a request as successfully handled."""
         state = await self._get_state()
-        if request.id in state.in_progress:
-            state.in_progress.remove(request.id)
+        if request.url in state.in_progress:
+            state.in_progress.remove(request.url)
             state.handled_count += 1
         return None
 
