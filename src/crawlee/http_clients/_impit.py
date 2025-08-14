@@ -200,6 +200,9 @@ class ImpitHttpClient(HttpClient):
         try:
             yield _ImpitResponse(response)
         finally:
+            # Quickly closing Response while reading the response body causes an error in the Rust generator in `impit`.
+            # With a short sleep and sync closing, the error does not occur.
+            # Replace with `response.aclose` when this is resolved in impit.
             await asyncio.sleep(0.01)
             response.close()
 
