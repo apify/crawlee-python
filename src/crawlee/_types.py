@@ -612,7 +612,7 @@ class GetDataKwargs(TypedDict):
     omit: NotRequired[list[str]]
     """Fields to exclude from each item."""
 
-    unwind: NotRequired[str]
+    unwind: NotRequired[list[str]]
     """Unwinds items by a specified array field, turning each element into a separate item."""
 
     skip_empty: NotRequired[bool]
