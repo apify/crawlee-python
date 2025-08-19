@@ -14,7 +14,7 @@ import pytest
 from crawlee._autoscaling import AutoscaledPool, SystemStatus
 from crawlee._autoscaling._types import LoadRatioInfo, SystemInfo
 from crawlee._types import ConcurrencySettings
-from crawlee._utils.measure_time import measure_time
+from crawlee._utils.time import measure_time
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
