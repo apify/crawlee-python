@@ -1353,7 +1353,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 await self._error_handler(context, session_error)
 
             if self._should_retry_request(context, session_error):
-                self._logger.warning('Encountered a session error, rotating session and retrying')
+                exc_only = ''.join(traceback.format_exception_only(session_error)).strip()
+                self._logger.warning('Encountered "%s", rotating session and retrying...', exc_only)
 
                 context.session.retire()
 
