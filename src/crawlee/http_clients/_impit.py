@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, TypedDict
@@ -199,7 +200,12 @@ class ImpitHttpClient(HttpClient):
         try:
             yield _ImpitResponse(response)
         finally:
-            await response.aclose()
+            # TODO: https://github.com/apify/impit/issues/242
+            # Quickly closing Response while reading the response body causes an error in the Rust generator in `impit`.
+            # With a short sleep and sync closing, the error does not occur.
+            # Replace with `response.aclose` when this is resolved in impit.
+            await asyncio.sleep(0.01)
+            response.close()
 
     def _get_client(self, proxy_url: str | None, cookie_jar: CookieJar | None) -> AsyncClient:
         """Retrieve or create an HTTP client for the given proxy URL.
