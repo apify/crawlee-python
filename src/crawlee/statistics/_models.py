@@ -12,6 +12,8 @@ from crawlee._utils.console import make_table
 from crawlee._utils.docs import docs_group
 from crawlee._utils.models import timedelta_ms
 
+_STATISTICS_TABLE_WIDTH = 100
+
 
 @dataclass(frozen=True)
 @docs_group('Statistics')
@@ -33,7 +35,7 @@ class FinalStatistics:
         """Print out the Final Statistics data as a table."""
         str_dict = {k: v.total_seconds() if isinstance(v, timedelta) else v for k, v in asdict(self).items()}
 
-        return make_table([(str(k), str(v)) for k, v in str_dict.items()], width=60)
+        return make_table([(str(k), str(v)) for k, v in str_dict.items()], width=_STATISTICS_TABLE_WIDTH)
 
     def to_dict(self) -> dict[str, float | int | list[int]]:
         return {k: v.total_seconds() if isinstance(v, timedelta) else v for k, v in asdict(self).items()}
