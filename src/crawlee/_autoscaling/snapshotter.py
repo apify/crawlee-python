@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from operator import attrgetter
 from typing import TYPE_CHECKING, TypeVar, cast
-
-from sortedcontainers import SortedList
 
 from crawlee import service_locator
 from crawlee._autoscaling._types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Snapshot
@@ -25,7 +22,25 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
-T = TypeVar('T')
+T = TypeVar('T', bound=Snapshot)
+
+
+class SortedSnapshotList(list[T]):
+    """A list that maintains sorted order by `created_at` attribute for snapshot objects."""
+
+    def add(self, item: T) -> None:
+        """Add an item to the list maintaining sorted order by `created_at` using binary search."""
+        left, right = 0, len(self)
+        item_time = item.created_at
+
+        while left < right:
+            mid = (left + right) // 2
+            if self[mid].created_at <= item_time:
+                left = mid + 1
+            else:
+                right = mid
+
+        self.insert(left, item)
 
 
 @docs_group('Autoscaling')
@@ -127,8 +142,14 @@ class Snapshotter:
         )
 
     @staticmethod
-    def _get_sorted_list_by_created_at(input_list: list[T]) -> SortedList[T]:
-        return SortedList(input_list, key=attrgetter('created_at'))
+    def _get_sorted_list_by_created_at(input_list: list[T]) -> SortedSnapshotList[T]:
+        """Create a sorted list from the input list.
+
+        Returns a custom list that maintains sorted order by created_at when items are added.
+        """
+        result = SortedSnapshotList[T]()
+        result.extend(input_list)
+        return result
 
     @property
     def active(self) -> bool:

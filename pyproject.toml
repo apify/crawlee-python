@@ -42,8 +42,6 @@ dependencies = [
     "pydantic-settings>=2.2.0,!=2.7.0,!=2.7.1,!=2.8.0",
     "pydantic>=2.8.0,!=2.10.0,!=2.10.1,!=2.10.2",
     "pyee>=9.0.0",
-    "sortedcollections>=2.1.0",
-    "sortedcontainers>=2.4.0",
     "tldextract>=5.1.0",
     "typing-extensions>=4.1.0",
     "yarl>=1.18.0",
@@ -103,7 +101,6 @@ dev = [
     "pytest~=8.4.0",
     "ruff~=0.12.0",
     "setuptools", # setuptools are used by pytest, but not explicitly required
-    "sortedcontainers-stubs~=2.4.0",
     "types-beautifulsoup4~=4.12.0.20240229",
     "types-cachetools~=6.1.0.20250717",
     "types-colorama~=0.4.15.20240106",
@@ -247,7 +244,6 @@ module = [
     "litestar",                     # Example code shows deploy on Google Cloud Run.
     "loguru",                       # Example code shows integration of loguru and crawlee for JSON logging.
     "sklearn.linear_model",         # Untyped and stubs not available
-    "sortedcollections",            # Untyped and stubs not available
     "cookiecutter.*",               # Untyped and stubs not available
     "inquirer.*",                   # Untyped and stubs not available
     "warcio.*",                     # Example code shows WARC files creation.
