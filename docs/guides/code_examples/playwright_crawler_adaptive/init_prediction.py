@@ -12,6 +12,8 @@ from crawlee.crawlers import (
 
 class CustomRenderingTypePredictor(RenderingTypePredictor):
     def __init__(self) -> None:
+        super().__init__()
+
         self._learning_data = list[tuple[Request, RenderingType]]()
 
     def predict(self, request: Request) -> RenderingTypePrediction:

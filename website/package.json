@@ -21,8 +21,8 @@
         "@docusaurus/module-type-aliases": "3.8.1",
         "@docusaurus/types": "3.8.1",
         "@types/react": "^19.0.0",
-        "@typescript-eslint/eslint-plugin": "8.38.0",
-        "@typescript-eslint/parser": "8.38.0",
+        "@typescript-eslint/eslint-plugin": "8.40.0",
+        "@typescript-eslint/parser": "8.40.0",
         "eslint": "8.57.0",
         "eslint-plugin-react": "7.37.5",
         "eslint-plugin-react-hooks": "5.2.0",
@@ -34,7 +34,7 @@
         "typescript": "5.9.2"
     },
     "dependencies": {
-        "@apify/docusaurus-plugin-typedoc-api": "^4.4.5",
+        "@apify/docusaurus-plugin-typedoc-api": "^4.4.7",
         "@apify/utilities": "^2.8.0",
         "@docusaurus/core": "3.8.1",
         "@docusaurus/faster": "3.8.1",
