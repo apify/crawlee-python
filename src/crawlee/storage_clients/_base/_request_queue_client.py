@@ -63,11 +63,11 @@ class RequestQueueClient(ABC):
         """
 
     @abstractmethod
-    async def get_request(self, request_id: str) -> Request | None:
+    async def get_request(self, request_unique_key: str) -> Request | None:
         """Retrieve a request from the queue.
 
         Args:
-            request_id: ID of the request to retrieve.
+            request_unique_key: Unique key of the request to retrieve.
 
         Returns:
             The retrieved request, or None, if it did not exist.

@@ -1057,7 +1057,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 max_retries=3,
             )
             await self._handle_failed_request(context, error)
-            self._statistics.record_request_processing_failure(request.id or request.unique_key)
+            self._statistics.record_request_processing_failure(request.unique_key)
 
     async def _handle_request_error(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
         try:
@@ -1274,7 +1274,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if not (await self._is_allowed_based_on_robots_txt_file(request.url)):
             self._logger.warning(
-                f'Skipping request {request.url} ({request.id}) because it is disallowed based on robots.txt'
+                f'Skipping request {request.url} ({request.unique_key}) because it is disallowed based on robots.txt'
             )
 
             await self._handle_skipped_request(request, 'robots_txt', need_mark=True)
@@ -1300,7 +1300,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
         self._context_result_map[context] = result
 
-        statistics_id = request.id or request.unique_key
+        statistics_id = request.unique_key
         self._statistics.record_request_processing_start(statistics_id)
 
         try:

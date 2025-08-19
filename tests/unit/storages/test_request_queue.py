@@ -371,12 +371,12 @@ async def test_get_request_by_id(rq: RequestQueue) -> None:
     """Test retrieving a request by its ID."""
     # Add a request
     added_result = await rq.add_request('https://example.com')
-    request_id = added_result.id
+    unique_key = added_result.unique_key
 
     # Retrieve the request by ID
-    retrieved_request = await rq.get_request(request_id)
+    retrieved_request = await rq.get_request(unique_key)
     assert retrieved_request is not None
-    assert retrieved_request.id == request_id
+    assert retrieved_request.unique_key == unique_key
     assert retrieved_request.url == 'https://example.com'
 
 
@@ -403,7 +403,7 @@ async def test_reclaim_request(rq: RequestQueue) -> None:
     # Verify we can fetch it again
     reclaimed_request = await rq.fetch_next_request()
     assert reclaimed_request is not None
-    assert reclaimed_request.id == request.id
+    assert reclaimed_request.unique_key == request.unique_key
     assert reclaimed_request.url == 'https://example.com'
 
 
