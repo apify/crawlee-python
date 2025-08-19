@@ -951,18 +951,18 @@ async def test_logs_final_statistics(
     if statistics_log_format == 'table':
         assert final_statistics.msg.splitlines() == [
             'Final request statistics:',
-            '┌───────────────────────────────┬───────────┐',
-            '│ requests_finished             │ 4         │',
-            '│ requests_failed               │ 33        │',
-            '│ retry_histogram               │ [1, 4, 8] │',
-            '│ request_avg_failed_duration   │ 1m 39.0s  │',
-            '│ request_avg_finished_duration │ 483.0ms   │',
-            '│ requests_finished_per_minute  │ 0.33      │',
-            '│ requests_failed_per_minute    │ 0.1       │',
-            '│ request_total_duration        │ 12min     │',
-            '│ requests_total                │ 37        │',
-            '│ crawler_runtime               │ 5min      │',
-            '└───────────────────────────────┴───────────┘',
+            '┌───────────────────────────────┬────────────┐',
+            '│ requests_finished             │ 4          │',
+            '│ requests_failed               │ 33         │',
+            '│ retry_histogram               │ [1, 4, 8]  │',
+            '│ request_avg_failed_duration   │ 1min 39.0s │',
+            '│ request_avg_finished_duration │ 483.0ms    │',
+            '│ requests_finished_per_minute  │ 0.33       │',
+            '│ requests_failed_per_minute    │ 0.1        │',
+            '│ request_total_duration        │ 12min      │',
+            '│ requests_total                │ 37         │',
+            '│ crawler_runtime               │ 5min       │',
+            '└───────────────────────────────┴────────────┘',
         ]
     else:
         assert final_statistics.msg == 'Final request statistics:'
