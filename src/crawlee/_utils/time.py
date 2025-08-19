@@ -62,8 +62,8 @@ def format_duration(duration: timedelta | None) -> str:
         minutes = int(total_seconds // _SECONDS_PER_MINUTE)
         seconds = total_seconds % _SECONDS_PER_MINUTE
         if seconds == 0:
-            return f'{minutes}m'
-        return f'{minutes}m {seconds:.1f}s'
+            return f'{minutes}min'
+        return f'{minutes}min {seconds:.1f}s'
 
     # For longer durations, show in hours, minutes, and seconds
     hours = int(total_seconds // _SECONDS_PER_HOUR)
@@ -73,7 +73,7 @@ def format_duration(duration: timedelta | None) -> str:
 
     result = f'{hours}h'
     if minutes > 0:
-        result += f' {minutes}m'
+        result += f' {minutes}min'
     if seconds > 0:
         result += f' {seconds:.1f}s'
 

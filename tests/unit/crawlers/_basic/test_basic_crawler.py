@@ -959,9 +959,9 @@ async def test_logs_final_statistics(
             '│ request_avg_finished_duration │ 483.0ms   │',
             '│ requests_finished_per_minute  │ 0.33      │',
             '│ requests_failed_per_minute    │ 0.1       │',
-            '│ request_total_duration        │ 12m       │',
+            '│ request_total_duration        │ 12min     │',
             '│ requests_total                │ 37        │',
-            '│ crawler_runtime               │ 5m        │',
+            '│ crawler_runtime               │ 5min      │',
             '└───────────────────────────────┴───────────┘',
         ]
     else:
