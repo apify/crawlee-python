@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import bisect
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, TypeVar, cast
@@ -30,17 +31,7 @@ class SortedSnapshotList(list[T]):
 
     def add(self, item: T) -> None:
         """Add an item to the list maintaining sorted order by `created_at` using binary search."""
-        left, right = 0, len(self)
-        item_time = item.created_at
-
-        while left < right:
-            mid = (left + right) // 2
-            if self[mid].created_at <= item_time:
-                left = mid + 1
-            else:
-                right = mid
-
-        self.insert(left, item)
+        bisect.insort(self, item, key=lambda item: item.created_at)
 
 
 @docs_group('Autoscaling')
