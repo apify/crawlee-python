@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import JSON, Boolean, ForeignKey, Index, Integer, LargeBinary, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import DateTime, TypeDecorator
+from typing_extensions import override
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Dialect
@@ -21,10 +22,12 @@ class NameDefaultNone(TypeDecorator):
     impl = String(100)
     cache_ok = True
 
-    def process_bind_param(self, value: str | None, _dialect: Dialect) -> str | None:
+    @override
+    def process_bind_param(self, value: str | None, _dialect: Dialect) -> str:
         """Convert Python value to database value."""
         return 'default' if value is None else value
 
+    @override
     def process_result_value(self, value: str | None, _dialect: Dialect) -> str | None:
         """Convert database value to Python value."""
         return None if value == 'default' else value
@@ -103,6 +106,10 @@ class RequestQueueMetadataDB(StorageMetadataDB, Base):
 
     # Relationship to queue requests with cascade deletion
     requests: Mapped[list[RequestDB]] = relationship(
+        back_populates='queue', cascade='all, delete-orphan', lazy='select'
+    )
+    # Relationship to queue state
+    state: Mapped[RequestQueueStateDB] = relationship(
         back_populates='queue', cascade='all, delete-orphan', lazy='select'
     )
 
@@ -199,3 +206,23 @@ class RequestDB(Base):
 
     # Relationship back to parent queue
     queue: Mapped[RequestQueueMetadataDB] = relationship(back_populates='requests')
+
+
+class RequestQueueStateDB(Base):
+    """State table for request queues."""
+
+    __tablename__ = 'request_queue_state'
+
+    queue_id: Mapped[str] = mapped_column(
+        String(20), ForeignKey('request_queue_metadata.id', ondelete='CASCADE'), primary_key=True
+    )
+    """Foreign key to metadata request queue record."""
+
+    sequence_counter: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    """Counter for regular request ordering (positive)."""
+
+    forefront_sequence_counter: Mapped[int] = mapped_column(Integer, nullable=False, default=-1)
+    """Counter for forefront request ordering (negative)."""
+
+    # Relationship back to parent queue
+    queue: Mapped[RequestQueueMetadataDB] = relationship(back_populates='state')

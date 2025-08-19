@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
-from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel
 from sqlalchemy import delete, select, text, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only
@@ -15,7 +13,6 @@ from typing_extensions import override
 
 from crawlee import Request
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.recoverable_state import RecoverableState
 from crawlee.storage_clients._base import RequestQueueClient
 from crawlee.storage_clients.models import (
     AddRequestsResponse,
@@ -24,10 +21,11 @@ from crawlee.storage_clients.models import (
     UnprocessedRequest,
 )
 
-from ._db_models import RequestDB, RequestQueueMetadataDB
+from ._client_mixin import SQLClientMixin
+from ._db_models import RequestDB, RequestQueueMetadataDB, RequestQueueStateDB
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Sequence
+    from collections.abc import Sequence
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,17 +35,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class RequestQueueState(BaseModel):
-    """Simplified state model for SQL implementation."""
-
-    sequence_counter: int = 1
-    """Counter for regular request ordering (positive)."""
-
-    forefront_sequence_counter: int = -1
-    """Counter for forefront request ordering (negative)."""
-
-
-class SQLRequestQueueClient(RequestQueueClient):
+class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
     """SQL implementation of the request queue client.
 
     This client persists requests to a SQL database with transaction handling and
@@ -71,7 +59,7 @@ class SQLRequestQueueClient(RequestQueueClient):
     _DEFAULT_NAME_DB = 'default'
     """Default dataset name used when no name is provided."""
 
-    _MAX_REQUESTS_IN_CACHE = 100_000
+    _MAX_REQUESTS_IN_CACHE = 1000
     """Maximum number of requests to keep in cache for faster access."""
 
     def __init__(
@@ -102,19 +90,19 @@ class SQLRequestQueueClient(RequestQueueClient):
         self._last_modified_at: datetime | None = None
         self._accessed_modified_update_interval = storage_client.get_accessed_modified_update_interval()
 
-        self._state = RecoverableState[RequestQueueState](
-            default_state=RequestQueueState(),
-            persist_state_key='request_queue_state',
-            persistence_enabled=True,
-            persist_state_kvs_name=f'__RQ_STATE_{self._id}',
-            logger=logger,
-        )
-        """Recoverable state to maintain request ordering and in-progress status."""
-
         self._storage_client = storage_client
         """The storage client used to access the SQL database."""
 
         self._lock = asyncio.Lock()
+
+    async def _get_state(self, session: AsyncSession) -> RequestQueueStateDB:
+        """Get the current state of the request queue."""
+        orm_state: RequestQueueStateDB | None = await session.get(RequestQueueStateDB, self._id)
+        if not orm_state:
+            orm_state = RequestQueueStateDB(queue_id=self._id)
+            session.add(orm_state)
+            await session.flush()
+        return orm_state
 
     @override
     async def get_metadata(self) -> RequestQueueMetadata:
@@ -126,22 +114,6 @@ class SQLRequestQueueClient(RequestQueueClient):
                 raise ValueError(f'Request queue with ID "{self._id}" not found.')
 
             return RequestQueueMetadata.model_validate(orm_metadata)
-
-    def get_session(self) -> AsyncSession:
-        """Create a new SQLAlchemy session for this request queue."""
-        return self._storage_client.create_session()
-
-    @asynccontextmanager
-    async def get_autocommit_session(self) -> AsyncIterator[AsyncSession]:
-        """Create a new SQLAlchemy autocommit session to insert, delete, or modify data."""
-        async with self.get_session() as session:
-            try:
-                yield session
-                await session.commit()
-            except SQLAlchemyError as e:
-                logger.warning(f'Error occurred during session transaction: {e}')
-                # Rollback the session in case of an error
-                await session.rollback()
 
     @classmethod
     async def open(
@@ -224,8 +196,6 @@ class SQLRequestQueueClient(RequestQueueClient):
                     storage_client=storage_client,
                 )
 
-        await client._state.initialize()
-
         return client
 
     @override
@@ -236,15 +206,12 @@ class SQLRequestQueueClient(RequestQueueClient):
         """
         stmt = delete(RequestQueueMetadataDB).where(RequestQueueMetadataDB.id == self._id)
         async with self.get_autocommit_session() as autocommit:
-            if self._storage_client.get_default_flag():
+            if self._storage_client.get_dialect_name() == 'sqlite':
                 # foreign_keys=ON is set at the connection level. Required for cascade deletion.
                 await autocommit.execute(text('PRAGMA foreign_keys=ON'))
             # Delete the request queue metadata (cascade will delete requests)
             await autocommit.execute(stmt)
 
-        # Clear recoverable state
-        await self._state.reset()
-        await self._state.teardown()
         self._request_cache.clear()
         self._request_cache_needs_refresh = True
         self._is_empty_cache = None
@@ -270,10 +237,8 @@ class SQLRequestQueueClient(RequestQueueClient):
         # Clear recoverable state
         self._request_cache.clear()
         self._request_cache_needs_refresh = True
-        await self._state.reset()
 
-    @override
-    async def add_batch_of_requests(
+    async def _add_batch_of_requests_optimization(
         self,
         requests: Sequence[Request],
         *,
@@ -296,94 +261,89 @@ class SQLRequestQueueClient(RequestQueueClient):
             if req.unique_key not in unique_requests:
                 unique_requests[req.unique_key] = req
 
-        unique_keys = list(unique_requests.keys())
-
         # Get existing requests by unique keys
         stmt = (
             select(RequestDB)
-            .where(RequestDB.queue_id == self._id, RequestDB.unique_key.in_(unique_keys))
+            .where(RequestDB.queue_id == self._id, RequestDB.unique_key.in_(set(unique_requests.keys())))
             .options(
                 load_only(
                     RequestDB.request_id,
                     RequestDB.unique_key,
                     RequestDB.is_handled,
-                    RequestDB.sequence_number,
                 )
             )
         )
 
-        state = self._state.current_value
-
-        async with self.get_session() as session, self._lock:
+        async with self.get_session() as session:
             result = await session.execute(stmt)
             existing_requests = {req.unique_key: req for req in result.scalars()}
-
-            new_request_objects = []
-
-            # Process each request
+            state = await self._get_state(session)
+            insert_values: list[dict] = []
             for unique_key, request in unique_requests.items():
                 existing_req_db = existing_requests.get(unique_key)
-
-                # New request
-                if existing_req_db is None:
+                if existing_req_db is None or not existing_req_db.is_handled:
+                    value = {
+                        'request_id': request.id,
+                        'queue_id': self._id,
+                        'data': request.model_dump_json(),
+                        'unique_key': request.unique_key,
+                        'is_handled': False,
+                    }
                     if forefront:
-                        sequence_number = state.forefront_sequence_counter
+                        value['sequence_number'] = state.forefront_sequence_counter
                         state.forefront_sequence_counter -= 1
                     else:
-                        sequence_number = state.sequence_counter
+                        value['sequence_number'] = state.sequence_counter
                         state.sequence_counter += 1
 
-                    new_request_objects.append(
-                        RequestDB(
-                            request_id=request.id,
-                            queue_id=self._id,
-                            data=request.model_dump_json(),
-                            unique_key=request.unique_key,
-                            sequence_number=sequence_number,
-                            is_handled=False,
+                    insert_values.append(value)
+
+                    if existing_req_db is None:
+                        delta_total_request_count += 1
+                        delta_pending_request_count += 1
+                        processed_requests.append(
+                            ProcessedRequest(
+                                id=request.id,
+                                unique_key=request.unique_key,
+                                was_already_present=False,
+                                was_already_handled=False,
+                            )
                         )
-                    )
-
-                    delta_total_request_count += 1
-                    delta_pending_request_count += 1
-
-                    processed_requests.append(
-                        ProcessedRequest(
-                            id=request.id,
-                            unique_key=request.unique_key,
-                            was_already_present=False,
-                            was_already_handled=False,
+                    else:
+                        processed_requests.append(
+                            ProcessedRequest(
+                                id=request.id,
+                                unique_key=request.unique_key,
+                                was_already_present=True,
+                                was_already_handled=existing_req_db.is_handled,
+                            )
                         )
-                    )
 
-                elif existing_req_db.is_handled:
-                    # Already handled
+                else:
+                    # Already handled request, skip adding
                     processed_requests.append(
                         ProcessedRequest(
                             id=existing_req_db.request_id,
-                            unique_key=request.unique_key,
+                            unique_key=unique_key,
                             was_already_present=True,
                             was_already_handled=True,
                         )
                     )
 
-                else:
-                    # Exists but not handled - might update priority
-                    if forefront and existing_req_db.sequence_number > 0:
-                        existing_req_db.sequence_number = state.forefront_sequence_counter
-                        state.forefront_sequence_counter -= 1
-
-                    processed_requests.append(
-                        ProcessedRequest(
-                            id=existing_req_db.request_id,
-                            unique_key=request.unique_key,
-                            was_already_present=True,
-                            was_already_handled=False,
-                        )
+            if insert_values:
+                if forefront:
+                    # If the request already exists in the database, we update the sequence_number by shifting request
+                    # to the left.
+                    upsert_stmt = self.build_upsert_stmt(
+                        RequestDB,
+                        insert_values,
+                        update_columns=['sequence_number'],
                     )
-
-            if new_request_objects:
-                session.add_all(new_request_objects)
+                    await session.execute(upsert_stmt)
+                else:
+                    # If the request already exists in the database, we ignore this request when inserting.
+                    insert_stmt_with_ignore = self.build_insert_stmt_with_ignore(RequestDB, insert_values)
+                    await session.execute(insert_stmt_with_ignore)
 
             await self._update_metadata(
                 session,
@@ -396,6 +356,7 @@ class SQLRequestQueueClient(RequestQueueClient):
             try:
                 await session.commit()
             except SQLAlchemyError as e:
+                await session.rollback()
                 logger.warning(f'Failed to commit session: {e}')
                 processed_requests.clear()
                 unprocessed_requests.extend(
@@ -417,6 +378,18 @@ class SQLRequestQueueClient(RequestQueueClient):
             processed_requests=processed_requests,
             unprocessed_requests=unprocessed_requests,
         )
+
+    @override
+    async def add_batch_of_requests(
+        self,
+        requests: Sequence[Request],
+        *,
+        forefront: bool = False,
+    ) -> AddRequestsResponse:
+        if self._storage_client.get_dialect_name() in {'sqlite', 'postgresql', 'mysql'}:
+            return await self._add_batch_of_requests_optimization(requests, forefront=forefront)
+
+        raise NotImplementedError('Batch addition is not supported for this database dialect.')
 
     @override
     async def get_request(self, request_id: str) -> Request | None:
@@ -517,44 +490,45 @@ class SQLRequestQueueClient(RequestQueueClient):
         forefront: bool = False,
     ) -> ProcessedRequest | None:
         self._is_empty_cache = None
-        state = self._state.current_value
 
         if request.id not in self.in_progress_requests:
             logger.info(f'Reclaiming request {request.id} that is not in progress.')
             return None
 
-        # Update sequence number if changing priority
-        if forefront:
-            new_sequence = state.forefront_sequence_counter
-            state.forefront_sequence_counter -= 1
-        else:
-            new_sequence = state.sequence_counter
-            state.sequence_counter += 1
-
-        stmt = (
-            update(RequestDB)
-            .where(RequestDB.queue_id == self._id, RequestDB.request_id == request.id)
-            .values(sequence_number=new_sequence)
-        )
-
         async with self.get_autocommit_session() as autocommit:
+            state = await self._get_state(autocommit)
+
+            # Update sequence number if changing priority
+            if forefront:
+                new_sequence = state.forefront_sequence_counter
+                state.forefront_sequence_counter -= 1
+            else:
+                new_sequence = state.sequence_counter
+                state.sequence_counter += 1
+
+            stmt = (
+                update(RequestDB)
+                .where(RequestDB.queue_id == self._id, RequestDB.request_id == request.id)
+                .values(sequence_number=new_sequence)
+            )
+
             result = await autocommit.execute(stmt)
 
             if result.rowcount == 0:
                 logger.warning(f'Request {request.id} not found in database.')
                 return None
 
-            # Remove from in-progress
-            self.in_progress_requests.discard(request.id)
-
-            # Invalidate cache or add to cache
-            if forefront:
-                self._request_cache_needs_refresh = True
-            elif len(self._request_cache) < self._MAX_REQUESTS_IN_CACHE:
-                # For regular requests, we can add to the end if there's space
-                self._request_cache.append(request)
-
             await self._update_metadata(autocommit, update_modified_at=True, update_accessed_at=True)
+
+        # Remove from in-progress
+        self.in_progress_requests.discard(request.id)
+
+        # Invalidate cache or add to cache
+        if forefront:
+            self._request_cache_needs_refresh = True
+        elif len(self._request_cache) < self._MAX_REQUESTS_IN_CACHE:
+            # For regular requests, we can add to the end if there's space
+            self._request_cache.append(request)
 
         return ProcessedRequest(
             id=request.id,

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import delete, select, text, update
+from sqlalchemy import delete, insert, select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from typing_extensions import override
 
@@ -15,6 +14,7 @@ from crawlee._utils.file import infer_mime_type
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
+from ._client_mixin import SQLClientMixin
 from ._db_models import KeyValueStoreMetadataDB, KeyValueStoreRecordDB
 
 if TYPE_CHECKING:
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class SQLKeyValueStoreClient(KeyValueStoreClient):
+class SQLKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
     """SQL implementation of the key-value store client.
 
     This client persists key-value data to a SQL database with transaction support and
@@ -83,22 +83,6 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
                 raise ValueError(f'Key-value store with ID "{self._id}" not found.')
 
             return KeyValueStoreMetadata.model_validate(orm_metadata)
-
-    def get_session(self) -> AsyncSession:
-        """Create a new SQLAlchemy session for this key-value store."""
-        return self._storage_client.create_session()
-
-    @asynccontextmanager
-    async def get_autocommit_session(self) -> AsyncIterator[AsyncSession]:
-        """Create a new SQLAlchemy autocommit session to insert, delete, or modify data."""
-        async with self.get_session() as session:
-            try:
-                yield session
-                await session.commit()
-            except SQLAlchemyError as e:
-                logger.warning(f'Error occurred during session transaction: {e}')
-                # Rollback the session in case of an error
-                await session.rollback()
 
     @classmethod
     async def open(
@@ -183,20 +167,20 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
         This operation is irreversible. Uses CASCADE deletion to remove all related records.
         """
         stmt = delete(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.id == self._id)
-        async with self.get_autocommit_session() as autosession:
-            if self._storage_client.get_default_flag():
+        async with self.get_autocommit_session() as autocommit:
+            if self._storage_client.get_dialect_name() == 'sqlite':
                 # foreign_keys=ON is set at the connection level. Required for cascade deletion.
-                await autosession.execute(text('PRAGMA foreign_keys=ON'))
-            await autosession.execute(stmt)
+                await autocommit.execute(text('PRAGMA foreign_keys=ON'))
+            await autocommit.execute(stmt)
 
     @override
     async def purge(self) -> None:
         """Remove all items from this key-value store while keeping the key-value store structure."""
         stmt = delete(KeyValueStoreRecordDB).filter_by(kvs_id=self._id)
-        async with self.get_autocommit_session() as autosession:
-            await autosession.execute(stmt)
+        async with self.get_autocommit_session() as autocommit:
+            await autocommit.execute(stmt)
 
-            await self._update_metadata(autosession, update_accessed_at=True, update_modified_at=True)
+            await self._update_metadata(autocommit, update_accessed_at=True, update_modified_at=True)
 
     @override
     async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
@@ -220,29 +204,41 @@ class SQLKeyValueStoreClient(KeyValueStoreClient):
                 value_bytes = str(value).encode('utf-8')
 
         size = len(value_bytes)
-        record_db = KeyValueStoreRecordDB(
-            kvs_id=self._id,
-            key=key,
-            value=value_bytes,
-            content_type=content_type,
-            size=size,
-        )
+        insert_values = {
+            'kvs_id': self._id,
+            'key': key,
+            'value': value_bytes,
+            'content_type': content_type,
+            'size': size,
+        }
+        try:
+            # Trying to build a statement for Upsert
+            upsert_stmt = self.build_upsert_stmt(
+                KeyValueStoreRecordDB,
+                insert_values=insert_values,
+                update_columns=['value', 'content_type', 'size'],
+                conflict_cols=['kvs_id', 'key'],
+            )
+        except NotImplementedError:
+            # If it is not possible to build an upsert for the current dialect, build an update + insert.
+            upsert_stmt = None
+            update_stmt = (
+                update(KeyValueStoreRecordDB)
+                .where(KeyValueStoreRecordDB.kvs_id == self._id, KeyValueStoreRecordDB.key == key)
+                .values(value=value_bytes, content_type=content_type, size=size)
+            )
+            insert_stmt = insert(KeyValueStoreRecordDB).values(**insert_values)
 
-        stmt = (
-            update(KeyValueStoreRecordDB)
-            .where(KeyValueStoreRecordDB.kvs_id == self._id, KeyValueStoreRecordDB.key == key)
-            .values(value=value_bytes, content_type=content_type, size=size)
-        )
-
-        # A race condition is possible if several clients work with one kvs.
-        # Unfortunately, there is no implementation of atomic Upsert that is independent of specific dialects.
-        # https://docs.sqlalchemy.org/en/20/orm/queryguide/dml.html#orm-upsert-statements
         async with self.get_session() as session:
-            result = await session.execute(stmt)
-            if result.rowcount == 0:
-                session.add(record_db)
+            if upsert_stmt is not None:
+                result = await session.execute(upsert_stmt)
+            else:
+                result = await session.execute(update_stmt)
+                if result.rowcount == 0:
+                    await session.execute(insert_stmt)
 
             await self._update_metadata(session, update_accessed_at=True, update_modified_at=True)
+
             try:
                 await session.commit()
             except IntegrityError:

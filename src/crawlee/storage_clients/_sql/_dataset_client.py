@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import delete, select, text, update
+from sqlalchemy import Select, delete, insert, select, text, update
 from sqlalchemy.exc import SQLAlchemyError
 from typing_extensions import override
 
@@ -14,11 +13,13 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
+from ._client_mixin import SQLClientMixin
 from ._db_models import DatasetItemDB, DatasetMetadataDB
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+    from sqlalchemy import Select
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from ._storage_client import SQLStorageClient
@@ -26,7 +27,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class SQLDatasetClient(DatasetClient):
+class SQLDatasetClient(DatasetClient, SQLClientMixin):
     """SQL implementation of the dataset client.
 
     This client persists dataset items to a SQL database using two tables for storage
@@ -72,22 +73,6 @@ class SQLDatasetClient(DatasetClient):
                 raise ValueError(f'Dataset with ID "{self._id}" not found.')
 
             return DatasetMetadata.model_validate(orm_metadata)
-
-    def get_session(self) -> AsyncSession:
-        """Create a new SQLAlchemy session for this dataset."""
-        return self._storage_client.create_session()
-
-    @asynccontextmanager
-    async def get_autocommit_session(self) -> AsyncIterator[AsyncSession]:
-        """Create a new SQLAlchemy autocommit session to insert, delete, or modify data."""
-        async with self.get_session() as session:
-            try:
-                yield session
-                await session.commit()
-            except SQLAlchemyError as e:
-                logger.warning(f'Error occurred during session transaction: {e}')
-                # Rollback the session in case of an error
-                await session.rollback()
 
     @classmethod
     async def open(
@@ -173,7 +158,7 @@ class SQLDatasetClient(DatasetClient):
         """
         stmt = delete(DatasetMetadataDB).where(DatasetMetadataDB.id == self._id)
         async with self.get_autocommit_session() as autocommit:
-            if self._storage_client.get_default_flag():
+            if self._storage_client.get_dialect_name() == 'sqlite':
                 # foreign_keys=ON is set at the connection level. Required for cascade deletion.
                 await autocommit.execute(text('PRAGMA foreign_keys=ON'))
             await autocommit.execute(stmt)
@@ -196,26 +181,28 @@ class SQLDatasetClient(DatasetClient):
         if not isinstance(data, list):
             data = [data]
 
-        db_items: list[DatasetItemDB] = []
+        db_items: list[dict[str, Any]] = []
 
         for item in data:
             # Serialize with default=str to handle non-serializable types like datetime
             json_item = json.dumps(item, default=str, ensure_ascii=False)
             db_items.append(
-                DatasetItemDB(
-                    dataset_id=self._id,
-                    data=json_item,
-                )
+                {
+                    'dataset_id': self._id,
+                    'data': json_item,
+                }
             )
 
+        stmt = insert(DatasetItemDB).values(db_items)
+
         async with self.get_autocommit_session() as autocommit:
-            autocommit.add_all(db_items)
+            await autocommit.execute(stmt)
+
             await self._update_metadata(
                 autocommit, update_accessed_at=True, update_modified_at=True, delta_item_count=len(data)
             )
 
-    @override
-    async def get_data(
+    def _prepare_get_stmt(
         self,
         *,
         offset: int = 0,
@@ -229,7 +216,7 @@ class SQLDatasetClient(DatasetClient):
         skip_hidden: bool = False,
         flatten: list[str] | None = None,
         view: str | None = None,
-    ) -> DatasetItemsListPage:
+    ) -> Select:
         # Check for unsupported arguments and log a warning if found.
         unsupported_args: dict[str, Any] = {
             'clean': clean,
@@ -257,7 +244,37 @@ class SQLDatasetClient(DatasetClient):
         # Apply ordering by insertion order (order_id)
         stmt = stmt.order_by(DatasetItemDB.order_id.desc()) if desc else stmt.order_by(DatasetItemDB.order_id.asc())
 
-        stmt = stmt.offset(offset).limit(limit)
+        return stmt.offset(offset).limit(limit)
+
+    @override
+    async def get_data(
+        self,
+        *,
+        offset: int = 0,
+        limit: int | None = 999_999_999_999,
+        clean: bool = False,
+        desc: bool = False,
+        fields: list[str] | None = None,
+        omit: list[str] | None = None,
+        unwind: str | None = None,
+        skip_empty: bool = False,
+        skip_hidden: bool = False,
+        flatten: list[str] | None = None,
+        view: str | None = None,
+    ) -> DatasetItemsListPage:
+        stmt = self._prepare_get_stmt(
+            offset=offset,
+            limit=limit,
+            clean=clean,
+            desc=desc,
+            fields=fields,
+            omit=omit,
+            unwind=unwind,
+            skip_empty=skip_empty,
+            skip_hidden=skip_hidden,
+            flatten=flatten,
+            view=view,
+        )
 
         async with self.get_session() as session:
             result = await session.execute(stmt)
@@ -296,47 +313,29 @@ class SQLDatasetClient(DatasetClient):
         skip_hidden: bool = False,
     ) -> AsyncIterator[dict[str, Any]]:
         """Iterate over dataset items with optional filtering and ordering."""
-        # Check for unsupported arguments and log a warning if found.
-        unsupported_args: dict[str, Any] = {
-            'clean': clean,
-            'fields': fields,
-            'omit': omit,
-            'unwind': unwind,
-            'skip_hidden': skip_hidden,
-        }
-        unsupported = {k: v for k, v in unsupported_args.items() if v not in (False, None)}
-
-        if unsupported:
-            logger.warning(
-                f'The arguments {list(unsupported.keys())} of iterate are not supported '
-                f'by the {self.__class__.__name__} client.'
-            )
-
-        stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == self._id)
-
-        if skip_empty:
-            # Skip items that are empty JSON objects
-            stmt = stmt.where(DatasetItemDB.data != '"{}"')
-
-        stmt = stmt.order_by(DatasetItemDB.order_id.desc()) if desc else stmt.order_by(DatasetItemDB.order_id.asc())
-
-        # Apply ordering by insertion order (order_id)
-        stmt = stmt.offset(offset).limit(limit)
+        stmt = self._prepare_get_stmt(
+            offset=offset,
+            limit=limit,
+            clean=clean,
+            desc=desc,
+            fields=fields,
+            omit=omit,
+            unwind=unwind,
+            skip_empty=skip_empty,
+            skip_hidden=skip_hidden,
+        )
 
         async with self.get_session() as session:
-            result = await session.execute(stmt)
-            db_items = result.scalars().all()
+            db_items = await session.stream_scalars(stmt)
+
+            async for db_item in db_items:
+                yield json.loads(db_item.data)
 
             updated = await self._update_metadata(session, update_accessed_at=True)
 
             # Commit updates to the metadata
             if updated:
                 await session.commit()
-
-        # Deserialize and yield items
-        items = [json.loads(db_item.data) for db_item in db_items]
-        for item in items:
-            yield item
 
     async def _update_metadata(
         self,

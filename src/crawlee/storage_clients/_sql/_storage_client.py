@@ -70,6 +70,7 @@ class SQLStorageClient(StorageClient):
 
         # Flag needed to apply optimizations only for default database
         self._default_flag = self._engine is None and self._connection_string is None
+        self._dialect_name: str | None = None
 
     @property
     def engine(self) -> AsyncEngine:
@@ -78,9 +79,9 @@ class SQLStorageClient(StorageClient):
             raise ValueError('Engine is not initialized. Call initialize() before accessing the engine.')
         return self._engine
 
-    def get_default_flag(self) -> bool:
-        """Check if the default database is being used."""
-        return self._default_flag
+    def get_dialect_name(self) -> str | None:
+        """Get the database dialect name."""
+        return self._dialect_name
 
     def get_accessed_modified_update_interval(self) -> timedelta:
         """Get the interval for accessed and modified updates."""
@@ -127,6 +128,7 @@ class SQLStorageClient(StorageClient):
             engine = self._get_or_create_engine(configuration)
             async with engine.begin() as conn:
                 # Set SQLite pragmas for performance and consistency
+                self._dialect_name = engine.dialect.name
                 if self._default_flag:
                     await conn.execute(text('PRAGMA journal_mode=WAL'))  # Better concurrency
                     await conn.execute(text('PRAGMA synchronous=NORMAL'))  # Balanced safety/speed
