@@ -215,9 +215,9 @@ class MemoryRequestQueueClient(RequestQueueClient):
         return None
 
     @override
-    async def get_request(self, request_unique_key: str) -> Request | None:
+    async def get_request(self, unique_key: str) -> Request | None:
         await self._update_metadata(update_accessed_at=True)
-        return self._requests_by_unique_key.get(request_unique_key)
+        return self._requests_by_unique_key.get(unique_key)
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:

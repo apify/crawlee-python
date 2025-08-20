@@ -223,16 +223,16 @@ class RequestQueue(Storage, RequestManager):
         """
         return await self._client.fetch_next_request()
 
-    async def get_request(self, request_unique_key: str) -> Request | None:
+    async def get_request(self, unique_key: str) -> Request | None:
         """Retrieve a specific request from the queue by its ID.
 
         Args:
-            request_unique_key: Unique key of the request to retrieve.
+            unique_key: Unique key of the request to retrieve.
 
         Returns:
             The request with the specified ID, or `None` if no such request exists.
         """
-        return await self._client.get_request(request_unique_key)
+        return await self._client.get_request(unique_key)
 
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         """Mark a request as handled after successful processing.

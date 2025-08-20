@@ -150,7 +150,6 @@ async def test_add_request_string_url(rq: RequestQueue) -> None:
     result = await rq.add_request(url)
 
     # Verify request was added
-    assert result.id is not None
     assert result.unique_key is not None
     assert result.was_already_present is False
     assert result.was_already_handled is False
@@ -168,7 +167,6 @@ async def test_add_request_object(rq: RequestQueue) -> None:
     result = await rq.add_request(request)
 
     # Verify request was added
-    assert result.id is not None
     assert result.unique_key is not None
     assert result.was_already_present is False
     assert result.was_already_handled is False

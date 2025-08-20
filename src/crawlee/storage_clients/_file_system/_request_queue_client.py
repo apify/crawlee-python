@@ -435,13 +435,13 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             )
 
     @override
-    async def get_request(self, request_id: str) -> Request | None:
+    async def get_request(self, unique_key: str) -> Request | None:
         async with self._lock:
-            request_path = self._get_request_path(request_id)
+            request_path = self._get_request_path(unique_key)
             request = await self._parse_request_file(request_path)
 
             if request is None:
-                logger.warning(f'Request with ID "{request_id}" not found in the queue.')
+                logger.warning(f'Request with ID "{unique_key}" not found in the queue.')
                 return None
 
             state = self._state.current_value
@@ -613,16 +613,16 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             self._is_empty_cache = True
             return True
 
-    def _get_request_path(self, request_unique_key: str) -> Path:
+    def _get_request_path(self, unique_key: str) -> Path:
         """Get the path to a specific request file.
 
         Args:
-            request_unique_key: The ID of the request.
+            unique_key: Unique key of the request.
 
         Returns:
             The path to the request file.
         """
-        return self.path_to_rq / f'{self._get_file_base_name_from_unique_key(request_unique_key)}.json'
+        return self.path_to_rq / f'{self._get_file_base_name_from_unique_key(unique_key)}.json'
 
     async def _update_metadata(
         self,
