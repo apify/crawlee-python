@@ -204,6 +204,7 @@ The fields `persist_storage` and `persist_metadata` have been removed from the `
 ### Changes in Request
 
 `Request` objects no longer have `id` field and all its usages have been transferred to `unique_key` field.
+
 ### Changes in HttpResponse
 
 The method `HttpResponse.read` is now asynchronous. This affects all HTTP-based crawlers.
