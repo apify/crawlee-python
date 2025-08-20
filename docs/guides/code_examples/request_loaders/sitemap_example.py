@@ -25,6 +25,8 @@ async def main() -> None:
                 # And mark it as handled.
                 await sitemap_loader.mark_request_as_handled(request)
             else:
+                # If request is None, we give the loader time to get a new URL
+                # from the sitemap.
                 await asyncio.sleep(0.01)
 
 
