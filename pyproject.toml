@@ -72,7 +72,7 @@ otel = [
     "wrapt>=1.17.0",
 ]
 sql = [
-    "sqlalchemy[asyncio]>=2.0.42,<3.0.0",
+    "sqlalchemy[asyncio]~=2.0.0,<3.0.0",
     "aiosqlite>=0.21.0",
 ]
 

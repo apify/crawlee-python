@@ -740,7 +740,7 @@ requires-dist = [
     { name = "pyee", specifier = ">=9.0.0" },
     { name = "rich", marker = "extra == 'cli'", specifier = ">=13.9.0" },
     { name = "scikit-learn", marker = "extra == 'adaptive-crawler'", specifier = ">=1.6.0" },
-    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.0.42,<3.0.0" },
+    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = "~=2.0.0,<3.0.0" },
     { name = "tldextract", specifier = ">=5.1.0" },
     { name = "typer", marker = "extra == 'cli'", specifier = ">=0.12.0" },
     { name = "typing-extensions", specifier = ">=4.1.0" },
