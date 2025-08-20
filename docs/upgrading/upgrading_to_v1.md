@@ -5,7 +5,6 @@ title: Upgrading to v1
 
 This page summarizes the breaking changes between Crawlee for Python v0.6 and v1.0.
 
-
 ## Terminology change: "browser" in different contexts
 
 The word "browser" is now used distinctly in two contexts:
