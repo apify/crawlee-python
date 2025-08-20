@@ -1300,8 +1300,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
         self._context_result_map[context] = result
 
-        statistics_id = request.unique_key
-        self._statistics.record_request_processing_start(statistics_id)
+        self._statistics.record_request_processing_start(request.unique_key)
 
         try:
             request.state = RequestState.REQUEST_HANDLER
@@ -1328,7 +1327,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             if context.session and context.session.is_usable:
                 context.session.mark_good()
 
-            self._statistics.record_request_processing_finish(statistics_id)
+            self._statistics.record_request_processing_finish(request.unique_key)
 
         except RequestCollisionError as request_error:
             context.request.no_retry = True
@@ -1374,7 +1373,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 )
 
                 await self._handle_failed_request(context, session_error)
-                self._statistics.record_request_processing_failure(statistics_id)
+                self._statistics.record_request_processing_failure(request.unique_key)
 
         except ContextPipelineInterruptedError as interrupted_error:
             self._logger.debug('The context pipeline was interrupted', exc_info=interrupted_error)

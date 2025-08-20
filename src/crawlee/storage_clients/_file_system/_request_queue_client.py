@@ -44,16 +44,16 @@ class RequestQueueState(BaseModel):
     """Counter for forefront request ordering."""
 
     forefront_requests: dict[str, int] = {}
-    """Mapping of forefront request IDs to their sequence numbers."""
+    """Mapping of forefront request unique keys to their sequence numbers."""
 
     regular_requests: dict[str, int] = {}
-    """Mapping of regular request IDs to their sequence numbers."""
+    """Mapping of regular request unique keys to their sequence numbers."""
 
     in_progress_requests: set[str] = set()
-    """Set of request IDs currently being processed."""
+    """Set of request unique keys currently being processed."""
 
     handled_requests: set[str] = set()
-    """Set of request IDs that have been handled."""
+    """Set of request unique keys that have been handled."""
 
 
 class FileSystemRequestQueueClient(RequestQueueClient):
@@ -817,11 +817,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         """Generate a deterministic file name for a unique_key.
 
         Args:
-            unique_key: The unique key to convert into a request ID.
-            request_id_length: The length of the request ID.
+            unique_key: Unique key to be used to generate filename.
 
         Returns:
-            A URL-safe, truncated request ID based on the unique key.
+            A file name based on the unique_key.
         """
         # hexdigest produces filenames compliant strings
         hashed_key = sha256(unique_key.encode('utf-8')).hexdigest()
