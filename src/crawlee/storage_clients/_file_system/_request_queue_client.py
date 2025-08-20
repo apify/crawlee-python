@@ -441,7 +441,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             request = await self._parse_request_file(request_path)
 
             if request is None:
-                logger.warning(f'Request with ID "{unique_key}" not found in the queue.')
+                logger.warning(f'Request with unique key "{unique_key}" not found in the queue.')
                 return None
 
             state = self._state.current_value
