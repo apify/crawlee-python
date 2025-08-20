@@ -5,6 +5,9 @@ title: Upgrading to v1
 
 This page summarizes the breaking changes between Crawlee for Python v0.6 and v1.0.
 
+## Removed `id` field from `Request`
+`Request` objects no longer have `id` field and all its usages have been transferred to `unique_key` field.
+
 ## Terminology change: "browser" in different contexts
 
 The word "browser" is now used distinctly in two contexts:
