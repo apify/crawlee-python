@@ -131,7 +131,7 @@ class KeyValueStoreRecordDB(Base):
     __tablename__ = 'kvs_record'
 
     metadata_id: Mapped[str] = mapped_column(
-        String(255), ForeignKey('kvs_metadata.id', ondelete='CASCADE'), primary_key=True, index=True
+        String(20), ForeignKey('kvs_metadata.id', ondelete='CASCADE'), primary_key=True, index=True
     )
     """Foreign key to metadata key-value store record."""
 
@@ -141,7 +141,7 @@ class KeyValueStoreRecordDB(Base):
     value: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     """Value stored as binary data to support any content type."""
 
-    content_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(50), nullable=False)
     """MIME type for proper value deserialization."""
 
     size: Mapped[int | None] = mapped_column(Integer, nullable=False, default=0)
