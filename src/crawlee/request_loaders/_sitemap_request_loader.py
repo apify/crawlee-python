@@ -153,15 +153,15 @@ class SitemapRequestLoader(RequestLoader):
             url = await self._url_queue.get()
 
             request = Request.from_url(url)
-            self._in_progress.add(request.id)
+            self._in_progress.add(request.unique_key)
             return request
 
         return None
 
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         """Mark a request as successfully handled."""
-        if request.id in self._in_progress:
-            self._in_progress.remove(request.id)
+        if request.unique_key in self._in_progress:
+            self._in_progress.remove(request.unique_key)
             self._handled_count += 1
         return None
 

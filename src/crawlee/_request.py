@@ -11,7 +11,7 @@ from yarl import URL
 from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, JsonSerializable
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
-from crawlee._utils.requests import compute_unique_key, unique_key_to_request_id
+from crawlee._utils.requests import compute_unique_key
 from crawlee._utils.urls import validate_http_url
 
 if TYPE_CHECKING:
@@ -165,10 +165,6 @@ class Request(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    id: str
-    """A unique identifier for the request. Note that this is not used for deduplication, and should not be confused
-    with `unique_key`."""
-
     unique_key: Annotated[str, Field(alias='uniqueKey')]
     """A unique key identifying the request. Two requests with the same `unique_key` are considered as pointing
     to the same URL.
@@ -239,7 +235,6 @@ class Request(BaseModel):
         label: str | None = None,
         session_id: str | None = None,
         unique_key: str | None = None,
-        id: str | None = None,
         keep_url_fragment: bool = False,
         use_extended_unique_key: bool = False,
         always_enqueue: bool = False,
@@ -264,8 +259,6 @@ class Request(BaseModel):
                 raised.
             unique_key: A unique key identifying the request. If not provided, it is automatically computed based on
                 the URL and other parameters. Requests with the same `unique_key` are treated as identical.
-            id: A unique identifier for the request. If not provided, it is automatically generated from the
-                `unique_key`.
             keep_url_fragment: Determines whether the URL fragment (e.g., `#section`) should be included in
                 the `unique_key` computation. This is only relevant when `unique_key` is not provided.
             use_extended_unique_key: Determines whether to include the HTTP method, ID Session and payload in the
@@ -296,12 +289,9 @@ class Request(BaseModel):
         if always_enqueue:
             unique_key = f'{unique_key}_{crypto_random_object_id()}'
 
-        id = id or unique_key_to_request_id(unique_key)
-
         request = cls(
             url=url,
             unique_key=unique_key,
-            id=id,
             method=method,
             headers=headers,
             payload=payload,
