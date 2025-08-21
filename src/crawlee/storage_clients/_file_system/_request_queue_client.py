@@ -112,12 +112,15 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self._is_empty_cache: bool | None = None
         """Cache for is_empty result: None means unknown, True/False is cached state."""
 
+        from crawlee.storage_clients import FileSystemStorageClient  # noqa: PLC0415 , avoid circular imports
+
         self._state = RecoverableState[RequestQueueState](
             default_state=RequestQueueState(),
             persist_state_key='request_queue_state',
             persistence_enabled=True,
             persist_state_kvs_name=f'__RQ_STATE_{self._metadata.id}',
             logger=logger,
+            storage_client=FileSystemStorageClient(),  # It makes no sense to persist to different client.
         )
         """Recoverable state to maintain request ordering, in-progress status, and handled status."""
 
