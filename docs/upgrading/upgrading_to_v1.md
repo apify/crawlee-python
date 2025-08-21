@@ -102,6 +102,7 @@ Some older methods have been removed or replaced:
 
 - `from_storage_object` - removed; use the `open` method with either a `name` or `id` instead.
 - `get_info` and `storage_object` - replaced by the new `get_metadata` method.
+- `get_request` has argument `unique_key` instead of `request_id` as the `id` field was removed from the `Request`.
 - `set_metadata` method has been removed.
 
 Some changes in the related model classes:
@@ -199,6 +200,10 @@ We drop support for Python 3.9. The minimum supported version is now Python 3.10
 ### Changes in Configuration
 
 The fields `persist_storage` and `persist_metadata` have been removed from the `Configuration`. Persistence is now determined only by which storage client class you use.
+
+### Changes in Request
+
+`Request` objects no longer have `id` field and all its usages have been transferred to `unique_key` field.
 
 ### Changes in HttpResponse
 
