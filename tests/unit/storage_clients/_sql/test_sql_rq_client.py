@@ -123,7 +123,7 @@ async def test_request_records_persistence(rq_client: SQLRequestQueueClient) -> 
     metadata_client = await rq_client.get_metadata()
 
     async with rq_client.get_session() as session:
-        stmt = select(RequestDB).where(RequestDB.queue_id == metadata_client.id)
+        stmt = select(RequestDB).where(RequestDB.metadata_id == metadata_client.id)
         result = await session.execute(stmt)
         db_requests = result.scalars().all()
         assert len(db_requests) == 3
@@ -137,7 +137,7 @@ async def test_drop_removes_records(rq_client: SQLRequestQueueClient) -> None:
     await rq_client.add_batch_of_requests([Request.from_url('https://example.com')])
     metadata = await rq_client.get_metadata()
     async with rq_client.get_session() as session:
-        stmt = select(RequestDB).where(RequestDB.queue_id == metadata.id)
+        stmt = select(RequestDB).where(RequestDB.metadata_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 1
@@ -145,7 +145,7 @@ async def test_drop_removes_records(rq_client: SQLRequestQueueClient) -> None:
     await rq_client.drop()
 
     async with rq_client.get_session() as session:
-        stmt = select(RequestDB).where(RequestDB.queue_id == metadata.id)
+        stmt = select(RequestDB).where(RequestDB.metadata_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 0

@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
-from datetime import datetime, timezone
+from hashlib import sha256
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy import delete, select, text, update
+from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only
 from typing_extensions import override
 
 from crawlee import Request
-from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.storage_clients._base import RequestQueueClient
 from crawlee.storage_clients.models import (
     AddRequestsResponse,
@@ -50,17 +49,27 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
     - `request_queue_metadata` table: Contains queue metadata (id, name, timestamps, request counts, multi-client flag)
     - `request` table: Contains individual requests with JSON data, unique keys for deduplication, sequence numbers for
         ordering, and processing status flags
+    - `request_queue_state` table: Maintains counters for sequence numbers to ensure proper ordering of requests.
 
     Requests are serialized to JSON for storage and maintain proper ordering through sequence
     numbers. The implementation provides concurrent access safety through transaction
     handling, locking mechanisms, and optimized database indexes for efficient querying.
     """
 
-    _DEFAULT_NAME_DB = 'default'
+    _DEFAULT_NAME = 'default'
     """Default dataset name used when no name is provided."""
 
     _MAX_REQUESTS_IN_CACHE = 1000
     """Maximum number of requests to keep in cache for faster access."""
+
+    _METADATA_TABLE = RequestQueueMetadataDB
+    """SQLAlchemy model for request queue metadata."""
+
+    _ITEM_TABLE = RequestDB
+    """SQLAlchemy model for request items."""
+
+    _CLIENT_TYPE = 'Request queue'
+    """Human-readable client type for error messages."""
 
     def __init__(
         self,
@@ -72,7 +81,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
 
         Preferably use the `SQLRequestQueueClient.open` class method to create a new instance.
         """
-        self._id = id
+        super().__init__(id=id, storage_client=storage_client)
 
         self._request_cache: deque[Request] = deque()
         """Cache for requests: ordered by sequence number."""
@@ -86,20 +95,13 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         self._is_empty_cache: bool | None = None
         """Cache for is_empty result: None means unknown, True/False is cached state."""
 
-        self._last_accessed_at: datetime | None = None
-        self._last_modified_at: datetime | None = None
-        self._accessed_modified_update_interval = storage_client.get_accessed_modified_update_interval()
-
-        self._storage_client = storage_client
-        """The storage client used to access the SQL database."""
-
         self._lock = asyncio.Lock()
 
     async def _get_state(self, session: AsyncSession) -> RequestQueueStateDB:
         """Get the current state of the request queue."""
         orm_state: RequestQueueStateDB | None = await session.get(RequestQueueStateDB, self._id)
         if not orm_state:
-            orm_state = RequestQueueStateDB(queue_id=self._id)
+            orm_state = RequestQueueStateDB(metadata_id=self._id)
             session.add(orm_state)
             await session.flush()
         return orm_state
@@ -108,12 +110,8 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
     async def get_metadata(self) -> RequestQueueMetadata:
         """Get the metadata for this request queue."""
         # The database is a single place of truth
-        async with self.get_session() as session:
-            orm_metadata: RequestQueueMetadataDB | None = await session.get(RequestQueueMetadataDB, self._id)
-            if not orm_metadata:
-                raise ValueError(f'Request queue with ID "{self._id}" not found.')
-
-            return RequestQueueMetadata.model_validate(orm_metadata)
+        metadata = await self._get_metadata(RequestQueueMetadata)
+        return cast('RequestQueueMetadata', metadata)
 
     @classmethod
     async def open(
@@ -140,63 +138,18 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         Raises:
             ValueError: If a queue with the specified ID is not found.
         """
-        async with storage_client.create_session() as session:
-            orm_metadata: RequestQueueMetadataDB | None = None
-            if id:
-                orm_metadata = await session.get(RequestQueueMetadataDB, id)
-                if not orm_metadata:
-                    raise ValueError(f'Request queue with ID "{id}" not found.')
-            else:
-                # Try to find by name
-                search_name = name or cls._DEFAULT_NAME_DB
-                stmt = select(RequestQueueMetadataDB).where(RequestQueueMetadataDB.name == search_name)
-                result = await session.execute(stmt)
-                orm_metadata = result.scalar_one_or_none()
-            if orm_metadata:
-                client = cls(
-                    id=orm_metadata.id,
-                    storage_client=storage_client,
-                )
-                await client._update_metadata(session, update_accessed_at=True)
-            else:
-                now = datetime.now(timezone.utc)
-                metadata = RequestQueueMetadata(
-                    id=crypto_random_object_id(),
-                    name=name,
-                    created_at=now,
-                    accessed_at=now,
-                    modified_at=now,
-                    had_multiple_clients=False,
-                    handled_request_count=0,
-                    pending_request_count=0,
-                    total_request_count=0,
-                )
-
-                client = cls(
-                    id=metadata.id,
-                    storage_client=storage_client,
-                )
-                session.add(RequestQueueMetadataDB(**metadata.model_dump()))
-
-            try:
-                # Commit the insert or update metadata to the database
-                await session.commit()
-            except SQLAlchemyError:
-                # Attempt to open simultaneously by different clients.
-                # The commit that created the record has already been executed, make rollback and get by name.
-                await session.rollback()
-                search_name = name or cls._DEFAULT_NAME_DB
-                stmt = select(RequestQueueMetadataDB).where(RequestQueueMetadataDB.name == search_name)
-                result = await session.execute(stmt)
-                orm_metadata = result.scalar_one_or_none()
-                if not orm_metadata:
-                    raise ValueError(f'Request queue with Name "{search_name}" not found.') from None
-                client = cls(
-                    id=orm_metadata.id,
-                    storage_client=storage_client,
-                )
-
-        return client
+        return await cls._safely_open(
+            id=id,
+            name=name,
+            storage_client=storage_client,
+            metadata_model=RequestQueueMetadata,
+            extra_metadata_fields={
+                'had_multiple_clients': False,
+                'handled_request_count': 0,
+                'pending_request_count': 0,
+                'total_request_count': 0,
+            },
+        )
 
     @override
     async def drop(self) -> None:
@@ -204,13 +157,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
 
         This operation is irreversible. Uses CASCADE deletion to remove all related records.
         """
-        stmt = delete(RequestQueueMetadataDB).where(RequestQueueMetadataDB.id == self._id)
-        async with self.get_autocommit_session() as autocommit:
-            if self._storage_client.get_dialect_name() == 'sqlite':
-                # foreign_keys=ON is set at the connection level. Required for cascade deletion.
-                await autocommit.execute(text('PRAGMA foreign_keys=ON'))
-            # Delete the request queue metadata (cascade will delete requests)
-            await autocommit.execute(stmt)
+        await self._drop()
 
         self._request_cache.clear()
         self._request_cache_needs_refresh = True
@@ -219,18 +166,14 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
     @override
     async def purge(self) -> None:
         """Purge all requests from this request queue."""
-        stmt = delete(RequestDB).where(RequestDB.queue_id == self._id)
-        async with self.get_autocommit_session() as autocommit:
-            # Delete all requests for this queue
-            await autocommit.execute(stmt)
-
-            await self._update_metadata(
-                autocommit,
-                new_pending_request_count=0,
-                new_handled_request_count=0,
-                update_modified_at=True,
-                update_accessed_at=True,
-            )
+        await self._purge(
+            metadata_kwargs={
+                'update_accessed_at': True,
+                'update_modified_at': True,
+                'new_pending_request_count': 0,
+                'new_handled_request_count': 0,
+            }
+        )
 
         self._is_empty_cache = None
 
@@ -257,36 +200,39 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
 
         # Deduplicate requests by unique_key upfront
         unique_requests = {}
+        unique_key_by_request_id = {}
         for req in requests:
             if req.unique_key not in unique_requests:
-                unique_requests[req.unique_key] = req
+                request_id = self._get_int_id_from_unique_key(req.unique_key)
+                unique_requests[request_id] = req
+                unique_key_by_request_id[request_id] = req.unique_key
 
         # Get existing requests by unique keys
         stmt = (
-            select(RequestDB)
-            .where(RequestDB.queue_id == self._id, RequestDB.unique_key.in_(set(unique_requests.keys())))
+            select(self._ITEM_TABLE)
+            .where(
+                self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id.in_(set(unique_requests.keys()))
+            )
             .options(
                 load_only(
-                    RequestDB.request_id,
-                    RequestDB.unique_key,
-                    RequestDB.is_handled,
+                    self._ITEM_TABLE.request_id,
+                    self._ITEM_TABLE.is_handled,
                 )
             )
         )
 
         async with self.get_session() as session:
             result = await session.execute(stmt)
-            existing_requests = {req.unique_key: req for req in result.scalars()}
+            existing_requests = {req.request_id: req for req in result.scalars()}
             state = await self._get_state(session)
             insert_values: list[dict] = []
-            for unique_key, request in unique_requests.items():
-                existing_req_db = existing_requests.get(unique_key)
+            for request_id, request in unique_requests.items():
+                existing_req_db = existing_requests.get(request_id)
                 if existing_req_db is None or not existing_req_db.is_handled:
                     value = {
-                        'request_id': request.id,
-                        'queue_id': self._id,
+                        'request_id': request_id,
+                        'metadata_id': self._id,
                         'data': request.model_dump_json(),
-                        'unique_key': request.unique_key,
                         'is_handled': False,
                     }
                     if forefront:
@@ -303,7 +249,6 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
                         delta_pending_request_count += 1
                         processed_requests.append(
                             ProcessedRequest(
-                                id=request.id,
                                 unique_key=request.unique_key,
                                 was_already_present=False,
                                 was_already_handled=False,
@@ -312,7 +257,6 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
                     else:
                         processed_requests.append(
                             ProcessedRequest(
-                                id=request.id,
                                 unique_key=request.unique_key,
                                 was_already_present=True,
                                 was_already_handled=existing_req_db.is_handled,
@@ -323,8 +267,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
                     # Already handled request, skip adding
                     processed_requests.append(
                         ProcessedRequest(
-                            id=existing_req_db.request_id,
-                            unique_key=unique_key,
+                            unique_key=unique_key_by_request_id[request_id],
                             was_already_present=True,
                             was_already_handled=True,
                         )
@@ -335,14 +278,14 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
                     # If the request already exists in the database, we update the sequence_number by shifting request
                     # to the left.
                     upsert_stmt = self.build_upsert_stmt(
-                        RequestDB,
+                        self._ITEM_TABLE,
                         insert_values,
                         update_columns=['sequence_number'],
                     )
                     await session.execute(upsert_stmt)
                 else:
                     # If the request already exists in the database, we ignore this request when inserting.
-                    insert_stmt_with_ignore = self.build_insert_stmt_with_ignore(RequestDB, insert_values)
+                    insert_stmt_with_ignore = self.build_insert_stmt_with_ignore(self._ITEM_TABLE, insert_values)
                     await session.execute(insert_stmt_with_ignore)
 
             await self._update_metadata(
@@ -392,14 +335,17 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         raise NotImplementedError('Batch addition is not supported for this database dialect.')
 
     @override
-    async def get_request(self, request_id: str) -> Request | None:
-        stmt = select(RequestDB).where(RequestDB.queue_id == self._id, RequestDB.request_id == request_id)
+    async def get_request(self, unique_key: str) -> Request | None:
+        request_id = self._get_int_id_from_unique_key(unique_key)
+        stmt = select(self._ITEM_TABLE).where(
+            self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id
+        )
         async with self.get_session() as session:
             result = await session.execute(stmt)
             request_db = result.scalar_one_or_none()
 
             if request_db is None:
-                logger.warning(f'Request with ID "{request_id}" not found in the queue.')
+                logger.warning(f'Request with ID "{unique_key}" not found in the queue.')
                 return None
 
             updated = await self._update_metadata(session, update_accessed_at=True)
@@ -410,7 +356,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
 
         request = Request.model_validate_json(request_db.data)
 
-        self.in_progress_requests.add(request.id)
+        self.in_progress_requests.add(request.unique_key)
 
         return request
 
@@ -428,9 +374,9 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
             candidate = self._request_cache.popleft()
 
             # Only check local state
-            if candidate.id not in self.in_progress_requests:
+            if candidate.unique_key not in self.in_progress_requests:
                 next_request = candidate
-                self.in_progress_requests.add(next_request.id)
+                self.in_progress_requests.add(next_request.unique_key)
 
         if not self._request_cache:
             self._is_empty_cache = None
@@ -441,14 +387,16 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         self._is_empty_cache = None
 
-        if request.id not in self.in_progress_requests:
-            logger.warning(f'Marking request {request.id} as handled that is not in progress.')
+        if request.unique_key not in self.in_progress_requests:
+            logger.warning(f'Marking request {request.unique_key} as handled that is not in progress.')
             return None
+
+        request_id = self._get_int_id_from_unique_key(request.unique_key)
 
         # Update request in DB
         stmt = (
-            update(RequestDB)
-            .where(RequestDB.queue_id == self._id, RequestDB.request_id == request.id)
+            update(self._ITEM_TABLE)
+            .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id)
             .values(is_handled=True)
         )
 
@@ -456,7 +404,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
             result = await session.execute(stmt)
 
             if result.rowcount == 0:
-                logger.warning(f'Request {request.id} not found in database.')
+                logger.warning(f'Request {request.unique_key} not found in database.')
                 return None
 
             await self._update_metadata(
@@ -473,10 +421,9 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
                 await session.rollback()
                 return None
 
-        self.in_progress_requests.discard(request.id)
+        self.in_progress_requests.discard(request.unique_key)
 
         return ProcessedRequest(
-            id=request.id,
             unique_key=request.unique_key,
             was_already_present=True,
             was_already_handled=True,
@@ -491,9 +438,11 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
     ) -> ProcessedRequest | None:
         self._is_empty_cache = None
 
-        if request.id not in self.in_progress_requests:
-            logger.info(f'Reclaiming request {request.id} that is not in progress.')
+        if request.unique_key not in self.in_progress_requests:
+            logger.info(f'Reclaiming request {request.unique_key} that is not in progress.')
             return None
+
+        request_id = self._get_int_id_from_unique_key(request.unique_key)
 
         async with self.get_autocommit_session() as autocommit:
             state = await self._get_state(autocommit)
@@ -507,21 +456,21 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
                 state.sequence_counter += 1
 
             stmt = (
-                update(RequestDB)
-                .where(RequestDB.queue_id == self._id, RequestDB.request_id == request.id)
+                update(self._ITEM_TABLE)
+                .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id)
                 .values(sequence_number=new_sequence)
             )
 
             result = await autocommit.execute(stmt)
 
             if result.rowcount == 0:
-                logger.warning(f'Request {request.id} not found in database.')
+                logger.warning(f'Request {request.unique_key} not found in database.')
                 return None
 
             await self._update_metadata(autocommit, update_modified_at=True, update_accessed_at=True)
 
         # Remove from in-progress
-        self.in_progress_requests.discard(request.id)
+        self.in_progress_requests.discard(request.unique_key)
 
         # Invalidate cache or add to cache
         if forefront:
@@ -531,7 +480,6 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
             self._request_cache.append(request)
 
         return ProcessedRequest(
-            id=request.id,
             unique_key=request.unique_key,
             was_already_present=True,
             was_already_handled=False,
@@ -549,7 +497,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
 
         # Check database for unhandled requests
         async with self.get_session() as session:
-            metadata_orm = await session.get(RequestQueueMetadataDB, self._id)
+            metadata_orm = await session.get(self._METADATA_TABLE, self._id)
             if not metadata_orm:
                 raise ValueError(f'Request queue with ID "{self._id}" not found.')
 
@@ -569,13 +517,13 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         async with self.get_session() as session:
             # Simple query - get unhandled requests not in progress
             stmt = (
-                select(RequestDB)
+                select(self._ITEM_TABLE)
                 .where(
-                    RequestDB.queue_id == self._id,
-                    RequestDB.is_handled == False,  # noqa: E712
-                    RequestDB.request_id.notin_(self.in_progress_requests),
+                    self._ITEM_TABLE.metadata_id == self._id,
+                    self._ITEM_TABLE.is_handled == False,  # noqa: E712
+                    self._ITEM_TABLE.request_id.notin_(self.in_progress_requests),
                 )
-                .order_by(RequestDB.sequence_number.asc())
+                .order_by(self._ITEM_TABLE.sequence_number.asc())
                 .limit(self._MAX_REQUESTS_IN_CACHE)
             )
 
@@ -602,6 +550,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         update_had_multiple_clients: bool = False,
         update_accessed_at: bool = False,
         update_modified_at: bool = False,
+        **_kwargs: dict[str, Any],
     ) -> bool:
         """Update the request queue metadata in the database.
 
@@ -617,20 +566,10 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
             update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
             update_modified_at: If True, update the `modified_at` timestamp to the current time.
         """
-        now = datetime.now(timezone.utc)
-        values_to_set: dict[str, Any] = {}
-
-        if update_accessed_at and (
-            self._last_accessed_at is None or (now - self._last_accessed_at) > self._accessed_modified_update_interval
-        ):
-            values_to_set['accessed_at'] = now
-            self._last_accessed_at = now
-
-        if update_modified_at and (
-            self._last_modified_at is None or (now - self._last_modified_at) > self._accessed_modified_update_interval
-        ):
-            values_to_set['modified_at'] = now
-            self._last_modified_at = now
+        values_to_set = self._default_update_metadata(
+            update_accessed_at=update_accessed_at,
+            update_modified_at=update_modified_at,
+        )
 
         if update_had_multiple_clients:
             values_to_set['had_multiple_clients'] = True
@@ -639,26 +578,88 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
             values_to_set['handled_request_count'] = new_handled_request_count
         elif delta_handled_request_count is not None:
             values_to_set['handled_request_count'] = (
-                RequestQueueMetadataDB.handled_request_count + delta_handled_request_count
+                self._METADATA_TABLE.handled_request_count + delta_handled_request_count
             )
 
         if new_pending_request_count is not None:
             values_to_set['pending_request_count'] = new_pending_request_count
         elif delta_pending_request_count is not None:
             values_to_set['pending_request_count'] = (
-                RequestQueueMetadataDB.pending_request_count + delta_pending_request_count
+                self._METADATA_TABLE.pending_request_count + delta_pending_request_count
             )
 
         if new_total_request_count is not None:
             values_to_set['total_request_count'] = new_total_request_count
         elif delta_total_request_count is not None:
-            values_to_set['total_request_count'] = (
-                RequestQueueMetadataDB.total_request_count + delta_total_request_count
-            )
+            values_to_set['total_request_count'] = self._METADATA_TABLE.total_request_count + delta_total_request_count
 
         if values_to_set:
-            stmt = update(RequestQueueMetadataDB).where(RequestQueueMetadataDB.id == self._id).values(**values_to_set)
+            stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id).values(**values_to_set)
             await session.execute(stmt)
             return True
 
         return False
+
+    def _specific_update_metadata(
+        self,
+        new_handled_request_count: int | None = None,
+        new_pending_request_count: int | None = None,
+        new_total_request_count: int | None = None,
+        delta_handled_request_count: int | None = None,
+        delta_pending_request_count: int | None = None,
+        delta_total_request_count: int | None = None,
+        *,
+        update_had_multiple_clients: bool = False,
+        **_kwargs: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Update the request queue metadata in the database.
+
+        Args:
+            session: The SQLAlchemy session to use for database operations.
+            new_handled_request_count: If provided, update the handled_request_count to this value.
+            new_pending_request_count: If provided, update the pending_request_count to this value.
+            new_total_request_count: If provided, update the total_request_count to this value.
+            delta_handled_request_count: If provided, add this value to the handled_request_count.
+            delta_pending_request_count: If provided, add this value to the pending_request_count.
+            delta_total_request_count: If provided, add this value to the total_request_count.
+            update_had_multiple_clients: If True, set had_multiple_clients to True.
+        """
+        values_to_set: dict[str, Any] = {}
+
+        if update_had_multiple_clients:
+            values_to_set['had_multiple_clients'] = True
+
+        if new_handled_request_count is not None:
+            values_to_set['handled_request_count'] = new_handled_request_count
+        elif delta_handled_request_count is not None:
+            values_to_set['handled_request_count'] = (
+                self._METADATA_TABLE.handled_request_count + delta_handled_request_count
+            )
+
+        if new_pending_request_count is not None:
+            values_to_set['pending_request_count'] = new_pending_request_count
+        elif delta_pending_request_count is not None:
+            values_to_set['pending_request_count'] = (
+                self._METADATA_TABLE.pending_request_count + delta_pending_request_count
+            )
+
+        if new_total_request_count is not None:
+            values_to_set['total_request_count'] = new_total_request_count
+        elif delta_total_request_count is not None:
+            values_to_set['total_request_count'] = self._METADATA_TABLE.total_request_count + delta_total_request_count
+
+        return values_to_set
+
+    @staticmethod
+    def _get_int_id_from_unique_key(unique_key: str) -> int:
+        """Generate a deterministic integer ID for a unique_key.
+
+        Args:
+            unique_key: Unique key to be used to generate ID.
+
+        Returns:
+            An integer ID based on the unique_key.
+        """
+        hashed_key = sha256(unique_key.encode('utf-8')).hexdigest()
+        name_length = 15
+        return int(hashed_key[:name_length], 16)

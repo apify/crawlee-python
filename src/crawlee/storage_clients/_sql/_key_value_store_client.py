@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy import delete, insert, select, text, update
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy import delete, insert, select, update
+from sqlalchemy.exc import IntegrityError
 from typing_extensions import override
 
-from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import infer_mime_type
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
@@ -19,8 +17,6 @@ from ._db_models import KeyValueStoreMetadataDB, KeyValueStoreRecordDB
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-
-    from sqlalchemy.ext.asyncio import AsyncSession
 
     from ._storage_client import SQLStorageClient
 
@@ -47,11 +43,20 @@ class SQLKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
 
     All database operations are wrapped in transactions with proper error handling and rollback
     mechanisms. The client supports atomic upsert operations and handles race conditions when
-    multiple clients access the same store using composite primary keys (kvs_id, key).
+    multiple clients access the same store using composite primary keys (metadata_id, key).
     """
 
-    _DEFAULT_NAME_DB = 'default'
+    _DEFAULT_NAME = 'default'
     """Default dataset name used when no name is provided."""
+
+    _METADATA_TABLE = KeyValueStoreMetadataDB
+    """SQLAlchemy model for key-value store metadata."""
+
+    _ITEM_TABLE = KeyValueStoreRecordDB
+    """SQLAlchemy model for key-value store items."""
+
+    _CLIENT_TYPE = 'Key-value store'
+    """Human-readable client type for error messages."""
 
     def __init__(
         self,
@@ -63,26 +68,14 @@ class SQLKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
 
         Preferably use the `SQLKeyValueStoreClient.open` class method to create a new instance.
         """
-        self._id = id
-
-        self._storage_client = storage_client
-        """The storage client used to access the SQL database."""
-
-        # Time tracking to reduce database writes during frequent operation
-        self._last_accessed_at: datetime | None = None
-        self._last_modified_at: datetime | None = None
-        self._accessed_modified_update_interval = storage_client.get_accessed_modified_update_interval()
+        super().__init__(id=id, storage_client=storage_client)
 
     @override
     async def get_metadata(self) -> KeyValueStoreMetadata:
         """Get the metadata for this key-value store."""
         # The database is a single place of truth
-        async with self.get_session() as session:
-            orm_metadata: KeyValueStoreMetadataDB | None = await session.get(KeyValueStoreMetadataDB, self._id)
-            if not orm_metadata:
-                raise ValueError(f'Key-value store with ID "{self._id}" not found.')
-
-            return KeyValueStoreMetadata.model_validate(orm_metadata)
+        metadata = await self._get_metadata(KeyValueStoreMetadata)
+        return cast('KeyValueStoreMetadata', metadata)
 
     @classmethod
     async def open(
@@ -109,56 +102,13 @@ class SQLKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
         Raises:
             ValueError: If a store with the specified ID is not found, or if metadata is invalid.
         """
-        async with storage_client.create_session() as session:
-            orm_metadata: KeyValueStoreMetadataDB | None = None
-            if id:
-                orm_metadata = await session.get(KeyValueStoreMetadataDB, id)
-                if not orm_metadata:
-                    raise ValueError(f'Key-value store with ID "{id}" not found.')
-            else:
-                search_name = name or cls._DEFAULT_NAME_DB
-                stmt = select(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.name == search_name)
-                result = await session.execute(stmt)
-                orm_metadata = result.scalar_one_or_none()
-            if orm_metadata:
-                client = cls(
-                    id=orm_metadata.id,
-                    storage_client=storage_client,
-                )
-                await client._update_metadata(session, update_accessed_at=True)
-            else:
-                now = datetime.now(timezone.utc)
-                metadata = KeyValueStoreMetadata(
-                    id=crypto_random_object_id(),
-                    name=name,
-                    created_at=now,
-                    accessed_at=now,
-                    modified_at=now,
-                )
-                client = cls(
-                    id=metadata.id,
-                    storage_client=storage_client,
-                )
-                session.add(KeyValueStoreMetadataDB(**metadata.model_dump()))
-
-            try:
-                # Commit the insert or update metadata to the database
-                await session.commit()
-            except SQLAlchemyError:
-                # Attempt to open simultaneously by different clients.
-                # The commit that created the record has already been executed, make rollback and get by name.
-                await session.rollback()
-                search_name = name or cls._DEFAULT_NAME_DB
-                stmt = select(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.name == search_name)
-                result = await session.execute(stmt)
-                orm_metadata = result.scalar_one_or_none()
-                if not orm_metadata:
-                    raise ValueError(f'Key-value store with Name "{search_name}" not found.') from None
-                client = cls(
-                    id=orm_metadata.id,
-                    storage_client=storage_client,
-                )
-            return client
+        return await cls._safely_open(
+            id=id,
+            name=name,
+            storage_client=storage_client,
+            metadata_model=KeyValueStoreMetadata,
+            extra_metadata_fields={},
+        )
 
     @override
     async def drop(self) -> None:
@@ -166,21 +116,12 @@ class SQLKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
 
         This operation is irreversible. Uses CASCADE deletion to remove all related records.
         """
-        stmt = delete(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.id == self._id)
-        async with self.get_autocommit_session() as autocommit:
-            if self._storage_client.get_dialect_name() == 'sqlite':
-                # foreign_keys=ON is set at the connection level. Required for cascade deletion.
-                await autocommit.execute(text('PRAGMA foreign_keys=ON'))
-            await autocommit.execute(stmt)
+        await self._drop()
 
     @override
     async def purge(self) -> None:
         """Remove all items from this key-value store while keeping the key-value store structure."""
-        stmt = delete(KeyValueStoreRecordDB).filter_by(kvs_id=self._id)
-        async with self.get_autocommit_session() as autocommit:
-            await autocommit.execute(stmt)
-
-            await self._update_metadata(autocommit, update_accessed_at=True, update_modified_at=True)
+        await self._purge(metadata_kwargs={'update_accessed_at': True, 'update_modified_at': True})
 
     @override
     async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
@@ -205,7 +146,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
 
         size = len(value_bytes)
         insert_values = {
-            'kvs_id': self._id,
+            'metadata_id': self._id,
             'key': key,
             'value': value_bytes,
             'content_type': content_type,
@@ -214,20 +155,20 @@ class SQLKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
         try:
             # Trying to build a statement for Upsert
             upsert_stmt = self.build_upsert_stmt(
-                KeyValueStoreRecordDB,
+                self._ITEM_TABLE,
                 insert_values=insert_values,
                 update_columns=['value', 'content_type', 'size'],
-                conflict_cols=['kvs_id', 'key'],
+                conflict_cols=['metadata_id', 'key'],
             )
         except NotImplementedError:
             # If it is not possible to build an upsert for the current dialect, build an update + insert.
             upsert_stmt = None
             update_stmt = (
-                update(KeyValueStoreRecordDB)
-                .where(KeyValueStoreRecordDB.kvs_id == self._id, KeyValueStoreRecordDB.key == key)
+                update(self._ITEM_TABLE)
+                .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.key == key)
                 .values(value=value_bytes, content_type=content_type, size=size)
             )
-            insert_stmt = insert(KeyValueStoreRecordDB).values(**insert_values)
+            insert_stmt = insert(self._ITEM_TABLE).values(**insert_values)
 
         async with self.get_session() as session:
             if upsert_stmt is not None:
@@ -249,9 +190,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
         """Get a value from the key-value store."""
         # Query the record by key
-        stmt = select(KeyValueStoreRecordDB).where(
-            KeyValueStoreRecordDB.kvs_id == self._id, KeyValueStoreRecordDB.key == key
-        )
+        stmt = select(self._ITEM_TABLE).where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.key == key)
         async with self.get_session() as session:
             result = await session.execute(stmt)
             record_db = result.scalar_one_or_none()
@@ -299,9 +238,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
     @override
     async def delete_value(self, *, key: str) -> None:
         """Delete a value from the key-value store."""
-        stmt = delete(KeyValueStoreRecordDB).where(
-            KeyValueStoreRecordDB.kvs_id == self._id, KeyValueStoreRecordDB.key == key
-        )
+        stmt = delete(self._ITEM_TABLE).where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.key == key)
         async with self.get_autocommit_session() as autocommit:
             # Delete the record if it exists
             result = await autocommit.execute(stmt)
@@ -322,14 +259,14 @@ class SQLKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
         """Iterate over the existing keys in the key-value store."""
         # Build query for record metadata
         stmt = (
-            select(KeyValueStoreRecordDB.key, KeyValueStoreRecordDB.content_type, KeyValueStoreRecordDB.size)
-            .where(KeyValueStoreRecordDB.kvs_id == self._id)
-            .order_by(KeyValueStoreRecordDB.key)
+            select(self._ITEM_TABLE.key, self._ITEM_TABLE.content_type, self._ITEM_TABLE.size)
+            .where(self._ITEM_TABLE.metadata_id == self._id)
+            .order_by(self._ITEM_TABLE.key)
         )
 
         # Apply exclusive_start_key filter
         if exclusive_start_key is not None:
-            stmt = stmt.where(KeyValueStoreRecordDB.key > exclusive_start_key)
+            stmt = stmt.where(self._ITEM_TABLE.key > exclusive_start_key)
 
         # Apply limit
         if limit is not None:
@@ -354,9 +291,7 @@ class SQLKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
     @override
     async def record_exists(self, *, key: str) -> bool:
         """Check if a record with the given key exists in the key-value store."""
-        stmt = select(KeyValueStoreRecordDB.key).where(
-            KeyValueStoreRecordDB.kvs_id == self._id, KeyValueStoreRecordDB.key == key
-        )
+        stmt = select(self._ITEM_TABLE.key).where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.key == key)
         async with self.get_session() as session:
             # Check if record exists
             result = await session.execute(stmt)
@@ -373,38 +308,5 @@ class SQLKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
     async def get_public_url(self, *, key: str) -> str:
         raise NotImplementedError('Public URLs are not supported for memory key-value stores.')
 
-    async def _update_metadata(
-        self,
-        session: AsyncSession,
-        *,
-        update_accessed_at: bool = False,
-        update_modified_at: bool = False,
-    ) -> bool:
-        """Update the KVS metadata in the database.
-
-        Args:
-            session: The SQLAlchemy AsyncSession to use for the update.
-            update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
-            update_modified_at: If True, update the `modified_at` timestamp to the current time.
-        """
-        now = datetime.now(timezone.utc)
-        values_to_set: dict[str, Any] = {}
-
-        if update_accessed_at and (
-            self._last_accessed_at is None or (now - self._last_accessed_at) > self._accessed_modified_update_interval
-        ):
-            values_to_set['accessed_at'] = now
-            self._last_accessed_at = now
-
-        if update_modified_at and (
-            self._last_modified_at is None or (now - self._last_modified_at) > self._accessed_modified_update_interval
-        ):
-            values_to_set['modified_at'] = now
-            self._last_modified_at = now
-
-        if values_to_set:
-            stmt = update(KeyValueStoreMetadataDB).where(KeyValueStoreMetadataDB.id == self._id).values(**values_to_set)
-            await session.execute(stmt)
-            return True
-
-        return False
+    def _specific_update_metadata(self, **_kwargs: dict[str, Any]) -> dict[str, Any]:
+        return {}

@@ -1,20 +1,36 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
+from sqlalchemy import delete, select, text, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as lite_insert
 from sqlalchemy.exc import SQLAlchemyError
+
+from crawlee._utils.crypto import crypto_random_object_id
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from sqlalchemy import Insert
     from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import DeclarativeBase
+    from typing_extensions import Self
 
+    from crawlee.storage_clients.models import DatasetMetadata, KeyValueStoreMetadata, RequestQueueMetadata
+
+    from ._db_models import (
+        DatasetItemDB,
+        DatasetMetadataDB,
+        KeyValueStoreMetadataDB,
+        KeyValueStoreRecordDB,
+        RequestDB,
+        RequestQueueMetadataDB,
+    )
     from ._storage_client import SQLStorageClient
 
 
@@ -22,13 +38,45 @@ logger = getLogger(__name__)
 
 
 class SQLClientMixin:
-    """Mixin class for SQL clients."""
+    """Mixin class for SQL clients.
 
-    _storage_client: SQLStorageClient
+    This mixin provides common SQL operations and basic methods for SQL storage clients.
+    """
+
+    _DEFAULT_NAME: ClassVar[str]
+    """Default name when none provided."""
+
+    _METADATA_TABLE: ClassVar[type[DatasetMetadataDB | KeyValueStoreMetadataDB | RequestQueueMetadataDB]]
+    """SQLAlchemy model for metadata."""
+
+    _ITEM_TABLE: ClassVar[type[DatasetItemDB | KeyValueStoreRecordDB | RequestDB]]
+    """SQLAlchemy model for items."""
+
+    _CLIENT_TYPE: ClassVar[str]
+    """Human-readable client type for error messages."""
+
+    def __init__(self, *, id: str, storage_client: SQLStorageClient) -> None:
+        self._id = id
+        self._storage_client = storage_client
+
+        # Time tracking to reduce database writes during frequent operation
+        self._accessed_at_allow_update_after: datetime | None = None
+        self._accessed_modified_update_interval = storage_client.get_accessed_modified_update_interval()
 
     def get_session(self) -> AsyncSession:
-        """Create a new SQLAlchemy session for this request queue."""
+        """Create a new SQLAlchemy session for this storage."""
         return self._storage_client.create_session()
+
+    async def _get_metadata(
+        self, metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata]
+    ) -> DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata:
+        """Retrieve client metadata."""
+        async with self.get_session() as session:
+            orm_metadata = await session.get(self._METADATA_TABLE, self._id)
+            if not orm_metadata:
+                raise ValueError(f'Dataset with ID "{self._id}" not found.')
+
+            return metadata_model.model_validate(orm_metadata)
 
     @asynccontextmanager
     async def get_autocommit_session(self) -> AsyncIterator[AsyncSession]:
@@ -39,11 +87,17 @@ class SQLClientMixin:
                 await session.commit()
             except SQLAlchemyError as e:
                 logger.warning(f'Error occurred during session transaction: {e}')
-                # Rollback the session in case of an error
                 await session.rollback()
 
-    def build_insert_stmt_with_ignore(self, table_model: Any, insert_values: dict | list[dict]) -> Insert:
-        """Build an insert statement with ignore for the SQL dialect."""
+    def build_insert_stmt_with_ignore(
+        self, table_model: type[DeclarativeBase], insert_values: dict[str, Any] | list[dict[str, Any]]
+    ) -> Insert:
+        """Build an insert statement with ignore for the SQL dialect.
+
+        Args:
+            table_model: SQLAlchemy table model
+            insert_values: Single dict or list of dicts to insert
+        """
         if isinstance(insert_values, dict):
             insert_values = [insert_values]
 
@@ -62,11 +116,20 @@ class SQLClientMixin:
 
     def build_upsert_stmt(
         self,
-        table_model: Any,
-        insert_values: dict | list[dict],
+        table_model: type[DeclarativeBase],
+        insert_values: dict[str, Any] | list[dict[str, Any]],
         update_columns: list[str],
         conflict_cols: list[str] | None = None,
     ) -> Insert:
+        """Build an upsert statement for the SQL dialect.
+
+        Args:
+            table_model: SQLAlchemy table model
+            insert_values: Single dict or list of dicts to upsert
+            update_columns: Column names to update on conflict
+            conflict_cols: Column names that define uniqueness (for PostgreSQL/SQLite)
+
+        """
         if isinstance(insert_values, dict):
             insert_values = [insert_values]
 
@@ -88,3 +151,190 @@ class SQLClientMixin:
             return mysql_stmt.on_duplicate_key_update(**set_)
 
         raise NotImplementedError(f'Upsert not supported for dialect: {dialect}')
+
+    async def _purge(self, metadata_kwargs: dict[str, Any]) -> None:
+        """Drop all items in storage and update metadata.
+
+        Args:
+            metadata_kwargs: Arguments to pass to _update_metadata
+        """
+        stmt = delete(self._ITEM_TABLE).where(self._ITEM_TABLE.metadata_id == self._id)
+        async with self.get_autocommit_session() as autocommit:
+            await autocommit.execute(stmt)
+            await self._update_metadata(autocommit, **metadata_kwargs)
+
+    async def _drop(self) -> None:
+        """Delete this storage and all its data.
+
+        This operation is irreversible. Uses CASCADE deletion to remove all related items.
+        """
+        stmt = delete(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id)
+        async with self.get_autocommit_session() as autocommit:
+            if self._storage_client.get_dialect_name() == 'sqlite':
+                # foreign_keys=ON is set at the connection level. Required for cascade deletion.
+                await autocommit.execute(text('PRAGMA foreign_keys=ON'))
+            await autocommit.execute(stmt)
+
+    def _default_update_metadata(
+        self, *, update_accessed_at: bool = False, update_modified_at: bool = False
+    ) -> dict[str, Any]:
+        """Prepare common metadata updates with rate limiting.
+
+        Args:
+            update_accessed_at: Whether to update accessed_at timestamp
+            update_modified_at: Whether to update modified_at timestamp
+        """
+        now = datetime.now(timezone.utc)
+        values_to_set: dict[str, Any] = {}
+
+        if update_accessed_at and (
+            self._accessed_at_allow_update_after is None or (now >= self._accessed_at_allow_update_after)
+        ):
+            values_to_set['accessed_at'] = now
+            self._accessed_at_allow_update_after = now + self._accessed_modified_update_interval
+
+        if update_modified_at:
+            values_to_set['modified_at'] = now
+
+        return values_to_set
+
+    def _specific_update_metadata(self, **kwargs: Any) -> dict[str, Any]:
+        """Prepare storage-specific metadata updates.
+
+        Must be implemented by concrete classes.
+
+        Args:
+            **kwargs: Storage-specific update parameters
+        """
+        raise NotImplementedError('Method _specific_update_metadata must be implemented in the client class.')
+
+    async def _update_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        update_accessed_at: bool = False,
+        update_modified_at: bool = False,
+        **kwargs: Any,
+    ) -> bool:
+        """Update storage metadata combining common and specific fields.
+
+        Args:
+            session: Active database session
+            update_accessed_at: Whether to update accessed_at timestamp
+            update_modified_at: Whether to update modified_at timestamp
+            **kwargs: Additional arguments for _specific_update_metadata
+
+        Returns:
+            True if any updates were made, False otherwise
+        """
+        values_to_set = self._default_update_metadata(
+            update_accessed_at=update_accessed_at, update_modified_at=update_modified_at
+        )
+
+        values_to_set.update(self._specific_update_metadata(**kwargs))
+
+        if values_to_set:
+            stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id).values(**values_to_set)
+            await session.execute(stmt)
+            return True
+
+        return False
+
+    @classmethod
+    async def _open(
+        cls,
+        *,
+        id: str | None,
+        name: str | None,
+        storage_client: SQLStorageClient,
+        metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata],
+        session: AsyncSession,
+        extra_metadata_fields: dict[str, Any],
+    ) -> Self:
+        """Open existing storage or create new one.
+
+        Internal method used by _safely_open.
+
+        Args:
+            id: Storage ID to open (takes precedence over name)
+            name: Storage name to open
+            storage_client: SQL storage client instance
+            metadata_model: Pydantic model for metadata validation
+            session: Active database session
+            extra_metadata_fields: Storage-specific metadata fields
+        """
+        orm_metadata: DatasetMetadataDB | KeyValueStoreMetadataDB | RequestQueueMetadataDB | None = None
+        if id:
+            orm_metadata = await session.get(cls._METADATA_TABLE, id)
+            if not orm_metadata:
+                raise ValueError(f'{cls._CLIENT_TYPE} with ID "{id}" not found.')
+        else:
+            search_name = name or cls._DEFAULT_NAME
+            stmt = select(cls._METADATA_TABLE).where(cls._METADATA_TABLE.name == search_name)
+            result = await session.execute(stmt)
+            orm_metadata = result.scalar_one_or_none()  # type: ignore[assignment]
+
+        if orm_metadata:
+            client = cls(id=orm_metadata.id, storage_client=storage_client)
+            await client._update_metadata(session, update_accessed_at=True)
+        else:
+            now = datetime.now(timezone.utc)
+            metadata = metadata_model(
+                id=crypto_random_object_id(),
+                name=name,
+                created_at=now,
+                accessed_at=now,
+                modified_at=now,
+                **extra_metadata_fields,
+            )
+            client = cls(id=metadata.id, storage_client=storage_client)
+            session.add(cls._METADATA_TABLE(**metadata.model_dump()))
+
+        return client
+
+    @classmethod
+    async def _safely_open(
+        cls,
+        *,
+        id: str | None,
+        name: str | None,
+        storage_client: SQLStorageClient,
+        metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata],
+        extra_metadata_fields: dict[str, Any],
+    ) -> Self:
+        """Safely open storage with transaction handling.
+
+        Args:
+            id: Storage ID to open (takes precedence over name)
+            name: Storage name to open
+            storage_client: SQL storage client instance
+            client_class: Concrete client class to instantiate
+            metadata_model: Pydantic model for metadata validation
+            extra_metadata_fields: Storage-specific metadata fields
+        """
+        async with storage_client.create_session() as session:
+            try:
+                client = await cls._open(
+                    id=id,
+                    name=name,
+                    storage_client=storage_client,
+                    metadata_model=metadata_model,
+                    session=session,
+                    extra_metadata_fields=extra_metadata_fields,
+                )
+                await session.commit()
+            except SQLAlchemyError:
+                await session.rollback()
+
+                search_name = name or cls._DEFAULT_NAME
+                stmt = select(cls._METADATA_TABLE).where(cls._METADATA_TABLE.name == search_name)
+                result = await session.execute(stmt)
+                orm_metadata: DatasetMetadataDB | KeyValueStoreMetadataDB | RequestQueueMetadataDB | None
+                orm_metadata = result.scalar_one_or_none()  # type: ignore[assignment]
+
+                if not orm_metadata:
+                    raise ValueError(f'{cls._CLIENT_TYPE} with Name "{search_name}" not found.') from None
+
+                client = cls(id=orm_metadata.id, storage_client=storage_client)
+
+        return client

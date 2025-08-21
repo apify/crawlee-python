@@ -122,7 +122,7 @@ async def test_record_and_content_verification(dataset_client: SQLDatasetClient)
     assert metadata.accessed_at is not None
 
     async with dataset_client.get_session() as session:
-        stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == metadata.id)
+        stmt = select(DatasetItemDB).where(DatasetItemDB.metadata_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 1
@@ -134,7 +134,7 @@ async def test_record_and_content_verification(dataset_client: SQLDatasetClient)
     await dataset_client.push_data(items)
 
     async with dataset_client.get_session() as session:
-        stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == metadata.id)
+        stmt = select(DatasetItemDB).where(DatasetItemDB.metadata_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 4
@@ -147,7 +147,7 @@ async def test_drop_removes_records(dataset_client: SQLDatasetClient) -> None:
     client_metadata = await dataset_client.get_metadata()
 
     async with dataset_client.get_session() as session:
-        stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == client_metadata.id)
+        stmt = select(DatasetItemDB).where(DatasetItemDB.metadata_id == client_metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 1
@@ -156,7 +156,7 @@ async def test_drop_removes_records(dataset_client: SQLDatasetClient) -> None:
     await dataset_client.drop()
 
     async with dataset_client.get_session() as session:
-        stmt = select(DatasetItemDB).where(DatasetItemDB.dataset_id == client_metadata.id)
+        stmt = select(DatasetItemDB).where(DatasetItemDB.metadata_id == client_metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 0

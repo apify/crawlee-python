@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, Boolean, ForeignKey, Index, Integer, LargeBinary, String
+from sqlalchemy import JSON, BigInteger, Boolean, ForeignKey, Index, Integer, LargeBinary, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import DateTime, TypeDecorator
 from typing_extensions import override
@@ -130,7 +130,7 @@ class KeyValueStoreRecordDB(Base):
 
     __tablename__ = 'kvs_record'
 
-    kvs_id: Mapped[str] = mapped_column(
+    metadata_id: Mapped[str] = mapped_column(
         String(255), ForeignKey('kvs_metadata.id', ondelete='CASCADE'), primary_key=True, index=True
     )
     """Foreign key to metadata key-value store record."""
@@ -159,7 +159,7 @@ class DatasetItemDB(Base):
     order_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     """Auto-increment primary key preserving insertion order."""
 
-    dataset_id: Mapped[str] = mapped_column(
+    metadata_id: Mapped[str] = mapped_column(
         String(20),
         ForeignKey('dataset_metadata.id', ondelete='CASCADE'),
         index=True,
@@ -179,15 +179,13 @@ class RequestDB(Base):
     __tablename__ = 'request'
     __table_args__ = (
         # Index for efficient SELECT to cache
-        Index('idx_queue_handled_seq', 'queue_id', 'is_handled', 'sequence_number'),
-        # Deduplication index
-        Index('idx_queue_unique_key', 'queue_id', 'unique_key'),
+        Index('idx_queue_handled_seq', 'metadata_id', 'is_handled', 'sequence_number'),
     )
 
-    request_id: Mapped[str] = mapped_column(String(20), primary_key=True)
-    """Unique identifier for the request."""
+    request_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    """Unique identifier for the request representing the unique_key."""
 
-    queue_id: Mapped[str] = mapped_column(
+    metadata_id: Mapped[str] = mapped_column(
         String(20), ForeignKey('request_queue_metadata.id', ondelete='CASCADE'), primary_key=True
     )
     """Foreign key to metadata request queue record."""
@@ -195,16 +193,13 @@ class RequestDB(Base):
     data: Mapped[str] = mapped_column(JSON, nullable=False)
     """JSON-serialized Request object."""
 
-    unique_key: Mapped[str] = mapped_column(String(512), nullable=False)
-    """Request unique key for deduplication within queue."""
-
     sequence_number: Mapped[int] = mapped_column(Integer, nullable=False)
     """Ordering sequence: negative for forefront, positive for regular."""
 
     is_handled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     """Processing status flag."""
 
-    # Relationship back to parent queue
+    # Relationship back to metadata table
     queue: Mapped[RequestQueueMetadataDB] = relationship(back_populates='requests')
 
 
@@ -213,7 +208,7 @@ class RequestQueueStateDB(Base):
 
     __tablename__ = 'request_queue_state'
 
-    queue_id: Mapped[str] = mapped_column(
+    metadata_id: Mapped[str] = mapped_column(
         String(20), ForeignKey('request_queue_metadata.id', ondelete='CASCADE'), primary_key=True
     )
     """Foreign key to metadata request queue record."""
@@ -224,5 +219,5 @@ class RequestQueueStateDB(Base):
     forefront_sequence_counter: Mapped[int] = mapped_column(Integer, nullable=False, default=-1)
     """Counter for forefront request ordering (negative)."""
 
-    # Relationship back to parent queue
+    # Relationship back to metadata table
     queue: Mapped[RequestQueueMetadataDB] = relationship(back_populates='state')
