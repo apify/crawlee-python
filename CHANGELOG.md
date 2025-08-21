@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Expose `PlaywrightPersistentBrowser` class ([#1314](https://github.com/apify/crawlee-python/pull/1314)) ([b5fa955](https://github.com/apify/crawlee-python/commit/b5fa95508d7c099ff3a342577f338439283a975f)) by [@Mantisus](https://github.com/Mantisus)
 - Add `impit` option for Crawlee CLI ([#1312](https://github.com/apify/crawlee-python/pull/1312)) ([508d7ce](https://github.com/apify/crawlee-python/commit/508d7ce4d998f37ab2adcf9c057c3c635a69f863)) by [@Mantisus](https://github.com/Mantisus)
 - Persist RequestList state ([#1274](https://github.com/apify/crawlee-python/pull/1274)) ([cc68014](https://github.com/apify/crawlee-python/commit/cc680147ba3cc8b35b9da70274e53e6f5dd92434)) by [@janbuchar](https://github.com/janbuchar), closes [#99](https://github.com/apify/crawlee-python/issues/99)
+- Persist `DefaultRenderingTypePredictor` state ([#1340](https://github.com/apify/crawlee-python/pull/1340)) ([fad4c25](https://github.com/apify/crawlee-python/commit/fad4c25fc712915c4a45b24e3290b6f5dbd8a683)) by [@Mantisus](https://github.com/Mantisus), closes [#1272](https://github.com/apify/crawlee-python/issues/1272)
 
 ### 🐛 Bug Fixes
 
@@ -24,6 +25,9 @@ All notable changes to this project will be documented in this file.
 - Fix retry count to not count the original request ([#1328](https://github.com/apify/crawlee-python/pull/1328)) ([74fa1d9](https://github.com/apify/crawlee-python/commit/74fa1d936cb3c29cf62d87862a96b4266694af2f)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1326](https://github.com/apify/crawlee-python/issues/1326)
 - [**breaking**] Remove unused &quot;stats&quot; field from RequestQueueMetadata ([#1331](https://github.com/apify/crawlee-python/pull/1331)) ([0a63bef](https://github.com/apify/crawlee-python/commit/0a63bef514b0bdcd3d6f208b386f706d0fe561e6)) by [@vdusek](https://github.com/vdusek)
 - Ignore unknown parameters passed in cookies ([#1336](https://github.com/apify/crawlee-python/pull/1336)) ([50d3ef7](https://github.com/apify/crawlee-python/commit/50d3ef7540551383d26d40f3404b435bde35b47d)) by [@Mantisus](https://github.com/Mantisus), closes [#1333](https://github.com/apify/crawlee-python/issues/1333)
+- Fix `timeout` for `stream` method in `ImpitHttpClient` ([#1352](https://github.com/apify/crawlee-python/pull/1352)) ([54b693b](https://github.com/apify/crawlee-python/commit/54b693b838f135a596e1e9493b565bc558b19a3a)) by [@Mantisus](https://github.com/Mantisus)
+- Include reason in the session rotation warning logs ([#1363](https://github.com/apify/crawlee-python/pull/1363)) ([d6d7a45](https://github.com/apify/crawlee-python/commit/d6d7a45dd64a906419d9552c45062d726cbb1a0f)) by [@vdusek](https://github.com/vdusek), closes [#1318](https://github.com/apify/crawlee-python/issues/1318)
+- Improve crawler statistics logging ([#1364](https://github.com/apify/crawlee-python/pull/1364)) ([1eb6da5](https://github.com/apify/crawlee-python/commit/1eb6da5dd85870124593dcad877284ccaed9c0ce)) by [@vdusek](https://github.com/vdusek), closes [#1317](https://github.com/apify/crawlee-python/issues/1317)
 
 ### Refactor
 
@@ -31,6 +35,8 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Split `BrowserType` literal into two different literals based on context ([#1070](https://github.com/apify/crawlee-python/pull/1070)) ([72b5698](https://github.com/apify/crawlee-python/commit/72b5698fa0647ea02b08da5651736cc37c4c0f6a)) by [@Pijukatel](https://github.com/Pijukatel)
 - [**breaking**] Change method `HttpResponse.read` from sync to async ([#1296](https://github.com/apify/crawlee-python/pull/1296)) ([83fa8a4](https://github.com/apify/crawlee-python/commit/83fa8a416b6d2d4e27c678b9bf99bd1b8799f57b)) by [@Mantisus](https://github.com/Mantisus)
 - [**breaking**] Replace `HttpxHttpClient` with `ImpitHttpClient` as default HTTP client ([#1307](https://github.com/apify/crawlee-python/pull/1307)) ([c803a97](https://github.com/apify/crawlee-python/commit/c803a976776a76846866d533e3a3ee8144e248c4)) by [@Mantisus](https://github.com/Mantisus), closes [#1079](https://github.com/apify/crawlee-python/issues/1079)
+- [**breaking**] Change Dataset unwind parameter to accept list of strings ([#1357](https://github.com/apify/crawlee-python/pull/1357)) ([862a203](https://github.com/apify/crawlee-python/commit/862a20398f00fe91802fe7a1ccd58b05aee053a1)) by [@vdusek](https://github.com/vdusek)
+- [**breaking**] Remove `Request.id` field ([#1366](https://github.com/apify/crawlee-python/pull/1366)) ([32f3580](https://github.com/apify/crawlee-python/commit/32f3580e9775a871924ab1233085d0c549c4cd52)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1358](https://github.com/apify/crawlee-python/issues/1358)
 
 
 <!-- git-cliff-unreleased-end -->

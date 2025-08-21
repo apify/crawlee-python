@@ -1057,7 +1057,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 max_retries=3,
             )
             await self._handle_failed_request(context, error)
-            self._statistics.record_request_processing_failure(request.id or request.unique_key)
+            self._statistics.record_request_processing_failure(request.unique_key)
 
     async def _handle_request_error(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
         try:
@@ -1274,7 +1274,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if not (await self._is_allowed_based_on_robots_txt_file(request.url)):
             self._logger.warning(
-                f'Skipping request {request.url} ({request.id}) because it is disallowed based on robots.txt'
+                f'Skipping request {request.url} ({request.unique_key}) because it is disallowed based on robots.txt'
             )
 
             await self._handle_skipped_request(request, 'robots_txt', need_mark=True)
@@ -1300,8 +1300,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
         self._context_result_map[context] = result
 
-        statistics_id = request.id or request.unique_key
-        self._statistics.record_request_processing_start(statistics_id)
+        self._statistics.record_request_processing_start(request.unique_key)
 
         try:
             request.state = RequestState.REQUEST_HANDLER
@@ -1328,7 +1327,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             if context.session and context.session.is_usable:
                 context.session.mark_good()
 
-            self._statistics.record_request_processing_finish(statistics_id)
+            self._statistics.record_request_processing_finish(request.unique_key)
 
         except RequestCollisionError as request_error:
             context.request.no_retry = True
@@ -1353,7 +1352,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 await self._error_handler(context, session_error)
 
             if self._should_retry_request(context, session_error):
-                self._logger.warning('Encountered a session error, rotating session and retrying')
+                exc_only = ''.join(traceback.format_exception_only(session_error)).strip()
+                self._logger.warning('Encountered "%s", rotating session and retrying...', exc_only)
 
                 context.session.retire()
 
@@ -1373,7 +1373,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 )
 
                 await self._handle_failed_request(context, session_error)
-                self._statistics.record_request_processing_failure(statistics_id)
+                self._statistics.record_request_processing_failure(request.unique_key)
 
         except ContextPipelineInterruptedError as interrupted_error:
             self._logger.debug('The context pipeline was interrupted', exc_info=interrupted_error)

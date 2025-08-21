@@ -10,6 +10,7 @@ import pytest
 from crawlee import service_locator
 from crawlee._autoscaling import Snapshotter
 from crawlee._autoscaling._types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, Snapshot
+from crawlee._autoscaling.snapshotter import SortedSnapshotList
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.system import CpuInfo, MemoryInfo
 from crawlee.configuration import Configuration
@@ -299,3 +300,34 @@ async def test_snapshots_time_ordered(snapshotter: Snapshotter) -> None:
         assert cpu_samples[0].created_at == time_old
         assert memory_samples[1].created_at == time_new
         assert cpu_samples[1].created_at == time_new
+
+
+def test_sorted_snapshot_list_add_maintains_order() -> None:
+    """Test that SortedSnapshotList.add method maintains sorted order by created_at with multiple items."""
+    sorted_list = SortedSnapshotList[CpuSnapshot]()
+
+    # Create snapshots with different timestamps (more items to test binary search better)
+    now = datetime.now(timezone.utc)
+    snapshots = [
+        CpuSnapshot(used_ratio=0.1, max_used_ratio=0.95, created_at=now - timedelta(seconds=50)),  # oldest
+        CpuSnapshot(used_ratio=0.2, max_used_ratio=0.95, created_at=now - timedelta(seconds=40)),
+        CpuSnapshot(used_ratio=0.3, max_used_ratio=0.95, created_at=now - timedelta(seconds=30)),
+        CpuSnapshot(used_ratio=0.4, max_used_ratio=0.95, created_at=now - timedelta(seconds=20)),
+        CpuSnapshot(used_ratio=0.5, max_used_ratio=0.95, created_at=now - timedelta(seconds=10)),
+        CpuSnapshot(used_ratio=0.6, max_used_ratio=0.95, created_at=now - timedelta(seconds=5)),
+        CpuSnapshot(used_ratio=0.7, max_used_ratio=0.95, created_at=now),  # newest
+    ]
+
+    # Add snapshots in random order to test binary search insertion
+    add_order = [3, 0, 5, 1, 6, 2, 4]  # indices in random order
+    for i in add_order:
+        sorted_list.add(snapshots[i])
+
+    # Verify the list is sorted by created_at (should be in original order)
+    assert len(sorted_list) == 7
+    for i, snapshot in enumerate(sorted_list):
+        assert snapshot == snapshots[i], f'Item at index {i} is not correctly sorted'
+        if i > 0:
+            prev_time = sorted_list[i - 1].created_at
+            curr_time = snapshot.created_at
+            assert prev_time <= curr_time, f'Items at indices {i - 1} and {i} are not in chronological order'

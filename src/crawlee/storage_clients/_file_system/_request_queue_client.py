@@ -5,6 +5,7 @@ import json
 import shutil
 from collections import deque
 from datetime import datetime, timezone
+from hashlib import sha256
 from logging import getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -43,16 +44,16 @@ class RequestQueueState(BaseModel):
     """Counter for forefront request ordering."""
 
     forefront_requests: dict[str, int] = {}
-    """Mapping of forefront request IDs to their sequence numbers."""
+    """Mapping of forefront request unique keys to their sequence numbers."""
 
     regular_requests: dict[str, int] = {}
-    """Mapping of regular request IDs to their sequence numbers."""
+    """Mapping of regular request unique keys to their sequence numbers."""
 
     in_progress_requests: set[str] = set()
-    """Set of request IDs currently being processed."""
+    """Set of request unique keys currently being processed."""
 
     handled_requests: set[str] = set()
-    """Set of request IDs that have been handled."""
+    """Set of request unique keys that have been handled."""
 
 
 class FileSystemRequestQueueClient(RequestQueueClient):
@@ -331,17 +332,17 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
                 # If there is no existing request with the same unique key, add the new request.
                 if existing_request is None:
-                    request_path = self._get_request_path(request.id)
+                    request_path = self._get_request_path(request.unique_key)
 
                     # Add sequence number to ensure FIFO ordering using state.
                     if forefront:
                         sequence_number = state.forefront_sequence_counter
                         state.forefront_sequence_counter += 1
-                        state.forefront_requests[request.id] = sequence_number
+                        state.forefront_requests[request.unique_key] = sequence_number
                     else:
                         sequence_number = state.sequence_counter
                         state.sequence_counter += 1
-                        state.regular_requests[request.id] = sequence_number
+                        state.regular_requests[request.unique_key] = sequence_number
 
                     # Save the clean request without extra fields
                     request_data = await json_dumps(request.model_dump())
@@ -352,11 +353,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     new_pending_request_count += 1
 
                     # Add to our index for subsequent requests in this batch
-                    existing_unique_keys[request.unique_key] = self._get_request_path(request.id)
+                    existing_unique_keys[request.unique_key] = self._get_request_path(request.unique_key)
 
                     processed_requests.append(
                         ProcessedRequest(
-                            id=request.id,
                             unique_key=request.unique_key,
                             was_already_present=False,
                             was_already_handled=False,
@@ -367,13 +367,12 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 else:
                     # Set the processed request flags.
                     was_already_present = existing_request is not None
-                    was_already_handled = existing_request.id in state.handled_requests
+                    was_already_handled = existing_request.unique_key in state.handled_requests
 
                     # If the request is already in the RQ and handled, just continue with the next one.
                     if was_already_present and was_already_handled:
                         processed_requests.append(
                             ProcessedRequest(
-                                id=existing_request.id,
                                 unique_key=request.unique_key,
                                 was_already_present=True,
                                 was_already_handled=True,
@@ -385,22 +384,21 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                         # Update request type (forefront vs regular) in state
                         if forefront:
                             # Move from regular to forefront if needed
-                            if existing_request.id in state.regular_requests:
-                                state.regular_requests.pop(existing_request.id)
-                            if existing_request.id not in state.forefront_requests:
-                                state.forefront_requests[existing_request.id] = state.forefront_sequence_counter
+                            if existing_request.unique_key in state.regular_requests:
+                                state.regular_requests.pop(existing_request.unique_key)
+                            if existing_request.unique_key not in state.forefront_requests:
+                                state.forefront_requests[existing_request.unique_key] = state.forefront_sequence_counter
                                 state.forefront_sequence_counter += 1
                         elif (
-                            existing_request.id not in state.forefront_requests
-                            and existing_request.id not in state.regular_requests
+                            existing_request.unique_key not in state.forefront_requests
+                            and existing_request.unique_key not in state.regular_requests
                         ):
                             # Keep as regular if not already forefront
-                            state.regular_requests[existing_request.id] = state.sequence_counter
+                            state.regular_requests[existing_request.unique_key] = state.sequence_counter
                             state.sequence_counter += 1
 
                         processed_requests.append(
                             ProcessedRequest(
-                                id=existing_request.id,
                                 unique_key=request.unique_key,
                                 was_already_present=True,
                                 was_already_handled=False,
@@ -437,17 +435,17 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             )
 
     @override
-    async def get_request(self, request_id: str) -> Request | None:
+    async def get_request(self, unique_key: str) -> Request | None:
         async with self._lock:
-            request_path = self._get_request_path(request_id)
+            request_path = self._get_request_path(unique_key)
             request = await self._parse_request_file(request_path)
 
             if request is None:
-                logger.warning(f'Request with ID "{request_id}" not found in the queue.')
+                logger.warning(f'Request with unique key "{unique_key}" not found in the queue.')
                 return None
 
             state = self._state.current_value
-            state.in_progress_requests.add(request.id)
+            state.in_progress_requests.add(request.unique_key)
             await self._update_metadata(update_accessed_at=True)
             return request
 
@@ -466,11 +464,11 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 candidate = self._request_cache.popleft()
 
                 # Skip requests that are already in progress, however this should not happen.
-                if candidate.id not in state.in_progress_requests:
+                if candidate.unique_key not in state.in_progress_requests:
                     next_request = candidate
 
             if next_request is not None:
-                state.in_progress_requests.add(next_request.id)
+                state.in_progress_requests.add(next_request.unique_key)
 
             return next_request
 
@@ -481,8 +479,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             state = self._state.current_value
 
             # Check if the request is in progress.
-            if request.id not in state.in_progress_requests:
-                logger.warning(f'Marking request {request.id} as handled that is not in progress.')
+            if request.unique_key not in state.in_progress_requests:
+                logger.warning(f'Marking request {request.unique_key} as handled that is not in progress.')
                 return None
 
             # Update the request's handled_at timestamp.
@@ -490,18 +488,18 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 request.handled_at = datetime.now(timezone.utc)
 
             # Dump the updated request to the file.
-            request_path = self._get_request_path(request.id)
+            request_path = self._get_request_path(request.unique_key)
 
             if not await asyncio.to_thread(request_path.exists):
-                logger.warning(f'Request file for {request.id} does not exist, cannot mark as handled.')
+                logger.warning(f'Request file for {request.unique_key} does not exist, cannot mark as handled.')
                 return None
 
             request_data = await json_dumps(request.model_dump())
             await atomic_write(request_path, request_data)
 
             # Update state: remove from in-progress and add to handled.
-            state.in_progress_requests.discard(request.id)
-            state.handled_requests.add(request.id)
+            state.in_progress_requests.discard(request.unique_key)
+            state.handled_requests.add(request.unique_key)
 
             # Update RQ metadata.
             await self._update_metadata(
@@ -512,7 +510,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             )
 
             return ProcessedRequest(
-                id=request.id,
                 unique_key=request.unique_key,
                 was_already_present=True,
                 was_already_handled=True,
@@ -530,36 +527,36 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             state = self._state.current_value
 
             # Check if the request is in progress.
-            if request.id not in state.in_progress_requests:
-                logger.info(f'Reclaiming request {request.id} that is not in progress.')
+            if request.unique_key not in state.in_progress_requests:
+                logger.info(f'Reclaiming request {request.unique_key} that is not in progress.')
                 return None
 
-            request_path = self._get_request_path(request.id)
+            request_path = self._get_request_path(request.unique_key)
 
             if not await asyncio.to_thread(request_path.exists):
-                logger.warning(f'Request file for {request.id} does not exist, cannot reclaim.')
+                logger.warning(f'Request file for {request.unique_key} does not exist, cannot reclaim.')
                 return None
 
             # Update sequence number and state to ensure proper ordering.
             if forefront:
                 # Remove from regular requests if it was there
-                state.regular_requests.pop(request.id, None)
+                state.regular_requests.pop(request.unique_key, None)
                 sequence_number = state.forefront_sequence_counter
                 state.forefront_sequence_counter += 1
-                state.forefront_requests[request.id] = sequence_number
+                state.forefront_requests[request.unique_key] = sequence_number
             else:
                 # Remove from forefront requests if it was there
-                state.forefront_requests.pop(request.id, None)
+                state.forefront_requests.pop(request.unique_key, None)
                 sequence_number = state.sequence_counter
                 state.sequence_counter += 1
-                state.regular_requests[request.id] = sequence_number
+                state.regular_requests[request.unique_key] = sequence_number
 
             # Save the clean request without extra fields
             request_data = await json_dumps(request.model_dump())
             await atomic_write(request_path, request_data)
 
             # Remove from in-progress.
-            state.in_progress_requests.discard(request.id)
+            state.in_progress_requests.discard(request.unique_key)
 
             # Update RQ metadata.
             await self._update_metadata(
@@ -574,7 +571,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 self._request_cache.append(request)
 
             return ProcessedRequest(
-                id=request.id,
                 unique_key=request.unique_key,
                 was_already_present=True,
                 was_already_handled=False,
@@ -597,7 +593,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             # If we have a cached requests, check them first (fast path).
             if self._request_cache:
                 for req in self._request_cache:
-                    if req.id not in state.handled_requests:
+                    if req.unique_key not in state.handled_requests:
                         self._is_empty_cache = False
                         return False
                 self._is_empty_cache = True
@@ -617,16 +613,16 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             self._is_empty_cache = True
             return True
 
-    def _get_request_path(self, request_id: str) -> Path:
+    def _get_request_path(self, unique_key: str) -> Path:
         """Get the path to a specific request file.
 
         Args:
-            request_id: The ID of the request.
+            unique_key: Unique key of the request.
 
         Returns:
             The path to the request file.
         """
-        return self.path_to_rq / f'{request_id}.json'
+        return self.path_to_rq / f'{self._get_file_base_name_from_unique_key(unique_key)}.json'
 
     async def _update_metadata(
         self,
@@ -699,23 +695,23 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 continue
 
             # Skip handled requests
-            if request.id in state.handled_requests:
+            if request.unique_key in state.handled_requests:
                 continue
 
             # Skip in-progress requests
-            if request.id in state.in_progress_requests:
+            if request.unique_key in state.in_progress_requests:
                 continue
 
             # Determine if request is forefront or regular based on state
-            if request.id in state.forefront_requests:
-                sequence = state.forefront_requests[request.id]
+            if request.unique_key in state.forefront_requests:
+                sequence = state.forefront_requests[request.unique_key]
                 forefront_requests.append((request, sequence))
-            elif request.id in state.regular_requests:
-                sequence = state.regular_requests[request.id]
+            elif request.unique_key in state.regular_requests:
+                sequence = state.regular_requests[request.unique_key]
                 regular_requests.append((request, sequence))
             else:
                 # Request not in state, skip it (might be orphaned)
-                logger.warning(f'Request {request.id} not found in state, skipping.')
+                logger.warning(f'Request {request.unique_key} not found in state, skipping.')
                 continue
 
         # Sort forefront requests by sequence (newest first for LIFO behavior).
@@ -807,11 +803,27 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 continue
 
             # Add request to state as regular request (assign sequence numbers)
-            if request.id not in state.regular_requests and request.id not in state.forefront_requests:
+            if request.unique_key not in state.regular_requests and request.unique_key not in state.forefront_requests:
                 # Assign as regular request with current sequence counter
-                state.regular_requests[request.id] = state.sequence_counter
+                state.regular_requests[request.unique_key] = state.sequence_counter
                 state.sequence_counter += 1
 
                 # Check if request was already handled
                 if request.handled_at is not None:
-                    state.handled_requests.add(request.id)
+                    state.handled_requests.add(request.unique_key)
+
+    @staticmethod
+    def _get_file_base_name_from_unique_key(unique_key: str) -> str:
+        """Generate a deterministic file name for a unique_key.
+
+        Args:
+            unique_key: Unique key to be used to generate filename.
+
+        Returns:
+            A file name based on the unique_key.
+        """
+        # hexdigest produces filenames compliant strings
+        hashed_key = sha256(unique_key.encode('utf-8')).hexdigest()
+        name_length = 15
+        # Truncate the key to the desired length
+        return hashed_key[:name_length]
