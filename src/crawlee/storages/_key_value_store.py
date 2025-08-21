@@ -272,9 +272,9 @@ class KeyValueStore(Storage):
             cache[key] = recoverable_state = RecoverableState(
                 default_state=AutosavedValue(default_value),
                 persistence_enabled=True,
-                persist_state_kvs_id=self.id,
                 persist_state_key=key,
                 logger=logger,
+                key_value_store=self,  # Use self for RecoverableState.
             )
 
             await recoverable_state.initialize()

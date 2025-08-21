@@ -90,6 +90,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         metadata: RequestQueueMetadata,
         storage_dir: Path,
         lock: asyncio.Lock,
+        recoverable_state: RecoverableState[RequestQueueState],
     ) -> None:
         """Initialize a new instance.
 
@@ -112,16 +113,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self._is_empty_cache: bool | None = None
         """Cache for is_empty result: None means unknown, True/False is cached state."""
 
-        from crawlee.storage_clients import FileSystemStorageClient  # noqa: PLC0415 , avoid circular imports
-
-        self._state = RecoverableState[RequestQueueState](
-            default_state=RequestQueueState(),
-            persist_state_key='request_queue_state',
-            persistence_enabled=True,
-            persist_state_kvs_name=f'__RQ_STATE_{self._metadata.id}',
-            logger=logger,
-            storage_client=FileSystemStorageClient(),  # It makes no sense to persist to different client.
-        )
+        self._state = recoverable_state
         """Recoverable state to maintain request ordering, in-progress status, and handled status."""
 
     @override
@@ -190,14 +182,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                         metadata = RequestQueueMetadata(**file_content)
 
                         if metadata.id == id:
-                            client = cls(
-                                metadata=metadata,
-                                storage_dir=storage_dir,
-                                lock=asyncio.Lock(),
+                            client = await cls._create_client(
+                                metadata=metadata, storage_dir=storage_dir, update_accessed_at=True
                             )
-                            await client._state.initialize()
-                            await client._discover_existing_requests()
-                            await client._update_metadata(update_accessed_at=True)
                             found = True
                             break
                     finally:
@@ -227,15 +214,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
                 metadata.name = name
 
-                client = cls(
-                    metadata=metadata,
-                    storage_dir=storage_dir,
-                    lock=asyncio.Lock(),
-                )
-
-                await client._state.initialize()
-                await client._discover_existing_requests()
-                await client._update_metadata(update_accessed_at=True)
+                client = await cls._create_client(metadata=metadata, storage_dir=storage_dir, update_accessed_at=True)
 
             # Otherwise, create a new dataset client.
             else:
@@ -251,13 +230,40 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     pending_request_count=0,
                     total_request_count=0,
                 )
-                client = cls(
-                    metadata=metadata,
-                    storage_dir=storage_dir,
-                    lock=asyncio.Lock(),
-                )
-                await client._state.initialize()
-                await client._update_metadata()
+                client = await cls._create_client(metadata=metadata, storage_dir=storage_dir)
+
+        return client
+
+    @classmethod
+    async def _create_client(
+        cls, metadata: RequestQueueMetadata, storage_dir: Path, *, update_accessed_at: bool = False
+    ) -> FileSystemRequestQueueClient:
+        """Create client from metadata and storage directory."""
+        from crawlee.storage_clients import FileSystemStorageClient  # noqa: PLC0415 avoid circular imports
+        from crawlee.storages._key_value_store import KeyValueStore  # noqa: PLC0415 avoid circular imports
+
+        # Prepare kvs for recoverable state
+        kvs_client = await FileSystemStorageClient().create_kvs_client(name=f'__RQ_STATE_{metadata.id}')
+        kvs_client_metadata = await kvs_client.get_metadata()
+        kvs = KeyValueStore(client=kvs_client, id=kvs_client_metadata.id, name=kvs_client_metadata.name)
+
+        # Create state
+        recoverable_state = RecoverableState[RequestQueueState](
+            default_state=RequestQueueState(),
+            persist_state_key='request_queue_state',
+            persistence_enabled=True,
+            logger=logger,
+            key_value_store=kvs,
+        )
+
+        # Create client
+        client = cls(
+            metadata=metadata, storage_dir=storage_dir, lock=asyncio.Lock(), recoverable_state=recoverable_state
+        )
+
+        await client._state.initialize()
+        await client._discover_existing_requests()
+        await client._update_metadata(update_accessed_at=update_accessed_at)
 
         return client
 

@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, TypeVar, cast
+from typing import TYPE_CHECKING, TypeVar, cast, Generic
 
 from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
 
-from ._base import Storage
-
 if TYPE_CHECKING:
     from crawlee.configuration import Configuration
+
+    from ._base import Storage
 
 T = TypeVar('T', bound='Storage')
 
@@ -19,6 +20,22 @@ ClientOpener = Callable[..., Awaitable[StorageClientType]]
 """Type alias for the client opener function."""
 
 
+class StorageClientCache(Generic[T]):
+    """Cache for specific storage client."""
+
+    by_id: dict[type[Storage], dict[str, T]]
+    """Cache for storage instances by ID, separated by storage type."""
+    by_name: dict[type[Storage], dict[str, T]]
+    """Cache for storage instances by name, separated by storage type."""
+    default_instances: dict[type[Storage], T]
+    """Cache for default instances of each storage type."""
+
+    def __init__(self) -> None:
+        self.by_id = defaultdict(lambda: defaultdict(dict))
+        self.by_name = defaultdict(lambda: defaultdict(dict))
+        self.default_instances = defaultdict(dict)
+
+
 class StorageInstanceManager:
     """Manager for caching and managing storage instances.
 
@@ -27,14 +44,7 @@ class StorageInstanceManager:
     """
 
     def __init__(self) -> None:
-        self._cache_by_id = dict[type[Storage], dict[str, Storage]]()
-        """Cache for storage instances by ID, separated by storage type."""
-
-        self._cache_by_name = dict[type[Storage], dict[str, Storage]]()
-        """Cache for storage instances by name, separated by storage type."""
-
-        self._default_instances = dict[type[Storage], Storage]()
-        """Cache for default instances of each storage type."""
+        self._cache_by_storage_client: dict[str, StorageClientCache] = defaultdict(StorageClientCache)
 
     async def open_storage_instance(
         self,
@@ -64,19 +74,23 @@ class StorageInstanceManager:
             raise ValueError('Only one of "id" or "name" can be specified, not both.')
 
         # Check for default instance
-        if id is None and name is None and cls in self._default_instances:
-            return cast('T', self._default_instances[cls])
+        if (
+            id is None
+            and name is None
+            and cls in self._cache_by_storage_client[client_opener.__qualname__].default_instances
+        ):
+            return cast('T', self._cache_by_storage_client[client_opener.__qualname__].default_instances[cls])
 
         # Check cache
         if id is not None:
-            type_cache_by_id = self._cache_by_id.get(cls, {})
+            type_cache_by_id = self._cache_by_storage_client[client_opener.__qualname__].by_id
             if id in type_cache_by_id:
                 cached_instance = type_cache_by_id[id]
                 if isinstance(cached_instance, cls):
                     return cached_instance
 
         if name is not None:
-            type_cache_by_name = self._cache_by_name.get(cls, {})
+            type_cache_by_name = self._cache_by_storage_client[client_opener.__qualname__].by_name
             if name in type_cache_by_name:
                 cached_instance = type_cache_by_name[name]
                 if isinstance(cached_instance, cls):
@@ -90,16 +104,13 @@ class StorageInstanceManager:
         instance_name = getattr(instance, 'name', None)
 
         # Cache the instance
-        type_cache_by_id = self._cache_by_id.setdefault(cls, {})
-        type_cache_by_name = self._cache_by_name.setdefault(cls, {})
-
-        type_cache_by_id[instance.id] = instance
+        self._cache_by_storage_client[client_opener.__qualname__].by_id[cls][instance.id] = instance
         if instance_name is not None:
-            type_cache_by_name[instance_name] = instance
+            self._cache_by_storage_client[client_opener.__qualname__].by_name[cls][instance_name] = instance
 
         # Set as default if no id/name specified
         if id is None and name is None:
-            self._default_instances[cls] = instance
+            self._cache_by_storage_client[client_opener.__qualname__].default_instances[cls] = instance
 
         return instance
 
