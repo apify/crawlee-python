@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore
@@ -57,3 +58,39 @@ async def test_identical_storage(tmp_path: Path) -> None:
         configuration=config,
     )
     assert kvs1 is kvs2
+
+
+async def test_identical_storage_clear_cache(tmp_path: Path) -> None:
+    config = Configuration(
+        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        purge_on_start=True,
+    )
+
+    kvs1 = await KeyValueStore.open(storage_client=MemoryStorageClient(), configuration=config)
+
+    # Clearing cache, so expect different instances
+    service_locator.storage_instance_manager.clear_cache()
+
+    kvs2 = await KeyValueStore.open(
+        storage_client=MemoryStorageClient(),
+        configuration=config,
+    )
+    assert kvs1 is not kvs2
+
+
+async def test_identical_storage_remove_from_cache(tmp_path: Path) -> None:
+    config = Configuration(
+        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        purge_on_start=True,
+    )
+
+    kvs1 = await KeyValueStore.open(storage_client=MemoryStorageClient(), configuration=config)
+
+    # Removing from cache, so expect different instances
+    service_locator.storage_instance_manager.remove_from_cache(kvs1)
+
+    kvs2 = await KeyValueStore.open(
+        storage_client=MemoryStorageClient(),
+        configuration=config,
+    )
+    assert kvs1 is not kvs2

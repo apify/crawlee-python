@@ -138,6 +138,4 @@ class StorageInstanceManager:
 
     def clear_cache(self) -> None:
         """Clear all cached storage instances."""
-        self.by_id: defaultdict[type[Storage], defaultdict[str, Storage]] = defaultdict(lambda: defaultdict())
-        self.by_name: defaultdict[type[Storage], defaultdict[str, Storage]] = defaultdict(lambda: defaultdict())
-        self.default_instances: defaultdict[type[Storage], Storage] = defaultdict()
+        self._cache_by_storage_client = defaultdict(StorageClientCache)
