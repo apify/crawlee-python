@@ -138,7 +138,7 @@ class ProcessedRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: Annotated[str | None, Field(alias='requestId', default=None)] = None
-    """Represents internal representation of the request by the storage client. Only some clients use id."""
+    """Internal representation of the request by the storage client. Only some clients use id."""
 
     unique_key: Annotated[str, Field(alias='uniqueKey')]
     was_already_present: Annotated[bool, Field(alias='wasAlreadyPresent')]
