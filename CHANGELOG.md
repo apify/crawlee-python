@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.0rc1](https://github.com/apify/crawlee-python/releases/tag/v1.0.0rc1) (2025-08-22)
+<!-- git-cliff-unreleased-start -->
+
+## 0.6.13 - **not yet released**
 
 ### 🚀 Features
 
@@ -37,6 +39,7 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Change Dataset unwind parameter to accept list of strings ([#1357](https://github.com/apify/crawlee-python/pull/1357)) ([862a203](https://github.com/apify/crawlee-python/commit/862a20398f00fe91802fe7a1ccd58b05aee053a1)) by [@vdusek](https://github.com/vdusek)
 - [**breaking**] Remove `Request.id` field ([#1366](https://github.com/apify/crawlee-python/pull/1366)) ([32f3580](https://github.com/apify/crawlee-python/commit/32f3580e9775a871924ab1233085d0c549c4cd52)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1358](https://github.com/apify/crawlee-python/issues/1358)
 
+<!-- git-cliff-unreleased-end -->
 
 ## [0.6.12](https://github.com/apify/crawlee-python/releases/tag/v0.6.12) (2025-07-30)
 
