@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING, Any, Literal
 from unittest import mock
 from unittest.mock import Mock
@@ -758,3 +759,28 @@ async def test_extract_links(server_url: URL) -> None:
 
     assert len(extracted_links) == 1
     assert extracted_links[0] == str(server_url / 'page_1')
+
+
+async def test_reduced_logs_from_playwright_navigation_timeout(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO)
+    crawler = PlaywrightCrawler(configure_logging=False)
+    non_existent_page = 'https://totally-non-existing-site.com/blablablba'
+
+    # Capture all logs from the 'crawlee' logger at INFO level or higher
+    with caplog.at_level(logging.INFO, logger='crawlee'):
+        await crawler.run([Request.from_url(non_existent_page)])
+
+    expected_summarized_log = (
+        f'Retrying request to {non_existent_page} due to: Page.goto: net::ERR_NAME_NOT_RESOLVED at {non_existent_page}'
+    )
+
+    # Find the Playwright specific error message in the logs
+    found_playwright_message = False
+    for record in caplog.records:
+        if record.message and expected_summarized_log in record.message:
+            full_message = (record.message or '') + (record.exc_text or '')
+            assert '\n' not in full_message
+            found_playwright_message = True
+            break
+
+    assert found_playwright_message, 'Expected log message about request handler error was not found.'
