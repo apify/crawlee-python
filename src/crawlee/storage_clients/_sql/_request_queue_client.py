@@ -86,7 +86,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         self._request_cache: deque[Request] = deque()
         """Cache for requests: ordered by sequence number."""
 
-        self.in_progress_requests: set[str] = set()
+        self.in_progress_requests: set[int] = set()
         """Set of request IDs currently being processed."""
 
         self._request_cache_needs_refresh = True
@@ -356,7 +356,9 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
 
         request = Request.model_validate_json(request_db.data)
 
-        self.in_progress_requests.add(request.unique_key)
+        request_id = self._get_int_id_from_unique_key(request.unique_key)
+
+        self.in_progress_requests.add(request_id)
 
         return request
 
@@ -372,11 +374,11 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         # Get from cache
         while self._request_cache and next_request is None:
             candidate = self._request_cache.popleft()
-
+            request_id = self._get_int_id_from_unique_key(candidate.unique_key)
             # Only check local state
-            if candidate.unique_key not in self.in_progress_requests:
+            if request_id not in self.in_progress_requests:
                 next_request = candidate
-                self.in_progress_requests.add(next_request.unique_key)
+                self.in_progress_requests.add(request_id)
 
         if not self._request_cache:
             self._is_empty_cache = None
@@ -387,11 +389,10 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         self._is_empty_cache = None
 
-        if request.unique_key not in self.in_progress_requests:
+        request_id = self._get_int_id_from_unique_key(request.unique_key)
+        if request_id not in self.in_progress_requests:
             logger.warning(f'Marking request {request.unique_key} as handled that is not in progress.')
             return None
-
-        request_id = self._get_int_id_from_unique_key(request.unique_key)
 
         # Update request in DB
         stmt = (
@@ -421,7 +422,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
                 await session.rollback()
                 return None
 
-        self.in_progress_requests.discard(request.unique_key)
+        self.in_progress_requests.discard(request_id)
 
         return ProcessedRequest(
             unique_key=request.unique_key,
@@ -438,11 +439,11 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
     ) -> ProcessedRequest | None:
         self._is_empty_cache = None
 
-        if request.unique_key not in self.in_progress_requests:
+        request_id = self._get_int_id_from_unique_key(request.unique_key)
+
+        if request_id not in self.in_progress_requests:
             logger.info(f'Reclaiming request {request.unique_key} that is not in progress.')
             return None
-
-        request_id = self._get_int_id_from_unique_key(request.unique_key)
 
         async with self.get_autocommit_session() as autocommit:
             state = await self._get_state(autocommit)
@@ -470,7 +471,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
             await self._update_metadata(autocommit, update_modified_at=True, update_accessed_at=True)
 
         # Remove from in-progress
-        self.in_progress_requests.discard(request.unique_key)
+        self.in_progress_requests.discard(request_id)
 
         # Invalidate cache or add to cache
         if forefront:
