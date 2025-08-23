@@ -234,7 +234,10 @@ class SQLClientMixin:
         values_to_set.update(self._specific_update_metadata(**kwargs))
 
         if values_to_set:
-            stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id).values(**values_to_set)
+            if (stmt := values_to_set.pop('custom_stmt', None)) is None:
+                stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id)
+
+            stmt = stmt.values(**values_to_set)
             await session.execute(stmt)
             return True
 
