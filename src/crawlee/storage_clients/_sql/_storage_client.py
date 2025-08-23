@@ -36,6 +36,9 @@ class SQLStorageClient(StorageClient):
 
     Database schema is automatically created during initialization. SQLite databases receive performance
     optimizations including WAL mode and increased cache size.
+
+    Warning:
+        This is an experimental feature. The behavior and interface may change in future versions.
     """
 
     _DB_NAME = 'crawlee.db'
