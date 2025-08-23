@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import asyncio
 from collections import deque
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy import select, update
+from cachetools import LRUCache
+from sqlalchemy import or_, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only
 from typing_extensions import override
@@ -59,8 +60,12 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
     _DEFAULT_NAME = 'default'
     """Default dataset name used when no name is provided."""
 
-    _MAX_REQUESTS_IN_CACHE = 1000
-    """Maximum number of requests to keep in cache for faster access."""
+    _MAX_BATCH_FETCH_SIZE = 10
+    """Maximum number of requests to fetch from the database in a single batch operation.
+
+    Used to limit the number of requests loaded and locked for processing at once (improves efficiency and reduces
+    database load).
+    """
 
     _METADATA_TABLE = RequestQueueMetadataDB
     """SQLAlchemy model for request queue metadata."""
@@ -70,6 +75,13 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
 
     _CLIENT_TYPE = 'Request queue'
     """Human-readable client type for error messages."""
+
+    _REQUEST_ID_BY_KEY: LRUCache[str, int] = LRUCache(maxsize=10000)
+    """Cache mapping unique keys to integer IDs."""
+
+    _BLOCK_REQUEST_TIME = 300
+    """Number of seconds for which a request is considered blocked in the database after being fetched for processing.
+    """
 
     def __init__(
         self,
@@ -83,19 +95,8 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         """
         super().__init__(id=id, storage_client=storage_client)
 
-        self._request_cache: deque[Request] = deque()
+        self._pending_fetch_cache: deque[Request] = deque()
         """Cache for requests: ordered by sequence number."""
-
-        self.in_progress_requests: set[int] = set()
-        """Set of request IDs currently being processed."""
-
-        self._request_cache_needs_refresh = True
-        """Flag indicating whether the cache needs to be refreshed from database."""
-
-        self._is_empty_cache: bool | None = None
-        """Cache for is_empty result: None means unknown, True/False is cached state."""
-
-        self._lock = asyncio.Lock()
 
     async def _get_state(self, session: AsyncSession) -> RequestQueueStateDB:
         """Get the current state of the request queue."""
@@ -159,9 +160,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         """
         await self._drop()
 
-        self._request_cache.clear()
-        self._request_cache_needs_refresh = True
-        self._is_empty_cache = None
+        self._pending_fetch_cache.clear()
 
     @override
     async def purge(self) -> None:
@@ -175,11 +174,8 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
             }
         )
 
-        self._is_empty_cache = None
-
         # Clear recoverable state
-        self._request_cache.clear()
-        self._request_cache_needs_refresh = True
+        self._pending_fetch_cache.clear()
 
     async def _add_batch_of_requests_optimization(
         self,
@@ -191,7 +187,6 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
             return AddRequestsResponse(processed_requests=[], unprocessed_requests=[])
 
         # Clear empty cache since we're adding requests
-        self._is_empty_cache = None
         processed_requests = []
         unprocessed_requests = []
 
@@ -206,6 +201,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
                 request_id = self._get_int_id_from_unique_key(req.unique_key)
                 unique_requests[request_id] = req
                 unique_key_by_request_id[request_id] = req.unique_key
+                self._REQUEST_ID_BY_KEY[req.unique_key] = request_id
 
         # Get existing requests by unique keys
         stmt = (
@@ -314,9 +310,6 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
                     ]
                 )
 
-        if forefront:
-            self._request_cache_needs_refresh = True
-
         return AddRequestsResponse(
             processed_requests=processed_requests,
             unprocessed_requests=unprocessed_requests,
@@ -336,7 +329,10 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
 
     @override
     async def get_request(self, unique_key: str) -> Request | None:
-        request_id = self._get_int_id_from_unique_key(unique_key)
+        if not (request_id := self._REQUEST_ID_BY_KEY.get(unique_key)):
+            request_id = self._get_int_id_from_unique_key(unique_key)
+            self._REQUEST_ID_BY_KEY[unique_key] = request_id
+
         stmt = select(self._ITEM_TABLE).where(
             self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id
         )
@@ -354,60 +350,92 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
             if updated:
                 await session.commit()
 
-        request = Request.model_validate_json(request_db.data)
-
-        request_id = self._get_int_id_from_unique_key(request.unique_key)
-
-        self.in_progress_requests.add(request_id)
-
-        return request
+        return Request.model_validate_json(request_db.data)
 
     @override
     async def fetch_next_request(self) -> Request | None:
-        # Refresh cache if needed
-        async with self._lock:
-            if self._request_cache_needs_refresh or not self._request_cache:
-                await self._refresh_cache()
+        if self._pending_fetch_cache:
+            return self._pending_fetch_cache.popleft()
 
-        next_request = None
+        now = datetime.now(timezone.utc)
+        block_until = now + timedelta(seconds=self._BLOCK_REQUEST_TIME)
+        dialect = self._storage_client.get_dialect_name()
 
-        # Get from cache
-        while self._request_cache and next_request is None:
-            candidate = self._request_cache.popleft()
-            request_id = self._get_int_id_from_unique_key(candidate.unique_key)
-            # Only check local state
-            if request_id not in self.in_progress_requests:
-                next_request = candidate
-                self.in_progress_requests.add(request_id)
+        # Get available requests not blocked by another client
+        stmt = (
+            select(self._ITEM_TABLE)
+            .where(
+                self._ITEM_TABLE.metadata_id == self._id,
+                self._ITEM_TABLE.is_handled.is_(False),
+                or_(self._ITEM_TABLE.time_blocked_until.is_(None), self._ITEM_TABLE.time_blocked_until < now),
+            )
+            .order_by(self._ITEM_TABLE.sequence_number.asc())
+            .limit(self._MAX_BATCH_FETCH_SIZE)
+        )
 
-        if not self._request_cache:
-            self._is_empty_cache = None
+        # We use the `skip_locked` database mechanism to prevent the “interception” of requests by another client
+        if dialect in {'postgresql', 'mysql'}:
+            stmt = stmt.with_for_update(skip_locked=True)
 
-        return next_request
+        async with self.get_session() as session:
+            result = await session.execute(stmt)
+            requests_db = result.scalars().all()
+            if not requests_db:
+                return None
+
+            request_ids = {r.request_id for r in requests_db}
+
+            # Mark the requests as blocked
+            update_stmt = (
+                update(self._ITEM_TABLE)
+                .where(
+                    self._ITEM_TABLE.metadata_id == self._id,
+                    self._ITEM_TABLE.request_id.in_(request_ids),
+                    self._ITEM_TABLE.is_handled.is_(False),
+                    or_(self._ITEM_TABLE.time_blocked_until.is_(None), self._ITEM_TABLE.time_blocked_until < now),
+                )
+                .values(time_blocked_until=block_until)
+                .returning(self._ITEM_TABLE.request_id)
+            )
+
+            update_result = await session.execute(update_stmt)
+
+            # Get IDs of successfully blocked requests
+            blocked_ids = {row[0] for row in update_result.fetchall()}
+
+            if not blocked_ids:
+                await session.rollback()
+                return None
+
+            await self._update_metadata(session, update_accessed_at=True)
+
+            await session.commit()
+
+        requests = [Request.model_validate_json(r.data) for r in requests_db if r.request_id in blocked_ids]
+
+        if not requests:
+            return None
+
+        self._pending_fetch_cache.extend(requests[1:])
+
+        return requests[0]
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
-        self._is_empty_cache = None
-
-        request_id = self._get_int_id_from_unique_key(request.unique_key)
-        if request_id not in self.in_progress_requests:
-            logger.warning(f'Marking request {request.unique_key} as handled that is not in progress.')
-            return None
+        if not (request_id := self._REQUEST_ID_BY_KEY.get(request.unique_key)):
+            request_id = self._get_int_id_from_unique_key(request.unique_key)
 
         # Update request in DB
         stmt = (
             update(self._ITEM_TABLE)
             .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id)
-            .values(is_handled=True)
+            .values(is_handled=True, time_blocked_until=None)
         )
-
         async with self.get_session() as session:
             result = await session.execute(stmt)
-
             if result.rowcount == 0:
                 logger.warning(f'Request {request.unique_key} not found in database.')
                 return None
-
             await self._update_metadata(
                 session,
                 delta_handled_request_count=1,
@@ -415,15 +443,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
                 update_modified_at=True,
                 update_accessed_at=True,
             )
-
-            try:
-                await session.commit()
-            except SQLAlchemyError:
-                await session.rollback()
-                return None
-
-        self.in_progress_requests.discard(request_id)
-
+            await session.commit()
         return ProcessedRequest(
             unique_key=request.unique_key,
             was_already_present=True,
@@ -437,13 +457,12 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         *,
         forefront: bool = False,
     ) -> ProcessedRequest | None:
-        self._is_empty_cache = None
+        if not (request_id := self._REQUEST_ID_BY_KEY.get(request.unique_key)):
+            request_id = self._get_int_id_from_unique_key(request.unique_key)
 
-        request_id = self._get_int_id_from_unique_key(request.unique_key)
-
-        if request_id not in self.in_progress_requests:
-            logger.info(f'Reclaiming request {request.unique_key} that is not in progress.')
-            return None
+        stmt = update(self._ITEM_TABLE).where(
+            self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id
+        )
 
         async with self.get_autocommit_session() as autocommit:
             state = await self._get_state(autocommit)
@@ -452,33 +471,24 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
             if forefront:
                 new_sequence = state.forefront_sequence_counter
                 state.forefront_sequence_counter -= 1
+                now = datetime.now(timezone.utc)
+                block_until = now + timedelta(seconds=self._BLOCK_REQUEST_TIME)
+                # Extend blocking for forefront request, it is considered blocked by the current client.
+                stmt = stmt.values(sequence_number=new_sequence, time_blocked_until=block_until)
             else:
                 new_sequence = state.sequence_counter
                 state.sequence_counter += 1
-
-            stmt = (
-                update(self._ITEM_TABLE)
-                .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id)
-                .values(sequence_number=new_sequence)
-            )
+                stmt = stmt.values(sequence_number=new_sequence, time_blocked_until=None)
 
             result = await autocommit.execute(stmt)
-
             if result.rowcount == 0:
                 logger.warning(f'Request {request.unique_key} not found in database.')
                 return None
-
             await self._update_metadata(autocommit, update_modified_at=True, update_accessed_at=True)
 
-        # Remove from in-progress
-        self.in_progress_requests.discard(request_id)
-
-        # Invalidate cache or add to cache
+        # put the forefront request at the beginning of the cache
         if forefront:
-            self._request_cache_needs_refresh = True
-        elif len(self._request_cache) < self._MAX_REQUESTS_IN_CACHE:
-            # For regular requests, we can add to the end if there's space
-            self._request_cache.append(request)
+            self._pending_fetch_cache.appendleft(request)
 
         return ProcessedRequest(
             unique_key=request.unique_key,
@@ -488,12 +498,8 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
 
     @override
     async def is_empty(self) -> bool:
-        if self._is_empty_cache is not None:
-            return self._is_empty_cache
-
-        # If there are in-progress requests, not empty
-        if len(self.in_progress_requests) > 0:
-            self._is_empty_cache = False
+        # Check in-memory cache for requests
+        if self._pending_fetch_cache:
             return False
 
         # Check database for unhandled requests
@@ -502,41 +508,14 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
             if not metadata_orm:
                 raise ValueError(f'Request queue with ID "{self._id}" not found.')
 
-            self._is_empty_cache = metadata_orm.pending_request_count == 0
+            empty = metadata_orm.pending_request_count == 0
             updated = await self._update_metadata(session, update_accessed_at=True)
 
             # Commit updates to the metadata
             if updated:
                 await session.commit()
 
-        return self._is_empty_cache
-
-    async def _refresh_cache(self) -> None:
-        """Refresh the request cache from database."""
-        self._request_cache.clear()
-
-        async with self.get_session() as session:
-            # Simple query - get unhandled requests not in progress
-            stmt = (
-                select(self._ITEM_TABLE)
-                .where(
-                    self._ITEM_TABLE.metadata_id == self._id,
-                    self._ITEM_TABLE.is_handled == False,  # noqa: E712
-                    self._ITEM_TABLE.request_id.notin_(self.in_progress_requests),
-                )
-                .order_by(self._ITEM_TABLE.sequence_number.asc())
-                .limit(self._MAX_REQUESTS_IN_CACHE)
-            )
-
-            result = await session.execute(stmt)
-            request_dbs = result.scalars().all()
-
-        # Add to cache in order
-        for request_db in request_dbs:
-            request = Request.model_validate_json(request_db.data)
-            self._request_cache.append(request)
-
-        self._request_cache_needs_refresh = False
+        return empty
 
     async def _update_metadata(
         self,

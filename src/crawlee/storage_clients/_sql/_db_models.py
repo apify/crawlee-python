@@ -178,8 +178,7 @@ class RequestDB(Base):
 
     __tablename__ = 'request'
     __table_args__ = (
-        # Index for efficient SELECT to cache
-        Index('idx_queue_handled_seq', 'metadata_id', 'is_handled', 'sequence_number'),
+        Index('idx_fetch_available', 'metadata_id', 'is_handled', 'time_blocked_until', 'sequence_number'),
     )
 
     request_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -198,6 +197,9 @@ class RequestDB(Base):
 
     is_handled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     """Processing status flag."""
+
+    time_blocked_until: Mapped[datetime | None] = mapped_column(AwareDateTime, nullable=True)
+    """Timestamp until which this request is considered blocked for processing by other clients."""
 
     # Relationship back to metadata table
     queue: Mapped[RequestQueueMetadataDB] = relationship(back_populates='requests')
