@@ -14,6 +14,8 @@ import FileSystemStorageClientBasicExample from '!!raw-loader!roa-loader!./code_
 import FileSystemStorageClientConfigurationExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/file_system_storage_client_configuration_example.py';
 import CustomStorageClientExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/custom_storage_client_example.py';
 import RegisteringStorageClientsExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/registering_storage_clients_example.py';
+import SQLStorageClientBasicExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/sql_storage_client_basic_example.py';
+import SQLStorageClientConfigurationExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/sql_storage_client_configuration_example.py';
 
 Storage clients provide a unified interface for interacting with <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, regardless of the underlying implementation. They handle operations like creating, reading, updating, and deleting storage instances, as well as managing data persistence and cleanup. This abstraction makes it easy to switch between different environments, such as local development and cloud production setups.
 
@@ -50,6 +52,8 @@ class FileSystemStorageClient
 
 class MemoryStorageClient
 
+class SQLStorageClient
+
 class ApifyStorageClient
 
 %% ========================
@@ -58,6 +62,7 @@ class ApifyStorageClient
 
 StorageClient --|> FileSystemStorageClient
 StorageClient --|> MemoryStorageClient
+StorageClient --|> SQLStorageClient
 StorageClient --|> ApifyStorageClient
 ```
 
@@ -123,6 +128,94 @@ The `MemoryStorageClient` does not persist data between runs. All data is lost w
 
 <RunnableCodeBlock className="language-python" language="python">
     {MemoryStorageClientBasicExample}
+</RunnableCodeBlock>
+
+### SQL storage client
+
+:::warning Experimental feature
+The `SQLStorageClient` is experimental. Its API and behavior may change in future releases.
+:::
+
+The <ApiLink to="class/SQLStorageClient">`SQLStorageClient`</ApiLink> provides persistent storage using a SQL database ([SQLite](https://sqlite.org/) by default, or [PostgreSQL](https://www.postgresql.org/)). It supports all Crawlee storage types and enables concurrent access from multiple independent clients or processes.
+
+:::note dependencies
+Use crawlee['sql_storage'] for SQLite and crawlee['sql_storage_posgres'] for PostgreSQL
+:::
+
+<RunnableCodeBlock className="language-python" language="python">
+    {SQLStorageClientBasicExample}
+</RunnableCodeBlock>
+
+Data is organized in relational tables. Below are the main tables and columns used for each storage type:
+
+```text
+{DATABASE}
+├── dataset_metadata
+│   ├── id (PK)
+│   ├── name
+│   ├── accessed_at
+│   ├── created_at
+│   ├── modified_at
+│   └── item_count
+├── dataset_item
+│   ├── order_id (PK)
+│   ├── metadata_id (FK)
+│   └── data
+├── kvs_metadata
+│   ├── id (PK)
+│   ├── name
+│   ├── accessed_at
+│   ├── created_at
+│   └── modified_at
+├── kvs_record
+│   ├── metadata_id (FK, PK)
+│   ├── key (PK)
+│   ├── value
+│   ├── content_type
+│   └── size
+├── request_queue_metadata
+│   ├── id (PK)
+│   ├── name
+│   ├── accessed_at
+│   ├── created_at
+│   ├── modified_at
+│   ├── had_multiple_clients
+│   ├── handled_request_count
+│   ├── pending_request_count
+│   └── total_request_count
+├── request
+│   ├── request_id (PK)
+│   ├── metadata_id (FK, PK)
+│   ├── data
+│   ├── sequence_number
+│   ├── is_handled
+│   └── time_blocked_until
+└── request_queue_state
+    ├── metadata_id (PK, FK)
+    ├── sequence_counter
+    └── forefront_sequence_counter
+```
+
+Where:
+
+- Each *_metadata table stores metadata for the storage instance.
+- Data tables (dataset_item, kvs_record, request) store the actual items, records, or requests.
+- request_queue_state is technical table for queue.
+- Foreign keys (`metadata_id`) link data to the corresponding metadata record.
+
+Configuration options for the <ApiLink to="class/SQLStorageClient">`SQLStorageClient`</ApiLink> can be set through environment variables or the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class:
+
+- **`storage_dir`** (env: `CRAWLEE_STORAGE_DIR`, default: `'./storage'`) - The root directory where the default SQLite database will be created if no connection string is provided.
+- **`purge_on_start`** (env: `CRAWLEE_PURGE_ON_START`, default: `True`) - Whether to purge default storages on start.
+
+Configuration options for the <ApiLink to="class/SQLStorageClient">SQLStorageClient</ApiLink> can be set via constructor arguments:
+
+- **`connection_string`** (default: SQLite in <ApiLink to="class/Configuration">Configuration</ApiLink> storage dir) – SQLAlchemy connection string, e.g. 'sqlite+aiosqlite:///my.db' or 'postgresql+asyncpg://user:pass@host/db'.
+- **`engine`** – Pre-configured SQLAlchemy AsyncEngine (optional).
+- **`accessed_modified_update_interval`** – Minimum interval between metadata timestamp updates (default: 1 second). Reducing this parameter can significantly increase the load on the database.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {SQLStorageClientConfigurationExample}
 </RunnableCodeBlock>
 
 ## Creating a custom storage client
