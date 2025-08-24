@@ -113,7 +113,9 @@ class SQLDatasetClient(DatasetClient, SQLClientMixin):
 
         Resets item_count to 0 and deletes all records from dataset_item table.
         """
-        await self._purge(metadata_kwargs={'new_item_count': 0, 'update_accessed_at': True, 'update_modified_at': True})
+        await self._purge(
+            metadata_kwargs={'new_item_count': 0, 'update_accessed_at': True, 'update_modified_at': True, 'force': True}
+        )
 
     @override
     async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
@@ -139,7 +141,7 @@ class SQLDatasetClient(DatasetClient, SQLClientMixin):
             await autocommit.execute(stmt)
 
             await self._update_metadata(
-                autocommit, update_accessed_at=True, update_modified_at=True, delta_item_count=len(data)
+                autocommit, update_accessed_at=True, update_modified_at=True, delta_item_count=len(data), force=True
             )
 
     def _prepare_get_stmt(

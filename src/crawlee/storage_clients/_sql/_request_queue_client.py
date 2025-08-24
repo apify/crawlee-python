@@ -171,6 +171,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
                 'update_modified_at': True,
                 'new_pending_request_count': 0,
                 'new_handled_request_count': 0,
+                'force': True,
             }
         )
 
@@ -292,6 +293,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
                 recalculate=metadata_recalculate,
                 update_modified_at=True,
                 update_accessed_at=True,
+                force=metadata_recalculate,
             )
 
             try:
@@ -301,10 +303,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
                 logger.warning(f'Failed to commit session: {e}')
                 await self._block_metadata_for_update(session)
                 await self._update_metadata(
-                    session,
-                    recalculate=True,
-                    update_modified_at=True,
-                    update_accessed_at=True,
+                    session, recalculate=True, update_modified_at=True, update_accessed_at=True, force=True
                 )
                 processed_requests.clear()
                 unprocessed_requests.extend(
@@ -451,6 +450,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
                 delta_pending_request_count=-1,
                 update_modified_at=True,
                 update_accessed_at=True,
+                force=True,
             )
             await session.commit()
         return ProcessedRequest(

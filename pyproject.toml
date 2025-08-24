@@ -71,6 +71,10 @@ otel = [
     "opentelemetry-semantic-conventions>=0.54",
     "wrapt>=1.17.0",
 ]
+sql_storage_posgres = [
+    "sqlalchemy[asyncio]~=2.0.0,<3.0.0",
+    "asyncpg>=0.24.0"
+]
 sql_storage = [
     "sqlalchemy[asyncio]~=2.0.0,<3.0.0",
     "aiosqlite>=0.21.0",

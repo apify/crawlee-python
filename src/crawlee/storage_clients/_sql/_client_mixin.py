@@ -60,6 +60,7 @@ class SQLClientMixin:
 
         # Time tracking to reduce database writes during frequent operation
         self._accessed_at_allow_update_after: datetime | None = None
+        self._modified_at_allow_update_after: datetime | None = None
         self._accessed_modified_update_interval = storage_client.get_accessed_modified_update_interval()
 
     def get_session(self) -> AsyncSession:
@@ -167,25 +168,42 @@ class SQLClientMixin:
             await autocommit.execute(stmt)
 
     def _default_update_metadata(
-        self, *, update_accessed_at: bool = False, update_modified_at: bool = False
+        self, *, update_accessed_at: bool = False, update_modified_at: bool = False, force: bool = False
     ) -> dict[str, Any]:
         """Prepare common metadata updates with rate limiting.
 
         Args:
             update_accessed_at: Whether to update accessed_at timestamp
             update_modified_at: Whether to update modified_at timestamp
+            force: Whether to force the update regardless of rate limiting
         """
-        now = datetime.now(timezone.utc)
         values_to_set: dict[str, Any] = {}
+        now = datetime.now(timezone.utc)
 
-        if update_accessed_at and (
-            self._accessed_at_allow_update_after is None or (now >= self._accessed_at_allow_update_after)
+        # If the record must be updated (for example, when updating counters), we update timestamps and shift the time.
+        if force:
+            if update_modified_at:
+                values_to_set['modified_at'] = now
+                self._modified_at_allow_update_after = now + self._accessed_modified_update_interval
+            if update_accessed_at:
+                values_to_set['accessed_at'] = now
+                self._accessed_at_allow_update_after = now + self._accessed_modified_update_interval
+
+        elif update_modified_at and (
+            self._modified_at_allow_update_after is None or now >= self._modified_at_allow_update_after
+        ):
+            values_to_set['modified_at'] = now
+            self._modified_at_allow_update_after = now + self._accessed_modified_update_interval
+            # The record will be updated, we can update `accessed_at` and shift the time.
+            if update_accessed_at:
+                values_to_set['accessed_at'] = now
+                self._accessed_at_allow_update_after = now + self._accessed_modified_update_interval
+
+        elif update_accessed_at and (
+            self._accessed_at_allow_update_after is None or now >= self._accessed_at_allow_update_after
         ):
             values_to_set['accessed_at'] = now
             self._accessed_at_allow_update_after = now + self._accessed_modified_update_interval
-
-        if update_modified_at:
-            values_to_set['modified_at'] = now
 
         return values_to_set
 
@@ -205,6 +223,7 @@ class SQLClientMixin:
         *,
         update_accessed_at: bool = False,
         update_modified_at: bool = False,
+        force: bool = False,
         **kwargs: Any,
     ) -> bool:
         """Update storage metadata combining common and specific fields.
@@ -213,13 +232,14 @@ class SQLClientMixin:
             session: Active database session
             update_accessed_at: Whether to update accessed_at timestamp
             update_modified_at: Whether to update modified_at timestamp
+            force: Whether to force the update timestamps regardless of rate limiting
             **kwargs: Additional arguments for _specific_update_metadata
 
         Returns:
             True if any updates were made, False otherwise
         """
         values_to_set = self._default_update_metadata(
-            update_accessed_at=update_accessed_at, update_modified_at=update_modified_at
+            update_accessed_at=update_accessed_at, update_modified_at=update_modified_at, force=force
         )
 
         values_to_set.update(self._specific_update_metadata(**kwargs))
