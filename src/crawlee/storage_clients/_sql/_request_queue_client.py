@@ -331,7 +331,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         *,
         forefront: bool = False,
     ) -> AddRequestsResponse:
-        if self._storage_client.get_dialect_name() in {'sqlite', 'postgresql', 'mysql'}:
+        if self._storage_client.get_dialect_name() in {'sqlite', 'postgresql'}:
             return await self._add_batch_of_requests_optimization(requests, forefront=forefront)
 
         raise NotImplementedError('Batch addition is not supported for this database dialect.')
@@ -383,7 +383,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         )
 
         # We use the `skip_locked` database mechanism to prevent the “interception” of requests by another client
-        if dialect in {'postgresql', 'mysql'}:
+        if dialect == 'postgresql':
             stmt = stmt.with_for_update(skip_locked=True)
 
         async with self.get_session() as session:
@@ -527,7 +527,7 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         return empty
 
     async def _block_metadata_for_update(self, session: AsyncSession) -> None:
-        if self._storage_client.get_dialect_name() in {'postgresql', 'mysql'}:
+        if self._storage_client.get_dialect_name() == 'postgresql':
             stmt = select(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id).with_for_update()
             await session.execute(stmt)
 

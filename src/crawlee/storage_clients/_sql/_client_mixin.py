@@ -6,7 +6,6 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from sqlalchemy import delete, select, text, update
-from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as lite_insert
 from sqlalchemy.exc import SQLAlchemyError
@@ -106,9 +105,6 @@ class SQLClientMixin:
         if dialect == 'postgresql':
             return pg_insert(table_model).values(insert_values).on_conflict_do_nothing()
 
-        if dialect == 'mysql':
-            return mysql_insert(table_model).values(insert_values).on_duplicate_key_update()
-
         if dialect == 'sqlite':
             return lite_insert(table_model).values(insert_values).on_conflict_do_nothing()
 
@@ -144,11 +140,6 @@ class SQLClientMixin:
             lite_stmt = lite_insert(table_model).values(insert_values)
             set_ = {col: getattr(lite_stmt.excluded, col) for col in update_columns}
             return lite_stmt.on_conflict_do_update(index_elements=conflict_cols, set_=set_)
-
-        if dialect == 'mysql':
-            mysql_stmt = mysql_insert(table_model).values(insert_values)
-            set_ = {col: mysql_stmt.inserted[col] for col in update_columns}
-            return mysql_stmt.on_duplicate_key_update(**set_)
 
         raise NotImplementedError(f'Upsert not supported for dialect: {dialect}')
 
