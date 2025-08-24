@@ -130,8 +130,15 @@ class SQLStorageClient(StorageClient):
         if not self._initialized:
             engine = self._get_or_create_engine(configuration)
             async with engine.begin() as conn:
-                # Set SQLite pragmas for performance and consistency
                 self._dialect_name = engine.dialect.name
+
+                if self._dialect_name not in ('sqlite', 'postgresql'):
+                    raise ValueError(
+                        f'Unsupported database dialect: {self._dialect_name}. Supported: sqlite, postgresql.\n',
+                        'Consider using a different database.',
+                    )
+
+                # Set SQLite pragmas for performance and consistency
                 if self._default_flag:
                     await conn.execute(text('PRAGMA journal_mode=WAL'))  # Better concurrency
                     await conn.execute(text('PRAGMA synchronous=NORMAL'))  # Balanced safety/speed

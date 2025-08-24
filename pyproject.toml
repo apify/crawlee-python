@@ -48,7 +48,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-all = ["crawlee[adaptive-crawler,beautifulsoup,cli,curl-impersonate,httpx,parsel,playwright,otel,sql]"]
+all = ["crawlee[adaptive-crawler,beautifulsoup,cli,curl-impersonate,httpx,parsel,playwright,otel,sql_storage]"]
 adaptive-crawler = [
     "jaro-winkler>=2.0.3",
     "playwright>=1.27.0",
@@ -71,7 +71,7 @@ otel = [
     "opentelemetry-semantic-conventions>=0.54",
     "wrapt>=1.17.0",
 ]
-sql = [
+sql_storage = [
     "sqlalchemy[asyncio]~=2.0.0,<3.0.0",
     "aiosqlite>=0.21.0",
 ]
