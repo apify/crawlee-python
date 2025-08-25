@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient, SQLStorageClient
 from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
@@ -19,11 +19,13 @@ if TYPE_CHECKING:
     from crawlee.storage_clients import StorageClient
 
 
-@pytest.fixture(params=['memory', 'file_system'])
+@pytest.fixture(params=['memory', 'file_system', 'sql'])
 def storage_client(request: pytest.FixtureRequest) -> StorageClient:
     """Parameterized fixture to test with different storage clients."""
     if request.param == 'memory':
         return MemoryStorageClient()
+    if request.param == 'sql':
+        return SQLStorageClient()
 
     return FileSystemStorageClient()
 

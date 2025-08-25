@@ -31,11 +31,7 @@ class FileSystemStorageClient(StorageClient):
 
     @override
     async def create_dataset_client(
-        self,
-        *,
-        id: str | None = None,
-        name: str | None = None,
-        configuration: Configuration | None = None,
+        self, *, id: str | None = None, name: str | None = None, configuration: Configuration | None = None
     ) -> FileSystemDatasetClient:
         configuration = configuration or Configuration.get_global_configuration()
         client = await FileSystemDatasetClient.open(id=id, name=name, configuration=configuration)
