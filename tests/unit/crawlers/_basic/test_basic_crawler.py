@@ -1368,7 +1368,7 @@ async def test_reduced_logs_from_timed_out_request_handler(caplog: pytest.LogCap
     for record in caplog.records:
         if record.message and 'timed out after 1.0 seconds' in record.message:
             full_message = (record.message or '') + (record.exc_text or '')
-            assert Counter(full_message)['\n'] < 10
+            assert '\n' not in full_message
             assert '# INJECTED DELAY' in full_message
             found_timeout_message = True
             break

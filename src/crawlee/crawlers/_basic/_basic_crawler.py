@@ -1031,8 +1031,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if self._should_retry_request(context, error):
             request.retry_count += 1
+            reduced_error = str(error).split('\n')[0]
             self.log.warning(
-                f'Retrying request to {context.request.url} due to: {error} \n'
+                f'Retrying request to {context.request.url} due to: {reduced_error}'
                 f'{get_one_line_error_summary_if_possible(error)}'
             )
             await self._statistics.error_tracker.add(error=error, context=context)
