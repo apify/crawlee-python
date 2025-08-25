@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from logging import getLogger
 from typing import TYPE_CHECKING, Literal, TypedDict
+from xml.sax import SAXParseException
 from xml.sax.expatreader import ExpatParser
 from xml.sax.handler import ContentHandler
 
@@ -192,7 +193,8 @@ class _XmlSitemapParser:
 
     def close(self) -> None:
         """Clean up resources."""
-        self._parser.close()
+        with suppress(SAXParseException):
+            self._parser.close()
 
 
 def _get_parser(content_type: str = '', url: str | None = None) -> _XmlSitemapParser | _TxtSitemapParser:
