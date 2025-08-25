@@ -38,6 +38,7 @@ class RecoverableState(Generic[TStateModel]):
         persist_state_kvs_name: str | None = None,
         persist_state_kvs_id: str | None = None,
         logger: logging.Logger,
+        key_value_store: None | KeyValueStore = None,
     ) -> None:
         """Initialize a new recoverable state object.
 
@@ -52,6 +53,8 @@ class RecoverableState(Generic[TStateModel]):
             persist_state_kvs_id: The identifier of the KeyValueStore to use for persistence.
                 If neither a name nor and id are supplied, the default store will be used.
             logger: A logger instance for logging operations related to state persistence
+            key_value_store: KeyValueStore to use for persistence. If not provided, the service locator is used to
+                provide suitable KeyValueStore.
         """
         self._default_state = default_state
         self._state_type: type[TStateModel] = self._default_state.__class__
@@ -60,7 +63,7 @@ class RecoverableState(Generic[TStateModel]):
         self._persist_state_key = persist_state_key
         self._persist_state_kvs_name = persist_state_kvs_name
         self._persist_state_kvs_id = persist_state_kvs_id
-        self._key_value_store: 'KeyValueStore | None' = None  # noqa: UP037
+        self._key_value_store = key_value_store
         self._log = logger
 
     async def initialize(self) -> TStateModel:
@@ -79,9 +82,10 @@ class RecoverableState(Generic[TStateModel]):
         # Import here to avoid circular imports.
         from crawlee.storages._key_value_store import KeyValueStore  # noqa: PLC0415
 
-        self._key_value_store = await KeyValueStore.open(
-            name=self._persist_state_kvs_name, id=self._persist_state_kvs_id
-        )
+        if not self._key_value_store:
+            self._key_value_store = await KeyValueStore.open(
+                name=self._persist_state_kvs_name, id=self._persist_state_kvs_id
+            )
 
         await self._load_saved_state()
 
