@@ -7,6 +7,7 @@ from crawlee.storage_clients import SQLStorageClient
 
 async def main() -> None:
     # Create a new instance of storage client.
+    # On first run, also creates tables in your PostgreSQL database.
     # Use the context manager to ensure that connections are properly cleaned up.
     async with SQLStorageClient(
         # Create an `engine` with the desired configuration

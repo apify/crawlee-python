@@ -669,6 +669,7 @@ adaptive-crawler = [
 all = [
     { name = "aiosqlite" },
     { name = "apify-fingerprint-datapoints" },
+    { name = "asyncpg" },
     { name = "beautifulsoup4", extra = ["lxml"] },
     { name = "browserforge" },
     { name = "cookiecutter" },
@@ -730,7 +731,7 @@ sql-storage = [
     { name = "aiosqlite" },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
-sql-storage-posgres = [
+sql-storage-postgres = [
     { name = "asyncpg" },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
@@ -765,7 +766,7 @@ requires-dist = [
     { name = "apify-fingerprint-datapoints", marker = "extra == 'adaptive-crawler'", specifier = ">=0.0.2" },
     { name = "apify-fingerprint-datapoints", marker = "extra == 'httpx'", specifier = ">=0.0.2" },
     { name = "apify-fingerprint-datapoints", marker = "extra == 'playwright'", specifier = ">=0.0.2" },
-    { name = "asyncpg", marker = "extra == 'sql-storage-posgres'", specifier = ">=0.24.0" },
+    { name = "asyncpg", marker = "extra == 'sql-storage-postgres'", specifier = ">=0.24.0" },
     { name = "beautifulsoup4", extras = ["lxml"], marker = "extra == 'beautifulsoup'", specifier = ">=4.12.0" },
     { name = "browserforge", marker = "extra == 'adaptive-crawler'", specifier = ">=1.2.3" },
     { name = "browserforge", marker = "extra == 'httpx'", specifier = ">=1.2.3" },
@@ -773,7 +774,7 @@ requires-dist = [
     { name = "cachetools", specifier = ">=5.5.0" },
     { name = "colorama", specifier = ">=0.4.0" },
     { name = "cookiecutter", marker = "extra == 'cli'", specifier = ">=2.6.0" },
-    { name = "crawlee", extras = ["adaptive-crawler", "beautifulsoup", "cli", "curl-impersonate", "httpx", "parsel", "playwright", "otel", "sql-storage"], marker = "extra == 'all'" },
+    { name = "crawlee", extras = ["adaptive-crawler", "beautifulsoup", "cli", "curl-impersonate", "httpx", "parsel", "playwright", "otel", "sql-storage", "sql-storage-postgres"], marker = "extra == 'all'" },
     { name = "curl-cffi", marker = "extra == 'curl-impersonate'", specifier = ">=0.9.0" },
     { name = "html5lib", marker = "extra == 'beautifulsoup'", specifier = ">=1.0" },
     { name = "httpx", extras = ["brotli", "http2", "zstd"], marker = "extra == 'httpx'", specifier = ">=0.27.0" },
@@ -798,14 +799,14 @@ requires-dist = [
     { name = "rich", marker = "extra == 'cli'", specifier = ">=13.9.0" },
     { name = "scikit-learn", marker = "extra == 'adaptive-crawler'", specifier = ">=1.6.0" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql-storage'", specifier = "~=2.0.0,<3.0.0" },
-    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql-storage-posgres'", specifier = "~=2.0.0,<3.0.0" },
+    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql-storage-postgres'", specifier = "~=2.0.0,<3.0.0" },
     { name = "tldextract", specifier = ">=5.1.0" },
     { name = "typer", marker = "extra == 'cli'", specifier = ">=0.12.0" },
     { name = "typing-extensions", specifier = ">=4.1.0" },
     { name = "wrapt", marker = "extra == 'otel'", specifier = ">=1.17.0" },
     { name = "yarl", specifier = ">=1.18.0" },
 ]
-provides-extras = ["all", "adaptive-crawler", "beautifulsoup", "cli", "curl-impersonate", "httpx", "parsel", "playwright", "otel", "sql-storage-posgres", "sql-storage"]
+provides-extras = ["all", "adaptive-crawler", "beautifulsoup", "cli", "curl-impersonate", "httpx", "parsel", "playwright", "otel", "sql-storage-postgres", "sql-storage"]
 
 [package.metadata.requires-dev]
 dev = [

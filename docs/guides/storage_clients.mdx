@@ -148,60 +148,139 @@ Use crawlee['sql_storage'] for SQLite and crawlee['sql_storage_posgres'] for Pos
 
 Data is organized in relational tables. Below are the main tables and columns used for each storage type:
 
-```text
-{DATABASE}
-├── dataset_metadata
-│   ├── id (PK)
-│   ├── name
-│   ├── accessed_at
-│   ├── created_at
-│   ├── modified_at
-│   └── item_count
-├── dataset_item
-│   ├── order_id (PK)
-│   ├── metadata_id (FK)
-│   └── data
-├── kvs_metadata
-│   ├── id (PK)
-│   ├── name
-│   ├── accessed_at
-│   ├── created_at
-│   └── modified_at
-├── kvs_record
-│   ├── metadata_id (FK, PK)
-│   ├── key (PK)
-│   ├── value
-│   ├── content_type
-│   └── size
-├── request_queue_metadata
-│   ├── id (PK)
-│   ├── name
-│   ├── accessed_at
-│   ├── created_at
-│   ├── modified_at
-│   ├── had_multiple_clients
-│   ├── handled_request_count
-│   ├── pending_request_count
-│   └── total_request_count
-├── request
-│   ├── request_id (PK)
-│   ├── metadata_id (FK, PK)
-│   ├── data
-│   ├── sequence_number
-│   ├── is_handled
-│   └── time_blocked_until
-└── request_queue_state
-    ├── metadata_id (PK, FK)
-    ├── sequence_counter
-    └── forefront_sequence_counter
+```mermaid
+---
+config:
+    class:
+        hideEmptyMembersBox: true
+---
+
+classDiagram
+
+%% ========================
+%% Storage Clients
+%% ========================
+
+class SQLDatasetClient {
+    <<Dataset Storage>>
+}
+
+class SQLKeyValueStoreClient {
+    <<Key-Value Store>>
+}
+
+%% ========================
+%% Dataset Tables
+%% ========================
+
+class dataset_metadata {
+    <<table>>
+    + id (PK)
+    + name
+    + accessed_at
+    + created_at
+    + modified_at
+    + item_count
+}
+
+class dataset_item {
+    <<table>>
+    + order_id (PK)
+    + metadata_id (FK)
+    + data
+}
+
+%% ========================
+%% Key-Value Store Tables
+%% ========================
+
+class kvs_metadata {
+    <<table>>
+    + id (PK)
+    + name
+    + accessed_at
+    + created_at
+    + modified_at
+}
+
+class kvs_record {
+    <<table>>
+    + metadata_id (FK, PK)
+    + key (PK)
+    + value
+    + content_type
+    + size
+}
+
+%% ========================
+%% Client to Table arrows
+%% ========================
+
+SQLDatasetClient --> dataset_metadata
+SQLDatasetClient --> dataset_item
+
+SQLKeyValueStoreClient --> kvs_metadata
+SQLKeyValueStoreClient --> kvs_record
 ```
+```mermaid
+---
+config:
+    class:
+        hideEmptyMembersBox: true
+---
 
-Where:
+classDiagram
 
-- Each *_metadata table stores metadata for the storage instance.
-- Data tables (dataset_item, kvs_record, request) store the actual items, records, or requests.
-- request_queue_state is technical table for queue.
-- Foreign keys (`metadata_id`) link data to the corresponding metadata record.
+%% ========================
+%% Storage Clients
+%% ========================
+
+class SQLRequestQueueClient {
+    <<Request Queue>>
+}
+
+%% ========================
+%% Request Queue Tables
+%% ========================
+
+class request_queue_metadata {
+    <<table>>
+    + id (PK)
+    + name
+    + accessed_at
+    + created_at
+    + modified_at
+    + had_multiple_clients
+    + handled_request_count
+    + pending_request_count
+    + total_request_count
+}
+
+class request {
+    <<table>>
+    + request_id (PK)
+    + metadata_id (FK, PK)
+    + data
+    + sequence_number
+    + is_handled
+    + time_blocked_until
+}
+
+class request_queue_state {
+    <<table>>
+    + metadata_id (FK, PK)
+    + sequence_counter
+    + forefront_sequence_counter
+}
+
+%% ========================
+%% Client to Table arrows
+%% ========================
+
+SQLRequestQueueClient --> request_queue_metadata
+SQLRequestQueueClient --> request
+SQLRequestQueueClient --> request_queue_state
+```
 
 Configuration options for the <ApiLink to="class/SQLStorageClient">`SQLStorageClient`</ApiLink> can be set through environment variables or the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class:
 
