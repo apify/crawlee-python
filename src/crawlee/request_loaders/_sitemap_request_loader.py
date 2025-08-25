@@ -267,19 +267,23 @@ class SitemapRequestLoader(RequestLoader):
     @override
     async def fetch_next_request(self) -> Request | None:
         """Fetch the next request to process."""
-        state = await self._get_state()
-        if not state.url_queue:
-            return None
+        while not (await self.is_finished()):
+            state = await self._get_state()
+            if not state.url_queue:
+                await asyncio.sleep(0.1)
+                continue
 
-        async with self._queue_lock:
-            url = state.url_queue.popleft()
+            async with self._queue_lock:
+                url = state.url_queue.popleft()
 
-            request = Request.from_url(url)
-            state.in_progress.add(request.url)
-            if len(state.url_queue) < self._max_buffer_size:
-                self._queue_has_capacity.set()
+                request = Request.from_url(url)
+                state.in_progress.add(request.url)
+                if len(state.url_queue) < self._max_buffer_size:
+                    self._queue_has_capacity.set()
 
-        return request
+            return request
+
+        return None
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:

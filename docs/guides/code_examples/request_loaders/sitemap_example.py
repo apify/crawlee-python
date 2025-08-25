@@ -18,16 +18,11 @@ async def main() -> None:
         )
 
         # We work with the loader until we process all relevant links from the sitemap.
-        while not await sitemap_loader.is_finished():
-            if request := await sitemap_loader.fetch_next_request():
-                # Do something with it...
+        while request := await sitemap_loader.fetch_next_request():
+            # Do something with it...
 
-                # And mark it as handled.
-                await sitemap_loader.mark_request_as_handled(request)
-            else:
-                # If request is None, we give the loader time to get a new URL
-                # from the sitemap.
-                await asyncio.sleep(0.01)
+            # And mark it as handled.
+            await sitemap_loader.mark_request_as_handled(request)
 
 
 if __name__ == '__main__':
