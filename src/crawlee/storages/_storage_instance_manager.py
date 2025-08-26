@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, TypeVar, cast
 
 from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
@@ -20,16 +21,20 @@ ClientOpener = Callable[..., Awaitable[StorageClientType]]
 """Type alias for the client opener function."""
 
 
-class StorageClientCache:
+@dataclass
+class _StorageClientCache:
     """Cache for specific storage client."""
 
-    def __init__(self) -> None:
-        self.by_id: defaultdict[type[Storage], defaultdict[str, Storage]] = defaultdict(lambda: defaultdict())
-        """Cache for storage instances by ID, separated by storage type."""
-        self.by_name: defaultdict[type[Storage], defaultdict[str, Storage]] = defaultdict(lambda: defaultdict())
-        """Cache for storage instances by name, separated by storage type."""
-        self.default_instances: defaultdict[type[Storage], Storage] = defaultdict()
-        """Cache for default instances of each storage type."""
+    by_id: defaultdict[type[Storage], defaultdict[str, Storage]] = field(
+        default_factory=lambda: defaultdict(lambda: defaultdict())
+    )
+    """Cache for storage instances by ID, separated by storage type."""
+    by_name: defaultdict[type[Storage], defaultdict[str, Storage]] = field(
+        default_factory=lambda: defaultdict(lambda: defaultdict())
+    )
+    """Cache for storage instances by name, separated by storage type."""
+    default_instances: defaultdict[type[Storage], Storage] = field(default_factory=lambda: defaultdict())
+    """Cache for default instances of each storage type."""
 
 
 class StorageInstanceManager:
@@ -40,7 +45,7 @@ class StorageInstanceManager:
     """
 
     def __init__(self) -> None:
-        self._cache_by_storage_client: dict[str, StorageClientCache] = defaultdict(StorageClientCache)
+        self._cache_by_storage_client: dict[str, _StorageClientCache] = defaultdict(_StorageClientCache)
 
     async def open_storage_instance(
         self,
@@ -138,4 +143,4 @@ class StorageInstanceManager:
 
     def clear_cache(self) -> None:
         """Clear all cached storage instances."""
-        self._cache_by_storage_client = defaultdict(StorageClientCache)
+        self._cache_by_storage_client = defaultdict(_StorageClientCache)
