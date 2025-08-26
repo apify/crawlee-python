@@ -18,13 +18,13 @@ from ._db_models import KeyValueStoreMetadataDB, KeyValueStoreRecordDB
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-    from ._storage_client import SQLStorageClient
+    from ._storage_client import SqlStorageClient
 
 
 logger = getLogger(__name__)
 
 
-class SQLKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
+class SqlKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
     """SQL implementation of the key-value store client.
 
     This client persists key-value data to a SQL database with transaction support and
@@ -61,12 +61,12 @@ class SQLKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
     def __init__(
         self,
         *,
-        storage_client: SQLStorageClient,
+        storage_client: SqlStorageClient,
         id: str,
     ) -> None:
         """Initialize a new instance.
 
-        Preferably use the `SQLKeyValueStoreClient.open` class method to create a new instance.
+        Preferably use the `SqlKeyValueStoreClient.open` class method to create a new instance.
         """
         super().__init__(id=id, storage_client=storage_client)
 
@@ -83,8 +83,8 @@ class SQLKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
         *,
         id: str | None,
         name: str | None,
-        storage_client: SQLStorageClient,
-    ) -> SQLKeyValueStoreClient:
+        storage_client: SqlStorageClient,
+    ) -> SqlKeyValueStoreClient:
         """Open or create a SQL key-value store client.
 
         This method attempts to open an existing key-value store from the SQL database. If a KVS with the specified

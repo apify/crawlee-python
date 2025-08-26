@@ -10,7 +10,7 @@ from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import SQLStorageClient
+from crawlee.storage_clients import SqlStorageClient
 from crawlee.storage_clients._sql._db_models import KeyValueStoreMetadataDB, KeyValueStoreRecordDB
 from crawlee.storage_clients.models import KeyValueStoreMetadata
 
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy import Connection
 
-    from crawlee.storage_clients._sql import SQLKeyValueStoreClient
+    from crawlee.storage_clients._sql import SqlKeyValueStoreClient
 
 
 @pytest.fixture
@@ -32,9 +32,9 @@ def configuration(tmp_path: Path) -> Configuration:
 
 
 @pytest.fixture
-async def kvs_client(configuration: Configuration) -> AsyncGenerator[SQLKeyValueStoreClient, None]:
+async def kvs_client(configuration: Configuration) -> AsyncGenerator[SqlKeyValueStoreClient, None]:
     """A fixture for a SQL key-value store client."""
-    async with SQLStorageClient(accessed_modified_update_interval=timedelta(seconds=0)) as storage_client:
+    async with SqlStorageClient(accessed_modified_update_interval=timedelta(seconds=0)) as storage_client:
         client = await storage_client.create_kvs_client(
             name='test_kvs',
             configuration=configuration,
@@ -53,7 +53,7 @@ async def test_create_tables_with_connection_string(configuration: Configuration
     """Test that SQL key-value store client creates tables with a connection string."""
     storage_dir = tmp_path / 'test_table.db'
 
-    async with SQLStorageClient(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_client:
+    async with SqlStorageClient(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_client:
         await storage_client.create_kvs_client(
             name='new_kvs',
             configuration=configuration,
@@ -71,7 +71,7 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
 
     engine = create_async_engine(f'sqlite+aiosqlite:///{storage_dir}', future=True, echo=False)
 
-    async with SQLStorageClient(engine=engine) as storage_client:
+    async with SqlStorageClient(engine=engine) as storage_client:
         await storage_client.create_kvs_client(
             name='new_kvs',
             configuration=configuration,
@@ -85,7 +85,7 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
 
 async def test_tables_and_metadata_record(configuration: Configuration) -> None:
     """Test that SQL key-value store creates proper tables and metadata records."""
-    async with SQLStorageClient() as storage_client:
+    async with SqlStorageClient() as storage_client:
         client = await storage_client.create_kvs_client(
             name='new_kvs',
             configuration=configuration,
@@ -109,7 +109,7 @@ async def test_tables_and_metadata_record(configuration: Configuration) -> None:
         await client.drop()
 
 
-async def test_value_record_creation(kvs_client: SQLKeyValueStoreClient) -> None:
+async def test_value_record_creation(kvs_client: SqlKeyValueStoreClient) -> None:
     """Test that SQL key-value store client can create a record."""
     test_key = 'test-key'
     test_value = 'Hello, world!'
@@ -125,7 +125,7 @@ async def test_value_record_creation(kvs_client: SQLKeyValueStoreClient) -> None
         assert record.value == test_value.encode('utf-8')
 
 
-async def test_binary_data_persistence(kvs_client: SQLKeyValueStoreClient) -> None:
+async def test_binary_data_persistence(kvs_client: SqlKeyValueStoreClient) -> None:
     """Test that binary data is stored correctly without corruption."""
     test_key = 'test-binary'
     test_value = b'\x00\x01\x02\x03\x04'
@@ -147,7 +147,7 @@ async def test_binary_data_persistence(kvs_client: SQLKeyValueStoreClient) -> No
     assert verify_record.content_type == 'application/octet-stream'
 
 
-async def test_json_serialization_to_record(kvs_client: SQLKeyValueStoreClient) -> None:
+async def test_json_serialization_to_record(kvs_client: SqlKeyValueStoreClient) -> None:
     """Test that JSON objects are properly serialized to records."""
     test_key = 'test-json'
     test_value = {'name': 'John', 'age': 30, 'items': [1, 2, 3]}
@@ -162,7 +162,7 @@ async def test_json_serialization_to_record(kvs_client: SQLKeyValueStoreClient) 
         assert json.loads(record.value.decode('utf-8')) == test_value
 
 
-async def test_record_deletion_on_value_delete(kvs_client: SQLKeyValueStoreClient) -> None:
+async def test_record_deletion_on_value_delete(kvs_client: SqlKeyValueStoreClient) -> None:
     """Test that deleting a value removes its record from the database."""
     test_key = 'test-delete'
     test_value = 'Delete me'
@@ -189,7 +189,7 @@ async def test_record_deletion_on_value_delete(kvs_client: SQLKeyValueStoreClien
         assert record is None
 
 
-async def test_drop_removes_records(kvs_client: SQLKeyValueStoreClient) -> None:
+async def test_drop_removes_records(kvs_client: SqlKeyValueStoreClient) -> None:
     """Test that drop removes all records from the database."""
     await kvs_client.set_value(key='test', value='test-value')
 
@@ -213,7 +213,7 @@ async def test_drop_removes_records(kvs_client: SQLKeyValueStoreClient) -> None:
         assert metadata is None
 
 
-async def test_metadata_record_updates(kvs_client: SQLKeyValueStoreClient) -> None:
+async def test_metadata_record_updates(kvs_client: SqlKeyValueStoreClient) -> None:
     """Test that read/write operations properly update metadata record timestamps."""
     # Record initial timestamps
     metadata = await kvs_client.get_metadata()
@@ -257,7 +257,7 @@ async def test_metadata_record_updates(kvs_client: SQLKeyValueStoreClient) -> No
 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
     """Test that data persists correctly when reopening the same key-value store."""
-    async with SQLStorageClient() as storage_client:
+    async with SqlStorageClient() as storage_client:
         original_client = await storage_client.create_kvs_client(
             name='persistence-test',
             configuration=configuration,

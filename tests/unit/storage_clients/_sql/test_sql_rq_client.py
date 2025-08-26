@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from crawlee import Request
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import SQLStorageClient
+from crawlee.storage_clients import SqlStorageClient
 from crawlee.storage_clients._sql._db_models import RequestDB, RequestQueueMetadataDB
 from crawlee.storage_clients.models import RequestQueueMetadata
 
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy import Connection
 
-    from crawlee.storage_clients._sql import SQLRequestQueueClient
+    from crawlee.storage_clients._sql import SqlRequestQueueClient
 
 
 @pytest.fixture
@@ -33,9 +33,9 @@ def configuration(tmp_path: Path) -> Configuration:
 
 
 @pytest.fixture
-async def rq_client(configuration: Configuration) -> AsyncGenerator[SQLRequestQueueClient, None]:
+async def rq_client(configuration: Configuration) -> AsyncGenerator[SqlRequestQueueClient, None]:
     """A fixture for a SQL request queue client."""
-    async with SQLStorageClient(accessed_modified_update_interval=timedelta(seconds=0)) as storage_client:
+    async with SqlStorageClient(accessed_modified_update_interval=timedelta(seconds=0)) as storage_client:
         client = await storage_client.create_rq_client(
             name='test_request_queue',
             configuration=configuration,
@@ -54,7 +54,7 @@ async def test_create_tables_with_connection_string(configuration: Configuration
     """Test that SQL request queue client creates tables with a connection string."""
     storage_dir = tmp_path / 'test_table.db'
 
-    async with SQLStorageClient(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_client:
+    async with SqlStorageClient(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_client:
         await storage_client.create_rq_client(
             name='test_request_queue',
             configuration=configuration,
@@ -72,7 +72,7 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
 
     engine = create_async_engine(f'sqlite+aiosqlite:///{storage_dir}', future=True, echo=False)
 
-    async with SQLStorageClient(engine=engine) as storage_client:
+    async with SqlStorageClient(engine=engine) as storage_client:
         await storage_client.create_rq_client(
             name='test_request_queue',
             configuration=configuration,
@@ -86,7 +86,7 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
 
 async def test_tables_and_metadata_record(configuration: Configuration) -> None:
     """Test that SQL request queue creates proper tables and metadata records."""
-    async with SQLStorageClient() as storage_client:
+    async with SqlStorageClient() as storage_client:
         client = await storage_client.create_rq_client(
             name='test_request_queue',
             configuration=configuration,
@@ -110,7 +110,7 @@ async def test_tables_and_metadata_record(configuration: Configuration) -> None:
         await client.drop()
 
 
-async def test_request_records_persistence(rq_client: SQLRequestQueueClient) -> None:
+async def test_request_records_persistence(rq_client: SqlRequestQueueClient) -> None:
     """Test that all added requests are persisted and can be retrieved from the database."""
     requests = [
         Request.from_url('https://example.com/1'),
@@ -132,7 +132,7 @@ async def test_request_records_persistence(rq_client: SQLRequestQueueClient) -> 
         assert request['url'] in ['https://example.com/1', 'https://example.com/2', 'https://example.com/3']
 
 
-async def test_drop_removes_records(rq_client: SQLRequestQueueClient) -> None:
+async def test_drop_removes_records(rq_client: SqlRequestQueueClient) -> None:
     """Test that drop removes all records from the database."""
     await rq_client.add_batch_of_requests([Request.from_url('https://example.com')])
     metadata = await rq_client.get_metadata()
@@ -153,7 +153,7 @@ async def test_drop_removes_records(rq_client: SQLRequestQueueClient) -> None:
         assert db_metadata is None
 
 
-async def test_metadata_record_updates(rq_client: SQLRequestQueueClient) -> None:
+async def test_metadata_record_updates(rq_client: SqlRequestQueueClient) -> None:
     """Test that metadata record updates correctly after operations."""
     # Record initial timestamps
     metadata = await rq_client.get_metadata()
@@ -197,7 +197,7 @@ async def test_metadata_record_updates(rq_client: SQLRequestQueueClient) -> None
 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
     """Test that data persists correctly when reopening the same request queue."""
-    async with SQLStorageClient() as storage_client:
+    async with SqlStorageClient() as storage_client:
         original_client = await storage_client.create_rq_client(
             name='persistence-test',
             configuration=configuration,

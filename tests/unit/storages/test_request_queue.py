@@ -10,7 +10,7 @@ import pytest
 
 from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient, SQLStorageClient, StorageClient
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient, SqlStorageClient, StorageClient
 from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
@@ -26,7 +26,7 @@ def storage_client(request: pytest.FixtureRequest) -> StorageClient:
     if request.param == 'memory':
         return MemoryStorageClient()
     if request.param == 'sql':
-        return SQLStorageClient()
+        return SqlStorageClient()
     return FileSystemStorageClient()
 
 

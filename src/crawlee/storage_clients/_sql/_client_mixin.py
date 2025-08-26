@@ -30,7 +30,7 @@ if TYPE_CHECKING:
         RequestDB,
         RequestQueueMetadataDB,
     )
-    from ._storage_client import SQLStorageClient
+    from ._storage_client import SqlStorageClient
 
 
 logger = getLogger(__name__)
@@ -54,7 +54,7 @@ class SQLClientMixin:
     _CLIENT_TYPE: ClassVar[str]
     """Human-readable client type for error messages."""
 
-    def __init__(self, *, id: str, storage_client: SQLStorageClient) -> None:
+    def __init__(self, *, id: str, storage_client: SqlStorageClient) -> None:
         self._id = id
         self._storage_client = storage_client
 
@@ -260,7 +260,7 @@ class SQLClientMixin:
         *,
         id: str | None,
         name: str | None,
-        storage_client: SQLStorageClient,
+        storage_client: SqlStorageClient,
         metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata],
         session: AsyncSession,
         extra_metadata_fields: dict[str, Any],
@@ -312,7 +312,7 @@ class SQLClientMixin:
         *,
         id: str | None,
         name: str | None,
-        storage_client: SQLStorageClient,
+        storage_client: SqlStorageClient,
         metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata],
         extra_metadata_fields: dict[str, Any],
     ) -> Self:

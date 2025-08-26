@@ -29,13 +29,13 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from ._storage_client import SQLStorageClient
+    from ._storage_client import SqlStorageClient
 
 
 logger = getLogger(__name__)
 
 
-class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
+class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
     """SQL implementation of the request queue client.
 
     This client persists requests to a SQL database with transaction handling and
@@ -87,11 +87,11 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         self,
         *,
         id: str,
-        storage_client: SQLStorageClient,
+        storage_client: SqlStorageClient,
     ) -> None:
         """Initialize a new instance.
 
-        Preferably use the `SQLRequestQueueClient.open` class method to create a new instance.
+        Preferably use the `SqlRequestQueueClient.open` class method to create a new instance.
         """
         super().__init__(id=id, storage_client=storage_client)
 
@@ -120,8 +120,8 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         *,
         id: str | None,
         name: str | None,
-        storage_client: SQLStorageClient,
-    ) -> SQLRequestQueueClient:
+        storage_client: SqlStorageClient,
+    ) -> SqlRequestQueueClient:
         """Open an existing request queue or create a new one.
 
         This method first tries to find an existing queue by ID or name.

@@ -17,13 +17,13 @@ if TYPE_CHECKING:
 
     from sqlalchemy import Select
 
-    from ._storage_client import SQLStorageClient
+    from ._storage_client import SqlStorageClient
 
 
 logger = getLogger(__name__)
 
 
-class SQLDatasetClient(DatasetClient, SQLClientMixin):
+class SqlDatasetClient(DatasetClient, SQLClientMixin):
     """SQL implementation of the dataset client.
 
     This client persists dataset items to a SQL database using two tables for storage
@@ -54,7 +54,7 @@ class SQLDatasetClient(DatasetClient, SQLClientMixin):
         self,
         *,
         id: str,
-        storage_client: SQLStorageClient,
+        storage_client: SqlStorageClient,
     ) -> None:
         """Initialize a new instance.
 
@@ -75,8 +75,8 @@ class SQLDatasetClient(DatasetClient, SQLClientMixin):
         *,
         id: str | None,
         name: str | None,
-        storage_client: SQLStorageClient,
-    ) -> SQLDatasetClient:
+        storage_client: SqlStorageClient,
+    ) -> SqlDatasetClient:
         """Open an existing dataset or create a new one.
 
         Args:

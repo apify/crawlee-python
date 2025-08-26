@@ -12,10 +12,10 @@ from crawlee._utils.docs import docs_group
 from crawlee.configuration import Configuration
 from crawlee.storage_clients._base import StorageClient
 
-from ._dataset_client import SQLDatasetClient
+from ._dataset_client import SqlDatasetClient
 from ._db_models import Base
-from ._key_value_store_client import SQLKeyValueStoreClient
-from ._request_queue_client import SQLRequestQueueClient
+from ._key_value_store_client import SqlKeyValueStoreClient
+from ._request_queue_client import SqlRequestQueueClient
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 
 @docs_group('Storage clients')
-class SQLStorageClient(StorageClient):
+class SqlStorageClient(StorageClient):
     """SQL implementation of the storage client.
 
     This storage client provides access to datasets, key-value stores, and request queues that persist data
@@ -172,7 +172,7 @@ class SQLStorageClient(StorageClient):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
-    ) -> SQLDatasetClient:
+    ) -> SqlDatasetClient:
         """Create or open a SQL dataset client.
 
         Args:
@@ -186,7 +186,7 @@ class SQLStorageClient(StorageClient):
         configuration = configuration or Configuration.get_global_configuration()
         await self.initialize(configuration)
 
-        client = await SQLDatasetClient.open(
+        client = await SqlDatasetClient.open(
             id=id,
             name=name,
             storage_client=self,
@@ -202,7 +202,7 @@ class SQLStorageClient(StorageClient):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
-    ) -> SQLKeyValueStoreClient:
+    ) -> SqlKeyValueStoreClient:
         """Create or open a SQL key-value store client.
 
         Args:
@@ -216,7 +216,7 @@ class SQLStorageClient(StorageClient):
         configuration = configuration or Configuration.get_global_configuration()
         await self.initialize(configuration)
 
-        client = await SQLKeyValueStoreClient.open(
+        client = await SqlKeyValueStoreClient.open(
             id=id,
             name=name,
             storage_client=self,
@@ -232,7 +232,7 @@ class SQLStorageClient(StorageClient):
         id: str | None = None,
         name: str | None = None,
         configuration: Configuration | None = None,
-    ) -> SQLRequestQueueClient:
+    ) -> SqlRequestQueueClient:
         """Create or open a SQL request queue client.
 
         Args:
@@ -246,7 +246,7 @@ class SQLStorageClient(StorageClient):
         configuration = configuration or Configuration.get_global_configuration()
         await self.initialize(configuration)
 
-        client = await SQLRequestQueueClient.open(
+        client = await SqlRequestQueueClient.open(
             id=id,
             name=name,
             storage_client=self,
@@ -255,7 +255,7 @@ class SQLStorageClient(StorageClient):
         await self._purge_if_needed(client, configuration)
         return client
 
-    async def __aenter__(self) -> SQLStorageClient:
+    async def __aenter__(self) -> SqlStorageClient:
         """Async context manager entry."""
         return self
 

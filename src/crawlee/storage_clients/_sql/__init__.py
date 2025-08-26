@@ -1,6 +1,6 @@
-from ._dataset_client import SQLDatasetClient
-from ._key_value_store_client import SQLKeyValueStoreClient
-from ._request_queue_client import SQLRequestQueueClient
-from ._storage_client import SQLStorageClient
+from ._dataset_client import SqlDatasetClient
+from ._key_value_store_client import SqlKeyValueStoreClient
+from ._request_queue_client import SqlRequestQueueClient
+from ._storage_client import SqlStorageClient
 
-__all__ = ['SQLDatasetClient', 'SQLKeyValueStoreClient', 'SQLRequestQueueClient', 'SQLStorageClient']
+__all__ = ['SqlDatasetClient', 'SqlKeyValueStoreClient', 'SqlRequestQueueClient', 'SqlStorageClient']

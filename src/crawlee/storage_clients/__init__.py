@@ -10,12 +10,12 @@ _install_import_hook(__name__)
 
 # The following imports are wrapped in try_import to handle optional dependencies,
 # ensuring the module can still function even if these dependencies are missing.
-with _try_import(__name__, 'SQLStorageClient'):
-    from ._sql import SQLStorageClient
+with _try_import(__name__, 'SqlStorageClient'):
+    from ._sql import SqlStorageClient
 
 __all__ = [
     'FileSystemStorageClient',
     'MemoryStorageClient',
-    'SQLStorageClient',
+    'SqlStorageClient',
     'StorageClient',
 ]

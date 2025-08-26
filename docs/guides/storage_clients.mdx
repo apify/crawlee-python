@@ -52,7 +52,7 @@ class FileSystemStorageClient
 
 class MemoryStorageClient
 
-class SQLStorageClient
+class SqlStorageClient
 
 class ApifyStorageClient
 
@@ -62,7 +62,7 @@ class ApifyStorageClient
 
 StorageClient --|> FileSystemStorageClient
 StorageClient --|> MemoryStorageClient
-StorageClient --|> SQLStorageClient
+StorageClient --|> SqlStorageClient
 StorageClient --|> ApifyStorageClient
 ```
 
@@ -133,10 +133,10 @@ The `MemoryStorageClient` does not persist data between runs. All data is lost w
 ### SQL storage client
 
 :::warning Experimental feature
-The `SQLStorageClient` is experimental. Its API and behavior may change in future releases.
+The `SqlStorageClient` is experimental. Its API and behavior may change in future releases.
 :::
 
-The <ApiLink to="class/SQLStorageClient">`SQLStorageClient`</ApiLink> provides persistent storage using a SQL database ([SQLite](https://sqlite.org/) by default, or [PostgreSQL](https://www.postgresql.org/)). It supports all Crawlee storage types and enables concurrent access from multiple independent clients or processes.
+The <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> provides persistent storage using a SQL database ([SQLite](https://sqlite.org/) by default, or [PostgreSQL](https://www.postgresql.org/)). It supports all Crawlee storage types and enables concurrent access from multiple independent clients or processes.
 
 :::note dependencies
 Use crawlee['sql_storage'] for SQLite and crawlee['sql_storage_posgres'] for PostgreSQL
@@ -161,11 +161,11 @@ classDiagram
 %% Storage Clients
 %% ========================
 
-class SQLDatasetClient {
+class SqlDatasetClient {
     <<Dataset Storage>>
 }
 
-class SQLKeyValueStoreClient {
+class SqlKeyValueStoreClient {
     <<Key-Value Store>>
 }
 
@@ -216,11 +216,11 @@ class kvs_record {
 %% Client to Table arrows
 %% ========================
 
-SQLDatasetClient --> dataset_metadata
-SQLDatasetClient --> dataset_item
+SqlDatasetClient --> dataset_metadata
+SqlDatasetClient --> dataset_item
 
-SQLKeyValueStoreClient --> kvs_metadata
-SQLKeyValueStoreClient --> kvs_record
+SqlKeyValueStoreClient --> kvs_metadata
+SqlKeyValueStoreClient --> kvs_record
 ```
 ```mermaid
 ---
@@ -235,7 +235,7 @@ classDiagram
 %% Storage Clients
 %% ========================
 
-class SQLRequestQueueClient {
+class SqlRequestQueueClient {
     <<Request Queue>>
 }
 
@@ -277,17 +277,17 @@ class request_queue_state {
 %% Client to Table arrows
 %% ========================
 
-SQLRequestQueueClient --> request_queue_metadata
-SQLRequestQueueClient --> request
-SQLRequestQueueClient --> request_queue_state
+SqlRequestQueueClient --> request_queue_metadata
+SqlRequestQueueClient --> request
+SqlRequestQueueClient --> request_queue_state
 ```
 
-Configuration options for the <ApiLink to="class/SQLStorageClient">`SQLStorageClient`</ApiLink> can be set through environment variables or the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class:
+Configuration options for the <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> can be set through environment variables or the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class:
 
 - **`storage_dir`** (env: `CRAWLEE_STORAGE_DIR`, default: `'./storage'`) - The root directory where the default SQLite database will be created if no connection string is provided.
 - **`purge_on_start`** (env: `CRAWLEE_PURGE_ON_START`, default: `True`) - Whether to purge default storages on start.
 
-Configuration options for the <ApiLink to="class/SQLStorageClient">SQLStorageClient</ApiLink> can be set via constructor arguments:
+Configuration options for the <ApiLink to="class/SqlStorageClient">SqlStorageClient</ApiLink> can be set via constructor arguments:
 
 - **`connection_string`** (default: SQLite in <ApiLink to="class/Configuration">Configuration</ApiLink> storage dir) – SQLAlchemy connection string, e.g. 'sqlite+aiosqlite:///my.db' or 'postgresql+asyncpg://user:pass@host/db'.
 - **`engine`** – Pre-configured SQLAlchemy AsyncEngine (optional).

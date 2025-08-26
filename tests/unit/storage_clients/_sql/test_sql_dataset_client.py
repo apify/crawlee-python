@@ -9,7 +9,7 @@ from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import SQLStorageClient
+from crawlee.storage_clients import SqlStorageClient
 from crawlee.storage_clients._sql._db_models import DatasetItemDB, DatasetMetadataDB
 
 if TYPE_CHECKING:
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy import Connection
 
-    from crawlee.storage_clients._sql import SQLDatasetClient
+    from crawlee.storage_clients._sql import SqlDatasetClient
 
 
 @pytest.fixture
@@ -36,9 +36,9 @@ def get_tables(sync_conn: Connection) -> list[str]:
 
 
 @pytest.fixture
-async def dataset_client(configuration: Configuration) -> AsyncGenerator[SQLDatasetClient, None]:
+async def dataset_client(configuration: Configuration) -> AsyncGenerator[SqlDatasetClient, None]:
     """A fixture for a SQL dataset client."""
-    async with SQLStorageClient(accessed_modified_update_interval=timedelta(seconds=0)) as storage_client:
+    async with SqlStorageClient(accessed_modified_update_interval=timedelta(seconds=0)) as storage_client:
         client = await storage_client.create_dataset_client(
             name='test_dataset',
             configuration=configuration,
@@ -51,7 +51,7 @@ async def test_create_tables_with_connection_string(configuration: Configuration
     """Test that SQL dataset client creates tables with a connection string."""
     storage_dir = tmp_path / 'test_table.db'
 
-    async with SQLStorageClient(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_client:
+    async with SqlStorageClient(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_client:
         await storage_client.create_dataset_client(
             name='new_dataset',
             configuration=configuration,
@@ -69,7 +69,7 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
 
     engine = create_async_engine(f'sqlite+aiosqlite:///{storage_dir}', future=True, echo=False)
 
-    async with SQLStorageClient(engine=engine) as storage_client:
+    async with SqlStorageClient(engine=engine) as storage_client:
         await storage_client.create_dataset_client(
             name='new_dataset',
             configuration=configuration,
@@ -83,7 +83,7 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
 
 async def test_tables_and_metadata_record(configuration: Configuration) -> None:
     """Test that SQL dataset creates proper tables and metadata records."""
-    async with SQLStorageClient() as storage_client:
+    async with SqlStorageClient() as storage_client:
         client = await storage_client.create_dataset_client(
             name='new_dataset',
             configuration=configuration,
@@ -108,7 +108,7 @@ async def test_tables_and_metadata_record(configuration: Configuration) -> None:
         await client.drop()
 
 
-async def test_record_and_content_verification(dataset_client: SQLDatasetClient) -> None:
+async def test_record_and_content_verification(dataset_client: SqlDatasetClient) -> None:
     """Test that dataset client can push data and verify its content."""
     item = {'key': 'value', 'number': 42}
     await dataset_client.push_data(item)
@@ -139,7 +139,7 @@ async def test_record_and_content_verification(dataset_client: SQLDatasetClient)
         assert len(records) == 4
 
 
-async def test_drop_removes_records(dataset_client: SQLDatasetClient) -> None:
+async def test_drop_removes_records(dataset_client: SqlDatasetClient) -> None:
     """Test that dropping a dataset removes all records from the database."""
     await dataset_client.push_data({'test': 'data'})
 
@@ -163,7 +163,7 @@ async def test_drop_removes_records(dataset_client: SQLDatasetClient) -> None:
         assert metadata is None
 
 
-async def test_metadata_record_updates(dataset_client: SQLDatasetClient) -> None:
+async def test_metadata_record_updates(dataset_client: SqlDatasetClient) -> None:
     """Test that metadata record is updated correctly after operations."""
     # Record initial timestamps
     metadata = await dataset_client.get_metadata()
@@ -209,7 +209,7 @@ async def test_metadata_record_updates(dataset_client: SQLDatasetClient) -> None
 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
     """Test that data persists correctly when reopening the same dataset."""
-    async with SQLStorageClient() as storage_client:
+    async with SqlStorageClient() as storage_client:
         original_client = await storage_client.create_dataset_client(
             name='persistence-test',
             configuration=configuration,
