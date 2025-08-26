@@ -67,6 +67,7 @@ class SqlStorageClient(StorageClient):
         self._connection_string = connection_string
         self._engine = engine
         self._initialized = False
+        self.session_maker: None | async_sessionmaker[AsyncSession] = None
 
         # Minimum interval to reduce database load from frequent concurrent metadata updates
         self._accessed_modified_update_interval = accessed_modified_update_interval
@@ -162,8 +163,9 @@ class SqlStorageClient(StorageClient):
         Returns:
             A new AsyncSession instance.
         """
-        session = async_sessionmaker(self._engine, expire_on_commit=False, autoflush=False)
-        return session()
+        if self.session_maker is None:
+            self.session_maker = async_sessionmaker(self._engine, expire_on_commit=False, autoflush=False)
+        return self.session_maker()
 
     @override
     async def create_dataset_client(

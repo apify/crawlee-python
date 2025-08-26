@@ -25,12 +25,12 @@ class NameDefaultNone(TypeDecorator):
     cache_ok = True
 
     @override
-    def process_bind_param(self, value: str | None, _dialect: Dialect) -> str:
+    def process_bind_param(self, value: str | None, dialect: Dialect) -> str:
         """Convert Python value to database value."""
         return 'default' if value is None else value
 
     @override
-    def process_result_value(self, value: str | None, _dialect: Dialect) -> str | None:
+    def process_result_value(self, value: str | None, dialect: Dialect) -> str | None:
         """Convert database value to Python value."""
         return None if value == 'default' else value
 
@@ -45,7 +45,8 @@ class AwareDateTime(TypeDecorator):
     impl = DateTime(timezone=True)
     cache_ok = True
 
-    def process_result_value(self, value: datetime | None, _dialect: Dialect) -> datetime | None:
+    @override
+    def process_result_value(self, value: datetime | None, dialect: Dialect) -> datetime | None:
         """Add UTC timezone to naive datetime values."""
         if value is not None and value.tzinfo is None:
             return value.replace(tzinfo=timezone.utc)
