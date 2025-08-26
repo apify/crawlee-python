@@ -30,7 +30,31 @@ logger = getLogger(__name__)
 
 
 class SitemapRequestLoaderState(BaseModel):
-    """State model for persisting sitemap request loader data."""
+    """State model for persisting sitemap request loader data.
+
+    The crawler processes one sitemap at a time. The current sitemap is stored in `in_progress_sitemap_url`.
+    The `parse_sitemap` function parses the sitemap and returns elements as an async iterator. Each element retrieved
+    from the iterator is processed based on its type. If the element is a `NestedSitemap`, its URL is added to
+    `pending_sitemap_urls` if it hasn't been processed yet (not in `processed_sitemap_urls`). If the element is a
+    `SitemapUrl`, the system checks whether it already exists in `current_sitemap_processed_urls`. If it exists,
+    the loader was restarted from a saved state and the URL is skipped.
+
+    If the URL is new, it is first added to `url_queue`, then to `current_sitemap_processed_urls`, and `total_count` is
+    incremented by 1. When all elements from the current sitemap iterator have been processed, `in_progress_sitemap_url`
+    is set to `None`, the sitemap URL is added to `processed_sitemap_urls`, and `current_sitemap_processed_urls` is
+    cleared. The next sitemap is retrieved from `pending_sitemap_urls`, skipping any URLs that already exist in
+    `processed_sitemap_urls`. If `pending_sitemap_urls` is empty, `completed` is set to `True`.
+
+    When `fetch_next_request` is called, a URL is extracted from `url_queue` and placed in `in_progress`.
+    When `mark_request_as_handled` is called for the extracted URL, it is removed from `in_progress` and
+    `handled_count` is incremented by 1.
+
+    During initial startup or restart after persistence, state validation occurs in `_get_state`. If both
+    `pending_sitemap_urls` and `in_progress_sitemap_url` are empty and `completed` is False, this indicates a
+    fresh start. In this case, `self._sitemap_urls` are moved to `pending_sitemap_urls`. Otherwise, the system is
+    restarting from a persisted state. If `in_progress` contains any URLs, they are moved back to `url_queue` and
+    `in_progress` is cleared.
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -48,6 +72,9 @@ class SitemapRequestLoaderState(BaseModel):
 
     current_sitemap_processed_urls: Annotated[set[str], Field(alias='currentSitemapProcessedUrls')] = set()
     """URLs from the current sitemap that have been added to the queue."""
+
+    processed_sitemap_urls: Annotated[set[str], Field(alias='processedSitemapUrls')] = set()
+    """Set of processed sitemap URLs."""
 
     completed: Annotated[bool, Field(alias='sitemapCompleted')] = False
     """Whether all sitemaps have been fully processed."""
@@ -187,6 +214,9 @@ class SitemapRequestLoader(RequestLoader):
                 sitemap_url = state.in_progress_sitemap_url
                 if not sitemap_url:
                     sitemap_url = state.pending_sitemap_urls.popleft()
+                    # Skip processed urls
+                    if sitemap_url in state.processed_sitemap_urls:
+                        continue
                     state.in_progress_sitemap_url = sitemap_url
 
                 parse_options = ParseSitemapOptions(max_depth=0, emit_nested_sitemaps=True)
@@ -199,7 +229,7 @@ class SitemapRequestLoader(RequestLoader):
                 ):
                     if isinstance(item, NestedSitemap):
                         # Add nested sitemap to queue
-                        if item.loc not in state.pending_sitemap_urls:
+                        if item.loc not in state.pending_sitemap_urls and item.loc not in state.processed_sitemap_urls:
                             state.pending_sitemap_urls.append(item.loc)
                         continue
 
@@ -230,7 +260,10 @@ class SitemapRequestLoader(RequestLoader):
 
                 # Clear current sitemap after processing
                 state = await self._get_state()
+                current_sitemap_url = state.in_progress_sitemap_url
                 state.in_progress_sitemap_url = None
+                if current_sitemap_url:
+                    state.processed_sitemap_urls.add(current_sitemap_url)
                 state.current_sitemap_processed_urls.clear()
 
             # Mark as completed after processing all sitemap urls
