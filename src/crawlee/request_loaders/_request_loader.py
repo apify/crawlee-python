@@ -43,7 +43,11 @@ class RequestLoader(ABC):
 
     @abstractmethod
     async def fetch_next_request(self) -> Request | None:
-        """Return the next request to be processed, or `null` if there are no more pending requests."""
+        """Return the next request to be processed, or `None` if there are no more pending requests.
+
+        The method should return `None` if and only if `is_finished` would return `True`. In other cases, the method
+        should wait until a request appears.
+        """
 
     @abstractmethod
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
