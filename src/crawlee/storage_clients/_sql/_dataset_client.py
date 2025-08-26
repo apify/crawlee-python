@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
 
@@ -34,8 +33,8 @@ class SQLDatasetClient(DatasetClient, SQLClientMixin):
     - `dataset_metadata` table: Contains dataset metadata (id, name, timestamps, item_count)
     - `dataset_item` table: Contains individual items with JSON data and auto-increment ordering
 
-    Items are serialized to JSON with `default=str` to handle non-serializable types like datetime
-    objects. The `order_id` auto-increment primary key ensures insertion order is preserved.
+    Items are stored as a JSON object in SQLite and as JSONB in PostgreSQL. These objects must be JSON-serializable.
+    The `order_id` auto-increment primary key ensures insertion order is preserved.
     All operations are wrapped in database transactions with CASCADE deletion support.
     """
 
@@ -124,17 +123,7 @@ class SQLDatasetClient(DatasetClient, SQLClientMixin):
             data = [data]
 
         db_items: list[dict[str, Any]] = []
-
-        for item in data:
-            # Serialize with default=str to handle non-serializable types like datetime
-            json_item = json.dumps(item, default=str, ensure_ascii=False)
-            db_items.append(
-                {
-                    'metadata_id': self._id,
-                    'data': json_item,
-                }
-            )
-
+        db_items = [{'metadata_id': self._id, 'data': item} for item in data]
         stmt = insert(self._ITEM_TABLE).values(db_items)
 
         async with self.get_autocommit_session() as autocommit:
@@ -181,7 +170,7 @@ class SQLDatasetClient(DatasetClient, SQLClientMixin):
 
         if skip_empty:
             # Skip items that are empty JSON objects
-            stmt = stmt.where(self._ITEM_TABLE.data != '"{}"')
+            stmt = stmt.where(self._ITEM_TABLE.data != {})
 
         # Apply ordering by insertion order (order_id)
         stmt = (
@@ -230,8 +219,7 @@ class SQLDatasetClient(DatasetClient, SQLClientMixin):
             if updated:
                 await session.commit()
 
-        # Deserialize JSON items
-        items = [json.loads(db_item.data) for db_item in db_items]
+        items = [db_item.data for db_item in db_items]
         metadata = await self.get_metadata()
         return DatasetItemsListPage(
             items=items,
@@ -273,7 +261,7 @@ class SQLDatasetClient(DatasetClient, SQLClientMixin):
             db_items = await session.stream_scalars(stmt)
 
             async for db_item in db_items:
-                yield json.loads(db_item.data)
+                yield db_item.data
 
             updated = await self._update_metadata(session, update_accessed_at=True)
 

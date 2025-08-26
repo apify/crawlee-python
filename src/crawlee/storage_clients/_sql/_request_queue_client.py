@@ -433,11 +433,15 @@ class SQLRequestQueueClient(RequestQueueClient, SQLClientMixin):
         if not (request_id := self._REQUEST_ID_BY_KEY.get(request.unique_key)):
             request_id = self._get_int_id_from_unique_key(request.unique_key)
 
+        # Update the request's handled_at timestamp.
+        if request.handled_at is None:
+            request.handled_at = datetime.now(timezone.utc)
+
         # Update request in DB
         stmt = (
             update(self._ITEM_TABLE)
             .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id)
-            .values(is_handled=True, time_blocked_until=None)
+            .values(is_handled=True, time_blocked_until=None, data=request.model_dump_json())
         )
         async with self.get_session() as session:
             result = await session.execute(stmt)

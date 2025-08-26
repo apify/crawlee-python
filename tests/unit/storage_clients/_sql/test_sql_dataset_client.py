@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
@@ -126,7 +125,7 @@ async def test_record_and_content_verification(dataset_client: SQLDatasetClient)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 1
-        saved_item = json.loads(records[0].data)
+        saved_item = records[0].data
         assert saved_item == item
 
     # Test pushing multiple items and verify total count

@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import JSON, BigInteger, Boolean, ForeignKey, Index, Integer, LargeBinary, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import DateTime, TypeDecorator
 from typing_extensions import override
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Dialect
+    from sqlalchemy.types import TypeEngine
 
 
 # This is necessary because unique constraints don't apply to NULL values in SQL.
@@ -48,6 +50,19 @@ class AwareDateTime(TypeDecorator):
         if value is not None and value.tzinfo is None:
             return value.replace(tzinfo=timezone.utc)
         return value
+
+
+class JSONField(TypeDecorator):
+    """Uses JSONB for PostgreSQL and JSON for other databases."""
+
+    impl = JSON
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[JSON | JSONB]:
+        """Load the appropriate dialect implementation for the JSON type."""
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(JSONB())
+        return dialect.type_descriptor(JSON())
 
 
 class Base(DeclarativeBase):
@@ -166,8 +181,8 @@ class DatasetItemDB(Base):
     )
     """Foreign key to metadata dataset record."""
 
-    data: Mapped[str] = mapped_column(JSON, nullable=False)
-    """JSON-serialized item data."""
+    data: Mapped[list[dict[str, Any]] | dict[str, Any]] = mapped_column(JSONField, nullable=False)
+    """JSON serializable item data."""
 
     # Relationship back to parent dataset
     dataset: Mapped[DatasetMetadataDB] = relationship(back_populates='items')
@@ -189,7 +204,7 @@ class RequestDB(Base):
     )
     """Foreign key to metadata request queue record."""
 
-    data: Mapped[str] = mapped_column(JSON, nullable=False)
+    data: Mapped[str] = mapped_column(String, nullable=False)
     """JSON-serialized Request object."""
 
     sequence_number: Mapped[int] = mapped_column(Integer, nullable=False)
