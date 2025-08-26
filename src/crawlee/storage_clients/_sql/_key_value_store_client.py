@@ -12,7 +12,7 @@ from crawlee._utils.file import infer_mime_type
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
-from ._client_mixin import SQLClientMixin
+from ._client_mixin import MetadataUpdateParams, SQLClientMixin
 from ._db_models import KeyValueStoreMetadataDB, KeyValueStoreRecordDB
 
 if TYPE_CHECKING:
@@ -121,7 +121,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
     @override
     async def purge(self) -> None:
         """Remove all items from this key-value store while keeping the key-value store structure."""
-        await self._purge(metadata_kwargs={'update_accessed_at': True, 'update_modified_at': True})
+        await self._purge(metadata_kwargs=MetadataUpdateParams(update_accessed_at=True, update_modified_at=True))
 
     @override
     async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
@@ -178,7 +178,9 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
                 if result.rowcount == 0:
                     await session.execute(insert_stmt)
 
-            await self._update_metadata(session, update_accessed_at=True, update_modified_at=True)
+            await self._update_metadata(
+                session, **MetadataUpdateParams(update_accessed_at=True, update_modified_at=True)
+            )
 
             try:
                 await session.commit()
@@ -195,7 +197,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
             result = await session.execute(stmt)
             record_db = result.scalar_one_or_none()
 
-            updated = await self._update_metadata(session, update_accessed_at=True)
+            updated = await self._update_metadata(session, **MetadataUpdateParams(update_accessed_at=True))
 
             # Commit updates to the metadata
             if updated:
@@ -239,15 +241,17 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
     async def delete_value(self, *, key: str) -> None:
         """Delete a value from the key-value store."""
         stmt = delete(self._ITEM_TABLE).where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.key == key)
-        async with self.get_autocommit_session() as autocommit:
+        async with self.get_session(with_simple_commit=True) as session:
             # Delete the record if it exists
-            result = await autocommit.execute(stmt)
+            result = await session.execute(stmt)
 
             # Update metadata if we actually deleted something
             if result.rowcount > 0:
-                await self._update_metadata(autocommit, update_accessed_at=True, update_modified_at=True)
+                await self._update_metadata(
+                    session, **MetadataUpdateParams(update_accessed_at=True, update_modified_at=True)
+                )
 
-                await autocommit.commit()
+                await session.commit()
 
     @override
     async def iterate_keys(
@@ -282,7 +286,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
                     size=row.size,
                 )
 
-            updated = await self._update_metadata(session, update_accessed_at=True)
+            updated = await self._update_metadata(session, **MetadataUpdateParams(update_accessed_at=True))
 
             # Commit updates to the metadata
             if updated:
@@ -296,7 +300,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
             # Check if record exists
             result = await session.execute(stmt)
 
-            updated = await self._update_metadata(session, update_accessed_at=True)
+            updated = await self._update_metadata(session, **MetadataUpdateParams(update_accessed_at=True))
 
             # Commit updates to the metadata
             if updated:

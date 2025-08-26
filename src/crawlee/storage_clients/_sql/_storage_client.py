@@ -49,7 +49,6 @@ class SqlStorageClient(StorageClient):
         *,
         connection_string: str | None = None,
         engine: AsyncEngine | None = None,
-        accessed_modified_update_interval: timedelta = timedelta(seconds=1),
     ) -> None:
         """Initialize the SQL storage client.
 
@@ -57,9 +56,6 @@ class SqlStorageClient(StorageClient):
             connection_string: Database connection string (e.g., "sqlite+aiosqlite:///crawlee.db").
                 If not provided, defaults to SQLite database in the storage directory.
             engine: Pre-configured AsyncEngine instance. If provided, connection_string is ignored.
-            accessed_modified_update_interval: Minimum interval between updates of accessed_at and modified_at
-                timestamps in metadata tables. Used to reduce frequency of timestamp updates during frequent
-                read/write operations. Default is 1 second.
         """
         if engine is not None and connection_string is not None:
             raise ValueError('Either connection_string or engine must be provided, not both.')
@@ -70,7 +66,7 @@ class SqlStorageClient(StorageClient):
         self.session_maker: None | async_sessionmaker[AsyncSession] = None
 
         # Minimum interval to reduce database load from frequent concurrent metadata updates
-        self._accessed_modified_update_interval = accessed_modified_update_interval
+        self._accessed_modified_update_interval = timedelta(seconds=1)
 
         # Flag needed to apply optimizations only for default database
         self._default_flag = self._engine is None and self._connection_string is None

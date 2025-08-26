@@ -10,7 +10,7 @@ from cachetools import LRUCache
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only
-from typing_extensions import override
+from typing_extensions import NotRequired, override
 
 from crawlee import Request
 from crawlee.storage_clients._base import RequestQueueClient
@@ -21,7 +21,7 @@ from crawlee.storage_clients.models import (
     UnprocessedRequest,
 )
 
-from ._client_mixin import SQLClientMixin
+from ._client_mixin import MetadataUpdateParams, SQLClientMixin
 from ._db_models import RequestDB, RequestQueueMetadataDB, RequestQueueStateDB
 
 if TYPE_CHECKING:
@@ -33,6 +33,18 @@ if TYPE_CHECKING:
 
 
 logger = getLogger(__name__)
+
+
+class _QueueMetadataUpdateParams(MetadataUpdateParams):
+    """Parameters for updating queue metadata."""
+
+    new_handled_request_count: NotRequired[int]
+    new_pending_request_count: NotRequired[int]
+    new_total_request_count: NotRequired[int]
+    delta_handled_request_count: NotRequired[int]
+    delta_pending_request_count: NotRequired[int]
+    recalculate: NotRequired[bool]
+    update_had_multiple_clients: NotRequired[bool]
 
 
 class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
@@ -166,13 +178,13 @@ class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
     async def purge(self) -> None:
         """Purge all requests from this request queue."""
         await self._purge(
-            metadata_kwargs={
-                'update_accessed_at': True,
-                'update_modified_at': True,
-                'new_pending_request_count': 0,
-                'new_handled_request_count': 0,
-                'force': True,
-            }
+            metadata_kwargs=_QueueMetadataUpdateParams(
+                update_accessed_at=True,
+                update_modified_at=True,
+                new_pending_request_count=0,
+                new_handled_request_count=0,
+                force=True,
+            )
         )
 
         # Clear recoverable state
@@ -290,10 +302,12 @@ class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
 
             await self._update_metadata(
                 session,
-                recalculate=metadata_recalculate,
-                update_modified_at=True,
-                update_accessed_at=True,
-                force=metadata_recalculate,
+                **_QueueMetadataUpdateParams(
+                    recalculate=metadata_recalculate,
+                    update_modified_at=True,
+                    update_accessed_at=True,
+                    force=metadata_recalculate,
+                ),
             )
 
             try:
@@ -415,7 +429,7 @@ class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
                 await session.rollback()
                 return None
 
-            await self._update_metadata(session, update_accessed_at=True)
+            await self._update_metadata(session, **_QueueMetadataUpdateParams(update_accessed_at=True))
 
             await session.commit()
 
@@ -450,11 +464,13 @@ class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
                 return None
             await self._update_metadata(
                 session,
-                delta_handled_request_count=1,
-                delta_pending_request_count=-1,
-                update_modified_at=True,
-                update_accessed_at=True,
-                force=True,
+                **_QueueMetadataUpdateParams(
+                    delta_handled_request_count=1,
+                    delta_pending_request_count=-1,
+                    update_modified_at=True,
+                    update_accessed_at=True,
+                    force=True,
+                ),
             )
             await session.commit()
         return ProcessedRequest(
@@ -477,8 +493,8 @@ class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
             self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id
         )
 
-        async with self.get_autocommit_session() as autocommit:
-            state = await self._get_state(autocommit)
+        async with self.get_session(with_simple_commit=True) as session:
+            state = await self._get_state(session)
 
             # Update sequence number if changing priority
             if forefront:
@@ -493,11 +509,13 @@ class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
                 state.sequence_counter += 1
                 stmt = stmt.values(sequence_number=new_sequence, time_blocked_until=None)
 
-            result = await autocommit.execute(stmt)
+            result = await session.execute(stmt)
             if result.rowcount == 0:
                 logger.warning(f'Request {request.unique_key} not found in database.')
                 return None
-            await self._update_metadata(autocommit, update_modified_at=True, update_accessed_at=True)
+            await self._update_metadata(
+                session, **_QueueMetadataUpdateParams(update_modified_at=True, update_accessed_at=True)
+            )
 
         # put the forefront request at the beginning of the cache
         if forefront:
@@ -522,7 +540,7 @@ class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
                 raise ValueError(f'Request queue with ID "{self._id}" not found.')
 
             empty = metadata_orm.pending_request_count == 0
-            updated = await self._update_metadata(session, update_accessed_at=True)
+            updated = await self._update_metadata(session, **_QueueMetadataUpdateParams(update_accessed_at=True))
 
             # Commit updates to the metadata
             if updated:

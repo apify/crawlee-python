@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
 
 from sqlalchemy import delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
     from sqlalchemy import Insert
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import DeclarativeBase
-    from typing_extensions import Self
+    from typing_extensions import NotRequired, Self
 
     from crawlee.storage_clients.models import DatasetMetadata, KeyValueStoreMetadata, RequestQueueMetadata
 
@@ -36,7 +37,15 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class SQLClientMixin:
+class MetadataUpdateParams(TypedDict, total=False):
+    """Parameters for updating metadata."""
+
+    update_accessed_at: NotRequired[bool]
+    update_modified_at: NotRequired[bool]
+    force: NotRequired[bool]
+
+
+class SQLClientMixin(ABC):
     """Mixin class for SQL clients.
 
     This mixin provides common SQL operations and basic methods for SQL storage clients.
@@ -63,9 +72,20 @@ class SQLClientMixin:
         self._modified_at_allow_update_after: datetime | None = None
         self._accessed_modified_update_interval = storage_client.get_accessed_modified_update_interval()
 
-    def get_session(self) -> AsyncSession:
+    @asynccontextmanager
+    async def get_session(self, *, with_simple_commit: bool = False) -> AsyncIterator[AsyncSession]:
         """Create a new SQLAlchemy session for this storage."""
-        return self._storage_client.create_session()
+        async with self._storage_client.create_session() as session:
+            # For operations where a final commit is mandatory and does not require specific processing conditions
+            if with_simple_commit:
+                try:
+                    yield session
+                    await session.commit()
+                except SQLAlchemyError as e:
+                    logger.warning(f'Error occurred during session transaction: {e}')
+                    await session.rollback()
+            else:
+                yield session
 
     async def _get_metadata(
         self, metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata]
@@ -77,17 +97,6 @@ class SQLClientMixin:
                 raise ValueError(f'Dataset with ID "{self._id}" not found.')
 
             return metadata_model.model_validate(orm_metadata)
-
-    @asynccontextmanager
-    async def get_autocommit_session(self) -> AsyncIterator[AsyncSession]:
-        """Create a new SQLAlchemy autocommit session to insert, delete, or modify data."""
-        async with self.get_session() as session:
-            try:
-                yield session
-                await session.commit()
-            except SQLAlchemyError as e:
-                logger.warning(f'Error occurred during session transaction: {e}')
-                await session.rollback()
 
     def build_insert_stmt_with_ignore(
         self, table_model: type[DeclarativeBase], insert_values: dict[str, Any] | list[dict[str, Any]]
@@ -144,16 +153,16 @@ class SQLClientMixin:
 
         raise NotImplementedError(f'Upsert not supported for dialect: {dialect}')
 
-    async def _purge(self, metadata_kwargs: dict[str, Any]) -> None:
+    async def _purge(self, metadata_kwargs: MetadataUpdateParams) -> None:
         """Drop all items in storage and update metadata.
 
         Args:
             metadata_kwargs: Arguments to pass to _update_metadata
         """
         stmt = delete(self._ITEM_TABLE).where(self._ITEM_TABLE.metadata_id == self._id)
-        async with self.get_autocommit_session() as autocommit:
-            await autocommit.execute(stmt)
-            await self._update_metadata(autocommit, **metadata_kwargs)
+        async with self.get_session(with_simple_commit=True) as session:
+            await session.execute(stmt)
+            await self._update_metadata(session, **metadata_kwargs)
 
     async def _drop(self) -> None:
         """Delete this storage and all its data.
@@ -161,11 +170,11 @@ class SQLClientMixin:
         This operation is irreversible. Uses CASCADE deletion to remove all related items.
         """
         stmt = delete(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id)
-        async with self.get_autocommit_session() as autocommit:
+        async with self.get_session(with_simple_commit=True) as session:
             if self._storage_client.get_dialect_name() == 'sqlite':
                 # foreign_keys=ON is set at the connection level. Required for cascade deletion.
-                await autocommit.execute(text('PRAGMA foreign_keys=ON'))
-            await autocommit.execute(stmt)
+                await session.execute(text('PRAGMA foreign_keys=ON'))
+            await session.execute(stmt)
 
     def _default_update_metadata(
         self, *, update_accessed_at: bool = False, update_modified_at: bool = False, force: bool = False
@@ -207,6 +216,7 @@ class SQLClientMixin:
 
         return values_to_set
 
+    @abstractmethod
     def _specific_update_metadata(self, **kwargs: Any) -> dict[str, Any]:
         """Prepare storage-specific metadata updates.
 
@@ -215,7 +225,6 @@ class SQLClientMixin:
         Args:
             **kwargs: Storage-specific update parameters
         """
-        raise NotImplementedError('Method _specific_update_metadata must be implemented in the client class.')
 
     async def _update_metadata(
         self,
@@ -302,6 +311,8 @@ class SQLClientMixin:
                 **extra_metadata_fields,
             )
             client = cls(id=metadata.id, storage_client=storage_client)
+            client._accessed_at_allow_update_after = now + client._accessed_modified_update_interval
+            client._modified_at_allow_update_after = now + client._accessed_modified_update_interval
             session.add(cls._METADATA_TABLE(**metadata.model_dump()))
 
         return client

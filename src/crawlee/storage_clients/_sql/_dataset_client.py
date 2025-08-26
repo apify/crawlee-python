@@ -9,18 +9,26 @@ from typing_extensions import override
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
-from ._client_mixin import SQLClientMixin
+from ._client_mixin import MetadataUpdateParams, SQLClientMixin
 from ._db_models import DatasetItemDB, DatasetMetadataDB
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from sqlalchemy import Select
+    from typing_extensions import NotRequired
 
     from ._storage_client import SqlStorageClient
 
 
 logger = getLogger(__name__)
+
+
+class _DatasetMetadataUpdateParams(MetadataUpdateParams):
+    """Parameters for updating dataset metadata."""
+
+    new_item_count: NotRequired[int]
+    delta_item_count: NotRequired[int]
 
 
 class SqlDatasetClient(DatasetClient, SQLClientMixin):
@@ -95,7 +103,7 @@ class SqlDatasetClient(DatasetClient, SQLClientMixin):
             name=name,
             storage_client=storage_client,
             metadata_model=DatasetMetadata,
-            extra_metadata_fields={'itemCount': 0},
+            extra_metadata_fields={'item_count': 0},
         )
 
     @override
@@ -113,7 +121,12 @@ class SqlDatasetClient(DatasetClient, SQLClientMixin):
         Resets item_count to 0 and deletes all records from dataset_item table.
         """
         await self._purge(
-            metadata_kwargs={'new_item_count': 0, 'update_accessed_at': True, 'update_modified_at': True, 'force': True}
+            metadata_kwargs=_DatasetMetadataUpdateParams(
+                new_item_count=0,
+                update_accessed_at=True,
+                update_modified_at=True,
+                force=True,
+            )
         )
 
     @override
@@ -126,11 +139,18 @@ class SqlDatasetClient(DatasetClient, SQLClientMixin):
         db_items = [{'metadata_id': self._id, 'data': item} for item in data]
         stmt = insert(self._ITEM_TABLE).values(db_items)
 
-        async with self.get_autocommit_session() as autocommit:
-            await autocommit.execute(stmt)
+        async with self.get_session(with_simple_commit=True) as session:
+            await session.execute(stmt)
 
             await self._update_metadata(
-                autocommit, update_accessed_at=True, update_modified_at=True, delta_item_count=len(data), force=True
+                session,
+                **_DatasetMetadataUpdateParams(
+                    update_accessed_at=True,
+                    update_modified_at=True,
+                    delta_item_count=len(data),
+                    new_item_count=len(data),
+                    force=True,
+                ),
             )
 
     def _prepare_get_stmt(
@@ -213,7 +233,7 @@ class SqlDatasetClient(DatasetClient, SQLClientMixin):
             result = await session.execute(stmt)
             db_items = result.scalars().all()
 
-            updated = await self._update_metadata(session, update_accessed_at=True)
+            updated = await self._update_metadata(session, **_DatasetMetadataUpdateParams(update_accessed_at=True))
 
             # Commit updates to the metadata
             if updated:
@@ -263,7 +283,7 @@ class SqlDatasetClient(DatasetClient, SQLClientMixin):
             async for db_item in db_items:
                 yield db_item.data
 
-            updated = await self._update_metadata(session, update_accessed_at=True)
+            updated = await self._update_metadata(session, **_DatasetMetadataUpdateParams(update_accessed_at=True))
 
             # Commit updates to the metadata
             if updated:

@@ -33,13 +33,17 @@ def configuration(tmp_path: Path) -> Configuration:
 
 
 @pytest.fixture
-async def rq_client(configuration: Configuration) -> AsyncGenerator[SqlRequestQueueClient, None]:
+async def rq_client(
+    configuration: Configuration, monkeypatch: pytest.MonkeyPatch
+) -> AsyncGenerator[SqlRequestQueueClient, None]:
     """A fixture for a SQL request queue client."""
-    async with SqlStorageClient(accessed_modified_update_interval=timedelta(seconds=0)) as storage_client:
+    async with SqlStorageClient() as storage_client:
+        monkeypatch.setattr(storage_client, '_accessed_modified_update_interval', timedelta(seconds=0))
         client = await storage_client.create_rq_client(
             name='test_request_queue',
             configuration=configuration,
         )
+        monkeypatch.setattr(client, '_accessed_modified_update_interval', timedelta(seconds=0))
         yield client
         await client.drop()
 

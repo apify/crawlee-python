@@ -36,9 +36,12 @@ def get_tables(sync_conn: Connection) -> list[str]:
 
 
 @pytest.fixture
-async def dataset_client(configuration: Configuration) -> AsyncGenerator[SqlDatasetClient, None]:
+async def dataset_client(
+    configuration: Configuration, monkeypatch: pytest.MonkeyPatch
+) -> AsyncGenerator[SqlDatasetClient, None]:
     """A fixture for a SQL dataset client."""
-    async with SqlStorageClient(accessed_modified_update_interval=timedelta(seconds=0)) as storage_client:
+    async with SqlStorageClient() as storage_client:
+        monkeypatch.setattr(storage_client, '_accessed_modified_update_interval', timedelta(seconds=0))
         client = await storage_client.create_dataset_client(
             name='test_dataset',
             configuration=configuration,

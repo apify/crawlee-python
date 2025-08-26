@@ -291,7 +291,6 @@ Configuration options for the <ApiLink to="class/SqlStorageClient">SqlStorageCli
 
 - **`connection_string`** (default: SQLite in <ApiLink to="class/Configuration">Configuration</ApiLink> storage dir) – SQLAlchemy connection string, e.g. 'sqlite+aiosqlite:///my.db' or 'postgresql+asyncpg://user:pass@host/db'.
 - **`engine`** – Pre-configured SQLAlchemy AsyncEngine (optional).
-- **`accessed_modified_update_interval`** – Minimum interval between metadata timestamp updates (default: 1 second). Reducing this parameter can significantly increase the load on the database.
 
 <RunnableCodeBlock className="language-python" language="python">
     {SQLStorageClientConfigurationExample}
