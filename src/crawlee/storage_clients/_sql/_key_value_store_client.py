@@ -306,7 +306,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
 
     @override
     async def get_public_url(self, *, key: str) -> str:
-        raise NotImplementedError('Public URLs are not supported for memory key-value stores.')
+        raise NotImplementedError('Public URLs are not supported for SQL key-value stores.')
 
     def _specific_update_metadata(self, **_kwargs: dict[str, Any]) -> dict[str, Any]:
         return {}
