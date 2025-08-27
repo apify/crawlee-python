@@ -45,7 +45,7 @@ class MetadataUpdateParams(TypedDict, total=False):
     force: NotRequired[bool]
 
 
-class SQLClientMixin(ABC):
+class SqlClientMixin(ABC):
     """Mixin class for SQL clients.
 
     This mixin provides common SQL operations and basic methods for SQL storage clients.
