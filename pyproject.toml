@@ -182,6 +182,7 @@ indent-style = "space"
     "INP001", # File {filename} is part of an implicit namespace package, add an __init__.py
     "F841",   # Local variable {variable} is assigned to but never used
     "N999",   # Invalid module name
+    "T201",   # `print` found
 ]
 "**/docs/examples/code_examples/*crawler_with_error_snapshotter.py" = [
     "PLR2004", # Magic value used in comparison. Ignored for simplicity and readability of example code.
