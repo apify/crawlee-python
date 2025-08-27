@@ -41,7 +41,7 @@ class SqlStorageClient(StorageClient):
         This is an experimental feature. The behavior and interface may change in future versions.
     """
 
-    _DB_NAME = 'crawlee.db'
+    _DEFAULT_DB_NAME = 'crawlee.db'
     """Default database name if not specified in connection string."""
 
     def __init__(
