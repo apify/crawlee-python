@@ -70,7 +70,7 @@ class Base(DeclarativeBase):
     """Base class for all database models for correct type annotations."""
 
 
-class StorageMetadataDB:
+class StorageMetadataDb:
     """Base database model for storage metadata."""
 
     id: Mapped[str] = mapped_column(String(20), nullable=False, primary_key=True)
