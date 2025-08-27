@@ -76,7 +76,7 @@ sql_storage_postgres = [
     "asyncpg>=0.24.0"
 ]
 sql_storage = [
-    "sqlalchemy[asyncio]~=2.0.0,<3.0.0",
+    "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
     "aiosqlite>=0.21.0",
 ]
 
