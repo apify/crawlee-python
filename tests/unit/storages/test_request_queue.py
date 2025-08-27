@@ -27,6 +27,7 @@ def storage_client(request: pytest.FixtureRequest) -> StorageClient:
         return MemoryStorageClient()
     if request.param == 'sql':
         return SqlStorageClient()
+
     return FileSystemStorageClient()
 
 
