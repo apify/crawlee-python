@@ -53,7 +53,7 @@ class AwareDateTime(TypeDecorator):
         return value
 
 
-class JSONField(TypeDecorator):
+class JsonField(TypeDecorator):
     """Uses JSONB for PostgreSQL and JSON for other databases."""
 
     impl = JSON
