@@ -29,7 +29,7 @@ class SqlStorageClient(StorageClient):
 
     This storage client provides access to datasets, key-value stores, and request queues that persist data
     to a SQL database using SQLAlchemy 2+. Each storage type uses two tables: one for metadata and one for
-    records/items.
+    records.
 
     The client accepts either a database connection string or a pre-configured AsyncEngine. If neither is
     provided, it creates a default SQLite database 'crawlee.db' in the storage directory.
