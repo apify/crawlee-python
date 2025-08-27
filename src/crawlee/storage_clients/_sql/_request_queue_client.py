@@ -21,8 +21,8 @@ from crawlee.storage_clients.models import (
     UnprocessedRequest,
 )
 
-from ._client_mixin import MetadataUpdateParams, SQLClientMixin
-from ._db_models import RequestDB, RequestQueueMetadataDB, RequestQueueStateDB
+from ._client_mixin import MetadataUpdateParams, SqlClientMixin
+from ._db_models import RequestDb, RequestQueueMetadataDb, RequestQueueStateDb
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -47,7 +47,7 @@ class _QueueMetadataUpdateParams(MetadataUpdateParams):
     update_had_multiple_clients: NotRequired[bool]
 
 
-class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
+class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
     """SQL implementation of the request queue client.
 
     This client persists requests to a SQL database with transaction handling and
@@ -59,9 +59,9 @@ class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
     ordering. A cache mechanism reduces database queries.
 
     The request queue data is stored in SQL database tables following the pattern:
-    - `request_queue_metadata` table: Contains queue metadata (id, name, timestamps, request counts, multi-client flag)
-    - `request` table: Contains individual requests with JSON data, unique keys for deduplication, sequence numbers for
-        ordering, and processing status flags
+    - `request_queues` table: Contains queue metadata (id, name, timestamps, request counts, multi-client flag)
+    - `request_queue_records` table: Contains individual requests with JSON data, unique keys for deduplication,
+    sequence numbers for ordering, and processing status flags
     - `request_queue_state` table: Maintains counters for sequence numbers to ensure proper ordering of requests.
 
     Requests are serialized to JSON for storage and maintain proper ordering through sequence
@@ -79,10 +79,10 @@ class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
     database load).
     """
 
-    _METADATA_TABLE = RequestQueueMetadataDB
+    _METADATA_TABLE = RequestQueueMetadataDb
     """SQLAlchemy model for request queue metadata."""
 
-    _ITEM_TABLE = RequestDB
+    _ITEM_TABLE = RequestDb
     """SQLAlchemy model for request items."""
 
     _CLIENT_TYPE = 'Request queue'
@@ -109,22 +109,6 @@ class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
 
         self._pending_fetch_cache: deque[Request] = deque()
         """Cache for requests: ordered by sequence number."""
-
-    async def _get_state(self, session: AsyncSession) -> RequestQueueStateDB:
-        """Get the current state of the request queue."""
-        orm_state: RequestQueueStateDB | None = await session.get(RequestQueueStateDB, self._id)
-        if not orm_state:
-            orm_state = RequestQueueStateDB(metadata_id=self._id)
-            session.add(orm_state)
-            await session.flush()
-        return orm_state
-
-    @override
-    async def get_metadata(self) -> RequestQueueMetadata:
-        """Get the metadata for this request queue."""
-        # The database is a single place of truth
-        metadata = await self._get_metadata(RequestQueueMetadata)
-        return cast('RequestQueueMetadata', metadata)
 
     @classmethod
     async def open(
@@ -165,6 +149,13 @@ class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
         )
 
     @override
+    async def get_metadata(self) -> RequestQueueMetadata:
+        """Get the metadata for this request queue."""
+        # The database is a single place of truth
+        metadata = await self._get_metadata(RequestQueueMetadata)
+        return cast('RequestQueueMetadata', metadata)
+
+    @override
     async def drop(self) -> None:
         """Delete this request queue and all its records from the database.
 
@@ -189,6 +180,214 @@ class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
 
         # Clear recoverable state
         self._pending_fetch_cache.clear()
+
+    @override
+    async def add_batch_of_requests(
+        self,
+        requests: Sequence[Request],
+        *,
+        forefront: bool = False,
+    ) -> AddRequestsResponse:
+        return await self._add_batch_of_requests_optimization(requests, forefront=forefront)
+
+    @override
+    async def get_request(self, unique_key: str) -> Request | None:
+        if not (request_id := self._REQUEST_ID_BY_KEY.get(unique_key)):
+            request_id = self._get_int_id_from_unique_key(unique_key)
+            self._REQUEST_ID_BY_KEY[unique_key] = request_id
+
+        stmt = select(self._ITEM_TABLE).where(
+            self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id
+        )
+        async with self.get_session() as session:
+            result = await session.execute(stmt)
+            request_db = result.scalar_one_or_none()
+
+            if request_db is None:
+                logger.warning(f'Request with ID "{unique_key}" not found in the queue.')
+                return None
+
+            updated = await self._update_metadata(session, update_accessed_at=True)
+
+            # Commit updates to the metadata
+            if updated:
+                await session.commit()
+
+        return Request.model_validate_json(request_db.data)
+
+    @override
+    async def fetch_next_request(self) -> Request | None:
+        if self._pending_fetch_cache:
+            return self._pending_fetch_cache.popleft()
+
+        now = datetime.now(timezone.utc)
+        block_until = now + timedelta(seconds=self._BLOCK_REQUEST_TIME)
+        dialect = self._storage_client.get_dialect_name()
+
+        # Get available requests not blocked by another client
+        stmt = (
+            select(self._ITEM_TABLE)
+            .where(
+                self._ITEM_TABLE.metadata_id == self._id,
+                self._ITEM_TABLE.is_handled.is_(False),
+                or_(self._ITEM_TABLE.time_blocked_until.is_(None), self._ITEM_TABLE.time_blocked_until < now),
+            )
+            .order_by(self._ITEM_TABLE.sequence_number.asc())
+            .limit(self._MAX_BATCH_FETCH_SIZE)
+        )
+
+        # We use the `skip_locked` database mechanism to prevent the “interception” of requests by another client
+        if dialect == 'postgresql':
+            stmt = stmt.with_for_update(skip_locked=True)
+
+        async with self.get_session() as session:
+            result = await session.execute(stmt)
+            requests_db = result.scalars().all()
+            if not requests_db:
+                return None
+
+            request_ids = {r.request_id for r in requests_db}
+
+            # Mark the requests as blocked
+            update_stmt = (
+                update(self._ITEM_TABLE)
+                .where(
+                    self._ITEM_TABLE.metadata_id == self._id,
+                    self._ITEM_TABLE.request_id.in_(request_ids),
+                    self._ITEM_TABLE.is_handled.is_(False),
+                    or_(self._ITEM_TABLE.time_blocked_until.is_(None), self._ITEM_TABLE.time_blocked_until < now),
+                )
+                .values(time_blocked_until=block_until)
+                .returning(self._ITEM_TABLE.request_id)
+            )
+
+            update_result = await session.execute(update_stmt)
+
+            # Get IDs of successfully blocked requests
+            blocked_ids = {row[0] for row in update_result.fetchall()}
+
+            if not blocked_ids:
+                await session.rollback()
+                return None
+
+            await self._update_metadata(session, **_QueueMetadataUpdateParams(update_accessed_at=True))
+
+            await session.commit()
+
+        requests = [Request.model_validate_json(r.data) for r in requests_db if r.request_id in blocked_ids]
+
+        if not requests:
+            return None
+
+        self._pending_fetch_cache.extend(requests[1:])
+
+        return requests[0]
+
+    @override
+    async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
+        if not (request_id := self._REQUEST_ID_BY_KEY.get(request.unique_key)):
+            request_id = self._get_int_id_from_unique_key(request.unique_key)
+
+        # Update the request's handled_at timestamp.
+        if request.handled_at is None:
+            request.handled_at = datetime.now(timezone.utc)
+
+        # Update request in Db
+        stmt = (
+            update(self._ITEM_TABLE)
+            .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id)
+            .values(is_handled=True, time_blocked_until=None, data=request.model_dump_json())
+        )
+        async with self.get_session() as session:
+            result = await session.execute(stmt)
+            if result.rowcount == 0:
+                logger.warning(f'Request {request.unique_key} not found in database.')
+                return None
+            await self._update_metadata(
+                session,
+                **_QueueMetadataUpdateParams(
+                    delta_handled_request_count=1,
+                    delta_pending_request_count=-1,
+                    update_modified_at=True,
+                    update_accessed_at=True,
+                    force=True,
+                ),
+            )
+            await session.commit()
+        return ProcessedRequest(
+            unique_key=request.unique_key,
+            was_already_present=True,
+            was_already_handled=True,
+        )
+
+    @override
+    async def reclaim_request(
+        self,
+        request: Request,
+        *,
+        forefront: bool = False,
+    ) -> ProcessedRequest | None:
+        if not (request_id := self._REQUEST_ID_BY_KEY.get(request.unique_key)):
+            request_id = self._get_int_id_from_unique_key(request.unique_key)
+
+        stmt = update(self._ITEM_TABLE).where(
+            self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id
+        )
+
+        async with self.get_session(with_simple_commit=True) as session:
+            state = await self._get_state(session)
+
+            # Update sequence number if changing priority
+            if forefront:
+                new_sequence = state.forefront_sequence_counter
+                state.forefront_sequence_counter -= 1
+                now = datetime.now(timezone.utc)
+                block_until = now + timedelta(seconds=self._BLOCK_REQUEST_TIME)
+                # Extend blocking for forefront request, it is considered blocked by the current client.
+                stmt = stmt.values(sequence_number=new_sequence, time_blocked_until=block_until)
+            else:
+                new_sequence = state.sequence_counter
+                state.sequence_counter += 1
+                stmt = stmt.values(sequence_number=new_sequence, time_blocked_until=None)
+
+            result = await session.execute(stmt)
+            if result.rowcount == 0:
+                logger.warning(f'Request {request.unique_key} not found in database.')
+                return None
+            await self._update_metadata(
+                session, **_QueueMetadataUpdateParams(update_modified_at=True, update_accessed_at=True)
+            )
+
+        # put the forefront request at the beginning of the cache
+        if forefront:
+            self._pending_fetch_cache.appendleft(request)
+
+        return ProcessedRequest(
+            unique_key=request.unique_key,
+            was_already_present=True,
+            was_already_handled=False,
+        )
+
+    @override
+    async def is_empty(self) -> bool:
+        # Check in-memory cache for requests
+        if self._pending_fetch_cache:
+            return False
+
+        # Check database for unhandled requests
+        async with self.get_session() as session:
+            metadata_orm = await session.get(self._METADATA_TABLE, self._id)
+            if not metadata_orm:
+                raise ValueError(f'Request queue with ID "{self._id}" not found.')
+
+            empty = metadata_orm.pending_request_count == 0
+            updated = await self._update_metadata(session, **_QueueMetadataUpdateParams(update_accessed_at=True))
+
+            # Commit updates to the metadata
+            if updated:
+                await session.commit()
+
+        return empty
 
     async def _add_batch_of_requests_optimization(
         self,
@@ -337,221 +536,19 @@ class SqlRequestQueueClient(RequestQueueClient, SQLClientMixin):
             unprocessed_requests=unprocessed_requests,
         )
 
-    @override
-    async def add_batch_of_requests(
-        self,
-        requests: Sequence[Request],
-        *,
-        forefront: bool = False,
-    ) -> AddRequestsResponse:
-        if self._storage_client.get_dialect_name() in {'sqlite', 'postgresql'}:
-            return await self._add_batch_of_requests_optimization(requests, forefront=forefront)
-
-        raise NotImplementedError('Batch addition is not supported for this database dialect.')
-
-    @override
-    async def get_request(self, unique_key: str) -> Request | None:
-        if not (request_id := self._REQUEST_ID_BY_KEY.get(unique_key)):
-            request_id = self._get_int_id_from_unique_key(unique_key)
-            self._REQUEST_ID_BY_KEY[unique_key] = request_id
-
-        stmt = select(self._ITEM_TABLE).where(
-            self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id
-        )
-        async with self.get_session() as session:
-            result = await session.execute(stmt)
-            request_db = result.scalar_one_or_none()
-
-            if request_db is None:
-                logger.warning(f'Request with ID "{unique_key}" not found in the queue.')
-                return None
-
-            updated = await self._update_metadata(session, update_accessed_at=True)
-
-            # Commit updates to the metadata
-            if updated:
-                await session.commit()
-
-        return Request.model_validate_json(request_db.data)
-
-    @override
-    async def fetch_next_request(self) -> Request | None:
-        if self._pending_fetch_cache:
-            return self._pending_fetch_cache.popleft()
-
-        now = datetime.now(timezone.utc)
-        block_until = now + timedelta(seconds=self._BLOCK_REQUEST_TIME)
-        dialect = self._storage_client.get_dialect_name()
-
-        # Get available requests not blocked by another client
-        stmt = (
-            select(self._ITEM_TABLE)
-            .where(
-                self._ITEM_TABLE.metadata_id == self._id,
-                self._ITEM_TABLE.is_handled.is_(False),
-                or_(self._ITEM_TABLE.time_blocked_until.is_(None), self._ITEM_TABLE.time_blocked_until < now),
-            )
-            .order_by(self._ITEM_TABLE.sequence_number.asc())
-            .limit(self._MAX_BATCH_FETCH_SIZE)
-        )
-
-        # We use the `skip_locked` database mechanism to prevent the “interception” of requests by another client
-        if dialect == 'postgresql':
-            stmt = stmt.with_for_update(skip_locked=True)
-
-        async with self.get_session() as session:
-            result = await session.execute(stmt)
-            requests_db = result.scalars().all()
-            if not requests_db:
-                return None
-
-            request_ids = {r.request_id for r in requests_db}
-
-            # Mark the requests as blocked
-            update_stmt = (
-                update(self._ITEM_TABLE)
-                .where(
-                    self._ITEM_TABLE.metadata_id == self._id,
-                    self._ITEM_TABLE.request_id.in_(request_ids),
-                    self._ITEM_TABLE.is_handled.is_(False),
-                    or_(self._ITEM_TABLE.time_blocked_until.is_(None), self._ITEM_TABLE.time_blocked_until < now),
-                )
-                .values(time_blocked_until=block_until)
-                .returning(self._ITEM_TABLE.request_id)
-            )
-
-            update_result = await session.execute(update_stmt)
-
-            # Get IDs of successfully blocked requests
-            blocked_ids = {row[0] for row in update_result.fetchall()}
-
-            if not blocked_ids:
-                await session.rollback()
-                return None
-
-            await self._update_metadata(session, **_QueueMetadataUpdateParams(update_accessed_at=True))
-
-            await session.commit()
-
-        requests = [Request.model_validate_json(r.data) for r in requests_db if r.request_id in blocked_ids]
-
-        if not requests:
-            return None
-
-        self._pending_fetch_cache.extend(requests[1:])
-
-        return requests[0]
-
-    @override
-    async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
-        if not (request_id := self._REQUEST_ID_BY_KEY.get(request.unique_key)):
-            request_id = self._get_int_id_from_unique_key(request.unique_key)
-
-        # Update the request's handled_at timestamp.
-        if request.handled_at is None:
-            request.handled_at = datetime.now(timezone.utc)
-
-        # Update request in DB
-        stmt = (
-            update(self._ITEM_TABLE)
-            .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id)
-            .values(is_handled=True, time_blocked_until=None, data=request.model_dump_json())
-        )
-        async with self.get_session() as session:
-            result = await session.execute(stmt)
-            if result.rowcount == 0:
-                logger.warning(f'Request {request.unique_key} not found in database.')
-                return None
-            await self._update_metadata(
-                session,
-                **_QueueMetadataUpdateParams(
-                    delta_handled_request_count=1,
-                    delta_pending_request_count=-1,
-                    update_modified_at=True,
-                    update_accessed_at=True,
-                    force=True,
-                ),
-            )
-            await session.commit()
-        return ProcessedRequest(
-            unique_key=request.unique_key,
-            was_already_present=True,
-            was_already_handled=True,
-        )
-
-    @override
-    async def reclaim_request(
-        self,
-        request: Request,
-        *,
-        forefront: bool = False,
-    ) -> ProcessedRequest | None:
-        if not (request_id := self._REQUEST_ID_BY_KEY.get(request.unique_key)):
-            request_id = self._get_int_id_from_unique_key(request.unique_key)
-
-        stmt = update(self._ITEM_TABLE).where(
-            self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id
-        )
-
-        async with self.get_session(with_simple_commit=True) as session:
-            state = await self._get_state(session)
-
-            # Update sequence number if changing priority
-            if forefront:
-                new_sequence = state.forefront_sequence_counter
-                state.forefront_sequence_counter -= 1
-                now = datetime.now(timezone.utc)
-                block_until = now + timedelta(seconds=self._BLOCK_REQUEST_TIME)
-                # Extend blocking for forefront request, it is considered blocked by the current client.
-                stmt = stmt.values(sequence_number=new_sequence, time_blocked_until=block_until)
-            else:
-                new_sequence = state.sequence_counter
-                state.sequence_counter += 1
-                stmt = stmt.values(sequence_number=new_sequence, time_blocked_until=None)
-
-            result = await session.execute(stmt)
-            if result.rowcount == 0:
-                logger.warning(f'Request {request.unique_key} not found in database.')
-                return None
-            await self._update_metadata(
-                session, **_QueueMetadataUpdateParams(update_modified_at=True, update_accessed_at=True)
-            )
-
-        # put the forefront request at the beginning of the cache
-        if forefront:
-            self._pending_fetch_cache.appendleft(request)
-
-        return ProcessedRequest(
-            unique_key=request.unique_key,
-            was_already_present=True,
-            was_already_handled=False,
-        )
-
-    @override
-    async def is_empty(self) -> bool:
-        # Check in-memory cache for requests
-        if self._pending_fetch_cache:
-            return False
-
-        # Check database for unhandled requests
-        async with self.get_session() as session:
-            metadata_orm = await session.get(self._METADATA_TABLE, self._id)
-            if not metadata_orm:
-                raise ValueError(f'Request queue with ID "{self._id}" not found.')
-
-            empty = metadata_orm.pending_request_count == 0
-            updated = await self._update_metadata(session, **_QueueMetadataUpdateParams(update_accessed_at=True))
-
-            # Commit updates to the metadata
-            if updated:
-                await session.commit()
-
-        return empty
-
     async def _block_metadata_for_update(self, session: AsyncSession) -> None:
         if self._storage_client.get_dialect_name() == 'postgresql':
             stmt = select(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id).with_for_update()
             await session.execute(stmt)
+
+    async def _get_state(self, session: AsyncSession) -> RequestQueueStateDb:
+        """Get the current state of the request queue."""
+        orm_state: RequestQueueStateDb | None = await session.get(RequestQueueStateDb, self._id)
+        if not orm_state:
+            orm_state = RequestQueueStateDb(metadata_id=self._id)
+            session.add(orm_state)
+            await session.flush()
+        return orm_state
 
     def _specific_update_metadata(
         self,

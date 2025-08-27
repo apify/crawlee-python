@@ -9,8 +9,8 @@ from typing_extensions import override
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
-from ._client_mixin import MetadataUpdateParams, SQLClientMixin
-from ._db_models import DatasetItemDB, DatasetMetadataDB
+from ._client_mixin import MetadataUpdateParams, SqlClientMixin
+from ._db_models import DatasetItemDb, DatasetMetadataDb
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -31,15 +31,15 @@ class _DatasetMetadataUpdateParams(MetadataUpdateParams):
     delta_item_count: NotRequired[int]
 
 
-class SqlDatasetClient(DatasetClient, SQLClientMixin):
+class SqlDatasetClient(DatasetClient, SqlClientMixin):
     """SQL implementation of the dataset client.
 
     This client persists dataset items to a SQL database using two tables for storage
     and retrieval. Items are stored as JSON with automatic ordering preservation.
 
     The dataset data is stored in SQL database tables following the pattern:
-    - `dataset_metadata` table: Contains dataset metadata (id, name, timestamps, item_count)
-    - `dataset_item` table: Contains individual items with JSON data and auto-increment ordering
+    - `datasets` table: Contains dataset metadata (id, name, timestamps, item_count)
+    - `dataset_records` table: Contains individual items with JSON data and auto-increment ordering
 
     Items are stored as a JSON object in SQLite and as JSONB in PostgreSQL. These objects must be JSON-serializable.
     The `order_id` auto-increment primary key ensures insertion order is preserved.
@@ -49,10 +49,10 @@ class SqlDatasetClient(DatasetClient, SQLClientMixin):
     _DEFAULT_NAME = 'default'
     """Default dataset name used when no name is provided."""
 
-    _METADATA_TABLE = DatasetMetadataDB
+    _METADATA_TABLE = DatasetMetadataDb
     """SQLAlchemy model for dataset metadata."""
 
-    _ITEM_TABLE = DatasetItemDB
+    _ITEM_TABLE = DatasetItemDb
     """SQLAlchemy model for dataset items."""
 
     _CLIENT_TYPE = 'Dataset'
@@ -69,13 +69,6 @@ class SqlDatasetClient(DatasetClient, SQLClientMixin):
         Preferably use the `SqlDatasetClient.open` class method to create a new instance.
         """
         super().__init__(id=id, storage_client=storage_client)
-
-    @override
-    async def get_metadata(self) -> DatasetMetadata:
-        """Get dataset metadata from the database."""
-        # The database is a single place of truth
-        metadata = await self._get_metadata(DatasetMetadata)
-        return cast('DatasetMetadata', metadata)
 
     @classmethod
     async def open(
@@ -107,6 +100,13 @@ class SqlDatasetClient(DatasetClient, SQLClientMixin):
         )
 
     @override
+    async def get_metadata(self) -> DatasetMetadata:
+        """Get dataset metadata from the database."""
+        # The database is a single place of truth
+        metadata = await self._get_metadata(DatasetMetadata)
+        return cast('DatasetMetadata', metadata)
+
+    @override
     async def drop(self) -> None:
         """Delete this dataset and all its items from the database.
 
@@ -118,7 +118,7 @@ class SqlDatasetClient(DatasetClient, SQLClientMixin):
     async def purge(self) -> None:
         """Remove all items from this dataset while keeping the dataset structure.
 
-        Resets item_count to 0 and deletes all records from dataset_item table.
+        Resets item_count to 0 and deletes all records from dataset_records table.
         """
         await self._purge(
             metadata_kwargs=_DatasetMetadataUpdateParams(
@@ -152,52 +152,6 @@ class SqlDatasetClient(DatasetClient, SQLClientMixin):
                     force=True,
                 ),
             )
-
-    def _prepare_get_stmt(
-        self,
-        *,
-        offset: int = 0,
-        limit: int | None = 999_999_999_999,
-        clean: bool = False,
-        desc: bool = False,
-        fields: list[str] | None = None,
-        omit: list[str] | None = None,
-        unwind: list[str] | None = None,
-        skip_empty: bool = False,
-        skip_hidden: bool = False,
-        flatten: list[str] | None = None,
-        view: str | None = None,
-    ) -> Select:
-        # Check for unsupported arguments and log a warning if found.
-        unsupported_args: dict[str, Any] = {
-            'clean': clean,
-            'fields': fields,
-            'omit': omit,
-            'unwind': unwind,
-            'skip_hidden': skip_hidden,
-            'flatten': flatten,
-            'view': view,
-        }
-        unsupported = {k: v for k, v in unsupported_args.items() if v not in (False, None)}
-
-        if unsupported:
-            logger.warning(
-                f'The arguments {list(unsupported.keys())} of get_data are not supported by the '
-                f'{self.__class__.__name__} client.'
-            )
-
-        stmt = select(self._ITEM_TABLE).where(self._ITEM_TABLE.metadata_id == self._id)
-
-        if skip_empty:
-            # Skip items that are empty JSON objects
-            stmt = stmt.where(self._ITEM_TABLE.data != {})
-
-        # Apply ordering by insertion order (order_id)
-        stmt = (
-            stmt.order_by(self._ITEM_TABLE.order_id.desc()) if desc else stmt.order_by(self._ITEM_TABLE.order_id.asc())
-        )
-
-        return stmt.offset(offset).limit(limit)
 
     @override
     async def get_data(
@@ -288,6 +242,52 @@ class SqlDatasetClient(DatasetClient, SQLClientMixin):
             # Commit updates to the metadata
             if updated:
                 await session.commit()
+
+    def _prepare_get_stmt(
+        self,
+        *,
+        offset: int = 0,
+        limit: int | None = 999_999_999_999,
+        clean: bool = False,
+        desc: bool = False,
+        fields: list[str] | None = None,
+        omit: list[str] | None = None,
+        unwind: list[str] | None = None,
+        skip_empty: bool = False,
+        skip_hidden: bool = False,
+        flatten: list[str] | None = None,
+        view: str | None = None,
+    ) -> Select:
+        # Check for unsupported arguments and log a warning if found.
+        unsupported_args: dict[str, Any] = {
+            'clean': clean,
+            'fields': fields,
+            'omit': omit,
+            'unwind': unwind,
+            'skip_hidden': skip_hidden,
+            'flatten': flatten,
+            'view': view,
+        }
+        unsupported = {k: v for k, v in unsupported_args.items() if v not in (False, None)}
+
+        if unsupported:
+            logger.warning(
+                f'The arguments {list(unsupported.keys())} of get_data are not supported by the '
+                f'{self.__class__.__name__} client.'
+            )
+
+        stmt = select(self._ITEM_TABLE).where(self._ITEM_TABLE.metadata_id == self._id)
+
+        if skip_empty:
+            # Skip items that are empty JSON objects
+            stmt = stmt.where(self._ITEM_TABLE.data != {})
+
+        # Apply ordering by insertion order (order_id)
+        stmt = (
+            stmt.order_by(self._ITEM_TABLE.order_id.desc()) if desc else stmt.order_by(self._ITEM_TABLE.order_id.asc())
+        )
+
+        return stmt.offset(offset).limit(limit)
 
     def _specific_update_metadata(
         self,

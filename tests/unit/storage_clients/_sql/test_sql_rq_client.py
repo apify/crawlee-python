@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from crawlee import Request
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import SqlStorageClient
-from crawlee.storage_clients._sql._db_models import RequestDB, RequestQueueMetadataDB
+from crawlee.storage_clients._sql._db_models import RequestDb, RequestQueueMetadataDb
 from crawlee.storage_clients.models import RequestQueueMetadata
 
 if TYPE_CHECKING:
@@ -66,8 +66,9 @@ async def test_create_tables_with_connection_string(configuration: Configuration
 
         async with storage_client.engine.begin() as conn:
             tables = await conn.run_sync(get_tables)
-            assert 'request_queue_metadata' in tables
-            assert 'request' in tables
+            assert 'request_queues' in tables
+            assert 'request_queue_records' in tables
+            assert 'request_queue_state' in tables
 
 
 async def test_create_tables_with_engine(configuration: Configuration, tmp_path: Path) -> None:
@@ -84,8 +85,9 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
 
         async with engine.begin() as conn:
             tables = await conn.run_sync(get_tables)
-            assert 'request_queue_metadata' in tables
-            assert 'request' in tables
+            assert 'request_queues' in tables
+            assert 'request_queue_records' in tables
+            assert 'request_queue_state' in tables
 
 
 async def test_tables_and_metadata_record(configuration: Configuration) -> None:
@@ -100,11 +102,12 @@ async def test_tables_and_metadata_record(configuration: Configuration) -> None:
 
         async with storage_client.engine.begin() as conn:
             tables = await conn.run_sync(get_tables)
-            assert 'request_queue_metadata' in tables
-            assert 'request' in tables
+            assert 'request_queues' in tables
+            assert 'request_queue_records' in tables
+            assert 'request_queue_state' in tables
 
         async with client.get_session() as session:
-            stmt = select(RequestQueueMetadataDB).where(RequestQueueMetadataDB.name == 'test_request_queue')
+            stmt = select(RequestQueueMetadataDb).where(RequestQueueMetadataDb.name == 'test_request_queue')
             result = await session.execute(stmt)
             orm_metadata = result.scalar_one_or_none()
             metadata = RequestQueueMetadata.model_validate(orm_metadata)
@@ -127,7 +130,7 @@ async def test_request_records_persistence(rq_client: SqlRequestQueueClient) -> 
     metadata_client = await rq_client.get_metadata()
 
     async with rq_client.get_session() as session:
-        stmt = select(RequestDB).where(RequestDB.metadata_id == metadata_client.id)
+        stmt = select(RequestDb).where(RequestDb.metadata_id == metadata_client.id)
         result = await session.execute(stmt)
         db_requests = result.scalars().all()
         assert len(db_requests) == 3
@@ -141,7 +144,7 @@ async def test_drop_removes_records(rq_client: SqlRequestQueueClient) -> None:
     await rq_client.add_batch_of_requests([Request.from_url('https://example.com')])
     metadata = await rq_client.get_metadata()
     async with rq_client.get_session() as session:
-        stmt = select(RequestDB).where(RequestDB.metadata_id == metadata.id)
+        stmt = select(RequestDb).where(RequestDb.metadata_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 1
@@ -149,11 +152,11 @@ async def test_drop_removes_records(rq_client: SqlRequestQueueClient) -> None:
     await rq_client.drop()
 
     async with rq_client.get_session() as session:
-        stmt = select(RequestDB).where(RequestDB.metadata_id == metadata.id)
+        stmt = select(RequestDb).where(RequestDb.metadata_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 0
-        db_metadata = await session.get(RequestQueueMetadataDB, metadata.id)
+        db_metadata = await session.get(RequestQueueMetadataDb, metadata.id)
         assert db_metadata is None
 
 
@@ -192,7 +195,7 @@ async def test_metadata_record_updates(rq_client: SqlRequestQueueClient) -> None
     assert metadata.accessed_at > accessed_after_read
 
     async with rq_client.get_session() as session:
-        orm_metadata = await session.get(RequestQueueMetadataDB, metadata.id)
+        orm_metadata = await session.get(RequestQueueMetadataDb, metadata.id)
         assert orm_metadata is not None
         assert orm_metadata.created_at == metadata.created_at
         assert orm_metadata.accessed_at == metadata.accessed_at

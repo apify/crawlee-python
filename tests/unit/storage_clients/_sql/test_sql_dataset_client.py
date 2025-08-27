@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import SqlStorageClient
-from crawlee.storage_clients._sql._db_models import DatasetItemDB, DatasetMetadataDB
+from crawlee.storage_clients._sql._db_models import DatasetItemDb, DatasetMetadataDb
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -62,8 +62,8 @@ async def test_create_tables_with_connection_string(configuration: Configuration
 
         async with storage_client.engine.begin() as conn:
             tables = await conn.run_sync(get_tables)
-            assert 'dataset_item' in tables
-            assert 'dataset_metadata' in tables
+            assert 'dataset_records' in tables
+            assert 'datasets' in tables
 
 
 async def test_create_tables_with_engine(configuration: Configuration, tmp_path: Path) -> None:
@@ -80,8 +80,8 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
 
         async with engine.begin() as conn:
             tables = await conn.run_sync(get_tables)
-            assert 'dataset_item' in tables
-            assert 'dataset_metadata' in tables
+            assert 'dataset_records' in tables
+            assert 'datasets' in tables
 
 
 async def test_tables_and_metadata_record(configuration: Configuration) -> None:
@@ -96,11 +96,11 @@ async def test_tables_and_metadata_record(configuration: Configuration) -> None:
 
         async with storage_client.engine.begin() as conn:
             tables = await conn.run_sync(get_tables)
-            assert 'dataset_item' in tables
-            assert 'dataset_metadata' in tables
+            assert 'dataset_records' in tables
+            assert 'datasets' in tables
 
         async with client.get_session() as session:
-            stmt = select(DatasetMetadataDB).where(DatasetMetadataDB.name == 'new_dataset')
+            stmt = select(DatasetMetadataDb).where(DatasetMetadataDb.name == 'new_dataset')
             result = await session.execute(stmt)
             orm_metadata = result.scalar_one_or_none()
             assert orm_metadata is not None
@@ -124,7 +124,7 @@ async def test_record_and_content_verification(dataset_client: SqlDatasetClient)
     assert metadata.accessed_at is not None
 
     async with dataset_client.get_session() as session:
-        stmt = select(DatasetItemDB).where(DatasetItemDB.metadata_id == metadata.id)
+        stmt = select(DatasetItemDb).where(DatasetItemDb.metadata_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 1
@@ -136,7 +136,7 @@ async def test_record_and_content_verification(dataset_client: SqlDatasetClient)
     await dataset_client.push_data(items)
 
     async with dataset_client.get_session() as session:
-        stmt = select(DatasetItemDB).where(DatasetItemDB.metadata_id == metadata.id)
+        stmt = select(DatasetItemDb).where(DatasetItemDb.metadata_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 4
@@ -149,7 +149,7 @@ async def test_drop_removes_records(dataset_client: SqlDatasetClient) -> None:
     client_metadata = await dataset_client.get_metadata()
 
     async with dataset_client.get_session() as session:
-        stmt = select(DatasetItemDB).where(DatasetItemDB.metadata_id == client_metadata.id)
+        stmt = select(DatasetItemDb).where(DatasetItemDb.metadata_id == client_metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 1
@@ -158,11 +158,11 @@ async def test_drop_removes_records(dataset_client: SqlDatasetClient) -> None:
     await dataset_client.drop()
 
     async with dataset_client.get_session() as session:
-        stmt = select(DatasetItemDB).where(DatasetItemDB.metadata_id == client_metadata.id)
+        stmt = select(DatasetItemDb).where(DatasetItemDb.metadata_id == client_metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 0
-        metadata = await session.get(DatasetMetadataDB, client_metadata.id)
+        metadata = await session.get(DatasetMetadataDb, client_metadata.id)
         assert metadata is None
 
 
@@ -202,7 +202,7 @@ async def test_metadata_record_updates(dataset_client: SqlDatasetClient) -> None
 
     # Verify metadata record is updated in db
     async with dataset_client.get_session() as session:
-        orm_metadata = await session.get(DatasetMetadataDB, metadata.id)
+        orm_metadata = await session.get(DatasetMetadataDb, metadata.id)
         assert orm_metadata is not None
         orm_metadata.item_count = 1
         assert orm_metadata.created_at == initial_created

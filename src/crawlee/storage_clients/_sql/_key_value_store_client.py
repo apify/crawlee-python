@@ -4,16 +4,15 @@ import json
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy import delete, insert, select, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import delete, select
 from typing_extensions import override
 
 from crawlee._utils.file import infer_mime_type
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
-from ._client_mixin import MetadataUpdateParams, SQLClientMixin
-from ._db_models import KeyValueStoreMetadataDB, KeyValueStoreRecordDB
+from ._client_mixin import MetadataUpdateParams, SqlClientMixin
+from ._db_models import KeyValueStoreMetadataDb, KeyValueStoreRecordDb
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -24,7 +23,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class SqlKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
+class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
     """SQL implementation of the key-value store client.
 
     This client persists key-value data to a SQL database with transaction support and
@@ -32,9 +31,9 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
     for efficient retrieval.
 
     The key-value store data is stored in SQL database tables following the pattern:
-    - `kvs_metadata` table: Contains store metadata (id, name, timestamps)
-    - `kvs_record` table: Contains individual key-value pairs with binary value storage, content type, and size
-        information
+    - `key_value_stores` table: Contains store metadata (id, name, timestamps)
+    - `key_value_store_records` table: Contains individual key-value pairs with binary value storage, content type,
+    and size information
 
     Values are serialized based on their type: JSON objects are stored as formatted JSON,
     text values as UTF-8 encoded strings, and binary data as-is in the `LargeBinary` column.
@@ -49,10 +48,10 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
     _DEFAULT_NAME = 'default'
     """Default dataset name used when no name is provided."""
 
-    _METADATA_TABLE = KeyValueStoreMetadataDB
+    _METADATA_TABLE = KeyValueStoreMetadataDb
     """SQLAlchemy model for key-value store metadata."""
 
-    _ITEM_TABLE = KeyValueStoreRecordDB
+    _ITEM_TABLE = KeyValueStoreRecordDb
     """SQLAlchemy model for key-value store items."""
 
     _CLIENT_TYPE = 'Key-value store'
@@ -69,13 +68,6 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
         Preferably use the `SqlKeyValueStoreClient.open` class method to create a new instance.
         """
         super().__init__(id=id, storage_client=storage_client)
-
-    @override
-    async def get_metadata(self) -> KeyValueStoreMetadata:
-        """Get the metadata for this key-value store."""
-        # The database is a single place of truth
-        metadata = await self._get_metadata(KeyValueStoreMetadata)
-        return cast('KeyValueStoreMetadata', metadata)
 
     @classmethod
     async def open(
@@ -109,6 +101,13 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
             metadata_model=KeyValueStoreMetadata,
             extra_metadata_fields={},
         )
+
+    @override
+    async def get_metadata(self) -> KeyValueStoreMetadata:
+        """Get the metadata for this key-value store."""
+        # The database is a single place of truth
+        metadata = await self._get_metadata(KeyValueStoreMetadata)
+        return cast('KeyValueStoreMetadata', metadata)
 
     @override
     async def drop(self) -> None:
@@ -152,41 +151,20 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SQLClientMixin):
             'content_type': content_type,
             'size': size,
         }
-        try:
-            # Trying to build a statement for Upsert
-            upsert_stmt = self.build_upsert_stmt(
-                self._ITEM_TABLE,
-                insert_values=insert_values,
-                update_columns=['value', 'content_type', 'size'],
-                conflict_cols=['metadata_id', 'key'],
-            )
-        except NotImplementedError:
-            # If it is not possible to build an upsert for the current dialect, build an update + insert.
-            upsert_stmt = None
-            update_stmt = (
-                update(self._ITEM_TABLE)
-                .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.key == key)
-                .values(value=value_bytes, content_type=content_type, size=size)
-            )
-            insert_stmt = insert(self._ITEM_TABLE).values(**insert_values)
 
-        async with self.get_session() as session:
-            if upsert_stmt is not None:
-                result = await session.execute(upsert_stmt)
-            else:
-                result = await session.execute(update_stmt)
-                if result.rowcount == 0:
-                    await session.execute(insert_stmt)
+        upsert_stmt = self.build_upsert_stmt(
+            self._ITEM_TABLE,
+            insert_values=insert_values,
+            update_columns=['value', 'content_type', 'size'],
+            conflict_cols=['metadata_id', 'key'],
+        )
+
+        async with self.get_session(with_simple_commit=True) as session:
+            await session.execute(upsert_stmt)
 
             await self._update_metadata(
                 session, **MetadataUpdateParams(update_accessed_at=True, update_modified_at=True)
             )
-
-            try:
-                await session.commit()
-            except IntegrityError:
-                # Race condition when attempting to INSERT the same key. Ignore duplicates.
-                await session.rollback()
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:

@@ -139,8 +139,17 @@ The `SqlStorageClient` is experimental. Its API and behavior may change in futur
 The <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> provides persistent storage using a SQL database ([SQLite](https://sqlite.org/) by default, or [PostgreSQL](https://www.postgresql.org/)). It supports all Crawlee storage types and enables concurrent access from multiple independent clients or processes.
 
 :::note dependencies
-Use crawlee['sql_storage'] for SQLite and crawlee['sql_storage_posgres'] for PostgreSQL
+The <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> is not included in the core Crawlee package.
+To use it, you need to install Crawlee with the appropriate extra dependency:
+
+- For SQLite support, run:
+  <code>pip install 'crawlee[sql_sqlite]'</code>
+- For PostgreSQL support, run:
+  <code>pip install 'crawlee[sql_postgres]'</code>
 :::
+
+By default, <ApiLink to="class/SqlStorageClient">SqlStorageClient</ApiLink> uses SQLite.
+To use PostgreSQL instead, just provide a PostgreSQL connection string via the connection_string parameter. No other code changes are needed—the same client works for both databases.
 
 <RunnableCodeBlock className="language-python" language="python">
     {SQLStorageClientBasicExample}
@@ -173,7 +182,7 @@ class SqlKeyValueStoreClient {
 %% Dataset Tables
 %% ========================
 
-class dataset_metadata {
+class datasets {
     <<table>>
     + id (PK)
     + name
@@ -183,7 +192,7 @@ class dataset_metadata {
     + item_count
 }
 
-class dataset_item {
+class dataset_records {
     <<table>>
     + order_id (PK)
     + metadata_id (FK)
@@ -194,7 +203,7 @@ class dataset_item {
 %% Key-Value Store Tables
 %% ========================
 
-class kvs_metadata {
+class key_value_stores {
     <<table>>
     + id (PK)
     + name
@@ -203,7 +212,7 @@ class kvs_metadata {
     + modified_at
 }
 
-class kvs_record {
+class key_value_store_records {
     <<table>>
     + metadata_id (FK, PK)
     + key (PK)
@@ -216,11 +225,11 @@ class kvs_record {
 %% Client to Table arrows
 %% ========================
 
-SqlDatasetClient --> dataset_metadata
-SqlDatasetClient --> dataset_item
+SqlDatasetClient --> datasets
+SqlDatasetClient --> dataset_records
 
-SqlKeyValueStoreClient --> kvs_metadata
-SqlKeyValueStoreClient --> kvs_record
+SqlKeyValueStoreClient --> key_value_stores
+SqlKeyValueStoreClient --> key_value_store_records
 ```
 ```mermaid
 ---
@@ -243,7 +252,7 @@ class SqlRequestQueueClient {
 %% Request Queue Tables
 %% ========================
 
-class request_queue_metadata {
+class request_queues {
     <<table>>
     + id (PK)
     + name
@@ -256,7 +265,7 @@ class request_queue_metadata {
     + total_request_count
 }
 
-class request {
+class request_queue_records {
     <<table>>
     + request_id (PK)
     + metadata_id (FK, PK)
@@ -277,8 +286,8 @@ class request_queue_state {
 %% Client to Table arrows
 %% ========================
 
-SqlRequestQueueClient --> request_queue_metadata
-SqlRequestQueueClient --> request
+SqlRequestQueueClient --> request_queues
+SqlRequestQueueClient --> request_queue_records
 SqlRequestQueueClient --> request_queue_state
 ```
 
@@ -291,6 +300,8 @@ Configuration options for the <ApiLink to="class/SqlStorageClient">SqlStorageCli
 
 - **`connection_string`** (default: SQLite in <ApiLink to="class/Configuration">Configuration</ApiLink> storage dir) – SQLAlchemy connection string, e.g. 'sqlite+aiosqlite:///my.db' or 'postgresql+asyncpg://user:pass@host/db'.
 - **`engine`** – Pre-configured SQLAlchemy AsyncEngine (optional).
+
+For advanced scenarios, you can configure <ApiLink to="class/SqlStorageClient">SqlStorageClient</ApiLink> with a custom SQLAlchemy engine and additional options via the <ApiLink to="class/Configuration">Configuration</ApiLink> class. This is useful, for example, when connecting to an external PostgreSQL database or customizing connection pooling.
 
 <RunnableCodeBlock className="language-python" language="python">
     {SQLStorageClientConfigurationExample}

@@ -24,12 +24,12 @@ if TYPE_CHECKING:
     from crawlee.storage_clients.models import DatasetMetadata, KeyValueStoreMetadata, RequestQueueMetadata
 
     from ._db_models import (
-        DatasetItemDB,
-        DatasetMetadataDB,
-        KeyValueStoreMetadataDB,
-        KeyValueStoreRecordDB,
-        RequestDB,
-        RequestQueueMetadataDB,
+        DatasetItemDb,
+        DatasetMetadataDb,
+        KeyValueStoreMetadataDb,
+        KeyValueStoreRecordDb,
+        RequestDb,
+        RequestQueueMetadataDb,
     )
     from ._storage_client import SqlStorageClient
 
@@ -54,10 +54,10 @@ class SqlClientMixin(ABC):
     _DEFAULT_NAME: ClassVar[str]
     """Default name when none provided."""
 
-    _METADATA_TABLE: ClassVar[type[DatasetMetadataDB | KeyValueStoreMetadataDB | RequestQueueMetadataDB]]
+    _METADATA_TABLE: ClassVar[type[DatasetMetadataDb | KeyValueStoreMetadataDb | RequestQueueMetadataDb]]
     """SQLAlchemy model for metadata."""
 
-    _ITEM_TABLE: ClassVar[type[DatasetItemDB | KeyValueStoreRecordDB | RequestDB]]
+    _ITEM_TABLE: ClassVar[type[DatasetItemDb | KeyValueStoreRecordDb | RequestDb]]
     """SQLAlchemy model for items."""
 
     _CLIENT_TYPE: ClassVar[str]
@@ -71,197 +71,6 @@ class SqlClientMixin(ABC):
         self._accessed_at_allow_update_after: datetime | None = None
         self._modified_at_allow_update_after: datetime | None = None
         self._accessed_modified_update_interval = storage_client.get_accessed_modified_update_interval()
-
-    @asynccontextmanager
-    async def get_session(self, *, with_simple_commit: bool = False) -> AsyncIterator[AsyncSession]:
-        """Create a new SQLAlchemy session for this storage."""
-        async with self._storage_client.create_session() as session:
-            # For operations where a final commit is mandatory and does not require specific processing conditions
-            if with_simple_commit:
-                try:
-                    yield session
-                    await session.commit()
-                except SQLAlchemyError as e:
-                    logger.warning(f'Error occurred during session transaction: {e}')
-                    await session.rollback()
-            else:
-                yield session
-
-    async def _get_metadata(
-        self, metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata]
-    ) -> DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata:
-        """Retrieve client metadata."""
-        async with self.get_session() as session:
-            orm_metadata = await session.get(self._METADATA_TABLE, self._id)
-            if not orm_metadata:
-                raise ValueError(f'Dataset with ID "{self._id}" not found.')
-
-            return metadata_model.model_validate(orm_metadata)
-
-    def build_insert_stmt_with_ignore(
-        self, table_model: type[DeclarativeBase], insert_values: dict[str, Any] | list[dict[str, Any]]
-    ) -> Insert:
-        """Build an insert statement with ignore for the SQL dialect.
-
-        Args:
-            table_model: SQLAlchemy table model.
-            insert_values: Single dict or list of dicts to insert.
-        """
-        if isinstance(insert_values, dict):
-            insert_values = [insert_values]
-
-        dialect = self._storage_client.get_dialect_name()
-
-        if dialect == 'postgresql':
-            return pg_insert(table_model).values(insert_values).on_conflict_do_nothing()
-
-        if dialect == 'sqlite':
-            return lite_insert(table_model).values(insert_values).on_conflict_do_nothing()
-
-        raise NotImplementedError(f'Insert with ignore not supported for dialect: {dialect}')
-
-    def build_upsert_stmt(
-        self,
-        table_model: type[DeclarativeBase],
-        insert_values: dict[str, Any] | list[dict[str, Any]],
-        update_columns: list[str],
-        conflict_cols: list[str] | None = None,
-    ) -> Insert:
-        """Build an upsert statement for the SQL dialect.
-
-        Args:
-            table_model: SQLAlchemy table model
-            insert_values: Single dict or list of dicts to upsert
-            update_columns: Column names to update on conflict
-            conflict_cols: Column names that define uniqueness (for PostgreSQL/SQLite)
-
-        """
-        if isinstance(insert_values, dict):
-            insert_values = [insert_values]
-
-        dialect = self._storage_client.get_dialect_name()
-
-        if dialect == 'postgresql':
-            pg_stmt = pg_insert(table_model).values(insert_values)
-            set_ = {col: getattr(pg_stmt.excluded, col) for col in update_columns}
-            return pg_stmt.on_conflict_do_update(index_elements=conflict_cols, set_=set_)
-
-        if dialect == 'sqlite':
-            lite_stmt = lite_insert(table_model).values(insert_values)
-            set_ = {col: getattr(lite_stmt.excluded, col) for col in update_columns}
-            return lite_stmt.on_conflict_do_update(index_elements=conflict_cols, set_=set_)
-
-        raise NotImplementedError(f'Upsert not supported for dialect: {dialect}')
-
-    async def _purge(self, metadata_kwargs: MetadataUpdateParams) -> None:
-        """Drop all items in storage and update metadata.
-
-        Args:
-            metadata_kwargs: Arguments to pass to _update_metadata
-        """
-        stmt = delete(self._ITEM_TABLE).where(self._ITEM_TABLE.metadata_id == self._id)
-        async with self.get_session(with_simple_commit=True) as session:
-            await session.execute(stmt)
-            await self._update_metadata(session, **metadata_kwargs)
-
-    async def _drop(self) -> None:
-        """Delete this storage and all its data.
-
-        This operation is irreversible. Uses CASCADE deletion to remove all related items.
-        """
-        stmt = delete(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id)
-        async with self.get_session(with_simple_commit=True) as session:
-            if self._storage_client.get_dialect_name() == 'sqlite':
-                # foreign_keys=ON is set at the connection level. Required for cascade deletion.
-                await session.execute(text('PRAGMA foreign_keys=ON'))
-            await session.execute(stmt)
-
-    def _default_update_metadata(
-        self, *, update_accessed_at: bool = False, update_modified_at: bool = False, force: bool = False
-    ) -> dict[str, Any]:
-        """Prepare common metadata updates with rate limiting.
-
-        Args:
-            update_accessed_at: Whether to update accessed_at timestamp
-            update_modified_at: Whether to update modified_at timestamp
-            force: Whether to force the update regardless of rate limiting
-        """
-        values_to_set: dict[str, Any] = {}
-        now = datetime.now(timezone.utc)
-
-        # If the record must be updated (for example, when updating counters), we update timestamps and shift the time.
-        if force:
-            if update_modified_at:
-                values_to_set['modified_at'] = now
-                self._modified_at_allow_update_after = now + self._accessed_modified_update_interval
-            if update_accessed_at:
-                values_to_set['accessed_at'] = now
-                self._accessed_at_allow_update_after = now + self._accessed_modified_update_interval
-
-        elif update_modified_at and (
-            self._modified_at_allow_update_after is None or now >= self._modified_at_allow_update_after
-        ):
-            values_to_set['modified_at'] = now
-            self._modified_at_allow_update_after = now + self._accessed_modified_update_interval
-            # The record will be updated, we can update `accessed_at` and shift the time.
-            if update_accessed_at:
-                values_to_set['accessed_at'] = now
-                self._accessed_at_allow_update_after = now + self._accessed_modified_update_interval
-
-        elif update_accessed_at and (
-            self._accessed_at_allow_update_after is None or now >= self._accessed_at_allow_update_after
-        ):
-            values_to_set['accessed_at'] = now
-            self._accessed_at_allow_update_after = now + self._accessed_modified_update_interval
-
-        return values_to_set
-
-    @abstractmethod
-    def _specific_update_metadata(self, **kwargs: Any) -> dict[str, Any]:
-        """Prepare storage-specific metadata updates.
-
-        Must be implemented by concrete classes.
-
-        Args:
-            **kwargs: Storage-specific update parameters
-        """
-
-    async def _update_metadata(
-        self,
-        session: AsyncSession,
-        *,
-        update_accessed_at: bool = False,
-        update_modified_at: bool = False,
-        force: bool = False,
-        **kwargs: Any,
-    ) -> bool:
-        """Update storage metadata combining common and specific fields.
-
-        Args:
-            session: Active database session
-            update_accessed_at: Whether to update accessed_at timestamp
-            update_modified_at: Whether to update modified_at timestamp
-            force: Whether to force the update timestamps regardless of rate limiting
-            **kwargs: Additional arguments for _specific_update_metadata
-
-        Returns:
-            True if any updates were made, False otherwise
-        """
-        values_to_set = self._default_update_metadata(
-            update_accessed_at=update_accessed_at, update_modified_at=update_modified_at, force=force
-        )
-
-        values_to_set.update(self._specific_update_metadata(**kwargs))
-
-        if values_to_set:
-            if (stmt := values_to_set.pop('custom_stmt', None)) is None:
-                stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id)
-
-            stmt = stmt.values(**values_to_set)
-            await session.execute(stmt)
-            return True
-
-        return False
 
     @classmethod
     async def _open(
@@ -279,14 +88,14 @@ class SqlClientMixin(ABC):
         Internal method used by _safely_open.
 
         Args:
-            id: Storage ID to open (takes precedence over name)
-            name: Storage name to open
-            storage_client: SQL storage client instance
-            metadata_model: Pydantic model for metadata validation
-            session: Active database session
-            extra_metadata_fields: Storage-specific metadata fields
+            id: Storage ID to open (takes precedence over name).
+            name: Storage name to open.
+            storage_client: SQL storage client instance.
+            metadata_model: Pydantic model for metadata validation.
+            session: Active database session.
+            extra_metadata_fields: Storage-specific metadata fields.
         """
-        orm_metadata: DatasetMetadataDB | KeyValueStoreMetadataDB | RequestQueueMetadataDB | None = None
+        orm_metadata: DatasetMetadataDb | KeyValueStoreMetadataDb | RequestQueueMetadataDb | None = None
         if id:
             orm_metadata = await session.get(cls._METADATA_TABLE, id)
             if not orm_metadata:
@@ -330,12 +139,12 @@ class SqlClientMixin(ABC):
         """Safely open storage with transaction handling.
 
         Args:
-            id: Storage ID to open (takes precedence over name)
-            name: Storage name to open
-            storage_client: SQL storage client instance
-            client_class: Concrete client class to instantiate
-            metadata_model: Pydantic model for metadata validation
-            extra_metadata_fields: Storage-specific metadata fields
+            id: Storage ID to open (takes precedence over name).
+            name: Storage name to open.
+            storage_client: SQL storage client instance.
+            client_class: Concrete client class to instantiate.
+            metadata_model: Pydantic model for metadata validation.
+            extra_metadata_fields: Storage-specific metadata fields.
         """
         async with storage_client.create_session() as session:
             try:
@@ -354,7 +163,7 @@ class SqlClientMixin(ABC):
                 search_name = name or cls._DEFAULT_NAME
                 stmt = select(cls._METADATA_TABLE).where(cls._METADATA_TABLE.name == search_name)
                 result = await session.execute(stmt)
-                orm_metadata: DatasetMetadataDB | KeyValueStoreMetadataDB | RequestQueueMetadataDB | None
+                orm_metadata: DatasetMetadataDb | KeyValueStoreMetadataDb | RequestQueueMetadataDb | None
                 orm_metadata = result.scalar_one_or_none()  # type: ignore[assignment]
 
                 if not orm_metadata:
@@ -363,3 +172,194 @@ class SqlClientMixin(ABC):
                 client = cls(id=orm_metadata.id, storage_client=storage_client)
 
         return client
+
+    @asynccontextmanager
+    async def get_session(self, *, with_simple_commit: bool = False) -> AsyncIterator[AsyncSession]:
+        """Create a new SQLAlchemy session for this storage."""
+        async with self._storage_client.create_session() as session:
+            # For operations where a final commit is mandatory and does not require specific processing conditions
+            if with_simple_commit:
+                try:
+                    yield session
+                    await session.commit()
+                except SQLAlchemyError as e:
+                    logger.warning(f'Error occurred during session transaction: {e}')
+                    await session.rollback()
+            else:
+                yield session
+
+    def build_insert_stmt_with_ignore(
+        self, table_model: type[DeclarativeBase], insert_values: dict[str, Any] | list[dict[str, Any]]
+    ) -> Insert:
+        """Build an insert statement with ignore for the SQL dialect.
+
+        Args:
+            table_model: SQLAlchemy table model.
+            insert_values: Single dict or list of dicts to insert.
+        """
+        if isinstance(insert_values, dict):
+            insert_values = [insert_values]
+
+        dialect = self._storage_client.get_dialect_name()
+
+        if dialect == 'postgresql':
+            return pg_insert(table_model).values(insert_values).on_conflict_do_nothing()
+
+        if dialect == 'sqlite':
+            return lite_insert(table_model).values(insert_values).on_conflict_do_nothing()
+
+        raise NotImplementedError(f'Insert with ignore not supported for dialect: {dialect}')
+
+    def build_upsert_stmt(
+        self,
+        table_model: type[DeclarativeBase],
+        insert_values: dict[str, Any] | list[dict[str, Any]],
+        update_columns: list[str],
+        conflict_cols: list[str] | None = None,
+    ) -> Insert:
+        """Build an upsert statement for the SQL dialect.
+
+        Args:
+            table_model: SQLAlchemy table model.
+            insert_values: Single dict or list of dicts to upsert.
+            update_columns: Column names to update on conflict.
+            conflict_cols: Column names that define uniqueness (for PostgreSQL/SQLite).
+
+        """
+        if isinstance(insert_values, dict):
+            insert_values = [insert_values]
+
+        dialect = self._storage_client.get_dialect_name()
+
+        if dialect == 'postgresql':
+            pg_stmt = pg_insert(table_model).values(insert_values)
+            set_ = {col: getattr(pg_stmt.excluded, col) for col in update_columns}
+            return pg_stmt.on_conflict_do_update(index_elements=conflict_cols, set_=set_)
+
+        if dialect == 'sqlite':
+            lite_stmt = lite_insert(table_model).values(insert_values)
+            set_ = {col: getattr(lite_stmt.excluded, col) for col in update_columns}
+            return lite_stmt.on_conflict_do_update(index_elements=conflict_cols, set_=set_)
+
+        raise NotImplementedError(f'Upsert not supported for dialect: {dialect}')
+
+    async def _purge(self, metadata_kwargs: MetadataUpdateParams) -> None:
+        """Drop all items in storage and update metadata.
+
+        Args:
+            metadata_kwargs: Arguments to pass to _update_metadata.
+        """
+        stmt = delete(self._ITEM_TABLE).where(self._ITEM_TABLE.metadata_id == self._id)
+        async with self.get_session(with_simple_commit=True) as session:
+            await session.execute(stmt)
+            await self._update_metadata(session, **metadata_kwargs)
+
+    async def _drop(self) -> None:
+        """Delete this storage and all its data.
+
+        This operation is irreversible. Uses CASCADE deletion to remove all related items.
+        """
+        stmt = delete(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id)
+        async with self.get_session(with_simple_commit=True) as session:
+            if self._storage_client.get_dialect_name() == 'sqlite':
+                # foreign_keys=ON is set at the connection level. Required for cascade deletion.
+                await session.execute(text('PRAGMA foreign_keys=ON'))
+            await session.execute(stmt)
+
+    async def _get_metadata(
+        self, metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata]
+    ) -> DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata:
+        """Retrieve client metadata."""
+        async with self.get_session() as session:
+            orm_metadata = await session.get(self._METADATA_TABLE, self._id)
+            if not orm_metadata:
+                raise ValueError(f'Dataset with ID "{self._id}" not found.')
+
+            return metadata_model.model_validate(orm_metadata)
+
+    def _default_update_metadata(
+        self, *, update_accessed_at: bool = False, update_modified_at: bool = False, force: bool = False
+    ) -> dict[str, Any]:
+        """Prepare common metadata updates with rate limiting.
+
+        Args:
+            update_accessed_at: Whether to update accessed_at timestamp.
+            update_modified_at: Whether to update modified_at timestamp.
+            force: Whether to force the update regardless of rate limiting.
+        """
+        values_to_set: dict[str, Any] = {}
+        now = datetime.now(timezone.utc)
+
+        # If the record must be updated (for example, when updating counters), we update timestamps and shift the time.
+        if force:
+            if update_modified_at:
+                values_to_set['modified_at'] = now
+                self._modified_at_allow_update_after = now + self._accessed_modified_update_interval
+            if update_accessed_at:
+                values_to_set['accessed_at'] = now
+                self._accessed_at_allow_update_after = now + self._accessed_modified_update_interval
+
+        elif update_modified_at and (
+            self._modified_at_allow_update_after is None or now >= self._modified_at_allow_update_after
+        ):
+            values_to_set['modified_at'] = now
+            self._modified_at_allow_update_after = now + self._accessed_modified_update_interval
+            # The record will be updated, we can update `accessed_at` and shift the time.
+            if update_accessed_at:
+                values_to_set['accessed_at'] = now
+                self._accessed_at_allow_update_after = now + self._accessed_modified_update_interval
+
+        elif update_accessed_at and (
+            self._accessed_at_allow_update_after is None or now >= self._accessed_at_allow_update_after
+        ):
+            values_to_set['accessed_at'] = now
+            self._accessed_at_allow_update_after = now + self._accessed_modified_update_interval
+
+        return values_to_set
+
+    @abstractmethod
+    def _specific_update_metadata(self, **kwargs: Any) -> dict[str, Any]:
+        """Prepare storage-specific metadata updates.
+
+        Must be implemented by concrete classes.
+
+        Args:
+            **kwargs: Storage-specific update parameters.
+        """
+
+    async def _update_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        update_accessed_at: bool = False,
+        update_modified_at: bool = False,
+        force: bool = False,
+        **kwargs: Any,
+    ) -> bool:
+        """Update storage metadata combining common and specific fields.
+
+        Args:
+            session: Active database session.
+            update_accessed_at: Whether to update accessed_at timestamp.
+            update_modified_at: Whether to update modified_at timestamp.
+            force: Whether to force the update timestamps regardless of rate limiting.
+            **kwargs: Additional arguments for _specific_update_metadata.
+
+        Returns:
+            True if any updates were made, False otherwise
+        """
+        values_to_set = self._default_update_metadata(
+            update_accessed_at=update_accessed_at, update_modified_at=update_modified_at, force=force
+        )
+
+        values_to_set.update(self._specific_update_metadata(**kwargs))
+
+        if values_to_set:
+            if (stmt := values_to_set.pop('custom_stmt', None)) is None:
+                stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id)
+
+            stmt = stmt.values(**values_to_set)
+            await session.execute(stmt)
+            return True
+
+        return False

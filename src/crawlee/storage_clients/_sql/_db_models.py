@@ -89,24 +89,24 @@ class StorageMetadataDb:
     """Last modification datetime."""
 
 
-class DatasetMetadataDB(StorageMetadataDB, Base):
+class DatasetMetadataDb(StorageMetadataDb, Base):
     """Metadata table for datasets."""
 
-    __tablename__ = 'dataset_metadata'
+    __tablename__ = 'datasets'
 
     item_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     """Number of items in the dataset."""
 
     # Relationship to dataset items with cascade deletion
-    items: Mapped[list[DatasetItemDB]] = relationship(
+    items: Mapped[list[DatasetItemDb]] = relationship(
         back_populates='dataset', cascade='all, delete-orphan', lazy='select'
     )
 
 
-class RequestQueueMetadataDB(StorageMetadataDB, Base):
+class RequestQueueMetadataDb(StorageMetadataDb, Base):
     """Metadata table for request queues."""
 
-    __tablename__ = 'request_queue_metadata'
+    __tablename__ = 'request_queues'
 
     had_multiple_clients: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     """Flag indicating if multiple clients have accessed this queue."""
@@ -121,33 +121,33 @@ class RequestQueueMetadataDB(StorageMetadataDB, Base):
     """Total number of requests ever added to this queue."""
 
     # Relationship to queue requests with cascade deletion
-    requests: Mapped[list[RequestDB]] = relationship(
+    requests: Mapped[list[RequestDb]] = relationship(
         back_populates='queue', cascade='all, delete-orphan', lazy='select'
     )
     # Relationship to queue state
-    state: Mapped[RequestQueueStateDB] = relationship(
+    state: Mapped[RequestQueueStateDb] = relationship(
         back_populates='queue', cascade='all, delete-orphan', lazy='select'
     )
 
 
-class KeyValueStoreMetadataDB(StorageMetadataDB, Base):
+class KeyValueStoreMetadataDb(StorageMetadataDb, Base):
     """Metadata table for key-value stores."""
 
-    __tablename__ = 'kvs_metadata'
+    __tablename__ = 'key_value_stores'
 
     # Relationship to store records with cascade deletion
-    records: Mapped[list[KeyValueStoreRecordDB]] = relationship(
+    records: Mapped[list[KeyValueStoreRecordDb]] = relationship(
         back_populates='kvs', cascade='all, delete-orphan', lazy='select'
     )
 
 
-class KeyValueStoreRecordDB(Base):
+class KeyValueStoreRecordDb(Base):
     """Records table for key-value stores."""
 
-    __tablename__ = 'kvs_record'
+    __tablename__ = 'key_value_store_records'
 
     metadata_id: Mapped[str] = mapped_column(
-        String(20), ForeignKey('kvs_metadata.id', ondelete='CASCADE'), primary_key=True, index=True
+        String(20), ForeignKey('key_value_stores.id', ondelete='CASCADE'), primary_key=True, index=True
     )
     """Foreign key to metadata key-value store record."""
 
@@ -164,35 +164,35 @@ class KeyValueStoreRecordDB(Base):
     """Size of stored value in bytes."""
 
     # Relationship back to parent store
-    kvs: Mapped[KeyValueStoreMetadataDB] = relationship(back_populates='records')
+    kvs: Mapped[KeyValueStoreMetadataDb] = relationship(back_populates='records')
 
 
-class DatasetItemDB(Base):
+class DatasetItemDb(Base):
     """Items table for datasets."""
 
-    __tablename__ = 'dataset_item'
+    __tablename__ = 'dataset_records'
 
     order_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     """Auto-increment primary key preserving insertion order."""
 
     metadata_id: Mapped[str] = mapped_column(
         String(20),
-        ForeignKey('dataset_metadata.id', ondelete='CASCADE'),
+        ForeignKey('datasets.id', ondelete='CASCADE'),
         index=True,
     )
     """Foreign key to metadata dataset record."""
 
-    data: Mapped[list[dict[str, Any]] | dict[str, Any]] = mapped_column(JSONField, nullable=False)
+    data: Mapped[list[dict[str, Any]] | dict[str, Any]] = mapped_column(JsonField, nullable=False)
     """JSON serializable item data."""
 
     # Relationship back to parent dataset
-    dataset: Mapped[DatasetMetadataDB] = relationship(back_populates='items')
+    dataset: Mapped[DatasetMetadataDb] = relationship(back_populates='items')
 
 
-class RequestDB(Base):
+class RequestDb(Base):
     """Requests table for request queues."""
 
-    __tablename__ = 'request'
+    __tablename__ = 'request_queue_records'
     __table_args__ = (
         Index('idx_fetch_available', 'metadata_id', 'is_handled', 'time_blocked_until', 'sequence_number'),
     )
@@ -201,7 +201,7 @@ class RequestDB(Base):
     """Unique identifier for the request representing the unique_key."""
 
     metadata_id: Mapped[str] = mapped_column(
-        String(20), ForeignKey('request_queue_metadata.id', ondelete='CASCADE'), primary_key=True
+        String(20), ForeignKey('request_queues.id', ondelete='CASCADE'), primary_key=True
     )
     """Foreign key to metadata request queue record."""
 
@@ -218,16 +218,16 @@ class RequestDB(Base):
     """Timestamp until which this request is considered blocked for processing by other clients."""
 
     # Relationship back to metadata table
-    queue: Mapped[RequestQueueMetadataDB] = relationship(back_populates='requests')
+    queue: Mapped[RequestQueueMetadataDb] = relationship(back_populates='requests')
 
 
-class RequestQueueStateDB(Base):
+class RequestQueueStateDb(Base):
     """State table for request queues."""
 
     __tablename__ = 'request_queue_state'
 
     metadata_id: Mapped[str] = mapped_column(
-        String(20), ForeignKey('request_queue_metadata.id', ondelete='CASCADE'), primary_key=True
+        String(20), ForeignKey('request_queues.id', ondelete='CASCADE'), primary_key=True
     )
     """Foreign key to metadata request queue record."""
 
@@ -238,4 +238,12 @@ class RequestQueueStateDB(Base):
     """Counter for forefront request ordering (negative)."""
 
     # Relationship back to metadata table
-    queue: Mapped[RequestQueueMetadataDB] = relationship(back_populates='state')
+    queue: Mapped[RequestQueueMetadataDb] = relationship(back_populates='state')
+
+
+class VersionDb(Base):
+    """Table for storing the database schema version."""
+
+    __tablename__ = 'version'
+
+    version: Mapped[str] = mapped_column(String, nullable=False, primary_key=True)
