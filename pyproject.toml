@@ -72,7 +72,7 @@ otel = [
     "wrapt>=1.17.0",
 ]
 sql_storage_postgres = [
-    "sqlalchemy[asyncio]~=2.0.0,<3.0.0",
+    "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
     "asyncpg>=0.24.0"
 ]
 sql_storage = [
