@@ -104,8 +104,8 @@ class SQLClientMixin(ABC):
         """Build an insert statement with ignore for the SQL dialect.
 
         Args:
-            table_model: SQLAlchemy table model
-            insert_values: Single dict or list of dicts to insert
+            table_model: SQLAlchemy table model.
+            insert_values: Single dict or list of dicts to insert.
         """
         if isinstance(insert_values, dict):
             insert_values = [insert_values]
