@@ -17,6 +17,7 @@ async def main() -> None:
         max_buffer_size=500,  # Keep up to 500 URLs in memory before processing.
     )
 
+    # We work with the loader until we process all relevant links from the sitemap.
     while request := await sitemap_loader.fetch_next_request():
         # Do something with it...
         print(f'Processing {request.url}')
