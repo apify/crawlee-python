@@ -21,8 +21,8 @@
         "@docusaurus/module-type-aliases": "3.8.1",
         "@docusaurus/types": "3.8.1",
         "@types/react": "^19.0.0",
-        "@typescript-eslint/eslint-plugin": "8.40.0",
-        "@typescript-eslint/parser": "8.40.0",
+        "@typescript-eslint/eslint-plugin": "8.41.0",
+        "@typescript-eslint/parser": "8.41.0",
         "eslint": "8.57.0",
         "eslint-plugin-react": "7.37.5",
         "eslint-plugin-react-hooks": "5.2.0",
@@ -61,5 +61,5 @@
         "stream-browserify": "^3.0.0",
         "unist-util-visit": "^5.0.0"
     },
-    "packageManager": "yarn@4.9.3"
+    "packageManager": "yarn@4.9.4"
 }

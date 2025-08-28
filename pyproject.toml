@@ -102,7 +102,7 @@ dev = [
     "ruff~=0.12.0",
     "setuptools", # setuptools are used by pytest, but not explicitly required
     "types-beautifulsoup4~=4.12.0.20240229",
-    "types-cachetools~=6.1.0.20250717",
+    "types-cachetools~=6.2.0.20250827",
     "types-colorama~=0.4.15.20240106",
     "types-psutil~=7.0.0.20250218",
     "types-python-dateutil~=2.9.0.20240316",
@@ -174,6 +174,7 @@ indent-style = "space"
     "INP001", # File {filename} is part of an implicit namespace package, add an __init__.py
     "F841",   # Local variable {variable} is assigned to but never used
     "N999",   # Invalid module name
+    "T201",   # `print` found
 ]
 "**/docs/examples/code_examples/*crawler_with_error_snapshotter.py" = [
     "PLR2004", # Magic value used in comparison. Ignored for simplicity and readability of example code.
