@@ -8,15 +8,9 @@ from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, Re
 from ._base import Storage
 
 if TYPE_CHECKING:
-    from crawlee.configuration import Configuration
+    from ..storage_clients import StorageClient
 
 T = TypeVar('T', bound='Storage')
-
-StorageClientType = DatasetClient | KeyValueStoreClient | RequestQueueClient
-"""Type alias for the storage client types."""
-
-ClientOpener = Callable[..., Awaitable[StorageClientType]]
-"""Type alias for the client opener function."""
 
 
 class StorageInstanceManager:
@@ -42,8 +36,7 @@ class StorageInstanceManager:
         *,
         id: str | None,
         name: str | None,
-        configuration: Configuration,
-        client_opener: ClientOpener,
+        storage_client: StorageClient,
     ) -> T:
         """Open a storage instance with caching support.
 
@@ -51,8 +44,7 @@ class StorageInstanceManager:
             cls: The storage class to instantiate.
             id: Storage ID.
             name: Storage name.
-            configuration: Configuration object.
-            client_opener: Function to create the storage client.
+            storage_client: Storage client instance.
 
         Returns:
             The storage instance.

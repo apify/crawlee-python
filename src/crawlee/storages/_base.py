@@ -36,7 +36,6 @@ class Storage(ABC):
         *,
         id: str | None = None,
         name: str | None = None,
-        configuration: Configuration | None = None,
         storage_client: StorageClient | None = None,
     ) -> Storage:
         """Open a storage, either restore existing or create a new one.
@@ -44,7 +43,6 @@ class Storage(ABC):
         Args:
             id: The storage ID.
             name: The storage name.
-            configuration: Configuration object used during the storage creation or restoration process.
             storage_client: Underlying storage client to use. If not provided, the default global storage client
                 from the service locator will be used.
         """
