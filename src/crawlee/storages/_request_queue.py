@@ -16,6 +16,7 @@ from ._base import Storage
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import Literal
 
     from crawlee import Request
     from crawlee.configuration import Configuration
@@ -120,6 +121,7 @@ class RequestQueue(Storage, RequestManager):
         name: str | None = None,
         configuration: Configuration | None = None,
         storage_client: StorageClient | None = None,
+        scope: Literal['run', 'global'] = 'run',
     ) -> RequestQueue:
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
@@ -130,6 +132,7 @@ class RequestQueue(Storage, RequestManager):
             name=name,
             configuration=configuration,
             client_opener=storage_client.create_rq_client,
+            scope=scope,
         )
 
     @override

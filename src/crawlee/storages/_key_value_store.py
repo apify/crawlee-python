@@ -18,6 +18,7 @@ from ._base import Storage
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
+    from typing import Literal
 
     from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
@@ -114,6 +115,7 @@ class KeyValueStore(Storage):
         name: str | None = None,
         configuration: Configuration | None = None,
         storage_client: StorageClient | None = None,
+        scope: Literal['run', 'global'] = 'run',
     ) -> KeyValueStore:
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
@@ -124,6 +126,7 @@ class KeyValueStore(Storage):
             name=name,
             configuration=configuration,
             client_opener=storage_client.create_kvs_client,
+            scope=scope,
         )
 
     @override

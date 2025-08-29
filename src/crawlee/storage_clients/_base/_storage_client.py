@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
+    from typing import Literal
+
     from crawlee.configuration import Configuration
 
     from ._dataset_client import DatasetClient
@@ -32,8 +34,9 @@ class StorageClient(ABC):
     async def create_dataset_client(
         self,
         *,
-        id: str | None = None,
         name: str | None = None,
+        id: str | None = None,
+        scope: Literal['run', 'global'] = 'global',
         configuration: Configuration | None = None,
     ) -> DatasetClient:
         """Create a dataset client."""
@@ -42,8 +45,9 @@ class StorageClient(ABC):
     async def create_kvs_client(
         self,
         *,
-        id: str | None = None,
         name: str | None = None,
+        id: str | None = None,
+        scope: Literal['run', 'global'] = 'global',
         configuration: Configuration | None = None,
     ) -> KeyValueStoreClient:
         """Create a key-value store client."""
@@ -52,8 +56,9 @@ class StorageClient(ABC):
     async def create_rq_client(
         self,
         *,
-        id: str | None = None,
         name: str | None = None,
+        id: str | None = None,
+        scope: Literal['run', 'global'] = 'global',
         configuration: Configuration | None = None,
     ) -> RequestQueueClient:
         """Create a request queue client."""

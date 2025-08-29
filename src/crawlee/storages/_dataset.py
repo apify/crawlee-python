@@ -98,8 +98,9 @@ class Dataset(Storage):
     async def open(
         cls,
         *,
-        id: str | None = None,
         name: str | None = None,
+        id: str | None = None,
+        scope: Literal['run', 'global'] = 'global',
         configuration: Configuration | None = None,
         storage_client: StorageClient | None = None,
     ) -> Dataset:
@@ -108,8 +109,9 @@ class Dataset(Storage):
 
         return await service_locator.storage_instance_manager.open_storage_instance(
             cls,
-            id=id,
             name=name,
+            id=id,
+            scope=scope,
             configuration=configuration,
             client_opener=storage_client.create_dataset_client,
         )

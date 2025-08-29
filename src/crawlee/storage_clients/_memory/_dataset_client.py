@@ -12,6 +12,7 @@ from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
+    from typing import Literal
 
 logger = getLogger(__name__)
 
@@ -33,6 +34,8 @@ class MemoryDatasetClient(DatasetClient):
         self,
         *,
         metadata: DatasetMetadata,
+        scope: Literal['run', 'global'] = 'global',
+        reference_name: str | None = None,
     ) -> None:
         """Initialize a new instance.
 
@@ -43,6 +46,12 @@ class MemoryDatasetClient(DatasetClient):
         self._records = list[dict[str, Any]]()
         """List to hold dataset items. Each item is a dictionary representing a record."""
 
+        self._scope = scope
+        """The scope of the storage ('run' or 'global')."""
+
+        self._reference_name = reference_name
+        """The reference name used for run-scope storages for internal purposes."""
+
     @override
     async def get_metadata(self) -> DatasetMetadata:
         return self._metadata
@@ -51,8 +60,9 @@ class MemoryDatasetClient(DatasetClient):
     async def open(
         cls,
         *,
-        id: str | None,
         name: str | None,
+        id: str | None,
+        scope: Literal['run', 'global'] = 'global',
     ) -> MemoryDatasetClient:
         """Open or create a new memory dataset client.
 
@@ -61,26 +71,49 @@ class MemoryDatasetClient(DatasetClient):
         and is lost when the process terminates.
 
         Args:
+            name: The name of the dataset.
             id: The ID of the dataset. If not provided, a random ID will be generated.
-            name: The name of the dataset. If not provided, the dataset will be unnamed.
+            scope: The storage scope. 'run' for non-default unnamed storage, 'global' for globally named storages.
 
         Returns:
             An instance for the opened or created storage client.
+
+        Raises:
+            ValueError: If both id and name are provided, or if scope is specified when opening by ID.
         """
-        # Otherwise create a new dataset
+        # Validate input parameters according to behavior matrix
+        if id is not None and name is not None:
+            raise ValueError('Cannot specify both "id" and "name" parameters.')
+
+        # Determine the actual storage name based on scope
+        if name is None:
+            # Default unnamed storage - scope is ignored
+            storage_name = None
+            reference_name = None
+        else:
+            # Named storage: always use name as actual storage name
+            # Scope affects behavior but not the name preservation
+            storage_name = name
+            reference_name = name
+
+        # Create a new dataset
         dataset_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 
         metadata = DatasetMetadata(
             id=dataset_id,
-            name=name,
+            name=storage_name,
             created_at=now,
             accessed_at=now,
             modified_at=now,
             item_count=0,
         )
 
-        return cls(metadata=metadata)
+        return cls(
+            metadata=metadata,
+            scope=scope,
+            reference_name=reference_name,
+        )
 
     @override
     async def drop(self) -> None:

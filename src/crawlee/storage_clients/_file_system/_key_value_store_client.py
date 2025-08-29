@@ -20,6 +20,7 @@ from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreR
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
+    from typing import Literal
 
     from crawlee.configuration import Configuration
 
@@ -57,6 +58,8 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         metadata: KeyValueStoreMetadata,
         storage_dir: Path,
         lock: asyncio.Lock,
+        scope: Literal['run', 'global'] = 'global',
+        reference_name: str | None = None,
     ) -> None:
         """Initialize a new instance.
 
@@ -70,6 +73,12 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         self._lock = lock
         """A lock to ensure that only one operation is performed at a time."""
 
+        self._scope = scope
+        """The scope of the storage ('run' or 'global')."""
+
+        self._reference_name = reference_name
+        """The reference name used for run-scope storages for internal purposes."""
+
     @override
     async def get_metadata(self) -> KeyValueStoreMetadata:
         return self._metadata
@@ -77,10 +86,20 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
     @property
     def path_to_kvs(self) -> Path:
         """The full path to the key-value store directory."""
-        if self._metadata.name is None:
+        # Default unnamed storage
+        if self._metadata.name is None and self._reference_name is None:
             return self._storage_dir / self._STORAGE_SUBDIR / self._STORAGE_SUBSUBDIR_DEFAULT
 
-        return self._storage_dir / self._STORAGE_SUBDIR / self._metadata.name
+        # Run-scope storage: use reference_name for directory but storage has no actual name
+        if self._scope == 'run' and self._reference_name is not None:
+            return self._storage_dir / self._STORAGE_SUBDIR / self._reference_name
+
+        # Global named storage: use actual storage name
+        if self._metadata.name is not None:
+            return self._storage_dir / self._STORAGE_SUBDIR / self._metadata.name
+
+        # Fallback to default
+        return self._storage_dir / self._STORAGE_SUBDIR / self._STORAGE_SUBSUBDIR_DEFAULT
 
     @property
     def path_to_metadata(self) -> Path:
@@ -91,8 +110,9 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
     async def open(
         cls,
         *,
-        id: str | None,
         name: str | None,
+        id: str | None,
+        scope: Literal['run', 'global'] = 'global',
         configuration: Configuration,
     ) -> FileSystemKeyValueStoreClient:
         """Open or create a file system key-value store client.
@@ -102,15 +122,17 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         is created.
 
         Args:
+            name: The name of the key-value store to open.
             id: The ID of the key-value store to open. If provided, searches for existing store by ID.
-            name: The name of the key-value store to open. If not provided, uses the default store.
+            scope: The storage scope. 'run' for non-default unnamed storage, 'global' for globally named storages.
             configuration: The configuration object containing storage directory settings.
 
         Returns:
             An instance for the opened or created storage client.
 
         Raises:
-            ValueError: If a store with the specified ID is not found, or if metadata is invalid.
+            ValueError: If both id and name are provided, if a store with the specified ID is not found,
+                       if metadata is invalid, or if scope is specified when opening by ID.
         """
         storage_dir = Path(configuration.storage_dir)
         kvs_base_path = storage_dir / cls._STORAGE_SUBDIR
@@ -118,7 +140,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         if not kvs_base_path.exists():
             await asyncio.to_thread(kvs_base_path.mkdir, parents=True, exist_ok=True)
 
-        # Get a new instance by ID.
+        # Open by ID
         if id:
             found = False
             for kvs_dir in kvs_base_path.iterdir():
@@ -139,6 +161,8 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                                 metadata=metadata,
                                 storage_dir=storage_dir,
                                 lock=asyncio.Lock(),
+                                scope='global',  # ID-based access is always global scope
+                                reference_name=None,
                             )
                             await client._update_metadata(update_accessed_at=True)
                             found = True
@@ -151,9 +175,21 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             if not found:
                 raise ValueError(f'Key-value store with ID "{id}" not found.')
 
-        # Get a new instance by name.
+        # Open by name or default (no args)
         else:
-            kvs_path = kvs_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT if name is None else kvs_base_path / name
+            if name is None:
+                # Default unnamed storage - scope is ignored
+                kvs_path = kvs_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT
+                reference_name = None
+                storage_name = None
+
+            else:
+                # Named storage: always use name as actual storage name
+                # Scope affects behavior but not the name preservation
+                kvs_path = kvs_base_path / name
+                reference_name = name
+                storage_name = name
+
             metadata_path = kvs_path / METADATA_FILENAME
 
             # If the key-value store directory exists, reconstruct the client from the metadata file.
@@ -172,6 +208,8 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                     metadata=metadata,
                     storage_dir=storage_dir,
                     lock=asyncio.Lock(),
+                    scope=scope,
+                    reference_name=reference_name,
                 )
 
                 await client._update_metadata(update_accessed_at=True)
@@ -181,7 +219,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                 now = datetime.now(timezone.utc)
                 metadata = KeyValueStoreMetadata(
                     id=crypto_random_object_id(),
-                    name=name,
+                    name=storage_name,
                     created_at=now,
                     accessed_at=now,
                     modified_at=now,
@@ -190,6 +228,8 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                     metadata=metadata,
                     storage_dir=storage_dir,
                     lock=asyncio.Lock(),
+                    scope=scope,
+                    reference_name=reference_name,
                 )
                 await client._update_metadata()
 

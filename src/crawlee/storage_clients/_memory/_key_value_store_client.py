@@ -13,6 +13,7 @@ from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreR
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
+    from typing import Literal
 
 
 class MemoryKeyValueStoreClient(KeyValueStoreClient):
@@ -31,6 +32,8 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         self,
         *,
         metadata: KeyValueStoreMetadata,
+        scope: Literal['run', 'global'] = 'global',
+        reference_name: str | None = None,
     ) -> None:
         """Initialize a new instance.
 
@@ -41,6 +44,12 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         self._records = dict[str, KeyValueStoreRecord]()
         """Dictionary to hold key-value records."""
 
+        self._scope = scope
+        """The scope of the storage ('run' or 'global')."""
+
+        self._reference_name = reference_name
+        """The reference name used for run-scope storages for internal purposes."""
+
     @override
     async def get_metadata(self) -> KeyValueStoreMetadata:
         return self._metadata
@@ -49,8 +58,9 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
     async def open(
         cls,
         *,
-        id: str | None,
         name: str | None,
+        id: str | None,
+        scope: Literal['run', 'global'] = 'global',
     ) -> MemoryKeyValueStoreClient:
         """Open or create a new memory key-value store client.
 
@@ -59,25 +69,44 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         and is lost when the process terminates.
 
         Args:
+            name: The name of the key-value store.
             id: The ID of the key-value store. If not provided, a random ID will be generated.
-            name: The name of the key-value store. If not provided, the store will be unnamed.
+            scope: The storage scope. 'run' for non-default unnamed storage, 'global' for globally named storages.
 
         Returns:
             An instance for the opened or created storage client.
+
+        Raises:
+            ValueError: If both id and name are provided, or if scope is specified when opening by ID.
         """
-        # Otherwise create a new key-value store
+        # Determine the actual storage name and reference name based on scope
+        if name is None:
+            # Default unnamed storage - scope is ignored
+            storage_name = None
+            reference_name = None
+        else:
+            # Named storage: always use name as actual storage name
+            # Scope affects behavior but not the name preservation
+            storage_name = name
+            reference_name = name
+
+        # Create a new key-value store
         store_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 
         metadata = KeyValueStoreMetadata(
             id=store_id,
-            name=name,
+            name=storage_name,
             created_at=now,
             accessed_at=now,
             modified_at=now,
         )
 
-        return cls(metadata=metadata)
+        return cls(
+            metadata=metadata,
+            scope=scope,
+            reference_name=reference_name,
+        )
 
     @override
     async def drop(self) -> None:

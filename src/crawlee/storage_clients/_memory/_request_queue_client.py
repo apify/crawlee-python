@@ -15,6 +15,7 @@ from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import Literal
 
 logger = getLogger(__name__)
 
@@ -34,6 +35,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
         self,
         *,
         metadata: RequestQueueMetadata,
+        scope: Literal['run', 'global'] = 'run',
     ) -> None:
         """Initialize a new instance.
 
@@ -63,6 +65,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
         *,
         id: str | None,
         name: str | None,
+        scope: Literal['run', 'global'] = 'run',
     ) -> MemoryRequestQueueClient:
         """Open or create a new memory request queue client.
 
@@ -73,6 +76,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
         Args:
             id: The ID of the request queue. If not provided, a random ID will be generated.
             name: The name of the request queue. If not provided, the queue will be unnamed.
+            scope: The scope of the request queue. 'run' for per-run storage, 'global' for persistent storage.
 
         Returns:
             An instance for the opened or created storage client.
@@ -81,9 +85,13 @@ class MemoryRequestQueueClient(RequestQueueClient):
         queue_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 
+        # For named storages, always preserve the name regardless of scope
+        # Scope affects behavior and caching but not name preservation
+        storage_name = name
+
         metadata = RequestQueueMetadata(
             id=queue_id,
-            name=name,
+            name=storage_name,
             created_at=now,
             accessed_at=now,
             modified_at=now,
@@ -93,7 +101,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
             total_request_count=0,
         )
 
-        return cls(metadata=metadata)
+        return cls(metadata=metadata, scope=scope)
 
     @override
     async def drop(self) -> None:

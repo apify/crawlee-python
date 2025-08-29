@@ -19,6 +19,7 @@ from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
+    from typing import Literal
 
     from crawlee.configuration import Configuration
 
@@ -58,6 +59,8 @@ class FileSystemDatasetClient(DatasetClient):
         metadata: DatasetMetadata,
         storage_dir: Path,
         lock: asyncio.Lock,
+        scope: Literal['run', 'global'] = 'global',
+        reference_name: str | None = None,
     ) -> None:
         """Initialize a new instance.
 
@@ -71,6 +74,12 @@ class FileSystemDatasetClient(DatasetClient):
         self._lock = lock
         """A lock to ensure that only one operation is performed at a time."""
 
+        self._scope = scope
+        """The scope of the storage ('run' or 'global')."""
+
+        self._reference_name = reference_name
+        """The reference name used for run-scope storages for internal purposes."""
+
     @override
     async def get_metadata(self) -> DatasetMetadata:
         return self._metadata
@@ -78,10 +87,20 @@ class FileSystemDatasetClient(DatasetClient):
     @property
     def path_to_dataset(self) -> Path:
         """The full path to the dataset directory."""
-        if self._metadata.name is None:
+        # Default unnamed storage
+        if self._metadata.name is None and self._reference_name is None:
             return self._storage_dir / self._STORAGE_SUBDIR / self._STORAGE_SUBSUBDIR_DEFAULT
 
-        return self._storage_dir / self._STORAGE_SUBDIR / self._metadata.name
+        # Run-scope storage: use reference_name for directory but storage has no actual name
+        if self._scope == 'run' and self._reference_name is not None:
+            return self._storage_dir / self._STORAGE_SUBDIR / self._reference_name
+
+        # Global named storage: use actual storage name
+        if self._metadata.name is not None:
+            return self._storage_dir / self._STORAGE_SUBDIR / self._metadata.name
+
+        # Fallback to default
+        return self._storage_dir / self._STORAGE_SUBDIR / self._STORAGE_SUBSUBDIR_DEFAULT
 
     @property
     def path_to_metadata(self) -> Path:
@@ -92,8 +111,9 @@ class FileSystemDatasetClient(DatasetClient):
     async def open(
         cls,
         *,
-        id: str | None,
         name: str | None,
+        id: str | None,
+        scope: Literal['run', 'global'] = 'global',
         configuration: Configuration,
     ) -> FileSystemDatasetClient:
         """Open or create a file system dataset client.
@@ -103,23 +123,32 @@ class FileSystemDatasetClient(DatasetClient):
         is created.
 
         Args:
+            name: The name of the dataset to open.
             id: The ID of the dataset to open. If provided, searches for existing dataset by ID.
-            name: The name of the dataset to open. If not provided, uses the default dataset.
+            scope: The storage scope. 'run' for non-default unnamed storage, 'global' for globally named storages.
             configuration: The configuration object containing storage directory settings.
 
         Returns:
             An instance for the opened or created storage client.
 
         Raises:
-            ValueError: If a dataset with the specified ID is not found, or if metadata is invalid.
+            ValueError: If both id and name are provided, if a dataset with the specified ID is not found,
+                       if metadata is invalid, or if scope is specified when opening by ID.
         """
+        # Validate input parameters according to behavior matrix
+        if id is not None and name is not None:
+            raise ValueError('Cannot specify both "id" and "name" parameters.')
+
+        if id is not None and scope != 'global':
+            raise ValueError('Scope parameter is not allowed when opening storage by ID.')
+
         storage_dir = Path(configuration.storage_dir)
         dataset_base_path = storage_dir / cls._STORAGE_SUBDIR
 
         if not dataset_base_path.exists():
             await asyncio.to_thread(dataset_base_path.mkdir, parents=True, exist_ok=True)
 
-        # Get a new instance by ID.
+        # Open by ID
         if id:
             found = False
             for dataset_dir in dataset_base_path.iterdir():
@@ -140,6 +169,8 @@ class FileSystemDatasetClient(DatasetClient):
                                 metadata=metadata,
                                 storage_dir=storage_dir,
                                 lock=asyncio.Lock(),
+                                scope='global',  # ID-based access is always global scope
+                                reference_name=None,
                             )
                             await client._update_metadata(update_accessed_at=True)
                             found = True
@@ -152,12 +183,22 @@ class FileSystemDatasetClient(DatasetClient):
             if not found:
                 raise ValueError(f'Dataset with ID "{id}" not found')
 
-        # Get a new instance by name.
+        # Open by name or default (no args)
         else:
-            dataset_path = (
-                dataset_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT if name is None else dataset_base_path / name
-            )
-            metadata_path = dataset_path / METADATA_FILENAME
+            if name is None:
+                # Default unnamed storage - scope is ignored
+                dataset_path = dataset_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT
+                metadata_path = dataset_path / METADATA_FILENAME
+                reference_name = None
+                storage_name = None
+
+            else:
+                # Named storage: always use name as actual storage name
+                # Scope affects behavior but not the name preservation
+                dataset_path = dataset_base_path / name
+                metadata_path = dataset_path / METADATA_FILENAME
+                reference_name = name
+                storage_name = name
 
             # If the dataset directory exists, reconstruct the client from the metadata file.
             if dataset_path.exists() and metadata_path.exists():
@@ -175,6 +216,8 @@ class FileSystemDatasetClient(DatasetClient):
                     metadata=metadata,
                     storage_dir=storage_dir,
                     lock=asyncio.Lock(),
+                    scope=scope,
+                    reference_name=reference_name,
                 )
 
                 await client._update_metadata(update_accessed_at=True)
@@ -184,7 +227,7 @@ class FileSystemDatasetClient(DatasetClient):
                 now = datetime.now(timezone.utc)
                 metadata = DatasetMetadata(
                     id=crypto_random_object_id(),
-                    name=name,
+                    name=storage_name,
                     created_at=now,
                     accessed_at=now,
                     modified_at=now,
@@ -194,6 +237,8 @@ class FileSystemDatasetClient(DatasetClient):
                     metadata=metadata,
                     storage_dir=storage_dir,
                     lock=asyncio.Lock(),
+                    scope=scope,
+                    reference_name=reference_name,
                 )
                 await client._update_metadata()
 

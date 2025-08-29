@@ -28,6 +28,7 @@ from crawlee.storage_clients.models import (
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import Literal
 
     from crawlee.configuration import Configuration
 
@@ -146,6 +147,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         id: str | None,
         name: str | None,
         configuration: Configuration,
+        scope: Literal['run', 'global'] = 'run',
     ) -> FileSystemRequestQueueClient:
         """Open or create a file system request queue client.
 
@@ -157,6 +159,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             id: The ID of the request queue to open. If provided, searches for existing queue by ID.
             name: The name of the request queue to open. If not provided, uses the default queue.
             configuration: The configuration object containing storage directory settings.
+            scope: The scope of the request queue. 'run' for per-run storage, 'global' for persistent storage.
 
         Returns:
             An instance for the opened or created storage client.
@@ -208,8 +211,19 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         # Open an existing RQ by its name, or create a new one if not found.
         else:
-            rq_path = rq_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT if name is None else rq_base_path / name
-            metadata_path = rq_path / METADATA_FILENAME
+            # Determine storage naming based on scope
+            if name is None:
+                # Default storage: use default directory
+                rq_path = rq_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT
+                metadata_path = rq_path / METADATA_FILENAME
+                storage_name = None
+
+            else:
+                # Named storage: always use name as actual storage name
+                # Scope affects behavior but not the name preservation
+                rq_path = rq_base_path / name
+                metadata_path = rq_path / METADATA_FILENAME
+                storage_name = name
 
             # If the RQ directory exists, reconstruct the client from the metadata file.
             if rq_path.exists() and metadata_path.exists():
@@ -223,7 +237,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 except ValidationError as exc:
                     raise ValueError(f'Invalid metadata file for request queue "{name}"') from exc
 
-                metadata.name = name
+                metadata.name = storage_name
 
                 client = cls(
                     metadata=metadata,
@@ -240,7 +254,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 now = datetime.now(timezone.utc)
                 metadata = RequestQueueMetadata(
                     id=crypto_random_object_id(),
-                    name=name,
+                    name=storage_name,
                     created_at=now,
                     accessed_at=now,
                     modified_at=now,

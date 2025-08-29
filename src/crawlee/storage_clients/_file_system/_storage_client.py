@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
@@ -9,6 +11,9 @@ from crawlee.storage_clients._base import StorageClient
 from ._dataset_client import FileSystemDatasetClient
 from ._key_value_store_client import FileSystemKeyValueStoreClient
 from ._request_queue_client import FileSystemRequestQueueClient
+
+if TYPE_CHECKING:
+    from typing import Literal
 
 
 @docs_group('Storage clients')
@@ -33,12 +38,13 @@ class FileSystemStorageClient(StorageClient):
     async def create_dataset_client(
         self,
         *,
-        id: str | None = None,
         name: str | None = None,
+        id: str | None = None,
+        scope: Literal['run', 'global'] = 'global',
         configuration: Configuration | None = None,
     ) -> FileSystemDatasetClient:
         configuration = configuration or Configuration.get_global_configuration()
-        client = await FileSystemDatasetClient.open(id=id, name=name, configuration=configuration)
+        client = await FileSystemDatasetClient.open(name=name, id=id, scope=scope, configuration=configuration)
         await self._purge_if_needed(client, configuration)
         return client
 
@@ -46,12 +52,13 @@ class FileSystemStorageClient(StorageClient):
     async def create_kvs_client(
         self,
         *,
-        id: str | None = None,
         name: str | None = None,
+        id: str | None = None,
+        scope: Literal['run', 'global'] = 'global',
         configuration: Configuration | None = None,
     ) -> FileSystemKeyValueStoreClient:
         configuration = configuration or Configuration.get_global_configuration()
-        client = await FileSystemKeyValueStoreClient.open(id=id, name=name, configuration=configuration)
+        client = await FileSystemKeyValueStoreClient.open(name=name, id=id, scope=scope, configuration=configuration)
         await self._purge_if_needed(client, configuration)
         return client
 
@@ -59,11 +66,12 @@ class FileSystemStorageClient(StorageClient):
     async def create_rq_client(
         self,
         *,
-        id: str | None = None,
         name: str | None = None,
+        id: str | None = None,
+        scope: Literal['run', 'global'] = 'global',
         configuration: Configuration | None = None,
     ) -> FileSystemRequestQueueClient:
         configuration = configuration or Configuration.get_global_configuration()
-        client = await FileSystemRequestQueueClient.open(id=id, name=name, configuration=configuration)
+        client = await FileSystemRequestQueueClient.open(name=name, id=id, scope=scope, configuration=configuration)
         await self._purge_if_needed(client, configuration)
         return client

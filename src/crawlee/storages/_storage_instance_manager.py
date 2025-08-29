@@ -8,6 +8,8 @@ from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, Re
 from ._base import Storage
 
 if TYPE_CHECKING:
+    from typing import Literal
+
     from crawlee.configuration import Configuration
 
 T = TypeVar('T', bound='Storage')
@@ -40,8 +42,9 @@ class StorageInstanceManager:
         self,
         cls: type[T],
         *,
-        id: str | None,
         name: str | None,
+        id: str | None,
+        scope: Literal['run', 'global'] = 'run',
         configuration: Configuration,
         client_opener: ClientOpener,
     ) -> T:
@@ -49,8 +52,9 @@ class StorageInstanceManager:
 
         Args:
             cls: The storage class to instantiate.
-            id: Storage ID.
             name: Storage name.
+            id: Storage ID.
+            scope: Storage scope ('run' or 'global').
             configuration: Configuration object.
             client_opener: Function to create the storage client.
 
@@ -60,8 +64,13 @@ class StorageInstanceManager:
         Raises:
             ValueError: If both id and name are specified.
         """
-        if id and name:
+        # Validate input parameters according to behavior matrix
+        if id is not None and name is not None:
             raise ValueError('Only one of "id" or "name" can be specified, not both.')
+
+        # When opening by ID, default to global scope if not explicitly set to run
+        if id is not None:
+            scope = 'global'
 
         # Check for default instance
         if id is None and name is None and cls in self._default_instances:
@@ -77,13 +86,16 @@ class StorageInstanceManager:
 
         if name is not None:
             type_cache_by_name = self._cache_by_name.get(cls, {})
-            if name in type_cache_by_name:
-                cached_instance = type_cache_by_name[name]
+            # For run-scope, use a special cache key format to avoid conflicts
+            lookup_key = f'__run__{name}' if scope == 'run' else name
+            if lookup_key in type_cache_by_name:
+                cached_instance = type_cache_by_name[lookup_key]
                 if isinstance(cached_instance, cls):
                     return cached_instance
 
         # Create new instance
-        client = await client_opener(id=id, name=name, configuration=configuration)
+        client = await client_opener(name=name, id=id, scope=scope, configuration=configuration)
+
         metadata = await client.get_metadata()
 
         instance = cls(client, metadata.id, metadata.name)  # type: ignore[call-arg]
@@ -94,7 +106,11 @@ class StorageInstanceManager:
         type_cache_by_name = self._cache_by_name.setdefault(cls, {})
 
         type_cache_by_id[instance.id] = instance
-        if instance_name is not None:
+
+        # For run-scope storages, use special cache key format to avoid conflicts
+        if scope == 'run' and name is not None:
+            type_cache_by_name[f'__run__{name}'] = instance
+        elif instance_name is not None:
             type_cache_by_name[instance_name] = instance
 
         # Set as default if no id/name specified
