@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Add `impit` option for Crawlee CLI ([#1312](https://github.com/apify/crawlee-python/pull/1312)) ([508d7ce](https://github.com/apify/crawlee-python/commit/508d7ce4d998f37ab2adcf9c057c3c635a69f863)) by [@Mantisus](https://github.com/Mantisus)
 - Persist RequestList state ([#1274](https://github.com/apify/crawlee-python/pull/1274)) ([cc68014](https://github.com/apify/crawlee-python/commit/cc680147ba3cc8b35b9da70274e53e6f5dd92434)) by [@janbuchar](https://github.com/janbuchar), closes [#99](https://github.com/apify/crawlee-python/issues/99)
 - Persist `DefaultRenderingTypePredictor` state ([#1340](https://github.com/apify/crawlee-python/pull/1340)) ([fad4c25](https://github.com/apify/crawlee-python/commit/fad4c25fc712915c4a45b24e3290b6f5dbd8a683)) by [@Mantisus](https://github.com/Mantisus), closes [#1272](https://github.com/apify/crawlee-python/issues/1272)
+- Persist the `SitemapRequestLoader` state ([#1347](https://github.com/apify/crawlee-python/pull/1347)) ([27ef9ad](https://github.com/apify/crawlee-python/commit/27ef9ad194552ea9f1321d91a7a52054be9a8a51)) by [@Mantisus](https://github.com/Mantisus), closes [#1269](https://github.com/apify/crawlee-python/issues/1269)
 
 ### 🐛 Bug Fixes
 
