@@ -5,9 +5,9 @@ camoufox[geoip]~=0.4.5
 # % set extras = [cookiecutter.crawler_type]
 # % endif
 # % if cookiecutter.enable_apify_integration
-apify
+apify==3.0.0rc1
 # % endif
 # % if cookiecutter.http_client == 'curl-impersonate'
 # % do extras.append('curl-impersonate')
 # % endif
-crawlee[{{ extras | join(',') }}]
+crawlee[{{ extras | join(',') }}]==1.0.0rc1

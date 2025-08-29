@@ -19,7 +19,6 @@ from ._base import Storage
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-    from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients._base import KeyValueStoreClient
     from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata

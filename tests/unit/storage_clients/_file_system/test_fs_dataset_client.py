@@ -27,9 +27,8 @@ def configuration(tmp_path: Path) -> Configuration:
 @pytest.fixture
 async def dataset_client(configuration: Configuration) -> AsyncGenerator[FileSystemDatasetClient, None]:
     """A fixture for a file system dataset client."""
-    client = await FileSystemStorageClient().create_dataset_client(
+    client = await FileSystemStorageClient(configuration=configuration).create_dataset_client(
         name='test_dataset',
-        configuration=configuration,
     )
     yield client
     await client.drop()
@@ -37,9 +36,8 @@ async def dataset_client(configuration: Configuration) -> AsyncGenerator[FileSys
 
 async def test_file_and_directory_creation(configuration: Configuration) -> None:
     """Test that file system dataset creates proper files and directories."""
-    client = await FileSystemStorageClient().create_dataset_client(
+    client = await FileSystemStorageClient(configuration=configuration).create_dataset_client(
         name='new_dataset',
-        configuration=configuration,
     )
 
     # Verify files were created
@@ -137,15 +135,12 @@ async def test_metadata_file_updates(dataset_client: FileSystemDatasetClient) ->
         assert metadata_json['item_count'] == 1
 
 
-async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
+async def test_data_persistence_across_reopens() -> None:
     """Test that data persists correctly when reopening the same dataset."""
     storage_client = FileSystemStorageClient()
 
     # Create dataset and add data
-    original_client = await storage_client.create_dataset_client(
-        name='persistence-test',
-        configuration=configuration,
-    )
+    original_client = await storage_client.create_dataset_client(name='persistence-test')
 
     test_data = {'test_item': 'test_value', 'id': 123}
     await original_client.push_data(test_data)
@@ -153,10 +148,7 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
     dataset_id = (await original_client.get_metadata()).id
 
     # Reopen by ID and verify data persists
-    reopened_client = await storage_client.create_dataset_client(
-        id=dataset_id,
-        configuration=configuration,
-    )
+    reopened_client = await storage_client.create_dataset_client(id=dataset_id)
 
     data = await reopened_client.get_data()
     assert len(data.items) == 1

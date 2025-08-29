@@ -27,6 +27,7 @@ from crawlee import EnqueueStrategy, Glob, RequestTransformAction, service_locat
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
 from crawlee._log_config import configure_logger, get_configured_log_level, string_to_log_level
 from crawlee._request import Request, RequestOptions, RequestState
+from crawlee._service_locator import ServiceLocator
 from crawlee._types import (
     BasicCrawlingContext,
     EnqueueLinksKwargs,
@@ -346,14 +347,18 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             _logger: A logger instance, typically provided by a subclass, for consistent logging labels.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
-        if configuration:
-            service_locator.set_configuration(configuration)
-        if storage_client:
-            service_locator.set_storage_client(storage_client)
-        if event_manager:
-            service_locator.set_event_manager(event_manager)
+        if not configuration:
+            configuration = service_locator.get_configuration()
+        if not storage_client:
+            storage_client = service_locator.get_storage_client()
+        if not event_manager:
+            event_manager = service_locator.get_event_manager()
 
-        config = service_locator.get_configuration()
+        self._service_locator = ServiceLocator(
+            configuration=configuration, storage_client=storage_client, event_manager=event_manager
+        )
+
+        config = self._service_locator.get_configuration()
 
         # Core components
         self._request_manager = request_manager
@@ -548,7 +553,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def get_request_manager(self) -> RequestManager:
         """Return the configured request manager. If none is configured, open and return the default request queue."""
         if not self._request_manager:
-            self._request_manager = await RequestQueue.open()
+            self._request_manager = await RequestQueue.open(storage_client=self._service_locator.get_storage_client())
 
         return self._request_manager
 
@@ -559,7 +564,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         name: str | None = None,
     ) -> Dataset:
         """Return the `Dataset` with the given ID or name. If none is provided, return the default one."""
-        return await Dataset.open(id=id, name=name)
+        return await Dataset.open(id=id, name=name, storage_client=self._service_locator.get_storage_client())
 
     async def get_key_value_store(
         self,
@@ -568,7 +573,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         name: str | None = None,
     ) -> KeyValueStore:
         """Return the `KeyValueStore` with the given ID or name. If none is provided, return the default KVS."""
-        return await KeyValueStore.open(id=id, name=name)
+        return await KeyValueStore.open(id=id, name=name, storage_client=self._service_locator.get_storage_client())
 
     def error_handler(
         self, handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext]
@@ -684,7 +689,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         return final_statistics
 
     async def _run_crawler(self) -> None:
-        event_manager = service_locator.get_event_manager()
+        event_manager = self._service_locator.get_event_manager()
 
         self._crawler_state_rec_task.start()
 
@@ -1520,7 +1525,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def _crawler_state_task(self) -> None:
         """Emit a persist state event with the given migration status."""
-        event_manager = service_locator.get_event_manager()
+        event_manager = self._service_locator.get_event_manager()
 
         current_state = self.statistics.state
 

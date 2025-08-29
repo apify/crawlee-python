@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee import Request
-    from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients._base import RequestQueueClient
     from crawlee.storage_clients.models import ProcessedRequest, RequestQueueMetadata

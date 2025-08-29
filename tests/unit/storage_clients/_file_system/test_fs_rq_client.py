@@ -27,9 +27,8 @@ def configuration(tmp_path: Path) -> Configuration:
 @pytest.fixture
 async def rq_client(configuration: Configuration) -> AsyncGenerator[FileSystemRequestQueueClient, None]:
     """A fixture for a file system request queue client."""
-    client = await FileSystemStorageClient().create_rq_client(
+    client = await FileSystemStorageClient(configuration=configuration).create_rq_client(
         name='test_request_queue',
-        configuration=configuration,
     )
     yield client
     await client.drop()
@@ -37,10 +36,7 @@ async def rq_client(configuration: Configuration) -> AsyncGenerator[FileSystemRe
 
 async def test_file_and_directory_creation(configuration: Configuration) -> None:
     """Test that file system RQ creates proper files and directories."""
-    client = await FileSystemStorageClient().create_rq_client(
-        name='new_request_queue',
-        configuration=configuration,
-    )
+    client = await FileSystemStorageClient(configuration=configuration).create_rq_client(name='new_request_queue')
 
     # Verify files were created
     assert client.path_to_rq.exists()
@@ -137,12 +133,11 @@ async def test_metadata_file_updates(rq_client: FileSystemRequestQueueClient) ->
 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
     """Test that requests persist correctly when reopening the same RQ."""
-    storage_client = FileSystemStorageClient()
+    storage_client = FileSystemStorageClient(configuration=configuration)
 
     # Create RQ and add requests
     original_client = await storage_client.create_rq_client(
         name='persistence-test',
-        configuration=configuration,
     )
 
     test_requests = [
@@ -156,7 +151,6 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
     # Reopen by ID and verify requests persist
     reopened_client = await storage_client.create_rq_client(
         id=rq_id,
-        configuration=configuration,
     )
 
     metadata = await reopened_client.get_metadata()

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from crawlee._service_locator import service_locator
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore
@@ -20,32 +21,35 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(params=['memory', 'file_system'])
-def storage_client(request: pytest.FixtureRequest) -> StorageClient:
+def storage_client(request: pytest.FixtureRequest, configuration: Configuration) -> StorageClient:
     """Parameterized fixture to test with different storage clients."""
+    storage_client: StorageClient
     if request.param == 'memory':
-        return MemoryStorageClient()
-
-    return FileSystemStorageClient()
+        storage_client = MemoryStorageClient(configuration=configuration)
+    else:
+        storage_client = FileSystemStorageClient(configuration=configuration)
+    service_locator.set_storage_client(storage_client)
+    return storage_client
 
 
 @pytest.fixture
 def configuration(tmp_path: Path) -> Configuration:
     """Provide a configuration with a temporary storage directory."""
-    return Configuration(
+    configuration = Configuration(
         crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
         purge_on_start=True,
     )
+    service_locator.set_configuration(configuration)
+    return configuration
 
 
 @pytest.fixture
 async def dataset(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> AsyncGenerator[Dataset, None]:
     """Fixture that provides a dataset instance for each test."""
     dataset = await Dataset.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     yield dataset
@@ -54,13 +58,11 @@ async def dataset(
 
 async def test_open_creates_new_dataset(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that open() creates a new dataset with proper metadata."""
     dataset = await Dataset.open(
         name='new_dataset',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify dataset properties
@@ -75,13 +77,11 @@ async def test_open_creates_new_dataset(
 
 async def test_reopen_default(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test reopening a dataset with default parameters."""
     # Create a first dataset instance with default parameters
     dataset_1 = await Dataset.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify default properties
@@ -97,7 +97,6 @@ async def test_reopen_default(
     # Reopen the same dataset
     dataset_2 = await Dataset.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify both instances reference the same dataset
@@ -116,14 +115,12 @@ async def test_reopen_default(
 
 async def test_open_by_id(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test opening a dataset by its ID."""
     # First create a dataset by name
     dataset1 = await Dataset.open(
         name='dataset_by_id_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some data to identify it
@@ -134,7 +131,6 @@ async def test_open_by_id(
     dataset2 = await Dataset.open(
         id=dataset1.id,
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify it's the same dataset
@@ -153,13 +149,11 @@ async def test_open_by_id(
 
 async def test_open_existing_dataset(
     dataset: Dataset,
-    storage_client: StorageClient,
 ) -> None:
     """Test that open() loads an existing dataset correctly."""
     # Open the same dataset again
     reopened_dataset = await Dataset.open(
         name=dataset.name,
-        storage_client=storage_client,
     )
 
     # Verify dataset properties
@@ -175,7 +169,6 @@ async def test_open_existing_dataset(
 
 async def test_open_with_id_and_name(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that open() raises an error when both id and name are provided."""
     with pytest.raises(ValueError, match='Only one of "id" or "name" can be specified'):
@@ -183,7 +176,6 @@ async def test_open_with_id_and_name(
             id='some-id',
             name='some-name',
             storage_client=storage_client,
-            configuration=configuration,
         )
 
 
@@ -395,13 +387,11 @@ async def test_list_items_with_options(dataset: Dataset) -> None:
 
 async def test_drop(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test dropping a dataset removes it from cache and clears its data."""
     dataset = await Dataset.open(
         name='drop_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some data
@@ -414,7 +404,6 @@ async def test_drop(
     new_dataset = await Dataset.open(
         name='drop_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     result = await new_dataset.get_data()
@@ -430,7 +419,6 @@ async def test_export_to_json(
     # Create a key-value store for export
     kvs = await KeyValueStore.open(
         name='export_kvs',
-        storage_client=storage_client,
     )
 
     # Add some items to the dataset
@@ -530,14 +518,12 @@ async def test_large_dataset(dataset: Dataset) -> None:
 
 async def test_purge(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test purging a dataset removes all data but keeps the dataset itself."""
     # First create a dataset
     dataset = await Dataset.open(
         name='purge_test_dataset',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some data

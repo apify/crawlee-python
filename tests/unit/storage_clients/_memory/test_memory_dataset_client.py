@@ -27,9 +27,8 @@ async def test_memory_specific_purge_behavior() -> None:
     configuration = Configuration(purge_on_start=True)
 
     # Create dataset and add data
-    dataset_client1 = await MemoryStorageClient().create_dataset_client(
+    dataset_client1 = await MemoryStorageClient(configuration=configuration).create_dataset_client(
         name='test_purge_dataset',
-        configuration=configuration,
     )
     await dataset_client1.push_data({'item': 'initial data'})
 
@@ -38,9 +37,8 @@ async def test_memory_specific_purge_behavior() -> None:
     assert len(items.items) == 1
 
     # Reopen with same storage client instance
-    dataset_client2 = await MemoryStorageClient().create_dataset_client(
+    dataset_client2 = await MemoryStorageClient(configuration=configuration).create_dataset_client(
         name='test_purge_dataset',
-        configuration=configuration,
     )
 
     # Verify data was purged (memory storage specific behavior)

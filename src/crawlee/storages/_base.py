@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
-    from crawlee.configuration import Configuration
     from crawlee.storage_clients._base import StorageClient
     from crawlee.storage_clients.models import DatasetMetadata, KeyValueStoreMetadata, RequestQueueMetadata
 

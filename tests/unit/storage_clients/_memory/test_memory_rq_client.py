@@ -28,9 +28,8 @@ async def test_memory_specific_purge_behavior() -> None:
     configuration = Configuration(purge_on_start=True)
 
     # Create RQ and add data
-    rq_client1 = await MemoryStorageClient().create_rq_client(
+    rq_client1 = await MemoryStorageClient(configuration=configuration).create_rq_client(
         name='test_purge_rq',
-        configuration=configuration,
     )
     request = Request.from_url(url='https://example.com/initial')
     await rq_client1.add_batch_of_requests([request])
@@ -39,9 +38,8 @@ async def test_memory_specific_purge_behavior() -> None:
     assert await rq_client1.is_empty() is False
 
     # Reopen with same storage client instance
-    rq_client2 = await MemoryStorageClient().create_rq_client(
+    rq_client2 = await MemoryStorageClient(configuration=configuration).create_rq_client(
         name='test_purge_rq',
-        configuration=configuration,
     )
 
     # Verify queue was purged (memory storage specific behavior)

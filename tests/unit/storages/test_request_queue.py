@@ -21,32 +21,35 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(params=['memory', 'file_system'])
-def storage_client(request: pytest.FixtureRequest) -> StorageClient:
+def storage_client(request: pytest.FixtureRequest, configuration: Configuration) -> StorageClient:
     """Parameterized fixture to test with different storage clients."""
+    storage_client: StorageClient
     if request.param == 'memory':
-        return MemoryStorageClient()
-
-    return FileSystemStorageClient()
+        storage_client = MemoryStorageClient(configuration=configuration)
+    else:
+        storage_client = FileSystemStorageClient(configuration=configuration)
+    service_locator.set_storage_client(storage_client)
+    return storage_client
 
 
 @pytest.fixture
 def configuration(tmp_path: Path) -> Configuration:
     """Provide a configuration with a temporary storage directory."""
-    return Configuration(
+    configuration = Configuration(
         crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
         purge_on_start=True,
     )
+    service_locator.set_configuration(configuration)
+    return configuration
 
 
 @pytest.fixture
 async def rq(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> AsyncGenerator[RequestQueue, None]:
     """Fixture that provides a request queue instance for each test."""
     rq = await RequestQueue.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     yield rq
@@ -55,13 +58,11 @@ async def rq(
 
 async def test_open_creates_new_rq(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that open() creates a new request queue with proper metadata."""
     rq = await RequestQueue.open(
         name='new_request_queue',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify request queue properties
@@ -96,7 +97,6 @@ async def test_open_existing_rq(
 
 async def test_open_with_id_and_name(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that open() raises an error when both id and name are provided."""
     with pytest.raises(ValueError, match='Only one of "id" or "name" can be specified'):
@@ -104,20 +104,17 @@ async def test_open_with_id_and_name(
             id='some-id',
             name='some-name',
             storage_client=storage_client,
-            configuration=configuration,
         )
 
 
 async def test_open_by_id(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test opening a request queue by its ID."""
     # First create a request queue by name
     rq1 = await RequestQueue.open(
         name='rq_by_id_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add a request to identify it
@@ -127,7 +124,6 @@ async def test_open_by_id(
     rq2 = await RequestQueue.open(
         id=rq1.id,
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify it's the same request queue
@@ -498,13 +494,11 @@ async def test_reclaim_non_existent_request(rq: RequestQueue) -> None:
 
 async def test_drop(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test dropping a request queue removes it from cache and clears its data."""
     rq = await RequestQueue.open(
         name='drop_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add a request
@@ -517,7 +511,6 @@ async def test_drop(
     new_rq = await RequestQueue.open(
         name='drop_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify the queue is empty
@@ -530,7 +523,6 @@ async def test_drop(
 
 async def test_reopen_default(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test reopening the default request queue."""
     # First clean up any storage instance caches
@@ -540,7 +532,6 @@ async def test_reopen_default(
     # Open the default request queue
     rq1 = await RequestQueue.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # If a request queue already exists (due to previous test run), purge it to start fresh
@@ -551,7 +542,6 @@ async def test_reopen_default(
         await rq1.drop()
         rq1 = await RequestQueue.open(
             storage_client=storage_client,
-            configuration=configuration,
         )
 
     # Verify we're starting fresh
@@ -568,7 +558,6 @@ async def test_reopen_default(
     # Open the default request queue again
     rq2 = await RequestQueue.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify they are the same queue
@@ -591,14 +580,12 @@ async def test_reopen_default(
 
 async def test_purge(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test purging a request queue removes all requests but keeps the queue itself."""
     # First create a request queue
     rq = await RequestQueue.open(
         name='purge_test_queue',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some requests

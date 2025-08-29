@@ -35,13 +35,8 @@ class FileSystemStorageClient(StorageClient):
         Args:
             configuration: Optional configuration instance to use with the storage client.
                 If not provided, the global configuration will be used.
-            purge_on_start: If true, all storages (datasets, key-value stores, request queues)
-                will be purged (deleted) when they are opened for the first time.
-                Use with caution as this will delete all existing data in the storages.
         """
         self._configuration = configuration or Configuration.get_global_configuration()
-
-
 
     @override
     async def create_dataset_client(
