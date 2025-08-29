@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import KeyValueStore
@@ -20,32 +21,35 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(params=['memory', 'file_system'])
-def storage_client(request: pytest.FixtureRequest) -> StorageClient:
+def storage_client(request: pytest.FixtureRequest, configuration: Configuration) -> StorageClient:
     """Parameterized fixture to test with different storage clients."""
+    storage_client: StorageClient
     if request.param == 'memory':
-        return MemoryStorageClient()
-
-    return FileSystemStorageClient()
+        storage_client = MemoryStorageClient(configuration=configuration)
+    else:
+        storage_client = FileSystemStorageClient(configuration=configuration)
+    service_locator.set_storage_client(storage_client)
+    return storage_client
 
 
 @pytest.fixture
 def configuration(tmp_path: Path) -> Configuration:
     """Provide a configuration with a temporary storage directory."""
-    return Configuration(
+    configuration = Configuration(
         crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
         purge_on_start=True,
     )
+    service_locator.set_configuration(configuration)
+    return configuration
 
 
 @pytest.fixture
 async def kvs(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> AsyncGenerator[KeyValueStore, None]:
     """Fixture that provides a key-value store instance for each test."""
     kvs = await KeyValueStore.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     yield kvs
@@ -54,13 +58,11 @@ async def kvs(
 
 async def test_open_creates_new_kvs(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that open() creates a new key-value store with proper metadata."""
     kvs = await KeyValueStore.open(
         name='new_kvs',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify key-value store properties
@@ -91,7 +93,6 @@ async def test_open_existing_kvs(
 
 async def test_open_with_id_and_name(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that open() raises an error when both id and name are provided."""
     with pytest.raises(ValueError, match='Only one of "id" or "name" can be specified'):
@@ -99,20 +100,17 @@ async def test_open_with_id_and_name(
             id='some-id',
             name='some-name',
             storage_client=storage_client,
-            configuration=configuration,
         )
 
 
 async def test_open_by_id(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test opening a key-value store by its ID."""
     # First create a key-value store by name
     kvs1 = await KeyValueStore.open(
         name='kvs_by_id_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some data to identify it
@@ -122,7 +120,6 @@ async def test_open_by_id(
     kvs2 = await KeyValueStore.open(
         id=kvs1.id,
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify it's the same key-value store
@@ -294,13 +291,11 @@ async def test_iterate_keys_with_limit(kvs: KeyValueStore) -> None:
 
 async def test_drop(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test dropping a key-value store removes it from cache and clears its data."""
     kvs = await KeyValueStore.open(
         name='drop_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some data
@@ -313,7 +308,6 @@ async def test_drop(
     new_kvs = await KeyValueStore.open(
         name='drop_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Attempt to get a previously stored value
@@ -324,13 +318,11 @@ async def test_drop(
 
 async def test_reopen_default(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test reopening the default key-value store."""
     # Open the default key-value store
     kvs1 = await KeyValueStore.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Set a value
@@ -339,7 +331,6 @@ async def test_reopen_default(
     # Open the default key-value store again
     kvs2 = await KeyValueStore.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify they are the same store
@@ -416,16 +407,16 @@ async def test_key_with_special_characters(kvs: KeyValueStore) -> None:
     assert await kvs.get_value(key=special_key) is None
 
 
-async def test_data_persistence_on_reopen(configuration: Configuration) -> None:
+async def test_data_persistence_on_reopen() -> None:
     """Test that data persists when reopening a KeyValueStore."""
-    kvs1 = await KeyValueStore.open(configuration=configuration)
+    kvs1 = await KeyValueStore.open()
 
     await kvs1.set_value('key_123', 'value_123')
 
     result1 = await kvs1.get_value('key_123')
     assert result1 == 'value_123'
 
-    kvs2 = await KeyValueStore.open(configuration=configuration)
+    kvs2 = await KeyValueStore.open()
 
     result2 = await kvs2.get_value('key_123')
     assert result2 == 'value_123'
@@ -439,14 +430,12 @@ async def test_data_persistence_on_reopen(configuration: Configuration) -> None:
 
 async def test_purge(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test purging a key-value store removes all values but keeps the store itself."""
     # First create a key-value store
     kvs = await KeyValueStore.open(
         name='purge_test_kvs',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some values

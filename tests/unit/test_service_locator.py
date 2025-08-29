@@ -22,13 +22,13 @@ def test_custom_configuration() -> None:
     assert config is custom_config
 
 
-def test_configuration_overwrite() -> None:
+def test_configuration_overwrite_not_possible() -> None:
     default_config = Configuration()
     service_locator.set_configuration(default_config)
 
     custom_config = Configuration(default_browser_path='custom_path')
-    service_locator.set_configuration(custom_config)
-    assert service_locator.get_configuration() is custom_config
+    with pytest.raises(ServiceConflictError):
+        service_locator.set_configuration(custom_config)
 
 
 def test_configuration_conflict() -> None:
@@ -51,15 +51,13 @@ def test_custom_event_manager() -> None:
     assert event_manager is custom_event_manager
 
 
-def test_event_manager_overwrite() -> None:
+def test_event_manager_overwrite_not_possible() -> None:
     custom_event_manager = LocalEventManager()
     service_locator.set_event_manager(custom_event_manager)
 
     another_custom_event_manager = LocalEventManager()
-    service_locator.set_event_manager(another_custom_event_manager)
-
-    assert custom_event_manager != another_custom_event_manager
-    assert service_locator.get_event_manager() is another_custom_event_manager
+    with pytest.raises(ServiceConflictError):
+        service_locator.set_event_manager(another_custom_event_manager)
 
 
 def test_event_manager_conflict() -> None:
@@ -82,15 +80,13 @@ def test_custom_storage_client() -> None:
     assert storage_client is custom_storage_client
 
 
-def test_storage_client_overwrite() -> None:
+def test_storage_client_overwrite_not_possible() -> None:
     custom_storage_client = MemoryStorageClient()
     service_locator.set_storage_client(custom_storage_client)
 
     another_custom_storage_client = MemoryStorageClient()
-    service_locator.set_storage_client(another_custom_storage_client)
-
-    assert custom_storage_client != another_custom_storage_client
-    assert service_locator.get_storage_client() is another_custom_storage_client
+    with pytest.raises(ServiceConflictError):
+        service_locator.set_storage_client(another_custom_storage_client)
 
 
 def test_storage_client_conflict() -> None:

@@ -113,7 +113,7 @@ class Snapshotter:
         Args:
             config: The `Configuration` instance. Uses the global (default) one if not provided.
         """
-        config = service_locator.get_configuration()
+        config = config or service_locator.get_configuration()
 
         # Compute the maximum memory size based on the provided configuration. If `memory_mbytes` is provided,
         # it uses that value. Otherwise, it calculates the `max_memory_size` as a proportion of the system's

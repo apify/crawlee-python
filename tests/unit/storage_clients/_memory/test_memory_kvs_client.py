@@ -27,9 +27,8 @@ async def test_memory_specific_purge_behavior() -> None:
     configuration = Configuration(purge_on_start=True)
 
     # Create KVS and add data
-    kvs_client1 = await MemoryStorageClient().create_kvs_client(
+    kvs_client1 = await MemoryStorageClient(configuration=configuration).create_kvs_client(
         name='test_purge_kvs',
-        configuration=configuration,
     )
     await kvs_client1.set_value(key='test-key', value='initial value')
 
@@ -39,9 +38,8 @@ async def test_memory_specific_purge_behavior() -> None:
     assert record.value == 'initial value'
 
     # Reopen with same storage client instance
-    kvs_client2 = await MemoryStorageClient().create_kvs_client(
+    kvs_client2 = await MemoryStorageClient(configuration=configuration).create_kvs_client(
         name='test_purge_kvs',
-        configuration=configuration,
     )
 
     # Verify value was purged (memory storage specific behavior)

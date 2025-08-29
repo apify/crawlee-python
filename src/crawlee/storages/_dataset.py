@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs
-    from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients._base import DatasetClient
     from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
@@ -100,18 +99,15 @@ class Dataset(Storage):
         *,
         id: str | None = None,
         name: str | None = None,
-        configuration: Configuration | None = None,
         storage_client: StorageClient | None = None,
     ) -> Dataset:
-        configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
 
         return await service_locator.storage_instance_manager.open_storage_instance(
             cls,
             id=id,
             name=name,
-            configuration=configuration,
-            client_opener=storage_client.create_dataset_client,
+            storage_client=storage_client,
         )
 
     @override
@@ -294,7 +290,6 @@ class Dataset(Storage):
         to_kvs_id: str | None = None,
         to_kvs_name: str | None = None,
         to_kvs_storage_client: StorageClient | None = None,
-        to_kvs_configuration: Configuration | None = None,
         **kwargs: Unpack[ExportDataJsonKwargs],
     ) -> None: ...
 
@@ -306,7 +301,6 @@ class Dataset(Storage):
         to_kvs_id: str | None = None,
         to_kvs_name: str | None = None,
         to_kvs_storage_client: StorageClient | None = None,
-        to_kvs_configuration: Configuration | None = None,
         **kwargs: Unpack[ExportDataCsvKwargs],
     ) -> None: ...
 
@@ -317,7 +311,6 @@ class Dataset(Storage):
         to_kvs_id: str | None = None,
         to_kvs_name: str | None = None,
         to_kvs_storage_client: StorageClient | None = None,
-        to_kvs_configuration: Configuration | None = None,
         **kwargs: Any,
     ) -> None:
         """Export the entire dataset into a specified file stored under a key in a key-value store.
@@ -335,13 +328,11 @@ class Dataset(Storage):
             to_kvs_name: Name of the key-value store to save the exported file.
                 Specify only one of ID or name.
             to_kvs_storage_client: Storage client to use for the key-value store.
-            to_kvs_configuration: Configuration for the key-value store.
             kwargs: Additional parameters for the export operation, specific to the chosen content type.
         """
         kvs = await KeyValueStore.open(
             id=to_kvs_id,
             name=to_kvs_name,
-            configuration=to_kvs_configuration,
             storage_client=to_kvs_storage_client,
         )
         dst = StringIO()

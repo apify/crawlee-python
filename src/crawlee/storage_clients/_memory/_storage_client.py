@@ -27,17 +27,24 @@ class MemoryStorageClient(StorageClient):
     operations where persistence is not required.
     """
 
+    def __init__(self, configuration: Configuration | None = None) -> None:
+        """Initialize the file system storage client.
+
+        Args:
+            configuration: Optional configuration instance to use with the storage client.
+                If not provided, the global configuration will be used.
+        """
+        self._configuration = configuration or Configuration.get_global_configuration()
+
     @override
     async def create_dataset_client(
         self,
         *,
         id: str | None = None,
         name: str | None = None,
-        configuration: Configuration | None = None,
     ) -> MemoryDatasetClient:
-        configuration = configuration or Configuration.get_global_configuration()
         client = await MemoryDatasetClient.open(id=id, name=name)
-        await self._purge_if_needed(client, configuration)
+        await self._purge_if_needed(client, self._configuration)
         return client
 
     @override
@@ -46,11 +53,9 @@ class MemoryStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
-        configuration: Configuration | None = None,
     ) -> MemoryKeyValueStoreClient:
-        configuration = configuration or Configuration.get_global_configuration()
         client = await MemoryKeyValueStoreClient.open(id=id, name=name)
-        await self._purge_if_needed(client, configuration)
+        await self._purge_if_needed(client, self._configuration)
         return client
 
     @override
@@ -59,9 +64,7 @@ class MemoryStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
-        configuration: Configuration | None = None,
     ) -> MemoryRequestQueueClient:
-        configuration = configuration or Configuration.get_global_configuration()
         client = await MemoryRequestQueueClient.open(id=id, name=name)
-        await self._purge_if_needed(client, configuration)
+        await self._purge_if_needed(client, self._configuration)
         return client
