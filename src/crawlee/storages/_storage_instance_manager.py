@@ -1,28 +1,18 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, TypeVar, cast
-
-from mypy_extensions import DefaultNamedArg
-
-from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
+from typing import TYPE_CHECKING, TypeVar, cast
 
 from . import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
     from crawlee.storage_clients import StorageClient
+    from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
 
     from ._base import Storage
 
 T = TypeVar('T', bound='Storage')
-
-ClientOpener = Callable[
-    [DefaultNamedArg(str | None, 'id'), DefaultNamedArg(str | None, 'name')],
-    Coroutine[Any, Any, DatasetClient | KeyValueStoreClient | RequestQueueClient],
-]
-"""Type alias for the client opener function."""
 
 
 @dataclass
@@ -95,18 +85,17 @@ class StorageInstanceManager:
                 if isinstance(cached_instance, cls):
                     return cached_instance
 
-        client_opener: ClientOpener
+        client: KeyValueStoreClient | DatasetClient | RequestQueueClient
         # Create new instance
         if cls is Dataset:
-            client_opener = storage_client.create_dataset_client
+            client = await storage_client.create_dataset_client(id=id, name=name)
         elif cls is KeyValueStore:
-            client_opener = storage_client.create_kvs_client
+            client = await storage_client.create_kvs_client(id=id, name=name)
         elif cls is RequestQueue:
-            client_opener = storage_client.create_rq_client
+            client = await storage_client.create_rq_client(id=id, name=name)
         else:
             raise ValueError(f'Unsupported storage class: {cls.__name__}')
 
-        client = await client_opener(id=id, name=name)
         metadata = await client.get_metadata()
 
         instance = cls(client, metadata.id, metadata.name)  # type: ignore[call-arg]
