@@ -63,11 +63,12 @@ class ServiceLocator:
         """Get the event manager."""
         if self._event_manager is None:
             logger.warning('No event manager set, implicitly creating and using default LocalEventManager.')
-            self._event_manager = (
-                LocalEventManager().from_config(config=self._configuration)
-                if self._configuration
-                else LocalEventManager.from_config()
-            )
+            if self._configuration is None:
+                logger.warning(
+                    'Implicit creation of event manager will implicitly set configuration as side effect. '
+                    'It is advised to explicitly first set the configuration instead.'
+                )
+            self._event_manager = LocalEventManager().from_config(config=self._configuration)
 
         return self._event_manager
 
@@ -92,7 +93,12 @@ class ServiceLocator:
         """Get the storage client."""
         if self._storage_client is None:
             logger.warning('No storage client set, implicitly creating and using default FileSystemStorageClient.')
-            self._storage_client = FileSystemStorageClient()
+            if self._configuration is None:
+                logger.warning(
+                    'Implicit creation of storage client will implicitly set configuration as side effect. '
+                    'It is advised to explicitly first set the configuration instead.'
+                )
+            self._storage_client = FileSystemStorageClient(configuration=self._configuration)
 
         return self._storage_client
 
