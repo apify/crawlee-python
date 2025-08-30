@@ -37,7 +37,9 @@ def get_tables(sync_conn: Connection) -> list[str]:
 
 @pytest.fixture
 async def dataset_client(
-    configuration: Configuration, monkeypatch: pytest.MonkeyPatch
+    configuration: Configuration,
+    monkeypatch: pytest.MonkeyPatch,
+    suppose_user_warning: None,  # noqa: ARG001
 ) -> AsyncGenerator[SqlDatasetClient, None]:
     """A fixture for a SQL dataset client."""
     async with SqlStorageClient() as storage_client:
@@ -50,6 +52,7 @@ async def dataset_client(
         await client.drop()
 
 
+@pytest.mark.usefixtures('suppose_user_warning')
 async def test_create_tables_with_connection_string(configuration: Configuration, tmp_path: Path) -> None:
     """Test that SQL dataset client creates tables with a connection string."""
     storage_dir = tmp_path / 'test_table.db'
@@ -66,6 +69,7 @@ async def test_create_tables_with_connection_string(configuration: Configuration
             assert 'datasets' in tables
 
 
+@pytest.mark.usefixtures('suppose_user_warning')
 async def test_create_tables_with_engine(configuration: Configuration, tmp_path: Path) -> None:
     """Test that SQL dataset client creates tables with a pre-configured engine."""
     storage_dir = tmp_path / 'test_table.db'
@@ -84,6 +88,7 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
             assert 'datasets' in tables
 
 
+@pytest.mark.usefixtures('suppose_user_warning')
 async def test_tables_and_metadata_record(configuration: Configuration) -> None:
     """Test that SQL dataset creates proper tables and metadata records."""
     async with SqlStorageClient() as storage_client:
@@ -210,6 +215,7 @@ async def test_metadata_record_updates(dataset_client: SqlDatasetClient) -> None
         assert orm_metadata.modified_at == metadata.modified_at
 
 
+@pytest.mark.usefixtures('suppose_user_warning')
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
     """Test that data persists correctly when reopening the same dataset."""
     async with SqlStorageClient() as storage_client:

@@ -141,7 +141,7 @@ class SqlStorageClient(StorageClient):
                 db_version = (await conn.execute(select(VersionDb))).scalar_one_or_none()
 
                 # Raise an error if the new version creates breaking changes in the database schema.
-                if db_version and db_version.version != __version__:
+                if db_version and db_version != __version__:
                     warnings.warn(
                         f'Database version {db_version.version} does not match library version {__version__}. '
                         'This may lead to unexpected behavior.',

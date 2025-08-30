@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
 import pytest
@@ -25,7 +26,9 @@ def storage_client(request: pytest.FixtureRequest) -> StorageClient:
     if request.param == 'memory':
         return MemoryStorageClient()
     if request.param == 'sql':
-        return SqlStorageClient()
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', UserWarning)
+            return SqlStorageClient()
 
     return FileSystemStorageClient()
 
