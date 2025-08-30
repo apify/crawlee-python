@@ -301,7 +301,7 @@ Configuration options for the <ApiLink to="class/SqlStorageClient">SqlStorageCli
 - **`connection_string`** (default: SQLite in <ApiLink to="class/Configuration">Configuration</ApiLink> storage dir) – SQLAlchemy connection string, e.g. 'sqlite+aiosqlite:///my.db' or 'postgresql+asyncpg://user:pass@host/db'.
 - **`engine`** – Pre-configured SQLAlchemy AsyncEngine (optional).
 
-For advanced scenarios, you can configure <ApiLink to="class/SqlStorageClient">SqlStorageClient</ApiLink> with a custom SQLAlchemy engine and additional options via the <ApiLink to="class/Configuration">Configuration</ApiLink> class. This is useful, for example, when connecting to an external PostgreSQL database or customizing connection pooling.
+For advanced scenarios, you can configure <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> with a custom SQLAlchemy engine and additional options via the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class. This is useful, for example, when connecting to an external PostgreSQL database or customizing connection pooling.
 
 <RunnableCodeBlock className="language-python" language="python">
     {SQLStorageClientConfigurationExample}
