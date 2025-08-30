@@ -8,6 +8,7 @@ import ApiLink from '@site/src/components/ApiLink';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+import CodeBlock from '@theme/CodeBlock';
 
 import MemoryStorageClientBasicExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/memory_storage_client_basic_example.py';
 import FileSystemStorageClientBasicExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/file_system_storage_client_basic_example.py';
@@ -15,7 +16,7 @@ import FileSystemStorageClientConfigurationExample from '!!raw-loader!roa-loader
 import CustomStorageClientExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/custom_storage_client_example.py';
 import RegisteringStorageClientsExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/registering_storage_clients_example.py';
 import SQLStorageClientBasicExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/sql_storage_client_basic_example.py';
-import SQLStorageClientConfigurationExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/sql_storage_client_configuration_example.py';
+import SQLStorageClientConfigurationExample from '!!raw-loader!./code_examples/storage_clients/sql_storage_client_configuration_example.py';
 
 Storage clients provide a unified interface for interacting with <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, regardless of the underlying implementation. They handle operations like creating, reading, updating, and deleting storage instances, as well as managing data persistence and cleanup. This abstraction makes it easy to switch between different environments, such as local development and cloud production setups.
 
@@ -303,9 +304,9 @@ Configuration options for the <ApiLink to="class/SqlStorageClient">`SqlStorageCl
 
 For advanced scenarios, you can configure <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> with a custom SQLAlchemy engine and additional options via the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class. This is useful, for example, when connecting to an external PostgreSQL database or customizing connection pooling.
 
-<RunnableCodeBlock className="language-python" language="python">
+<CodeBlock className="language-python" language="python">
     {SQLStorageClientConfigurationExample}
-</RunnableCodeBlock>
+</CodeBlock>
 
 ## Creating a custom storage client
 
