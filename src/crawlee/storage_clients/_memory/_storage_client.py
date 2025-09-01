@@ -72,4 +72,4 @@ class MemoryStorageClient(StorageClient):
     @override
     def create_client(self, configuration: Configuration) -> MemoryStorageClient:
         """Create a storage client from an existing storage client potentially just replacing the configuration."""
-        return MemoryStorageClient(configuration or self._configuration)
+        return MemoryStorageClient(configuration)

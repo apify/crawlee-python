@@ -74,4 +74,4 @@ class FileSystemStorageClient(StorageClient):
     @override
     def create_client(self, configuration: Configuration) -> FileSystemStorageClient:
         """Create a storage client from an existing storage client potentially just replacing the configuration."""
-        return FileSystemStorageClient(configuration or self._configuration)
+        return FileSystemStorageClient(configuration)
