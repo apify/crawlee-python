@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
+from typing import TYPE_CHECKING, Any, ClassVar, TypedDict, overload
 
 from sqlalchemy import delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -265,6 +265,13 @@ class SqlClientMixin(ABC):
                 # foreign_keys=ON is set at the connection level. Required for cascade deletion.
                 await session.execute(text('PRAGMA foreign_keys=ON'))
             await session.execute(stmt)
+
+    @overload
+    async def _get_metadata(self, metadata_model: type[DatasetMetadata]) -> DatasetMetadata: ...
+    @overload
+    async def _get_metadata(self, metadata_model: type[KeyValueStoreMetadata]) -> KeyValueStoreMetadata: ...
+    @overload
+    async def _get_metadata(self, metadata_model: type[RequestQueueMetadata]) -> RequestQueueMetadata: ...
 
     async def _get_metadata(
         self, metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata]

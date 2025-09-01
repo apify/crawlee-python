@@ -4,7 +4,7 @@ from collections import deque
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from cachetools import LRUCache
 from sqlalchemy import func, or_, select, update
@@ -152,8 +152,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
     async def get_metadata(self) -> RequestQueueMetadata:
         """Get the metadata for this request queue."""
         # The database is a single place of truth
-        metadata = await self._get_metadata(RequestQueueMetadata)
-        return cast('RequestQueueMetadata', metadata)
+        return await self._get_metadata(RequestQueueMetadata)
 
     @override
     async def drop(self) -> None:

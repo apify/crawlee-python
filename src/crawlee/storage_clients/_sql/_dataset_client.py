@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Select, insert, select
 from typing_extensions import override
@@ -103,8 +103,7 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
     async def get_metadata(self) -> DatasetMetadata:
         """Get dataset metadata from the database."""
         # The database is a single place of truth
-        metadata = await self._get_metadata(DatasetMetadata)
-        return cast('DatasetMetadata', metadata)
+        return await self._get_metadata(DatasetMetadata)
 
     @override
     async def drop(self) -> None:

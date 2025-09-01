@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import delete, select
 from typing_extensions import override
@@ -106,8 +106,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
     async def get_metadata(self) -> KeyValueStoreMetadata:
         """Get the metadata for this key-value store."""
         # The database is a single place of truth
-        metadata = await self._get_metadata(KeyValueStoreMetadata)
-        return cast('KeyValueStoreMetadata', metadata)
+        return await self._get_metadata(KeyValueStoreMetadata)
 
     @override
     async def drop(self) -> None:
