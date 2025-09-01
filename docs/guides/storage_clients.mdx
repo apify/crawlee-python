@@ -26,6 +26,7 @@ Crawlee provides three main storage client implementations:
 
 - <ApiLink to="class/FileSystemStorageClient">`FileSystemStorageClient`</ApiLink> - Provides persistent file system storage with in-memory caching.
 - <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> - Stores data in memory with no persistence.
+- <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> – Provides persistent storage using a SQL database ([SQLite]((https://sqlite.org/)) or [PostgreSQL]((https://www.postgresql.org/))). Requires installing the extra dependency: 'crawlee[sql_sqlite]' for SQLite or 'crawlee[sql_postgres]' for PostgreSQL.
 - [`ApifyStorageClient`](https://docs.apify.com/sdk/python/reference/class/ApifyStorageClient) - Manages storage on the [Apify platform](https://apify.com), implemented in the [Apify SDK](https://github.com/apify/apify-sdk-python).
 
 ```mermaid
@@ -137,7 +138,7 @@ The `MemoryStorageClient` does not persist data between runs. All data is lost w
 The `SqlStorageClient` is experimental. Its API and behavior may change in future releases.
 :::
 
-The <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> provides persistent storage using a SQL database ([SQLite](https://sqlite.org/) by default, or [PostgreSQL](https://www.postgresql.org/)). It supports all Crawlee storage types and enables concurrent access from multiple independent clients or processes.
+The <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> provides persistent storage using a SQL database (SQLite by default, or PostgreSQL). It supports all Crawlee storage types and enables concurrent access from multiple independent clients or processes.
 
 :::note dependencies
 The <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> is not included in the core Crawlee package.
