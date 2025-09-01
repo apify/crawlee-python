@@ -55,6 +55,10 @@ class StorageClient(ABC):
     ) -> RequestQueueClient:
         """Create a request queue client."""
 
+    @abstractmethod
+    def create_client(self, configuration: Configuration) -> StorageClient:
+        """Create a storage client from an existing storage."""
+
     def get_rate_limit_errors(self) -> dict[int, int]:
         """Return statistics about rate limit errors encountered by the HTTP client in storage client."""
         return {}

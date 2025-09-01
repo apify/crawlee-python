@@ -68,3 +68,8 @@ class MemoryStorageClient(StorageClient):
         client = await MemoryRequestQueueClient.open(id=id, name=name)
         await self._purge_if_needed(client, self._configuration)
         return client
+
+    @override
+    def create_client(self, configuration: Configuration) -> MemoryStorageClient:
+        """Create a storage client from an existing storage client potentially just replacing the configuration."""
+        return MemoryStorageClient(configuration or self._configuration)

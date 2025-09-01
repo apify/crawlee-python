@@ -347,10 +347,20 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             _logger: A logger instance, typically provided by a subclass, for consistent logging labels.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
+        global_configuration: None | Configuration = None
+
         if not configuration:
-            configuration = service_locator.get_configuration()
+            global_configuration = service_locator.get_configuration()
+            configuration = global_configuration
+
         if not storage_client:
-            storage_client = service_locator.get_storage_client()
+            if global_configuration:
+                # If global configuration was used, reuse its storage client too
+                storage_client = service_locator.get_storage_client()
+            else:
+                # If unique configuration was used, create a unique storage client based on such configuration
+                storage_client = service_locator.get_storage_client().create_client(configuration)
+
         if not event_manager:
             event_manager = service_locator.get_event_manager()
 
