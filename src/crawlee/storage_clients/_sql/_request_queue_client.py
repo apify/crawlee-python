@@ -150,7 +150,6 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
     @override
     async def get_metadata(self) -> RequestQueueMetadata:
-        """Get the metadata for this request queue."""
         # The database is a single place of truth
         return await self._get_metadata(RequestQueueMetadata)
 
@@ -166,7 +165,11 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
     @override
     async def purge(self) -> None:
-        """Purge all requests from this request queue."""
+        """Remove all items from this dataset while keeping the dataset structure.
+
+        Resets pending_request_count and handled_request_count to 0 and deletes all records from request_queue_records
+        table.
+        """
         await self._purge(
             metadata_kwargs=_QueueMetadataUpdateParams(
                 update_accessed_at=True,
@@ -187,7 +190,146 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         *,
         forefront: bool = False,
     ) -> AddRequestsResponse:
-        return await self._add_batch_of_requests_optimization(requests, forefront=forefront)
+        if not requests:
+            return AddRequestsResponse(processed_requests=[], unprocessed_requests=[])
+
+        # Clear empty cache since we're adding requests
+        processed_requests = []
+        unprocessed_requests = []
+
+        metadata_recalculate = False
+
+        # Deduplicate requests by unique_key upfront
+        unique_requests = {}
+        unique_key_by_request_id = {}
+        for req in requests:
+            if req.unique_key not in unique_requests:
+                request_id = self._get_int_id_from_unique_key(req.unique_key)
+                unique_requests[request_id] = req
+                unique_key_by_request_id[request_id] = req.unique_key
+                self._REQUEST_ID_BY_KEY[req.unique_key] = request_id
+
+        # Get existing requests by unique keys
+        stmt = (
+            select(self._ITEM_TABLE)
+            .where(
+                self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id.in_(set(unique_requests.keys()))
+            )
+            .options(
+                load_only(
+                    self._ITEM_TABLE.request_id,
+                    self._ITEM_TABLE.is_handled,
+                )
+            )
+        )
+
+        async with self.get_session() as session:
+            result = await session.execute(stmt)
+            existing_requests = {req.request_id: req for req in result.scalars()}
+            state = await self._get_state(session)
+            insert_values: list[dict] = []
+
+            for request_id, request in sorted(unique_requests.items()):
+                existing_req_db = existing_requests.get(request_id)
+                if existing_req_db is None or not existing_req_db.is_handled:
+                    value = {
+                        'request_id': request_id,
+                        'metadata_id': self._id,
+                        'data': request.model_dump_json(),
+                        'is_handled': False,
+                    }
+                    if forefront:
+                        value['sequence_number'] = state.forefront_sequence_counter
+                        state.forefront_sequence_counter -= 1
+                    else:
+                        value['sequence_number'] = state.sequence_counter
+                        state.sequence_counter += 1
+
+                    insert_values.append(value)
+
+                    if existing_req_db is None:
+                        metadata_recalculate = True
+                        processed_requests.append(
+                            ProcessedRequest(
+                                unique_key=request.unique_key,
+                                was_already_present=False,
+                                was_already_handled=False,
+                            )
+                        )
+                    else:
+                        processed_requests.append(
+                            ProcessedRequest(
+                                unique_key=request.unique_key,
+                                was_already_present=True,
+                                was_already_handled=existing_req_db.is_handled,
+                            )
+                        )
+
+                else:
+                    # Already handled request, skip adding
+                    processed_requests.append(
+                        ProcessedRequest(
+                            unique_key=unique_key_by_request_id[request_id],
+                            was_already_present=True,
+                            was_already_handled=True,
+                        )
+                    )
+
+            if insert_values:
+                if forefront:
+                    # If the request already exists in the database, we update the sequence_number by shifting request
+                    # to the left.
+                    upsert_stmt = self.build_upsert_stmt(
+                        self._ITEM_TABLE,
+                        insert_values,
+                        update_columns=['sequence_number'],
+                        conflict_cols=['request_id', 'metadata_id'],
+                    )
+                    await session.execute(upsert_stmt)
+                else:
+                    # If the request already exists in the database, we ignore this request when inserting.
+                    insert_stmt_with_ignore = self.build_insert_stmt_with_ignore(self._ITEM_TABLE, insert_values)
+                    await session.execute(insert_stmt_with_ignore)
+
+            if metadata_recalculate:
+                await self._block_metadata_for_update(session)
+
+            await self._update_metadata(
+                session,
+                **_QueueMetadataUpdateParams(
+                    recalculate=metadata_recalculate,
+                    update_modified_at=True,
+                    update_accessed_at=True,
+                    force=metadata_recalculate,
+                ),
+            )
+
+            try:
+                await session.commit()
+            except SQLAlchemyError as e:
+                await session.rollback()
+                logger.warning(f'Failed to commit session: {e}')
+                await self._block_metadata_for_update(session)
+                await self._update_metadata(
+                    session, recalculate=True, update_modified_at=True, update_accessed_at=True, force=True
+                )
+                processed_requests.clear()
+                unprocessed_requests.extend(
+                    [
+                        UnprocessedRequest(
+                            unique_key=request.unique_key,
+                            url=request.url,
+                            method=request.method,
+                        )
+                        for request in requests
+                        if request.unique_key not in existing_requests
+                    ]
+                )
+
+        return AddRequestsResponse(
+            processed_requests=processed_requests,
+            unprocessed_requests=unprocessed_requests,
+        )
 
     @override
     async def get_request(self, unique_key: str) -> Request | None:
@@ -387,153 +529,6 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 await session.commit()
 
         return empty
-
-    async def _add_batch_of_requests_optimization(
-        self,
-        requests: Sequence[Request],
-        *,
-        forefront: bool = False,
-    ) -> AddRequestsResponse:
-        if not requests:
-            return AddRequestsResponse(processed_requests=[], unprocessed_requests=[])
-
-        # Clear empty cache since we're adding requests
-        processed_requests = []
-        unprocessed_requests = []
-
-        metadata_recalculate = False
-
-        # Deduplicate requests by unique_key upfront
-        unique_requests = {}
-        unique_key_by_request_id = {}
-        for req in requests:
-            if req.unique_key not in unique_requests:
-                request_id = self._get_int_id_from_unique_key(req.unique_key)
-                unique_requests[request_id] = req
-                unique_key_by_request_id[request_id] = req.unique_key
-                self._REQUEST_ID_BY_KEY[req.unique_key] = request_id
-
-        # Get existing requests by unique keys
-        stmt = (
-            select(self._ITEM_TABLE)
-            .where(
-                self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id.in_(set(unique_requests.keys()))
-            )
-            .options(
-                load_only(
-                    self._ITEM_TABLE.request_id,
-                    self._ITEM_TABLE.is_handled,
-                )
-            )
-        )
-
-        async with self.get_session() as session:
-            result = await session.execute(stmt)
-            existing_requests = {req.request_id: req for req in result.scalars()}
-            state = await self._get_state(session)
-            insert_values: list[dict] = []
-
-            for request_id, request in sorted(unique_requests.items()):
-                existing_req_db = existing_requests.get(request_id)
-                if existing_req_db is None or not existing_req_db.is_handled:
-                    value = {
-                        'request_id': request_id,
-                        'metadata_id': self._id,
-                        'data': request.model_dump_json(),
-                        'is_handled': False,
-                    }
-                    if forefront:
-                        value['sequence_number'] = state.forefront_sequence_counter
-                        state.forefront_sequence_counter -= 1
-                    else:
-                        value['sequence_number'] = state.sequence_counter
-                        state.sequence_counter += 1
-
-                    insert_values.append(value)
-
-                    if existing_req_db is None:
-                        metadata_recalculate = True
-                        processed_requests.append(
-                            ProcessedRequest(
-                                unique_key=request.unique_key,
-                                was_already_present=False,
-                                was_already_handled=False,
-                            )
-                        )
-                    else:
-                        processed_requests.append(
-                            ProcessedRequest(
-                                unique_key=request.unique_key,
-                                was_already_present=True,
-                                was_already_handled=existing_req_db.is_handled,
-                            )
-                        )
-
-                else:
-                    # Already handled request, skip adding
-                    processed_requests.append(
-                        ProcessedRequest(
-                            unique_key=unique_key_by_request_id[request_id],
-                            was_already_present=True,
-                            was_already_handled=True,
-                        )
-                    )
-
-            if insert_values:
-                if forefront:
-                    # If the request already exists in the database, we update the sequence_number by shifting request
-                    # to the left.
-                    upsert_stmt = self.build_upsert_stmt(
-                        self._ITEM_TABLE,
-                        insert_values,
-                        update_columns=['sequence_number'],
-                        conflict_cols=['request_id', 'metadata_id'],
-                    )
-                    await session.execute(upsert_stmt)
-                else:
-                    # If the request already exists in the database, we ignore this request when inserting.
-                    insert_stmt_with_ignore = self.build_insert_stmt_with_ignore(self._ITEM_TABLE, insert_values)
-                    await session.execute(insert_stmt_with_ignore)
-
-            if metadata_recalculate:
-                await self._block_metadata_for_update(session)
-
-            await self._update_metadata(
-                session,
-                **_QueueMetadataUpdateParams(
-                    recalculate=metadata_recalculate,
-                    update_modified_at=True,
-                    update_accessed_at=True,
-                    force=metadata_recalculate,
-                ),
-            )
-
-            try:
-                await session.commit()
-            except SQLAlchemyError as e:
-                await session.rollback()
-                logger.warning(f'Failed to commit session: {e}')
-                await self._block_metadata_for_update(session)
-                await self._update_metadata(
-                    session, recalculate=True, update_modified_at=True, update_accessed_at=True, force=True
-                )
-                processed_requests.clear()
-                unprocessed_requests.extend(
-                    [
-                        UnprocessedRequest(
-                            unique_key=request.unique_key,
-                            url=request.url,
-                            method=request.method,
-                        )
-                        for request in requests
-                        if request.unique_key not in existing_requests
-                    ]
-                )
-
-        return AddRequestsResponse(
-            processed_requests=processed_requests,
-            unprocessed_requests=unprocessed_requests,
-        )
 
     async def _block_metadata_for_update(self, session: AsyncSession) -> None:
         if self._storage_client.get_dialect_name() == 'postgresql':

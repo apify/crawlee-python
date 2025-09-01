@@ -104,7 +104,6 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
     @override
     async def get_metadata(self) -> KeyValueStoreMetadata:
-        """Get the metadata for this key-value store."""
         # The database is a single place of truth
         return await self._get_metadata(KeyValueStoreMetadata)
 
@@ -118,12 +117,14 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
     @override
     async def purge(self) -> None:
-        """Remove all items from this key-value store while keeping the key-value store structure."""
+        """Remove all items from this key-value store while keeping the key-value store structure.
+
+        Remove all records from key_value_store_records table.
+        """
         await self._purge(metadata_kwargs=MetadataUpdateParams(update_accessed_at=True, update_modified_at=True))
 
     @override
     async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
-        """Set a value in the key-value store."""
         # Special handling for None values
         if value is None:
             content_type = 'application/x-none'  # Special content type to identify None values
@@ -167,7 +168,6 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
-        """Get a value from the key-value store."""
         # Query the record by key
         stmt = select(self._ITEM_TABLE).where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.key == key)
         async with self.get_session() as session:
@@ -216,7 +216,6 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
     @override
     async def delete_value(self, *, key: str) -> None:
-        """Delete a value from the key-value store."""
         stmt = delete(self._ITEM_TABLE).where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.key == key)
         async with self.get_session(with_simple_commit=True) as session:
             # Delete the record if it exists
@@ -237,7 +236,6 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         exclusive_start_key: str | None = None,
         limit: int | None = None,
     ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
-        """Iterate over the existing keys in the key-value store."""
         # Build query for record metadata
         stmt = (
             select(self._ITEM_TABLE.key, self._ITEM_TABLE.content_type, self._ITEM_TABLE.size)
@@ -271,7 +269,6 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
     @override
     async def record_exists(self, *, key: str) -> bool:
-        """Check if a record with the given key exists in the key-value store."""
         stmt = select(self._ITEM_TABLE.key).where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.key == key)
         async with self.get_session() as session:
             # Check if record exists

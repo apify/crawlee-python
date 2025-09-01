@@ -101,7 +101,6 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
 
     @override
     async def get_metadata(self) -> DatasetMetadata:
-        """Get dataset metadata from the database."""
         # The database is a single place of truth
         return await self._get_metadata(DatasetMetadata)
 
@@ -130,7 +129,6 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
 
     @override
     async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
-        """Add new items to the dataset."""
         if not isinstance(data, list):
             data = [data]
 
@@ -217,7 +215,6 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
         skip_empty: bool = False,
         skip_hidden: bool = False,
     ) -> AsyncIterator[dict[str, Any]]:
-        """Iterate over dataset items with optional filtering and ordering."""
         stmt = self._prepare_get_stmt(
             offset=offset,
             limit=limit,
