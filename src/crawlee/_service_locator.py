@@ -23,6 +23,8 @@ class ServiceLocator:
     All services are initialized to its default value lazily.
     """
 
+    global_storage_instance_manager: StorageInstanceManager | None = None
+
     def __init__(
         self,
         configuration: Configuration | None = None,
@@ -121,14 +123,14 @@ class ServiceLocator:
 
     @property
     def storage_instance_manager(self) -> StorageInstanceManager:
-        """Get the storage instance manager."""
-        if self._storage_instance_manager is None:
+        """Get the storage instance manager. It is global manager shared by all instances of ServiceLocator."""
+        if self.__class__.global_storage_instance_manager is None:
             # Import here to avoid circular imports.
             from crawlee.storages._storage_instance_manager import StorageInstanceManager  # noqa: PLC0415
 
-            self._storage_instance_manager = StorageInstanceManager()
+            self.__class__.global_storage_instance_manager = StorageInstanceManager()
 
-        return self._storage_instance_manager
+        return self.__class__.global_storage_instance_manager
 
 
 service_locator = ServiceLocator()
