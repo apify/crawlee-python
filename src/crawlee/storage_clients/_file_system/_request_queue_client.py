@@ -304,6 +304,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         *,
         forefront: bool = False,
     ) -> AddRequestsResponse:
+        expected_requests_files = {
+            f'{self._get_file_base_name_from_unique_key(request.unique_key)}.json' for request in requests
+        }
         async with self._lock:
             self._is_empty_cache = None
             new_total_request_count = self._metadata.total_request_count
@@ -313,22 +316,18 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             state = self._state.current_value
 
             # Prepare a dictionary to track existing requests by their unique keys.
-            existing_unique_keys: dict[str, Path] = {}
-            existing_request_files = await self._get_request_files(self.path_to_rq)
-
+            existing_unique_keys: dict[str, Request] = {}
+            existing_request_files = await self._get_request_files(
+                self.path_to_rq, expected_files=expected_requests_files
+            )
             for request_file in existing_request_files:
                 existing_request = await self._parse_request_file(request_file)
                 if existing_request is not None:
-                    existing_unique_keys[existing_request.unique_key] = request_file
+                    existing_unique_keys[existing_request.unique_key] = existing_request
 
             # Process each request in the batch.
             for request in requests:
-                existing_request_file = existing_unique_keys.get(request.unique_key)
-                existing_request = None
-
-                # Only load the full request from disk if we found a duplicate
-                if existing_request_file is not None:
-                    existing_request = await self._parse_request_file(existing_request_file)
+                existing_request = existing_unique_keys.get(request.unique_key)
 
                 # If there is no existing request with the same unique key, add the new request.
                 if existing_request is None:
@@ -353,7 +352,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     new_pending_request_count += 1
 
                     # Add to our index for subsequent requests in this batch
-                    existing_unique_keys[request.unique_key] = self._get_request_path(request.unique_key)
+                    existing_unique_keys[request.unique_key] = request
 
                     processed_requests.append(
                         ProcessedRequest(
@@ -736,11 +735,12 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self._request_cache_needs_refresh = False
 
     @classmethod
-    async def _get_request_files(cls, path_to_rq: Path) -> list[Path]:
+    async def _get_request_files(cls, path_to_rq: Path, expected_files: set[str] | None = None) -> list[Path]:
         """Get all request files from the RQ.
 
         Args:
             path_to_rq: The path to the request queue directory.
+            expected_files: list of expected files.
 
         Returns:
             A list of paths to all request files.
@@ -753,7 +753,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         # Filter out metadata file and non-file entries.
         filtered = filter(
-            lambda request_file: request_file.is_file() and request_file.name != METADATA_FILENAME,
+            lambda request_file: request_file.is_file()
+            and request_file.name != METADATA_FILENAME
+            and (request_file.name in expected_files if expected_files else True),
             files,
         )
 

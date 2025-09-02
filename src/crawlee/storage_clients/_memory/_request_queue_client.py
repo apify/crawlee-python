@@ -151,19 +151,18 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
             # If the request is already in the queue but not handled, update it.
             if was_already_present and existing_request:
-                # Update the existing request with any new data and
-                # remove old request from pending queue if it's there.
-                with suppress(ValueError):
-                    self._pending_requests.remove(existing_request)
-
                 # Update indexes.
                 self._requests_by_unique_key[request.unique_key] = request
 
-                # Add updated request back to queue.
+                # We only update `forefront` by updating its position by shifting it to the left.
                 if forefront:
+                    # Update the existing request with any new data and
+                    # remove old request from pending queue if it's there.
+                    with suppress(ValueError):
+                        self._pending_requests.remove(existing_request)
+
+                    # Add updated request back to queue.
                     self._pending_requests.appendleft(request)
-                else:
-                    self._pending_requests.append(request)
             # Add the new request to the queue.
             else:
                 if forefront:
