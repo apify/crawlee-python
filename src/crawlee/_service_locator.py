@@ -123,13 +123,13 @@ class ServiceLocator:
     @property
     def storage_instance_manager(self) -> StorageInstanceManager:
         """Get the storage instance manager. It is global manager shared by all instances of ServiceLocator."""
-        if self.__class__.global_storage_instance_manager is None:
+        if ServiceLocator.global_storage_instance_manager is None:
             # Import here to avoid circular imports.
             from crawlee.storages._storage_instance_manager import StorageInstanceManager  # noqa: PLC0415
 
-            self.__class__.global_storage_instance_manager = StorageInstanceManager()
+            ServiceLocator.global_storage_instance_manager = StorageInstanceManager()
 
-        return self.__class__.global_storage_instance_manager
+        return ServiceLocator.global_storage_instance_manager
 
 
 service_locator = ServiceLocator()
