@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Awaitable, Hashable
+from collections.abc import Coroutine, Hashable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, TypeVar, cast
 
 from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
-
-from . import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
     from crawlee.storage_clients import StorageClient
@@ -43,7 +41,7 @@ class _StorageClientCache:
 StorageClientType = DatasetClient | KeyValueStoreClient | RequestQueueClient
 """Type alias for the storage client types."""
 
-ClientOpener = Awaitable[StorageClientType]
+ClientOpener = Coroutine[None, None, StorageClientType]
 """Type alias for the client opener function."""
 
 
@@ -74,7 +72,7 @@ class StorageInstanceManager:
             id: Storage ID.
             name: Storage name.
             storage_client_type: Type of storage client to use.
-            client_opener: Awaitable to open the storage client when storage instance not found in cache.
+            client_opener: Coroutine to open the storage client when storage instance not found in cache.
             additional_cache_key: Additional optional key to differentiate cache entries.
 
         Returns:
@@ -92,6 +90,7 @@ class StorageInstanceManager:
             and name is None
             and additional_cache_key in self._cache_by_storage_client[storage_client_type].default_instances[cls]
         ):
+            client_opener.close()  # Close the opener since we don't need it
             return cast(
                 'T', self._cache_by_storage_client[storage_client_type].default_instances[cls][additional_cache_key]
             )
@@ -103,6 +102,7 @@ class StorageInstanceManager:
             .get(additional_cache_key)
         ):
             if isinstance(cached_instance, cls):
+                client_opener.close()  # Close the opener since we don't need it
                 return cached_instance
             raise RuntimeError('Cached instance type mismatch.')
 
@@ -112,15 +112,13 @@ class StorageInstanceManager:
             .get(additional_cache_key)
         ):
             if isinstance(cached_instance, cls):
+                client_opener.close()  # Close the opener since we don't need it
                 return cached_instance
             raise RuntimeError('Cached instance type mismatch.')
 
         client: KeyValueStoreClient | DatasetClient | RequestQueueClient
         # Create new instance
-        if cls is Dataset or cls is KeyValueStore or cls is RequestQueue:
-            client = await client_opener
-        else:
-            raise ValueError(f'Unsupported storage class: {cls.__name__}')
+        client = await client_opener
 
         metadata = await client.get_metadata()
 
