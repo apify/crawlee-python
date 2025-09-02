@@ -34,7 +34,6 @@ class ServiceLocator:
         self._configuration = configuration
         self._event_manager = event_manager
         self._storage_client = storage_client
-        self._storage_instance_manager: StorageInstanceManager | None = None
 
     def get_configuration(self) -> Configuration:
         """Get the configuration."""
@@ -100,7 +99,7 @@ class ServiceLocator:
                     'Implicit creation of storage client will implicitly set configuration as side effect. '
                     'It is advised to explicitly first set the configuration instead.'
                 )
-            self._storage_client = FileSystemStorageClient(configuration=self._configuration)
+            self._storage_client = FileSystemStorageClient()
 
         return self._storage_client
 

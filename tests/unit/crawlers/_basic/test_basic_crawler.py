@@ -1161,7 +1161,7 @@ async def test_crawler_can_use_other_storages_of_same_type(tmp_path: Path) -> No
     rq = await RequestQueue.open()
 
     # Set the crawler to use different storage client
-    crawler = BasicCrawler(storage_client=FileSystemStorageClient(configuration=configuration_b))
+    crawler = BasicCrawler(storage_client=FileSystemStorageClient(), configuration=configuration_b)
 
     # Assert that the storages are different
     assert dataset is not await crawler.get_dataset()

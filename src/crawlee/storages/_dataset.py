@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs
+    from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients._base import DatasetClient
     from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
@@ -99,15 +100,22 @@ class Dataset(Storage):
         *,
         id: str | None = None,
         name: str | None = None,
+        configuration: Configuration | None = None,
         storage_client: StorageClient | None = None,
     ) -> Dataset:
+        configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
+
+        client_opener = storage_client.create_dataset_client(id=id, name=name, configuration=configuration)
+        additional_cache_key = storage_client.get_additional_cache_key(configuration=configuration)
 
         return await service_locator.storage_instance_manager.open_storage_instance(
             cls,
             id=id,
             name=name,
-            storage_client=storage_client,
+            client_opener=client_opener,
+            storage_client_type=storage_client.__class__,
+            additional_cache_key=additional_cache_key,
         )
 
     @override

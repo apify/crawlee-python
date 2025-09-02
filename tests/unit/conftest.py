@@ -55,7 +55,7 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
         service_locator._configuration = None
         service_locator._event_manager = None
         service_locator._storage_client = None
-        service_locator._storage_instance_manager = None
+        service_locator.storage_instance_manager.clear_cache()
 
         # Verify that the test environment was set up correctly.
         assert os.environ.get('CRAWLEE_STORAGE_DIR') == str(tmp_path)

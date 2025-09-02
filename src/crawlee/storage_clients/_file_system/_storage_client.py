@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
@@ -9,6 +11,9 @@ from crawlee.storage_clients._base import StorageClient
 from ._dataset_client import FileSystemDatasetClient
 from ._key_value_store_client import FileSystemKeyValueStoreClient
 from ._request_queue_client import FileSystemRequestQueueClient
+
+if TYPE_CHECKING:
+    from collections.abc import Hashable
 
 
 @docs_group('Storage clients')
@@ -29,14 +34,10 @@ class FileSystemStorageClient(StorageClient):
     Use it only when running a single crawler process at a time.
     """
 
-    def __init__(self, configuration: Configuration | None = None) -> None:
-        """Initialize the file system storage client.
-
-        Args:
-            configuration: Optional configuration instance to use with the storage client.
-                If not provided, the global configuration will be used.
-        """
-        self._configuration = configuration or Configuration.get_global_configuration()
+    @override
+    def get_additional_cache_key(self, configuration: Configuration) -> Hashable:
+        # Even different client instances should return same storage if the storage_dir is the same.
+        return configuration.storage_dir
 
     @override
     async def create_dataset_client(
@@ -44,9 +45,11 @@ class FileSystemStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        configuration: Configuration | None = None,
     ) -> FileSystemDatasetClient:
-        client = await FileSystemDatasetClient.open(id=id, name=name, configuration=self._configuration)
-        await self._purge_if_needed(client, self._configuration)
+        configuration = configuration or Configuration.get_global_configuration()
+        client = await FileSystemDatasetClient.open(id=id, name=name, configuration=configuration)
+        await self._purge_if_needed(client, configuration)
         return client
 
     @override
@@ -55,9 +58,11 @@ class FileSystemStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        configuration: Configuration | None = None,
     ) -> FileSystemKeyValueStoreClient:
-        client = await FileSystemKeyValueStoreClient.open(id=id, name=name, configuration=self._configuration)
-        await self._purge_if_needed(client, self._configuration)
+        configuration = configuration or Configuration.get_global_configuration()
+        client = await FileSystemKeyValueStoreClient.open(id=id, name=name, configuration=configuration)
+        await self._purge_if_needed(client, configuration)
         return client
 
     @override
@@ -66,12 +71,9 @@ class FileSystemStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        configuration: Configuration | None = None,
     ) -> FileSystemRequestQueueClient:
-        client = await FileSystemRequestQueueClient.open(id=id, name=name, configuration=self._configuration)
-        await self._purge_if_needed(client, self._configuration)
+        configuration = configuration or Configuration.get_global_configuration()
+        client = await FileSystemRequestQueueClient.open(id=id, name=name, configuration=configuration)
+        await self._purge_if_needed(client, configuration)
         return client
-
-    @override
-    def create_client(self, configuration: Configuration) -> FileSystemStorageClient:
-        """Create a storage client from an existing storage client potentially just replacing the configuration."""
-        return FileSystemStorageClient(configuration)

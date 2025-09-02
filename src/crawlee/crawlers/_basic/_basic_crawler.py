@@ -347,21 +347,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             _logger: A logger instance, typically provided by a subclass, for consistent logging labels.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
-        global_configuration: None | Configuration = None
-
         if not configuration:
-            global_configuration = service_locator.get_configuration()
-            configuration = global_configuration
+            configuration = service_locator.get_configuration()
 
         if not storage_client:
-            if global_configuration:
-                # If global configuration was used, reuse its storage client too
-                storage_client = service_locator.get_storage_client()
-            else:
-                # If unique configuration was used, create a unique storage client based on such configuration
-                storage_client = service_locator.get_storage_client().create_client(configuration)
+            storage_client = service_locator.get_storage_client()
 
         if not event_manager:
+            # This is weird if someone passes configuration and its event manager related stuff gets ignored as the
+            # event manager will be used from service_locator. Maybe keep the was created flag for it? It does not have
+            # the use cases like the storages
             event_manager = service_locator.get_event_manager()
 
         self._service_locator = ServiceLocator(
@@ -563,7 +558,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def get_request_manager(self) -> RequestManager:
         """Return the configured request manager. If none is configured, open and return the default request queue."""
         if not self._request_manager:
-            self._request_manager = await RequestQueue.open(storage_client=self._service_locator.get_storage_client())
+            self._request_manager = await RequestQueue.open(
+                storage_client=self._service_locator.get_storage_client(),
+                configuration=self._service_locator.get_configuration(),
+            )
 
         return self._request_manager
 
@@ -574,7 +572,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         name: str | None = None,
     ) -> Dataset:
         """Return the `Dataset` with the given ID or name. If none is provided, return the default one."""
-        return await Dataset.open(id=id, name=name, storage_client=self._service_locator.get_storage_client())
+        return await Dataset.open(
+            id=id,
+            name=name,
+            storage_client=self._service_locator.get_storage_client(),
+            configuration=self._service_locator.get_configuration(),
+        )
 
     async def get_key_value_store(
         self,
@@ -583,7 +586,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         name: str | None = None,
     ) -> KeyValueStore:
         """Return the `KeyValueStore` with the given ID or name. If none is provided, return the default KVS."""
-        return await KeyValueStore.open(id=id, name=name, storage_client=self._service_locator.get_storage_client())
+        return await KeyValueStore.open(
+            id=id,
+            name=name,
+            storage_client=self._service_locator.get_storage_client(),
+            configuration=self._service_locator.get_configuration(),
+        )
 
     def error_handler(
         self, handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext]

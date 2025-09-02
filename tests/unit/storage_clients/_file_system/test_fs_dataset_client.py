@@ -27,18 +27,14 @@ def configuration(tmp_path: Path) -> Configuration:
 @pytest.fixture
 async def dataset_client(configuration: Configuration) -> AsyncGenerator[FileSystemDatasetClient, None]:
     """A fixture for a file system dataset client."""
-    client = await FileSystemStorageClient(configuration=configuration).create_dataset_client(
-        name='test_dataset',
-    )
+    client = await FileSystemStorageClient().create_dataset_client(name='test_dataset', configuration=configuration)
     yield client
     await client.drop()
 
 
 async def test_file_and_directory_creation(configuration: Configuration) -> None:
     """Test that file system dataset creates proper files and directories."""
-    client = await FileSystemStorageClient(configuration=configuration).create_dataset_client(
-        name='new_dataset',
-    )
+    client = await FileSystemStorageClient().create_dataset_client(name='new_dataset', configuration=configuration)
 
     # Verify files were created
     assert client.path_to_dataset.exists()

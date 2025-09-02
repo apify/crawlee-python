@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
+    from collections.abc import Hashable
+
     from crawlee.configuration import Configuration
 
     from ._dataset_client import DatasetClient
@@ -28,12 +30,20 @@ class StorageClient(ABC):
     (where applicable), and consistent access patterns across all storage types it supports.
     """
 
+    def get_additional_cache_key(self, configuration: Configuration) -> Hashable:  # noqa: ARG002
+        """Return a cache key that can differentiate between different storages of this client.
+
+        Can be based on configuration or on the client itself. By default, returns an empty string.
+        """
+        return ''
+
     @abstractmethod
     async def create_dataset_client(
         self,
         *,
         id: str | None = None,
         name: str | None = None,
+        configuration: Configuration | None = None,
     ) -> DatasetClient:
         """Create a dataset client."""
 
@@ -43,6 +53,7 @@ class StorageClient(ABC):
         *,
         id: str | None = None,
         name: str | None = None,
+        configuration: Configuration | None = None,
     ) -> KeyValueStoreClient:
         """Create a key-value store client."""
 
@@ -52,12 +63,9 @@ class StorageClient(ABC):
         *,
         id: str | None = None,
         name: str | None = None,
+        configuration: Configuration | None = None,
     ) -> RequestQueueClient:
         """Create a request queue client."""
-
-    @abstractmethod
-    def create_client(self, configuration: Configuration) -> StorageClient:
-        """Create a storage client from an existing storage."""
 
     def get_rate_limit_errors(self) -> dict[int, int]:
         """Return statistics about rate limit errors encountered by the HTTP client in storage client."""

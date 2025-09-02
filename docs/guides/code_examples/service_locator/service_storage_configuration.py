@@ -19,10 +19,10 @@ async def main() -> None:
     # Use the global defaults when creating the dataset (or other storage).
     dataset_1 = await Dataset.open()
 
-    # Or set explicitly specific storage client if
+    # Or set explicitly specific configuration if
     # you do not want to rely on global defaults.
     dataset_2 = await Dataset.open(
-        storage_client=MemoryStorageClient(configuration=configuration)
+        storage_client=MemoryStorageClient(), configuration=configuration
     )
 
 

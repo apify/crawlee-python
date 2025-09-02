@@ -21,13 +21,10 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(params=['memory', 'file_system'])
-def storage_client(request: pytest.FixtureRequest, configuration: Configuration) -> StorageClient:
+def storage_client(request: pytest.FixtureRequest) -> StorageClient:
     """Parameterized fixture to test with different storage clients."""
     storage_client: StorageClient
-    if request.param == 'memory':
-        storage_client = MemoryStorageClient(configuration=configuration)
-    else:
-        storage_client = FileSystemStorageClient(configuration=configuration)
+    storage_client = MemoryStorageClient() if request.param == 'memory' else FileSystemStorageClient()
     service_locator.set_storage_client(storage_client)
     return storage_client
 
