@@ -137,6 +137,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
             was_already_present = existing_request is not None
             was_already_handled = was_already_present and existing_request and existing_request.handled_at is not None
+            is_in_progress = request.unique_key in self._in_progress_requests
 
             # If the request is already in the queue and handled, don't add it again.
             if was_already_handled:
@@ -145,6 +146,17 @@ class MemoryRequestQueueClient(RequestQueueClient):
                         unique_key=request.unique_key,
                         was_already_present=True,
                         was_already_handled=True,
+                    )
+                )
+                continue
+
+            # If the request is already in progress, don't add it again.
+            if is_in_progress:
+                processed_requests.append(
+                    ProcessedRequest(
+                        unique_key=request.unique_key,
+                        was_already_present=True,
+                        was_already_handled=False,
                     )
                 )
                 continue
