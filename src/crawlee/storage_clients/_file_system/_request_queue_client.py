@@ -304,9 +304,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         *,
         forefront: bool = False,
     ) -> AddRequestsResponse:
-        expected_requests_files = {
-            f'{self._get_file_base_name_from_unique_key(request.unique_key)}.json' for request in requests
-        }
         async with self._lock:
             self._is_empty_cache = None
             new_total_request_count = self._metadata.total_request_count
@@ -315,24 +312,43 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             unprocessed_requests = list[UnprocessedRequest]()
             state = self._state.current_value
 
-            # Prepare a dictionary to track existing requests by their unique keys.
-            existing_unique_keys: dict[str, Request] = {}
-            existing_request_files = await self._get_request_files(
-                self.path_to_rq, expected_files=expected_requests_files
-            )
-            for request_file in existing_request_files:
-                existing_request = await self._parse_request_file(request_file)
-                if existing_request is not None:
-                    existing_unique_keys[existing_request.unique_key] = existing_request
+            all_requests = state.forefront_requests | state.regular_requests
+
+            requests_for_add = {}
+
+            # Determine which requests can be added or are modified.
+            for request in requests:
+                # Check if the request has already been handled.
+                if request.unique_key in state.handled_requests:
+                    processed_requests.append(
+                        ProcessedRequest(
+                            unique_key=request.unique_key,
+                            was_already_present=True,
+                            was_already_handled=True,
+                        )
+                    )
+                # Check if the request is already in progress.
+                # Or if the request is already in the queue and the `forefront` flag is not used, we do not change the
+                # position of the request.
+                elif (request.unique_key in state.in_progress_requests) or (
+                    request.unique_key in all_requests and not forefront
+                ):
+                    processed_requests.append(
+                        ProcessedRequest(
+                            unique_key=request.unique_key,
+                            was_already_present=True,
+                            was_already_handled=False,
+                        )
+                    )
+                # These requests must either be added or update their position.
+                else:
+                    requests_for_add[request.unique_key] = request
 
             # Process each request in the batch.
-            for request in requests:
-                existing_request = existing_unique_keys.get(request.unique_key)
-
-                # If there is no existing request with the same unique key, add the new request.
-                if existing_request is None:
+            for request in requests_for_add.values():
+                # If the request is not already in the RQ, this is a new request.
+                if request.unique_key not in all_requests:
                     request_path = self._get_request_path(request.unique_key)
-
                     # Add sequence number to ensure FIFO ordering using state.
                     if forefront:
                         sequence_number = state.forefront_sequence_counter
@@ -351,9 +367,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     new_total_request_count += 1
                     new_pending_request_count += 1
 
-                    # Add to our index for subsequent requests in this batch
-                    existing_unique_keys[request.unique_key] = request
-
                     processed_requests.append(
                         ProcessedRequest(
                             unique_key=request.unique_key,
@@ -362,57 +375,33 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                         )
                     )
 
-                # If the request already exists in the RQ, just update it if needed.
+                # If the request already exists in the RQ and use the forefront flag to update its position
+                elif forefront:
+                    # If the request is among `regular`, remove it from its current position.
+                    if request.unique_key in state.regular_requests:
+                        state.regular_requests.pop(request.unique_key)
+
+                    # If the request is already in `forefront`, we just need to update its position.
+                    state.forefront_requests[request.unique_key] = state.forefront_sequence_counter
+                    state.forefront_sequence_counter += 1
+
+                    processed_requests.append(
+                        ProcessedRequest(
+                            unique_key=request.unique_key,
+                            was_already_present=True,
+                            was_already_handled=False,
+                        )
+                    )
+
                 else:
-                    # Set the processed request flags.
-                    was_already_present = existing_request is not None
-                    was_already_handled = existing_request.unique_key in state.handled_requests
-
-                    # If the request is already in the RQ and handled, just continue with the next one.
-                    if was_already_present and was_already_handled:
-                        processed_requests.append(
-                            ProcessedRequest(
-                                unique_key=request.unique_key,
-                                was_already_present=True,
-                                was_already_handled=True,
-                            )
+                    logger.warning(f'Request with unique key "{request.unique_key}" could not be processed.')
+                    unprocessed_requests.append(
+                        UnprocessedRequest(
+                            unique_key=request.unique_key,
+                            url=request.url,
+                            method=request.method,
                         )
-
-                    # If the request is already in the RQ but not handled yet, update it.
-                    elif was_already_present and not was_already_handled:
-                        # Update request type (forefront vs regular) in state
-                        if forefront:
-                            # Move from regular to forefront if needed
-                            if existing_request.unique_key in state.regular_requests:
-                                state.regular_requests.pop(existing_request.unique_key)
-                            if existing_request.unique_key not in state.forefront_requests:
-                                state.forefront_requests[existing_request.unique_key] = state.forefront_sequence_counter
-                                state.forefront_sequence_counter += 1
-                        elif (
-                            existing_request.unique_key not in state.forefront_requests
-                            and existing_request.unique_key not in state.regular_requests
-                        ):
-                            # Keep as regular if not already forefront
-                            state.regular_requests[existing_request.unique_key] = state.sequence_counter
-                            state.sequence_counter += 1
-
-                        processed_requests.append(
-                            ProcessedRequest(
-                                unique_key=request.unique_key,
-                                was_already_present=True,
-                                was_already_handled=False,
-                            )
-                        )
-
-                    else:
-                        logger.warning(f'Request with unique key "{request.unique_key}" could not be processed.')
-                        unprocessed_requests.append(
-                            UnprocessedRequest(
-                                unique_key=request.unique_key,
-                                url=request.url,
-                                method=request.method,
-                            )
-                        )
+                    )
 
             await self._update_metadata(
                 update_modified_at=True,
@@ -735,12 +724,11 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self._request_cache_needs_refresh = False
 
     @classmethod
-    async def _get_request_files(cls, path_to_rq: Path, expected_files: set[str] | None = None) -> list[Path]:
+    async def _get_request_files(cls, path_to_rq: Path) -> list[Path]:
         """Get all request files from the RQ.
 
         Args:
             path_to_rq: The path to the request queue directory.
-            expected_files: list of expected files.
 
         Returns:
             A list of paths to all request files.
@@ -752,12 +740,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         files = await asyncio.to_thread(list, path_to_rq.glob('*.json'))
 
         # Filter out metadata file and non-file entries.
-        filtered = filter(
-            lambda request_file: request_file.is_file()
-            and request_file.name != METADATA_FILENAME
-            and (request_file.name in expected_files if expected_files else True),
-            files,
-        )
+        filtered = filter(lambda request_file: request_file.is_file() and request_file.name != METADATA_FILENAME, files)
 
         return list(filtered)
 

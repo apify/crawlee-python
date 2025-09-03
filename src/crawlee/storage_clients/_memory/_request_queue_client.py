@@ -163,6 +163,15 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
                     # Add updated request back to queue.
                     self._pending_requests.appendleft(request)
+
+                processed_requests.append(
+                    ProcessedRequest(
+                        unique_key=request.unique_key,
+                        was_already_present=True,
+                        was_already_handled=False,
+                    )
+                )
+
             # Add the new request to the queue.
             else:
                 if forefront:
@@ -204,8 +213,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
             # Skip if already in progress (shouldn't happen, but safety check).
             if request.unique_key in self._in_progress_requests:
-                self._pending_requests.appendleft(request)
-                break
+                continue
 
             # Mark as in progress.
             self._in_progress_requests[request.unique_key] = request
