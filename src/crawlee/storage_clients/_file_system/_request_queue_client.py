@@ -342,10 +342,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     )
                 # These requests must either be added or update their position.
                 else:
-                    requests_for_add[request.unique_key] = request
+                    requests_to_enqueue[request.unique_key] = request
 
             # Process each request in the batch.
-            for request in requests_for_add.values():
+            for request in requests_to_enqueue.values():
                 # If the request is not already in the RQ, this is a new request.
                 if request.unique_key not in all_requests:
                     request_path = self._get_request_path(request.unique_key)
