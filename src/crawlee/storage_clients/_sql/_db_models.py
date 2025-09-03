@@ -99,7 +99,7 @@ class DatasetMetadataDb(StorageMetadataDb, Base):
 
     # Relationship to dataset items with cascade deletion
     items: Mapped[list[DatasetItemDb]] = relationship(
-        back_populates='dataset', cascade='all, delete-orphan', lazy='select'
+        back_populates='dataset', cascade='all, delete-orphan', lazy='noload'
     )
 
 
@@ -122,11 +122,11 @@ class RequestQueueMetadataDb(StorageMetadataDb, Base):
 
     # Relationship to queue requests with cascade deletion
     requests: Mapped[list[RequestDb]] = relationship(
-        back_populates='queue', cascade='all, delete-orphan', lazy='select'
+        back_populates='queue', cascade='all, delete-orphan', lazy='noload'
     )
     # Relationship to queue state
     state: Mapped[RequestQueueStateDb] = relationship(
-        back_populates='queue', cascade='all, delete-orphan', lazy='select'
+        back_populates='queue', cascade='all, delete-orphan', lazy='noload'
     )
 
 
@@ -137,7 +137,7 @@ class KeyValueStoreMetadataDb(StorageMetadataDb, Base):
 
     # Relationship to store records with cascade deletion
     records: Mapped[list[KeyValueStoreRecordDb]] = relationship(
-        back_populates='kvs', cascade='all, delete-orphan', lazy='select'
+        back_populates='kvs', cascade='all, delete-orphan', lazy='noload'
     )
 
 
@@ -246,4 +246,4 @@ class VersionDb(Base):
 
     __tablename__ = 'version'
 
-    version: Mapped[str] = mapped_column(String, nullable=False, primary_key=True)
+    version: Mapped[str] = mapped_column(String(10), nullable=False, primary_key=True)

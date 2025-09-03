@@ -121,7 +121,7 @@ class SqlStorageClient(StorageClient):
 
                 if self._dialect_name not in ('sqlite', 'postgresql'):
                     raise ValueError(
-                        f'Unsupported database dialect: {self._dialect_name}. Supported: sqlite, postgresql.\n',
+                        f'Unsupported database dialect: {self._dialect_name}. Supported: sqlite, postgresql. '
                         'Consider using a different database.',
                     )
 
@@ -276,6 +276,11 @@ class SqlStorageClient(StorageClient):
 
             # Create connection string with path to default database
             connection_string = f'sqlite+aiosqlite:///{db_path}'
+
+        if 'sqlite' not in connection_string and 'postgresql' not in connection_string:
+            raise ValueError(
+                'Unsupported database. Supported: sqlite, postgresql. Consider using a different database.'
+            )
 
         self._engine = create_async_engine(
             connection_string,

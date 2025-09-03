@@ -196,6 +196,8 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         # Clear empty cache since we're adding requests
         processed_requests = []
         unprocessed_requests = []
+        transaction_processed_requests = []
+        transaction_processed_requests_unique_keys = set()
 
         metadata_recalculate = False
 
@@ -219,6 +221,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 load_only(
                     self._ITEM_TABLE.request_id,
                     self._ITEM_TABLE.is_handled,
+                    self._ITEM_TABLE.time_blocked_until,
                 )
             )
         )
@@ -231,7 +234,8 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
             for request_id, request in sorted(unique_requests.items()):
                 existing_req_db = existing_requests.get(request_id)
-                if existing_req_db is None or not existing_req_db.is_handled:
+                # New Request, add it
+                if existing_req_db is None:
                     value = {
                         'request_id': request_id,
                         'metadata_id': self._id,
@@ -246,32 +250,71 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                         state.sequence_counter += 1
 
                     insert_values.append(value)
-
-                    if existing_req_db is None:
-                        metadata_recalculate = True
-                        processed_requests.append(
+                    metadata_recalculate = True
+                    transaction_processed_requests.append(
+                        ProcessedRequest(
+                            unique_key=request.unique_key,
+                            was_already_present=False,
+                            was_already_handled=False,
+                        )
+                    )
+                    transaction_processed_requests_unique_keys.add(request.unique_key)
+                # Already handled request, skip adding
+                elif existing_req_db and existing_req_db.is_handled:
+                    processed_requests.append(
+                        ProcessedRequest(
+                            unique_key=request.unique_key,
+                            was_already_present=True,
+                            was_already_handled=True,
+                        )
+                    )
+                # Already in progress in one of the clients
+                elif existing_req_db and existing_req_db.time_blocked_until:
+                    processed_requests.append(
+                        ProcessedRequest(
+                            unique_key=request.unique_key,
+                            was_already_present=True,
+                            was_already_handled=False,
+                        )
+                    )
+                # Request in database but not yet handled and not in progress
+                elif existing_req_db and not existing_req_db.is_handled and not existing_req_db.time_blocked_until:
+                    # Forefront request, update its sequence number
+                    if forefront:
+                        insert_values.append(
+                            {
+                                'metadata_id': self._id,
+                                'request_id': request_id,
+                                'sequence_number': state.forefront_sequence_counter,
+                                'data': request.model_dump_json(),
+                                'is_handled': False,
+                            }
+                        )
+                        state.forefront_sequence_counter -= 1
+                        transaction_processed_requests.append(
                             ProcessedRequest(
                                 unique_key=request.unique_key,
-                                was_already_present=False,
+                                was_already_present=True,
                                 was_already_handled=False,
                             )
                         )
+                        transaction_processed_requests_unique_keys.add(request.unique_key)
+                    # Regular request, keep its position
                     else:
                         processed_requests.append(
                             ProcessedRequest(
                                 unique_key=request.unique_key,
                                 was_already_present=True,
-                                was_already_handled=existing_req_db.is_handled,
+                                was_already_handled=False,
                             )
                         )
-
+                # Unexpected condition
                 else:
-                    # Already handled request, skip adding
-                    processed_requests.append(
-                        ProcessedRequest(
-                            unique_key=unique_key_by_request_id[request_id],
-                            was_already_present=True,
-                            was_already_handled=True,
+                    unprocessed_requests.append(
+                        UnprocessedRequest(
+                            unique_key=request.unique_key,
+                            url=request.url,
+                            method=request.method,
                         )
                     )
 
@@ -291,9 +334,6 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                     insert_stmt_with_ignore = self.build_insert_stmt_with_ignore(self._ITEM_TABLE, insert_values)
                     await session.execute(insert_stmt_with_ignore)
 
-            if metadata_recalculate:
-                await self._block_metadata_for_update(session)
-
             await self._update_metadata(
                 session,
                 **_QueueMetadataUpdateParams(
@@ -306,14 +346,15 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
             try:
                 await session.commit()
+                processed_requests.extend(transaction_processed_requests)
             except SQLAlchemyError as e:
                 await session.rollback()
                 logger.warning(f'Failed to commit session: {e}')
-                await self._block_metadata_for_update(session)
                 await self._update_metadata(
                     session, recalculate=True, update_modified_at=True, update_accessed_at=True, force=True
                 )
-                processed_requests.clear()
+                await session.commit()
+                transaction_processed_requests.clear()
                 unprocessed_requests.extend(
                     [
                         UnprocessedRequest(
@@ -322,7 +363,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                             method=request.method,
                         )
                         for request in requests
-                        if request.unique_key not in existing_requests
+                        if request.unique_key in transaction_processed_requests_unique_keys
                     ]
                 )
 
@@ -377,39 +418,55 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             .limit(self._MAX_BATCH_FETCH_SIZE)
         )
 
-        # We use the `skip_locked` database mechanism to prevent the “interception” of requests by another client
-        if dialect == 'postgresql':
-            stmt = stmt.with_for_update(skip_locked=True)
-
         async with self.get_session() as session:
-            result = await session.execute(stmt)
-            requests_db = result.scalars().all()
-            if not requests_db:
-                return None
+            # We use the `skip_locked` database mechanism to prevent the 'interception' of requests by another client
+            if dialect == 'postgresql':
+                stmt = stmt.with_for_update(skip_locked=True)
+                result = await session.execute(stmt)
+                requests_db = result.scalars().all()
 
-            request_ids = {r.request_id for r in requests_db}
+                if not requests_db:
+                    return None
 
-            # Mark the requests as blocked
-            update_stmt = (
-                update(self._ITEM_TABLE)
-                .where(
-                    self._ITEM_TABLE.metadata_id == self._id,
-                    self._ITEM_TABLE.request_id.in_(request_ids),
-                    self._ITEM_TABLE.is_handled.is_(False),
-                    or_(self._ITEM_TABLE.time_blocked_until.is_(None), self._ITEM_TABLE.time_blocked_until < now),
+                # All requests received have already been reserved for update with the help of `skip_locked`.
+                request_ids = {r.request_id for r in requests_db}
+
+                update_stmt = (
+                    update(self._ITEM_TABLE)
+                    .where(self._ITEM_TABLE.request_id.in_(request_ids))
+                    .values(time_blocked_until=block_until)
                 )
-                .values(time_blocked_until=block_until)
-                .returning(self._ITEM_TABLE.request_id)
-            )
+                await session.execute(update_stmt)
 
-            update_result = await session.execute(update_stmt)
+                blocked_ids = request_ids
+            else:
+                # For other databases, we first select the requests, then try to update them to be blocked.
+                result = await session.execute(stmt)
+                requests_db = result.scalars().all()
 
-            # Get IDs of successfully blocked requests
-            blocked_ids = {row[0] for row in update_result.fetchall()}
+                if not requests_db:
+                    return None
 
-            if not blocked_ids:
-                await session.rollback()
-                return None
+                request_ids = {r.request_id for r in requests_db}
+
+                update_stmt = (
+                    update(self._ITEM_TABLE)
+                    .where(
+                        self._ITEM_TABLE.metadata_id == self._id,
+                        self._ITEM_TABLE.request_id.in_(request_ids),
+                        self._ITEM_TABLE.is_handled.is_(False),
+                        or_(self._ITEM_TABLE.time_blocked_until.is_(None), self._ITEM_TABLE.time_blocked_until < now),
+                    )
+                    .values(time_blocked_until=block_until)
+                    .returning(self._ITEM_TABLE.request_id)
+                )
+
+                update_result = await session.execute(update_stmt)
+                blocked_ids = {row[0] for row in update_result.fetchall()}
+
+                if not blocked_ids:
+                    await session.rollback()
+                    return None
 
             await self._update_metadata(session, **_QueueMetadataUpdateParams(update_accessed_at=True))
 
@@ -522,7 +579,17 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 raise ValueError(f'Request queue with ID "{self._id}" not found.')
 
             empty = metadata_orm.pending_request_count == 0
-            updated = await self._update_metadata(session, **_QueueMetadataUpdateParams(update_accessed_at=True))
+
+            updated = await self._update_metadata(
+                session,
+                **_QueueMetadataUpdateParams(
+                    update_accessed_at=True,
+                    # With multi-client access, counters may become out of sync.
+                    # If the queue is not empty, we perform a recalculation to synchronize the counters in the metadata.
+                    recalculate=not empty,
+                    update_modified_at=not empty,
+                ),
+            )
 
             # Commit updates to the metadata
             if updated:
@@ -530,18 +597,20 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
         return empty
 
-    async def _block_metadata_for_update(self, session: AsyncSession) -> None:
-        if self._storage_client.get_dialect_name() == 'postgresql':
-            stmt = select(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id).with_for_update()
-            await session.execute(stmt)
-
     async def _get_state(self, session: AsyncSession) -> RequestQueueStateDb:
         """Get the current state of the request queue."""
         orm_state: RequestQueueStateDb | None = await session.get(RequestQueueStateDb, self._id)
         if not orm_state:
-            orm_state = RequestQueueStateDb(metadata_id=self._id)
-            session.add(orm_state)
+            insert_values = {'metadata_id': self._id}
+            # Create a new state if it doesn't exist
+            # This is a safeguard against race conditions where multiple clients might try to create the state
+            # simultaneously.
+            insert_stmt = self.build_insert_stmt_with_ignore(RequestQueueStateDb, insert_values)
+            await session.execute(insert_stmt)
             await session.flush()
+            orm_state = await session.get(RequestQueueStateDb, self._id)
+            if not orm_state:
+                raise RuntimeError(f'Failed to create or retrieve state for queue {self._id}')
         return orm_state
 
     def _specific_update_metadata(
@@ -591,25 +660,32 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             values_to_set['total_request_count'] = new_total_request_count
 
         if recalculate:
-            pending_count = (
-                select(func.count())
-                .select_from(self._ITEM_TABLE)
-                .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.is_handled.is_(False))
-                .scalar_subquery()
+            stmt = (
+                update(self._METADATA_TABLE)
+                .where(self._METADATA_TABLE.id == self._id)
+                .values(
+                    pending_request_count=(
+                        select(func.count())
+                        .select_from(self._ITEM_TABLE)
+                        .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.is_handled.is_(False))
+                        .scalar_subquery()
+                    ),
+                    total_request_count=(
+                        select(func.count())
+                        .select_from(self._ITEM_TABLE)
+                        .where(self._ITEM_TABLE.metadata_id == self._id)
+                        .scalar_subquery()
+                    ),
+                    handled_request_count=(
+                        select(func.count())
+                        .select_from(self._ITEM_TABLE)
+                        .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.is_handled.is_(True))
+                        .scalar_subquery()
+                    ),
+                )
             )
-
-            total_count = (
-                select(func.count())
-                .select_from(self._ITEM_TABLE)
-                .where(self._ITEM_TABLE.metadata_id == self._id)
-                .scalar_subquery()
-            )
-
-            stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id)
 
             values_to_set['custom_stmt'] = stmt
-            values_to_set['pending_request_count'] = pending_count
-            values_to_set['total_request_count'] = total_count
 
         return values_to_set
 
