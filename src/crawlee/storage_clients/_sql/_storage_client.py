@@ -5,6 +5,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.sql import insert, select, text
 from typing_extensions import override
@@ -125,31 +126,39 @@ class SqlStorageClient(StorageClient):
                         'Consider using a different database.',
                     )
 
-                # Set SQLite pragmas for performance and consistency
-                if self._default_flag:
-                    await conn.execute(text('PRAGMA journal_mode=WAL'))  # Better concurrency
-                    await conn.execute(text('PRAGMA synchronous=NORMAL'))  # Balanced safety/speed
-                    await conn.execute(text('PRAGMA cache_size=100000'))  # 100MB cache
-                    await conn.execute(text('PRAGMA temp_store=MEMORY'))  # Memory temp storage
-                    await conn.execute(text('PRAGMA mmap_size=268435456'))  # 256MB memory mapping
-                    await conn.execute(text('PRAGMA foreign_keys=ON'))  # Enforce constraints
-                    await conn.execute(text('PRAGMA busy_timeout=30000'))  # 30s busy timeout
-                await conn.run_sync(Base.metadata.create_all)
+                # Create tables if they don't exist.
+                # Rollback the transaction when an exception occurs.
+                # This is likely an attempt to create a database from several parallel processes.
+                try:
+                    # Set SQLite pragmas for performance and consistency
+                    if self._default_flag:
+                        await conn.execute(text('PRAGMA journal_mode=WAL'))  # Better concurrency
+                        await conn.execute(text('PRAGMA synchronous=NORMAL'))  # Balanced safety/speed
+                        await conn.execute(text('PRAGMA cache_size=100000'))  # 100MB cache
+                        await conn.execute(text('PRAGMA temp_store=MEMORY'))  # Memory temp storage
+                        await conn.execute(text('PRAGMA mmap_size=268435456'))  # 256MB memory mapping
+                        await conn.execute(text('PRAGMA foreign_keys=ON'))  # Enforce constraints
+                        await conn.execute(text('PRAGMA busy_timeout=30000'))  # 30s busy timeout
 
-                from crawlee import __version__  # Noqa: PLC0415
+                    await conn.run_sync(Base.metadata.create_all, checkfirst=True)
 
-                db_version = (await conn.execute(select(VersionDb))).scalar_one_or_none()
+                    from crawlee import __version__  # Noqa: PLC0415
 
-                # Raise an error if the new version creates breaking changes in the database schema.
-                if db_version and db_version != __version__:
-                    warnings.warn(
-                        f'Database version {db_version.version} does not match library version {__version__}. '
-                        'This may lead to unexpected behavior.',
-                        category=UserWarning,
-                        stacklevel=2,
-                    )
-                elif not db_version:
-                    await conn.execute(insert(VersionDb).values(version=__version__))
+                    db_version = (await conn.execute(select(VersionDb))).scalar_one_or_none()
+
+                    # Raise an error if the new version creates breaking changes in the database schema.
+                    if db_version and db_version != __version__:
+                        warnings.warn(
+                            f'Database version {db_version.version} does not match library version {__version__}. '
+                            'This may lead to unexpected behavior.',
+                            category=UserWarning,
+                            stacklevel=2,
+                        )
+                    elif not db_version:
+                        await conn.execute(insert(VersionDb).values(version=__version__))
+
+                except (IntegrityError, OperationalError):
+                    await conn.rollback()
 
             self._initialized = True
 
