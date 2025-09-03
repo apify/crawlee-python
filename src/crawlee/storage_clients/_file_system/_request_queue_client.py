@@ -314,7 +314,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             all_requests = state.forefront_requests | state.regular_requests
 
-            requests_for_add = {}
+            requests_to_enqueue = {}
 
             # Determine which requests can be added or are modified.
             for request in requests:
