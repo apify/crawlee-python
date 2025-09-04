@@ -283,7 +283,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         keep_alive: bool = False,
         configure_logging: bool = True,
         statistics_log_format: Literal['table', 'inline'] = 'table',
-        respect_robots_txt_file: bool = False,
+        respect_robots_txt_file: bool = True,
         status_message_logging_interval: timedelta = timedelta(seconds=10),
         status_message_callback: Callable[[StatisticsState, StatisticsState | None, str], Awaitable[str | None]]
         | None = None,
