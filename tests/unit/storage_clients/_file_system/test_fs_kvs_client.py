@@ -27,20 +27,14 @@ def configuration(tmp_path: Path) -> Configuration:
 @pytest.fixture
 async def kvs_client(configuration: Configuration) -> AsyncGenerator[FileSystemKeyValueStoreClient, None]:
     """A fixture for a file system key-value store client."""
-    client = await FileSystemStorageClient().create_kvs_client(
-        name='test_kvs',
-        configuration=configuration,
-    )
+    client = await FileSystemStorageClient().create_kvs_client(name='test_kvs', configuration=configuration)
     yield client
     await client.drop()
 
 
 async def test_file_and_directory_creation(configuration: Configuration) -> None:
     """Test that file system KVS creates proper files and directories."""
-    client = await FileSystemStorageClient().create_kvs_client(
-        name='new_kvs',
-        configuration=configuration,
-    )
+    client = await FileSystemStorageClient().create_kvs_client(name='new_kvs', configuration=configuration)
 
     # Verify files were created
     assert client.path_to_kvs.exists()
@@ -187,10 +181,7 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
     storage_client = FileSystemStorageClient()
 
     # Create KVS and add data
-    original_client = await storage_client.create_kvs_client(
-        name='persistence-test',
-        configuration=configuration,
-    )
+    original_client = await storage_client.create_kvs_client(name='persistence-test', configuration=configuration)
 
     test_key = 'persistent-key'
     test_value = 'persistent-value'
@@ -201,7 +192,6 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
     # Reopen by ID and verify data persists
     reopened_client = await storage_client.create_kvs_client(
         id=kvs_id,
-        configuration=configuration,
     )
 
     record = await reopened_client.get_value(key=test_key)

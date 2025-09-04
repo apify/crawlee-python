@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
@@ -9,6 +11,9 @@ from crawlee.storage_clients._base import StorageClient
 from ._dataset_client import FileSystemDatasetClient
 from ._key_value_store_client import FileSystemKeyValueStoreClient
 from ._request_queue_client import FileSystemRequestQueueClient
+
+if TYPE_CHECKING:
+    from collections.abc import Hashable
 
 
 @docs_group('Storage clients')
@@ -28,6 +33,11 @@ class FileSystemStorageClient(StorageClient):
     Warning: This storage client is not safe for concurrent access from multiple crawler processes.
     Use it only when running a single crawler process at a time.
     """
+
+    @override
+    def get_additional_cache_key(self, configuration: Configuration) -> Hashable:
+        # Even different client instances should return same storage if the storage_dir is the same.
+        return configuration.storage_dir
 
     @override
     async def create_dataset_client(
