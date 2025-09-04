@@ -30,7 +30,7 @@ jobs:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.ref }}
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
 
