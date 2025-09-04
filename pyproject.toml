@@ -3,10 +3,10 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "crawlee"
+name = "crawlee-tax"
 version = "0.6.13"
-description = "Crawlee for Python"
-authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
+description = "Crawlee for Python - Tax Data Collection Specialized Fork"
+authors = [{ name = "Tax Project Team", email = "contact@example.com" }]
 license = { file = "LICENSE" }
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,7 +23,6 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 keywords = [
-    "apify",
     "automation",
     "chrome",
     "crawlee",
@@ -31,6 +30,9 @@ keywords = [
     "headless",
     "scraper",
     "scraping",
+    "tax",
+    "finance",
+    "data-collection",
 ]
 dependencies = [
     "cachetools>=5.5.0",
@@ -76,14 +78,11 @@ otel = [
 crawlee = "crawlee._cli:cli"
 
 [project.urls]
-"Apify Homepage" = "https://apify.com"
-"Changelog" = "https://crawlee.dev/python/docs/changelog"
-"Discord" = "https://discord.com/invite/jyEM2PRvMU"
-"Documentation" = "https://crawlee.dev/python/docs/quick-start"
-"Homepage" = "https://crawlee.dev/python"
-"Issue Tracker" = "https://github.com/apify/crawlee-python/issues"
-"Release Notes" = "https://crawlee.dev/python/docs/upgrading"
-"Source Code" = "https://github.com/apify/crawlee-python"
+"Homepage" = "https://github.com/your-username/crawlee-python-tax"
+"Issue Tracker" = "https://github.com/your-username/crawlee-python-tax/issues"
+"Source Code" = "https://github.com/your-username/crawlee-python-tax"
+"Original Project" = "https://github.com/apify/crawlee-python"
+"Original Documentation" = "https://crawlee.dev/python/"
 
 [dependency-groups]
 dev = [
