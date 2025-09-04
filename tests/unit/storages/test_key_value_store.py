@@ -598,3 +598,30 @@ async def test_record_exists_after_purge(kvs: KeyValueStore) -> None:
     # Should no longer exist
     assert await kvs.record_exists('key1') is False
     assert await kvs.record_exists('key2') is False
+
+
+async def test_get_auto_saved_value_with_multiple_storage_clients(tmp_path: Path) -> None:
+    """Test that setting storage client through service locator does not break autosaved values in other clients."""
+    config = Configuration(
+        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        purge_on_start=True,
+    )
+
+    kvs1 = await KeyValueStore.open(storage_client=MemoryStorageClient(), configuration=config)
+
+    kvs2 = await KeyValueStore.open(
+        storage_client=FileSystemStorageClient(),
+        configuration=config,
+    )
+    assert kvs1 is not kvs2
+
+    expected_values = {'key': 'value'}
+    test_key = 'test_key'
+
+    autosaved_value = await kvs2.get_auto_saved_value(test_key)
+    assert autosaved_value == {}
+    autosaved_value.update(expected_values)
+
+    await kvs2.persist_autosaved_values()
+
+    assert await kvs2.get_value(test_key) == expected_values
