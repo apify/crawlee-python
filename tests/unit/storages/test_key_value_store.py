@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 import json
+import warnings
 from typing import TYPE_CHECKING
 
 import pytest
 
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient, SqlStorageClient
 from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
@@ -19,11 +20,15 @@ if TYPE_CHECKING:
     from crawlee.storage_clients import StorageClient
 
 
-@pytest.fixture(params=['memory', 'file_system'])
+@pytest.fixture(params=['memory', 'file_system', 'sql'])
 def storage_client(request: pytest.FixtureRequest) -> StorageClient:
     """Parameterized fixture to test with different storage clients."""
     if request.param == 'memory':
         return MemoryStorageClient()
+    if request.param == 'sql':
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', UserWarning)
+            return SqlStorageClient()
 
     return FileSystemStorageClient()
 
