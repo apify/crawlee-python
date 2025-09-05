@@ -173,6 +173,12 @@ class EnqueueLinksKwargs(TypedDict):
     exclude: NotRequired[list[re.Pattern | Glob]]
     """List of regular expressions or globs that URLs must not match to be enqueued."""
 
+    rq_name: NotRequired[str]
+    """Name of the request queue to add requests to (global scope)."""
+
+    rq_alias: NotRequired[str]
+    """Alias of the request queue to add requests to (run scope, unnamed)."""
+
 
 class AddRequestsKwargs(EnqueueLinksKwargs):
     """Keyword arguments for the `add_requests` methods."""
@@ -189,6 +195,7 @@ class PushDataFunctionCall(PushDataKwargs):
     data: list[dict[str, Any]] | dict[str, Any]
     dataset_id: str | None
     dataset_name: str | None
+    dataset_alias: str | None
 
 
 class KeyValueStoreInterface(Protocol):
@@ -255,7 +262,7 @@ class RequestHandlerRunResult:
         self._key_value_store_getter = key_value_store_getter
         self.add_requests_calls = list[AddRequestsKwargs]()
         self.push_data_calls = list[PushDataFunctionCall]()
-        self.key_value_store_changes = dict[tuple[str | None, str | None], KeyValueStoreChangeRecords]()
+        self.key_value_store_changes = dict[tuple[str | None, str | None, str | None], KeyValueStoreChangeRecords]()
 
     async def add_requests(
         self,
@@ -270,6 +277,7 @@ class RequestHandlerRunResult:
         data: list[dict[str, Any]] | dict[str, Any],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
+        dataset_alias: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
     ) -> None:
         """Track a call to the `push_data` context helper."""
@@ -278,6 +286,7 @@ class RequestHandlerRunResult:
                 data=data,
                 dataset_id=dataset_id,
                 dataset_name=dataset_name,
+                dataset_alias=dataset_alias,
                 **kwargs,
             )
         )
@@ -287,13 +296,14 @@ class RequestHandlerRunResult:
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
     ) -> KeyValueStoreInterface:
-        if (id, name) not in self.key_value_store_changes:
-            self.key_value_store_changes[id, name] = KeyValueStoreChangeRecords(
-                await self._key_value_store_getter(id=id, name=name)
+        if (id, name, alias) not in self.key_value_store_changes:
+            self.key_value_store_changes[id, name, alias] = KeyValueStoreChangeRecords(
+                await self._key_value_store_getter(id=id, name=name, alias=alias)
             )
 
-        return self.key_value_store_changes[id, name]
+        return self.key_value_store_changes[id, name, alias]
 
 
 @docs_group('Functions')
@@ -424,12 +434,14 @@ class GetKeyValueStoreFunction(Protocol):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
     ) -> Coroutine[None, None, KeyValueStore]:
         """Call dunder method.
 
         Args:
             id: The ID of the `KeyValueStore` to get.
-            name: The name of the `KeyValueStore` to get.
+            name: The name of the `KeyValueStore` to get (global scope).
+            alias: The alias of the `KeyValueStore` to get (run scope, unnamed).
         """
 
 
@@ -444,12 +456,14 @@ class GetKeyValueStoreFromRequestHandlerFunction(Protocol):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
     ) -> Coroutine[None, None, KeyValueStoreInterface]:
         """Call dunder method.
 
         Args:
             id: The ID of the `KeyValueStore` to get.
-            name: The name of the `KeyValueStore` to get.
+            name: The name of the `KeyValueStore` to get (global scope).
+            alias: The alias of the `KeyValueStore` to get (run scope, unnamed).
         """
 
 
@@ -466,6 +480,7 @@ class PushDataFunction(Protocol):
         data: list[dict[str, Any]] | dict[str, Any],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
+        dataset_alias: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
     ) -> Coroutine[None, None, None]:
         """Call dunder method.
@@ -473,8 +488,67 @@ class PushDataFunction(Protocol):
         Args:
             data: The data to push to the `Dataset`.
             dataset_id: The ID of the `Dataset` to push the data to.
-            dataset_name: The name of the `Dataset` to push the data to.
+            dataset_name: The name of the `Dataset` to push the data to (global scope).
+            dataset_alias: The alias of the `Dataset` to push the data to (run scope, unnamed).
             **kwargs: Additional keyword arguments.
+        """
+
+
+@docs_group('Functions')
+class GetDataFunction(Protocol):
+    """A function for retrieving data from a dataset.
+
+    It retrieves data from a specified dataset within the crawling context.
+    """
+
+    def __call__(
+        self,
+        *,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        dataset_alias: str | None = None,
+        **kwargs: Unpack[GetDataKwargs],
+    ) -> Coroutine[None, None, list[dict[str, Any]]]:
+        """Call get data function.
+
+        Args:
+            dataset_id: The ID of the `Dataset` to get the data from.
+            dataset_name: The name of the `Dataset` to get the data from (global scope).
+            dataset_alias: The alias of the `Dataset` to get the data from (run scope, unnamed).
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            List of items from the dataset.
+        """
+
+
+@docs_group('Functions')
+class ExportDataFunction(Protocol):
+    """A function for exporting data from a dataset.
+
+    It exports data from a specified dataset within the crawling context.
+    """
+
+    def __call__(
+        self,
+        content_type: Literal['json', 'csv'],
+        *,
+        dataset_id: str | None = None,
+        dataset_name: str | None = None,
+        dataset_alias: str | None = None,
+        **kwargs: Unpack[GetDataKwargs],
+    ) -> Coroutine[None, None, str]:
+        """Call export data function.
+
+        Args:
+            content_type: The format to export the data in ('json' or 'csv').
+            dataset_id: The ID of the `Dataset` to export the data from.
+            dataset_name: The name of the `Dataset` to export the data from (global scope).
+            dataset_alias: The alias of the `Dataset` to export the data from (run scope, unnamed).
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            The exported data as a string.
         """
 
 
@@ -572,6 +646,12 @@ class BasicCrawlingContext:
 
     push_data: PushDataFunction
     """Push data crawling context helper function."""
+
+    get_data: GetDataFunction
+    """Get data crawling context helper function."""
+
+    export_data: ExportDataFunction
+    """Export data crawling context helper function."""
 
     use_state: UseStateFunction
     """Use state crawling context helper function."""

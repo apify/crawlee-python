@@ -112,6 +112,7 @@ class KeyValueStore(Storage):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
         storage_client: StorageClient | None = None,
     ) -> KeyValueStore:
@@ -122,6 +123,7 @@ class KeyValueStore(Storage):
             cls,
             id=id,
             name=name,
+            alias=alias,
             configuration=configuration,
             client_opener=storage_client.create_kvs_client,
         )

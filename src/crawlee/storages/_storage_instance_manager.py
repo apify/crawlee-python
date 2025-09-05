@@ -33,6 +33,9 @@ class StorageInstanceManager:
         self._cache_by_name = dict[type[Storage], dict[str, Storage]]()
         """Cache for storage instances by name, separated by storage type."""
 
+        self._cache_by_alias = dict[type[Storage], dict[str, Storage]]()
+        """Cache for storage instances by alias, separated by storage type."""
+
         self._default_instances = dict[type[Storage], Storage]()
         """Cache for default instances of each storage type."""
 
@@ -42,6 +45,7 @@ class StorageInstanceManager:
         *,
         id: str | None,
         name: str | None,
+        alias: str | None,
         configuration: Configuration,
         client_opener: ClientOpener,
     ) -> T:
@@ -50,7 +54,8 @@ class StorageInstanceManager:
         Args:
             cls: The storage class to instantiate.
             id: Storage ID.
-            name: Storage name.
+            name: Storage name (global scope, persists across runs).
+            alias: Storage alias (run scope, creates unnamed storage).
             configuration: Configuration object.
             client_opener: Function to create the storage client.
 
@@ -58,13 +63,15 @@ class StorageInstanceManager:
             The storage instance.
 
         Raises:
-            ValueError: If both id and name are specified.
+            ValueError: If multiple parameters are specified or none for non-default storage.
         """
-        if id and name:
-            raise ValueError('Only one of "id" or "name" can be specified, not both.')
+        # Validate parameters
+        specified_params = sum(1 for param in [id, name, alias] if param is not None)
+        if specified_params > 1:
+            raise ValueError('Only one of "id", "name", or "alias" can be specified, not multiple.')
 
         # Check for default instance
-        if id is None and name is None and cls in self._default_instances:
+        if specified_params == 0 and cls in self._default_instances:
             return cast('T', self._default_instances[cls])
 
         # Check cache
@@ -82,8 +89,17 @@ class StorageInstanceManager:
                 if isinstance(cached_instance, cls):
                     return cached_instance
 
+        if alias is not None:
+            type_cache_by_alias = self._cache_by_alias.get(cls, {})
+            if alias in type_cache_by_alias:
+                cached_instance = type_cache_by_alias[alias]
+                if isinstance(cached_instance, cls):
+                    return cached_instance
+
         # Create new instance
-        client = await client_opener(id=id, name=name, configuration=configuration)
+        # For aliases, we pass None for name to create an unnamed storage
+        client_name = name if alias is None else None
+        client = await client_opener(id=id, name=client_name, configuration=configuration)
         metadata = await client.get_metadata()
 
         instance = cls(client, metadata.id, metadata.name)  # type: ignore[call-arg]
@@ -92,13 +108,16 @@ class StorageInstanceManager:
         # Cache the instance
         type_cache_by_id = self._cache_by_id.setdefault(cls, {})
         type_cache_by_name = self._cache_by_name.setdefault(cls, {})
+        type_cache_by_alias = self._cache_by_alias.setdefault(cls, {})
 
         type_cache_by_id[instance.id] = instance
         if instance_name is not None:
             type_cache_by_name[instance_name] = instance
+        if alias is not None:
+            type_cache_by_alias[alias] = instance
 
-        # Set as default if no id/name specified
-        if id is None and name is None:
+        # Set as default if no id/name/alias specified
+        if specified_params == 0:
             self._default_instances[cls] = instance
 
         return instance
@@ -122,6 +141,12 @@ class StorageInstanceManager:
             if storage_instance.name in type_cache_by_name:
                 del type_cache_by_name[storage_instance.name]
 
+        # Remove from alias cache - need to search by instance since alias is not stored on the instance
+        type_cache_by_alias = self._cache_by_alias.get(storage_type, {})
+        aliases_to_remove = [alias for alias, instance in type_cache_by_alias.items() if instance is storage_instance]
+        for alias in aliases_to_remove:
+            del type_cache_by_alias[alias]
+
         # Remove from default instances
         if storage_type in self._default_instances and self._default_instances[storage_type] is storage_instance:
             del self._default_instances[storage_type]
@@ -130,4 +155,5 @@ class StorageInstanceManager:
         """Clear all cached storage instances."""
         self._cache_by_id.clear()
         self._cache_by_name.clear()
+        self._cache_by_alias.clear()
         self._default_instances.clear()
