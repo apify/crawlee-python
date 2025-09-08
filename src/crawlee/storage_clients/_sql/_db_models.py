@@ -217,6 +217,9 @@ class RequestDb(Base):
     time_blocked_until: Mapped[datetime | None] = mapped_column(AwareDateTime, nullable=True)
     """Timestamp until which this request is considered blocked for processing by other clients."""
 
+    client_key: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    """Identifier of the client that has currently locked this request for processing."""
+
     # Relationship back to metadata table
     queue: Mapped[RequestQueueMetadataDb] = relationship(back_populates='requests')
 

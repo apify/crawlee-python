@@ -13,6 +13,7 @@ from sqlalchemy.orm import load_only
 from typing_extensions import NotRequired, override
 
 from crawlee import Request
+from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.storage_clients._base import RequestQueueClient
 from crawlee.storage_clients.models import (
     AddRequestsResponse,
@@ -109,6 +110,9 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
         self._pending_fetch_cache: deque[Request] = deque()
         """Cache for requests: ordered by sequence number."""
+
+        self.client_key = crypto_random_object_id(length=32)[:32]
+        """Unique identifier for this client instance."""
 
     @classmethod
     async def open(
@@ -434,7 +438,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 update_stmt = (
                     update(self._ITEM_TABLE)
                     .where(self._ITEM_TABLE.request_id.in_(request_ids))
-                    .values(time_blocked_until=block_until)
+                    .values(time_blocked_until=block_until, client_key=self.client_key)
                 )
                 await session.execute(update_stmt)
 
@@ -457,7 +461,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                         self._ITEM_TABLE.is_handled.is_(False),
                         or_(self._ITEM_TABLE.time_blocked_until.is_(None), self._ITEM_TABLE.time_blocked_until < now),
                     )
-                    .values(time_blocked_until=block_until)
+                    .values(time_blocked_until=block_until, client_key=self.client_key)
                     .returning(self._ITEM_TABLE.request_id)
                 )
 
@@ -494,7 +498,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         stmt = (
             update(self._ITEM_TABLE)
             .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id)
-            .values(is_handled=True, time_blocked_until=None, data=request.model_dump_json())
+            .values(is_handled=True, time_blocked_until=None, client_key=None, data=request.model_dump_json())
         )
         async with self.get_session() as session:
             result = await session.execute(stmt)
@@ -542,11 +546,13 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 now = datetime.now(timezone.utc)
                 block_until = now + timedelta(seconds=self._BLOCK_REQUEST_TIME)
                 # Extend blocking for forefront request, it is considered blocked by the current client.
-                stmt = stmt.values(sequence_number=new_sequence, time_blocked_until=block_until)
+                stmt = stmt.values(
+                    sequence_number=new_sequence, time_blocked_until=block_until, client_key=self.client_key
+                )
             else:
                 new_sequence = state.sequence_counter
                 state.sequence_counter += 1
-                stmt = stmt.values(sequence_number=new_sequence, time_blocked_until=None)
+                stmt = stmt.values(sequence_number=new_sequence, time_blocked_until=None, client_key=None)
 
             result = await session.execute(stmt)
             if result.rowcount == 0:
