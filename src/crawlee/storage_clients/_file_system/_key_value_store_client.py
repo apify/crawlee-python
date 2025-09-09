@@ -57,6 +57,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         metadata: KeyValueStoreMetadata,
         storage_dir: Path,
         lock: asyncio.Lock,
+        directory_name: str | None = None,
     ) -> None:
         """Initialize a new instance.
 
@@ -66,6 +67,9 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         self._storage_dir = storage_dir
         """The base directory where the storage data are being persisted."""
+
+        self._directory_name = directory_name
+        """The directory name to use for this key-value store. If None, uses metadata.name or default."""
 
         self._lock = lock
         """A lock to ensure that only one operation is performed at a time."""
@@ -77,6 +81,10 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
     @property
     def path_to_kvs(self) -> Path:
         """The full path to the key-value store directory."""
+        # Use the explicit directory name if provided, otherwise fall back to metadata.name or default
+        if self._directory_name is not None:
+            return self._storage_dir / self._STORAGE_SUBDIR / self._directory_name
+
         if self._metadata.name is None:
             return self._storage_dir / self._STORAGE_SUBDIR / self._STORAGE_SUBSUBDIR_DEFAULT
 
@@ -93,6 +101,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         *,
         id: str | None,
         name: str | None,
+        alias: str | None = None,
         configuration: Configuration,
     ) -> FileSystemKeyValueStoreClient:
         """Open or create a file system key-value store client.
@@ -103,15 +112,21 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         Args:
             id: The ID of the key-value store to open. If provided, searches for existing store by ID.
-            name: The name of the key-value store to open. If not provided, uses the default store.
+            name: The name of the key-value store for named storages. Mutually exclusive with alias.
+            alias: The alias of the key-value store for unnamed storages. Mutually exclusive with name.
             configuration: The configuration object containing storage directory settings.
 
         Returns:
             An instance for the opened or created storage client.
 
         Raises:
-            ValueError: If a store with the specified ID is not found, or if metadata is invalid.
+            ValueError: If a store with the specified ID is not found, if metadata is invalid,
+                or if both name and alias are provided.
         """
+        # Validate parameters - exactly one of name or alias should be provided (or neither for default)
+        if name is not None and alias is not None:
+            raise ValueError('Cannot specify both name and alias parameters')
+
         storage_dir = Path(configuration.storage_dir)
         kvs_base_path = storage_dir / cls._STORAGE_SUBDIR
 
@@ -139,6 +154,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                                 metadata=metadata,
                                 storage_dir=storage_dir,
                                 lock=asyncio.Lock(),
+                                directory_name=kvs_dir.name,  # Use the actual directory name
                             )
                             await client._update_metadata(update_accessed_at=True)
                             found = True
@@ -151,9 +167,28 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             if not found:
                 raise ValueError(f'Key-value store with ID "{id}" not found.')
 
-        # Get a new instance by name.
+        # Get a new instance by name or alias.
         else:
-            kvs_path = kvs_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT if name is None else kvs_base_path / name
+            # Determine the directory name and metadata name based on whether this is a named or alias storage
+            if alias is not None:
+                # For alias storages, use the alias as directory name and set metadata.name to None
+                # Special case: alias='default' should use the same directory as default storage
+                directory_name = None if alias == 'default' else alias
+                actual_name = None
+            elif name is not None:
+                # For named storages, use the name as both directory name and metadata.name
+                directory_name = name
+                actual_name = name
+            else:
+                # For default storage (no name or alias), use None for both - same as alias='default'
+                directory_name = None
+                actual_name = None
+
+            kvs_path = (
+                kvs_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT
+                if directory_name is None
+                else kvs_base_path / directory_name
+            )
             metadata_path = kvs_path / METADATA_FILENAME
 
             # If the key-value store directory exists, reconstruct the client from the metadata file.
@@ -165,6 +200,9 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                     await asyncio.to_thread(file.close)
                 try:
                     metadata = KeyValueStoreMetadata(**file_content)
+                    # For aliases, ensure the metadata.name is None
+                    if alias is not None:
+                        metadata = metadata.model_copy(update={'name': None})
                 except ValidationError as exc:
                     raise ValueError(f'Invalid metadata file for key-value store "{name}"') from exc
 
@@ -172,6 +210,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                     metadata=metadata,
                     storage_dir=storage_dir,
                     lock=asyncio.Lock(),
+                    directory_name=directory_name,
                 )
 
                 await client._update_metadata(update_accessed_at=True)
@@ -181,7 +220,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                 now = datetime.now(timezone.utc)
                 metadata = KeyValueStoreMetadata(
                     id=crypto_random_object_id(),
-                    name=name,
+                    name=actual_name,  # Use actual_name which will be None for aliases
                     created_at=now,
                     accessed_at=now,
                     modified_at=now,
@@ -190,6 +229,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                     metadata=metadata,
                     storage_dir=storage_dir,
                     lock=asyncio.Lock(),
+                    directory_name=directory_name,
                 )
                 await client._update_metadata()
 

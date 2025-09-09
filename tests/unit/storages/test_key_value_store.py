@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import KeyValueStore
@@ -94,7 +95,7 @@ async def test_open_with_id_and_name(
     configuration: Configuration,
 ) -> None:
     """Test that open() raises an error when both id and name are provided."""
-    with pytest.raises(ValueError, match=r'Only one of "id" or "name" can be specified'):
+    with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
         await KeyValueStore.open(
             id='some-id',
             name='some-name',
@@ -598,3 +599,528 @@ async def test_record_exists_after_purge(kvs: KeyValueStore) -> None:
     # Should no longer exist
     assert await kvs.record_exists('key1') is False
     assert await kvs.record_exists('key2') is False
+
+
+async def test_open_with_alias(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test opening key-value stores with alias parameter for NDU functionality."""
+    # Create key-value stores with different aliases
+    kvs_1 = await KeyValueStore.open(
+        alias='test_alias_1',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+    kvs_2 = await KeyValueStore.open(
+        alias='test_alias_2',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Verify they have different IDs but no names (unnamed)
+    assert kvs_1.id != kvs_2.id
+    assert kvs_1.name is None
+    assert kvs_2.name is None
+
+    # Add different data to each
+    await kvs_1.set_value('source', 'alias_1')
+    await kvs_2.set_value('source', 'alias_2')
+
+    # Verify data isolation
+    value_1 = await kvs_1.get_value('source')
+    value_2 = await kvs_2.get_value('source')
+
+    assert value_1 == 'alias_1'
+    assert value_2 == 'alias_2'
+
+    # Clean up
+    await kvs_1.drop()
+    await kvs_2.drop()
+
+
+async def test_alias_caching(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test that key-value stores with same alias return same instance (cached)."""
+    # Open kvs with alias
+    kvs_1 = await KeyValueStore.open(
+        alias='cache_test',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Open again with same alias
+    kvs_2 = await KeyValueStore.open(
+        alias='cache_test',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Should be same instance
+    assert kvs_1 is kvs_2
+    assert kvs_1.id == kvs_2.id
+
+    # Clean up
+    await kvs_1.drop()
+
+
+async def test_alias_with_id_error(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test that providing both alias and id raises error."""
+    with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
+        await KeyValueStore.open(
+            id='some-id',
+            alias='some-alias',
+            storage_client=storage_client,
+            configuration=configuration,
+        )
+
+
+async def test_alias_with_name_error(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test that providing both alias and name raises error."""
+    with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
+        await KeyValueStore.open(
+            name='some-name',
+            alias='some-alias',
+            storage_client=storage_client,
+            configuration=configuration,
+        )
+
+
+async def test_alias_with_special_characters(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test alias functionality with special characters."""
+    special_aliases = [
+        'alias-with-dashes',
+        'alias_with_underscores',
+        'alias.with.dots',
+        'alias123with456numbers',
+        'CamelCaseAlias',
+    ]
+
+    stores = []
+    for alias in special_aliases:
+        kvs = await KeyValueStore.open(
+            alias=alias,
+            storage_client=storage_client,
+            configuration=configuration,
+        )
+        stores.append(kvs)
+
+        # Add data with the alias as identifier
+        await kvs.set_value('alias_used', alias)
+        await kvs.set_value('test', 'special_chars')
+
+    # Verify all work correctly
+    for i, kvs in enumerate(stores):
+        assert await kvs.get_value('alias_used') == special_aliases[i]
+        assert await kvs.get_value('test') == 'special_chars'
+
+    # Clean up
+    for kvs in stores:
+        await kvs.drop()
+
+
+async def test_alias_key_operations(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test that key operations work correctly with alias stores."""
+    kvs = await KeyValueStore.open(
+        alias='key_ops_test',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Test setting multiple keys
+    test_data = {
+        'key1': {'data': 'value1', 'number': 1},
+        'key2': 'simple string value',
+        'key3': [1, 2, 3, 4, 5],
+        'key4': None,
+    }
+
+    for key, value in test_data.items():
+        await kvs.set_value(key, value)
+
+    # Test getting all keys
+    keys = await kvs.list_keys()
+    key_names = [k.key for k in keys]
+    assert len(keys) == 4
+    for key in test_data:
+        assert key in key_names
+
+    # Test record_exists
+    for key in test_data:
+        assert await kvs.record_exists(key) is True
+    assert await kvs.record_exists('nonexistent') is False
+
+    # Test iteration
+    collected_keys = [key async for key in kvs.iterate_keys()]
+    assert len(collected_keys) == 4
+
+    # Test deletion
+    await kvs.delete_value('key2')
+    assert await kvs.record_exists('key2') is False
+    assert await kvs.get_value('key2') is None
+
+    # Verify other keys still exist
+    remaining_keys = await kvs.list_keys()
+    assert len(remaining_keys) == 3
+
+    # Clean up
+    await kvs.drop()
+
+
+async def test_named_vs_alias_conflict_detection() -> None:
+    """Test that conflicts between named and alias storages are detected."""
+    # Test 1: Create named storage first, then try alias with same name
+    named_kvs = await KeyValueStore.open(name='conflict_test')
+    assert named_kvs.name == 'conflict_test'
+
+    # Try to create alias with same name - should raise error
+    with pytest.raises(ValueError, match=r'Cannot create alias storage "conflict_test".*already exists'):
+        await KeyValueStore.open(alias='conflict_test')
+
+    # Clean up
+    await named_kvs.drop()
+
+    # Test 2: Create alias first, then try named with same name
+    alias_kvs = await KeyValueStore.open(alias='conflict_test2')
+    assert alias_kvs.name is None  # Alias storages have no name
+
+    # Try to create named with same name - should raise error
+    with pytest.raises(ValueError, match=r'Cannot create named storage "conflict_test2".*already exists'):
+        await KeyValueStore.open(name='conflict_test2')
+
+    # Clean up
+    await alias_kvs.drop()
+
+    # Test 3: Different names should work fine
+    named_kvs_ok = await KeyValueStore.open(name='different_name')
+    alias_kvs_ok = await KeyValueStore.open(alias='different_alias')
+
+    assert named_kvs_ok.name == 'different_name'
+    assert alias_kvs_ok.name is None
+
+    # Clean up
+    await named_kvs_ok.drop()
+    await alias_kvs_ok.drop()
+
+
+async def test_alias_parameter(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test key-value store creation and operations with alias parameter."""
+    # Create kvs with alias
+    alias_kvs = await KeyValueStore.open(
+        alias='test_alias',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Verify alias kvs properties
+    assert alias_kvs.id is not None
+    assert alias_kvs.name is None  # Alias storages should be unnamed
+
+    # Test data operations
+    await alias_kvs.set_value('test_key', {'type': 'alias', 'value': 1})
+    value = await alias_kvs.get_value('test_key')
+    assert value['type'] == 'alias'
+
+    await alias_kvs.drop()
+
+
+async def test_alias_vs_named_isolation(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test that alias and named key-value stores with same identifier are isolated."""
+    # Create named kvs
+    named_kvs = await KeyValueStore.open(
+        name='test_identifier',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Verify named kvs
+    assert named_kvs.name == 'test_identifier'
+    await named_kvs.set_value('type', 'named')
+
+    # Clean up named kvs first
+    await named_kvs.drop()
+
+    # Now create alias kvs with same identifier (should work after cleanup)
+    alias_kvs = await KeyValueStore.open(
+        alias='test_identifier',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Should be different instance
+    assert alias_kvs.name is None
+    await alias_kvs.set_value('type', 'alias')
+
+    # Verify alias data
+    alias_value = await alias_kvs.get_value('type')
+    assert alias_value == 'alias'
+
+    await alias_kvs.drop()
+
+
+async def test_default_vs_alias_default_equivalence(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test that default key-value store and alias='default' are equivalent."""
+    # Open default kvs
+    default_kvs = await KeyValueStore.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Open alias='default' kvs
+    alias_default_kvs = await KeyValueStore.open(
+        alias='default',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Should be the same
+    assert default_kvs.id == alias_default_kvs.id
+    assert default_kvs.name is None
+    assert alias_default_kvs.name is None
+
+    # Data should be shared
+    await default_kvs.set_value('source', 'default')
+    value = await alias_default_kvs.get_value('source')
+    assert value == 'default'
+
+    await default_kvs.drop()
+
+
+async def test_alias_parameter_validation(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test alias parameter validation."""
+    # Should not allow both name and alias
+    with pytest.raises(ValueError, match=r'Only one of'):
+        await KeyValueStore.open(
+            name='test',
+            alias='test',
+            storage_client=storage_client,
+            configuration=configuration,
+        )
+
+    # Valid alias should work
+    alias_kvs = await KeyValueStore.open(
+        alias='valid_alias',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+    assert alias_kvs.name is None
+    await alias_kvs.drop()
+
+
+async def test_multiple_alias_isolation(
+    storage_client: StorageClient,
+    configuration: Configuration,
+) -> None:
+    """Test that different aliases create separate key-value stores."""
+    kvs_stores = []
+
+    for i in range(3):
+        kvs = await KeyValueStore.open(
+            alias=f'alias_{i}',
+            storage_client=storage_client,
+            configuration=configuration,
+        )
+        await kvs.set_value('alias', f'alias_{i}')
+        await kvs.set_value('index', i)
+        kvs_stores.append(kvs)
+
+    # All should be different
+    for i in range(3):
+        for j in range(i + 1, 3):
+            assert kvs_stores[i].id != kvs_stores[j].id
+
+    # Verify data isolation
+    for i, kvs in enumerate(kvs_stores):
+        alias_value = await kvs.get_value('alias')
+        index_value = await kvs.get_value('index')
+        assert alias_value == f'alias_{i}'
+        # For memory storage, value is preserved as int; for filesystem it's converted to string
+        assert index_value == i or index_value == str(i)
+        await kvs.drop()
+
+
+async def test_purge_on_start_enabled(storage_client: StorageClient) -> None:
+    """Test purge behavior when purge_on_start=True: named storages retain data, unnamed storages are purged."""
+
+    # Skip this test for memory storage since it doesn't persist data between client instances.
+    if storage_client.__class__.__name__ == 'MemoryStorageClient':
+        pytest.skip('Memory storage does not persist data between client instances.')
+
+    configuration = Configuration(purge_on_start=True)
+
+    # First, create all storage types with purge enabled and add data.
+    default_kvs = await KeyValueStore.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    alias_kvs = await KeyValueStore.open(
+        alias='purge_test_alias',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    named_kvs = await KeyValueStore.open(
+        name='purge_test_named',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    await default_kvs.set_value(key='data', value='should_be_purged')
+    await alias_kvs.set_value(key='data', value='should_be_purged')
+    await named_kvs.set_value(key='data', value='should_persist')
+
+    # Verify data was added
+    default_data = await default_kvs.get_value(key='data')
+    alias_data = await alias_kvs.get_value(key='data')
+    named_data = await named_kvs.get_value(key='data')
+
+    assert default_data == 'should_be_purged'
+    assert alias_data == 'should_be_purged'
+    assert named_data == 'should_persist'
+
+    # Verify that default and alias storages are unnamed
+    default_metadata = await default_kvs.get_metadata()
+    alias_metadata = await alias_kvs.get_metadata()
+    named_metadata = await named_kvs.get_metadata()
+
+    assert default_metadata.name is None
+    assert alias_metadata.name is None
+    assert named_metadata.name == 'purge_test_named'
+
+    # Clear storage cache to simulate "reopening" storages
+    service_locator.storage_instance_manager.clear_cache()
+
+    # Now "reopen" all storages
+    default_kvs_2 = await KeyValueStore.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+    alias_kvs_2 = await KeyValueStore.open(
+        alias='purge_test_alias',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+    named_kvs_2 = await KeyValueStore.open(
+        name='purge_test_named',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Check the data after purge
+    default_data_after = await default_kvs_2.get_value(key='data')
+    alias_data_after = await alias_kvs_2.get_value(key='data')
+    named_data_after = await named_kvs_2.get_value(key='data')
+
+    # Unnamed storages (alias and default) should be purged (data removed)
+    assert default_data_after is None
+    assert alias_data_after is None
+
+    # Named storage should retain data (not purged)
+    assert named_data_after == 'should_persist'
+
+    # Clean up
+    await named_kvs_2.drop()
+    await alias_kvs_2.drop()
+    await default_kvs_2.drop()
+
+
+async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
+    """Test purge behavior when purge_on_start=False: all storages retain data regardless of type."""
+
+    # Skip this test for memory storage since it doesn't persist data between client instances.
+    if storage_client.__class__.__name__ == 'MemoryStorageClient':
+        pytest.skip('Memory storage does not persist data between client instances.')
+
+    configuration = Configuration(purge_on_start=False)
+
+    # First, create all storage types with purge disabled and add data.
+    default_kvs = await KeyValueStore.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    alias_kvs = await KeyValueStore.open(
+        alias='purge_test_alias',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    named_kvs = await KeyValueStore.open(
+        name='purge_test_named',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    await default_kvs.set_value('data', 'should_persist')
+    await alias_kvs.set_value('data', 'should_persist')
+    await named_kvs.set_value('data', 'should_persist')
+
+    # Verify data was added
+    default_data = await default_kvs.get_value('data')
+    alias_data = await alias_kvs.get_value('data')
+    named_data = await named_kvs.get_value('data')
+
+    assert default_data == 'should_persist'
+    assert alias_data == 'should_persist'
+    assert named_data == 'should_persist'
+
+    # Clear storage cache to simulate "reopening" storages
+    service_locator.storage_instance_manager.clear_cache()
+
+    # Now "reopen" all storages
+    default_kvs_2 = await KeyValueStore.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+    alias_kvs_2 = await KeyValueStore.open(
+        alias='purge_test_alias',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+    named_kvs_2 = await KeyValueStore.open(
+        name='purge_test_named',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Check the data after reopen
+    default_data_after = await default_kvs_2.get_value('data')
+    alias_data_after = await alias_kvs_2.get_value('data')
+    named_data_after = await named_kvs_2.get_value('data')
+
+    # All storages should retain data when purge is disabled
+    assert default_data_after == 'should_persist'
+    assert alias_data_after == 'should_persist'
+    assert named_data_after == 'should_persist'
+
+    # Clean up
+    await named_kvs_2.drop()
+    await alias_kvs_2.drop()
+    await default_kvs_2.drop()

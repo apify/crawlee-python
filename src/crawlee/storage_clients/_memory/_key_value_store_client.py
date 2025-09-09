@@ -51,6 +51,7 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         *,
         id: str | None,
         name: str | None,
+        alias: str | None = None,
     ) -> MemoryKeyValueStoreClient:
         """Open or create a new memory key-value store client.
 
@@ -60,18 +61,37 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
 
         Args:
             id: The ID of the key-value store. If not provided, a random ID will be generated.
-            name: The name of the key-value store. If not provided, the store will be unnamed.
+            name: The name of the key-value store for named storages. Mutually exclusive with alias.
+            alias: The alias of the key-value store for unnamed storages. Mutually exclusive with name.
 
         Returns:
             An instance for the opened or created storage client.
+
+        Raises:
+            ValueError: If both name and alias are provided.
         """
-        # Otherwise create a new key-value store
+        # Validate parameters - exactly one of name or alias should be provided (or neither for default)
+        if name is not None and alias is not None:
+            raise ValueError('Cannot specify both name and alias parameters')
+
+        # Determine the actual name to use in metadata
+        if alias is not None:
+            # For alias storages, metadata.name should be None (unnamed storage)
+            actual_name = None
+        elif name is not None:
+            # For named storages, use the provided name
+            actual_name = name
+        else:
+            # For default storage (no name or alias), use None
+            actual_name = None
+
+        # Create a new key-value store
         store_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 
         metadata = KeyValueStoreMetadata(
             id=store_id,
-            name=name,
+            name=actual_name,
             created_at=now,
             accessed_at=now,
             modified_at=now,

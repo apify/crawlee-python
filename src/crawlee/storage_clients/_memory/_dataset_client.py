@@ -53,6 +53,7 @@ class MemoryDatasetClient(DatasetClient):
         *,
         id: str | None,
         name: str | None,
+        alias: str | None = None,
     ) -> MemoryDatasetClient:
         """Open or create a new memory dataset client.
 
@@ -62,18 +63,37 @@ class MemoryDatasetClient(DatasetClient):
 
         Args:
             id: The ID of the dataset. If not provided, a random ID will be generated.
-            name: The name of the dataset. If not provided, the dataset will be unnamed.
+            name: The name of the dataset for named storages. Mutually exclusive with alias.
+            alias: The alias of the dataset for unnamed storages. Mutually exclusive with name.
 
         Returns:
             An instance for the opened or created storage client.
+
+        Raises:
+            ValueError: If both name and alias are provided, or if neither id, name, nor alias is provided.
         """
-        # Otherwise create a new dataset
+        # Validate parameters - exactly one of name or alias should be provided (or neither for default)
+        if name is not None and alias is not None:
+            raise ValueError('Cannot specify both name and alias parameters')
+
+        # Determine the actual name to use in metadata
+        if alias is not None:
+            # For alias storages, metadata.name should be None (unnamed storage)
+            actual_name = None
+        elif name is not None:
+            # For named storages, use the provided name
+            actual_name = name
+        else:
+            # For default storage (no name or alias), use None
+            actual_name = None
+
+        # Create a new dataset
         dataset_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 
         metadata = DatasetMetadata(
             id=dataset_id,
-            name=name,
+            name=actual_name,
             created_at=now,
             accessed_at=now,
             modified_at=now,
