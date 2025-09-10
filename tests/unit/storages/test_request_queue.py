@@ -667,8 +667,9 @@ async def test_open_with_alias(
     assert rq_2.name is None
 
     # Add different requests to each
-    await rq_1.add_request('https://example1.com')
-    await rq_2.add_request('https://example2.com')
+    await rq_1.add_request('https://example.com/1')
+    await rq_1.add_request('https://example.com/2')
+    await rq_2.add_request('https://example.com/3')
 
     # Verify data isolation
     request_1 = await rq_1.fetch_next_request()
@@ -676,8 +677,8 @@ async def test_open_with_alias(
 
     assert request_1 is not None
     assert request_2 is not None
-    assert request_1.url == 'https://example1.com'
-    assert request_2.url == 'https://example2.com'
+    assert request_1.url == 'https://example.com/1'
+    assert request_2.url == 'https://example.com/3'
 
     # Clean up
     await rq_1.drop()

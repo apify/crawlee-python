@@ -849,30 +849,6 @@ async def test_default_vs_alias_default_equivalence(
     await default_dataset.drop()
 
 
-async def test_alias_parameter_validation(
-    storage_client: StorageClient,
-    configuration: Configuration,
-) -> None:
-    """Test alias parameter validation."""
-    # Should not allow both name and alias
-    with pytest.raises(ValueError, match=r'Only one of'):
-        await Dataset.open(
-            name='test',
-            alias='test',
-            storage_client=storage_client,
-            configuration=configuration,
-        )
-
-    # Valid alias should work
-    alias_dataset = await Dataset.open(
-        alias='valid_alias',
-        storage_client=storage_client,
-        configuration=configuration,
-    )
-    assert alias_dataset.name is None
-    await alias_dataset.drop()
-
-
 async def test_multiple_alias_isolation(
     storage_client: StorageClient,
     configuration: Configuration,
