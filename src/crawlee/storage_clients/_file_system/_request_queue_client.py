@@ -89,9 +89,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self,
         *,
         metadata: RequestQueueMetadata,
-        storage_dir: Path,
+        path_to_rq: Path,
         lock: asyncio.Lock,
-        directory_name: str | None = None,
     ) -> None:
         """Initialize a new instance.
 
@@ -99,11 +98,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         """
         self._metadata = metadata
 
-        self._storage_dir = storage_dir
-        """The base directory where the storage data are being persisted."""
-
-        self._directory_name = directory_name
-        """The directory name to use for this request queue. If None, uses metadata.name or default."""
+        self._path_to_rq = path_to_rq
+        """The full path to the request queue directory."""
 
         self._lock = lock
         """A lock to ensure that only one operation is performed at a time."""
@@ -133,14 +129,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     @property
     def path_to_rq(self) -> Path:
         """The full path to the request queue directory."""
-        # Use the explicit directory name if provided, otherwise fall back to metadata.name or default
-        if self._directory_name is not None:
-            return self._storage_dir / self._STORAGE_SUBDIR / self._directory_name
-
-        if self._metadata.name is None:
-            return self._storage_dir / self._STORAGE_SUBDIR / self._STORAGE_SUBSUBDIR_DEFAULT
-
-        return self._storage_dir / self._STORAGE_SUBDIR / self._metadata.name
+        return self._path_to_rq
 
     @property
     def path_to_metadata(self) -> Path:
@@ -179,8 +168,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         if name is not None and alias is not None:
             raise ValueError('Cannot specify both name and alias parameters')
 
-        storage_dir = Path(configuration.storage_dir)
-        rq_base_path = storage_dir / cls._STORAGE_SUBDIR
+        rq_base_path = Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
 
         if not rq_base_path.exists():
             await asyncio.to_thread(rq_base_path.mkdir, parents=True, exist_ok=True)
@@ -192,12 +180,12 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 if not rq_dir.is_dir():
                     continue
 
-                metadata_path = rq_dir / METADATA_FILENAME
-                if not metadata_path.exists():
+                path_to_metadata = rq_dir / METADATA_FILENAME
+                if not path_to_metadata.exists():
                     continue
 
                 try:
-                    file = await asyncio.to_thread(metadata_path.open)
+                    file = await asyncio.to_thread(path_to_metadata.open)
                     try:
                         file_content = json.load(file)
                         metadata = RequestQueueMetadata(**file_content)
@@ -205,9 +193,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                         if metadata.id == id:
                             client = cls(
                                 metadata=metadata,
-                                storage_dir=storage_dir,
+                                path_to_rq=rq_base_path / rq_dir,
                                 lock=asyncio.Lock(),
-                                directory_name=rq_dir.name,  # Use the actual directory name
                             )
                             await client._state.initialize()
                             await client._discover_existing_requests()
@@ -224,31 +211,13 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         # Open an existing RQ by its name or alias, or create a new one if not found.
         else:
-            # Determine the directory name and metadata name based on whether this is a named or alias storage
-            if alias is not None:
-                # For alias storages, use the alias as directory name and set metadata.name to None
-                # Special case: alias='default' should use the same directory as default storage
-                directory_name = None if alias == 'default' else alias
-                actual_name = None
-            elif name is not None:
-                # For named storages, use the name as both directory name and metadata.name
-                directory_name = name
-                actual_name = name
-            else:
-                # For default storage (no name or alias), use None for both - same as alias='default'
-                directory_name = None
-                actual_name = None
-
-            rq_path = (
-                rq_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT
-                if directory_name is None
-                else rq_base_path / directory_name
-            )
-            metadata_path = rq_path / METADATA_FILENAME
+            rq_dir = Path(name) if name else Path(alias) if alias else Path('default')
+            path_to_rq = rq_base_path / rq_dir
+            path_to_metadata = path_to_rq / METADATA_FILENAME
 
             # If the RQ directory exists, reconstruct the client from the metadata file.
-            if rq_path.exists() and metadata_path.exists():
-                file = await asyncio.to_thread(open, metadata_path)
+            if path_to_rq.exists() and path_to_metadata.exists():
+                file = await asyncio.to_thread(open, path_to_metadata)
                 try:
                     file_content = json.load(file)
                 finally:
@@ -256,15 +225,15 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 try:
                     metadata = RequestQueueMetadata(**file_content)
                 except ValidationError as exc:
-                    raise ValueError(f'Invalid metadata file for request queue "{name}"') from exc
+                    raise ValueError(f'Invalid metadata file for request queue "{name or alias}"') from exc
 
-                metadata.name = actual_name  # Use actual_name which will be None for aliases
+                # Update metadata name to match the resolution.
+                metadata.name = name
 
                 client = cls(
                     metadata=metadata,
-                    storage_dir=storage_dir,
+                    path_to_rq=path_to_rq,
                     lock=asyncio.Lock(),
-                    directory_name=directory_name,
                 )
 
                 await client._state.initialize()
@@ -276,7 +245,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 now = datetime.now(timezone.utc)
                 metadata = RequestQueueMetadata(
                     id=crypto_random_object_id(),
-                    name=actual_name,  # Use actual_name which will be None for aliases
+                    name=name,
                     created_at=now,
                     accessed_at=now,
                     modified_at=now,
@@ -287,9 +256,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 )
                 client = cls(
                     metadata=metadata,
-                    storage_dir=storage_dir,
+                    path_to_rq=path_to_rq,
                     lock=asyncio.Lock(),
-                    directory_name=directory_name,
                 )
                 await client._state.initialize()
                 await client._update_metadata()
