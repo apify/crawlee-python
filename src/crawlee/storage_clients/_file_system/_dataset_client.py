@@ -113,7 +113,7 @@ class FileSystemDatasetClient(DatasetClient):
             ValueError: If a dataset with the specified ID is not found, if metadata is invalid,
                 or if both name and alias are provided.
         """
-        # Validate parameters
+        # Validate input parameters.
         specified_params = sum(1 for param in [id, name, alias] if param is not None)
         if specified_params > 1:
             raise ValueError('Only one of "id", "name", or "alias" can be specified, not multiple.')
@@ -173,9 +173,6 @@ class FileSystemDatasetClient(DatasetClient):
                     metadata = DatasetMetadata(**file_content)
                 except ValidationError as exc:
                     raise ValueError(f'Invalid metadata file for dataset "{name or alias}"') from exc
-
-                # Update metadata name to match the resolution.
-                metadata.name = name
 
                 client = cls(
                     metadata=metadata,

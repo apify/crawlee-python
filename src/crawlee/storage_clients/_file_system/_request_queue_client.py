@@ -164,9 +164,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             ValueError: If a queue with the specified ID is not found, if metadata is invalid,
                 or if both name and alias are provided.
         """
-        # Validate parameters - exactly one of name or alias should be provided (or neither for default)
-        if name is not None and alias is not None:
-            raise ValueError('Cannot specify both name and alias parameters')
+        # Validate input parameters.
+        specified_params = sum(1 for param in [id, name, alias] if param is not None)
+        if specified_params > 1:
+            raise ValueError('Only one of "id", "name", or "alias" can be specified, not multiple.')
 
         rq_base_path = Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
 
@@ -226,9 +227,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     metadata = RequestQueueMetadata(**file_content)
                 except ValidationError as exc:
                     raise ValueError(f'Invalid metadata file for request queue "{name or alias}"') from exc
-
-                # Update metadata name to match the resolution.
-                metadata.name = name
 
                 client = cls(
                     metadata=metadata,

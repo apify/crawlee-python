@@ -70,20 +70,10 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         Raises:
             ValueError: If both name and alias are provided.
         """
-        # Validate parameters - exactly one of name or alias should be provided (or neither for default)
-        if name is not None and alias is not None:
-            raise ValueError('Cannot specify both name and alias parameters')
-
-        # Determine the actual name to use in metadata
-        if alias is not None:
-            # For alias storages, metadata.name should be None (unnamed storage)
-            actual_name = None
-        elif name is not None:
-            # For named storages, use the provided name
-            actual_name = name
-        else:
-            # For default storage (no name or alias), use None
-            actual_name = None
+        # Validate input parameters.
+        specified_params = sum(1 for param in [id, name, alias] if param is not None)
+        if specified_params > 1:
+            raise ValueError('Only one of "id", "name", or "alias" can be specified, not multiple.')
 
         # Create a new key-value store
         store_id = id or crypto_random_object_id()
@@ -91,7 +81,7 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
 
         metadata = KeyValueStoreMetadata(
             id=store_id,
-            name=actual_name,
+            name=name,
             created_at=now,
             accessed_at=now,
             modified_at=now,
