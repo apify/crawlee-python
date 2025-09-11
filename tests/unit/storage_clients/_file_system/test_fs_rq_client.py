@@ -7,8 +7,9 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee import Request
+from crawlee._service_locator import service_locator
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import FileSystemStorageClient
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -55,13 +56,19 @@ async def test_file_and_directory_creation(configuration: Configuration) -> None
     await client.drop()
 
 
-async def test_request_file_persistence(rq_client: FileSystemRequestQueueClient) -> None:
+@pytest.mark.parametrize('set_different_storage_client_in_service_locator', [True, False])
+async def test_request_file_persistence(
+    rq_client: FileSystemRequestQueueClient, *, set_different_storage_client_in_service_locator: bool
+) -> None:
     """Test that requests are properly persisted to files."""
     requests = [
         Request.from_url('https://example.com/1'),
         Request.from_url('https://example.com/2'),
         Request.from_url('https://example.com/3'),
     ]
+
+    if set_different_storage_client_in_service_locator:
+        service_locator.set_storage_client(MemoryStorageClient())
 
     await rq_client.add_batch_of_requests(requests)
 
