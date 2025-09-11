@@ -63,8 +63,8 @@ class MemoryDatasetClient(DatasetClient):
 
         Args:
             id: The ID of the dataset. If not provided, a random ID will be generated.
-            name: The name of the dataset for named storages. Mutually exclusive with alias.
-            alias: The alias of the dataset for unnamed storages. Mutually exclusive with name.
+            name: The name of the dataset for named (global scope) storages.
+            alias: The alias of the dataset for unnamed (run scope) storages.
 
         Returns:
             An instance for the opened or created storage client.

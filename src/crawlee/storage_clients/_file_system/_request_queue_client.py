@@ -153,8 +153,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         Args:
             id: The ID of the request queue to open. If provided, searches for existing queue by ID.
-            name: The name of the request queue for named storages. Mutually exclusive with alias.
-            alias: The alias of the request queue for unnamed storages. Mutually exclusive with name.
+            name: The name of the request queue for named (global scope) storages.
+            alias: The alias of the request queue for unnamed (run scope) storages.
             configuration: The configuration object containing storage directory settings.
 
         Returns:

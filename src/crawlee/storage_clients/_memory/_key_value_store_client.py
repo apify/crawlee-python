@@ -61,8 +61,8 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
 
         Args:
             id: The ID of the key-value store. If not provided, a random ID will be generated.
-            name: The name of the key-value store for named storages. Mutually exclusive with alias.
-            alias: The alias of the key-value store for unnamed storages. Mutually exclusive with name.
+            name: The name of the key-value store for named (global scope) storages.
+            alias: The alias of the key-value store for unnamed (run scope) storages.
 
         Returns:
             An instance for the opened or created storage client.

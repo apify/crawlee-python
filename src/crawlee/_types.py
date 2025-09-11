@@ -434,8 +434,8 @@ class GetKeyValueStoreFunction(Protocol):
 
         Args:
             id: The ID of the `KeyValueStore` to get.
-            name: The name of the `KeyValueStore` to get (global scope).
-            alias: The alias of the `KeyValueStore` to get (run scope, unnamed).
+            name: The name of the `KeyValueStore` to get (global scope, named storage).
+            alias: The alias of the `KeyValueStore` to get (run scope, unnamed storage).
         """
 
 
@@ -456,8 +456,8 @@ class GetKeyValueStoreFromRequestHandlerFunction(Protocol):
 
         Args:
             id: The ID of the `KeyValueStore` to get.
-            name: The name of the `KeyValueStore` to get (global scope).
-            alias: The alias of the `KeyValueStore` to get (run scope, unnamed).
+            name: The name of the `KeyValueStore` to get (global scope, named storage).
+            alias: The alias of the `KeyValueStore` to get (run scope, unnamed storage).
         """
 
 
@@ -482,8 +482,8 @@ class PushDataFunction(Protocol):
         Args:
             data: The data to push to the `Dataset`.
             dataset_id: The ID of the `Dataset` to push the data to.
-            dataset_name: The name of the `Dataset` to push the data to (global scope).
-            dataset_alias: The alias of the `Dataset` to push the data to (run scope, unnamed).
+            dataset_name: The name of the `Dataset` to push the data to (global scope, named storage).
+            dataset_alias: The alias of the `Dataset` to push the data to (run scope, unnamed storage).
             **kwargs: Additional keyword arguments.
         """
 

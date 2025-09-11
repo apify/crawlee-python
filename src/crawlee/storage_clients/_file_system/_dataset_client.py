@@ -102,8 +102,8 @@ class FileSystemDatasetClient(DatasetClient):
 
         Args:
             id: The ID of the dataset to open. If provided, searches for existing dataset by ID.
-            name: The name of the dataset for named storages. Mutually exclusive with alias.
-            alias: The alias of the dataset for unnamed storages. Mutually exclusive with name.
+            name: The name of the dataset for named (global scope) storages.
+            alias: The alias of the dataset for unnamed (run scope) storages.
             configuration: The configuration object containing storage directory settings.
 
         Returns:

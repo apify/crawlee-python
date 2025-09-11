@@ -101,8 +101,8 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         Args:
             id: The ID of the key-value store to open. If provided, searches for existing store by ID.
-            name: The name of the key-value store for named storages. Mutually exclusive with alias.
-            alias: The alias of the key-value store for unnamed storages. Mutually exclusive with name.
+            name: The name of the key-value store for named (global scope) storages.
+            alias: The alias of the key-value store for unnamed (run scope) storages.
             configuration: The configuration object containing storage directory settings.
 
         Returns:

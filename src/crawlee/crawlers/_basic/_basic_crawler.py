@@ -784,8 +784,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Args:
             dataset_id: The ID of the `Dataset`.
-            dataset_name: The name of the `Dataset` (global scope).
-            dataset_alias: The alias of the `Dataset` (run scope, unnamed).
+            dataset_name: The name of the `Dataset` (global scope, named storage).
+            dataset_alias: The alias of the `Dataset` (run scope, unnamed storage).
             kwargs: Keyword arguments to be passed to the `Dataset.get_data()` method.
 
         Returns:
@@ -809,9 +809,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Args:
             path: The destination file path. Must end with '.json' or '.csv'.
-            dataset_id: The ID of the Dataset to export from. If None, uses `name` parameter instead.
-            dataset_name: The name of the Dataset to export from (global scope). If None, uses `id` parameter instead.
-            dataset_alias: The alias of the Dataset to export from (run scope, unnamed).
+            dataset_id: The ID of the Dataset to export from.
+            dataset_name: The name of the Dataset to export from (global scope, named storage).
+            dataset_alias: The alias of the Dataset to export from (run scope, unnamed storage).
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name, alias=dataset_alias)
 
@@ -841,8 +841,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Args:
             data: The data to push to the `Dataset`.
             dataset_id: The ID of the `Dataset`.
-            dataset_name: The name of the `Dataset` (global scope).
-            dataset_alias: The alias of the `Dataset` (run scope, unnamed).
+            dataset_name: The name of the `Dataset` (global scope, named storage).
+            dataset_alias: The alias of the `Dataset` (run scope, unnamed storage).
             kwargs: Keyword arguments to be passed to the `Dataset.push_data()` method.
         """
         dataset = await self.get_dataset(id=dataset_id, name=dataset_name, alias=dataset_alias)
