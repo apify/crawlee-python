@@ -150,7 +150,8 @@ class SqlStorageClient(StorageClient):
                     if db_version and db_version != __version__:
                         warnings.warn(
                             f'Database version {db_version.version} does not match library version {__version__}. '
-                            'This may lead to unexpected behavior.',
+                            'This may lead to unexpected behavior. Drop the db if you want to make sure that '
+                            'everything will work fine.',
                             category=UserWarning,
                             stacklevel=2,
                         )

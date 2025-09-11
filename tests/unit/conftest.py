@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-async def suppose_user_warning() -> AsyncGenerator[None, None]:
+async def suppress_user_warning() -> AsyncGenerator[None, None]:
     """Suppress user warnings during tests."""
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', UserWarning)

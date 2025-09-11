@@ -36,7 +36,7 @@ def configuration(tmp_path: Path) -> Configuration:
 async def rq_client(
     configuration: Configuration,
     monkeypatch: pytest.MonkeyPatch,
-    suppose_user_warning: None,  # noqa: ARG001
+    suppress_user_warning: None,  # noqa: ARG001
 ) -> AsyncGenerator[SqlRequestQueueClient, None]:
     """A fixture for a SQL request queue client."""
     async with SqlStorageClient() as storage_client:
@@ -56,7 +56,7 @@ def get_tables(sync_conn: Connection) -> list[str]:
     return inspector.get_table_names()
 
 
-@pytest.mark.usefixtures('suppose_user_warning')
+@pytest.mark.usefixtures('suppress_user_warning')
 async def test_create_tables_with_connection_string(configuration: Configuration, tmp_path: Path) -> None:
     """Test that SQL request queue client creates tables with a connection string."""
     storage_dir = tmp_path / 'test_table.db'
@@ -74,7 +74,7 @@ async def test_create_tables_with_connection_string(configuration: Configuration
             assert 'request_queue_state' in tables
 
 
-@pytest.mark.usefixtures('suppose_user_warning')
+@pytest.mark.usefixtures('suppress_user_warning')
 async def test_create_tables_with_engine(configuration: Configuration, tmp_path: Path) -> None:
     """Test that SQL request queue client creates tables with a pre-configured engine."""
     storage_dir = tmp_path / 'test_table.db'
@@ -94,7 +94,7 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
             assert 'request_queue_state' in tables
 
 
-@pytest.mark.usefixtures('suppose_user_warning')
+@pytest.mark.usefixtures('suppress_user_warning')
 async def test_tables_and_metadata_record(configuration: Configuration) -> None:
     """Test that SQL request queue creates proper tables and metadata records."""
     async with SqlStorageClient() as storage_client:
@@ -135,7 +135,7 @@ async def test_request_records_persistence(rq_client: SqlRequestQueueClient) -> 
     metadata_client = await rq_client.get_metadata()
 
     async with rq_client.get_session() as session:
-        stmt = select(RequestDb).where(RequestDb.metadata_id == metadata_client.id)
+        stmt = select(RequestDb).where(RequestDb.request_queue_id == metadata_client.id)
         result = await session.execute(stmt)
         db_requests = result.scalars().all()
         assert len(db_requests) == 3
@@ -149,7 +149,7 @@ async def test_drop_removes_records(rq_client: SqlRequestQueueClient) -> None:
     await rq_client.add_batch_of_requests([Request.from_url('https://example.com')])
     metadata = await rq_client.get_metadata()
     async with rq_client.get_session() as session:
-        stmt = select(RequestDb).where(RequestDb.metadata_id == metadata.id)
+        stmt = select(RequestDb).where(RequestDb.request_queue_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 1
@@ -157,7 +157,7 @@ async def test_drop_removes_records(rq_client: SqlRequestQueueClient) -> None:
     await rq_client.drop()
 
     async with rq_client.get_session() as session:
-        stmt = select(RequestDb).where(RequestDb.metadata_id == metadata.id)
+        stmt = select(RequestDb).where(RequestDb.request_queue_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 0
@@ -207,7 +207,7 @@ async def test_metadata_record_updates(rq_client: SqlRequestQueueClient) -> None
         assert orm_metadata.modified_at == metadata.modified_at
 
 
-@pytest.mark.usefixtures('suppose_user_warning')
+@pytest.mark.usefixtures('suppress_user_warning')
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
     """Test that data persists correctly when reopening the same request queue."""
     async with SqlStorageClient() as storage_client:

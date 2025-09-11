@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, ClassVar, TypedDict, overload
+from typing import TYPE_CHECKING, Any, ClassVar, TypedDict, cast, overload
 
 from sqlalchemy import delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -164,7 +164,10 @@ class SqlClientMixin(ABC):
                 stmt = select(cls._METADATA_TABLE).where(cls._METADATA_TABLE.name == search_name)
                 result = await session.execute(stmt)
                 orm_metadata: DatasetMetadataDb | KeyValueStoreMetadataDb | RequestQueueMetadataDb | None
-                orm_metadata = result.scalar_one_or_none()  # type: ignore[assignment]
+                orm_metadata = cast(
+                    'DatasetMetadataDb | KeyValueStoreMetadataDb | RequestQueueMetadataDb | None',
+                    result.scalar_one_or_none(),
+                )
 
                 if not orm_metadata:
                     raise ValueError(f'{cls._CLIENT_TYPE} with Name "{search_name}" not found.') from None
@@ -188,7 +191,7 @@ class SqlClientMixin(ABC):
             else:
                 yield session
 
-    def build_insert_stmt_with_ignore(
+    def _build_insert_stmt_with_ignore(
         self, table_model: type[DeclarativeBase], insert_values: dict[str, Any] | list[dict[str, Any]]
     ) -> Insert:
         """Build an insert statement with ignore for the SQL dialect.
@@ -210,7 +213,7 @@ class SqlClientMixin(ABC):
 
         raise NotImplementedError(f'Insert with ignore not supported for dialect: {dialect}')
 
-    def build_upsert_stmt(
+    def _build_upsert_stmt(
         self,
         table_model: type[DeclarativeBase],
         insert_values: dict[str, Any] | list[dict[str, Any]],
@@ -249,7 +252,7 @@ class SqlClientMixin(ABC):
         Args:
             metadata_kwargs: Arguments to pass to _update_metadata.
         """
-        stmt = delete(self._ITEM_TABLE).where(self._ITEM_TABLE.metadata_id == self._id)
+        stmt = delete(self._ITEM_TABLE).where(self._ITEM_TABLE.storage_id == self._id)
         async with self.get_session(with_simple_commit=True) as session:
             await session.execute(stmt)
             await self._update_metadata(session, **metadata_kwargs)

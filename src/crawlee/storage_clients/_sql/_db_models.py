@@ -3,9 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import JSON, BigInteger, Boolean, ForeignKey, Index, Integer, LargeBinary, String
+from sqlalchemy import JSON, BigInteger, Boolean, ForeignKey, Index, Integer, LargeBinary, String, text
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, synonym
 from sqlalchemy.types import DateTime, TypeDecorator
 from typing_extensions import override
 
@@ -73,9 +73,6 @@ class Base(DeclarativeBase):
 class StorageMetadataDb:
     """Base database model for storage metadata."""
 
-    id: Mapped[str] = mapped_column(String(20), nullable=False, primary_key=True)
-    """Unique identifier."""
-
     name: Mapped[str | None] = mapped_column(NameDefaultNone, nullable=False, index=True, unique=True)
     """Human-readable name. None becomes 'default' in database to enforce uniqueness."""
 
@@ -94,6 +91,9 @@ class DatasetMetadataDb(StorageMetadataDb, Base):
 
     __tablename__ = 'datasets'
 
+    dataset_id: Mapped[str] = mapped_column(String(20), nullable=False, primary_key=True)
+    """Unique identifier for the dataset."""
+
     item_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     """Number of items in the dataset."""
 
@@ -102,11 +102,17 @@ class DatasetMetadataDb(StorageMetadataDb, Base):
         back_populates='dataset', cascade='all, delete-orphan', lazy='noload'
     )
 
+    id = synonym('dataset_id')
+    """Alias for dataset_id to match Pydantic expectations."""
+
 
 class RequestQueueMetadataDb(StorageMetadataDb, Base):
     """Metadata table for request queues."""
 
     __tablename__ = 'request_queues'
+
+    request_queue_id: Mapped[str] = mapped_column(String(20), nullable=False, primary_key=True)
+    """Unique identifier for the request queue."""
 
     had_multiple_clients: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     """Flag indicating if multiple clients have accessed this queue."""
@@ -129,16 +135,25 @@ class RequestQueueMetadataDb(StorageMetadataDb, Base):
         back_populates='queue', cascade='all, delete-orphan', lazy='noload'
     )
 
+    id = synonym('request_queue_id')
+    """Alias for request_queue_id to match Pydantic expectations."""
+
 
 class KeyValueStoreMetadataDb(StorageMetadataDb, Base):
     """Metadata table for key-value stores."""
 
     __tablename__ = 'key_value_stores'
 
+    key_value_store_id: Mapped[str] = mapped_column(String(20), nullable=False, primary_key=True)
+    """Unique identifier for the key-value store."""
+
     # Relationship to store records with cascade deletion
     records: Mapped[list[KeyValueStoreRecordDb]] = relationship(
         back_populates='kvs', cascade='all, delete-orphan', lazy='noload'
     )
+
+    id = synonym('key_value_store_id')
+    """Alias for key_value_store_id to match Pydantic expectations."""
 
 
 class KeyValueStoreRecordDb(Base):
@@ -146,8 +161,12 @@ class KeyValueStoreRecordDb(Base):
 
     __tablename__ = 'key_value_store_records'
 
-    metadata_id: Mapped[str] = mapped_column(
-        String(20), ForeignKey('key_value_stores.id', ondelete='CASCADE'), primary_key=True, index=True
+    key_value_store_id: Mapped[str] = mapped_column(
+        String(20),
+        ForeignKey('key_value_stores.key_value_store_id', ondelete='CASCADE'),
+        primary_key=True,
+        index=True,
+        nullable=False,
     )
     """Foreign key to metadata key-value store record."""
 
@@ -166,18 +185,21 @@ class KeyValueStoreRecordDb(Base):
     # Relationship back to parent store
     kvs: Mapped[KeyValueStoreMetadataDb] = relationship(back_populates='records')
 
+    storage_id = synonym('key_value_store_id')
+    """Alias for key_value_store_id to match SqlClientMixin expectations."""
+
 
 class DatasetItemDb(Base):
     """Items table for datasets."""
 
     __tablename__ = 'dataset_records'
 
-    order_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     """Auto-increment primary key preserving insertion order."""
 
-    metadata_id: Mapped[str] = mapped_column(
+    dataset_id: Mapped[str] = mapped_column(
         String(20),
-        ForeignKey('datasets.id', ondelete='CASCADE'),
+        ForeignKey('datasets.dataset_id', ondelete='CASCADE'),
         index=True,
     )
     """Foreign key to metadata dataset record."""
@@ -188,20 +210,30 @@ class DatasetItemDb(Base):
     # Relationship back to parent dataset
     dataset: Mapped[DatasetMetadataDb] = relationship(back_populates='items')
 
+    storage_id = synonym('dataset_id')
+    """Alias for dataset_id to match SqlClientMixin expectations."""
+
 
 class RequestDb(Base):
     """Requests table for request queues."""
 
     __tablename__ = 'request_queue_records'
     __table_args__ = (
-        Index('idx_fetch_available', 'metadata_id', 'is_handled', 'time_blocked_until', 'sequence_number'),
+        Index(
+            'idx_fetch_available',
+            'request_queue_id',
+            'is_handled',
+            'time_blocked_until',
+            'sequence_number',
+            postgresql_where=text('is_handled = false'),
+        ),
     )
 
     request_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     """Unique identifier for the request representing the unique_key."""
 
-    metadata_id: Mapped[str] = mapped_column(
-        String(20), ForeignKey('request_queues.id', ondelete='CASCADE'), primary_key=True
+    request_queue_id: Mapped[str] = mapped_column(
+        String(20), ForeignKey('request_queues.request_queue_id', ondelete='CASCADE'), primary_key=True
     )
     """Foreign key to metadata request queue record."""
 
@@ -223,14 +255,17 @@ class RequestDb(Base):
     # Relationship back to metadata table
     queue: Mapped[RequestQueueMetadataDb] = relationship(back_populates='requests')
 
+    storage_id = synonym('request_queue_id')
+    """Alias for request_queue_id to match SqlClientMixin expectations."""
+
 
 class RequestQueueStateDb(Base):
     """State table for request queues."""
 
     __tablename__ = 'request_queue_state'
 
-    metadata_id: Mapped[str] = mapped_column(
-        String(20), ForeignKey('request_queues.id', ondelete='CASCADE'), primary_key=True
+    request_queue_id: Mapped[str] = mapped_column(
+        String(20), ForeignKey('request_queues.request_queue_id', ondelete='CASCADE'), primary_key=True
     )
     """Foreign key to metadata request queue record."""
 

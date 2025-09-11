@@ -42,7 +42,7 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
     - `dataset_records` table: Contains individual items with JSON data and auto-increment ordering
 
     Items are stored as a JSON object in SQLite and as JSONB in PostgreSQL. These objects must be JSON-serializable.
-    The `order_id` auto-increment primary key ensures insertion order is preserved.
+    The `item_id` auto-increment primary key ensures insertion order is preserved.
     All operations are wrapped in database transactions with CASCADE deletion support.
     """
 
@@ -133,7 +133,7 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
             data = [data]
 
         db_items: list[dict[str, Any]] = []
-        db_items = [{'metadata_id': self._id, 'data': item} for item in data]
+        db_items = [{'dataset_id': self._id, 'data': item} for item in data]
         stmt = insert(self._ITEM_TABLE).values(db_items)
 
         async with self.get_session(with_simple_commit=True) as session:
@@ -272,16 +272,14 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
                 f'{self.__class__.__name__} client.'
             )
 
-        stmt = select(self._ITEM_TABLE).where(self._ITEM_TABLE.metadata_id == self._id)
+        stmt = select(self._ITEM_TABLE).where(self._ITEM_TABLE.dataset_id == self._id)
 
         if skip_empty:
             # Skip items that are empty JSON objects
             stmt = stmt.where(self._ITEM_TABLE.data != {})
 
-        # Apply ordering by insertion order (order_id)
-        stmt = (
-            stmt.order_by(self._ITEM_TABLE.order_id.desc()) if desc else stmt.order_by(self._ITEM_TABLE.order_id.asc())
-        )
+        # Apply ordering by insertion order (item_id)
+        stmt = stmt.order_by(self._ITEM_TABLE.item_id.desc()) if desc else stmt.order_by(self._ITEM_TABLE.item_id.asc())
 
         return stmt.offset(offset).limit(limit)
 

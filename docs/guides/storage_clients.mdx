@@ -186,7 +186,7 @@ class SqlKeyValueStoreClient {
 
 class datasets {
     <<table>>
-    + id (PK)
+    + dataset_id (PK)
     + name
     + accessed_at
     + created_at
@@ -196,8 +196,8 @@ class datasets {
 
 class dataset_records {
     <<table>>
-    + order_id (PK)
-    + metadata_id (FK)
+    + item_id (PK)
+    + dataset_id (FK)
     + data
 }
 
@@ -207,7 +207,7 @@ class dataset_records {
 
 class key_value_stores {
     <<table>>
-    + id (PK)
+    + key_value_store_id (PK)
     + name
     + accessed_at
     + created_at
@@ -216,7 +216,7 @@ class key_value_stores {
 
 class key_value_store_records {
     <<table>>
-    + metadata_id (FK, PK)
+    + key_value_store_id (FK, PK)
     + key (PK)
     + value
     + content_type
@@ -256,7 +256,7 @@ class SqlRequestQueueClient {
 
 class request_queues {
     <<table>>
-    + id (PK)
+    + request_queue_id (PK)
     + name
     + accessed_at
     + created_at
@@ -270,7 +270,7 @@ class request_queues {
 class request_queue_records {
     <<table>>
     + request_id (PK)
-    + metadata_id (FK, PK)
+    + request_queue_id (FK, PK)
     + data
     + sequence_number
     + is_handled
@@ -280,7 +280,7 @@ class request_queue_records {
 
 class request_queue_state {
     <<table>>
-    + metadata_id (FK, PK)
+    + request_queue_id (FK, PK)
     + sequence_counter
     + forefront_sequence_counter
 }

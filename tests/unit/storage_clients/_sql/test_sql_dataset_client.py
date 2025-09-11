@@ -39,7 +39,7 @@ def get_tables(sync_conn: Connection) -> list[str]:
 async def dataset_client(
     configuration: Configuration,
     monkeypatch: pytest.MonkeyPatch,
-    suppose_user_warning: None,  # noqa: ARG001
+    suppress_user_warning: None,  # noqa: ARG001
 ) -> AsyncGenerator[SqlDatasetClient, None]:
     """A fixture for a SQL dataset client."""
     async with SqlStorageClient() as storage_client:
@@ -52,7 +52,7 @@ async def dataset_client(
         await client.drop()
 
 
-@pytest.mark.usefixtures('suppose_user_warning')
+@pytest.mark.usefixtures('suppress_user_warning')
 async def test_create_tables_with_connection_string(configuration: Configuration, tmp_path: Path) -> None:
     """Test that SQL dataset client creates tables with a connection string."""
     storage_dir = tmp_path / 'test_table.db'
@@ -69,7 +69,7 @@ async def test_create_tables_with_connection_string(configuration: Configuration
             assert 'datasets' in tables
 
 
-@pytest.mark.usefixtures('suppose_user_warning')
+@pytest.mark.usefixtures('suppress_user_warning')
 async def test_create_tables_with_engine(configuration: Configuration, tmp_path: Path) -> None:
     """Test that SQL dataset client creates tables with a pre-configured engine."""
     storage_dir = tmp_path / 'test_table.db'
@@ -88,7 +88,7 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
             assert 'datasets' in tables
 
 
-@pytest.mark.usefixtures('suppose_user_warning')
+@pytest.mark.usefixtures('suppress_user_warning')
 async def test_tables_and_metadata_record(configuration: Configuration) -> None:
     """Test that SQL dataset creates proper tables and metadata records."""
     async with SqlStorageClient() as storage_client:
@@ -129,7 +129,7 @@ async def test_record_and_content_verification(dataset_client: SqlDatasetClient)
     assert metadata.accessed_at is not None
 
     async with dataset_client.get_session() as session:
-        stmt = select(DatasetItemDb).where(DatasetItemDb.metadata_id == metadata.id)
+        stmt = select(DatasetItemDb).where(DatasetItemDb.dataset_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 1
@@ -141,7 +141,7 @@ async def test_record_and_content_verification(dataset_client: SqlDatasetClient)
     await dataset_client.push_data(items)
 
     async with dataset_client.get_session() as session:
-        stmt = select(DatasetItemDb).where(DatasetItemDb.metadata_id == metadata.id)
+        stmt = select(DatasetItemDb).where(DatasetItemDb.dataset_id == metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 4
@@ -154,7 +154,7 @@ async def test_drop_removes_records(dataset_client: SqlDatasetClient) -> None:
     client_metadata = await dataset_client.get_metadata()
 
     async with dataset_client.get_session() as session:
-        stmt = select(DatasetItemDb).where(DatasetItemDb.metadata_id == client_metadata.id)
+        stmt = select(DatasetItemDb).where(DatasetItemDb.dataset_id == client_metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 1
@@ -163,7 +163,7 @@ async def test_drop_removes_records(dataset_client: SqlDatasetClient) -> None:
     await dataset_client.drop()
 
     async with dataset_client.get_session() as session:
-        stmt = select(DatasetItemDb).where(DatasetItemDb.metadata_id == client_metadata.id)
+        stmt = select(DatasetItemDb).where(DatasetItemDb.dataset_id == client_metadata.id)
         result = await session.execute(stmt)
         records = result.scalars().all()
         assert len(records) == 0
@@ -215,7 +215,7 @@ async def test_metadata_record_updates(dataset_client: SqlDatasetClient) -> None
         assert orm_metadata.modified_at == metadata.modified_at
 
 
-@pytest.mark.usefixtures('suppose_user_warning')
+@pytest.mark.usefixtures('suppress_user_warning')
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
     """Test that data persists correctly when reopening the same dataset."""
     async with SqlStorageClient() as storage_client:

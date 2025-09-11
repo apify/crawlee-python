@@ -42,7 +42,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
     All database operations are wrapped in transactions with proper error handling and rollback
     mechanisms. The client supports atomic upsert operations and handles race conditions when
-    multiple clients access the same store using composite primary keys (metadata_id, key).
+    multiple clients access the same store using composite primary keys (key_value_store_id, key).
     """
 
     _DEFAULT_NAME = 'default'
@@ -145,18 +145,18 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
         size = len(value_bytes)
         insert_values = {
-            'metadata_id': self._id,
+            'key_value_store_id': self._id,
             'key': key,
             'value': value_bytes,
             'content_type': content_type,
             'size': size,
         }
 
-        upsert_stmt = self.build_upsert_stmt(
+        upsert_stmt = self._build_upsert_stmt(
             self._ITEM_TABLE,
             insert_values=insert_values,
             update_columns=['value', 'content_type', 'size'],
-            conflict_cols=['metadata_id', 'key'],
+            conflict_cols=['key_value_store_id', 'key'],
         )
 
         async with self.get_session(with_simple_commit=True) as session:
@@ -169,7 +169,9 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
         # Query the record by key
-        stmt = select(self._ITEM_TABLE).where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.key == key)
+        stmt = select(self._ITEM_TABLE).where(
+            self._ITEM_TABLE.key_value_store_id == self._id, self._ITEM_TABLE.key == key
+        )
         async with self.get_session() as session:
             result = await session.execute(stmt)
             record_db = result.scalar_one_or_none()
@@ -216,7 +218,9 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
     @override
     async def delete_value(self, *, key: str) -> None:
-        stmt = delete(self._ITEM_TABLE).where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.key == key)
+        stmt = delete(self._ITEM_TABLE).where(
+            self._ITEM_TABLE.key_value_store_id == self._id, self._ITEM_TABLE.key == key
+        )
         async with self.get_session(with_simple_commit=True) as session:
             # Delete the record if it exists
             result = await session.execute(stmt)
@@ -239,7 +243,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         # Build query for record metadata
         stmt = (
             select(self._ITEM_TABLE.key, self._ITEM_TABLE.content_type, self._ITEM_TABLE.size)
-            .where(self._ITEM_TABLE.metadata_id == self._id)
+            .where(self._ITEM_TABLE.key_value_store_id == self._id)
             .order_by(self._ITEM_TABLE.key)
         )
 
@@ -269,7 +273,9 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
     @override
     async def record_exists(self, *, key: str) -> bool:
-        stmt = select(self._ITEM_TABLE.key).where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.key == key)
+        stmt = select(self._ITEM_TABLE.key).where(
+            self._ITEM_TABLE.key_value_store_id == self._id, self._ITEM_TABLE.key == key
+        )
         async with self.get_session() as session:
             # Check if record exists
             result = await session.execute(stmt)

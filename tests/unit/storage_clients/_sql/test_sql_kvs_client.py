@@ -35,7 +35,7 @@ def configuration(tmp_path: Path) -> Configuration:
 async def kvs_client(
     configuration: Configuration,
     monkeypatch: pytest.MonkeyPatch,
-    suppose_user_warning: None,  # noqa: ARG001
+    suppress_user_warning: None,  # noqa: ARG001
 ) -> AsyncGenerator[SqlKeyValueStoreClient, None]:
     """A fixture for a SQL key-value store client."""
     async with SqlStorageClient() as storage_client:
@@ -55,7 +55,7 @@ def get_tables(sync_conn: Connection) -> list[str]:
     return inspector.get_table_names()
 
 
-@pytest.mark.usefixtures('suppose_user_warning')
+@pytest.mark.usefixtures('suppress_user_warning')
 async def test_create_tables_with_connection_string(configuration: Configuration, tmp_path: Path) -> None:
     """Test that SQL key-value store client creates tables with a connection string."""
     storage_dir = tmp_path / 'test_table.db'
@@ -72,7 +72,7 @@ async def test_create_tables_with_connection_string(configuration: Configuration
             assert 'key_value_store_records' in tables
 
 
-@pytest.mark.usefixtures('suppose_user_warning')
+@pytest.mark.usefixtures('suppress_user_warning')
 async def test_create_tables_with_engine(configuration: Configuration, tmp_path: Path) -> None:
     """Test that SQL key-value store client creates tables with a pre-configured engine."""
     storage_dir = tmp_path / 'test_table.db'
@@ -91,7 +91,7 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
             assert 'key_value_store_records' in tables
 
 
-@pytest.mark.usefixtures('suppose_user_warning')
+@pytest.mark.usefixtures('suppress_user_warning')
 async def test_tables_and_metadata_record(configuration: Configuration) -> None:
     """Test that SQL key-value store creates proper tables and metadata records."""
     async with SqlStorageClient() as storage_client:
@@ -264,7 +264,7 @@ async def test_metadata_record_updates(kvs_client: SqlKeyValueStoreClient) -> No
         assert orm_metadata.modified_at == metadata.modified_at
 
 
-@pytest.mark.usefixtures('suppose_user_warning')
+@pytest.mark.usefixtures('suppress_user_warning')
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
     """Test that data persists correctly when reopening the same key-value store."""
     async with SqlStorageClient() as storage_client:

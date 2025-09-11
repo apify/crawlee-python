@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from collections import deque
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from hashlib import sha256
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
-from cachetools import LRUCache
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only
@@ -88,9 +88,6 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
     _CLIENT_TYPE = 'Request queue'
     """Human-readable client type for error messages."""
-
-    _REQUEST_ID_BY_KEY: LRUCache[str, int] = LRUCache(maxsize=10000)
-    """Cache mapping unique keys to integer IDs."""
 
     _BLOCK_REQUEST_TIME = 300
     """Number of seconds for which a request is considered blocked in the database after being fetched for processing.
@@ -213,13 +210,13 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 request_id = self._get_int_id_from_unique_key(req.unique_key)
                 unique_requests[request_id] = req
                 unique_key_by_request_id[request_id] = req.unique_key
-                self._REQUEST_ID_BY_KEY[req.unique_key] = request_id
 
         # Get existing requests by unique keys
         stmt = (
             select(self._ITEM_TABLE)
             .where(
-                self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id.in_(set(unique_requests.keys()))
+                self._ITEM_TABLE.request_queue_id == self._id,
+                self._ITEM_TABLE.request_id.in_(set(unique_requests.keys())),
             )
             .options(
                 load_only(
@@ -242,7 +239,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 if existing_req_db is None:
                     value = {
                         'request_id': request_id,
-                        'metadata_id': self._id,
+                        'request_queue_id': self._id,
                         'data': request.model_dump_json(),
                         'is_handled': False,
                     }
@@ -287,7 +284,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                     if forefront:
                         insert_values.append(
                             {
-                                'metadata_id': self._id,
+                                'request_queue_id': self._id,
                                 'request_id': request_id,
                                 'sequence_number': state.forefront_sequence_counter,
                                 'data': request.model_dump_json(),
@@ -326,16 +323,16 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 if forefront:
                     # If the request already exists in the database, we update the sequence_number by shifting request
                     # to the left.
-                    upsert_stmt = self.build_upsert_stmt(
+                    upsert_stmt = self._build_upsert_stmt(
                         self._ITEM_TABLE,
                         insert_values,
                         update_columns=['sequence_number'],
-                        conflict_cols=['request_id', 'metadata_id'],
+                        conflict_cols=['request_id', 'request_queue_id'],
                     )
                     await session.execute(upsert_stmt)
                 else:
                     # If the request already exists in the database, we ignore this request when inserting.
-                    insert_stmt_with_ignore = self.build_insert_stmt_with_ignore(self._ITEM_TABLE, insert_values)
+                    insert_stmt_with_ignore = self._build_insert_stmt_with_ignore(self._ITEM_TABLE, insert_values)
                     await session.execute(insert_stmt_with_ignore)
 
             await self._update_metadata(
@@ -378,12 +375,10 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
     @override
     async def get_request(self, unique_key: str) -> Request | None:
-        if not (request_id := self._REQUEST_ID_BY_KEY.get(unique_key)):
-            request_id = self._get_int_id_from_unique_key(unique_key)
-            self._REQUEST_ID_BY_KEY[unique_key] = request_id
+        request_id = self._get_int_id_from_unique_key(unique_key)
 
         stmt = select(self._ITEM_TABLE).where(
-            self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id
+            self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.request_id == request_id
         )
         async with self.get_session() as session:
             result = await session.execute(stmt)
@@ -414,7 +409,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         stmt = (
             select(self._ITEM_TABLE)
             .where(
-                self._ITEM_TABLE.metadata_id == self._id,
+                self._ITEM_TABLE.request_queue_id == self._id,
                 self._ITEM_TABLE.is_handled.is_(False),
                 or_(self._ITEM_TABLE.time_blocked_until.is_(None), self._ITEM_TABLE.time_blocked_until < now),
             )
@@ -456,7 +451,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 update_stmt = (
                     update(self._ITEM_TABLE)
                     .where(
-                        self._ITEM_TABLE.metadata_id == self._id,
+                        self._ITEM_TABLE.request_queue_id == self._id,
                         self._ITEM_TABLE.request_id.in_(request_ids),
                         self._ITEM_TABLE.is_handled.is_(False),
                         or_(self._ITEM_TABLE.time_blocked_until.is_(None), self._ITEM_TABLE.time_blocked_until < now),
@@ -487,8 +482,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
-        if not (request_id := self._REQUEST_ID_BY_KEY.get(request.unique_key)):
-            request_id = self._get_int_id_from_unique_key(request.unique_key)
+        request_id = self._get_int_id_from_unique_key(request.unique_key)
 
         # Update the request's handled_at timestamp.
         if request.handled_at is None:
@@ -497,7 +491,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         # Update request in Db
         stmt = (
             update(self._ITEM_TABLE)
-            .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id)
+            .where(self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.request_id == request_id)
             .values(is_handled=True, time_blocked_until=None, client_key=None, data=request.model_dump_json())
         )
         async with self.get_session() as session:
@@ -529,11 +523,10 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         *,
         forefront: bool = False,
     ) -> ProcessedRequest | None:
-        if not (request_id := self._REQUEST_ID_BY_KEY.get(request.unique_key)):
-            request_id = self._get_int_id_from_unique_key(request.unique_key)
+        request_id = self._get_int_id_from_unique_key(request.unique_key)
 
         stmt = update(self._ITEM_TABLE).where(
-            self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.request_id == request_id
+            self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.request_id == request_id
         )
 
         async with self.get_session(with_simple_commit=True) as session:
@@ -607,11 +600,11 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         """Get the current state of the request queue."""
         orm_state: RequestQueueStateDb | None = await session.get(RequestQueueStateDb, self._id)
         if not orm_state:
-            insert_values = {'metadata_id': self._id}
+            insert_values = {'request_queue_id': self._id}
             # Create a new state if it doesn't exist
             # This is a safeguard against race conditions where multiple clients might try to create the state
             # simultaneously.
-            insert_stmt = self.build_insert_stmt_with_ignore(RequestQueueStateDb, insert_values)
+            insert_stmt = self._build_insert_stmt_with_ignore(RequestQueueStateDb, insert_values)
             await session.execute(insert_stmt)
             await session.flush()
             orm_state = await session.get(RequestQueueStateDb, self._id)
@@ -668,24 +661,24 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         if recalculate:
             stmt = (
                 update(self._METADATA_TABLE)
-                .where(self._METADATA_TABLE.id == self._id)
+                .where(self._METADATA_TABLE.request_queue_id == self._id)
                 .values(
                     pending_request_count=(
                         select(func.count())
                         .select_from(self._ITEM_TABLE)
-                        .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.is_handled.is_(False))
+                        .where(self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.is_handled.is_(False))
                         .scalar_subquery()
                     ),
                     total_request_count=(
                         select(func.count())
                         .select_from(self._ITEM_TABLE)
-                        .where(self._ITEM_TABLE.metadata_id == self._id)
+                        .where(self._ITEM_TABLE.request_queue_id == self._id)
                         .scalar_subquery()
                     ),
                     handled_request_count=(
                         select(func.count())
                         .select_from(self._ITEM_TABLE)
-                        .where(self._ITEM_TABLE.metadata_id == self._id, self._ITEM_TABLE.is_handled.is_(True))
+                        .where(self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.is_handled.is_(True))
                         .scalar_subquery()
                     ),
                 )
@@ -696,6 +689,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         return values_to_set
 
     @staticmethod
+    @lru_cache(maxsize=10000)
     def _get_int_id_from_unique_key(unique_key: str) -> int:
         """Generate a deterministic integer ID for a unique_key.
 
