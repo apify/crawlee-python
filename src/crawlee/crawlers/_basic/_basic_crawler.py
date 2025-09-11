@@ -204,7 +204,7 @@ class _BasicCrawlerOptions(TypedDict):
     Returning `None` suppresses the status message."""
 
 
-class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], TypedDict):
+class _BasicCrawlerOptionsGeneric(TypedDict, Generic[TCrawlingContext, TStatisticsState]):
     """Generic options the `BasicCrawler` constructor."""
 
     request_handler: NotRequired[Callable[[TCrawlingContext], Awaitable[None]]]
@@ -219,9 +219,9 @@ class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], T
 
 
 class BasicCrawlerOptions(
-    Generic[TCrawlingContext, TStatisticsState],
     _BasicCrawlerOptions,
     _BasicCrawlerOptionsGeneric[TCrawlingContext, TStatisticsState],
+    Generic[TCrawlingContext, TStatisticsState],
 ):
     """Arguments for the `BasicCrawler` constructor.
 

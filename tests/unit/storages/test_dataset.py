@@ -178,7 +178,7 @@ async def test_open_with_id_and_name(
     configuration: Configuration,
 ) -> None:
     """Test that open() raises an error when both id and name are provided."""
-    with pytest.raises(ValueError, match='Only one of "id" or "name" can be specified'):
+    with pytest.raises(ValueError, match=r'Only one of "id" or "name" can be specified'):
         await Dataset.open(
             id='some-id',
             name='some-name',
@@ -503,7 +503,7 @@ async def test_export_to_csv(
 
 async def test_export_to_invalid_content_type(dataset: Dataset) -> None:
     """Test exporting dataset with invalid content type raises error."""
-    with pytest.raises(ValueError, match='Unsupported content type'):
+    with pytest.raises(ValueError, match=r'Unsupported content type'):
         await dataset.export_to(
             key='invalid_export',
             content_type='invalid',  # type: ignore[call-overload]  # Intentionally invalid content type
