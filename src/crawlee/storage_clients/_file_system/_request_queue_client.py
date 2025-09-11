@@ -142,7 +142,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         *,
         id: str | None,
         name: str | None,
-        alias: str | None = None,
+        alias: str | None,
         configuration: Configuration,
     ) -> FileSystemRequestQueueClient:
         """Open or create a file system request queue client.

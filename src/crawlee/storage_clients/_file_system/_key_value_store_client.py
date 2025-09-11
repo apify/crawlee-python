@@ -90,7 +90,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         *,
         id: str | None,
         name: str | None,
-        alias: str | None = None,
+        alias: str | None,
         configuration: Configuration,
     ) -> FileSystemKeyValueStoreClient:
         """Open or create a file system key-value store client.

@@ -53,7 +53,7 @@ class MemoryDatasetClient(DatasetClient):
         *,
         id: str | None,
         name: str | None,
-        alias: str | None = None,
+        alias: str | None,
     ) -> MemoryDatasetClient:
         """Open or create a new memory dataset client.
 

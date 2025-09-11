@@ -91,7 +91,7 @@ class FileSystemDatasetClient(DatasetClient):
         *,
         id: str | None,
         name: str | None,
-        alias: str | None = None,
+        alias: str | None,
         configuration: Configuration,
     ) -> FileSystemDatasetClient:
         """Open or create a file system dataset client.

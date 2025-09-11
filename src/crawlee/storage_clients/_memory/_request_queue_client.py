@@ -63,7 +63,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
         *,
         id: str | None,
         name: str | None,
-        alias: str | None = None,
+        alias: str | None,
     ) -> MemoryRequestQueueClient:
         """Open or create a new memory request queue client.
 

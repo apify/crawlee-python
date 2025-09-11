@@ -51,7 +51,7 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         *,
         id: str | None,
         name: str | None,
-        alias: str | None = None,
+        alias: str | None,
     ) -> MemoryKeyValueStoreClient:
         """Open or create a new memory key-value store client.
 

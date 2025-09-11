@@ -67,7 +67,7 @@ class StorageInstanceManager:
         Raises:
             ValueError: If multiple parameters out of `id`, `name`, and `alias` are specified.
         """
-        # Validate parameters
+        # Validate input parameters.
         specified_params = sum(1 for param in [id, name, alias] if param is not None)
         if specified_params > 1:
             raise ValueError('Only one of "id", "name", or "alias" can be specified, not multiple.')
