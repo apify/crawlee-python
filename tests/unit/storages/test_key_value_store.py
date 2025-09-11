@@ -94,7 +94,7 @@ async def test_open_with_id_and_name(
     configuration: Configuration,
 ) -> None:
     """Test that open() raises an error when both id and name are provided."""
-    with pytest.raises(ValueError, match='Only one of "id" or "name" can be specified'):
+    with pytest.raises(ValueError, match=r'Only one of "id" or "name" can be specified'):
         await KeyValueStore.open(
             id='some-id',
             name='some-name',
