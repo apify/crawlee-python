@@ -59,6 +59,9 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         memory KVS don't check for existing stores with the same name or ID since all data exists only in memory
         and is lost when the process terminates.
 
+        Alias does not have any effect on the memory storage client implementation, because unnamed storages
+        are supported by default, since data are not persisted.
+
         Args:
             id: The ID of the key-value store. If not provided, a random ID will be generated.
             name: The name of the key-value store for named (global scope) storages.

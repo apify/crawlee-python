@@ -71,6 +71,9 @@ class MemoryRequestQueueClient(RequestQueueClient):
         memory queues don't check for existing queues with the same name or ID since all data exists only
         in memory and is lost when the process terminates.
 
+        Alias does not have any effect on the memory storage client implementation, because unnamed storages
+        are supported by default, since data are not persisted.
+
         Args:
             id: The ID of the request queue. If not provided, a random ID will be generated.
             name: The name of the request queue for named (global scope) storages.
