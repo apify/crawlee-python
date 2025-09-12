@@ -75,6 +75,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         *,
         id: str | None,
         name: str | None,
+        alias: str | None,
         storage_client: SqlStorageClient,
     ) -> SqlKeyValueStoreClient:
         """Open or create a SQL key-value store client.
@@ -85,7 +86,8 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
         Args:
             id: The ID of the key-value store to open. If provided, searches for existing store by ID.
-            name: The name of the key-value store to open. If not provided, uses the default store.
+            name: The name of the key-value store for named (global scope) storages.
+            alias: The alias of the key-value store for unnamed (run scope) storages.
             storage_client: The SQL storage client used to access the database.
 
         Returns:
@@ -97,6 +99,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         return await cls._safely_open(
             id=id,
             name=name,
+            alias=alias,
             storage_client=storage_client,
             metadata_model=KeyValueStoreMetadata,
             extra_metadata_fields={},

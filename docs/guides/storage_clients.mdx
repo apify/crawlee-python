@@ -187,6 +187,7 @@ class SqlKeyValueStoreClient {
 class datasets {
     <<table>>
     + dataset_id (PK)
+    + internal_name
     + name
     + accessed_at
     + created_at
@@ -208,6 +209,7 @@ class dataset_records {
 class key_value_stores {
     <<table>>
     + key_value_store_id (PK)
+    + internal_name
     + name
     + accessed_at
     + created_at
@@ -257,6 +259,7 @@ class SqlRequestQueueClient {
 class request_queues {
     <<table>>
     + request_queue_id (PK)
+    + internal_name
     + name
     + accessed_at
     + created_at

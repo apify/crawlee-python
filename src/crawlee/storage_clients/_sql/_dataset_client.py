@@ -76,13 +76,15 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
         *,
         id: str | None,
         name: str | None,
+        alias: str | None,
         storage_client: SqlStorageClient,
     ) -> SqlDatasetClient:
         """Open an existing dataset or create a new one.
 
         Args:
             id: The ID of the dataset to open. If provided, searches for existing dataset by ID.
-            name: The name of the dataset to open. If not provided, uses the default dataset.
+            name: The name of the dataset for named (global scope) storages.
+            alias: The alias of the dataset for unnamed (run scope) storages.
             storage_client: The SQL storage client instance.
 
         Returns:
@@ -94,6 +96,7 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
         return await cls._safely_open(
             id=id,
             name=name,
+            alias=alias,
             storage_client=storage_client,
             metadata_model=DatasetMetadata,
             extra_metadata_fields={'item_count': 0},

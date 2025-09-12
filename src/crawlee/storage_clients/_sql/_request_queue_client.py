@@ -117,6 +117,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         *,
         id: str | None,
         name: str | None,
+        alias: str | None,
         storage_client: SqlStorageClient,
     ) -> SqlRequestQueueClient:
         """Open an existing request queue or create a new one.
@@ -127,7 +128,8 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
         Args:
             id: The ID of the request queue to open. Takes precedence over name.
-            name: The name of the request queue to open. Uses 'default' if None.
+            name: The name of the request queue for named (global scope) storages.
+            alias: The alias of the request queue for unnamed (run scope) storages.
             storage_client: The SQL storage client used to access the database.
 
         Returns:
@@ -139,6 +141,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         return await cls._safely_open(
             id=id,
             name=name,
+            alias=alias,
             storage_client=storage_client,
             metadata_model=RequestQueueMetadata,
             extra_metadata_fields={
@@ -176,7 +179,6 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 update_accessed_at=True,
                 update_modified_at=True,
                 new_pending_request_count=0,
-                new_handled_request_count=0,
                 force=True,
             )
         )

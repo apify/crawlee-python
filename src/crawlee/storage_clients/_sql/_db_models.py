@@ -14,27 +14,6 @@ if TYPE_CHECKING:
     from sqlalchemy.types import TypeEngine
 
 
-# This is necessary because unique constraints don't apply to NULL values in SQL.
-class NameDefaultNone(TypeDecorator):
-    """Custom SQLAlchemy type for handling default name values.
-
-    Converts None values to 'default' on storage and back to None on retrieval.
-    """
-
-    impl = String(100)
-    cache_ok = True
-
-    @override
-    def process_bind_param(self, value: str | None, dialect: Dialect) -> str:
-        """Convert Python value to database value."""
-        return 'default' if value is None else value
-
-    @override
-    def process_result_value(self, value: str | None, dialect: Dialect) -> str | None:
-        """Convert database value to Python value."""
-        return None if value == 'default' else value
-
-
 class AwareDateTime(TypeDecorator):
     """Custom SQLAlchemy type for timezone-aware datetime handling.
 
@@ -73,7 +52,10 @@ class Base(DeclarativeBase):
 class StorageMetadataDb:
     """Base database model for storage metadata."""
 
-    name: Mapped[str | None] = mapped_column(NameDefaultNone, nullable=False, index=True, unique=True)
+    internal_name: Mapped[str] = mapped_column(String, nullable=False, index=True, unique=True)
+    """Internal unique name for a storage instance based on a name or alias."""
+
+    name: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
     """Human-readable name. None becomes 'default' in database to enforce uniqueness."""
 
     accessed_at: Mapped[datetime] = mapped_column(AwareDateTime, nullable=False)

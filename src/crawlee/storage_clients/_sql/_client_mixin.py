@@ -78,6 +78,7 @@ class SqlClientMixin(ABC):
         *,
         id: str | None,
         name: str | None,
+        internal_name: str,
         storage_client: SqlStorageClient,
         metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata],
         session: AsyncSession,
@@ -89,7 +90,8 @@ class SqlClientMixin(ABC):
 
         Args:
             id: Storage ID to open (takes precedence over name).
-            name: Storage name to open.
+            name: The name of the storage.
+            internal_name: The database name for the storage based on name or alias.
             storage_client: SQL storage client instance.
             metadata_model: Pydantic model for metadata validation.
             session: Active database session.
@@ -101,8 +103,7 @@ class SqlClientMixin(ABC):
             if not orm_metadata:
                 raise ValueError(f'{cls._CLIENT_TYPE} with ID "{id}" not found.')
         else:
-            search_name = name or cls._DEFAULT_NAME
-            stmt = select(cls._METADATA_TABLE).where(cls._METADATA_TABLE.name == search_name)
+            stmt = select(cls._METADATA_TABLE).where(cls._METADATA_TABLE.internal_name == internal_name)
             result = await session.execute(stmt)
             orm_metadata = result.scalar_one_or_none()  # type: ignore[assignment]
 
@@ -122,7 +123,7 @@ class SqlClientMixin(ABC):
             client = cls(id=metadata.id, storage_client=storage_client)
             client._accessed_at_allow_update_after = now + client._accessed_modified_update_interval
             client._modified_at_allow_update_after = now + client._accessed_modified_update_interval
-            session.add(cls._METADATA_TABLE(**metadata.model_dump()))
+            session.add(cls._METADATA_TABLE(**metadata.model_dump(), internal_name=internal_name))
 
         return client
 
@@ -132,6 +133,7 @@ class SqlClientMixin(ABC):
         *,
         id: str | None,
         name: str | None,
+        alias: str | None = None,
         storage_client: SqlStorageClient,
         metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata],
         extra_metadata_fields: dict[str, Any],
@@ -140,17 +142,26 @@ class SqlClientMixin(ABC):
 
         Args:
             id: Storage ID to open (takes precedence over name).
-            name: Storage name to open.
+            name: The name of the storage for named (global scope) storages.
+            alias: The alias of the storage for unnamed (run scope) storages.
             storage_client: SQL storage client instance.
             client_class: Concrete client class to instantiate.
             metadata_model: Pydantic model for metadata validation.
             extra_metadata_fields: Storage-specific metadata fields.
         """
+        # Validate input parameters.
+        specified_params = sum(1 for param in [id, name, alias] if param is not None)
+        if specified_params > 1:
+            raise ValueError('Only one of "id", "name", or "alias" can be specified, not multiple.')
+
+        internal_name = name or alias or cls._DEFAULT_NAME
+
         async with storage_client.create_session() as session:
             try:
                 client = await cls._open(
                     id=id,
                     name=name,
+                    internal_name=internal_name,
                     storage_client=storage_client,
                     metadata_model=metadata_model,
                     session=session,
@@ -160,8 +171,7 @@ class SqlClientMixin(ABC):
             except SQLAlchemyError:
                 await session.rollback()
 
-                search_name = name or cls._DEFAULT_NAME
-                stmt = select(cls._METADATA_TABLE).where(cls._METADATA_TABLE.name == search_name)
+                stmt = select(cls._METADATA_TABLE).where(cls._METADATA_TABLE.internal_name == internal_name)
                 result = await session.execute(stmt)
                 orm_metadata: DatasetMetadataDb | KeyValueStoreMetadataDb | RequestQueueMetadataDb | None
                 orm_metadata = cast(
@@ -170,7 +180,7 @@ class SqlClientMixin(ABC):
                 )
 
                 if not orm_metadata:
-                    raise ValueError(f'{cls._CLIENT_TYPE} with Name "{search_name}" not found.') from None
+                    raise ValueError(f'{cls._CLIENT_TYPE} with Name "{internal_name}" not found.') from None
 
                 client = cls(id=orm_metadata.id, storage_client=storage_client)
 

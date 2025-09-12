@@ -185,24 +185,16 @@ class SqlStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> SqlDatasetClient:
-        """Create or open a SQL dataset client.
-
-        Args:
-            id: Specific dataset ID to open. If provided, name is ignored.
-            name: Dataset name to open or create. Uses 'default' if not specified.
-            configuration: Configuration object. Uses global config if not provided.
-
-        Returns:
-            Configured dataset client ready for use.
-        """
         configuration = configuration or Configuration.get_global_configuration()
         await self.initialize(configuration)
 
         client = await SqlDatasetClient.open(
             id=id,
             name=name,
+            alias=alias,
             storage_client=self,
         )
 
@@ -215,24 +207,16 @@ class SqlStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> SqlKeyValueStoreClient:
-        """Create or open a SQL key-value store client.
-
-        Args:
-            id: Specific store ID to open. If provided, name is ignored.
-            name: Store name to open or create. Uses 'default' if not specified.
-            configuration: Configuration object. Uses global config if not provided.
-
-        Returns:
-            Configured key-value store client ready for use.
-        """
         configuration = configuration or Configuration.get_global_configuration()
         await self.initialize(configuration)
 
         client = await SqlKeyValueStoreClient.open(
             id=id,
             name=name,
+            alias=alias,
             storage_client=self,
         )
 
@@ -245,24 +229,16 @@ class SqlStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> SqlRequestQueueClient:
-        """Create or open a SQL request queue client.
-
-        Args:
-            id: Specific queue ID to open. If provided, name is ignored.
-            name: Queue name to open or create. Uses 'default' if not specified.
-            configuration: Configuration object. Uses global config if not provided.
-
-        Returns:
-            Configured request queue client ready for use.
-        """
         configuration = configuration or Configuration.get_global_configuration()
         await self.initialize(configuration)
 
         client = await SqlRequestQueueClient.open(
             id=id,
             name=name,
+            alias=alias,
             storage_client=self,
         )
 
