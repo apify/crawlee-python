@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
+    from crawlee.configuration import Configuration
     from crawlee.storage_clients._base import StorageClient
     from crawlee.storage_clients.models import DatasetMetadata, KeyValueStoreMetadata, RequestQueueMetadata
 
@@ -36,6 +37,7 @@ class Storage(ABC):
         id: str | None = None,
         name: str | None = None,
         storage_client: StorageClient | None = None,
+        configuration: Configuration | None = None,
     ) -> Storage:
         """Open a storage, either restore existing or create a new one.
 
@@ -44,6 +46,7 @@ class Storage(ABC):
             name: The storage name.
             storage_client: Underlying storage client to use. If not provided, the default global storage client
                 from the service locator will be used.
+            configuration: Configuration object used during the storage creation or restoration process.
         """
 
     @abstractmethod
