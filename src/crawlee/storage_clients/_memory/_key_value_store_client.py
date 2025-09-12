@@ -51,6 +51,7 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         *,
         id: str | None,
         name: str | None,
+        alias: str | None,
     ) -> MemoryKeyValueStoreClient:
         """Open or create a new memory key-value store client.
 
@@ -58,14 +59,26 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         memory KVS don't check for existing stores with the same name or ID since all data exists only in memory
         and is lost when the process terminates.
 
+        Alias does not have any effect on the memory storage client implementation, because unnamed storages
+        are supported by default, since data are not persisted.
+
         Args:
             id: The ID of the key-value store. If not provided, a random ID will be generated.
-            name: The name of the key-value store. If not provided, the store will be unnamed.
+            name: The name of the key-value store for named (global scope) storages.
+            alias: The alias of the key-value store for unnamed (run scope) storages.
 
         Returns:
             An instance for the opened or created storage client.
+
+        Raises:
+            ValueError: If both name and alias are provided.
         """
-        # Otherwise create a new key-value store
+        # Validate input parameters.
+        specified_params = sum(1 for param in [id, name, alias] if param is not None)
+        if specified_params > 1:
+            raise ValueError('Only one of "id", "name", or "alias" can be specified, not multiple.')
+
+        # Create a new key-value store
         store_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 

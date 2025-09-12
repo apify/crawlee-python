@@ -63,6 +63,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
         *,
         id: str | None,
         name: str | None,
+        alias: str | None,
     ) -> MemoryRequestQueueClient:
         """Open or create a new memory request queue client.
 
@@ -70,14 +71,26 @@ class MemoryRequestQueueClient(RequestQueueClient):
         memory queues don't check for existing queues with the same name or ID since all data exists only
         in memory and is lost when the process terminates.
 
+        Alias does not have any effect on the memory storage client implementation, because unnamed storages
+        are supported by default, since data are not persisted.
+
         Args:
             id: The ID of the request queue. If not provided, a random ID will be generated.
-            name: The name of the request queue. If not provided, the queue will be unnamed.
+            name: The name of the request queue for named (global scope) storages.
+            alias: The alias of the request queue for unnamed (run scope) storages.
 
         Returns:
             An instance for the opened or created storage client.
+
+        Raises:
+            ValueError: If both name and alias are provided.
         """
-        # Otherwise create a new queue
+        # Validate input parameters.
+        specified_params = sum(1 for param in [id, name, alias] if param is not None)
+        if specified_params > 1:
+            raise ValueError('Only one of "id", "name", or "alias" can be specified, not multiple.')
+
+        # Create a new queue
         queue_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 
