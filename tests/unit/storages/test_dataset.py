@@ -8,9 +8,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee._service_locator import service_locator
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
+from crawlee.storage_clients import FileSystemStorageClient
 from crawlee.storages import Dataset, KeyValueStore
 
 if TYPE_CHECKING:
@@ -19,26 +18,6 @@ if TYPE_CHECKING:
     from typing import Any
 
     from crawlee.storage_clients import StorageClient
-
-
-@pytest.fixture(params=['memory', 'file_system'])
-def storage_client(request: pytest.FixtureRequest) -> StorageClient:
-    """Parameterized fixture to test with different storage clients."""
-    storage_client: StorageClient
-    storage_client = MemoryStorageClient() if request.param == 'memory' else FileSystemStorageClient()
-    service_locator.set_storage_client(storage_client)
-    return storage_client
-
-
-@pytest.fixture
-def configuration(tmp_path: Path) -> Configuration:
-    """Provide a configuration with a temporary storage directory."""
-    configuration = Configuration(
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
-        purge_on_start=True,
-    )
-    service_locator.set_configuration(configuration)
-    return configuration
 
 
 @pytest.fixture
