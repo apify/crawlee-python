@@ -298,6 +298,7 @@ class Dataset(Storage):
         to_kvs_id: str | None = None,
         to_kvs_name: str | None = None,
         to_kvs_storage_client: StorageClient | None = None,
+        to_kvs_configuration: Configuration | None = None,
         **kwargs: Unpack[ExportDataJsonKwargs],
     ) -> None: ...
 
@@ -309,6 +310,7 @@ class Dataset(Storage):
         to_kvs_id: str | None = None,
         to_kvs_name: str | None = None,
         to_kvs_storage_client: StorageClient | None = None,
+        to_kvs_configuration: Configuration | None = None,
         **kwargs: Unpack[ExportDataCsvKwargs],
     ) -> None: ...
 
@@ -319,6 +321,7 @@ class Dataset(Storage):
         to_kvs_id: str | None = None,
         to_kvs_name: str | None = None,
         to_kvs_storage_client: StorageClient | None = None,
+        to_kvs_configuration: Configuration | None = None,
         **kwargs: Any,
     ) -> None:
         """Export the entire dataset into a specified file stored under a key in a key-value store.
@@ -336,11 +339,13 @@ class Dataset(Storage):
             to_kvs_name: Name of the key-value store to save the exported file.
                 Specify only one of ID or name.
             to_kvs_storage_client: Storage client to use for the key-value store.
+            to_kvs_configuration: Configuration for the key-value store.
             kwargs: Additional parameters for the export operation, specific to the chosen content type.
         """
         kvs = await KeyValueStore.open(
             id=to_kvs_id,
             name=to_kvs_name,
+            configuration=to_kvs_configuration,
             storage_client=to_kvs_storage_client,
         )
         dst = StringIO()

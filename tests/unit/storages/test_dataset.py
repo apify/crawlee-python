@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 import pytest
@@ -493,6 +494,43 @@ async def test_export_to_invalid_content_type(dataset: Dataset) -> None:
             key='invalid_export',
             content_type='invalid',  # type: ignore[call-overload]  # Intentionally invalid content type
         )
+
+
+async def test_export_with_multiple_kwargs(dataset: Dataset, tmp_path: Path) -> None:
+    """Test exporting dataset using many optional arguments together."""
+    target_kvs_name = 'some_kvs'
+    target_storage_client = FileSystemStorageClient()
+    export_key = 'exported_dataset'
+    data = {'some key': 'some data'}
+
+    # Prepare custom directory and configuration
+    custom_dir_name = 'some_dir'
+    custom_dir = tmp_path / custom_dir_name
+    custom_dir.mkdir()
+    target_configuration = Configuration(crawlee_storage_dir=str(custom_dir))  # type: ignore[call-arg]
+
+    # Set expected values
+    expected_exported_data = f'{json.dumps([{"some key": "some data"}])}'
+    expected_kvs_dir = custom_dir / 'key_value_stores' / target_kvs_name
+
+    # Populate dataset and export
+    await dataset.push_data(data)
+    await dataset.export_to(
+        key=export_key,
+        content_type='json',
+        to_kvs_name=target_kvs_name,
+        to_kvs_storage_client=target_storage_client,
+        to_kvs_configuration=target_configuration,
+    )
+
+    # Verify the directory was created
+    assert expected_kvs_dir.is_dir()
+    # Verify that kvs contains the exported data
+    kvs = await KeyValueStore.open(
+        name=target_kvs_name, storage_client=target_storage_client, configuration=target_configuration
+    )
+
+    assert await kvs.get_value(key=export_key) == expected_exported_data
 
 
 async def test_large_dataset(dataset: Dataset) -> None:
