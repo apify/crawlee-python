@@ -204,7 +204,7 @@ class _BasicCrawlerOptions(TypedDict):
     Returning `None` suppresses the status message."""
 
 
-class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], TypedDict):
+class _BasicCrawlerOptionsGeneric(TypedDict, Generic[TCrawlingContext, TStatisticsState]):
     """Generic options the `BasicCrawler` constructor."""
 
     request_handler: NotRequired[Callable[[TCrawlingContext], Awaitable[None]]]
@@ -219,9 +219,9 @@ class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], T
 
 
 class BasicCrawlerOptions(
-    Generic[TCrawlingContext, TStatisticsState],
     _BasicCrawlerOptions,
     _BasicCrawlerOptionsGeneric[TCrawlingContext, TStatisticsState],
+    Generic[TCrawlingContext, TStatisticsState],
 ):
     """Arguments for the `BasicCrawler` constructor.
 
@@ -557,18 +557,20 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
     ) -> Dataset:
         """Return the `Dataset` with the given ID or name. If none is provided, return the default one."""
-        return await Dataset.open(id=id, name=name)
+        return await Dataset.open(id=id, name=name, alias=alias)
 
     async def get_key_value_store(
         self,
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
     ) -> KeyValueStore:
         """Return the `KeyValueStore` with the given ID or name. If none is provided, return the default KVS."""
-        return await KeyValueStore.open(id=id, name=name)
+        return await KeyValueStore.open(id=id, name=name, alias=alias)
 
     def error_handler(
         self, handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext]
@@ -772,6 +774,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
+        dataset_alias: str | None = None,
         **kwargs: Unpack[GetDataKwargs],
     ) -> DatasetItemsListPage:
         """Retrieve data from a `Dataset`.
@@ -781,13 +784,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Args:
             dataset_id: The ID of the `Dataset`.
-            dataset_name: The name of the `Dataset`.
+            dataset_name: The name of the `Dataset` (global scope, named storage).
+            dataset_alias: The alias of the `Dataset` (run scope, unnamed storage).
             kwargs: Keyword arguments to be passed to the `Dataset.get_data()` method.
 
         Returns:
             The retrieved data.
         """
-        dataset = await Dataset.open(id=dataset_id, name=dataset_name)
+        dataset = await Dataset.open(id=dataset_id, name=dataset_name, alias=dataset_alias)
         return await dataset.get_data(**kwargs)
 
     async def export_data(
@@ -795,6 +799,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         path: str | Path,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
+        dataset_alias: str | None = None,
     ) -> None:
         """Export all items from a Dataset to a JSON or CSV file.
 
@@ -804,10 +809,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Args:
             path: The destination file path. Must end with '.json' or '.csv'.
-            dataset_id: The ID of the Dataset to export from. If None, uses `name` parameter instead.
-            dataset_name: The name of the Dataset to export from. If None, uses `id` parameter instead.
+            dataset_id: The ID of the Dataset to export from.
+            dataset_name: The name of the Dataset to export from (global scope, named storage).
+            dataset_alias: The alias of the Dataset to export from (run scope, unnamed storage).
         """
-        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
+        dataset = await self.get_dataset(id=dataset_id, name=dataset_name, alias=dataset_alias)
 
         path = path if isinstance(path, Path) else Path(path)
         dst = path.open('w', newline='')
@@ -824,6 +830,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         data: list[dict[str, Any]] | dict[str, Any],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
+        dataset_alias: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
     ) -> None:
         """Push data to a `Dataset`.
@@ -834,10 +841,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Args:
             data: The data to push to the `Dataset`.
             dataset_id: The ID of the `Dataset`.
-            dataset_name: The name of the `Dataset`.
+            dataset_name: The name of the `Dataset` (global scope, named storage).
+            dataset_alias: The alias of the `Dataset` (run scope, unnamed storage).
             kwargs: Keyword arguments to be passed to the `Dataset.push_data()` method.
         """
-        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
+        dataset = await self.get_dataset(id=dataset_id, name=dataset_name, alias=dataset_alias)
         await dataset.push_data(data, **kwargs)
 
     def _should_retry_request(self, context: BasicCrawlingContext, error: Exception) -> bool:
@@ -1226,8 +1234,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         result: RequestHandlerRunResult, get_kvs: GetKeyValueStoreFromRequestHandlerFunction
     ) -> None:
         """Store key value store changes recorded in result."""
-        for (id, name), changes in result.key_value_store_changes.items():
-            store = await get_kvs(id=id, name=name)
+        for (id, name, alias), changes in result.key_value_store_changes.items():
+            store = await get_kvs(id=id, name=name, alias=alias)
             for key, value in changes.updates.items():
                 await store.set_value(key, value.content, value.content_type)
 

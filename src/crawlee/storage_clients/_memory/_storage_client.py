@@ -33,10 +33,11 @@ class MemoryStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> MemoryDatasetClient:
         configuration = configuration or Configuration.get_global_configuration()
-        client = await MemoryDatasetClient.open(id=id, name=name)
+        client = await MemoryDatasetClient.open(id=id, name=name, alias=alias)
         await self._purge_if_needed(client, configuration)
         return client
 
@@ -46,10 +47,11 @@ class MemoryStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> MemoryKeyValueStoreClient:
         configuration = configuration or Configuration.get_global_configuration()
-        client = await MemoryKeyValueStoreClient.open(id=id, name=name)
+        client = await MemoryKeyValueStoreClient.open(id=id, name=name, alias=alias)
         await self._purge_if_needed(client, configuration)
         return client
 
@@ -59,9 +61,10 @@ class MemoryStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> MemoryRequestQueueClient:
         configuration = configuration or Configuration.get_global_configuration()
-        client = await MemoryRequestQueueClient.open(id=id, name=name)
+        client = await MemoryRequestQueueClient.open(id=id, name=name, alias=alias)
         await self._purge_if_needed(client, configuration)
         return client

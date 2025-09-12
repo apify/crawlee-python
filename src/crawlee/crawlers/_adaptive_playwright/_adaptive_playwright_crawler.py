@@ -85,8 +85,8 @@ class _NonPersistentStatistics(Statistics):
 
 @docs_group('Crawlers')
 class AdaptivePlaywrightCrawler(
-    Generic[TStaticCrawlingContext, TStaticParseResult, TStaticSelectResult],
     BasicCrawler[AdaptivePlaywrightCrawlingContext, AdaptivePlaywrightCrawlerStatisticState],
+    Generic[TStaticCrawlingContext, TStaticParseResult, TStaticSelectResult],
 ):
     """An adaptive web crawler capable of using both static HTTP request based crawling and browser based crawling.
 

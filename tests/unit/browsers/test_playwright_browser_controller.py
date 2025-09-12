@@ -67,7 +67,7 @@ async def test_max_open_pages_limit(controller: PlaywrightBrowserController) -> 
     page2 = await controller.new_page()
     assert controller.pages_count == 2
 
-    with pytest.raises(ValueError, match='Cannot open more pages in this browser.'):
+    with pytest.raises(ValueError, match=r'Cannot open more pages in this browser.'):
         await controller.new_page()
 
     assert controller.pages_count == 2
@@ -96,7 +96,7 @@ async def test_close_browser_with_open_pages(browser: Browser) -> None:
     controller = PlaywrightBrowserController(browser, max_open_pages_per_browser=2)
     _ = await controller.new_page()
 
-    with pytest.raises(ValueError, match='Cannot close the browser while there are open pages.'):
+    with pytest.raises(ValueError, match=r'Cannot close the browser while there are open pages.'):
         await controller.close()
 
     assert controller.pages_count == 1

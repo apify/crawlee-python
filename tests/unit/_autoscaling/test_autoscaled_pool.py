@@ -111,7 +111,7 @@ async def test_propagates_exceptions(system_status: SystemStatus | Mock) -> None
         ),
     )
 
-    with pytest.raises(RuntimeError, match='Scheduled crash'):
+    with pytest.raises(RuntimeError, match=r'Scheduled crash'):
         await pool.run()
 
     assert done_count < 20
@@ -139,7 +139,7 @@ async def test_propagates_exceptions_after_finished(system_status: SystemStatus 
         ),
     )
 
-    with pytest.raises(RuntimeError, match='Scheduled crash'):
+    with pytest.raises(RuntimeError, match=r'Scheduled crash'):
         await pool.run()
 
 
