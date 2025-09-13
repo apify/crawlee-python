@@ -24,12 +24,8 @@ repeat
         -- Check if timed out
         if current_time > data.blocked_until_timestamp then
             -- Atomically remove from in_progress and add back to queue
-            req_obj = cjson.decode(redis.call('hget', data_key, unique_key) or '{}')
             redis.call('hdel', in_progress_key, unique_key)
-            if req_obj.forefront then
-                redis.call('lpush', queue_key, unique_key)
-            else
-                redis.call('rpush', queue_key, unique_key)
+            redis.call('rpush', queue_key, unique_key)
             count = count + 1
         end
     end

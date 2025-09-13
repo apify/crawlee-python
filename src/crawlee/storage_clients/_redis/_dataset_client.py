@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
 
 from typing_extensions import override
 
-from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
@@ -39,23 +37,20 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
 
     _MAIN_KEY = 'dataset'
 
-    def __init__(
-        self,
-        dataset_name: str,
-        redis: Redis,
-    ) -> None:
+    _CLIENT_TYPE = 'Dataset'
+    """Human-readable client type for error messages."""
+
+    def __init__(self, storage_name: str, storage_id: str, redis: Redis) -> None:
         """Initialize a new instance.
 
         Preferably use the `MemoryDatasetClient.open` class method to create a new instance.
         """
-        super().__init__(storage_name=dataset_name, redis=redis)
+        super().__init__(storage_name=storage_name, storage_id=storage_id, redis=redis)
 
-    @override
-    async def get_metadata(self) -> DatasetMetadata:
-        metadata_dict = await self._get_metadata_by_name(name=self._storage_name, redis=self._redis)
-        if metadata_dict is None:
-            raise ValueError(f'Dataset with name "{self._storage_name}" does not exist.')
-        return DatasetMetadata.model_validate(metadata_dict)
+    @property
+    def items_key(self) -> str:
+        """Return the Redis key for the items of this dataset."""
+        return f'{self._MAIN_KEY}:{self._storage_name}:items'
 
     @classmethod
     async def open(
@@ -81,57 +76,26 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         Returns:
             An instance for the opened or created storage client.
         """
-        search_name = name or alias or cls._DEFAULT_NAME
-        if id:
-            dataset_name = await cls._get_metadata_name_by_id(id=id, redis=redis)
-            if dataset_name is None:
-                raise ValueError(f'Dataset with ID "{id}" does not exist.')
-        else:
-            metadata_data = await cls._get_metadata_by_name(name=search_name, redis=redis)
-            dataset_name = search_name if metadata_data is not None else None
-        if dataset_name:
-            client = cls(dataset_name=dataset_name, redis=redis)
-            async with client._get_pipeline() as pipe:
-                await client._update_metadata(pipe, update_accessed_at=True)
-        else:
-            now = datetime.now(timezone.utc)
-            metadata = DatasetMetadata(
-                id=crypto_random_object_id(),
-                name=name,
-                created_at=now,
-                accessed_at=now,
-                modified_at=now,
-                item_count=0,
-            )
-            dataset_name = name or alias or cls._DEFAULT_NAME
-            client = cls(dataset_name=dataset_name, redis=redis)
-            await client._create_metadata_and_storage(metadata.model_dump())
-        return client
+        return await cls._open(
+            id=id,
+            name=name,
+            alias=alias,
+            redis=redis,
+            metadata_model=DatasetMetadata,
+            extra_metadata_fields={'item_count': 0},
+        )
 
     @override
-    async def _create_storage(self, pipeline: Pipeline) -> None:
-        items_key = f'{self._MAIN_KEY}:{self._storage_name}:items'
-        await await_redis_response(pipeline.json().set(items_key, '$', []))
+    async def get_metadata(self) -> DatasetMetadata:
+        return await self._get_metadata(DatasetMetadata)
 
     @override
     async def drop(self) -> None:
-        storage_id = (await self.get_metadata()).id
-        async with self._get_pipeline() as pipe:
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:metadata')
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:items')
-            await pipe.delete(f'{self._MAIN_KEY}:id_to_name:{storage_id}')
+        await self._drop(extra_keys=[self.items_key])
 
     @override
     async def purge(self) -> None:
-        async with self._get_pipeline() as pipe:
-            await self._create_storage(pipe)
-
-            await self._update_metadata(
-                pipe,
-                update_accessed_at=True,
-                update_modified_at=True,
-                new_item_count=0,
-            )
+        await self._purge(extra_keys=[self.items_key], metadata_kwargs={'new_item_count': 0})
 
     @override
     async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
@@ -140,7 +104,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
 
         async with self._get_pipeline() as pipe:
             # Incorrect signature for args type in redis-py
-            pipe.json().arrappend(f'{self._MAIN_KEY}:{self._storage_name}:items', '$', *data)  # type: ignore[arg-type]
+            pipe.json().arrappend(self.items_key, '$', *data)  # type: ignore[arg-type]
             delta_item_count = len(data)
             await self._update_metadata(
                 pipe, update_accessed_at=True, update_modified_at=True, delta_item_count=delta_item_count
@@ -184,7 +148,6 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         metadata = await self.get_metadata()
 
         total = metadata.item_count
-        items_key = f'{self._MAIN_KEY}:{self._storage_name}:items'
         json_path = '$'
 
         # Apply sorting and pagination
@@ -206,7 +169,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         if json_path == '$':
             json_path = '$[*]'
 
-        data = await await_redis_response(self._redis.json().get(items_key, json_path))
+        data = await await_redis_response(self._redis.json().get(self.items_key, json_path))
 
         if data is None:
             data = []
@@ -266,7 +229,6 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
 
         metadata = await self.get_metadata()
         total_items = metadata.item_count
-        items_key = f'{self._MAIN_KEY}:{self._storage_name}:items'
 
         # Calculate actual range based on parameters
         start_idx = offset
@@ -292,7 +254,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
                 json_path = f'$[{batch_start}:{batch_end}]'
 
             # Get batch of items
-            batch_items = await await_redis_response(self._redis.json().get(items_key, json_path))
+            batch_items = await await_redis_response(self._redis.json().get(self.items_key, json_path))
 
             # Handle case where batch_items might be None or not a list
             if batch_items is None:
@@ -313,38 +275,29 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         async with self._get_pipeline() as pipe:
             await self._update_metadata(pipe, update_accessed_at=True)
 
-    async def _update_metadata(
+    @override
+    async def _create_storage(self, pipeline: Pipeline) -> None:
+        await await_redis_response(pipeline.json().set(self.items_key, '$', []))
+
+    @override
+    async def _specific_update_metadata(
         self,
         pipeline: Pipeline,
         *,
         new_item_count: int | None = None,
         delta_item_count: int | None = None,
-        update_accessed_at: bool = False,
-        update_modified_at: bool = False,
+        **_kwargs: Any,
     ) -> None:
         """Update the dataset metadata with current information.
 
         Args:
             pipeline: The Redis pipeline to use for the update.
             new_item_count: If provided, update the item count to this value.
-            update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
-            update_modified_at: If True, update the `modified_at` timestamp to the current time.
             delta_item_count: If provided, increment the item count by this value.
         """
-        metadata_key = f'{self._MAIN_KEY}:{self._storage_name}:metadata'
-        now = datetime.now(timezone.utc)
-
-        if update_accessed_at:
-            await await_redis_response(
-                pipeline.json().set(metadata_key, '$.accessed_at', now.isoformat(), nx=False, xx=True)
-            )
-        if update_modified_at:
-            await await_redis_response(
-                pipeline.json().set(metadata_key, '$.modified_at', now.isoformat(), nx=False, xx=True)
-            )
         if new_item_count is not None:
             await await_redis_response(
-                pipeline.json().set(metadata_key, '$.item_count', new_item_count, nx=False, xx=True)
+                pipeline.json().set(self.metadata_key, '$.item_count', new_item_count, nx=False, xx=True)
             )
         elif delta_item_count is not None:
-            await await_redis_response(pipeline.json().numincrby(metadata_key, '$.item_count', delta_item_count))
+            await await_redis_response(pipeline.json().numincrby(self.metadata_key, '$.item_count', delta_item_count))

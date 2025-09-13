@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import infer_mime_type
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
@@ -40,23 +38,25 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
 
     _MAIN_KEY = 'key-value-store'
 
-    def __init__(
-        self,
-        dataset_name: str,
-        redis: Redis,
-    ) -> None:
+    _CLIENT_TYPE = 'Key-value store'
+    """Human-readable client type for error messages."""
+
+    def __init__(self, storage_name: str, storage_id: str, redis: Redis) -> None:
         """Initialize a new instance.
 
         Preferably use the `MemoryDatasetClient.open` class method to create a new instance.
         """
-        super().__init__(storage_name=dataset_name, redis=redis)
+        super().__init__(storage_name=storage_name, storage_id=storage_id, redis=redis)
 
-    @override
-    async def get_metadata(self) -> KeyValueStoreMetadata:
-        metadata_dict = await self._get_metadata_by_name(name=self._storage_name, redis=self._redis)
-        if metadata_dict is None:
-            raise ValueError(f'Dataset with name "{self._storage_name}" does not exist.')
-        return KeyValueStoreMetadata.model_validate(metadata_dict)
+    @property
+    def items_key(self) -> str:
+        """Return the Redis key for the items of this storage."""
+        return f'{self._MAIN_KEY}:{self._storage_name}:items'
+
+    @property
+    def metadata_items_key(self) -> str:
+        """Return the Redis key for the items metadata of this storage."""
+        return f'{self._MAIN_KEY}:{self._storage_name}:metadata_items'
 
     @classmethod
     async def open(
@@ -82,51 +82,26 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
         Returns:
             An instance for the opened or created storage client.
         """
-        search_name = name or alias or cls._DEFAULT_NAME
-        if id:
-            dataset_name = await cls._get_metadata_name_by_id(id=id, redis=redis)
-            if dataset_name is None:
-                raise ValueError(f'Dataset with ID "{id}" does not exist.')
-        else:
-            metadata_data = await cls._get_metadata_by_name(name=search_name, redis=redis)
-            dataset_name = search_name if metadata_data is not None else None
-        if dataset_name:
-            client = cls(dataset_name=dataset_name, redis=redis)
-            async with client._get_pipeline() as pipe:
-                await client._update_metadata(pipe, update_accessed_at=True)
-        else:
-            now = datetime.now(timezone.utc)
-            metadata = KeyValueStoreMetadata(
-                id=crypto_random_object_id(),
-                name=name,
-                created_at=now,
-                accessed_at=now,
-                modified_at=now,
-            )
-            dataset_name = name or alias or cls._DEFAULT_NAME
-            client = cls(dataset_name=dataset_name, redis=redis)
-            await client._create_metadata_and_storage(metadata.model_dump())
-        return client
+        return await cls._open(
+            id=id,
+            name=name,
+            alias=alias,
+            redis=redis,
+            metadata_model=KeyValueStoreMetadata,
+            extra_metadata_fields={},
+        )
+
+    @override
+    async def get_metadata(self) -> KeyValueStoreMetadata:
+        return await self._get_metadata(KeyValueStoreMetadata)
 
     @override
     async def drop(self) -> None:
-        storage_id = (await self.get_metadata()).id
-        async with self._get_pipeline() as pipe:
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:metadata')
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:items')
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:metadata_items')
-            await pipe.delete(f'{self._MAIN_KEY}:id_to_name:{storage_id}')
+        await self._drop(extra_keys=[self.items_key, self.metadata_items_key])
 
     @override
     async def purge(self) -> None:
-        async with self._get_pipeline() as pipe:
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:items')
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:metadata_items')
-            await self._update_metadata(
-                pipe,
-                update_accessed_at=True,
-                update_modified_at=True,
-            )
+        await self._purge(extra_keys=[self.items_key, self.metadata_items_key], metadata_kwargs={})
 
     @override
     async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
@@ -157,11 +132,11 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
 
         async with self._get_pipeline() as pipe:
             # redis-py typing issue
-            await await_redis_response(pipe.hset(f'{self._MAIN_KEY}:{self._storage_name}:items', key, value_bytes))  # type: ignore[arg-type]
+            await await_redis_response(pipe.hset(self.items_key, key, value_bytes))  # type: ignore[arg-type]
 
             await await_redis_response(
                 pipe.hset(
-                    f'{self._MAIN_KEY}:{self._storage_name}:metadata_items',
+                    self.metadata_items_key,
                     key,
                     item_metadata.model_dump_json(),
                 )
@@ -170,9 +145,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
-        serialized_metadata_item = await await_redis_response(
-            self._redis.hget(f'{self._MAIN_KEY}:{self._storage_name}:metadata_items', key)
-        )
+        serialized_metadata_item = await await_redis_response(self._redis.hget(self.metadata_items_key, key))
 
         if not isinstance(serialized_metadata_item, (str, bytes, bytearray)):
             logger.warning(f'Metadata for key "{key}" is missing or invalid.')
@@ -187,7 +160,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
         # Query the record by key
         # redis-py typing issue
         value_bytes: bytes | None = await await_redis_response(
-            self._redis.hget(f'{self._MAIN_KEY}:{self._storage_name}:items', key)  # type: ignore[arg-type]
+            self._redis.hget(self.items_key, key)  # type: ignore[arg-type]
         )
 
         if value_bytes is None:
@@ -217,8 +190,8 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
     @override
     async def delete_value(self, *, key: str) -> None:
         async with self._get_pipeline() as pipe:
-            await await_redis_response(pipe.hdel(f'{self._MAIN_KEY}:{self._storage_name}:items', key))
-            await await_redis_response(pipe.hdel(f'{self._MAIN_KEY}:{self._storage_name}:metadata_items', key))
+            await await_redis_response(pipe.hdel(self.items_key, key))
+            await await_redis_response(pipe.hdel(self.metadata_items_key, key))
             await self._update_metadata(pipe, update_accessed_at=True, update_modified_at=True)
 
     @override
@@ -228,9 +201,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
         exclusive_start_key: str | None = None,
         limit: int | None = None,
     ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
-        items_data = await await_redis_response(
-            self._redis.hgetall(f'{self._MAIN_KEY}:{self._storage_name}:metadata_items')
-        )
+        items_data = await await_redis_response(self._redis.hgetall(self.metadata_items_key))
 
         if not items_data:
             return  # No items to iterate over
@@ -268,7 +239,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
     @override
     async def record_exists(self, *, key: str) -> bool:
         async with self._get_pipeline(with_execute=False) as pipe:
-            await await_redis_response(pipe.hexists(f'{self._MAIN_KEY}:{self._storage_name}:items', key))
+            await await_redis_response(pipe.hexists(self.items_key, key))
             await self._update_metadata(
                 pipe,
                 update_accessed_at=True,
@@ -277,28 +248,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
 
         return bool(results[0])
 
-    async def _update_metadata(
-        self,
-        pipeline: Pipeline,
-        *,
-        update_accessed_at: bool = False,
-        update_modified_at: bool = False,
-    ) -> None:
-        """Update the dataset metadata with current information.
-
-        Args:
-            pipeline: The Redis pipeline to use for the update.
-            update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
-            update_modified_at: If True, update the `modified_at` timestamp to the current time.
-        """
-        metadata_key = f'{self._MAIN_KEY}:{self._storage_name}:metadata'
-        now = datetime.now(timezone.utc)
-
-        if update_accessed_at:
-            await await_redis_response(
-                pipeline.json().set(metadata_key, '$.accessed_at', now.isoformat(), nx=False, xx=True)
-            )
-        if update_modified_at:
-            await await_redis_response(
-                pipeline.json().set(metadata_key, '$.modified_at', now.isoformat(), nx=False, xx=True)
-            )
+    @override
+    async def _specific_update_metadata(self, pipeline: Pipeline, **kwargs: Any) -> None:
+        # No specific fields to update for Redis key-value stores.
+        return

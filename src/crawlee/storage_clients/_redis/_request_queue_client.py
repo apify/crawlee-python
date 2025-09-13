@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import json
 from collections import deque
-from contextlib import suppress
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from redis.exceptions import ResponseError
 from typing_extensions import override
 
 from crawlee import Request
@@ -39,24 +37,23 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     data sharing across different processes.
     """
 
-    _MAX_BATCH_FETCH_SIZE = 10
-
-    _BLOCK_REQUEST_TIME = 300_000  # milliseconds
-
     _DEFAULT_NAME = 'default'
 
     _MAIN_KEY = 'request_queue'
 
-    def __init__(
-        self,
-        dataset_name: str,
-        redis: Redis,
-    ) -> None:
+    _CLIENT_TYPE = 'Request queue'
+    """Human-readable client type for error messages."""
+
+    _MAX_BATCH_FETCH_SIZE = 10
+
+    _BLOCK_REQUEST_TIME = 300_000  # milliseconds
+
+    def __init__(self, storage_name: str, storage_id: str, redis: Redis) -> None:
         """Initialize a new instance.
 
         Preferably use the `MemoryDatasetClient.open` class method to create a new instance.
         """
-        super().__init__(storage_name=dataset_name, redis=redis)
+        super().__init__(storage_name=storage_name, storage_id=storage_id, redis=redis)
 
         self._pending_fetch_cache: deque[Request] = deque()
         """Cache for requests: ordered by sequence number."""
@@ -70,23 +67,30 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
         self._add_requests_script: AsyncScript | None = None
 
-        self._scripts_loaded = False
+    @property
+    def added_filter_key(self) -> str:
+        """Return the Redis key for the added requests Bloom filter."""
+        return f'{self._MAIN_KEY}:{self._storage_name}:added_bloom_filter'
 
-    async def _ensure_scripts_loaded(self) -> None:
-        """Ensure Lua scripts are loaded in Redis."""
-        if not self._scripts_loaded:
-            self._fetch_script = await self._create_script('atomic_fetch_request.lua')
-            self._reclaim_stale_script = await self._create_script('reclaim_stale_requests.lua')
-            self._add_requests_script = await self._create_script('atomic_add_requests.lua')
+    @property
+    def handled_filter_key(self) -> str:
+        """Return the Redis key for the handled requests Bloom filter."""
+        return f'{self._MAIN_KEY}:{self._storage_name}:handled_bloom_filter'
 
-            self._scripts_loaded = True
+    @property
+    def queue_key(self) -> str:
+        """Return the Redis key for the request queue."""
+        return f'{self._MAIN_KEY}:{self._storage_name}:queue'
 
-    @override
-    async def get_metadata(self) -> RequestQueueMetadata:
-        metadata_dict = await self._get_metadata_by_name(name=self._storage_name, redis=self._redis)
-        if metadata_dict is None:
-            raise ValueError(f'Dataset with name "{self._storage_name}" does not exist.')
-        return RequestQueueMetadata.model_validate(metadata_dict)
+    @property
+    def data_key(self) -> str:
+        """Return the Redis key for the request data hash."""
+        return f'{self._MAIN_KEY}:{self._storage_name}:data'
+
+    @property
+    def in_progress_key(self) -> str:
+        """Return the Redis key for the in-progress requests hash."""
+        return f'{self._MAIN_KEY}:{self._storage_name}:in_progress'
 
     @classmethod
     async def open(
@@ -112,75 +116,52 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         Returns:
             An instance for the opened or created storage client.
         """
-        search_name = name or alias or cls._DEFAULT_NAME
-        if id:
-            dataset_name = await cls._get_metadata_name_by_id(id=id, redis=redis)
-            if dataset_name is None:
-                raise ValueError(f'Dataset with ID "{id}" does not exist.')
-        else:
-            metadata_data = await cls._get_metadata_by_name(name=search_name, redis=redis)
-            dataset_name = search_name if metadata_data is not None else None
-        if dataset_name:
-            client = cls(dataset_name=dataset_name, redis=redis)
-            async with client._get_pipeline() as pipe:
-                await client._update_metadata(pipe, update_accessed_at=True)
-        else:
-            now = datetime.now(timezone.utc)
-            metadata = RequestQueueMetadata(
-                id=crypto_random_object_id(),
-                name=name,
-                created_at=now,
-                accessed_at=now,
-                modified_at=now,
-                had_multiple_clients=False,
-                handled_request_count=0,
-                pending_request_count=0,
-                total_request_count=0,
-            )
-            dataset_name = name or alias or cls._DEFAULT_NAME
-            client = cls(dataset_name=dataset_name, redis=redis)
-            with suppress(ResponseError):
-                await client._create_metadata_and_storage(metadata.model_dump())
-
-        await client._ensure_scripts_loaded()
-        return client
+        return await cls._open(
+            id=id,
+            name=name,
+            alias=alias,
+            redis=redis,
+            metadata_model=RequestQueueMetadata,
+            extra_metadata_fields={
+                'had_multiple_clients': False,
+                'handled_request_count': 0,
+                'pending_request_count': 0,
+                'total_request_count': 0,
+            },
+        )
 
     @override
-    async def _create_storage(self, pipeline: Pipeline) -> None:
-        added_bloom_filter_key = f'{self._MAIN_KEY}:{self._storage_name}:added_bloom_filter'
-        handled_bloom_filter_key = f'{self._MAIN_KEY}:{self._storage_name}:handled_bloom_filter'
-        await await_redis_response(pipeline.bf().create(added_bloom_filter_key, 0.1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
-        await await_redis_response(pipeline.bf().create(handled_bloom_filter_key, 0.1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
+    async def get_metadata(self) -> RequestQueueMetadata:
+        return await self._get_metadata(RequestQueueMetadata)
 
     @override
     async def drop(self) -> None:
-        storage_id = (await self.get_metadata()).id
-        async with self._get_pipeline() as pipe:
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:metadata')
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:added_bloom_filter')
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:handled_bloom_filter')
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:queue')
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:data')
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:in_progress')
-            await pipe.delete(f'{self._MAIN_KEY}:id_to_name:{storage_id}')
+        await self._drop(
+            extra_keys=[
+                self.added_filter_key,
+                self.handled_filter_key,
+                self.queue_key,
+                self.data_key,
+                self.in_progress_key,
+            ]
+        )
 
     @override
     async def purge(self) -> None:
-        async with self._get_pipeline() as pipe:
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:added_bloom_filter')
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:handled_bloom_filter')
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:queue')
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:data')
-            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:in_progress')
-
-            await self._create_storage(pipe)
-
-            await self._update_metadata(
-                pipe,
-                update_accessed_at=True,
-                update_modified_at=True,
-                new_pending_request_count=0,
-            )
+        await self._purge(
+            extra_keys=[
+                self.added_filter_key,
+                self.handled_filter_key,
+                self.queue_key,
+                self.data_key,
+                self.in_progress_key,
+            ],
+            metadata_kwargs={
+                'update_accessed_at': True,
+                'update_modified_at': True,
+                'new_pending_request_count': 0,
+            },
+        )
 
     @override
     async def add_batch_of_requests(
@@ -198,16 +179,11 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         delta_pending = 0
         delta_total = 0
 
-        added_bloom_filter_key = f'{self._MAIN_KEY}:{self._storage_name}:added_bloom_filter'
-        handled_bloom_filter_key = f'{self._MAIN_KEY}:{self._storage_name}:handled_bloom_filter'
-        queue_key = f'{self._MAIN_KEY}:{self._storage_name}:queue'
-        data_key = f'{self._MAIN_KEY}:{self._storage_name}:data'
-
         requests_by_unique_key = {req.unique_key: req for req in requests}
         unique_keys = list(requests_by_unique_key.keys())
         async with self._get_pipeline(with_execute=False) as pipe:
-            await await_redis_response(pipe.bf().mexists(added_bloom_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
-            await await_redis_response(pipe.bf().mexists(handled_bloom_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
+            await await_redis_response(pipe.bf().mexists(self.added_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
+            await await_redis_response(pipe.bf().mexists(self.handled_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
 
             results = await pipe.execute()
 
@@ -250,7 +226,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
         if new_unique_keys:
             script_results = await self._add_requests_script(
-                keys=[added_bloom_filter_key, queue_key, data_key],
+                keys=[self.added_filter_key, self.queue_key, self.data_key],
                 args=[int(forefront), json.dumps(new_unique_keys), json.dumps(new_request_data)],
             )
             actually_added = set(json.loads(script_results))
@@ -299,14 +275,10 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         if self._fetch_script is None:
             raise RuntimeError('Scripts not loaded. Call _ensure_scripts_loaded() before using the client.')
 
-        queue_key = f'{self._MAIN_KEY}:{self._storage_name}:queue'
-        in_progress_key = f'{self._MAIN_KEY}:{self._storage_name}:in_progress'
-        data_key = f'{self._MAIN_KEY}:{self._storage_name}:data'
-
         blocked_until_timestamp = int(datetime.now(tz=timezone.utc).timestamp() * 1000) + self._BLOCK_REQUEST_TIME
 
         requests_json = await self._fetch_script(
-            keys=[queue_key, in_progress_key, data_key],
+            keys=[self.queue_key, self.in_progress_key, self.data_key],
             args=[self.client_key, blocked_until_timestamp, self._MAX_BATCH_FETCH_SIZE],
         )
 
@@ -322,24 +294,9 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
         return requests[0]
 
-    async def _reclaim_stale_requests(self) -> None:
-        # Mypy workaround
-        if self._reclaim_stale_script is None:
-            raise RuntimeError('Scripts not loaded. Call _ensure_scripts_loaded() before using the client.')
-
-        in_progress_key = f'{self._MAIN_KEY}:{self._storage_name}:in_progress'
-        queue_key = f'{self._MAIN_KEY}:{self._storage_name}:queue'
-        data_key = f'{self._MAIN_KEY}:{self._storage_name}:data'
-
-        current_time = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
-
-        await self._reclaim_stale_script(keys=[in_progress_key, queue_key, data_key], args=[current_time])
-
     @override
     async def get_request(self, unique_key: str) -> Request | None:
-        data_key = f'{self._MAIN_KEY}:{self._storage_name}:data'
-
-        request_data = await await_redis_response(self._redis.hget(data_key, unique_key))
+        request_data = await await_redis_response(self._redis.hget(self.data_key, unique_key))
 
         if isinstance(request_data, (str, bytes, bytearray)):
             return Request.model_validate_json(request_data)
@@ -349,20 +306,17 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         # Check if the request is in progress.
-        in_progress_key = f'{self._MAIN_KEY}:{self._storage_name}:in_progress'
-        handled_bloom_filter_key = f'{self._MAIN_KEY}:{self._storage_name}:handled_bloom_filter'
-        data_key = f'{self._MAIN_KEY}:{self._storage_name}:data'
 
-        check_in_progress = await await_redis_response(self._redis.hexists(in_progress_key, request.unique_key))
+        check_in_progress = await await_redis_response(self._redis.hexists(self.in_progress_key, request.unique_key))
         if not check_in_progress:
             logger.warning(f'Marking request {request.unique_key} as handled that is not in progress.')
             return None
 
         async with self._get_pipeline() as pipe:
-            await await_redis_response(pipe.bf().add(handled_bloom_filter_key, request.unique_key))  # type: ignore[no-untyped-call]
+            await await_redis_response(pipe.bf().add(self.handled_filter_key, request.unique_key))  # type: ignore[no-untyped-call]
 
-            await await_redis_response(pipe.hdel(in_progress_key, request.unique_key))
-            await await_redis_response(pipe.hdel(data_key, request.unique_key))
+            await await_redis_response(pipe.hdel(self.in_progress_key, request.unique_key))
+            await await_redis_response(pipe.hdel(self.data_key, request.unique_key))
 
             await self._update_metadata(
                 pipe,
@@ -385,10 +339,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         *,
         forefront: bool = False,
     ) -> ProcessedRequest | None:
-        in_progress_key = f'{self._MAIN_KEY}:{self._storage_name}:in_progress'
-        queue_key = f'{self._MAIN_KEY}:{self._storage_name}:queue'
-
-        check_in_progress = await await_redis_response(self._redis.hexists(in_progress_key, request.unique_key))
+        check_in_progress = await await_redis_response(self._redis.hexists(self.in_progress_key, request.unique_key))
         if not check_in_progress:
             logger.info(f'Reclaiming request {request.unique_key} that is not in progress.')
             return None
@@ -401,15 +352,15 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
                 await await_redis_response(
                     pipe.hset(
-                        in_progress_key,
+                        self.in_progress_key,
                         request.unique_key,
                         f'{{"client_id":"{self.client_key}","blocked_until_timestamp":{blocked_until_timestamp}}}',
                     )
                 )
                 self._pending_fetch_cache.appendleft(request)
             else:
-                await await_redis_response(pipe.rpush(queue_key, request.unique_key))
-                await await_redis_response(pipe.hdel(in_progress_key, request.unique_key))
+                await await_redis_response(pipe.rpush(self.queue_key, request.unique_key))
+                await await_redis_response(pipe.hdel(self.in_progress_key, request.unique_key))
             await self._update_metadata(
                 pipe,
                 update_modified_at=True,
@@ -436,12 +387,33 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
         return metadata.pending_request_count == 0
 
-    async def _update_metadata(
+    async def _load_scripts(self) -> None:
+        """Ensure Lua scripts are loaded in Redis."""
+        self._fetch_script = await self._create_script('atomic_fetch_request.lua')
+        self._reclaim_stale_script = await self._create_script('reclaim_stale_requests.lua')
+        self._add_requests_script = await self._create_script('atomic_add_requests.lua')
+
+    @override
+    async def _create_storage(self, pipeline: Pipeline) -> None:
+        await await_redis_response(pipeline.bf().create(self.added_filter_key, 0.1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
+        await await_redis_response(pipeline.bf().create(self.handled_filter_key, 0.1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
+
+    async def _reclaim_stale_requests(self) -> None:
+        # Mypy workaround
+        if self._reclaim_stale_script is None:
+            raise RuntimeError('Scripts not loaded. Call _ensure_scripts_loaded() before using the client.')
+
+        current_time = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+
+        await self._reclaim_stale_script(
+            keys=[self.in_progress_key, self.queue_key, self.data_key], args=[current_time]
+        )
+
+    @override
+    async def _specific_update_metadata(
         self,
         pipeline: Pipeline,
         *,
-        update_accessed_at: bool = False,
-        update_modified_at: bool = False,
         delta_handled_request_count: int | None = None,
         new_handled_request_count: int | None = None,
         delta_pending_request_count: int | None = None,
@@ -449,13 +421,12 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         delta_total_request_count: int | None = None,
         new_total_request_count: int | None = None,
         update_had_multiple_clients: bool = False,
+        **_kwargs: Any,
     ) -> None:
-        """Update the request queue metadata with current information.
+        """Update the dataset metadata with current information.
 
         Args:
             pipeline: The Redis pipeline to use for the update.
-            update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
-            update_modified_at: If True, update the `modified_at` timestamp to the current time.
             new_handled_request_count: If provided, update the handled_request_count to this value.
             new_pending_request_count: If provided, update the pending_request_count to this value.
             new_total_request_count: If provided, update the total_request_count to this value.
@@ -464,53 +435,42 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
             delta_total_request_count: If provided, add this value to the total_request_count.
             update_had_multiple_clients: If True, set had_multiple_clients to True.
         """
-        now = datetime.now(timezone.utc)
-
-        metadata_key = f'{self._MAIN_KEY}:{self._storage_name}:metadata'
-        now = datetime.now(timezone.utc)
-
-        if update_accessed_at:
-            await await_redis_response(
-                pipeline.json().set(metadata_key, '$.accessed_at', now.isoformat(), nx=False, xx=True)
-            )
-        if update_modified_at:
-            await await_redis_response(
-                pipeline.json().set(metadata_key, '$.modified_at', now.isoformat(), nx=False, xx=True)
-            )
         if new_pending_request_count is not None:
             await await_redis_response(
                 pipeline.json().set(
-                    metadata_key, '$.pending_request_count', new_pending_request_count, nx=False, xx=True
+                    self.metadata_key, '$.pending_request_count', new_pending_request_count, nx=False, xx=True
                 )
             )
         elif delta_pending_request_count is not None:
             await await_redis_response(
-                pipeline.json().numincrby(metadata_key, '$.pending_request_count', delta_pending_request_count)
+                pipeline.json().numincrby(self.metadata_key, '$.pending_request_count', delta_pending_request_count)
             )
 
         if new_handled_request_count is not None:
             await await_redis_response(
                 pipeline.json().set(
-                    metadata_key, '$.handled_request_count', new_handled_request_count, nx=False, xx=True
+                    self.metadata_key, '$.handled_request_count', new_handled_request_count, nx=False, xx=True
                 )
             )
         elif delta_handled_request_count is not None:
             await await_redis_response(
-                pipeline.json().numincrby(metadata_key, '$.handled_request_count', delta_handled_request_count)
+                pipeline.json().numincrby(self.metadata_key, '$.handled_request_count', delta_handled_request_count)
             )
 
         if new_total_request_count is not None:
             await await_redis_response(
-                pipeline.json().set(metadata_key, '$.total_request_count', new_total_request_count, nx=False, xx=True)
+                pipeline.json().set(
+                    self.metadata_key, '$.total_request_count', new_total_request_count, nx=False, xx=True
+                )
             )
         elif delta_total_request_count is not None:
             await await_redis_response(
-                pipeline.json().numincrby(metadata_key, '$.total_request_count', delta_total_request_count)
+                pipeline.json().numincrby(self.metadata_key, '$.total_request_count', delta_total_request_count)
             )
 
         if update_had_multiple_clients:
             await await_redis_response(
                 pipeline.json().set(
-                    metadata_key, '$.had_multiple_clients', update_had_multiple_clients, nx=False, xx=True
+                    self.metadata_key, '$.had_multiple_clients', update_had_multiple_clients, nx=False, xx=True
                 )
             )

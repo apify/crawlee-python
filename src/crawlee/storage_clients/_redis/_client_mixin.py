@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-from abc import ABC
+from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from logging import getLogger
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, TypedDict
+from typing import TYPE_CHECKING, Any, ClassVar, TypedDict, overload
+
+from crawlee._utils.crypto import crypto_random_object_id
 
 from ._utils import await_redis_response, read_lua_script
 
@@ -15,7 +18,9 @@ if TYPE_CHECKING:
     from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
     from redis.commands.core import AsyncScript
-    from typing_extensions import NotRequired
+    from typing_extensions import NotRequired, Self
+
+    from crawlee.storage_clients.models import DatasetMetadata, KeyValueStoreMetadata, RequestQueueMetadata
 
 
 logger = getLogger(__name__)
@@ -39,12 +44,32 @@ class RedisClientMixin(ABC):
 
     _MAIN_KEY: ClassVar[str]
 
-    def __init__(self, *, storage_name: str, redis: Redis) -> None:
+    _CLIENT_TYPE: ClassVar[str]
+    """Human-readable client type for error messages."""
+
+    def __init__(self, storage_name: str, storage_id: str, redis: Redis) -> None:
         self._storage_name = storage_name
+        self._storage_id = storage_id
         self._redis = redis
 
+        self._scripts_loaded = False
+
+    @property
+    def redis(self) -> Redis:
+        """Return the Redis client instance."""
+        return self._redis
+
+    @property
+    def metadata_key(self) -> str:
+        """Return the Redis key for the metadata of this storage."""
+        return f'{self._MAIN_KEY}:{self._storage_name}:metadata'
+
     @classmethod
-    async def _get_metadata_by_name(cls, name: str, redis: Redis) -> dict | None:
+    async def _get_metadata_by_name(cls, name: str, redis: Redis, *, with_wait: bool = False) -> dict | None:
+        if with_wait:
+            await await_redis_response(redis.blpop([f'{cls._MAIN_KEY}:{name}:created_signal'], timeout=30))
+            await await_redis_response(redis.lpush(f'{cls._MAIN_KEY}:{name}:created_signal', 1))
+
         response = await await_redis_response(redis.json().get(f'{cls._MAIN_KEY}:{name}:metadata'))
         data = response[0] if response is not None and isinstance(response, list) else response
         if data is not None and not isinstance(data, dict):
@@ -54,6 +79,78 @@ class RedisClientMixin(ABC):
     @classmethod
     async def _get_metadata_name_by_id(cls, id: str, redis: Redis) -> str | None:
         return await await_redis_response(redis.get(f'{cls._MAIN_KEY}:id_to_name:{id}'))
+
+    @classmethod
+    async def _open(
+        cls,
+        *,
+        id: str | None,
+        name: str | None,
+        alias: str | None,
+        metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata],
+        redis: Redis,
+        extra_metadata_fields: dict[str, Any],
+    ) -> Self:
+        """Open or create a new Redis dataset client.
+
+        This method creates a new Redis dataset instance. Unlike persistent storage implementations, Redis
+        datasets don't check for existing datasets with the same name or ID since all data exists only in memory
+        and is lost when the process terminates.
+
+        Args:
+            id: The ID of the dataset. If not provided, a random ID will be generated.
+            name: The name of the dataset for named (global scope) storages.
+            alias: The alias of the dataset for unnamed (run scope) storages.
+            redis: Redis client instance.
+            metadata_model: Pydantic model for metadata validation.
+            extra_metadata_fields: Storage-specific metadata fields.
+
+        Returns:
+            An instance for the opened or created storage client.
+        """
+        internal_name = name or alias or cls._DEFAULT_NAME
+        storage_id: str | None = None
+        if id:
+            storage_name = await cls._get_metadata_name_by_id(id=id, redis=redis)
+            storage_id = id
+            if storage_name is None:
+                raise ValueError(f'Dataset with ID "{id}" does not exist.')
+        else:
+            metadata_data = await cls._get_metadata_by_name(name=internal_name, redis=redis)
+            storage_name = internal_name if metadata_data is not None else None
+            storage_id = metadata_data['id'] if metadata_data is not None else None
+        if storage_name and storage_id:
+            client = cls(storage_name=storage_name, storage_id=storage_id, redis=redis)
+            async with client._get_pipeline() as pipe:
+                await client._update_metadata(pipe, update_accessed_at=True)
+        else:
+            now = datetime.now(timezone.utc)
+            metadata = metadata_model(
+                id=crypto_random_object_id(),
+                name=name,
+                created_at=now,
+                accessed_at=now,
+                modified_at=now,
+                **extra_metadata_fields,
+            )
+            client = cls(storage_name=internal_name, storage_id=metadata.id, redis=redis)
+            created = await client._create_metadata_and_storage(internal_name, metadata.model_dump())
+            if not created:
+                metadata_data = await cls._get_metadata_by_name(name=internal_name, redis=redis, with_wait=True)
+                client = cls(storage_name=internal_name, storage_id=metadata.id, redis=redis)
+
+        await client._ensure_scripts_loaded()
+        return client
+
+    async def _load_scripts(self) -> None:
+        """Load Lua scripts in Redis."""
+        return
+
+    async def _ensure_scripts_loaded(self) -> None:
+        """Ensure Lua scripts are loaded in Redis."""
+        if not self._scripts_loaded:
+            await self._load_scripts()
+            self._scripts_loaded = True
 
     @asynccontextmanager
     async def _get_pipeline(self, *, with_execute: bool = True) -> AsyncIterator[Pipeline]:
@@ -76,15 +173,94 @@ class RedisClientMixin(ABC):
 
         return self._redis.register_script(script_content)
 
-    async def _create_metadata_and_storage(self, metadata: dict) -> None:
-        metadata_key = f'{self._MAIN_KEY}:{self._storage_name}:metadata'
-        index_id_to_name = f'{self._MAIN_KEY}:id_to_name:{metadata["id"]}'
+    async def _create_metadata_and_storage(self, storage_name: str, metadata: dict) -> bool:
+        index_id_to_name = f'{self._MAIN_KEY}:id_to_name'
+        index_name_to_id = f'{self._MAIN_KEY}:name_to_id'
         metadata['created_at'] = metadata['created_at'].isoformat()
         metadata['accessed_at'] = metadata['accessed_at'].isoformat()
         metadata['modified_at'] = metadata['modified_at'].isoformat()
-        name = metadata['name'] if metadata['name'] is not None else self._DEFAULT_NAME
-        # Use a transaction to ensure atomicity
+
+        name_to_id = await await_redis_response(self._redis.hsetnx(index_id_to_name, storage_name, metadata['id']))
+        if not name_to_id:
+            return False
+
         async with self._get_pipeline() as pipe:
-            await await_redis_response(pipe.json().set(metadata_key, '$', metadata, nx=True))
-            await await_redis_response(pipe.set(index_id_to_name, name, nx=True))
+            await await_redis_response(pipe.hsetnx(index_name_to_id, metadata['id'], storage_name))
+            await await_redis_response(pipe.json().set(self.metadata_key, '$', metadata))
+            await await_redis_response(pipe.lpush(f'{self._MAIN_KEY}:{storage_name}:created_signal', 1))
+
             await self._create_storage(pipe)
+
+        return True
+
+    async def _drop(self, extra_keys: list[str]) -> None:
+        async with self._get_pipeline() as pipe:
+            await pipe.delete(self.metadata_key)
+            await pipe.delete(f'{self._MAIN_KEY}:id_to_name', self._storage_id)
+            await pipe.delete(f'{self._MAIN_KEY}:name_to_id', self._storage_name)
+            for key in extra_keys:
+                await pipe.delete(key)
+
+    async def _purge(self, extra_keys: list[str], metadata_kwargs: dict) -> None:
+        async with self._get_pipeline() as pipe:
+            for key in extra_keys:
+                await pipe.delete(key)
+            await self._update_metadata(pipe, **metadata_kwargs)
+            await self._create_storage(pipe)
+
+    @overload
+    async def _get_metadata(self, metadata_model: type[DatasetMetadata]) -> DatasetMetadata: ...
+    @overload
+    async def _get_metadata(self, metadata_model: type[KeyValueStoreMetadata]) -> KeyValueStoreMetadata: ...
+    @overload
+    async def _get_metadata(self, metadata_model: type[RequestQueueMetadata]) -> RequestQueueMetadata: ...
+
+    async def _get_metadata(
+        self, metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata]
+    ) -> DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata:
+        """Retrieve client metadata."""
+        metadata_dict = await self._get_metadata_by_name(name=self._storage_name, redis=self._redis)
+        if metadata_dict is None:
+            raise ValueError(f'{self._CLIENT_TYPE} with name "{self._storage_name}" does not exist.')
+
+        return metadata_model.model_validate(metadata_dict)
+
+    @abstractmethod
+    async def _specific_update_metadata(self, pipeline: Pipeline, **kwargs: Any) -> None:
+        """Pipeline operations storage-specific metadata updates.
+
+        Must be implemented by concrete classes.
+
+        Args:
+            pipeline: The Redis pipeline to use for the update.
+            **kwargs: Storage-specific update parameters.
+        """
+
+    async def _update_metadata(
+        self,
+        pipeline: Pipeline,
+        *,
+        update_accessed_at: bool = False,
+        update_modified_at: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        """Update storage metadata combining common and specific fields.
+
+        Args:
+            pipeline: The Redis pipeline to use for the update.
+            update_accessed_at: Whether to update accessed_at timestamp.
+            update_modified_at: Whether to update modified_at timestamp.
+            **kwargs: Additional arguments for _specific_update_metadata.
+        """
+        now = datetime.now(timezone.utc)
+
+        if update_accessed_at:
+            await await_redis_response(
+                pipeline.json().set(self.metadata_key, '$.accessed_at', now.isoformat(), nx=False, xx=True)
+            )
+        if update_modified_at:
+            await await_redis_response(
+                pipeline.json().set(self.metadata_key, '$.modified_at', now.isoformat(), nx=False, xx=True)
+            )
+
+        await self._specific_update_metadata(pipeline, **kwargs)
