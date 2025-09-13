@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient, RedisStorageClient
 from crawlee.storages import Dataset, KeyValueStore
 
 if TYPE_CHECKING:
@@ -19,11 +19,14 @@ if TYPE_CHECKING:
     from crawlee.storage_clients import StorageClient
 
 
-@pytest.fixture(params=['memory', 'file_system'])
+@pytest.fixture(params=['memory', 'file_system', 'redis'])
 def storage_client(request: pytest.FixtureRequest) -> StorageClient:
     """Parameterized fixture to test with different storage clients."""
     if request.param == 'memory':
         return MemoryStorageClient()
+
+    if request.param == 'redis':
+        return RedisStorageClient(connection_string='redis://localhost:6379/0')
 
     return FileSystemStorageClient()
 
