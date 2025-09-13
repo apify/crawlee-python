@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 from curl_cffi import CurlHttpVersion
+from fakeredis import FakeAsyncRedis
 from proxy import Proxy
 from uvicorn.config import Config
 
@@ -208,3 +209,8 @@ async def http_client(request: pytest.FixtureRequest) -> HttpClient:
     if request.param == 'impit':
         return ImpitHttpClient(http3=False)
     return HttpxHttpClient(http2=False)
+
+
+@pytest.fixture
+def redis_client() -> FakeAsyncRedis:
+    return FakeAsyncRedis()

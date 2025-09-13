@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -16,17 +16,20 @@ if TYPE_CHECKING:
     from pathlib import Path
     from typing import Any
 
+    from fakeredis import FakeAsyncRedis
+    from redis.asyncio import Redis
+
     from crawlee.storage_clients import StorageClient
 
 
 @pytest.fixture(params=['memory', 'file_system', 'redis'])
-def storage_client(request: pytest.FixtureRequest) -> StorageClient:
+def storage_client(request: pytest.FixtureRequest, redis_client: FakeAsyncRedis) -> StorageClient:
     """Parameterized fixture to test with different storage clients."""
     if request.param == 'memory':
         return MemoryStorageClient()
 
     if request.param == 'redis':
-        return RedisStorageClient(connection_string='redis://localhost:6379/0')
+        return RedisStorageClient(redis=cast('Redis', redis_client))
 
     return FileSystemStorageClient()
 
