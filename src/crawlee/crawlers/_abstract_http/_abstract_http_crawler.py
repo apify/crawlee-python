@@ -34,7 +34,9 @@ TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=St
 
 @docs_group('Crawlers')
 class AbstractHttpCrawler(
-    Generic[TCrawlingContext, TParseResult, TSelectResult], BasicCrawler[TCrawlingContext, StatisticsState], ABC
+    BasicCrawler[TCrawlingContext, StatisticsState],
+    ABC,
+    Generic[TCrawlingContext, TParseResult, TSelectResult],
 ):
     """A web crawler for performing HTTP requests.
 

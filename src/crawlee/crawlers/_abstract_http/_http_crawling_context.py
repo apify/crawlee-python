@@ -31,7 +31,7 @@ class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
 
 @dataclass(frozen=True)
 @docs_group('Crawling contexts')
-class ParsedHttpCrawlingContext(Generic[TParseResult], HttpCrawlingContext):
+class ParsedHttpCrawlingContext(HttpCrawlingContext, Generic[TParseResult]):
     """The crawling context used by `AbstractHttpCrawler`.
 
     It provides access to key objects as well as utility functions for handling crawling tasks.
