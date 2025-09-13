@@ -94,6 +94,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         *,
         id: str | None,
         name: str | None,
+        alias: str | None,
         redis: Redis,
     ) -> RedisRequestQueueClient:
         """Open or create a new memory request queue client.
@@ -104,19 +105,19 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
         Args:
             id: The ID of the request queue. If not provided, a random ID will be generated.
-            name: The name of the request queue. If not provided, the queue will be unnamed.
+            name: The name of the dataset for named (global scope) storages.
+            alias: The alias of the dataset for unnamed (run scope) storages.
             redis: Redis client instance.
 
         Returns:
             An instance for the opened or created storage client.
         """
-        # Otherwise create a new queue
+        search_name = name or alias or cls._DEFAULT_NAME
         if id:
             dataset_name = await cls._get_metadata_name_by_id(id=id, redis=redis)
             if dataset_name is None:
                 raise ValueError(f'Dataset with ID "{id}" does not exist.')
         else:
-            search_name = name or cls._DEFAULT_NAME
             metadata_data = await cls._get_metadata_by_name(name=search_name, redis=redis)
             dataset_name = search_name if metadata_data is not None else None
         if dataset_name:
@@ -136,7 +137,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 pending_request_count=0,
                 total_request_count=0,
             )
-            dataset_name = name or cls._DEFAULT_NAME
+            dataset_name = name or alias or cls._DEFAULT_NAME
             client = cls(dataset_name=dataset_name, redis=redis)
             with suppress(ResponseError):
                 await client._create_metadata_and_storage(metadata.model_dump())

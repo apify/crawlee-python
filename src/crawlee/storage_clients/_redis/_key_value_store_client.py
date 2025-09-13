@@ -64,6 +64,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
         *,
         id: str | None,
         name: str | None,
+        alias: str | None,
         redis: Redis,
     ) -> RedisKeyValueStoreClient:
         """Open or create a new Redis dataset client.
@@ -74,18 +75,19 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
 
         Args:
             id: The ID of the dataset. If not provided, a random ID will be generated.
-            name: The name of the dataset. If not provided, the dataset will be unnamed.
+            name: The name of the dataset for named (global scope) storages.
+            alias: The alias of the dataset for unnamed (run scope) storages.
             redis: Redis client instance.
 
         Returns:
             An instance for the opened or created storage client.
         """
+        search_name = name or alias or cls._DEFAULT_NAME
         if id:
             dataset_name = await cls._get_metadata_name_by_id(id=id, redis=redis)
             if dataset_name is None:
                 raise ValueError(f'Dataset with ID "{id}" does not exist.')
         else:
-            search_name = name or cls._DEFAULT_NAME
             metadata_data = await cls._get_metadata_by_name(name=search_name, redis=redis)
             dataset_name = search_name if metadata_data is not None else None
         if dataset_name:
@@ -101,7 +103,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
                 accessed_at=now,
                 modified_at=now,
             )
-            dataset_name = name or cls._DEFAULT_NAME
+            dataset_name = name or alias or cls._DEFAULT_NAME
             client = cls(dataset_name=dataset_name, redis=redis)
             await client._create_metadata_and_storage(metadata.model_dump())
         return client

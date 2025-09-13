@@ -59,23 +59,15 @@ class RedisStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> RedisDatasetClient:
-        """Create or open a Redis dataset client.
-
-        Args:
-            id: Specific dataset ID to open. If provided, name is ignored.
-            name: Dataset name to open or create. Uses 'default' if not specified.
-            configuration: Configuration object. Uses global config if not provided.
-
-        Returns:
-            Configured dataset client ready for use.
-        """
         configuration = configuration or Configuration.get_global_configuration()
 
         client = await RedisDatasetClient.open(
             id=id,
             name=name,
+            alias=alias,
             redis=self._redis,
         )
 
@@ -88,23 +80,15 @@ class RedisStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> RedisKeyValueStoreClient:
-        """Create or open a SQL key-value store client.
-
-        Args:
-            id: Specific store ID to open. If provided, name is ignored.
-            name: Store name to open or create. Uses 'default' if not specified.
-            configuration: Configuration object. Uses global config if not provided.
-
-        Returns:
-            Configured key-value store client ready for use.
-        """
         configuration = configuration or Configuration.get_global_configuration()
 
         client = await RedisKeyValueStoreClient.open(
             id=id,
             name=name,
+            alias=alias,
             redis=self._redis,
         )
 
@@ -117,23 +101,15 @@ class RedisStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> RedisRequestQueueClient:
-        """Create or open a SQL request queue client.
-
-        Args:
-            id: Specific queue ID to open. If provided, name is ignored.
-            name: Queue name to open or create. Uses 'default' if not specified.
-            configuration: Configuration object. Uses global config if not provided.
-
-        Returns:
-            Configured request queue client ready for use.
-        """
         configuration = configuration or Configuration.get_global_configuration()
 
         client = await RedisRequestQueueClient.open(
             id=id,
             name=name,
+            alias=alias,
             redis=self._redis,
         )
 
