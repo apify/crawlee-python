@@ -293,7 +293,7 @@ class SqlClientMixin(ABC):
         async with self.get_session() as session:
             orm_metadata = await session.get(self._METADATA_TABLE, self._id)
             if not orm_metadata:
-                raise ValueError(f'Dataset with ID "{self._id}" not found.')
+                raise ValueError(f'{self._CLIENT_TYPE} with ID "{self._id}" not found.')
 
             return metadata_model.model_validate(orm_metadata)
 
