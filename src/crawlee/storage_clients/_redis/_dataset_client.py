@@ -34,8 +34,8 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
     Items are stored as JSON objects with automatic ordering preservation through Redis list operations.
 
     The dataset data is stored in Redis using the following key pattern:
-    - `dataset:{name}:items` - Redis JSON array containing all dataset items.
-    - `dataset:{name}:metadata` - Redis JSON object containing dataset metadata.
+    - `datasets:{name}:items` - Redis JSON array containing all dataset items.
+    - `datasets:{name}:metadata` - Redis JSON object containing dataset metadata.
 
     Items must be JSON-serializable dictionaries. Single items or lists of items can be pushed to the dataset.
     The item ordering is preserved through Redis JSON array operations. All operations provide atomic consistency
@@ -45,7 +45,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
     _DEFAULT_NAME = 'default'
     """Default Dataset name key prefix when none provided."""
 
-    _MAIN_KEY = 'dataset'
+    _MAIN_KEY = 'datasets'
     """Main Redis key prefix for Dataset."""
 
     _CLIENT_TYPE = 'Dataset'

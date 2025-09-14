@@ -51,12 +51,12 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     with timestamp-based expiration for stale request recovery.
 
     The request queue data is stored in Redis using the following key patterns:
-    - `request_queue:{name}:queue` - Redis list for FIFO request ordering
-    - `request_queue:{name}:data` - Redis hash storing serialized Request objects by unique_key
-    - `request_queue:{name}:in_progress` - Redis hash tracking requests currently being processed
-    - `request_queue:{name}:added_bloom_filter` - Bloom filter for added request deduplication
-    - `request_queue:{name}:handled_bloom_filter` - Bloom filter for completed request tracking
-    - `request_queue:{name}:metadata` - Redis JSON object containing queue metadata
+    - `request_queues:{name}:queue` - Redis list for FIFO request ordering
+    - `request_queues:{name}:data` - Redis hash storing serialized Request objects by unique_key
+    - `request_queues:{name}:in_progress` - Redis hash tracking requests currently being processed
+    - `request_queues:{name}:added_bloom_filter` - Bloom filter for added request deduplication
+    - `request_queues:{name}:handled_bloom_filter` - Bloom filter for completed request tracking
+    - `request_queues:{name}:metadata` - Redis JSON object containing queue metadata
 
     Requests are serialized to JSON for storage and maintain proper FIFO ordering through Redis list
     operations. The implementation provides concurrent access safety through atomic Lua scripts,
@@ -66,7 +66,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     _DEFAULT_NAME = 'default'
     """Default Request Queue name key prefix when none provided."""
 
-    _MAIN_KEY = 'request_queue'
+    _MAIN_KEY = 'request_queues'
     """Main Redis key prefix for Request Queue."""
 
     _CLIENT_TYPE = 'Request queue'

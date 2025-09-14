@@ -29,9 +29,9 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
     Keys are mapped to values with automatic content type detection and size tracking for metadata management.
 
     The key-value store data is stored in Redis using the following key pattern:
-    - `key-value-store:{name}:items` - Redis hash containing key-value pairs (values stored as binary data).
-    - `key-value-store:{name}:metadata_items` - Redis hash containing metadata for each key.
-    - `key-value-store:{name}:metadata` - Redis JSON object containing store metadata.
+    - `key_value_stores:{name}:items` - Redis hash containing key-value pairs (values stored as binary data).
+    - `key_value_stores:{name}:metadata_items` - Redis hash containing metadata for each key.
+    - `key_value_stores:{name}:metadata` - Redis JSON object containing store metadata.
 
     Values are serialized based on their type: JSON objects are stored as UTF-8 encoded JSON strings,
     text values as UTF-8 encoded strings, and binary data as-is. The implementation automatically handles
@@ -44,7 +44,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
     _DEFAULT_NAME = 'default'
     """Default Key-Value Store name key prefix when none provided."""
 
-    _MAIN_KEY = 'key-value-store'
+    _MAIN_KEY = 'key_value_stores'
     """Main Redis key prefix for Key-Value Store."""
 
     _CLIENT_TYPE = 'Key-value store'
