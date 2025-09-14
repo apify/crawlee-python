@@ -31,18 +31,19 @@ class MetadataUpdateParams(TypedDict, total=False):
 
     update_accessed_at: NotRequired[bool]
     update_modified_at: NotRequired[bool]
-    force: NotRequired[bool]
 
 
 class RedisClientMixin(ABC):
-    """Mixin class for SQL clients.
+    """Mixin class for Redis clients.
 
-    This mixin provides common SQL operations and basic methods for SQL storage clients.
+    This mixin provides common Redis operations and basic methods for Redis storage clients.
     """
 
     _DEFAULT_NAME = 'default'
+    """Default storage name in key prefix when none provided."""
 
     _MAIN_KEY: ClassVar[str]
+    """Main Redis key prefix for this storage type."""
 
     _CLIENT_TYPE: ClassVar[str]
     """Human-readable client type for error messages."""
@@ -66,8 +67,17 @@ class RedisClientMixin(ABC):
 
     @classmethod
     async def _get_metadata_by_name(cls, name: str, redis: Redis, *, with_wait: bool = False) -> dict | None:
+        """Retrieve metadata by storage name.
+
+        Args:
+            name: The name of the storage.
+            redis: The Redis client instance.
+            with_wait: Whether to wait for the storage to be created if it doesn't exist.
+        """
         if with_wait:
+            # Wait for the creation signal (max 30 seconds)
             await await_redis_response(redis.blpop([f'{cls._MAIN_KEY}:{name}:created_signal'], timeout=30))
+            # Signal consumed, push it back for other waiters
             await await_redis_response(redis.lpush(f'{cls._MAIN_KEY}:{name}:created_signal', 1))
 
         response = await await_redis_response(redis.json().get(f'{cls._MAIN_KEY}:{name}:metadata'))
@@ -78,6 +88,12 @@ class RedisClientMixin(ABC):
 
     @classmethod
     async def _get_metadata_name_by_id(cls, id: str, redis: Redis) -> str | None:
+        """Retrieve storage name by ID from id_to_name index.
+
+        Args:
+            id: The ID of the storage.
+            redis: The Redis client instance.
+        """
         return await await_redis_response(redis.get(f'{cls._MAIN_KEY}:id_to_name:{id}'))
 
     @classmethod
@@ -91,16 +107,12 @@ class RedisClientMixin(ABC):
         redis: Redis,
         extra_metadata_fields: dict[str, Any],
     ) -> Self:
-        """Open or create a new Redis dataset client.
-
-        This method creates a new Redis dataset instance. Unlike persistent storage implementations, Redis
-        datasets don't check for existing datasets with the same name or ID since all data exists only in memory
-        and is lost when the process terminates.
+        """Open or create a new Redis storage client.
 
         Args:
-            id: The ID of the dataset. If not provided, a random ID will be generated.
-            name: The name of the dataset for named (global scope) storages.
-            alias: The alias of the dataset for unnamed (run scope) storages.
+            id: The ID of the storage. If not provided, a random ID will be generated.
+            name: The name of the storage for named (global scope) storages.
+            alias: The alias of the storage for unnamed (run scope) storages.
             redis: Redis client instance.
             metadata_model: Pydantic model for metadata validation.
             extra_metadata_fields: Storage-specific metadata fields.
@@ -110,19 +122,22 @@ class RedisClientMixin(ABC):
         """
         internal_name = name or alias or cls._DEFAULT_NAME
         storage_id: str | None = None
+        # Determine if storage exists by ID or name
         if id:
             storage_name = await cls._get_metadata_name_by_id(id=id, redis=redis)
             storage_id = id
             if storage_name is None:
-                raise ValueError(f'Dataset with ID "{id}" does not exist.')
+                raise ValueError(f'{cls._CLIENT_TYPE} with ID "{id}" does not exist.')
         else:
             metadata_data = await cls._get_metadata_by_name(name=internal_name, redis=redis)
             storage_name = internal_name if metadata_data is not None else None
             storage_id = metadata_data['id'] if metadata_data is not None else None
+        # If both storage_name and storage_id are found, open existing storage
         if storage_name and storage_id:
             client = cls(storage_name=storage_name, storage_id=storage_id, redis=redis)
             async with client._get_pipeline() as pipe:
                 await client._update_metadata(pipe, update_accessed_at=True)
+        # Otherwise, create a new storage
         else:
             now = datetime.now(timezone.utc)
             metadata = metadata_model(
@@ -135,10 +150,12 @@ class RedisClientMixin(ABC):
             )
             client = cls(storage_name=internal_name, storage_id=metadata.id, redis=redis)
             created = await client._create_metadata_and_storage(internal_name, metadata.model_dump())
+            # The client was probably not created due to a race condition. Let's try to open it using the name.
             if not created:
                 metadata_data = await cls._get_metadata_by_name(name=internal_name, redis=redis, with_wait=True)
                 client = cls(storage_name=internal_name, storage_id=metadata.id, redis=redis)
 
+        # Ensure Lua scripts are loaded
         await client._ensure_scripts_loaded()
         return client
 
@@ -154,7 +171,7 @@ class RedisClientMixin(ABC):
 
     @asynccontextmanager
     async def _get_pipeline(self, *, with_execute: bool = True) -> AsyncIterator[Pipeline]:
-        """Create a new Redis pipeline for this storage."""
+        """Create a new Redis pipeline."""
         async with self._redis.pipeline() as pipe:
             try:
                 pipe.multi()  # type: ignore[no-untyped-call]
@@ -164,6 +181,7 @@ class RedisClientMixin(ABC):
                     await pipe.execute()
 
     async def _create_storage(self, pipeline: Pipeline) -> None:
+        """Create the actual storage structure in Redis."""
         _pipeline = pipeline  # To avoid unused variable mypy error
 
     async def _create_script(self, script_name: str) -> AsyncScript:
@@ -180,10 +198,13 @@ class RedisClientMixin(ABC):
         metadata['accessed_at'] = metadata['accessed_at'].isoformat()
         metadata['modified_at'] = metadata['modified_at'].isoformat()
 
+        # Try to create name_to_id index entry, if it already exists, return False.
         name_to_id = await await_redis_response(self._redis.hsetnx(index_id_to_name, storage_name, metadata['id']))
+        # If name already exists, return False. Probably an attempt at parallel creation.
         if not name_to_id:
             return False
 
+        # Create id_to_name index entry, metadata, and storage structure in a transaction.
         async with self._get_pipeline() as pipe:
             await await_redis_response(pipe.hsetnx(index_name_to_id, metadata['id'], storage_name))
             await await_redis_response(pipe.json().set(self.metadata_key, '$', metadata))
@@ -201,7 +222,7 @@ class RedisClientMixin(ABC):
             for key in extra_keys:
                 await pipe.delete(key)
 
-    async def _purge(self, extra_keys: list[str], metadata_kwargs: dict) -> None:
+    async def _purge(self, extra_keys: list[str], metadata_kwargs: MetadataUpdateParams) -> None:
         async with self._get_pipeline() as pipe:
             for key in extra_keys:
                 await pipe.delete(key)

@@ -3,12 +3,12 @@ from __future__ import annotations
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
 
-from typing_extensions import override
+from typing_extensions import NotRequired, override
 
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
-from ._client_mixin import RedisClientMixin
+from ._client_mixin import MetadataUpdateParams, RedisClientMixin
 from ._utils import await_redis_response
 
 if TYPE_CHECKING:
@@ -20,22 +20,33 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+class _DatasetMetadataUpdateParams(MetadataUpdateParams):
+    """Parameters for updating dataset metadata."""
+
+    new_item_count: NotRequired[int]
+    delta_item_count: NotRequired[int]
+
+
 class RedisDatasetClient(DatasetClient, RedisClientMixin):
-    """Memory implementation of the dataset client.
+    """Redis implementation of the dataset client.
 
-    This client stores dataset items in memory using Python lists and dictionaries. No data is persisted
-    between process runs, meaning all stored data is lost when the program terminates. This implementation
-    is primarily useful for testing, development, and short-lived crawler operations where persistent
-    storage is not required.
+    This client persists dataset items to Redis using JSON arrays for efficient storage and retrieval.
+    Items are stored as JSON objects with automatic ordering preservation through Redis list operations.
 
-    The memory implementation provides fast access to data but is limited by available memory and
-    does not support data sharing across different processes. It supports all dataset operations including
-    sorting, filtering, and pagination, but performs them entirely in memory.
+    The dataset data is stored in Redis using the following key pattern:
+    - `dataset:{name}:items` - Redis JSON array containing all dataset items.
+    - `dataset:{name}:metadata` - Redis JSON object containing dataset metadata.
+
+    Items must be JSON-serializable dictionaries. Single items or lists of items can be pushed to the dataset.
+    The item ordering is preserved through Redis JSON array operations. All operations provide atomic consistency
+    through Redis transactions and pipeline operations.
     """
 
     _DEFAULT_NAME = 'default'
+    """Default Dataset name key prefix when none provided."""
 
     _MAIN_KEY = 'dataset'
+    """Main Redis key prefix for Dataset."""
 
     _CLIENT_TYPE = 'Dataset'
     """Human-readable client type for error messages."""
@@ -43,7 +54,12 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
     def __init__(self, storage_name: str, storage_id: str, redis: Redis) -> None:
         """Initialize a new instance.
 
-        Preferably use the `MemoryDatasetClient.open` class method to create a new instance.
+        Preferably use the `RedisDatasetClient.open` class method to create a new instance.
+
+        Args:
+            storage_name: Internal storage name used for Redis keys.
+            storage_id: Unique identifier for the dataset.
+            redis: Redis client instance.
         """
         super().__init__(storage_name=storage_name, storage_id=storage_id, redis=redis)
 
@@ -63,9 +79,9 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
     ) -> RedisDatasetClient:
         """Open or create a new Redis dataset client.
 
-        This method creates a new Redis dataset instance. Unlike persistent storage implementations, Redis
-        datasets don't check for existing datasets with the same name or ID since all data exists only in memory
-        and is lost when the process terminates.
+        This method attempts to open an existing dataset from the Redis database. If a dataset with the specified
+        ID or name exists, it loads the metadata from the database. If no existing store is found, a new one
+        is created.
 
         Args:
             id: The ID of the dataset. If not provided, a random ID will be generated.
@@ -95,7 +111,12 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
 
     @override
     async def purge(self) -> None:
-        await self._purge(extra_keys=[self.items_key], metadata_kwargs={'new_item_count': 0})
+        await self._purge(
+            extra_keys=[self.items_key],
+            metadata_kwargs=_DatasetMetadataUpdateParams(
+                new_item_count=0, update_accessed_at=True, update_modified_at=True
+            ),
+        )
 
     @override
     async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
@@ -107,7 +128,10 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
             pipe.json().arrappend(self.items_key, '$', *data)  # type: ignore[arg-type]
             delta_item_count = len(data)
             await self._update_metadata(
-                pipe, update_accessed_at=True, update_modified_at=True, delta_item_count=delta_item_count
+                pipe,
+                **_DatasetMetadataUpdateParams(
+                    update_accessed_at=True, update_modified_at=True, delta_item_count=delta_item_count
+                ),
             )
 
     @override
@@ -181,7 +205,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
             data = list(reversed(data))
 
         async with self._get_pipeline() as pipe:
-            await self._update_metadata(pipe, update_accessed_at=True)
+            await self._update_metadata(pipe, **_DatasetMetadataUpdateParams(update_accessed_at=True))
 
         return DatasetItemsListPage(
             count=len(data),
@@ -236,7 +260,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
 
         # Update accessed_at timestamp
         async with self._get_pipeline() as pipe:
-            await self._update_metadata(pipe, update_accessed_at=True)
+            await self._update_metadata(pipe, **_DatasetMetadataUpdateParams(update_accessed_at=True))
 
         # Process items in batches for better network efficiency
         batch_size = 100
@@ -273,10 +297,12 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
                 yield cast('dict[str, Any]', item)
 
         async with self._get_pipeline() as pipe:
-            await self._update_metadata(pipe, update_accessed_at=True)
+            await self._update_metadata(pipe, **_DatasetMetadataUpdateParams(update_accessed_at=True))
 
     @override
     async def _create_storage(self, pipeline: Pipeline) -> None:
+        """Create the main dataset keys in Redis."""
+        # Create an empty JSON array for items
         await await_redis_response(pipeline.json().set(self.items_key, '$', []))
 
     @override
@@ -288,7 +314,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         delta_item_count: int | None = None,
         **_kwargs: Any,
     ) -> None:
-        """Update the dataset metadata with current information.
+        """Update the dataset metadata in the database.
 
         Args:
             pipeline: The Redis pipeline to use for the update.

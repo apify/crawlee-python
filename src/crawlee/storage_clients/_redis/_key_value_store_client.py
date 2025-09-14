@@ -10,7 +10,7 @@ from crawlee._utils.file import infer_mime_type
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
-from ._client_mixin import RedisClientMixin
+from ._client_mixin import MetadataUpdateParams, RedisClientMixin
 from ._utils import await_redis_response
 
 if TYPE_CHECKING:
@@ -23,20 +23,29 @@ logger = getLogger(__name__)
 
 
 class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
-    """Memory implementation of the key-value store client.
+    """Redis implementation of the key-value store client.
 
-    This client stores data in memory as Python dictionaries. No data is persisted between
-    process runs, meaning all stored data is lost when the program terminates. This implementation
-    is primarily useful for testing, development, and short-lived crawler operations where
-    persistence is not required.
+    This client persists key-value data to Redis using hash data structures for efficient storage and retrieval.
+    Keys are mapped to values with automatic content type detection and size tracking for metadata management.
 
-    The memory implementation provides fast access to data but is limited by available memory and
-    does not support data sharing across different processes.
+    The key-value store data is stored in Redis using the following key pattern:
+    - `key-value-store:{name}:items` - Redis hash containing key-value pairs (values stored as binary data).
+    - `key-value-store:{name}:metadata_items` - Redis hash containing metadata for each key.
+    - `key-value-store:{name}:metadata` - Redis JSON object containing store metadata.
+
+    Values are serialized based on their type: JSON objects are stored as UTF-8 encoded JSON strings,
+    text values as UTF-8 encoded strings, and binary data as-is. The implementation automatically handles
+    content type detection and maintains metadata about each record including size and MIME type information.
+
+    All operations are atomic through Redis hash operations and pipeline transactions. The client supports
+    concurrent access through Redis's built-in atomic operations for hash fields.
     """
 
     _DEFAULT_NAME = 'default'
+    """Default Key-Value Store name key prefix when none provided."""
 
     _MAIN_KEY = 'key-value-store'
+    """Main Redis key prefix for Key-Value Store."""
 
     _CLIENT_TYPE = 'Key-value store'
     """Human-readable client type for error messages."""
@@ -44,18 +53,18 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
     def __init__(self, storage_name: str, storage_id: str, redis: Redis) -> None:
         """Initialize a new instance.
 
-        Preferably use the `MemoryDatasetClient.open` class method to create a new instance.
+        Preferably use the `RedisKeyValueStoreClient.open` class method to create a new instance.
         """
         super().__init__(storage_name=storage_name, storage_id=storage_id, redis=redis)
 
     @property
     def items_key(self) -> str:
-        """Return the Redis key for the items of this storage."""
+        """Return the Redis key for the items of KVS."""
         return f'{self._MAIN_KEY}:{self._storage_name}:items'
 
     @property
     def metadata_items_key(self) -> str:
-        """Return the Redis key for the items metadata of this storage."""
+        """Return the Redis key for the items metadata of KVS."""
         return f'{self._MAIN_KEY}:{self._storage_name}:metadata_items'
 
     @classmethod
@@ -67,16 +76,16 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
         alias: str | None,
         redis: Redis,
     ) -> RedisKeyValueStoreClient:
-        """Open or create a new Redis dataset client.
+        """Open or create a new Redis key-value store client.
 
-        This method creates a new Redis dataset instance. Unlike persistent storage implementations, Redis
-        datasets don't check for existing datasets with the same name or ID since all data exists only in memory
-        and is lost when the process terminates.
+        This method attempts to open an existing key-value store from the Redis database. If a store with the specified
+        ID or name exists, it loads the metadata from the database. If no existing store is found, a new one
+        is created.
 
         Args:
-            id: The ID of the dataset. If not provided, a random ID will be generated.
-            name: The name of the dataset for named (global scope) storages.
-            alias: The alias of the dataset for unnamed (run scope) storages.
+            id: The ID of the key-value store. If not provided, a random ID will be generated.
+            name: The name of the key-value store for named (global scope) storages.
+            alias: The alias of the key-value store for unnamed (run scope) storages.
             redis: Redis client instance.
 
         Returns:
@@ -101,7 +110,10 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
 
     @override
     async def purge(self) -> None:
-        await self._purge(extra_keys=[self.items_key, self.metadata_items_key], metadata_kwargs={})
+        await self._purge(
+            extra_keys=[self.items_key, self.metadata_items_key],
+            metadata_kwargs=MetadataUpdateParams(update_accessed_at=True, update_modified_at=True),
+        )
 
     @override
     async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
@@ -141,7 +153,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
                     item_metadata.model_dump_json(),
                 )
             )
-            await self._update_metadata(pipe, update_accessed_at=True, update_modified_at=True)
+            await self._update_metadata(pipe, **MetadataUpdateParams(update_accessed_at=True, update_modified_at=True))
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
@@ -192,7 +204,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
         async with self._get_pipeline() as pipe:
             await await_redis_response(pipe.hdel(self.items_key, key))
             await await_redis_response(pipe.hdel(self.metadata_items_key, key))
-            await self._update_metadata(pipe, update_accessed_at=True, update_modified_at=True)
+            await self._update_metadata(pipe, **MetadataUpdateParams(update_accessed_at=True, update_modified_at=True))
 
     @override
     async def iterate_keys(
@@ -229,7 +241,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
         async with self._get_pipeline() as pipe:
             await self._update_metadata(
                 pipe,
-                update_accessed_at=True,
+                **MetadataUpdateParams(update_accessed_at=True),
             )
 
     @override
@@ -242,7 +254,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             await await_redis_response(pipe.hexists(self.items_key, key))
             await self._update_metadata(
                 pipe,
-                update_accessed_at=True,
+                **MetadataUpdateParams(update_accessed_at=True),
             )
             results = await pipe.execute()
 

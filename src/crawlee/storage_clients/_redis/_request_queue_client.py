@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import json
 from collections import deque
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
-from typing_extensions import override
+from typing_extensions import NotRequired, override
 
 from crawlee import Request
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee.storage_clients._base import RequestQueueClient
 from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, RequestQueueMetadata
 
-from ._client_mixin import RedisClientMixin
+from ._client_mixin import MetadataUpdateParams, RedisClientMixin
 from ._utils import await_redis_response
 
 if TYPE_CHECKING:
@@ -26,32 +26,65 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+class _QueueMetadataUpdateParams(MetadataUpdateParams):
+    """Parameters for updating queue metadata."""
+
+    new_handled_request_count: NotRequired[int]
+    new_pending_request_count: NotRequired[int]
+    new_total_request_count: NotRequired[int]
+    delta_handled_request_count: NotRequired[int]
+    delta_pending_request_count: NotRequired[int]
+    delta_total_request_count: NotRequired[int]
+    recalculate: NotRequired[bool]
+    update_had_multiple_clients: NotRequired[bool]
+
+
 class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
-    """Memory implementation of the request queue client.
+    """Redis implementation of the request queue client.
 
-    No data is persisted between process runs, which means all requests are lost when the program terminates.
-    This implementation is primarily useful for testing, development, and short-lived crawler runs where
-    persistence is not required.
+    This client persists requests to Redis using multiple data structures for efficient queue operations,
+    deduplication, and concurrent access safety. Requests are stored with FIFO ordering and support
+    both regular and forefront (high-priority) insertion modes.
 
-    This client provides fast access to request data but is limited by available memory and does not support
-    data sharing across different processes.
+    The implementation uses Bloom filters for efficient request deduplication and Redis lists for
+    queue operations. Request blocking and client coordination is handled through Redis hashes
+    with timestamp-based expiration for stale request recovery.
+
+    The request queue data is stored in Redis using the following key patterns:
+    - `request_queue:{name}:queue` - Redis list for FIFO request ordering
+    - `request_queue:{name}:data` - Redis hash storing serialized Request objects by unique_key
+    - `request_queue:{name}:in_progress` - Redis hash tracking requests currently being processed
+    - `request_queue:{name}:added_bloom_filter` - Bloom filter for added request deduplication
+    - `request_queue:{name}:handled_bloom_filter` - Bloom filter for completed request tracking
+    - `request_queue:{name}:metadata` - Redis JSON object containing queue metadata
+
+    Requests are serialized to JSON for storage and maintain proper FIFO ordering through Redis list
+    operations. The implementation provides concurrent access safety through atomic Lua scripts,
+    Bloom filter operations, and Redis's built-in atomicity guarantees for individual operations.
     """
 
     _DEFAULT_NAME = 'default'
+    """Default Request Queue name key prefix when none provided."""
 
     _MAIN_KEY = 'request_queue'
+    """Main Redis key prefix for Request Queue."""
 
     _CLIENT_TYPE = 'Request queue'
     """Human-readable client type for error messages."""
 
     _MAX_BATCH_FETCH_SIZE = 10
+    """Maximum number of requests to fetch in a single batch operation."""
 
     _BLOCK_REQUEST_TIME = 300_000  # milliseconds
+    """Time in milliseconds to block a fetched request before it can be reclaimed."""
+
+    _RECLAIM_INTERVAL = timedelta(seconds=30)
+    """Interval to check for stale requests to reclaim."""
 
     def __init__(self, storage_name: str, storage_id: str, redis: Redis) -> None:
         """Initialize a new instance.
 
-        Preferably use the `MemoryDatasetClient.open` class method to create a new instance.
+        Preferably use the `RedisRequestQueueClient.open` class method to create a new instance.
         """
         super().__init__(storage_name=storage_name, storage_id=storage_id, redis=redis)
 
@@ -61,11 +94,12 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         self.client_key = crypto_random_object_id(length=32)[:32]
         """Unique identifier for this client instance."""
 
+        # Lua scripts for atomic operations
         self._fetch_script: AsyncScript | None = None
-
         self._reclaim_stale_script: AsyncScript | None = None
-
         self._add_requests_script: AsyncScript | None = None
+
+        self._next_reclaim_stale: None | datetime = None
 
     @property
     def added_filter_key(self) -> str:
@@ -101,11 +135,11 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         alias: str | None,
         redis: Redis,
     ) -> RedisRequestQueueClient:
-        """Open or create a new memory request queue client.
+        """Open or create a new Redis request queue client.
 
-        This method creates a new in-memory request queue instance. Unlike persistent storage implementations,
-        memory queues don't check for existing queues with the same name or ID since all data exists only
-        in memory and is lost when the process terminates.
+        This method attempts to open an existing request queue from the Redis database. If a queue with the specified
+        ID or name exists, it loads the metadata from the database. If no existing queue is found, a new one
+        is created.
 
         Args:
             id: The ID of the request queue. If not provided, a random ID will be generated.
@@ -156,11 +190,11 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 self.data_key,
                 self.in_progress_key,
             ],
-            metadata_kwargs={
-                'update_accessed_at': True,
-                'update_modified_at': True,
-                'new_pending_request_count': 0,
-            },
+            metadata_kwargs=_QueueMetadataUpdateParams(
+                update_accessed_at=True,
+                update_modified_at=True,
+                new_pending_request_count=0,
+            ),
         )
 
     @override
@@ -181,6 +215,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
         requests_by_unique_key = {req.unique_key: req for req in requests}
         unique_keys = list(requests_by_unique_key.keys())
+        # Check which requests are already added or handled
         async with self._get_pipeline(with_execute=False) as pipe:
             await await_redis_response(pipe.bf().mexists(self.added_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
             await await_redis_response(pipe.bf().mexists(self.handled_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
@@ -225,6 +260,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
             new_request_data[unique_key] = request.model_dump_json()
 
         if new_unique_keys:
+            # Add new requests to the queue atomically, get back which were actually added
             script_results = await self._add_requests_script(
                 keys=[self.added_filter_key, self.queue_key, self.data_key],
                 args=[int(forefront), json.dumps(new_unique_keys), json.dumps(new_request_data)],
@@ -255,10 +291,12 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         async with self._get_pipeline() as pipe:
             await self._update_metadata(
                 pipe,
-                update_accessed_at=True,
-                update_modified_at=True,
-                delta_pending_request_count=delta_pending,
-                delta_total_request_count=delta_total,
+                **_QueueMetadataUpdateParams(
+                    update_accessed_at=True,
+                    update_modified_at=True,
+                    delta_pending_request_count=delta_pending,
+                    delta_total_request_count=delta_total,
+                ),
             )
 
         return AddRequestsResponse(
@@ -277,13 +315,14 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
         blocked_until_timestamp = int(datetime.now(tz=timezone.utc).timestamp() * 1000) + self._BLOCK_REQUEST_TIME
 
+        # The script retrieves requests from the queue and places them in the in_progress hash.
         requests_json = await self._fetch_script(
             keys=[self.queue_key, self.in_progress_key, self.data_key],
             args=[self.client_key, blocked_until_timestamp, self._MAX_BATCH_FETCH_SIZE],
         )
 
         async with self._get_pipeline() as pipe:
-            await self._update_metadata(pipe, update_accessed_at=True)
+            await self._update_metadata(pipe, **_QueueMetadataUpdateParams(update_accessed_at=True))
 
         if not requests_json:
             return None
@@ -320,10 +359,12 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
             await self._update_metadata(
                 pipe,
-                update_accessed_at=True,
-                update_modified_at=True,
-                delta_handled_request_count=1,
-                delta_pending_request_count=-1,
+                **_QueueMetadataUpdateParams(
+                    update_accessed_at=True,
+                    update_modified_at=True,
+                    delta_handled_request_count=1,
+                    delta_pending_request_count=-1,
+                ),
             )
 
         return ProcessedRequest(
@@ -363,8 +404,10 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 await await_redis_response(pipe.hdel(self.in_progress_key, request.unique_key))
             await self._update_metadata(
                 pipe,
-                update_modified_at=True,
-                update_accessed_at=True,
+                **_QueueMetadataUpdateParams(
+                    update_modified_at=True,
+                    update_accessed_at=True,
+                ),
             )
 
         return ProcessedRequest(
@@ -383,6 +426,11 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         if self._pending_fetch_cache:
             return False
 
+        # Reclaim stale requests if needed
+        if self._next_reclaim_stale is None or datetime.now(tz=timezone.utc) >= self._next_reclaim_stale:
+            await self._reclaim_stale_requests()
+            self._next_reclaim_stale = datetime.now(tz=timezone.utc) + self._RECLAIM_INTERVAL
+
         metadata = await self.get_metadata()
 
         return metadata.pending_request_count == 0
@@ -395,10 +443,12 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
     @override
     async def _create_storage(self, pipeline: Pipeline) -> None:
+        # Create Bloom filters for added and handled requests
         await await_redis_response(pipeline.bf().create(self.added_filter_key, 0.1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
         await await_redis_response(pipeline.bf().create(self.handled_filter_key, 0.1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
 
     async def _reclaim_stale_requests(self) -> None:
+        """Reclaim requests that have been in progress for too long."""
         # Mypy workaround
         if self._reclaim_stale_script is None:
             raise RuntimeError('Scripts not loaded. Call _ensure_scripts_loaded() before using the client.')
