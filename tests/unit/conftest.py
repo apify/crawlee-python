@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+import warnings
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -27,6 +28,14 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee.http_clients._base import HttpClient
+
+
+@pytest.fixture
+async def suppress_user_warning() -> AsyncGenerator[None, None]:
+    """Suppress user warnings during tests."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', UserWarning)
+        yield
 
 
 @pytest.fixture

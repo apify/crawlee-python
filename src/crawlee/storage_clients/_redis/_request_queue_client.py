@@ -102,27 +102,27 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         self._next_reclaim_stale: None | datetime = None
 
     @property
-    def added_filter_key(self) -> str:
+    def _added_filter_key(self) -> str:
         """Return the Redis key for the added requests Bloom filter."""
         return f'{self._MAIN_KEY}:{self._storage_name}:added_bloom_filter'
 
     @property
-    def handled_filter_key(self) -> str:
+    def _handled_filter_key(self) -> str:
         """Return the Redis key for the handled requests Bloom filter."""
         return f'{self._MAIN_KEY}:{self._storage_name}:handled_bloom_filter'
 
     @property
-    def queue_key(self) -> str:
+    def _queue_key(self) -> str:
         """Return the Redis key for the request queue."""
         return f'{self._MAIN_KEY}:{self._storage_name}:queue'
 
     @property
-    def data_key(self) -> str:
+    def _data_key(self) -> str:
         """Return the Redis key for the request data hash."""
         return f'{self._MAIN_KEY}:{self._storage_name}:data'
 
     @property
-    def in_progress_key(self) -> str:
+    def _in_progress_key(self) -> str:
         """Return the Redis key for the in-progress requests hash."""
         return f'{self._MAIN_KEY}:{self._storage_name}:in_progress'
 
@@ -172,11 +172,11 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     async def drop(self) -> None:
         await self._drop(
             extra_keys=[
-                self.added_filter_key,
-                self.handled_filter_key,
-                self.queue_key,
-                self.data_key,
-                self.in_progress_key,
+                self._added_filter_key,
+                self._handled_filter_key,
+                self._queue_key,
+                self._data_key,
+                self._in_progress_key,
             ]
         )
 
@@ -184,11 +184,11 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     async def purge(self) -> None:
         await self._purge(
             extra_keys=[
-                self.added_filter_key,
-                self.handled_filter_key,
-                self.queue_key,
-                self.data_key,
-                self.in_progress_key,
+                self._added_filter_key,
+                self._handled_filter_key,
+                self._queue_key,
+                self._data_key,
+                self._in_progress_key,
             ],
             metadata_kwargs=_QueueMetadataUpdateParams(
                 update_accessed_at=True,
@@ -217,8 +217,8 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         unique_keys = list(requests_by_unique_key.keys())
         # Check which requests are already added or handled
         async with self._get_pipeline(with_execute=False) as pipe:
-            await await_redis_response(pipe.bf().mexists(self.added_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
-            await await_redis_response(pipe.bf().mexists(self.handled_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
+            await await_redis_response(pipe.bf().mexists(self._added_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
+            await await_redis_response(pipe.bf().mexists(self._handled_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
 
             results = await pipe.execute()
 
@@ -262,7 +262,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         if new_unique_keys:
             # Add new requests to the queue atomically, get back which were actually added
             script_results = await self._add_requests_script(
-                keys=[self.added_filter_key, self.queue_key, self.data_key],
+                keys=[self._added_filter_key, self._queue_key, self._data_key],
                 args=[int(forefront), json.dumps(new_unique_keys), json.dumps(new_request_data)],
             )
             actually_added = set(json.loads(script_results))
@@ -317,7 +317,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
         # The script retrieves requests from the queue and places them in the in_progress hash.
         requests_json = await self._fetch_script(
-            keys=[self.queue_key, self.in_progress_key, self.data_key],
+            keys=[self._queue_key, self._in_progress_key, self._data_key],
             args=[self.client_key, blocked_until_timestamp, self._MAX_BATCH_FETCH_SIZE],
         )
 
@@ -335,7 +335,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
     @override
     async def get_request(self, unique_key: str) -> Request | None:
-        request_data = await await_redis_response(self._redis.hget(self.data_key, unique_key))
+        request_data = await await_redis_response(self._redis.hget(self._data_key, unique_key))
 
         if isinstance(request_data, (str, bytes, bytearray)):
             return Request.model_validate_json(request_data)
@@ -346,16 +346,16 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         # Check if the request is in progress.
 
-        check_in_progress = await await_redis_response(self._redis.hexists(self.in_progress_key, request.unique_key))
+        check_in_progress = await await_redis_response(self._redis.hexists(self._in_progress_key, request.unique_key))
         if not check_in_progress:
             logger.warning(f'Marking request {request.unique_key} as handled that is not in progress.')
             return None
 
         async with self._get_pipeline() as pipe:
-            await await_redis_response(pipe.bf().add(self.handled_filter_key, request.unique_key))  # type: ignore[no-untyped-call]
+            await await_redis_response(pipe.bf().add(self._handled_filter_key, request.unique_key))  # type: ignore[no-untyped-call]
 
-            await await_redis_response(pipe.hdel(self.in_progress_key, request.unique_key))
-            await await_redis_response(pipe.hdel(self.data_key, request.unique_key))
+            await await_redis_response(pipe.hdel(self._in_progress_key, request.unique_key))
+            await await_redis_response(pipe.hdel(self._data_key, request.unique_key))
 
             await self._update_metadata(
                 pipe,
@@ -380,7 +380,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         *,
         forefront: bool = False,
     ) -> ProcessedRequest | None:
-        check_in_progress = await await_redis_response(self._redis.hexists(self.in_progress_key, request.unique_key))
+        check_in_progress = await await_redis_response(self._redis.hexists(self._in_progress_key, request.unique_key))
         if not check_in_progress:
             logger.info(f'Reclaiming request {request.unique_key} that is not in progress.')
             return None
@@ -393,15 +393,15 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
                 await await_redis_response(
                     pipe.hset(
-                        self.in_progress_key,
+                        self._in_progress_key,
                         request.unique_key,
                         f'{{"client_id":"{self.client_key}","blocked_until_timestamp":{blocked_until_timestamp}}}',
                     )
                 )
                 self._pending_fetch_cache.appendleft(request)
             else:
-                await await_redis_response(pipe.rpush(self.queue_key, request.unique_key))
-                await await_redis_response(pipe.hdel(self.in_progress_key, request.unique_key))
+                await await_redis_response(pipe.rpush(self._queue_key, request.unique_key))
+                await await_redis_response(pipe.hdel(self._in_progress_key, request.unique_key))
             await self._update_metadata(
                 pipe,
                 **_QueueMetadataUpdateParams(
@@ -444,8 +444,8 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     @override
     async def _create_storage(self, pipeline: Pipeline) -> None:
         # Create Bloom filters for added and handled requests
-        await await_redis_response(pipeline.bf().create(self.added_filter_key, 0.1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
-        await await_redis_response(pipeline.bf().create(self.handled_filter_key, 0.1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
+        await await_redis_response(pipeline.bf().create(self._added_filter_key, 1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
+        await await_redis_response(pipeline.bf().create(self._handled_filter_key, 1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
 
     async def _reclaim_stale_requests(self) -> None:
         """Reclaim requests that have been in progress for too long."""
@@ -456,7 +456,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         current_time = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
 
         await self._reclaim_stale_script(
-            keys=[self.in_progress_key, self.queue_key, self.data_key], args=[current_time]
+            keys=[self._in_progress_key, self._queue_key, self._data_key], args=[current_time]
         )
 
     @override

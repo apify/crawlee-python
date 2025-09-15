@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from fakeredis import FakeAsyncRedis
-    from redis.asyncio import Redis
 
     from crawlee.storage_clients import StorageClient
 
@@ -30,7 +29,7 @@ def storage_client(request: pytest.FixtureRequest, redis_client: FakeAsyncRedis)
         return MemoryStorageClient()
 
     if request.param == 'redis':
-        return RedisStorageClient(redis=cast('Redis', redis_client))
+        return RedisStorageClient(redis=redis_client)
 
     return FileSystemStorageClient()
 

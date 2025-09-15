@@ -94,7 +94,12 @@ class RedisClientMixin(ABC):
             id: The ID of the storage.
             redis: The Redis client instance.
         """
-        return await await_redis_response(redis.get(f'{cls._MAIN_KEY}:id_to_name:{id}'))
+        name = await await_redis_response(redis.hget(f'{cls._MAIN_KEY}:id_to_name', id))
+        if isinstance(name, str) or name is None:
+            return name
+        if isinstance(name, bytes):
+            return name.decode('utf-8')
+        return None
 
     @classmethod
     async def _open(
@@ -199,14 +204,14 @@ class RedisClientMixin(ABC):
         metadata['modified_at'] = metadata['modified_at'].isoformat()
 
         # Try to create name_to_id index entry, if it already exists, return False.
-        name_to_id = await await_redis_response(self._redis.hsetnx(index_id_to_name, storage_name, metadata['id']))
+        name_to_id = await await_redis_response(self._redis.hsetnx(index_name_to_id, storage_name, metadata['id']))
         # If name already exists, return False. Probably an attempt at parallel creation.
         if not name_to_id:
             return False
 
         # Create id_to_name index entry, metadata, and storage structure in a transaction.
         async with self._get_pipeline() as pipe:
-            await await_redis_response(pipe.hsetnx(index_name_to_id, metadata['id'], storage_name))
+            await await_redis_response(pipe.hsetnx(index_id_to_name, metadata['id'], storage_name))
             await await_redis_response(pipe.json().set(self.metadata_key, '$', metadata))
             await await_redis_response(pipe.lpush(f'{self._MAIN_KEY}:{storage_name}:created_signal', 1))
 
@@ -219,6 +224,7 @@ class RedisClientMixin(ABC):
             await pipe.delete(self.metadata_key)
             await pipe.delete(f'{self._MAIN_KEY}:id_to_name', self._storage_id)
             await pipe.delete(f'{self._MAIN_KEY}:name_to_id', self._storage_name)
+            await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:created_signal')
             for key in extra_keys:
                 await pipe.delete(key)
 
@@ -243,6 +249,8 @@ class RedisClientMixin(ABC):
         metadata_dict = await self._get_metadata_by_name(name=self._storage_name, redis=self._redis)
         if metadata_dict is None:
             raise ValueError(f'{self._CLIENT_TYPE} with name "{self._storage_name}" does not exist.')
+        async with self._get_pipeline() as pipe:
+            await self._update_metadata(pipe, update_accessed_at=True)
 
         return metadata_model.model_validate(metadata_dict)
 

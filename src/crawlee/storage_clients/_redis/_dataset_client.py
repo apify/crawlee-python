@@ -64,7 +64,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         super().__init__(storage_name=storage_name, storage_id=storage_id, redis=redis)
 
     @property
-    def items_key(self) -> str:
+    def _items_key(self) -> str:
         """Return the Redis key for the items of this dataset."""
         return f'{self._MAIN_KEY}:{self._storage_name}:items'
 
@@ -107,12 +107,12 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
 
     @override
     async def drop(self) -> None:
-        await self._drop(extra_keys=[self.items_key])
+        await self._drop(extra_keys=[self._items_key])
 
     @override
     async def purge(self) -> None:
         await self._purge(
-            extra_keys=[self.items_key],
+            extra_keys=[self._items_key],
             metadata_kwargs=_DatasetMetadataUpdateParams(
                 new_item_count=0, update_accessed_at=True, update_modified_at=True
             ),
@@ -125,7 +125,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
 
         async with self._get_pipeline() as pipe:
             # Incorrect signature for args type in redis-py
-            pipe.json().arrappend(self.items_key, '$', *data)  # type: ignore[arg-type]
+            pipe.json().arrappend(self._items_key, '$', *data)  # type: ignore[arg-type]
             delta_item_count = len(data)
             await self._update_metadata(
                 pipe,
@@ -193,7 +193,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         if json_path == '$':
             json_path = '$[*]'
 
-        data = await await_redis_response(self._redis.json().get(self.items_key, json_path))
+        data = await await_redis_response(self._redis.json().get(self._items_key, json_path))
 
         if data is None:
             data = []
@@ -278,7 +278,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
                 json_path = f'$[{batch_start}:{batch_end}]'
 
             # Get batch of items
-            batch_items = await await_redis_response(self._redis.json().get(self.items_key, json_path))
+            batch_items = await await_redis_response(self._redis.json().get(self._items_key, json_path))
 
             # Handle case where batch_items might be None or not a list
             if batch_items is None:
@@ -303,7 +303,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
     async def _create_storage(self, pipeline: Pipeline) -> None:
         """Create the main dataset keys in Redis."""
         # Create an empty JSON array for items
-        await await_redis_response(pipeline.json().set(self.items_key, '$', []))
+        await await_redis_response(pipeline.json().set(self._items_key, '$', []))
 
     @override
     async def _specific_update_metadata(
