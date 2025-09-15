@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from logging import getLogger
@@ -33,7 +32,7 @@ class MetadataUpdateParams(TypedDict, total=False):
     update_modified_at: NotRequired[bool]
 
 
-class RedisClientMixin(ABC):
+class RedisClientMixin:
     """Mixin class for Redis clients.
 
     This mixin provides common Redis operations and basic methods for Redis storage clients.
@@ -187,7 +186,7 @@ class RedisClientMixin(ABC):
 
     async def _create_storage(self, pipeline: Pipeline) -> None:
         """Create the actual storage structure in Redis."""
-        _pipeline = pipeline  # To avoid unused variable mypy error
+        _ = pipeline  # To avoid unused variable mypy error
 
     async def _create_script(self, script_name: str) -> AsyncScript:
         """Load a Lua script from a file and return a Script object."""
@@ -254,7 +253,6 @@ class RedisClientMixin(ABC):
 
         return metadata_model.model_validate(metadata_dict)
 
-    @abstractmethod
     async def _specific_update_metadata(self, pipeline: Pipeline, **kwargs: Any) -> None:
         """Pipeline operations storage-specific metadata updates.
 
@@ -264,6 +262,8 @@ class RedisClientMixin(ABC):
             pipeline: The Redis pipeline to use for the update.
             **kwargs: Storage-specific update parameters.
         """
+        _ = pipeline  # To avoid unused variable mypy error
+        _ = kwargs
 
     async def _update_metadata(
         self,

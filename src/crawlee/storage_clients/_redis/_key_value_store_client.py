@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from redis.asyncio import Redis
-    from redis.asyncio.client import Pipeline
 
 logger = getLogger(__name__)
 
@@ -262,8 +261,3 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             results = await pipe.execute()
 
         return bool(results[0])
-
-    @override
-    async def _specific_update_metadata(self, pipeline: Pipeline, **kwargs: Any) -> None:
-        # No specific fields to update for Redis key-value stores.
-        return

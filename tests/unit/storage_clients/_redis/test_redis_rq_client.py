@@ -186,6 +186,7 @@ async def test_metadata_file_updates(rq_client: RedisRequestQueueClient) -> None
     assert metadata_json['total_request_count'] == 1  # type: ignore[unreachable] # py-json typing is broken
 
 
+@pytest.mark.usefixtures('suppress_user_warning')
 async def test_data_persistence_across_reopens(redis_client: FakeAsyncRedis) -> None:
     """Test that requests persist correctly when reopening the same RQ."""
     storage_client = RedisStorageClient(redis=redis_client)
