@@ -89,7 +89,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self,
         *,
         metadata: RequestQueueMetadata,
-        storage_dir: Path,
+        path_to_rq: Path,
         lock: asyncio.Lock,
     ) -> None:
         """Initialize a new instance.
@@ -98,8 +98,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         """
         self._metadata = metadata
 
-        self._storage_dir = storage_dir
-        """The base directory where the storage data are being persisted."""
+        self._path_to_rq = path_to_rq
+        """The full path to the request queue directory."""
 
         self._lock = lock
         """A lock to ensure that only one operation is performed at a time."""
@@ -129,10 +129,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     @property
     def path_to_rq(self) -> Path:
         """The full path to the request queue directory."""
-        if self._metadata.name is None:
-            return self._storage_dir / self._STORAGE_SUBDIR / self._STORAGE_SUBSUBDIR_DEFAULT
-
-        return self._storage_dir / self._STORAGE_SUBDIR / self._metadata.name
+        return self._path_to_rq
 
     @property
     def path_to_metadata(self) -> Path:
@@ -145,6 +142,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         *,
         id: str | None,
         name: str | None,
+        alias: str | None,
         configuration: Configuration,
     ) -> FileSystemRequestQueueClient:
         """Open or create a file system request queue client.
@@ -155,17 +153,23 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         Args:
             id: The ID of the request queue to open. If provided, searches for existing queue by ID.
-            name: The name of the request queue to open. If not provided, uses the default queue.
+            name: The name of the request queue for named (global scope) storages.
+            alias: The alias of the request queue for unnamed (run scope) storages.
             configuration: The configuration object containing storage directory settings.
 
         Returns:
             An instance for the opened or created storage client.
 
         Raises:
-            ValueError: If a queue with the specified ID is not found, or if metadata is invalid.
+            ValueError: If a queue with the specified ID is not found, if metadata is invalid,
+                or if both name and alias are provided.
         """
-        storage_dir = Path(configuration.storage_dir)
-        rq_base_path = storage_dir / cls._STORAGE_SUBDIR
+        # Validate input parameters.
+        specified_params = sum(1 for param in [id, name, alias] if param is not None)
+        if specified_params > 1:
+            raise ValueError('Only one of "id", "name", or "alias" can be specified, not multiple.')
+
+        rq_base_path = Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
 
         if not rq_base_path.exists():
             await asyncio.to_thread(rq_base_path.mkdir, parents=True, exist_ok=True)
@@ -177,12 +181,12 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 if not rq_dir.is_dir():
                     continue
 
-                metadata_path = rq_dir / METADATA_FILENAME
-                if not metadata_path.exists():
+                path_to_metadata = rq_dir / METADATA_FILENAME
+                if not path_to_metadata.exists():
                     continue
 
                 try:
-                    file = await asyncio.to_thread(metadata_path.open)
+                    file = await asyncio.to_thread(path_to_metadata.open)
                     try:
                         file_content = json.load(file)
                         metadata = RequestQueueMetadata(**file_content)
@@ -190,7 +194,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                         if metadata.id == id:
                             client = cls(
                                 metadata=metadata,
-                                storage_dir=storage_dir,
+                                path_to_rq=rq_base_path / rq_dir,
                                 lock=asyncio.Lock(),
                             )
                             await client._state.initialize()
@@ -206,14 +210,15 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             if not found:
                 raise ValueError(f'Request queue with ID "{id}" not found')
 
-        # Open an existing RQ by its name, or create a new one if not found.
+        # Open an existing RQ by its name or alias, or create a new one if not found.
         else:
-            rq_path = rq_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT if name is None else rq_base_path / name
-            metadata_path = rq_path / METADATA_FILENAME
+            rq_dir = Path(name) if name else Path(alias) if alias else Path('default')
+            path_to_rq = rq_base_path / rq_dir
+            path_to_metadata = path_to_rq / METADATA_FILENAME
 
             # If the RQ directory exists, reconstruct the client from the metadata file.
-            if rq_path.exists() and metadata_path.exists():
-                file = await asyncio.to_thread(open, metadata_path)
+            if path_to_rq.exists() and path_to_metadata.exists():
+                file = await asyncio.to_thread(open, path_to_metadata)
                 try:
                     file_content = json.load(file)
                 finally:
@@ -221,13 +226,11 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 try:
                     metadata = RequestQueueMetadata(**file_content)
                 except ValidationError as exc:
-                    raise ValueError(f'Invalid metadata file for request queue "{name}"') from exc
-
-                metadata.name = name
+                    raise ValueError(f'Invalid metadata file for request queue "{name or alias}"') from exc
 
                 client = cls(
                     metadata=metadata,
-                    storage_dir=storage_dir,
+                    path_to_rq=path_to_rq,
                     lock=asyncio.Lock(),
                 )
 
@@ -251,7 +254,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 )
                 client = cls(
                     metadata=metadata,
-                    storage_dir=storage_dir,
+                    path_to_rq=path_to_rq,
                     lock=asyncio.Lock(),
                 )
                 await client._state.initialize()
@@ -312,28 +315,43 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             unprocessed_requests = list[UnprocessedRequest]()
             state = self._state.current_value
 
-            # Prepare a dictionary to track existing requests by their unique keys.
-            existing_unique_keys: dict[str, Path] = {}
-            existing_request_files = await self._get_request_files(self.path_to_rq)
+            all_requests = state.forefront_requests | state.regular_requests
 
-            for request_file in existing_request_files:
-                existing_request = await self._parse_request_file(request_file)
-                if existing_request is not None:
-                    existing_unique_keys[existing_request.unique_key] = request_file
+            requests_to_enqueue = {}
+
+            # Determine which requests can be added or are modified.
+            for request in requests:
+                # Check if the request has already been handled.
+                if request.unique_key in state.handled_requests:
+                    processed_requests.append(
+                        ProcessedRequest(
+                            unique_key=request.unique_key,
+                            was_already_present=True,
+                            was_already_handled=True,
+                        )
+                    )
+                # Check if the request is already in progress.
+                # Or if the request is already in the queue and the `forefront` flag is not used, we do not change the
+                # position of the request.
+                elif (request.unique_key in state.in_progress_requests) or (
+                    request.unique_key in all_requests and not forefront
+                ):
+                    processed_requests.append(
+                        ProcessedRequest(
+                            unique_key=request.unique_key,
+                            was_already_present=True,
+                            was_already_handled=False,
+                        )
+                    )
+                # These requests must either be added or update their position.
+                else:
+                    requests_to_enqueue[request.unique_key] = request
 
             # Process each request in the batch.
-            for request in requests:
-                existing_request_file = existing_unique_keys.get(request.unique_key)
-                existing_request = None
-
-                # Only load the full request from disk if we found a duplicate
-                if existing_request_file is not None:
-                    existing_request = await self._parse_request_file(existing_request_file)
-
-                # If there is no existing request with the same unique key, add the new request.
-                if existing_request is None:
+            for request in requests_to_enqueue.values():
+                # If the request is not already in the RQ, this is a new request.
+                if request.unique_key not in all_requests:
                     request_path = self._get_request_path(request.unique_key)
-
                     # Add sequence number to ensure FIFO ordering using state.
                     if forefront:
                         sequence_number = state.forefront_sequence_counter
@@ -352,9 +370,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     new_total_request_count += 1
                     new_pending_request_count += 1
 
-                    # Add to our index for subsequent requests in this batch
-                    existing_unique_keys[request.unique_key] = self._get_request_path(request.unique_key)
-
                     processed_requests.append(
                         ProcessedRequest(
                             unique_key=request.unique_key,
@@ -363,57 +378,33 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                         )
                     )
 
-                # If the request already exists in the RQ, just update it if needed.
+                # If the request already exists in the RQ and use the forefront flag to update its position
+                elif forefront:
+                    # If the request is among `regular`, remove it from its current position.
+                    if request.unique_key in state.regular_requests:
+                        state.regular_requests.pop(request.unique_key)
+
+                    # If the request is already in `forefront`, we just need to update its position.
+                    state.forefront_requests[request.unique_key] = state.forefront_sequence_counter
+                    state.forefront_sequence_counter += 1
+
+                    processed_requests.append(
+                        ProcessedRequest(
+                            unique_key=request.unique_key,
+                            was_already_present=True,
+                            was_already_handled=False,
+                        )
+                    )
+
                 else:
-                    # Set the processed request flags.
-                    was_already_present = existing_request is not None
-                    was_already_handled = existing_request.unique_key in state.handled_requests
-
-                    # If the request is already in the RQ and handled, just continue with the next one.
-                    if was_already_present and was_already_handled:
-                        processed_requests.append(
-                            ProcessedRequest(
-                                unique_key=request.unique_key,
-                                was_already_present=True,
-                                was_already_handled=True,
-                            )
+                    logger.warning(f'Request with unique key "{request.unique_key}" could not be processed.')
+                    unprocessed_requests.append(
+                        UnprocessedRequest(
+                            unique_key=request.unique_key,
+                            url=request.url,
+                            method=request.method,
                         )
-
-                    # If the request is already in the RQ but not handled yet, update it.
-                    elif was_already_present and not was_already_handled:
-                        # Update request type (forefront vs regular) in state
-                        if forefront:
-                            # Move from regular to forefront if needed
-                            if existing_request.unique_key in state.regular_requests:
-                                state.regular_requests.pop(existing_request.unique_key)
-                            if existing_request.unique_key not in state.forefront_requests:
-                                state.forefront_requests[existing_request.unique_key] = state.forefront_sequence_counter
-                                state.forefront_sequence_counter += 1
-                        elif (
-                            existing_request.unique_key not in state.forefront_requests
-                            and existing_request.unique_key not in state.regular_requests
-                        ):
-                            # Keep as regular if not already forefront
-                            state.regular_requests[existing_request.unique_key] = state.sequence_counter
-                            state.sequence_counter += 1
-
-                        processed_requests.append(
-                            ProcessedRequest(
-                                unique_key=request.unique_key,
-                                was_already_present=True,
-                                was_already_handled=False,
-                            )
-                        )
-
-                    else:
-                        logger.warning(f'Request with unique key "{request.unique_key}" could not be processed.')
-                        unprocessed_requests.append(
-                            UnprocessedRequest(
-                                unique_key=request.unique_key,
-                                url=request.url,
-                                method=request.method,
-                            )
-                        )
+                    )
 
             await self._update_metadata(
                 update_modified_at=True,
@@ -752,10 +743,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         files = await asyncio.to_thread(list, path_to_rq.glob('*.json'))
 
         # Filter out metadata file and non-file entries.
-        filtered = filter(
-            lambda request_file: request_file.is_file() and request_file.name != METADATA_FILENAME,
-            files,
-        )
+        filtered = filter(lambda request_file: request_file.is_file() and request_file.name != METADATA_FILENAME, files)
 
         return list(filtered)
 

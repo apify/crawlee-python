@@ -45,10 +45,11 @@ class FileSystemStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> FileSystemDatasetClient:
         configuration = configuration or Configuration.get_global_configuration()
-        client = await FileSystemDatasetClient.open(id=id, name=name, configuration=configuration)
+        client = await FileSystemDatasetClient.open(id=id, name=name, alias=alias, configuration=configuration)
         await self._purge_if_needed(client, configuration)
         return client
 
@@ -58,10 +59,11 @@ class FileSystemStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> FileSystemKeyValueStoreClient:
         configuration = configuration or Configuration.get_global_configuration()
-        client = await FileSystemKeyValueStoreClient.open(id=id, name=name, configuration=configuration)
+        client = await FileSystemKeyValueStoreClient.open(id=id, name=name, alias=alias, configuration=configuration)
         await self._purge_if_needed(client, configuration)
         return client
 
@@ -71,9 +73,10 @@ class FileSystemStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> FileSystemRequestQueueClient:
         configuration = configuration or Configuration.get_global_configuration()
-        client = await FileSystemRequestQueueClient.open(id=id, name=name, configuration=configuration)
+        client = await FileSystemRequestQueueClient.open(id=id, name=name, alias=alias, configuration=configuration)
         await self._purge_if_needed(client, configuration)
         return client

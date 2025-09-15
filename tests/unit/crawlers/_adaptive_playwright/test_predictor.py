@@ -24,7 +24,7 @@ from crawlee.storages import KeyValueStore
         ('http://www.ddf.com/some', 'client only'),
     ],
 )
-async def ictor_same_label(url: str, expected_prediction: RenderingType, label: str | None) -> None:
+async def test_predictor_same_label(url: str, expected_prediction: RenderingType, label: str | None) -> None:
     async with DefaultRenderingTypePredictor() as predictor:
         learning_inputs: tuple[tuple[str, RenderingType], ...] = (
             ('http://www.aaa.com/some/stuff', 'static'),

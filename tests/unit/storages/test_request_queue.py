@@ -9,8 +9,10 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee import Request, service_locator
+from crawlee.configuration import Configuration
 from crawlee.storage_clients import StorageClient
 from crawlee.storages import RequestQueue
+from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -74,7 +76,7 @@ async def test_open_with_id_and_name(
     storage_client: StorageClient,
 ) -> None:
     """Test that open() raises an error when both id and name are provided."""
-    with pytest.raises(ValueError, match='Only one of "id" or "name" can be specified'):
+    with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
         await RequestQueue.open(
             id='some-id',
             name='some-name',
@@ -604,3 +606,644 @@ async def test_purge(
 
     # Clean up
     await rq.drop()
+
+
+async def test_open_with_alias(
+    storage_client: StorageClient,
+) -> None:
+    """Test opening request queues with alias parameter for NDU functionality."""
+    # Create request queues with different aliases
+    rq_1 = await RequestQueue.open(
+        alias='test_alias_1',
+        storage_client=storage_client,
+    )
+    rq_2 = await RequestQueue.open(
+        alias='test_alias_2',
+        storage_client=storage_client,
+    )
+
+    # Verify they have different IDs but no names (unnamed)
+    assert rq_1.id != rq_2.id
+    assert rq_1.name is None
+    assert rq_2.name is None
+
+    # Add different requests to each
+    await rq_1.add_request('https://example.com/1')
+    await rq_1.add_request('https://example.com/2')
+    await rq_2.add_request('https://example.com/3')
+
+    # Verify data isolation
+    request_1 = await rq_1.fetch_next_request()
+    request_2 = await rq_2.fetch_next_request()
+
+    assert request_1 is not None
+    assert request_2 is not None
+    assert request_1.url == 'https://example.com/1'
+    assert request_2.url == 'https://example.com/3'
+
+    # Clean up
+    await rq_1.drop()
+    await rq_2.drop()
+
+
+async def test_alias_caching(
+    storage_client: StorageClient,
+) -> None:
+    """Test that request queues with same alias return same instance (cached)."""
+    # Open rq with alias
+    rq_1 = await RequestQueue.open(
+        alias='cache_test',
+        storage_client=storage_client,
+    )
+
+    # Open again with same alias
+    rq_2 = await RequestQueue.open(
+        alias='cache_test',
+        storage_client=storage_client,
+    )
+
+    # Should be same instance
+    assert rq_1 is rq_2
+    assert rq_1.id == rq_2.id
+
+    # Clean up
+    await rq_1.drop()
+
+
+async def test_alias_with_id_error(
+    storage_client: StorageClient,
+) -> None:
+    """Test that providing both alias and id raises error."""
+    with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
+        await RequestQueue.open(
+            id='some-id',
+            alias='some-alias',
+            storage_client=storage_client,
+        )
+
+
+async def test_alias_with_name_error(
+    storage_client: StorageClient,
+) -> None:
+    """Test that providing both alias and name raises error."""
+    with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
+        await RequestQueue.open(
+            name='some-name',
+            alias='some-alias',
+            storage_client=storage_client,
+        )
+
+
+async def test_alias_with_special_characters(
+    storage_client: StorageClient,
+) -> None:
+    """Test alias functionality with special characters."""
+    special_aliases = [
+        'alias-with-dashes',
+        'alias_with_underscores',
+        'alias.with.dots',
+        'alias123with456numbers',
+        'CamelCaseAlias',
+    ]
+
+    queues = []
+    for alias in special_aliases:
+        rq = await RequestQueue.open(
+            alias=alias,
+            storage_client=storage_client,
+        )
+        queues.append(rq)
+
+        # Add request with the alias as identifier in URL
+        await rq.add_request(f'https://example.com/{alias}')
+
+    # Verify all work correctly
+    for i, rq in enumerate(queues):
+        request = await rq.fetch_next_request()
+        assert request is not None
+        assert f'/{special_aliases[i]}' in request.url
+
+    # Clean up
+    for rq in queues:
+        await rq.drop()
+
+
+async def test_alias_request_operations(
+    storage_client: StorageClient,
+) -> None:
+    """Test that request operations work correctly with alias queues."""
+    rq = await RequestQueue.open(
+        alias='request_ops_test',
+        storage_client=storage_client,
+    )
+
+    # Test adding multiple requests
+    urls = [
+        'https://example.com/page1',
+        'https://example.com/page2',
+        'https://example.com/page3',
+    ]
+
+    for url in urls:
+        result = await rq.add_request(url)
+        assert result.was_already_present is False
+
+    # Test queue metadata
+    metadata = await rq.get_metadata()
+    assert metadata.total_request_count == 3
+    assert metadata.pending_request_count == 3
+    assert metadata.handled_request_count == 0
+
+    # Test fetching and handling requests
+    processed_urls = []
+    while not await rq.is_empty():
+        request = await rq.fetch_next_request()
+        if request:
+            processed_urls.append(request.url)
+            await rq.mark_request_as_handled(request)
+
+    # Verify all requests were processed
+    assert len(processed_urls) == 3
+    assert set(processed_urls) == set(urls)
+
+    # Verify final state
+    metadata = await rq.get_metadata()
+    assert metadata.pending_request_count == 0
+    assert metadata.handled_request_count == 3
+    assert await rq.is_empty() is True
+
+    # Clean up
+    await rq.drop()
+
+
+async def test_alias_forefront_operations(
+    storage_client: StorageClient,
+) -> None:
+    """Test forefront operations work correctly with alias queues."""
+    rq = await RequestQueue.open(
+        alias='forefront_test',
+        storage_client=storage_client,
+    )
+
+    # Add normal requests
+    await rq.add_request('https://example.com/normal1')
+    await rq.add_request('https://example.com/normal2')
+
+    # Add priority request to forefront
+    await rq.add_request('https://example.com/priority', forefront=True)
+
+    # Priority request should come first
+    priority_request = await rq.fetch_next_request()
+    assert priority_request is not None
+    assert priority_request.url == 'https://example.com/priority'
+
+    # Then normal requests
+    normal_request = await rq.fetch_next_request()
+    assert normal_request is not None
+    assert normal_request.url == 'https://example.com/normal1'
+
+    # Clean up
+    await rq.drop()
+
+
+async def test_alias_batch_operations(
+    storage_client: StorageClient,
+) -> None:
+    """Test batch operations work correctly with alias queues."""
+    rq = await RequestQueue.open(
+        alias='batch_test',
+        storage_client=storage_client,
+    )
+
+    # Test batch adding
+    batch_urls = [
+        'https://example.com/batch1',
+        'https://example.com/batch2',
+        'https://example.com/batch3',
+    ]
+
+    await rq.add_requests(batch_urls)
+
+    # Wait for background processing
+    await asyncio.sleep(0.1)
+
+    # Verify all requests were added
+    metadata = await rq.get_metadata()
+    assert metadata.total_request_count == 3
+
+    # Clean up
+    await rq.drop()
+
+
+async def test_named_vs_alias_conflict_detection(
+    storage_client: StorageClient,
+) -> None:
+    """Test that conflicts between named and alias storages are detected."""
+    # Test 1: Create named storage first, then try alias with same name
+    named_rq = await RequestQueue.open(
+        name='conflict_test',
+        storage_client=storage_client,
+    )
+    assert named_rq.name == 'conflict_test'
+
+    # Try to create alias with same name - should raise error
+    with pytest.raises(ValueError, match=r'Cannot create alias storage "conflict_test".*already exists'):
+        await RequestQueue.open(alias='conflict_test', storage_client=storage_client)
+
+    # Clean up
+    await named_rq.drop()
+
+    # Test 2: Create alias first, then try named with same name
+    alias_rq = await RequestQueue.open(alias='conflict_test2', storage_client=storage_client)
+    assert alias_rq.name is None  # Alias storages have no name
+
+    # Try to create named with same name - should raise error
+    with pytest.raises(ValueError, match=r'Cannot create named storage "conflict_test2".*already exists'):
+        await RequestQueue.open(name='conflict_test2', storage_client=storage_client)
+
+    # Clean up
+    await alias_rq.drop()
+
+    # Test 3: Different names should work fine
+    named_rq_ok = await RequestQueue.open(name='different_name')
+    alias_rq_ok = await RequestQueue.open(alias='different_alias')
+
+    assert named_rq_ok.name == 'different_name'
+    assert alias_rq_ok.name is None
+
+    # Clean up
+    await named_rq_ok.drop()
+    await alias_rq_ok.drop()
+
+
+async def test_alias_parameter(
+    storage_client: StorageClient,
+) -> None:
+    """Test request queue creation and operations with alias parameter."""
+    # Create request queue with alias
+    alias_rq = await RequestQueue.open(
+        alias='test_alias',
+        storage_client=storage_client,
+    )
+
+    # Verify alias request queue properties
+    assert alias_rq.id is not None
+    assert alias_rq.name is None  # Alias storages should be unnamed
+
+    # Test data operations
+    await alias_rq.add_request('https://example.com/alias')
+    metadata = await alias_rq.get_metadata()
+    assert metadata.pending_request_count == 1
+
+    await alias_rq.drop()
+
+
+async def test_alias_vs_named_isolation(
+    storage_client: StorageClient,
+) -> None:
+    """Test that alias and named request queues with same identifier are isolated."""
+    # Create named request queue
+    named_rq = await RequestQueue.open(
+        name='test_identifier',
+        storage_client=storage_client,
+    )
+
+    # Verify named request queue
+    assert named_rq.name == 'test_identifier'
+    await named_rq.add_request('https://named.example.com')
+
+    # Clean up named request queue first
+    await named_rq.drop()
+
+    # Now create alias request queue with same identifier (should work after cleanup)
+    alias_rq = await RequestQueue.open(
+        alias='test_identifier',
+        storage_client=storage_client,
+    )
+
+    # Should be different instance
+    assert alias_rq.name is None
+    await alias_rq.add_request('https://alias.example.com')
+
+    # Verify alias data
+    alias_request = await alias_rq.fetch_next_request()
+    assert alias_request is not None
+    assert alias_request.url == 'https://alias.example.com'
+
+    await alias_rq.drop()
+
+
+async def test_default_vs_alias_default_equivalence(
+    storage_client: StorageClient,
+) -> None:
+    """Test that default request queue and alias='default' are equivalent."""
+    # Open default request queue
+    default_rq = await RequestQueue.open(
+        storage_client=storage_client,
+    )
+
+    alias_default_rq = await RequestQueue.open(
+        alias=StorageInstanceManager._DEFAULT_STORAGE_ALIAS,
+        storage_client=storage_client,
+    )
+
+    # Should be the same
+    assert default_rq.id == alias_default_rq.id
+    assert default_rq.name is None
+    assert alias_default_rq.name is None
+
+    # Data should be shared
+    await default_rq.add_request('https://default.example.com')
+    metadata = await alias_default_rq.get_metadata()
+    assert metadata.pending_request_count == 1
+
+    await default_rq.drop()
+
+
+async def test_multiple_alias_isolation(
+    storage_client: StorageClient,
+) -> None:
+    """Test that different aliases create separate request queues."""
+    request_queues = []
+
+    for i in range(3):
+        rq = await RequestQueue.open(
+            alias=f'alias_{i}',
+            storage_client=storage_client,
+        )
+        await rq.add_request(f'https://example.com/alias_{i}')
+        request_queues.append(rq)
+
+    # All should be different
+    for i in range(3):
+        for j in range(i + 1, 3):
+            assert request_queues[i].id != request_queues[j].id
+
+    # Verify data isolation
+    for i, rq in enumerate(request_queues):
+        request = await rq.fetch_next_request()
+        assert request is not None
+        assert request.url == f'https://example.com/alias_{i}'
+        await rq.drop()
+
+
+async def test_purge_on_start_enabled(storage_client: StorageClient) -> None:
+    """Test purge behavior when purge_on_start=True: named storages retain data, unnamed storages are purged."""
+
+    # Skip this test for memory storage since it doesn't persist data between client instances.
+    if storage_client.__class__.__name__ == 'MemoryStorageClient':
+        pytest.skip('Memory storage does not persist data between client instances.')
+
+    configuration = Configuration(purge_on_start=True)
+
+    # First, create all storage types with purge enabled and add data.
+    default_rq = await RequestQueue.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    alias_rq = await RequestQueue.open(
+        alias='purge_test_alias',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    named_rq = await RequestQueue.open(
+        name='purge_test_named',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    await default_rq.add_requests(
+        [
+            'https://default.example.com/1',
+            'https://default.example.com/2',
+            'https://default.example.com/3',
+        ]
+    )
+    await alias_rq.add_requests(
+        [
+            'https://alias.example.com/1',
+            'https://alias.example.com/2',
+            'https://alias.example.com/3',
+        ]
+    )
+    await named_rq.add_requests(
+        [
+            'https://named.example.com/1',
+            'https://named.example.com/2',
+            'https://named.example.com/3',
+        ]
+    )
+
+    default_request = await default_rq.fetch_next_request()
+    alias_request = await alias_rq.fetch_next_request()
+    named_request = await named_rq.fetch_next_request()
+
+    assert default_request is not None
+    assert alias_request is not None
+    assert named_request is not None
+
+    await default_rq.mark_request_as_handled(default_request)
+    await alias_rq.mark_request_as_handled(alias_request)
+    await named_rq.mark_request_as_handled(named_request)
+
+    # Verify data was added
+    default_metadata = await default_rq.get_metadata()
+    alias_metadata = await alias_rq.get_metadata()
+    named_metadata = await named_rq.get_metadata()
+
+    assert default_metadata.pending_request_count == 2
+    assert alias_metadata.pending_request_count == 2
+    assert named_metadata.pending_request_count == 2
+
+    assert default_metadata.handled_request_count == 1
+    assert alias_metadata.handled_request_count == 1
+    assert named_metadata.handled_request_count == 1
+
+    assert default_metadata.total_request_count == 3
+    assert alias_metadata.total_request_count == 3
+    assert named_metadata.total_request_count == 3
+
+    # Verify that default and alias storages are unnamed
+    assert default_metadata.name is None
+    assert alias_metadata.name is None
+    assert named_metadata.name == 'purge_test_named'
+
+    # Clear storage cache to simulate "reopening" storages
+    service_locator.storage_instance_manager.clear_cache()
+
+    # Now "reopen" all storages
+    default_rq_2 = await RequestQueue.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+    alias_rq_2 = await RequestQueue.open(
+        alias='purge_test_alias',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+    named_rq_2 = await RequestQueue.open(
+        name='purge_test_named',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Check the data after purge
+    default_metadata_after = await default_rq_2.get_metadata()
+    alias_metadata_after = await alias_rq_2.get_metadata()
+    named_metadata_after = await named_rq_2.get_metadata()
+
+    # Unnamed storages (alias and default) should be purged (data removed)
+    assert default_metadata_after.pending_request_count == 0
+    assert alias_metadata_after.pending_request_count == 0
+    assert named_metadata_after.pending_request_count == 2
+
+    assert default_metadata_after.handled_request_count == 1
+    assert alias_metadata_after.handled_request_count == 1
+    assert named_metadata_after.handled_request_count == 1
+
+    assert default_metadata_after.total_request_count == 3
+    assert alias_metadata_after.total_request_count == 3
+    assert named_metadata_after.total_request_count == 3
+
+    # Clean up
+    await named_rq_2.drop()
+    await alias_rq_2.drop()
+    await default_rq_2.drop()
+
+
+async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
+    """Test purge behavior when purge_on_start=False: all storages retain data regardless of type."""
+
+    # Skip this test for memory storage since it doesn't persist data between client instances.
+    if storage_client.__class__.__name__ == 'MemoryStorageClient':
+        pytest.skip('Memory storage does not persist data between client instances.')
+
+    configuration = Configuration(purge_on_start=False)
+
+    # First, create all storage types with purge disabled and add data.
+    default_rq = await RequestQueue.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    alias_rq = await RequestQueue.open(
+        alias='purge_test_alias',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    named_rq = await RequestQueue.open(
+        name='purge_test_named',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    await default_rq.add_requests(
+        [
+            'https://default.example.com/1',
+            'https://default.example.com/2',
+            'https://default.example.com/3',
+        ]
+    )
+    await alias_rq.add_requests(
+        [
+            'https://alias.example.com/1',
+            'https://alias.example.com/2',
+            'https://alias.example.com/3',
+        ]
+    )
+    await named_rq.add_requests(
+        [
+            'https://named.example.com/1',
+            'https://named.example.com/2',
+            'https://named.example.com/3',
+        ]
+    )
+
+    default_request = await default_rq.fetch_next_request()
+    alias_request = await alias_rq.fetch_next_request()
+    named_request = await named_rq.fetch_next_request()
+
+    assert default_request is not None
+    assert alias_request is not None
+    assert named_request is not None
+
+    await default_rq.mark_request_as_handled(default_request)
+    await alias_rq.mark_request_as_handled(alias_request)
+    await named_rq.mark_request_as_handled(named_request)
+
+    # Verify data was added
+    default_metadata = await default_rq.get_metadata()
+    alias_metadata = await alias_rq.get_metadata()
+    named_metadata = await named_rq.get_metadata()
+
+    assert default_metadata.pending_request_count == 2
+    assert alias_metadata.pending_request_count == 2
+    assert named_metadata.pending_request_count == 2
+
+    assert default_metadata.handled_request_count == 1
+    assert alias_metadata.handled_request_count == 1
+    assert named_metadata.handled_request_count == 1
+
+    assert default_metadata.total_request_count == 3
+    assert alias_metadata.total_request_count == 3
+    assert named_metadata.total_request_count == 3
+
+    # Verify that default and alias storages are unnamed
+    assert default_metadata.name is None
+    assert alias_metadata.name is None
+    assert named_metadata.name == 'purge_test_named'
+
+    # Clear storage cache to simulate "reopening" storages
+    service_locator.storage_instance_manager.clear_cache()
+
+    # Now "reopen" all storages
+    default_rq_2 = await RequestQueue.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+    alias_rq_2 = await RequestQueue.open(
+        alias='purge_test_alias',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+    named_rq_2 = await RequestQueue.open(
+        name='purge_test_named',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Check the data after purge
+    default_metadata_after = await default_rq_2.get_metadata()
+    alias_metadata_after = await alias_rq_2.get_metadata()
+    named_metadata_after = await named_rq_2.get_metadata()
+
+    # Unnamed storages (alias and default) should be purged (data removed)
+    assert default_metadata_after.pending_request_count == 2
+    assert alias_metadata_after.pending_request_count == 2
+    assert named_metadata_after.pending_request_count == 2
+
+    assert default_metadata_after.handled_request_count == 1
+    assert alias_metadata_after.handled_request_count == 1
+    assert named_metadata_after.handled_request_count == 1
+
+    assert default_metadata_after.total_request_count == 3
+    assert alias_metadata_after.total_request_count == 3
+    assert named_metadata_after.total_request_count == 3
+
+    # Clean up
+    await named_rq_2.drop()
+    await alias_rq_2.drop()
+    await default_rq_2.drop()
+
+
+async def test_name_default_not_allowed(storage_client: StorageClient) -> None:
+    """Test that storage can't have default alias as name, to prevent collisions with unnamed storage alias."""
+    with pytest.raises(
+        ValueError,
+        match=f'Storage name cannot be "{StorageInstanceManager._DEFAULT_STORAGE_ALIAS}" as '
+        f'it is reserved for default alias.',
+    ):
+        await RequestQueue.open(name=StorageInstanceManager._DEFAULT_STORAGE_ALIAS, storage_client=storage_client)

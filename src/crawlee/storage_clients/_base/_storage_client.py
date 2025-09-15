@@ -43,6 +43,7 @@ class StorageClient(ABC):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> DatasetClient:
         """Create a dataset client."""
@@ -53,6 +54,7 @@ class StorageClient(ABC):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> KeyValueStoreClient:
         """Create a key-value store client."""
@@ -63,6 +65,7 @@ class StorageClient(ABC):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> RequestQueueClient:
         """Create a request queue client."""

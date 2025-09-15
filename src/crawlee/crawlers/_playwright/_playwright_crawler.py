@@ -509,9 +509,9 @@ class _PlaywrightCrawlerAdditionalOptions(TypedDict):
 
 
 class PlaywrightCrawlerOptions(
-    Generic[TCrawlingContext, TStatisticsState],
     _PlaywrightCrawlerAdditionalOptions,
     BasicCrawlerOptions[TCrawlingContext, StatisticsState],
+    Generic[TCrawlingContext, TStatisticsState],
 ):
     """Arguments for the `AbstractHttpCrawler` constructor.
 
