@@ -565,11 +565,15 @@ async def test_error_snapshot_through_statistics(server_url: URL) -> None:
     kvs = await crawler.get_key_value_store()
     kvs_content = {}
     async for key_info in kvs.iterate_keys():
+        # Skip any non-error snapshot keys, e.g. _state.
+        if 'ERROR_SNAPSHOT' not in key_info.key:
+            continue
         kvs_content[key_info.key] = await kvs.get_value(key_info.key)
 
     # One error, three time retried.
+    content_key = next(iter(kvs_content))
     assert crawler.statistics.error_tracker.total == 4
     assert crawler.statistics.error_tracker.unique_error_count == 1
     assert len(kvs_content) == 1
-    assert key_info.key.endswith('.html')
-    assert kvs_content[key_info.key] == HELLO_WORLD.decode('utf8')
+    assert content_key.endswith('.html')
+    assert kvs_content[content_key] == HELLO_WORLD.decode('utf8')

@@ -631,6 +631,9 @@ async def test_error_snapshot_through_statistics(server_url: URL) -> None:
     kvs_content = {}
 
     async for key_info in kvs.iterate_keys():
+        # Skip any non-error snapshot keys, e.g. _state.
+        if 'ERROR_SNAPSHOT' not in key_info.key:
+            continue
         kvs_content[key_info.key] = await kvs.get_value(key_info.key)
 
         assert set(key_info.key).issubset(ErrorSnapshotter.ALLOWED_CHARACTERS)
