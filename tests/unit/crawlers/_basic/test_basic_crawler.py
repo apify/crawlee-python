@@ -10,6 +10,7 @@ import time
 from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
+from itertools import product
 from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, Mock, call, patch
 
@@ -27,7 +28,7 @@ from crawlee.events._local_event_manager import LocalEventManager
 from crawlee.request_loaders import RequestList, RequestManagerTandem
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics
-from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
@@ -1040,7 +1041,7 @@ async def test_crawler_multiple_stops_in_parallel() -> None:
     assert stats.requests_finished == 2
 
 
-async def test_sets_services() -> None:
+async def test_services_no_side_effet_on_crawler_init() -> None:
     custom_configuration = Configuration()
     custom_event_manager = LocalEventManager.from_config(custom_configuration)
     custom_storage_client = MemoryStorageClient()
@@ -1051,9 +1052,125 @@ async def test_sets_services() -> None:
         storage_client=custom_storage_client,
     )
 
-    assert service_locator.get_configuration() is custom_configuration
-    assert service_locator.get_event_manager() is custom_event_manager
-    assert service_locator.get_storage_client() is custom_storage_client
+    assert service_locator.get_configuration() is not custom_configuration
+    assert service_locator.get_event_manager() is not custom_event_manager
+    assert service_locator.get_storage_client() is not custom_storage_client
+
+
+async def test_crawler_uses_default_services() -> None:
+    custom_configuration = Configuration()
+    service_locator.set_configuration(custom_configuration)
+
+    custom_event_manager = LocalEventManager.from_config(custom_configuration)
+    service_locator.set_event_manager(custom_event_manager)
+
+    custom_storage_client = MemoryStorageClient()
+    service_locator.set_storage_client(custom_storage_client)
+
+    basic_crawler = BasicCrawler()
+
+    assert basic_crawler._service_locator.get_configuration() is custom_configuration
+    assert basic_crawler._service_locator.get_event_manager() is custom_event_manager
+    assert basic_crawler._service_locator.get_storage_client() is custom_storage_client
+
+
+async def test_services_crawlers_can_use_different_services() -> None:
+    custom_configuration_1 = Configuration()
+    custom_event_manager_1 = LocalEventManager.from_config(custom_configuration_1)
+    custom_storage_client_1 = MemoryStorageClient()
+
+    custom_configuration_2 = Configuration()
+    custom_event_manager_2 = LocalEventManager.from_config(custom_configuration_2)
+    custom_storage_client_2 = MemoryStorageClient()
+
+    _ = BasicCrawler(
+        configuration=custom_configuration_1,
+        event_manager=custom_event_manager_1,
+        storage_client=custom_storage_client_1,
+    )
+
+    _ = BasicCrawler(
+        configuration=custom_configuration_2,
+        event_manager=custom_event_manager_2,
+        storage_client=custom_storage_client_2,
+    )
+
+
+async def test_crawler_uses_default_storages(tmp_path: Path) -> None:
+    configuration = Configuration(
+        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        purge_on_start=True,
+    )
+    service_locator.set_configuration(configuration)
+
+    dataset = await Dataset.open()
+    kvs = await KeyValueStore.open()
+    rq = await RequestQueue.open()
+
+    crawler = BasicCrawler()
+
+    assert dataset is await crawler.get_dataset()
+    assert kvs is await crawler.get_key_value_store()
+    assert rq is await crawler.get_request_manager()
+
+
+async def test_crawler_can_use_other_storages(tmp_path: Path) -> None:
+    configuration = Configuration(
+        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        purge_on_start=True,
+    )
+    service_locator.set_configuration(configuration)
+
+    dataset = await Dataset.open()
+    kvs = await KeyValueStore.open()
+    rq = await RequestQueue.open()
+
+    crawler = BasicCrawler(storage_client=MemoryStorageClient())
+
+    assert dataset is not await crawler.get_dataset()
+    assert kvs is not await crawler.get_key_value_store()
+    assert rq is not await crawler.get_request_manager()
+
+
+async def test_crawler_can_use_other_storages_of_same_type(tmp_path: Path) -> None:
+    """Test that crawler can use non-global storage of the same type as global storage without conflicts"""
+    a_path = tmp_path / 'a'
+    b_path = tmp_path / 'b'
+    a_path.mkdir()
+    b_path.mkdir()
+    expected_paths = {
+        path / storage
+        for path, storage in product({a_path, b_path}, {'datasets', 'key_value_stores', 'request_queues'})
+    }
+
+    configuration_a = Configuration(
+        crawlee_storage_dir=str(a_path),  # type: ignore[call-arg]
+        purge_on_start=True,
+    )
+    configuration_b = Configuration(
+        crawlee_storage_dir=str(b_path),  # type: ignore[call-arg]
+        purge_on_start=True,
+    )
+
+    # Set global configuration
+    service_locator.set_configuration(configuration_a)
+    service_locator.set_storage_client(FileSystemStorageClient())
+    # Create storages based on the global services
+    dataset = await Dataset.open()
+    kvs = await KeyValueStore.open()
+    rq = await RequestQueue.open()
+
+    # Set the crawler to use different storage client
+    crawler = BasicCrawler(storage_client=FileSystemStorageClient(), configuration=configuration_b)
+
+    # Assert that the storages are different
+    assert dataset is not await crawler.get_dataset()
+    assert kvs is not await crawler.get_key_value_store()
+    assert rq is not await crawler.get_request_manager()
+
+    # Assert that all storages exists on the filesystem
+    for path in expected_paths:
+        assert path.is_dir()
 
 
 async def test_allows_storage_client_overwrite_before_run(monkeypatch: pytest.MonkeyPatch) -> None:
