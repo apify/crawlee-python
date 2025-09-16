@@ -180,6 +180,12 @@ class AddRequestsKwargs(EnqueueLinksKwargs):
     requests: Sequence[str | Request]
     """Requests to be added to the `RequestManager`."""
 
+    rq_name: str | None
+    """Name of the `RequestQueue` to add the requests to. Only one of `rq_name` or `rq_alias` can be provided."""
+
+    rq_alias: str | None
+    """Alias of the `RequestQueue` to add the requests to. Only one of `rq_name` or `rq_alias` can be provided."""
+
 
 class PushDataKwargs(TypedDict):
     """Keyword arguments for dataset's `push_data` method."""
@@ -261,10 +267,16 @@ class RequestHandlerRunResult:
     async def add_requests(
         self,
         requests: Sequence[str | Request],
+        rq_name: str | None = None,
+        rq_alias: str | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> None:
         """Track a call to the `add_requests` context helper."""
-        self.add_requests_calls.append(AddRequestsKwargs(requests=requests, **kwargs))
+        if rq_name is not None and rq_alias is not None:
+            raise ValueError('Only one of rq_name or rq_alias can be provided.')
+        self.add_requests_calls.append(
+            AddRequestsKwargs(requests=requests, rq_name=rq_name, rq_alias=rq_alias, **kwargs)
+        )
 
     async def push_data(
         self,
@@ -311,12 +323,19 @@ class AddRequestsFunction(Protocol):
     def __call__(
         self,
         requests: Sequence[str | Request],
+        rq_name: str | None = None,
+        rq_alias: str | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]:
         """Call dunder method.
 
         Args:
-            requests: Requests to be added to the `RequestManager`.
+            requests: Requests to be added to the `RequestManager` or, if `rq_name` or `rq_alias` is specified, to
+                the corresponding `RequestQueue`.
+            rq_name: Name of the `RequestQueue` to add the requests to. Only one of `rq_name` or `rq_alias` can
+                be provided.
+            rq_alias: Alias of the `RequestQueue` to add the requests to. Only one of `rq_name` or `rq_alias` can
+                be provided.
             **kwargs: Additional keyword arguments.
         """
 
@@ -344,12 +363,19 @@ class EnqueueLinksFunction(Protocol):
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
+        rq_name: str | None = None,
+        rq_alias: str | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]: ...
 
     @overload
     def __call__(
-        self, *, requests: Sequence[str | Request] | None = None, **kwargs: Unpack[EnqueueLinksKwargs]
+        self,
+        *,
+        requests: Sequence[str | Request] | None = None,
+        rq_name: str | None = None,
+        rq_alias: str | None = None,
+        **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]: ...
 
     def __call__(
@@ -360,6 +386,8 @@ class EnqueueLinksFunction(Protocol):
         user_data: dict[str, Any] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         requests: Sequence[str | Request] | None = None,
+        rq_name: str | None = None,
+        rq_alias: str | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]:
         """Call enqueue links function.
@@ -376,7 +404,12 @@ class EnqueueLinksFunction(Protocol):
                 - Modified `RequestOptions` to update the request configuration,
                 - `'skip'` to exclude the request from being enqueued,
                 - `'unchanged'` to use the original request options without modification.
-            requests: Requests to be added to the `RequestManager`.
+            requests: Requests to be added to the `RequestManager` or, if `rq_name` or `rq_alias` is specified, to
+                the corresponding `RequestQueue`.
+            rq_name: Name of the `RequestQueue` to add the requests to. Only one of `rq_name` or `rq_alias` can
+                be provided.
+            rq_alias: Alias of the `RequestQueue` to add the requests to. Only one of `rq_name` or `rq_alias` can
+                be provided.
             **kwargs: Additional keyword arguments.
         """
 

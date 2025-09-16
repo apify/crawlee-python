@@ -8,6 +8,7 @@ import pytest
 
 from crawlee import ConcurrencySettings, Glob, HttpHeaders, Request, RequestTransformAction, SkippedReason
 from crawlee.crawlers import ParselCrawler
+from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
     from yarl import URL
@@ -294,3 +295,78 @@ async def test_extract_links(server_url: URL, http_client: HttpClient) -> None:
 
     assert len(extracted_links) == 1
     assert extracted_links[0] == str(server_url / 'page_1')
+
+
+@pytest.mark.parametrize(
+    ('queue_name', 'queue_alias'),
+    [
+        pytest.param('named-queue', None, id='with rq_name'),
+        pytest.param(None, 'alias-queue', id='with rq_alias'),
+    ],
+)
+async def test_enqueue_links_with_rq_param(
+    server_url: URL, http_client: HttpClient, queue_name: str | None, queue_alias: str | None
+) -> None:
+    crawler = ParselCrawler(http_client=http_client)
+    rq = await RequestQueue.open(name=queue_name, alias=queue_alias)
+    visit_urls: set[str] = set()
+
+    @crawler.router.default_handler
+    async def handler(context: ParselCrawlingContext) -> None:
+        visit_urls.add(context.request.url)
+        await context.enqueue_links(rq_name=queue_name, rq_alias=queue_alias)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    requests_from_queue: list[str] = []
+    while request := await rq.fetch_next_request():
+        requests_from_queue.append(request.url)
+
+    assert set(requests_from_queue) == {str(server_url / 'page_1'), str(server_url / 'sub_index')}
+    assert visit_urls == {str(server_url / 'start_enqueue')}
+
+
+@pytest.mark.parametrize(
+    ('queue_name', 'queue_alias'),
+    [
+        pytest.param('named-queue', None, id='with rq_name'),
+        pytest.param(None, 'alias-queue', id='with rq_alias'),
+    ],
+)
+async def test_enqueue_links_requests_with_rq_param(
+    server_url: URL, http_client: HttpClient, queue_name: str | None, queue_alias: str | None
+) -> None:
+    crawler = ParselCrawler(http_client=http_client)
+    rq = await RequestQueue.open(name=queue_name, alias=queue_alias)
+    visit_urls: set[str] = set()
+
+    check_requests: list[str] = [
+        'https://a.placeholder.com',
+        'https://b.placeholder.com',
+        'https://c.placeholder.com',
+    ]
+
+    @crawler.router.default_handler
+    async def handler(context: ParselCrawlingContext) -> None:
+        visit_urls.add(context.request.url)
+        await context.enqueue_links(requests=check_requests, rq_name=queue_name, rq_alias=queue_alias, strategy='all')
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    requests_from_queue: list[str] = []
+    while request := await rq.fetch_next_request():
+        requests_from_queue.append(request.url)
+
+    assert set(requests_from_queue) == set(check_requests)
+    assert visit_urls == {str(server_url / 'start_enqueue')}
+
+
+async def test_enqueue_links_error_with_rq_alias_and_rq_name(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client)
+
+    @crawler.router.default_handler
+    async def handler(context: ParselCrawlingContext) -> None:
+        with pytest.raises(ValueError, match='Cannot use both `rq_name` and `rq_alias`'):
+            await context.enqueue_links(rq_name='named-queue', rq_alias='alias-queue')
+
+    await crawler.run([str(server_url / 'start_enqueue')])

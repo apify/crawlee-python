@@ -1549,3 +1549,51 @@ async def test_status_message_emit() -> None:
     event_manager.off(event=Event.CRAWLER_STATUS, listener=listener)
 
     assert status_message_listener.called
+
+
+@pytest.mark.parametrize(
+    ('queue_name', 'queue_alias'),
+    [
+        pytest.param('named-queue', None, id='with rq_name'),
+        pytest.param(None, 'alias-queue', id='with rq_alias'),
+    ],
+)
+async def test_add_requests_with_rq_param(queue_name: str | None, queue_alias: str | None) -> None:
+    crawler = BasicCrawler()
+    rq = await RequestQueue.open(name=queue_name, alias=queue_alias)
+    visit_urls = set()
+
+    check_requests = [
+        Request.from_url('https://a.placeholder.com'),
+        Request.from_url('https://b.placeholder.com'),
+        Request.from_url('https://c.placeholder.com'),
+    ]
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visit_urls.add(context.request.url)
+        await context.add_requests(check_requests, rq_name=queue_name, rq_alias=queue_alias)
+
+    await crawler.run(['https://start.placeholder.com'])
+
+    requests_from_queue = []
+    while request := await rq.fetch_next_request():
+        requests_from_queue.append(request)
+
+    assert requests_from_queue == check_requests
+    assert visit_urls == {'https://start.placeholder.com'}
+
+
+async def test_add_requests_error_with_rq_alias_and_rq_name() -> None:
+    crawler = BasicCrawler()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        with pytest.raises(ValueError, match='Cannot use both `rq_name` and `rq_alias`'):
+            await context.add_requests(
+                [Request.from_url('https://a.placeholder.com')],
+                rq_name='named-queue',
+                rq_alias='alias-queue',
+            )
+
+    await crawler.run(['https://start.placeholder.com'])
