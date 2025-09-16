@@ -43,7 +43,7 @@ class _StorageClientCache:
 StorageClientType = DatasetClient | KeyValueStoreClient | RequestQueueClient
 """Type alias for the storage client types."""
 
-ClientOpener = Coroutine[None, None, StorageClientType]
+ClientOpenerCoro = Coroutine[None, None, StorageClientType]
 """Type alias for the client opener function."""
 
 
@@ -67,7 +67,7 @@ class StorageInstanceManager:
         name: str | None,
         alias: str | None,
         storage_client_type: type[StorageClient],
-        client_opener: ClientOpener,
+        client_opener_coro: ClientOpenerCoro,
         additional_cache_key: Hashable = '',
     ) -> T:
         """Open a storage instance with caching support.
@@ -78,7 +78,7 @@ class StorageInstanceManager:
             name: Storage name. (global scope, persists across runs).
             alias: Storage alias (run scope, creates unnamed storage).
             storage_client_type: Type of storage client to use.
-            client_opener: Coroutine to open the storage client when storage instance not found in cache.
+            client_opener_coro: Coroutine to open the storage client when storage instance not found in cache.
             additional_cache_key: Additional optional key to differentiate cache entries.
 
         Returns:
@@ -150,7 +150,7 @@ class StorageInstanceManager:
 
             # Create new instance
             client: KeyValueStoreClient | DatasetClient | RequestQueueClient
-            client = await client_opener
+            client = await client_opener_coro
 
             metadata = await client.get_metadata()
 
@@ -172,7 +172,7 @@ class StorageInstanceManager:
         finally:
             # Make sure the client opener is closed.
             # If it was awaited, then closing is no operation, if it was not awaited, this is the cleanup.
-            client_opener.close()
+            client_opener_coro.close()
 
     def remove_from_cache(self, storage_instance: Storage) -> None:
         """Remove a storage instance from the cache.
