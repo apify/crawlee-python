@@ -17,7 +17,7 @@ logger = getLogger(__name__)
 
 
 class RequestListState(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     next_index: Annotated[int, Field(alias='nextIndex')] = 0
     next_unique_key: Annotated[str | None, Field(alias='nextUniqueKey')] = None

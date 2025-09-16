@@ -56,7 +56,7 @@ class SitemapRequestLoaderState(BaseModel):
     `in_progress` is cleared.
     """
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     url_queue: Annotated[deque[str], Field(alias='urlQueue')]
     """Queue of URLs extracted from sitemaps and ready for processing."""
