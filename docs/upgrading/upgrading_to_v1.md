@@ -7,7 +7,7 @@ This page summarizes the breaking changes between Crawlee for Python v0.6 and v1
 
 ## ServiceLocator changes
 
-### ServiceLocator is stricter with registering services.
+### ServiceLocator is stricter with registering services
 You can register the services just once, and you can no longer override already registered services.
 
 **Before (v0.6):**
@@ -28,9 +28,10 @@ service_locator.set_storage_client(MemoryStorageClient())
 service_locator.set_storage_client(MemoryStorageClient())  # Raises an error
 ```
 
-### BasicCrawler has own instance of ServiceLocator to track its own services.
+### BasicCrawler has its own instance of ServiceLocator to track its own services
 Explicitly passed services to the crawler can be different the global ones accessible in `crawlee.service_locator`. `BasicCrawler` no longer causes the global services in `service_locator` to be set to the crawler's explicitly passed services.
 
+**Before (v0.6):**
 ```python
 from crawlee import service_locator
 from crawlee.crawlers import BasicCrawler
@@ -61,7 +62,7 @@ async def main() -> None:
     assert service_locator.get_storage_client() is not custom_storage_client
     assert await crawler.get_dataset() is not await Dataset.open()
 ```
-### There can be two crawlers with different services at the same time.
+### There can be two crawlers with different services at the same time
 
 **Now (v1.0):**
 
