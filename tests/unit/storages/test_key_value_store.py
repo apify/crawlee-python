@@ -10,52 +10,22 @@ import pytest
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient, RedisStorageClient
 from crawlee.storages import KeyValueStore
+from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
-    from pathlib import Path
-
-    from fakeredis import FakeAsyncRedis
 
     from crawlee.storage_clients import StorageClient
-
-
-@pytest.fixture(params=['memory', 'file_system', 'redis'])
-def storage_client(
-    request: pytest.FixtureRequest,
-    redis_client: FakeAsyncRedis,
-    suppress_user_warning: None,  # noqa: ARG001
-) -> StorageClient:
-    """Parameterized fixture to test with different storage clients."""
-    if request.param == 'memory':
-        return MemoryStorageClient()
-
-    if request.param == 'redis':
-        return RedisStorageClient(redis=redis_client)
-
-    return FileSystemStorageClient()
-
-
-@pytest.fixture
-def configuration(tmp_path: Path) -> Configuration:
-    """Provide a configuration with a temporary storage directory."""
-    return Configuration(
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
-        purge_on_start=True,
-    )
 
 
 @pytest.fixture
 async def kvs(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> AsyncGenerator[KeyValueStore, None]:
     """Fixture that provides a key-value store instance for each test."""
     kvs = await KeyValueStore.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     yield kvs
@@ -64,13 +34,11 @@ async def kvs(
 
 async def test_open_creates_new_kvs(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that open() creates a new key-value store with proper metadata."""
     kvs = await KeyValueStore.open(
         name='new_kvs',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify key-value store properties
@@ -101,7 +69,6 @@ async def test_open_existing_kvs(
 
 async def test_open_with_id_and_name(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that open() raises an error when both id and name are provided."""
     with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
@@ -109,20 +76,17 @@ async def test_open_with_id_and_name(
             id='some-id',
             name='some-name',
             storage_client=storage_client,
-            configuration=configuration,
         )
 
 
 async def test_open_by_id(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test opening a key-value store by its ID."""
     # First create a key-value store by name
     kvs1 = await KeyValueStore.open(
         name='kvs_by_id_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some data to identify it
@@ -132,7 +96,6 @@ async def test_open_by_id(
     kvs2 = await KeyValueStore.open(
         id=kvs1.id,
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify it's the same key-value store
@@ -304,13 +267,11 @@ async def test_iterate_keys_with_limit(kvs: KeyValueStore) -> None:
 
 async def test_drop(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test dropping a key-value store removes it from cache and clears its data."""
     kvs = await KeyValueStore.open(
         name='drop_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some data
@@ -323,7 +284,6 @@ async def test_drop(
     new_kvs = await KeyValueStore.open(
         name='drop_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Attempt to get a previously stored value
@@ -334,13 +294,11 @@ async def test_drop(
 
 async def test_reopen_default(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test reopening the default key-value store."""
     # Open the default key-value store
     kvs1 = await KeyValueStore.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Set a value
@@ -349,7 +307,6 @@ async def test_reopen_default(
     # Open the default key-value store again
     kvs2 = await KeyValueStore.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify they are the same store
@@ -426,16 +383,16 @@ async def test_key_with_special_characters(kvs: KeyValueStore) -> None:
     assert await kvs.get_value(key=special_key) is None
 
 
-async def test_data_persistence_on_reopen(configuration: Configuration) -> None:
+async def test_data_persistence_on_reopen() -> None:
     """Test that data persists when reopening a KeyValueStore."""
-    kvs1 = await KeyValueStore.open(configuration=configuration)
+    kvs1 = await KeyValueStore.open()
 
     await kvs1.set_value('key_123', 'value_123')
 
     result1 = await kvs1.get_value('key_123')
     assert result1 == 'value_123'
 
-    kvs2 = await KeyValueStore.open(configuration=configuration)
+    kvs2 = await KeyValueStore.open()
 
     result2 = await kvs2.get_value('key_123')
     assert result2 == 'value_123'
@@ -449,14 +406,12 @@ async def test_data_persistence_on_reopen(configuration: Configuration) -> None:
 
 async def test_purge(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test purging a key-value store removes all values but keeps the store itself."""
     # First create a key-value store
     kvs = await KeyValueStore.open(
         name='purge_test_kvs',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some values
@@ -612,19 +567,16 @@ async def test_record_exists_after_purge(kvs: KeyValueStore) -> None:
 
 async def test_open_with_alias(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test opening key-value stores with alias parameter for NDU functionality."""
     # Create key-value stores with different aliases
     kvs_1 = await KeyValueStore.open(
         alias='test_alias_1',
         storage_client=storage_client,
-        configuration=configuration,
     )
     kvs_2 = await KeyValueStore.open(
         alias='test_alias_2',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify they have different IDs but no names (unnamed)
@@ -650,21 +602,18 @@ async def test_open_with_alias(
 
 async def test_alias_caching(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that key-value stores with same alias return same instance (cached)."""
     # Open kvs with alias
     kvs_1 = await KeyValueStore.open(
         alias='cache_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Open again with same alias
     kvs_2 = await KeyValueStore.open(
         alias='cache_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Should be same instance
@@ -677,7 +626,6 @@ async def test_alias_caching(
 
 async def test_alias_with_id_error(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that providing both alias and id raises error."""
     with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
@@ -685,13 +633,11 @@ async def test_alias_with_id_error(
             id='some-id',
             alias='some-alias',
             storage_client=storage_client,
-            configuration=configuration,
         )
 
 
 async def test_alias_with_name_error(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that providing both alias and name raises error."""
     with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
@@ -699,13 +645,11 @@ async def test_alias_with_name_error(
             name='some-name',
             alias='some-alias',
             storage_client=storage_client,
-            configuration=configuration,
         )
 
 
 async def test_alias_with_special_characters(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test alias functionality with special characters."""
     special_aliases = [
@@ -721,7 +665,6 @@ async def test_alias_with_special_characters(
         kvs = await KeyValueStore.open(
             alias=alias,
             storage_client=storage_client,
-            configuration=configuration,
         )
         stores.append(kvs)
 
@@ -741,13 +684,11 @@ async def test_alias_with_special_characters(
 
 async def test_alias_key_operations(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that key operations work correctly with alias stores."""
     kvs = await KeyValueStore.open(
         alias='key_ops_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Test setting multiple keys
@@ -790,33 +731,35 @@ async def test_alias_key_operations(
     await kvs.drop()
 
 
-async def test_named_vs_alias_conflict_detection() -> None:
+async def test_named_vs_alias_conflict_detection(
+    storage_client: StorageClient,
+) -> None:
     """Test that conflicts between named and alias storages are detected."""
     # Test 1: Create named storage first, then try alias with same name
-    named_kvs = await KeyValueStore.open(name='conflict_test')
+    named_kvs = await KeyValueStore.open(name='conflict_test', storage_client=storage_client)
     assert named_kvs.name == 'conflict_test'
 
     # Try to create alias with same name - should raise error
     with pytest.raises(ValueError, match=r'Cannot create alias storage "conflict_test".*already exists'):
-        await KeyValueStore.open(alias='conflict_test')
+        await KeyValueStore.open(alias='conflict_test', storage_client=storage_client)
 
     # Clean up
     await named_kvs.drop()
 
     # Test 2: Create alias first, then try named with same name
-    alias_kvs = await KeyValueStore.open(alias='conflict_test2')
+    alias_kvs = await KeyValueStore.open(alias='conflict_test2', storage_client=storage_client)
     assert alias_kvs.name is None  # Alias storages have no name
 
     # Try to create named with same name - should raise error
     with pytest.raises(ValueError, match=r'Cannot create named storage "conflict_test2".*already exists'):
-        await KeyValueStore.open(name='conflict_test2')
+        await KeyValueStore.open(name='conflict_test2', storage_client=storage_client)
 
     # Clean up
     await alias_kvs.drop()
 
     # Test 3: Different names should work fine
-    named_kvs_ok = await KeyValueStore.open(name='different_name')
-    alias_kvs_ok = await KeyValueStore.open(alias='different_alias')
+    named_kvs_ok = await KeyValueStore.open(name='different_name', storage_client=storage_client)
+    alias_kvs_ok = await KeyValueStore.open(alias='different_alias', storage_client=storage_client)
 
     assert named_kvs_ok.name == 'different_name'
     assert alias_kvs_ok.name is None
@@ -828,14 +771,12 @@ async def test_named_vs_alias_conflict_detection() -> None:
 
 async def test_alias_parameter(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test key-value store creation and operations with alias parameter."""
     # Create kvs with alias
     alias_kvs = await KeyValueStore.open(
         alias='test_alias',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify alias kvs properties
@@ -852,14 +793,12 @@ async def test_alias_parameter(
 
 async def test_alias_vs_named_isolation(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that alias and named key-value stores with same identifier are isolated."""
     # Create named kvs
     named_kvs = await KeyValueStore.open(
         name='test_identifier',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify named kvs
@@ -873,7 +812,6 @@ async def test_alias_vs_named_isolation(
     alias_kvs = await KeyValueStore.open(
         alias='test_identifier',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Should be different instance
@@ -889,20 +827,16 @@ async def test_alias_vs_named_isolation(
 
 async def test_default_vs_alias_default_equivalence(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that default key-value store and alias='default' are equivalent."""
     # Open default kvs
     default_kvs = await KeyValueStore.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
-    # Open alias='default' kvs
     alias_default_kvs = await KeyValueStore.open(
-        alias='default',
+        alias=StorageInstanceManager._DEFAULT_STORAGE_ALIAS,
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Should be the same
@@ -920,7 +854,6 @@ async def test_default_vs_alias_default_equivalence(
 
 async def test_multiple_alias_isolation(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that different aliases create separate key-value stores."""
     kvs_stores = []
@@ -929,7 +862,6 @@ async def test_multiple_alias_isolation(
         kvs = await KeyValueStore.open(
             alias=f'alias_{i}',
             storage_client=storage_client,
-            configuration=configuration,
         )
         await kvs.set_value('alias', f'alias_{i}')
         await kvs.set_value('index', i)
@@ -1109,3 +1041,13 @@ async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
     await named_kvs_2.drop()
     await alias_kvs_2.drop()
     await default_kvs_2.drop()
+
+
+async def test_name_default_not_allowed(storage_client: StorageClient) -> None:
+    """Test that storage can't have default alias as name, to prevent collisions with unnamed storage alias."""
+    with pytest.raises(
+        ValueError,
+        match=f'Storage name cannot be "{StorageInstanceManager._DEFAULT_STORAGE_ALIAS}" as '
+        f'it is reserved for default alias.',
+    ):
+        await KeyValueStore.open(name=StorageInstanceManager._DEFAULT_STORAGE_ALIAS, storage_client=storage_client)

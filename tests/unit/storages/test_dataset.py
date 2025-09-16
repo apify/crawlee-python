@@ -3,59 +3,32 @@
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 import pytest
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient, RedisStorageClient
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore
+from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
     from pathlib import Path
     from typing import Any
 
-    from fakeredis import FakeAsyncRedis
-
     from crawlee.storage_clients import StorageClient
-
-
-@pytest.fixture(params=['memory', 'file_system', 'redis'])
-def storage_client(
-    request: pytest.FixtureRequest,
-    redis_client: FakeAsyncRedis,
-    suppress_user_warning: None,  # noqa: ARG001
-) -> StorageClient:
-    """Parameterized fixture to test with different storage clients."""
-    if request.param == 'memory':
-        return MemoryStorageClient()
-
-    if request.param == 'redis':
-        return RedisStorageClient(redis=redis_client)
-
-    return FileSystemStorageClient()
-
-
-@pytest.fixture
-def configuration(tmp_path: Path) -> Configuration:
-    """Provide a configuration with a temporary storage directory."""
-    return Configuration(
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
-        purge_on_start=True,
-    )
 
 
 @pytest.fixture
 async def dataset(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> AsyncGenerator[Dataset, None]:
     """Fixture that provides a dataset instance for each test."""
     dataset = await Dataset.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     yield dataset
@@ -64,13 +37,11 @@ async def dataset(
 
 async def test_open_creates_new_dataset(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that open() creates a new dataset with proper metadata."""
     dataset = await Dataset.open(
         name='new_dataset',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify dataset properties
@@ -85,13 +56,11 @@ async def test_open_creates_new_dataset(
 
 async def test_reopen_default(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test reopening a dataset with default parameters."""
     # Create a first dataset instance with default parameters
     dataset_1 = await Dataset.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify default properties
@@ -107,7 +76,6 @@ async def test_reopen_default(
     # Reopen the same dataset
     dataset_2 = await Dataset.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify both instances reference the same dataset
@@ -126,14 +94,12 @@ async def test_reopen_default(
 
 async def test_open_by_id(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test opening a dataset by its ID."""
     # First create a dataset by name
     dataset1 = await Dataset.open(
         name='dataset_by_id_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some data to identify it
@@ -144,7 +110,6 @@ async def test_open_by_id(
     dataset2 = await Dataset.open(
         id=dataset1.id,
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify it's the same dataset
@@ -163,13 +128,11 @@ async def test_open_by_id(
 
 async def test_open_existing_dataset(
     dataset: Dataset,
-    storage_client: StorageClient,
 ) -> None:
     """Test that open() loads an existing dataset correctly."""
     # Open the same dataset again
     reopened_dataset = await Dataset.open(
         name=dataset.name,
-        storage_client=storage_client,
     )
 
     # Verify dataset properties
@@ -185,7 +148,6 @@ async def test_open_existing_dataset(
 
 async def test_open_with_id_and_name(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that open() raises an error when both id and name are provided."""
     with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
@@ -193,7 +155,6 @@ async def test_open_with_id_and_name(
             id='some-id',
             name='some-name',
             storage_client=storage_client,
-            configuration=configuration,
         )
 
 
@@ -405,13 +366,11 @@ async def test_list_items_with_options(dataset: Dataset) -> None:
 
 async def test_drop(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test dropping a dataset removes it from cache and clears its data."""
     dataset = await Dataset.open(
         name='drop_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some data
@@ -424,7 +383,6 @@ async def test_drop(
     new_dataset = await Dataset.open(
         name='drop_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     result = await new_dataset.get_data()
@@ -440,7 +398,6 @@ async def test_export_to_json(
     # Create a key-value store for export
     kvs = await KeyValueStore.open(
         name='export_kvs',
-        storage_client=storage_client,
     )
 
     # Add some items to the dataset
@@ -520,6 +477,43 @@ async def test_export_to_invalid_content_type(dataset: Dataset) -> None:
         )
 
 
+async def test_export_with_multiple_kwargs(dataset: Dataset, tmp_path: Path) -> None:
+    """Test exporting dataset using many optional arguments together."""
+    target_kvs_name = 'some_kvs'
+    target_storage_client = FileSystemStorageClient()
+    export_key = 'exported_dataset'
+    data = {'some key': 'some data'}
+
+    # Prepare custom directory and configuration
+    custom_dir_name = 'some_dir'
+    custom_dir = tmp_path / custom_dir_name
+    custom_dir.mkdir()
+    target_configuration = Configuration(crawlee_storage_dir=str(custom_dir))  # type: ignore[call-arg]
+
+    # Set expected values
+    expected_exported_data = f'{json.dumps([{"some key": "some data"}])}'
+    expected_kvs_dir = custom_dir / 'key_value_stores' / target_kvs_name
+
+    # Populate dataset and export
+    await dataset.push_data(data)
+    await dataset.export_to(
+        key=export_key,
+        content_type='json',
+        to_kvs_name=target_kvs_name,
+        to_kvs_storage_client=target_storage_client,
+        to_kvs_configuration=target_configuration,
+    )
+
+    # Verify the directory was created
+    assert expected_kvs_dir.is_dir()
+    # Verify that kvs contains the exported data
+    kvs = await KeyValueStore.open(
+        name=target_kvs_name, storage_client=target_storage_client, configuration=target_configuration
+    )
+
+    assert await kvs.get_value(key=export_key) == expected_exported_data
+
+
 async def test_large_dataset(dataset: Dataset) -> None:
     """Test handling a large dataset with many items."""
     items = [{'id': i, 'value': f'value-{i}'} for i in range(100)]
@@ -540,14 +534,12 @@ async def test_large_dataset(dataset: Dataset) -> None:
 
 async def test_purge(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test purging a dataset removes all data but keeps the dataset itself."""
     # First create a dataset
     dataset = await Dataset.open(
         name='purge_test_dataset',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some data
@@ -596,19 +588,16 @@ async def test_purge(
 
 async def test_open_with_alias(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test opening datasets with alias parameter for NDU functionality."""
     # Create datasets with different aliases
     dataset_1 = await Dataset.open(
         alias='test_alias_1',
         storage_client=storage_client,
-        configuration=configuration,
     )
     dataset_2 = await Dataset.open(
         alias='test_alias_2',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify they have different IDs but no names (unnamed)
@@ -636,21 +625,18 @@ async def test_open_with_alias(
 
 async def test_alias_caching(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that datasets with same alias return same instance (cached)."""
     # Open dataset with alias
     dataset_1 = await Dataset.open(
         alias='cache_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Open again with same alias
     dataset_2 = await Dataset.open(
         alias='cache_test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Should be same instance
@@ -663,7 +649,6 @@ async def test_alias_caching(
 
 async def test_alias_with_id_error(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that providing both alias and id raises error."""
     with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
@@ -671,13 +656,11 @@ async def test_alias_with_id_error(
             id='some-id',
             alias='some-alias',
             storage_client=storage_client,
-            configuration=configuration,
         )
 
 
 async def test_alias_with_name_error(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that providing both alias and name raises error."""
     with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
@@ -685,13 +668,11 @@ async def test_alias_with_name_error(
             name='some-name',
             alias='some-alias',
             storage_client=storage_client,
-            configuration=configuration,
         )
 
 
 async def test_alias_with_all_parameters_error(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that providing id, name, and alias raises error."""
     with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
@@ -700,13 +681,11 @@ async def test_alias_with_all_parameters_error(
             name='some-name',
             alias='some-alias',
             storage_client=storage_client,
-            configuration=configuration,
         )
 
 
 async def test_alias_with_special_characters(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test alias functionality with special characters."""
     special_aliases = [
@@ -722,7 +701,6 @@ async def test_alias_with_special_characters(
         dataset = await Dataset.open(
             alias=alias,
             storage_client=storage_client,
-            configuration=configuration,
         )
         datasets.append(dataset)
 
@@ -740,26 +718,28 @@ async def test_alias_with_special_characters(
         await dataset.drop()
 
 
-async def test_named_vs_alias_conflict_detection() -> None:
+async def test_named_vs_alias_conflict_detection(
+    storage_client: StorageClient,
+) -> None:
     """Test that conflicts between named and alias storages are detected."""
     # Test 1: Create named storage first, then try alias with same name
-    named_dataset = await Dataset.open(name='conflict_test')
+    named_dataset = await Dataset.open(name='conflict_test', storage_client=storage_client)
     assert named_dataset.name == 'conflict_test'
 
     # Try to create alias with same name - should raise error
     with pytest.raises(ValueError, match=r'Cannot create alias storage "conflict_test".*already exists'):
-        await Dataset.open(alias='conflict_test')
+        await Dataset.open(alias='conflict_test', storage_client=storage_client)
 
     # Clean up
     await named_dataset.drop()
 
     # Test 2: Create alias first, then try named with same name
-    alias_dataset = await Dataset.open(alias='conflict_test2')
+    alias_dataset = await Dataset.open(alias='conflict_test2', storage_client=storage_client)
     assert alias_dataset.name is None  # Alias storages have no name
 
     # Try to create named with same name - should raise error
     with pytest.raises(ValueError, match=r'Cannot create named storage "conflict_test2".*already exists'):
-        await Dataset.open(name='conflict_test2')
+        await Dataset.open(name='conflict_test2', storage_client=storage_client)
 
     # Clean up
     await alias_dataset.drop()
@@ -767,14 +747,12 @@ async def test_named_vs_alias_conflict_detection() -> None:
 
 async def test_alias_parameter(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test dataset creation and operations with alias parameter."""
     # Create dataset with alias
     alias_dataset = await Dataset.open(
         alias='test_alias',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify alias dataset properties
@@ -792,14 +770,12 @@ async def test_alias_parameter(
 
 async def test_alias_vs_named_isolation(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that alias and named datasets with same identifier are isolated."""
     # Create named dataset
     named_dataset = await Dataset.open(
         name='test_identifier',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify named dataset
@@ -813,7 +789,6 @@ async def test_alias_vs_named_isolation(
     alias_dataset = await Dataset.open(
         alias='test_identifier',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Should be different instance
@@ -829,20 +804,16 @@ async def test_alias_vs_named_isolation(
 
 async def test_default_vs_alias_default_equivalence(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that default dataset and alias='default' are equivalent."""
     # Open default dataset
     default_dataset = await Dataset.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
-    # Open alias='default' dataset
     alias_default_dataset = await Dataset.open(
-        alias='default',
+        alias=StorageInstanceManager._DEFAULT_STORAGE_ALIAS,
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Should be the same
@@ -860,7 +831,6 @@ async def test_default_vs_alias_default_equivalence(
 
 async def test_multiple_alias_isolation(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that different aliases create separate datasets."""
     datasets = []
@@ -869,7 +839,6 @@ async def test_multiple_alias_isolation(
         dataset = await Dataset.open(
             alias=f'alias_{i}',
             storage_client=storage_client,
-            configuration=configuration,
         )
         await dataset.push_data({'alias': f'alias_{i}', 'index': i})
         datasets.append(dataset)
@@ -1058,3 +1027,13 @@ async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
     await default_dataset_2.drop()
     await alias_dataset_2.drop()
     await named_dataset_2.drop()
+
+
+async def test_name_default_not_allowed(storage_client: StorageClient) -> None:
+    """Test that storage can't have default alias as name, to prevent collisions with unnamed storage alias."""
+    with pytest.raises(
+        ValueError,
+        match=f'Storage name cannot be "{StorageInstanceManager._DEFAULT_STORAGE_ALIAS}" as '
+        f'it is reserved for default alias.',
+    ):
+        await Dataset.open(name=StorageInstanceManager._DEFAULT_STORAGE_ALIAS, storage_client=storage_client)
