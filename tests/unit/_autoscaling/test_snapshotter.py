@@ -225,7 +225,7 @@ def test_snapshot_pruning_keeps_recent_records_unaffected(snapshotter: Snapshott
 
 
 def test_memory_load_evaluation_logs_warning_on_high_usage(caplog: pytest.LogCaptureFixture) -> None:
-    config = Configuration(memory_mbytes=ByteSize.from_gb(8).bytes)
+    config = Configuration(memory_mbytes=ByteSize.from_gb(8).to_mb())
 
     snapshotter = Snapshotter.from_config(config)
 
