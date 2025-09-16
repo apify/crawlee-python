@@ -40,7 +40,7 @@ dependencies = [
     "protego>=0.5.0",
     "psutil>=6.0.0",
     "pydantic-settings>=2.2.0,!=2.7.0,!=2.7.1,!=2.8.0",
-    "pydantic>=2.8.0,!=2.10.0,!=2.10.1,!=2.10.2",
+    "pydantic>=2.11.0",
     "pyee>=9.0.0",
     "tldextract>=5.1.0",
     "typing-extensions>=4.1.0",
@@ -98,11 +98,11 @@ dev = [
     "apify_client", # For e2e tests.
     "build~=1.3.0", # For e2e tests.
     "dycw-pytest-only~=2.1.0",
-    "mypy~=1.17.0",
+    "mypy~=1.18.1",
     "pre-commit~=4.3.0",
     "proxy-py~=2.4.0",
     "pydoc-markdown~=4.8.0",
-    "pytest-asyncio~=1.1.0",
+    "pytest-asyncio~=1.2.0",
     "pytest-cov~=7.0.0",
     "pytest-timeout~=2.4.0",
     "pytest-xdist~=3.8.0",

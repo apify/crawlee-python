@@ -125,13 +125,17 @@ class RequestQueue(Storage, RequestManager):
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
 
+        client_opener_coro = storage_client.create_rq_client(id=id, name=name, alias=alias, configuration=configuration)
+        additional_cache_key = storage_client.get_additional_cache_key(configuration=configuration)
+
         return await service_locator.storage_instance_manager.open_storage_instance(
             cls,
             id=id,
             name=name,
             alias=alias,
-            configuration=configuration,
-            client_opener=storage_client.create_rq_client,
+            client_opener_coro=client_opener_coro,
+            storage_client_type=storage_client.__class__,
+            additional_cache_key=additional_cache_key,
         )
 
     @override

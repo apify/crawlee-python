@@ -27,6 +27,7 @@ from crawlee import EnqueueStrategy, Glob, RequestTransformAction, service_locat
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
 from crawlee._log_config import configure_logger, get_configured_log_level, string_to_log_level
 from crawlee._request import Request, RequestOptions, RequestState
+from crawlee._service_locator import ServiceLocator
 from crawlee._types import (
     BasicCrawlingContext,
     EnqueueLinksKwargs,
@@ -346,14 +347,23 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             _logger: A logger instance, typically provided by a subclass, for consistent logging labels.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
-        if configuration:
-            service_locator.set_configuration(configuration)
-        if storage_client:
-            service_locator.set_storage_client(storage_client)
-        if event_manager:
-            service_locator.set_event_manager(event_manager)
+        implicit_event_manager_with_explicit_config = False
+        if not configuration:
+            configuration = service_locator.get_configuration()
+        elif not event_manager:
+            implicit_event_manager_with_explicit_config = True
 
-        config = service_locator.get_configuration()
+        if not storage_client:
+            storage_client = service_locator.get_storage_client()
+
+        if not event_manager:
+            event_manager = service_locator.get_event_manager()
+
+        self._service_locator = ServiceLocator(
+            configuration=configuration, storage_client=storage_client, event_manager=event_manager
+        )
+
+        config = self._service_locator.get_configuration()
 
         # Core components
         self._request_manager = request_manager
@@ -419,6 +429,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             httpx_logger = logging.getLogger('httpx')  # Silence HTTPX logger
             httpx_logger.setLevel(logging.DEBUG if get_configured_log_level() <= logging.DEBUG else logging.WARNING)
         self._logger = _logger or logging.getLogger(__name__)
+        if implicit_event_manager_with_explicit_config:
+            self._logger.warning(
+                'No event manager set, implicitly using event manager from global service_locator.'
+                'It is advised to explicitly set the event manager if explicit configuration is used as well.'
+            )
         self._statistics_log_format = statistics_log_format
 
         # Statistics
@@ -548,7 +563,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def get_request_manager(self) -> RequestManager:
         """Return the configured request manager. If none is configured, open and return the default request queue."""
         if not self._request_manager:
-            self._request_manager = await RequestQueue.open()
+            self._request_manager = await RequestQueue.open(
+                storage_client=self._service_locator.get_storage_client(),
+                configuration=self._service_locator.get_configuration(),
+            )
 
         return self._request_manager
 
@@ -560,7 +578,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         alias: str | None = None,
     ) -> Dataset:
         """Return the `Dataset` with the given ID or name. If none is provided, return the default one."""
-        return await Dataset.open(id=id, name=name, alias=alias)
+        return await Dataset.open(
+            id=id,
+            name=name,
+            alias=alias,
+            storage_client=self._service_locator.get_storage_client(),
+            configuration=self._service_locator.get_configuration(),
+        )
 
     async def get_key_value_store(
         self,
@@ -570,7 +594,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         alias: str | None = None,
     ) -> KeyValueStore:
         """Return the `KeyValueStore` with the given ID or name. If none is provided, return the default KVS."""
-        return await KeyValueStore.open(id=id, name=name, alias=alias)
+        return await KeyValueStore.open(
+            id=id,
+            name=name,
+            alias=alias,
+            storage_client=self._service_locator.get_storage_client(),
+            configuration=self._service_locator.get_configuration(),
+        )
 
     def error_handler(
         self, handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext]
@@ -686,7 +716,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         return final_statistics
 
     async def _run_crawler(self) -> None:
-        event_manager = service_locator.get_event_manager()
+        event_manager = self._service_locator.get_event_manager()
 
         self._crawler_state_rec_task.start()
 
@@ -791,7 +821,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Returns:
             The retrieved data.
         """
-        dataset = await Dataset.open(id=dataset_id, name=dataset_name, alias=dataset_alias)
+        dataset = await Dataset.open(
+            id=dataset_id,
+            name=dataset_name,
+            alias=dataset_alias,
+            storage_client=self._service_locator.get_storage_client(),
+            configuration=self._service_locator.get_configuration(),
+        )
         return await dataset.get_data(**kwargs)
 
     async def export_data(
@@ -813,7 +849,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             dataset_name: The name of the Dataset to export from (global scope, named storage).
             dataset_alias: The alias of the Dataset to export from (run scope, unnamed storage).
         """
-        dataset = await self.get_dataset(id=dataset_id, name=dataset_name, alias=dataset_alias)
+        dataset = await Dataset.open(
+            id=dataset_id,
+            name=dataset_name,
+            alias=dataset_alias,
+            storage_client=self._service_locator.get_storage_client(),
+            configuration=self._service_locator.get_configuration(),
+        )
 
         path = path if isinstance(path, Path) else Path(path)
         dst = path.open('w', newline='')
@@ -1528,7 +1570,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def _crawler_state_task(self) -> None:
         """Emit a persist state event with the given migration status."""
-        event_manager = service_locator.get_event_manager()
+        event_manager = self._service_locator.get_event_manager()
 
         current_state = self.statistics.state
 
