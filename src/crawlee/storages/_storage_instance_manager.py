@@ -55,6 +55,7 @@ class StorageInstanceManager:
     """
 
     _DEFAULT_STORAGE_ALIAS = '__default__'
+    """Reserved alias for default unnamed storage."""
 
     def __init__(self) -> None:
         self._cache_by_storage_client: dict[type[StorageClient], _StorageClientCache] = defaultdict(_StorageClientCache)
