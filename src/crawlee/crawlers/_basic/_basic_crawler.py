@@ -347,16 +347,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             _logger: A logger instance, typically provided by a subclass, for consistent logging labels.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
+        implicit_event_manager_with_explicit_config = False
         if not configuration:
             configuration = service_locator.get_configuration()
+        elif not event_manager:
+            implicit_event_manager_with_explicit_config = True
 
         if not storage_client:
             storage_client = service_locator.get_storage_client()
 
         if not event_manager:
-            # This is weird if someone passes configuration and its event manager related stuff gets ignored as the
-            # event manager will be used from service_locator. Maybe keep the was created flag for it? It does not have
-            # the use cases like the storages
             event_manager = service_locator.get_event_manager()
 
         self._service_locator = ServiceLocator(
@@ -429,6 +429,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             httpx_logger = logging.getLogger('httpx')  # Silence HTTPX logger
             httpx_logger.setLevel(logging.DEBUG if get_configured_log_level() <= logging.DEBUG else logging.WARNING)
         self._logger = _logger or logging.getLogger(__name__)
+        if implicit_event_manager_with_explicit_config:
+            self._logger.warning(
+                'No event manager set, implicitly using event manager from global service_locator.'
+                'It is advised to explicitly set the event manager if explicit configuration is used as well.'
+            )
         self._statistics_log_format = statistics_log_format
 
         # Statistics

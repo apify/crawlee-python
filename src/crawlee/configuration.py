@@ -28,7 +28,7 @@ class Configuration(BaseSettings):
     Settings can also be configured via environment variables, prefixed with `CRAWLEE_`.
     """
 
-    model_config = SettingsConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = SettingsConfigDict(populate_by_name=True)
 
     internal_timeout: Annotated[timedelta | None, Field(alias='crawlee_internal_timeout')] = None
     """Timeout for the internal asynchronous operations."""

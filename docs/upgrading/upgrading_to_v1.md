@@ -5,96 +5,6 @@ title: Upgrading to v1
 
 This page summarizes the breaking changes between Crawlee for Python v0.6 and v1.0.
 
-## ServiceLocator changes
-
-### ServiceLocator is stricter with registering services
-You can register the services just once, and you can no longer override already registered services.
-
-**Before (v0.6):**
-```python
-from crawlee import service_locator
-from crawlee.storage_clients import MemoryStorageClient
-
-service_locator.set_storage_client(MemoryStorageClient())
-service_locator.set_storage_client(MemoryStorageClient())
-```
-**Now (v1.0):**
-
-```python
-from crawlee import service_locator
-from crawlee.storage_clients import MemoryStorageClient
-
-service_locator.set_storage_client(MemoryStorageClient())
-service_locator.set_storage_client(MemoryStorageClient())  # Raises an error
-```
-
-### BasicCrawler has its own instance of ServiceLocator to track its own services
-Explicitly passed services to the crawler can be different the global ones accessible in `crawlee.service_locator`. `BasicCrawler` no longer causes the global services in `service_locator` to be set to the crawler's explicitly passed services.
-
-**Before (v0.6):**
-```python
-from crawlee import service_locator
-from crawlee.crawlers import BasicCrawler
-from crawlee.storage_clients import MemoryStorageClient
-from crawlee.storages import Dataset
-
-
-async def main() -> None:
-    custom_storage_client = MemoryStorageClient()
-    crawler = BasicCrawler(storage_client=custom_storage_client)
-
-    assert service_locator.get_storage_client() is custom_storage_client
-    assert await crawler.get_dataset() is await Dataset.open()
-```
-**Now (v1.0):**
-
-```python
-from crawlee import service_locator
-from crawlee.crawlers import BasicCrawler
-from crawlee.storage_clients import MemoryStorageClient
-from crawlee.storages import Dataset
-
-
-async def main() -> None:
-    custom_storage_client = MemoryStorageClient()
-    crawler = BasicCrawler(storage_client=custom_storage_client)
-
-    assert service_locator.get_storage_client() is not custom_storage_client
-    assert await crawler.get_dataset() is not await Dataset.open()
-```
-### There can be two crawlers with different services at the same time
-
-**Now (v1.0):**
-
-```python
-from crawlee.crawlers import BasicCrawler
-from crawlee.storage_clients import MemoryStorageClient, FileSystemStorageClient
-from crawlee.configuration import Configuration
-from crawlee.events import LocalEventManager
-
-custom_configuration_1 = Configuration()
-custom_event_manager_1 = LocalEventManager.from_config(custom_configuration_1)
-custom_storage_client_1 = MemoryStorageClient()
-
-custom_configuration_2 = Configuration()
-custom_event_manager_2 = LocalEventManager.from_config(custom_configuration_2)
-custom_storage_client_2 = FileSystemStorageClient()
-
-crawler_1 = BasicCrawler(
-    configuration=custom_configuration_1,
-    event_manager=custom_event_manager_1,
-    storage_client=custom_storage_client_1,
-)
-
-crawler_2 = BasicCrawler(
-    configuration=custom_configuration_2,
-    event_manager=custom_event_manager_2,
-    storage_client=custom_storage_client_2,
-  )
-
-# use crawlers without runtime crash...
-```
-
 ## Terminology change: "browser" in different contexts
 
 The word "browser" is now used distinctly in two contexts:
@@ -278,6 +188,96 @@ The interface for custom storage clients has been simplified:
 - One storage client per storage type (`RequestQueue`, `KeyValueStore`, `Dataset`).
 - Collection storage clients have been removed.
 - The number of methods that have to be implemented have been reduced.
+
+## ServiceLocator changes
+
+### ServiceLocator is stricter with registering services
+You can register the services just once, and you can no longer override already registered services.
+
+**Before (v0.6):**
+```python
+from crawlee import service_locator
+from crawlee.storage_clients import MemoryStorageClient
+
+service_locator.set_storage_client(MemoryStorageClient())
+service_locator.set_storage_client(MemoryStorageClient())
+```
+**Now (v1.0):**
+
+```python
+from crawlee import service_locator
+from crawlee.storage_clients import MemoryStorageClient
+
+service_locator.set_storage_client(MemoryStorageClient())
+service_locator.set_storage_client(MemoryStorageClient())  # Raises an error
+```
+
+### BasicCrawler has its own instance of ServiceLocator to track its own services
+Explicitly passed services to the crawler can be different the global ones accessible in `crawlee.service_locator`. `BasicCrawler` no longer causes the global services in `service_locator` to be set to the crawler's explicitly passed services.
+
+**Before (v0.6):**
+```python
+from crawlee import service_locator
+from crawlee.crawlers import BasicCrawler
+from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storages import Dataset
+
+
+async def main() -> None:
+    custom_storage_client = MemoryStorageClient()
+    crawler = BasicCrawler(storage_client=custom_storage_client)
+
+    assert service_locator.get_storage_client() is custom_storage_client
+    assert await crawler.get_dataset() is await Dataset.open()
+```
+**Now (v1.0):**
+
+```python
+from crawlee import service_locator
+from crawlee.crawlers import BasicCrawler
+from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storages import Dataset
+
+
+async def main() -> None:
+    custom_storage_client = MemoryStorageClient()
+    crawler = BasicCrawler(storage_client=custom_storage_client)
+
+    assert service_locator.get_storage_client() is not custom_storage_client
+    assert await crawler.get_dataset() is not await Dataset.open()
+```
+### There can be two crawlers with different services at the same time
+
+**Now (v1.0):**
+
+```python
+from crawlee.crawlers import BasicCrawler
+from crawlee.storage_clients import MemoryStorageClient, FileSystemStorageClient
+from crawlee.configuration import Configuration
+from crawlee.events import LocalEventManager
+
+custom_configuration_1 = Configuration()
+custom_event_manager_1 = LocalEventManager.from_config(custom_configuration_1)
+custom_storage_client_1 = MemoryStorageClient()
+
+custom_configuration_2 = Configuration()
+custom_event_manager_2 = LocalEventManager.from_config(custom_configuration_2)
+custom_storage_client_2 = FileSystemStorageClient()
+
+crawler_1 = BasicCrawler(
+    configuration=custom_configuration_1,
+    event_manager=custom_event_manager_1,
+    storage_client=custom_storage_client_1,
+)
+
+crawler_2 = BasicCrawler(
+    configuration=custom_configuration_2,
+    event_manager=custom_event_manager_2,
+    storage_client=custom_storage_client_2,
+  )
+
+# use crawlers without runtime crash...
+```
 
 ## Other smaller updates
 

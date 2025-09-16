@@ -75,7 +75,7 @@ class StorageInstanceManager:
         Args:
             cls: The storage class to instantiate.
             id: Storage ID.
-            name: Storage name.
+            name: Storage name. (global scope, persists across runs).
             alias: Storage alias (run scope, creates unnamed storage).
             storage_client_type: Type of storage client to use.
             client_opener: Coroutine to open the storage client when storage instance not found in cache.
