@@ -40,7 +40,7 @@ dependencies = [
     "protego>=0.5.0",
     "psutil>=6.0.0",
     "pydantic-settings>=2.2.0,!=2.7.0,!=2.7.1,!=2.8.0",
-    "pydantic>=2.8.0,!=2.10.0,!=2.10.1,!=2.10.2",
+    "pydantic>= 2.11.0",
     "pyee>=9.0.0",
     "tldextract>=5.1.0",
     "typing-extensions>=4.1.0",

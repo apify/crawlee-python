@@ -246,7 +246,8 @@ async def main() -> None:
     assert service_locator.get_storage_client() is not custom_storage_client
     assert await crawler.get_dataset() is not await Dataset.open()
 ```
-### There can be two crawlers with different services at the same time
+
+This allows two crawlers with different services at the same time.
 
 **Now (v1.0):**
 
