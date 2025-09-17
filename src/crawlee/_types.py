@@ -69,7 +69,7 @@ def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
 class HttpHeaders(RootModel, Mapping[str, str]):
     """A dictionary-like object representing HTTP headers."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     root: Annotated[
         dict[str, str],

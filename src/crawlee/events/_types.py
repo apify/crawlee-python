@@ -40,7 +40,7 @@ class Event(str, Enum):
 class EventPersistStateData(BaseModel):
     """Data for the persist state event."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     is_migrating: Annotated[bool, Field(alias='isMigrating')]
 
@@ -49,7 +49,7 @@ class EventPersistStateData(BaseModel):
 class EventSystemInfoData(BaseModel):
     """Data for the system info event."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     cpu_info: Annotated[CpuInfo, Field(alias='cpuInfo')]
     memory_info: Annotated[
@@ -62,7 +62,7 @@ class EventSystemInfoData(BaseModel):
 class EventMigratingData(BaseModel):
     """Data for the migrating event."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     # The remaining time in seconds before the migration is forced and the process is killed
     # Optional because it's not present when the event handler is called manually
@@ -73,21 +73,21 @@ class EventMigratingData(BaseModel):
 class EventAbortingData(BaseModel):
     """Data for the aborting event."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
 
 @docs_group('Event data')
 class EventExitData(BaseModel):
     """Data for the exit event."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
 
 @docs_group('Event data')
 class EventCrawlerStatusData(BaseModel):
     """Data for the crawler status event."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     message: str
     """A message describing the current status of the crawler."""
