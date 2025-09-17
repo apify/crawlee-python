@@ -128,3 +128,16 @@ async def test_identical_storage_remove_from_cache(storage_type: type[Storage]) 
     service_locator.storage_instance_manager.remove_from_cache(storage_1)
     storage_2 = await storage_type.open()
     assert storage_1 is not storage_2
+
+
+async def test_preexisting_unnamed_storage_open_by_id(storage_type: type[Storage]) -> None:
+    """Test that persisted pre-existing unnamed storage can be opened by ID."""
+    storage_client = FileSystemStorageClient()
+    storage_1 = await storage_type.open(alias='custom_name', storage_client=storage_client)
+
+    # Make service_locator unaware of this storage
+    service_locator.storage_instance_manager.clear_cache()
+
+    storage_1_again = await storage_type.open(id=storage_1.id, storage_client=storage_client)
+
+    assert storage_1.id == storage_1_again.id
