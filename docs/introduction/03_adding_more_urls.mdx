@@ -109,7 +109,7 @@ For even more control, you can use the `include` or `exclude` parameters, either
 
 ### Transform requests before enqueuing
 
-For cases where you need to modify or filter requests before they are enqueued, you can use the `transform_request_function` parameter. This function takes a <ApiLink to="class/Request">`Request`</ApiLink> object as input and should return either a modified <ApiLink to="class/Request">`Request`</ApiLink>` object or `None`. If the function returns `None`, the request will be skipped.
+For cases where you need to modify or filter requests before they are enqueued, you can use the `transform_request_function` parameter. This function receives a <ApiLink to="class/RequestOptions">`RequestOptions`</ApiLink> object and should return either a modified <ApiLink to="class/RequestOptions">`RequestOptions`</ApiLink> object, or a string of type `RequestTransformAction`, which only allows the values `skip` and `unchanged`. Returning `skip` means the request will be skipped, while `unchanged` will add it without any changes
 
 <RunnableCodeBlock className="language-python" language="python">
     {TransformExample}

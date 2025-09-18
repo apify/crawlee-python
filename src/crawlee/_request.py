@@ -117,6 +117,7 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
 user_data_adapter = TypeAdapter(UserData)
 
 
+@docs_group('Other')
 class RequestOptions(TypedDict):
     """Options that can be used to customize request creation.
 
