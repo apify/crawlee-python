@@ -158,18 +158,22 @@ class StorageInstanceManager:
             instance = cls(client, metadata.id, metadata.name)  # type: ignore[call-arg]
             instance_name = getattr(instance, 'name', None)
 
-            # Cache the instance. Always cache by id and cache named or unnamed (alias).
+            # Cache the instance.
+            # Always cache by id.
             self._cache_by_storage_client[storage_client_type].by_id[cls][instance.id][additional_cache_key] = instance
+
+            # Cache named storage.
             if instance_name is not None:
                 self._cache_by_storage_client[storage_client_type].by_name[cls][instance_name][additional_cache_key] = (
                     instance
                 )
-            elif alias is not None:
+
+            # Cache unnamed storage.
+            if alias is not None:
                 self._cache_by_storage_client[storage_client_type].by_alias[cls][alias][additional_cache_key] = instance
-            else:
-                raise RuntimeError('Storage instance must have either a name or an alias.')
 
             return instance
+
         finally:
             # Make sure the client opener is closed.
             # If it was awaited, then closing is no operation, if it was not awaited, this is the cleanup.

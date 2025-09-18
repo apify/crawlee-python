@@ -57,7 +57,7 @@ class FinalStatistics:
 class StatisticsState(BaseModel):
     """Statistic data about a crawler run."""
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_inf_nan='constants')
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, ser_json_inf_nan='constants')
     stats_id: Annotated[int | None, Field(alias='statsId')] = None
 
     requests_finished: Annotated[int, Field(alias='requestsFinished')] = 0

@@ -163,7 +163,7 @@ class Request(BaseModel):
     ```
     """
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     unique_key: Annotated[str, Field(alias='uniqueKey')]
     """A unique key identifying the request. Two requests with the same `unique_key` are considered as pointing
