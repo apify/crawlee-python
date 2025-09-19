@@ -560,7 +560,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             proxy_tier=None,
         )
 
-    async def open_request_manager(self) -> RequestManager:
+    async def get_request_manager(self) -> RequestManager:
         """Return the configured request manager. If none is configured, open and return the default request queue."""
         if not self._request_manager:
             self._request_manager = await self.open_request_queue()
@@ -668,7 +668,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             if self._use_session_pool:
                 await self._session_pool.reset_store()
 
-            request_manager = await self.open_request_manager()
+            request_manager = await self.get_request_manager()
             if purge_request_queue and isinstance(request_manager, RequestQueue):
                 await request_manager.drop()
                 self._request_manager = await self.open_request_queue()
@@ -790,7 +790,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             await asyncio.gather(*skipped_tasks)
             self._logger.warning('Some requests were skipped because they were disallowed based on the robots.txt file')
 
-        request_manager = await self.open_request_manager()
+        request_manager = await self.get_request_manager()
 
         await request_manager.add_requests(
             requests=allowed_requests,
@@ -1084,7 +1084,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         context: TCrawlingContext | BasicCrawlingContext,
         error: Exception,
     ) -> None:
-        request_manager = await self.open_request_manager()
+        request_manager = await self.get_request_manager()
         request = context.request
 
         if self._abort_on_error:
@@ -1167,7 +1167,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self, request: Request | str, reason: SkippedReason, *, need_mark: bool = False
     ) -> None:
         if need_mark and isinstance(request, Request):
-            request_manager = await self.open_request_manager()
+            request_manager = await self.get_request_manager()
 
             await wait_for(
                 lambda: request_manager.mark_request_as_handled(request),
@@ -1253,7 +1253,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """Commit request handler result for the input `context`. Result is taken from `_context_result_map`."""
         result = self._context_result_map[context]
 
-        request_manager = await self.open_request_manager()
+        request_manager = await self.get_request_manager()
         origin = context.request.loaded_url or context.request.url
 
         for add_requests_call in result.add_requests_calls:
@@ -1306,7 +1306,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if self._keep_alive:
             return False
 
-        request_manager = await self.open_request_manager()
+        request_manager = await self.get_request_manager()
         return await request_manager.is_finished()
 
     async def __is_task_ready_function(self) -> bool:
@@ -1318,11 +1318,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             )
             return False
 
-        request_manager = await self.open_request_manager()
+        request_manager = await self.get_request_manager()
         return not await request_manager.is_empty()
 
     async def __run_task_function(self) -> None:
-        request_manager = await self.open_request_manager()
+        request_manager = await self.get_request_manager()
 
         request = await wait_for(
             lambda: request_manager.fetch_next_request(),
@@ -1594,7 +1594,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         ):
             message = f'Experiencing problems, {failed_requests} failed requests since last status update.'
         else:
-            request_manager = await self.open_request_manager()
+            request_manager = await self.get_request_manager()
             total_count = await request_manager.get_total_count()
             if total_count is not None and total_count > 0:
                 pages_info = f'{self._statistics.state.requests_finished}/{total_count}'
