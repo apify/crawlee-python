@@ -215,11 +215,11 @@ service_locator.set_storage_client(MemoryStorageClient())  # Raises an error
 ## BasicCrawler changes
 
 ### Renamed methods for opening storages
-`BasicCrawler.get_dataset` -> `BasicCrawler.open_dataset`
-`BasicCrawler.get_key_value_store` -> `BasicCrawler.open_key_value_store`
+- `BasicCrawler.get_dataset` renamed to `BasicCrawler.open_dataset`
+- `BasicCrawler.get_key_value_store` renamed to `BasicCrawler.open_key_value_store`
 
 ### Added method for opening RequestQueue that uses configuration and storage client of the crawler
-`BasicCrawler.open_request_queue`
+- `BasicCrawler.open_request_queue`
 
 ### BasicCrawler has its own instance of ServiceLocator to track its own services
 Explicitly passed services to the crawler can be different the global ones accessible in `crawlee.service_locator`. `BasicCrawler` no longer causes the global services in `service_locator` to be set to the crawler's explicitly passed services.
