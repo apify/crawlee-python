@@ -1551,22 +1551,24 @@ async def test_status_message_emit() -> None:
     assert status_message_listener.called
 
 
-async def test_crawler_purge_request_queue_uses_same_request_manager() -> None:
-    """Make sure that purge on start does not replace the `request_manager`"""
+async def test_crawler_purge_request_queue_uses_same_storage_client() -> None:
+    """Make sure that purge on start does not replace the storage client in the underlying storage manager"""
 
-    # Set some different storage_client that what Crawler is using.
+    # Set some different storage_client globally and different for Crawlee.
     service_locator.set_storage_client(FileSystemStorageClient())
+    unrelated_rq = await RequestQueue.open()
+    unrelated_request = Request.from_url('https://x.placeholder.com')
+    await unrelated_rq.add_request(unrelated_request)
 
-    # Make sure that the Crawler is correctly isolated from global storage client
-    crawler_storage_client = MemoryStorageClient()
-    rq = await RequestQueue.open(storage_client=crawler_storage_client)
-    crawler = BasicCrawler(storage_client=crawler_storage_client)
+    crawler = BasicCrawler(storage_client=MemoryStorageClient())
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        pass
+        context.log.info(context.request.url)
 
     for _ in (1, 2):
         await crawler.run(requests=[Request.from_url('https://a.placeholder.com')], purge_request_queue=True)
         assert crawler.statistics.state.requests_finished == 1
-        assert await crawler.open_request_manager() is rq
+
+    # Crawler should not fall back to the default storage after the purge
+    assert await unrelated_rq.fetch_next_request() == unrelated_request

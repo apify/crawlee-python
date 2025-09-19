@@ -187,21 +187,33 @@ class StorageInstanceManager:
         """
         storage_type = type(storage_instance)
 
-        for storage_client_cache in self._cache_by_storage_client.values():
+        for storage_client_type in self._cache_by_storage_client:
             # Remove from ID cache
-            for additional_key in storage_client_cache.by_id[storage_type][storage_instance.id]:
-                del storage_client_cache.by_id[storage_type][storage_instance.id][additional_key]
+            for additional_key in self._cache_by_storage_client[storage_client_type].by_id[storage_type][
+                storage_instance.id
+            ]:
+                del self._cache_by_storage_client[storage_client_type].by_id[storage_type][storage_instance.id][
+                    additional_key
+                ]
                 break
 
             # Remove from name cache or alias cache. It can never be in both.
             if storage_instance.name is not None:
-                for additional_key in storage_client_cache.by_name[storage_type][storage_instance.name]:
-                    del storage_client_cache.by_name[storage_type][storage_instance.name][additional_key]
+                for additional_key in self._cache_by_storage_client[storage_client_type].by_name[storage_type][
+                    storage_instance.name
+                ]:
+                    del self._cache_by_storage_client[storage_client_type].by_name[storage_type][storage_instance.name][
+                        additional_key
+                    ]
                     break
             else:
-                for alias_key in storage_client_cache.by_alias[storage_type]:
-                    for additional_key in storage_client_cache.by_alias[storage_type][alias_key]:
-                        del storage_client_cache.by_alias[storage_type][alias_key][additional_key]
+                for alias_key in self._cache_by_storage_client[storage_client_type].by_alias[storage_type]:
+                    for additional_key in self._cache_by_storage_client[storage_client_type].by_alias[storage_type][
+                        alias_key
+                    ]:
+                        del self._cache_by_storage_client[storage_client_type].by_alias[storage_type][alias_key][
+                            additional_key
+                        ]
                         break
 
     def clear_cache(self) -> None:
