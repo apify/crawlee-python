@@ -79,7 +79,9 @@ async def test_enqueue_links_with_max_crawl(server_url: URL, http_client: HttpCl
 
     # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
     crawler = BeautifulSoupCrawler(
-        concurrency_settings=ConcurrencySettings(max_concurrency=1), max_requests_per_crawl=3, http_client=http_client
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+        max_requests_per_crawl=3,
+        http_client=http_client,
     )
 
     @crawler.router.default_handler

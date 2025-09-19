@@ -135,6 +135,7 @@ async def test_propagates_exceptions_after_finished(system_status: SystemStatus 
         is_finished_function=lambda: future(started_count > 0),
         concurrency_settings=ConcurrencySettings(
             min_concurrency=1,
+            desired_concurrency=1,
             max_concurrency=1,
         ),
     )
@@ -320,6 +321,7 @@ async def test_allows_multiple_run_calls(system_status: SystemStatus | Mock) -> 
         is_finished_function=lambda: future(done_count >= 4),
         concurrency_settings=ConcurrencySettings(
             min_concurrency=4,
+            desired_concurrency=4,
             max_concurrency=4,
         ),
     )

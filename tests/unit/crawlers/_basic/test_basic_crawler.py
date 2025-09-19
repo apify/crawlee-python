@@ -799,7 +799,7 @@ async def test_max_requests_per_crawl() -> None:
 
     # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
     crawler = BasicCrawler(
-        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
         max_requests_per_crawl=3,
     )
 
@@ -820,7 +820,7 @@ async def test_max_crawl_depth() -> None:
 
     # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
     crawler = BasicCrawler(
-        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
         max_crawl_depth=2,
     )
 
@@ -859,7 +859,10 @@ async def test_abort_on_error(
 ) -> None:
     starts_urls = []
 
-    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=1), abort_on_error=True)
+    crawler = BasicCrawler(
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+        abort_on_error=True,
+    )
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -991,7 +994,7 @@ async def test_crawler_manual_stop() -> None:
     processed_urls = []
 
     # Set max_concurrency to 1 to ensure testing urls are visited one by one in order.
-    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=1))
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1))
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -1018,8 +1021,8 @@ async def test_crawler_multiple_stops_in_parallel() -> None:
     ]
     processed_urls = []
 
-    # Set max_concurrency to 2 to ensure two urls are being visited in parallel.
-    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=2))
+    # Set concurrency to 2 to ensure two urls are being visited in parallel.
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=2, max_concurrency=2))
 
     both_handlers_started = asyncio.Barrier(2)  # type:ignore[attr-defined]  # Test is skipped in older Python versions.
     only_one_handler_at_a_time = asyncio.Semaphore(1)
@@ -1298,7 +1301,7 @@ async def test_keep_alive(
         keep_alive=keep_alive,
         max_requests_per_crawl=max_requests_per_crawl,
         # If more request can run in parallel, then max_requests_per_crawl is not deterministic.
-        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
     )
     mocked_handler = Mock()
 
