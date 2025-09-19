@@ -565,7 +565,7 @@ async def test_error_snapshot_through_statistics(server_url: URL) -> None:
     kvs = await crawler.get_key_value_store()
     kvs_content = {}
     async for key_info in kvs.iterate_keys():
-        # Skip any non-error snapshot keys, e.g. _state.
+        # Skip any non-error snapshot keys, e.g. __RQ_STATE_.
         if 'ERROR_SNAPSHOT' not in key_info.key:
             continue
         kvs_content[key_info.key] = await kvs.get_value(key_info.key)

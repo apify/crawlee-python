@@ -115,7 +115,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         self._state = RecoverableState[RequestQueueState](
             default_state=RequestQueueState(),
-            persist_state_key=f'request_queue_{self._metadata.id}_state',
+            persist_state_key=f'__RQ_STATE_{self._metadata.id}',
             persistence_enabled=True,
             logger=logger,
         )
