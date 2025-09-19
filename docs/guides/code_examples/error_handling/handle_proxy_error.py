@@ -30,7 +30,7 @@ async def main() -> None:
             )
 
             # Add the new `Request` to the `Queue`
-            rq = await crawler.get_request_manager()
+            rq = await crawler.open_request_manager()
             await rq.add_request(new_request)
 
     await crawler.run(['https://crawlee.dev/'])

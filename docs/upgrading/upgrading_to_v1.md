@@ -216,6 +216,7 @@ service_locator.set_storage_client(MemoryStorageClient())  # Raises an error
 Explicitly passed services to the crawler can be different the global ones accessible in `crawlee.service_locator`. `BasicCrawler` no longer causes the global services in `service_locator` to be set to the crawler's explicitly passed services.
 
 **Before (v0.6):**
+
 ```python
 from crawlee import service_locator
 from crawlee.crawlers import BasicCrawler
@@ -228,7 +229,7 @@ async def main() -> None:
     crawler = BasicCrawler(storage_client=custom_storage_client)
 
     assert service_locator.get_storage_client() is custom_storage_client
-    assert await crawler.get_dataset() is await Dataset.open()
+    assert await crawler.open_dataset() is await Dataset.open()
 ```
 **Now (v1.0):**
 
@@ -244,7 +245,7 @@ async def main() -> None:
     crawler = BasicCrawler(storage_client=custom_storage_client)
 
     assert service_locator.get_storage_client() is not custom_storage_client
-    assert await crawler.get_dataset() is not await Dataset.open()
+    assert await crawler.open_dataset() is not await Dataset.open()
 ```
 
 This allows two crawlers with different services at the same time.

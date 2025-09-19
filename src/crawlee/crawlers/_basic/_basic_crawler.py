@@ -560,24 +560,36 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             proxy_tier=None,
         )
 
-    async def get_request_manager(self) -> RequestManager:
+    async def open_request_manager(self) -> RequestManager:
         """Return the configured request manager. If none is configured, open and return the default request queue."""
         if not self._request_manager:
-            self._request_manager = await RequestQueue.open(
-                storage_client=self._service_locator.get_storage_client(),
-                configuration=self._service_locator.get_configuration(),
-            )
-
+            self._request_manager = await self.open_request_queue()
         return self._request_manager
 
-    async def get_dataset(
+    async def open_request_queue(
+        self,
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        alias: str | None = None,
+    ) -> RequestQueue:
+        """Return `RequestQueue` with the given ID or name or alias. If none is provided, return the default one."""
+        return await RequestQueue.open(
+            id=id,
+            name=name,
+            alias=alias,
+            storage_client=self._service_locator.get_storage_client(),
+            configuration=self._service_locator.get_configuration(),
+        )
+
+    async def open_dataset(
         self,
         *,
         id: str | None = None,
         name: str | None = None,
         alias: str | None = None,
     ) -> Dataset:
-        """Return the `Dataset` with the given ID or name. If none is provided, return the default one."""
+        """Return `Dataset` with the given ID or name or alias. If none is provided, return the default one."""
         return await Dataset.open(
             id=id,
             name=name,
@@ -586,14 +598,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             configuration=self._service_locator.get_configuration(),
         )
 
-    async def get_key_value_store(
+    async def open_key_value_store(
         self,
         *,
         id: str | None = None,
         name: str | None = None,
         alias: str | None = None,
     ) -> KeyValueStore:
-        """Return the `KeyValueStore` with the given ID or name. If none is provided, return the default KVS."""
+        """Return `KeyValueStore` with the given ID or name or alias. If none is provided, return the default KVS."""
         return await KeyValueStore.open(
             id=id,
             name=name,
@@ -656,10 +668,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             if self._use_session_pool:
                 await self._session_pool.reset_store()
 
-            request_manager = await self.get_request_manager()
+            request_manager = await self.open_request_manager()
             if purge_request_queue and isinstance(request_manager, RequestQueue):
                 await request_manager.drop()
-                self._request_manager = await RequestQueue.open()
+                self._request_manager = await self.open_request_manager()
 
         if requests is not None:
             await self.add_requests(requests)
@@ -778,7 +790,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             await asyncio.gather(*skipped_tasks)
             self._logger.warning('Some requests were skipped because they were disallowed based on the robots.txt file')
 
-        request_manager = await self.get_request_manager()
+        request_manager = await self.open_request_manager()
 
         await request_manager.add_requests(
             requests=allowed_requests,
@@ -793,11 +805,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self,
         default_value: dict[str, JsonSerializable] | None = None,
     ) -> dict[str, JsonSerializable]:
-        kvs = await self.get_key_value_store()
+        kvs = await self.open_key_value_store()
         return await kvs.get_auto_saved_value(self._CRAWLEE_STATE_KEY, default_value)
 
     async def _save_crawler_state(self) -> None:
-        store = await self.get_key_value_store()
+        store = await self.open_key_value_store()
         await store.persist_autosaved_values()
 
     async def get_data(
@@ -887,7 +899,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             dataset_alias: The alias of the `Dataset` (run scope, unnamed storage).
             kwargs: Keyword arguments to be passed to the `Dataset.push_data()` method.
         """
-        dataset = await self.get_dataset(id=dataset_id, name=dataset_name, alias=dataset_alias)
+        dataset = await self.open_dataset(id=dataset_id, name=dataset_name, alias=dataset_alias)
         await dataset.push_data(data, **kwargs)
 
     def _should_retry_request(self, context: BasicCrawlingContext, error: Exception) -> bool:
@@ -1072,7 +1084,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         context: TCrawlingContext | BasicCrawlingContext,
         error: Exception,
     ) -> None:
-        request_manager = await self.get_request_manager()
+        request_manager = await self.open_request_manager()
         request = context.request
 
         if self._abort_on_error:
@@ -1155,7 +1167,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self, request: Request | str, reason: SkippedReason, *, need_mark: bool = False
     ) -> None:
         if need_mark and isinstance(request, Request):
-            request_manager = await self.get_request_manager()
+            request_manager = await self.open_request_manager()
 
             await wait_for(
                 lambda: request_manager.mark_request_as_handled(request),
@@ -1241,7 +1253,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """Commit request handler result for the input `context`. Result is taken from `_context_result_map`."""
         result = self._context_result_map[context]
 
-        request_manager = await self.get_request_manager()
+        request_manager = await self.open_request_manager()
         origin = context.request.loaded_url or context.request.url
 
         for add_requests_call in result.add_requests_calls:
@@ -1269,7 +1281,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         for push_data_call in result.push_data_calls:
             await self._push_data(**push_data_call)
 
-        await self._commit_key_value_store_changes(result, get_kvs=self.get_key_value_store)
+        await self._commit_key_value_store_changes(result, get_kvs=self.open_key_value_store)
 
     @staticmethod
     async def _commit_key_value_store_changes(
@@ -1294,7 +1306,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if self._keep_alive:
             return False
 
-        request_manager = await self.get_request_manager()
+        request_manager = await self.open_request_manager()
         return await request_manager.is_finished()
 
     async def __is_task_ready_function(self) -> bool:
@@ -1306,11 +1318,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             )
             return False
 
-        request_manager = await self.get_request_manager()
+        request_manager = await self.open_request_manager()
         return not await request_manager.is_empty()
 
     async def __run_task_function(self) -> None:
-        request_manager = await self.get_request_manager()
+        request_manager = await self.open_request_manager()
 
         request = await wait_for(
             lambda: request_manager.fetch_next_request(),
@@ -1336,7 +1348,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         else:
             session = await self._get_session()
         proxy_info = await self._get_proxy_info(request, session)
-        result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
+        result = RequestHandlerRunResult(key_value_store_getter=self.open_key_value_store)
 
         context = BasicCrawlingContext(
             request=request,
@@ -1582,7 +1594,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         ):
             message = f'Experiencing problems, {failed_requests} failed requests since last status update.'
         else:
-            request_manager = await self.get_request_manager()
+            request_manager = await self.open_request_manager()
             total_count = await request_manager.get_total_count()
             if total_count is not None and total_count > 0:
                 pages_info = f'{self._statistics.state.requests_finished}/{total_count}'
