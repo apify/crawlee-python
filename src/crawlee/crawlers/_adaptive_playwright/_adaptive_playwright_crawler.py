@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup, Tag
 from parsel import Selector
 from typing_extensions import Self, TypeVar, override
 
-from crawlee._types import BasicCrawlingContext, JsonSerializable, RequestHandlerRunResult
+from crawlee._types import BasicCrawlingContext, ConcurrencySettings, JsonSerializable, RequestHandlerRunResult
 from crawlee._utils.docs import docs_group
 from crawlee._utils.wait import wait_for
 from crawlee.crawlers import (
@@ -157,6 +157,10 @@ class AdaptivePlaywrightCrawler(
         self.rendering_type_predictor = rendering_type_predictor or DefaultRenderingTypePredictor()
         self.result_checker = result_checker or (lambda _: True)
         self.result_comparator = result_comparator or create_default_comparator(result_checker)
+
+        # Set default concurrency settings for browser crawlers if not provided
+        if 'concurrency_settings' not in kwargs or kwargs['concurrency_settings'] is None:
+            kwargs['concurrency_settings'] = ConcurrencySettings(desired_concurrency=1)
 
         super().__init__(statistics=statistics, **kwargs)
 

@@ -110,9 +110,9 @@ class ConcurrencySettings:
     def __init__(
         self,
         min_concurrency: int = 1,
-        max_concurrency: int = 200,
+        max_concurrency: int = 100,
         max_tasks_per_minute: float = float('inf'),
-        desired_concurrency: int | None = None,
+        desired_concurrency: int = 10,
     ) -> None:
         """Initialize a new instance.
 
@@ -125,21 +125,24 @@ class ConcurrencySettings:
             desired_concurrency: The desired number of tasks that should be running parallel on the start of the pool,
                 if there is a large enough supply of them. By default, it is `min_concurrency`.
         """
-        if desired_concurrency is not None and desired_concurrency < 1:
-            raise ValueError('desired_concurrency must be 1 or larger')
-
         if min_concurrency < 1:
             raise ValueError('min_concurrency must be 1 or larger')
 
         if max_concurrency < min_concurrency:
             raise ValueError('max_concurrency cannot be less than min_concurrency')
 
+        if desired_concurrency < min_concurrency:
+            raise ValueError('desired_concurrency cannot be less than min_concurrency')
+
+        if desired_concurrency > max_concurrency:
+            raise ValueError('desired_concurrency cannot be greater than max_concurrency')
+
         if max_tasks_per_minute <= 0:
             raise ValueError('max_tasks_per_minute must be positive')
 
         self.min_concurrency = min_concurrency
         self.max_concurrency = max_concurrency
-        self.desired_concurrency = desired_concurrency if desired_concurrency is not None else min_concurrency
+        self.desired_concurrency = desired_concurrency
         self.max_tasks_per_minute = max_tasks_per_minute
 
 
