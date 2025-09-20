@@ -788,21 +788,29 @@ async def test_reduced_logs_from_playwright_navigation_timeout(caplog: pytest.Lo
 
 
 @pytest.mark.parametrize(
-    ('queue_name', 'queue_alias'),
+    ('queue_name', 'queue_alias', 'by_id'),
     [
-        pytest.param('named-queue', None, id='with rq_name'),
-        pytest.param(None, 'alias-queue', id='with rq_alias'),
+        pytest.param('named-queue', None, False, id='with rq_name'),
+        pytest.param(None, 'alias-queue', False, id='with rq_alias'),
+        pytest.param('id-queue', None, True, id='with rq_id'),
     ],
 )
-async def test_enqueue_links_with_rq_param(server_url: URL, queue_name: str | None, queue_alias: str | None) -> None:
+async def test_enqueue_links_with_rq_param(
+    server_url: URL, queue_name: str | None, queue_alias: str | None, *, by_id: bool
+) -> None:
     crawler = PlaywrightCrawler()
     rq = await RequestQueue.open(name=queue_name, alias=queue_alias)
+    if by_id:
+        queue_name = None
+        queue_id = rq.id
+    else:
+        queue_id = None
     visit_urls: set[str] = set()
 
     @crawler.router.default_handler
     async def handler(context: PlaywrightCrawlingContext) -> None:
         visit_urls.add(context.request.url)
-        await context.enqueue_links(rq_name=queue_name, rq_alias=queue_alias)
+        await context.enqueue_links(rq_name=queue_name, rq_alias=queue_alias, rq_id=queue_id)
 
     await crawler.run([str(server_url / 'start_enqueue')])
 
@@ -815,17 +823,23 @@ async def test_enqueue_links_with_rq_param(server_url: URL, queue_name: str | No
 
 
 @pytest.mark.parametrize(
-    ('queue_name', 'queue_alias'),
+    ('queue_name', 'queue_alias', 'by_id'),
     [
-        pytest.param('named-queue', None, id='with rq_name'),
-        pytest.param(None, 'alias-queue', id='with rq_alias'),
+        pytest.param('named-queue', None, False, id='with rq_name'),
+        pytest.param(None, 'alias-queue', False, id='with rq_alias'),
+        pytest.param('id-queue', None, True, id='with rq_id'),
     ],
 )
 async def test_enqueue_links_requests_with_rq_param(
-    server_url: URL, queue_name: str | None, queue_alias: str | None
+    server_url: URL, queue_name: str | None, queue_alias: str | None, *, by_id: bool
 ) -> None:
     crawler = PlaywrightCrawler()
     rq = await RequestQueue.open(name=queue_name, alias=queue_alias)
+    if by_id:
+        queue_name = None
+        queue_id = rq.id
+    else:
+        queue_id = None
     visit_urls: set[str] = set()
 
     check_requests: list[str] = [
@@ -837,7 +851,9 @@ async def test_enqueue_links_requests_with_rq_param(
     @crawler.router.default_handler
     async def handler(context: PlaywrightCrawlingContext) -> None:
         visit_urls.add(context.request.url)
-        await context.enqueue_links(requests=check_requests, rq_name=queue_name, rq_alias=queue_alias, strategy='all')
+        await context.enqueue_links(
+            requests=check_requests, rq_name=queue_name, rq_alias=queue_alias, rq_id=queue_id, strategy='all'
+        )
 
     await crawler.run([str(server_url / 'start_enqueue')])
 
@@ -849,12 +865,23 @@ async def test_enqueue_links_requests_with_rq_param(
     assert visit_urls == {str(server_url / 'start_enqueue')}
 
 
-async def test_enqueue_links_error_with_rq_alias_and_rq_name(server_url: URL) -> None:
+@pytest.mark.parametrize(
+    ('queue_name', 'queue_alias', 'queue_id'),
+    [
+        pytest.param('named-queue', 'alias-queue', None, id='rq_name and rq_alias'),
+        pytest.param('named-queue', None, 'id-queue', id='rq_name and rq_id'),
+        pytest.param(None, 'alias-queue', 'id-queue', id='rq_alias and rq_id'),
+        pytest.param('named-queue', 'alias-queue', 'id-queue', id='rq_name and rq_alias and rq_id'),
+    ],
+)
+async def test_enqueue_links_error_with_multi_params(
+    server_url: URL, queue_name: str | None, queue_alias: str | None, queue_id: str | None
+) -> None:
     crawler = PlaywrightCrawler()
 
     @crawler.router.default_handler
     async def handler(context: PlaywrightCrawlingContext) -> None:
         with pytest.raises(ValueError, match='Cannot use both `rq_name` and `rq_alias`'):
-            await context.enqueue_links(rq_name='named-queue', rq_alias='alias-queue')
+            await context.enqueue_links(rq_name=queue_name, rq_alias=queue_alias, rq_id=queue_id)
 
     await crawler.run([str(server_url / 'start_enqueue')])

@@ -181,10 +181,15 @@ class AddRequestsKwargs(EnqueueLinksKwargs):
     """Requests to be added to the `RequestManager`."""
 
     rq_name: str | None
-    """Name of the `RequestQueue` to add the requests to. Only one of `rq_name` or `rq_alias` can be provided."""
+    """Name of the `RequestQueue` to add the requests to. Only one of `rq_name`, `rq_alias` or `rq_id` can be provided.
+    """
 
     rq_alias: str | None
-    """Alias of the `RequestQueue` to add the requests to. Only one of `rq_name` or `rq_alias` can be provided."""
+    """Alias of the `RequestQueue` to add the requests to. Only one of `rq_alias`, `rq_name` or `rq_id` can be provided.
+    """
+
+    rq_id: str | None
+    """ID of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias` can be provided."""
 
 
 class PushDataKwargs(TypedDict):
@@ -269,13 +274,15 @@ class RequestHandlerRunResult:
         requests: Sequence[str | Request],
         rq_name: str | None = None,
         rq_alias: str | None = None,
+        rq_id: str | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> None:
         """Track a call to the `add_requests` context helper."""
-        if rq_name is not None and rq_alias is not None:
-            raise ValueError('Only one of rq_name or rq_alias can be provided.')
+        specified_params = sum(1 for param in [rq_name, rq_alias, rq_id] if param is not None)
+        if specified_params > 1:
+            raise ValueError('Only one of `rq_name`, `rq_alias` or `rq_id` can be provided.')
         self.add_requests_calls.append(
-            AddRequestsKwargs(requests=requests, rq_name=rq_name, rq_alias=rq_alias, **kwargs)
+            AddRequestsKwargs(requests=requests, rq_name=rq_name, rq_alias=rq_alias, rq_id=rq_id, **kwargs)
         )
 
     async def push_data(
@@ -325,6 +332,7 @@ class AddRequestsFunction(Protocol):
         requests: Sequence[str | Request],
         rq_name: str | None = None,
         rq_alias: str | None = None,
+        rq_id: str | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]:
         """Call dunder method.
@@ -332,10 +340,12 @@ class AddRequestsFunction(Protocol):
         Args:
             requests: Requests to be added to the `RequestManager` or, if `rq_name` or `rq_alias` is specified, to
                 the corresponding `RequestQueue`.
-            rq_name: Name of the `RequestQueue` to add the requests to. Only one of `rq_name` or `rq_alias` can
+            rq_name: Name of the `RequestQueue` to add the requests to. Only one of `rq_name`, `rq_alias` or `rq_id` can
                 be provided.
-            rq_alias: Alias of the `RequestQueue` to add the requests to. Only one of `rq_name` or `rq_alias` can
-                be provided.
+            rq_alias: Alias of the `RequestQueue` to add the requests to. Only one of `rq_alias`, `rq_name` or `rq_id`
+                can be provided.
+            rq_id: ID of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias` can be
+                provided.
             **kwargs: Additional keyword arguments.
         """
 
@@ -365,6 +375,7 @@ class EnqueueLinksFunction(Protocol):
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         rq_name: str | None = None,
         rq_alias: str | None = None,
+        rq_id: str | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]: ...
 
@@ -375,6 +386,7 @@ class EnqueueLinksFunction(Protocol):
         requests: Sequence[str | Request] | None = None,
         rq_name: str | None = None,
         rq_alias: str | None = None,
+        rq_id: str | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]: ...
 
@@ -388,6 +400,7 @@ class EnqueueLinksFunction(Protocol):
         requests: Sequence[str | Request] | None = None,
         rq_name: str | None = None,
         rq_alias: str | None = None,
+        rq_id: str | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]:
         """Call enqueue links function.
@@ -406,10 +419,12 @@ class EnqueueLinksFunction(Protocol):
                 - `'unchanged'` to use the original request options without modification.
             requests: Requests to be added to the `RequestManager` or, if `rq_name` or `rq_alias` is specified, to
                 the corresponding `RequestQueue`.
-            rq_name: Name of the `RequestQueue` to add the requests to. Only one of `rq_name` or `rq_alias` can
+            rq_name: Name of the `RequestQueue` to add the requests to. Only one of `rq_name`, `rq_alias` or `rq_id` can
                 be provided.
-            rq_alias: Alias of the `RequestQueue` to add the requests to. Only one of `rq_name` or `rq_alias` can
-                be provided.
+            rq_alias: Alias of the `RequestQueue` to add the requests to. Only one of `rq_alias`, `rq_name` or `rq_id`
+                can be provided.
+            rq_id: ID of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias` can be
+                provided.
             **kwargs: Additional keyword arguments.
         """
 

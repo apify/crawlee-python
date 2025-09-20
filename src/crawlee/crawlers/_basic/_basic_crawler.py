@@ -946,6 +946,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             requests: Sequence[str | Request] | None = None,
             rq_name: str | None = None,
             rq_alias: str | None = None,
+            rq_id: str | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> None:
             kwargs.setdefault('strategy', 'same-hostname')
@@ -958,7 +959,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     )
                 # Add directly passed requests.
                 await context.add_requests(
-                    requests or list[str | Request](), rq_name=rq_name, rq_alias=rq_alias, **kwargs
+                    requests or list[str | Request](), rq_name=rq_name, rq_alias=rq_alias, rq_id=rq_id, **kwargs
                 )
             else:
                 # Add requests from extracted links.
@@ -971,6 +972,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     ),
                     rq_name=rq_name,
                     rq_alias=rq_alias,
+                    rq_id=rq_id,
                     **kwargs,
                 )
 
@@ -1254,11 +1256,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         for add_requests_call in result.add_requests_calls:
             rq_name = add_requests_call.get('rq_name')
             rq_alias = add_requests_call.get('rq_alias')
-
-            if rq_name and rq_alias:
-                raise ValueError('You cannot provide both `rq_name` and `rq_alias` arguments.')
-            if rq_name or rq_alias:
+            rq_id = add_requests_call.get('rq_id')
+            specified_params = sum(1 for param in [rq_name, rq_alias, rq_id] if param is not None)
+            if specified_params > 1:
+                raise ValueError('You can only provide one of `rq_id`, `rq_name` or `rq_alias` arguments.')
+            if rq_name or rq_alias or rq_id:
                 request_manager: RequestManager | RequestQueue = await RequestQueue.open(
+                    id=rq_id,
                     name=rq_name,
                     alias=rq_alias,
                     storage_client=self._service_locator.get_storage_client(),
