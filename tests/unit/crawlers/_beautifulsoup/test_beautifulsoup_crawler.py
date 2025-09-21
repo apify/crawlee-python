@@ -226,7 +226,7 @@ async def test_enqueue_links_with_rq_param(
     @crawler.router.default_handler
     async def handler(context: BeautifulSoupCrawlingContext) -> None:
         visit_urls.add(context.request.url)
-        await context.enqueue_links(rq_name=queue_name, rq_alias=queue_alias, rq_id=queue_id)
+        await context.enqueue_links(rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
 
     await crawler.run([str(server_url / 'start_enqueue')])
 
@@ -282,7 +282,7 @@ async def test_enqueue_links_requests_with_rq_param(
 
 
 @pytest.mark.parametrize(
-    ('queue_name', 'queue_alias', 'queue_id'),
+    ('queue_id', 'queue_name', 'queue_alias'),
     [
         pytest.param('named-queue', 'alias-queue', None, id='rq_name and rq_alias'),
         pytest.param('named-queue', None, 'id-queue', id='rq_name and rq_id'),
@@ -291,13 +291,13 @@ async def test_enqueue_links_requests_with_rq_param(
     ],
 )
 async def test_enqueue_links_error_with_multi_params(
-    server_url: URL, http_client: HttpClient, queue_name: str | None, queue_alias: str | None, queue_id: str | None
+    server_url: URL, http_client: HttpClient, queue_id: str | None, queue_name: str | None, queue_alias: str | None
 ) -> None:
     crawler = BeautifulSoupCrawler(http_client=http_client)
 
     @crawler.router.default_handler
     async def handler(context: BeautifulSoupCrawlingContext) -> None:
         with pytest.raises(ValueError, match='Cannot use both `rq_name` and `rq_alias`'):
-            await context.enqueue_links(rq_name=queue_name, rq_alias=queue_alias, rq_id=queue_id)
+            await context.enqueue_links(rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
 
     await crawler.run([str(server_url / 'start_enqueue')])

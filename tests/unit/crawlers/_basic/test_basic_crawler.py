@@ -1578,7 +1578,7 @@ async def test_add_requests_with_rq_param(queue_name: str | None, queue_alias: s
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
         visit_urls.add(context.request.url)
-        await context.add_requests(check_requests, rq_name=queue_name, rq_alias=queue_alias, rq_id=queue_id)
+        await context.add_requests(check_requests, rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
 
     await crawler.run(['https://start.placeholder.com'])
 
@@ -1600,18 +1600,18 @@ async def test_add_requests_with_rq_param(queue_name: str | None, queue_alias: s
     ],
 )
 async def test_add_requests_error_with_multi_params(
-    queue_name: str | None, queue_alias: str | None, queue_id: str | None
+    queue_id: str | None, queue_name: str | None, queue_alias: str | None
 ) -> None:
     crawler = BasicCrawler()
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        with pytest.raises(ValueError, match='Only one of `rq_name`, `rq_alias` or `rq_id` can be set'):
+        with pytest.raises(ValueError, match='Only one of `rq_id`, `rq_name` or `rq_alias` can be set'):
             await context.add_requests(
                 [Request.from_url('https://a.placeholder.com')],
+                rq_id=queue_id,
                 rq_name=queue_name,
                 rq_alias=queue_alias,
-                rq_id=queue_id,
             )
 
     await crawler.run(['https://start.placeholder.com'])
