@@ -184,8 +184,7 @@ class AddRequestsKwargs(EnqueueLinksKwargs):
     """Name of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias` can be provided."""
 
     rq_alias: str | None
-    """Alias of the `RequestQueue` to add the requests to. Only one of `rq_alias`, `rq_name` or `rq_id` can be provided.
-    """
+    """Alias of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias` can be provided."""
 
     rq_id: str | None
     """ID of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias` can be provided."""
