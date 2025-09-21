@@ -1589,6 +1589,8 @@ async def test_add_requests_with_rq_param(queue_name: str | None, queue_alias: s
     assert requests_from_queue == check_requests
     assert visit_urls == {'https://start.placeholder.com'}
 
+    await rq.drop()
+
 
 @pytest.mark.parametrize(
     ('queue_name', 'queue_alias', 'queue_id'),

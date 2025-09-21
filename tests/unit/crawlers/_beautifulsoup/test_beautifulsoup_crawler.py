@@ -237,6 +237,8 @@ async def test_enqueue_links_with_rq_param(
     assert set(requests_from_queue) == {str(server_url / 'page_1'), str(server_url / 'sub_index')}
     assert visit_urls == {str(server_url / 'start_enqueue')}
 
+    await rq.drop()
+
 
 @pytest.mark.parametrize(
     ('queue_name', 'queue_alias', 'by_id'),
@@ -279,6 +281,8 @@ async def test_enqueue_links_requests_with_rq_param(
 
     assert set(requests_from_queue) == set(check_requests)
     assert visit_urls == {str(server_url / 'start_enqueue')}
+
+    await rq.drop()
 
 
 @pytest.mark.parametrize(
