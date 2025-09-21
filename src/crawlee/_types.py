@@ -338,8 +338,7 @@ class AddRequestsFunction(Protocol):
         """Call dunder method.
 
         Args:
-            requests: Requests to be added to the `RequestManager` or, if `rq_name` or `rq_alias` is specified, to
-                the corresponding `RequestQueue`.
+            requests: Requests to be added to the `RequestManager`.
             rq_id: ID of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias` can be
                 provided.
             rq_name: Name of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias`
@@ -417,8 +416,7 @@ class EnqueueLinksFunction(Protocol):
                 - Modified `RequestOptions` to update the request configuration,
                 - `'skip'` to exclude the request from being enqueued,
                 - `'unchanged'` to use the original request options without modification.
-            requests: Requests to be added to the `RequestManager` or, if `rq_name` or `rq_alias` is specified, to
-                the corresponding `RequestQueue`.
+            requests: Requests to be added to the `RequestManager`.
             rq_id: ID of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias` can be
                 provided.
             rq_name: Name of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias`
