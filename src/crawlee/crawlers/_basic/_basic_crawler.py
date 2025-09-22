@@ -944,6 +944,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             requests: Sequence[str | Request] | None = None,
+            rq_id: str | None = None,
+            rq_name: str | None = None,
+            rq_alias: str | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> None:
             kwargs.setdefault('strategy', 'same-hostname')
@@ -955,7 +958,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                         '`transform_request_function` arguments when `requests` is provided.'
                     )
                 # Add directly passed requests.
-                await context.add_requests(requests or list[str | Request](), **kwargs)
+                await context.add_requests(
+                    requests or list[str | Request](), rq_id=rq_id, rq_name=rq_name, rq_alias=rq_alias, **kwargs
+                )
             else:
                 # Add requests from extracted links.
                 await context.add_requests(
@@ -965,6 +970,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                         user_data=user_data,
                         transform_request_function=transform_request_function,
                     ),
+                    rq_id=rq_id,
+                    rq_name=rq_name,
+                    rq_alias=rq_alias,
                     **kwargs,
                 )
 
@@ -1241,10 +1249,28 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """Commit request handler result for the input `context`. Result is taken from `_context_result_map`."""
         result = self._context_result_map[context]
 
-        request_manager = await self.get_request_manager()
+        base_request_manager = await self.get_request_manager()
+
         origin = context.request.loaded_url or context.request.url
 
         for add_requests_call in result.add_requests_calls:
+            rq_id = add_requests_call.get('rq_id')
+            rq_name = add_requests_call.get('rq_name')
+            rq_alias = add_requests_call.get('rq_alias')
+            specified_params = sum(1 for param in [rq_id, rq_name, rq_alias] if param is not None)
+            if specified_params > 1:
+                raise ValueError('You can only provide one of `rq_id`, `rq_name` or `rq_alias` arguments.')
+            if rq_id or rq_name or rq_alias:
+                request_manager: RequestManager | RequestQueue = await RequestQueue.open(
+                    id=rq_id,
+                    name=rq_name,
+                    alias=rq_alias,
+                    storage_client=self._service_locator.get_storage_client(),
+                    configuration=self._service_locator.get_configuration(),
+                )
+            else:
+                request_manager = base_request_manager
+
             requests = list[Request]()
 
             base_url = url if (url := add_requests_call.get('base_url')) else origin

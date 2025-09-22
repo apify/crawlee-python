@@ -3,8 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest import mock
 
+import pytest
+
 from crawlee import ConcurrencySettings, Glob, HttpHeaders, RequestTransformAction, SkippedReason
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
+from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
     from yarl import URL
@@ -198,3 +201,107 @@ async def test_extract_links(server_url: URL, http_client: HttpClient) -> None:
 
     assert len(extracted_links) == 1
     assert extracted_links[0] == str(server_url / 'page_1')
+
+
+@pytest.mark.parametrize(
+    ('queue_name', 'queue_alias', 'by_id'),
+    [
+        pytest.param('named-queue', None, False, id='with rq_name'),
+        pytest.param(None, 'alias-queue', False, id='with rq_alias'),
+        pytest.param('id-queue', None, True, id='with rq_id'),
+    ],
+)
+async def test_enqueue_links_with_rq_param(
+    server_url: URL, http_client: HttpClient, queue_name: str | None, queue_alias: str | None, *, by_id: bool
+) -> None:
+    crawler = BeautifulSoupCrawler(http_client=http_client)
+    rq = await RequestQueue.open(name=queue_name, alias=queue_alias)
+    if by_id:
+        queue_name = None
+        queue_id = rq.id
+    else:
+        queue_id = None
+    visit_urls: set[str] = set()
+
+    @crawler.router.default_handler
+    async def handler(context: BeautifulSoupCrawlingContext) -> None:
+        visit_urls.add(context.request.url)
+        await context.enqueue_links(rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    requests_from_queue: list[str] = []
+    while request := await rq.fetch_next_request():
+        requests_from_queue.append(request.url)
+
+    assert set(requests_from_queue) == {str(server_url / 'page_1'), str(server_url / 'sub_index')}
+    assert visit_urls == {str(server_url / 'start_enqueue')}
+
+    await rq.drop()
+
+
+@pytest.mark.parametrize(
+    ('queue_name', 'queue_alias', 'by_id'),
+    [
+        pytest.param('named-queue', None, False, id='with rq_name'),
+        pytest.param(None, 'alias-queue', False, id='with rq_alias'),
+        pytest.param('id-queue', None, True, id='with rq_id'),
+    ],
+)
+async def test_enqueue_links_requests_with_rq_param(
+    server_url: URL, http_client: HttpClient, queue_name: str | None, queue_alias: str | None, *, by_id: bool
+) -> None:
+    crawler = BeautifulSoupCrawler(http_client=http_client)
+    rq = await RequestQueue.open(name=queue_name, alias=queue_alias)
+    if by_id:
+        queue_name = None
+        queue_id = rq.id
+    else:
+        queue_id = None
+    visit_urls: set[str] = set()
+
+    check_requests: list[str] = [
+        'https://a.placeholder.com',
+        'https://b.placeholder.com',
+        'https://c.placeholder.com',
+    ]
+
+    @crawler.router.default_handler
+    async def handler(context: BeautifulSoupCrawlingContext) -> None:
+        visit_urls.add(context.request.url)
+        await context.enqueue_links(
+            requests=check_requests, rq_name=queue_name, rq_alias=queue_alias, rq_id=queue_id, strategy='all'
+        )
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    requests_from_queue: list[str] = []
+    while request := await rq.fetch_next_request():
+        requests_from_queue.append(request.url)
+
+    assert set(requests_from_queue) == set(check_requests)
+    assert visit_urls == {str(server_url / 'start_enqueue')}
+
+    await rq.drop()
+
+
+@pytest.mark.parametrize(
+    ('queue_id', 'queue_name', 'queue_alias'),
+    [
+        pytest.param('named-queue', 'alias-queue', None, id='rq_name and rq_alias'),
+        pytest.param('named-queue', None, 'id-queue', id='rq_name and rq_id'),
+        pytest.param(None, 'alias-queue', 'id-queue', id='rq_alias and rq_id'),
+        pytest.param('named-queue', 'alias-queue', 'id-queue', id='rq_name and rq_alias and rq_id'),
+    ],
+)
+async def test_enqueue_links_error_with_multi_params(
+    server_url: URL, http_client: HttpClient, queue_id: str | None, queue_name: str | None, queue_alias: str | None
+) -> None:
+    crawler = BeautifulSoupCrawler(http_client=http_client)
+
+    @crawler.router.default_handler
+    async def handler(context: BeautifulSoupCrawlingContext) -> None:
+        with pytest.raises(ValueError, match='Cannot use both `rq_name` and `rq_alias`'):
+            await context.enqueue_links(rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
