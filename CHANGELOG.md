@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - Persist `DefaultRenderingTypePredictor` state ([#1340](https://github.com/apify/crawlee-python/pull/1340)) ([fad4c25](https://github.com/apify/crawlee-python/commit/fad4c25fc712915c4a45b24e3290b6f5dbd8a683)) by [@Mantisus](https://github.com/Mantisus), closes [#1272](https://github.com/apify/crawlee-python/issues/1272)
 - Persist the `SitemapRequestLoader` state ([#1347](https://github.com/apify/crawlee-python/pull/1347)) ([27ef9ad](https://github.com/apify/crawlee-python/commit/27ef9ad194552ea9f1321d91a7a52054be9a8a51)) by [@Mantisus](https://github.com/Mantisus), closes [#1269](https://github.com/apify/crawlee-python/issues/1269)
 - Add support for NDU storages ([#1401](https://github.com/apify/crawlee-python/pull/1401)) ([5dbd212](https://github.com/apify/crawlee-python/commit/5dbd212663e7abc37535713f4c6e3a5bbf30a12e)) by [@vdusek](https://github.com/vdusek), closes [#1175](https://github.com/apify/crawlee-python/issues/1175)
+- Add RQ id, name, alias args to `add_requests` and `enqueue_links` methods ([#1413](https://github.com/apify/crawlee-python/pull/1413)) ([1cae2bc](https://github.com/apify/crawlee-python/commit/1cae2bca0b1508fcb3cb419dc239caf33e20a7ef)) by [@Mantisus](https://github.com/Mantisus), closes [#1402](https://github.com/apify/crawlee-python/issues/1402)
 
 ### 🐛 Bug Fixes
 
