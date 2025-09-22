@@ -562,7 +562,7 @@ async def test_error_snapshot_through_statistics(server_url: URL) -> None:
 
     await crawler.run([str(server_url)])
 
-    kvs = await crawler.open_key_value_store()
+    kvs = await crawler._open_key_value_store()
     kvs_content = {}
     async for key_info in kvs.iterate_keys():
         kvs_content[key_info.key] = await kvs.get_value(key_info.key)
