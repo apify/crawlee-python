@@ -611,6 +611,12 @@ async def test_crawler_get_storages() -> None:
     rp = await crawler.get_request_manager()
     assert isinstance(rp, RequestQueue)
 
+    dataset = await crawler.open_dataset()
+    assert isinstance(dataset, Dataset)
+
+    kvs = await crawler.open_key_value_store()
+    assert isinstance(kvs, KeyValueStore)
+
 
 async def test_crawler_run_requests() -> None:
     crawler = BasicCrawler()
@@ -719,7 +725,7 @@ async def test_context_update_kv_store() -> None:
 
     await crawler.run(['https://hello.world'])
 
-    store = await crawler._open_key_value_store()
+    store = await crawler.open_key_value_store()
     assert (await store.get_value('foo')) == 'bar'
 
 
@@ -732,7 +738,7 @@ async def test_context_use_state() -> None:
 
     await crawler.run(['https://hello.world'])
 
-    kvs = await crawler._open_key_value_store()
+    kvs = await crawler.open_key_value_store()
     value = await kvs.get_value(BasicCrawler._CRAWLEE_STATE_KEY)
 
     assert value == {'hello': 'world'}
@@ -775,7 +781,7 @@ async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> Non
     # The state in handler_three must match the final state updated in previous run
     assert state_in_handler_three == {'hello': 'last_world'}
 
-    store = await crawler._open_key_value_store()
+    store = await crawler.open_key_value_store()
 
     # The state in the KVS must match with the last set state
     assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY)) == {'hello': 'last_world'}
@@ -1097,10 +1103,14 @@ async def test_crawler_uses_default_storages(tmp_path: Path) -> None:
     )
     service_locator.set_configuration(configuration)
 
+    dataset = await Dataset.open()
+    kvs = await KeyValueStore.open()
     rq = await RequestQueue.open()
 
     crawler = BasicCrawler()
 
+    assert dataset is await crawler.open_dataset()
+    assert kvs is await crawler.open_key_value_store()
     assert rq is await crawler.get_request_manager()
 
 
@@ -1111,10 +1121,14 @@ async def test_crawler_can_use_other_storages(tmp_path: Path) -> None:
     )
     service_locator.set_configuration(configuration)
 
+    dataset = await Dataset.open()
+    kvs = await KeyValueStore.open()
     rq = await RequestQueue.open()
 
     crawler = BasicCrawler(storage_client=MemoryStorageClient())
 
+    assert dataset is not await crawler.open_dataset()
+    assert kvs is not await crawler.open_key_value_store()
     assert rq is not await crawler.get_request_manager()
 
 
@@ -1124,7 +1138,10 @@ async def test_crawler_can_use_other_storages_of_same_type(tmp_path: Path) -> No
     b_path = tmp_path / 'b'
     a_path.mkdir()
     b_path.mkdir()
-    expected_paths = {path / storage for path, storage in product({a_path, b_path}, {'request_queues'})}
+    expected_paths = {
+        path / storage
+        for path, storage in product({a_path, b_path}, {'datasets', 'key_value_stores', 'request_queues'})
+    }
 
     configuration_a = Configuration(
         crawlee_storage_dir=str(a_path),  # type: ignore[call-arg]
@@ -1139,12 +1156,16 @@ async def test_crawler_can_use_other_storages_of_same_type(tmp_path: Path) -> No
     service_locator.set_configuration(configuration_a)
     service_locator.set_storage_client(FileSystemStorageClient())
     # Create storages based on the global services
+    dataset = await Dataset.open()
+    kvs = await KeyValueStore.open()
     rq = await RequestQueue.open()
 
     # Set the crawler to use different storage client
     crawler = BasicCrawler(storage_client=FileSystemStorageClient(), configuration=configuration_b)
 
     # Assert that the storages are different
+    assert dataset is not await crawler.open_dataset()
+    assert kvs is not await crawler.open_key_value_store()
     assert rq is not await crawler.get_request_manager()
 
     # Assert that all storages exists on the filesystem
@@ -1172,7 +1193,7 @@ async def test_allows_storage_client_overwrite_before_run(monkeypatch: pytest.Mo
         await crawler.run(['https://does-not-matter.com'])
         assert spy.call_count >= 1
 
-    dataset = await Dataset.open()
+    dataset = await crawler.open_dataset()
     data = await dataset.get_data()
     assert data.items == [{'foo': 'bar'}]
 
@@ -1187,7 +1208,7 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
     from asyncio import Barrier  # type:ignore[attr-defined] # noqa: PLC0415
 
     crawler = BasicCrawler()
-    store = await crawler._open_key_value_store()
+    store = await crawler.open_key_value_store()
     await store.set_value(BasicCrawler._CRAWLEE_STATE_KEY, {'counter': 0})
     handler_barrier = Barrier(2)
 
@@ -1200,7 +1221,7 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
 
     await crawler.run(['https://crawlee.dev/', 'https://crawlee.dev/docs/quick-start'])
 
-    store = await crawler._open_key_value_store()
+    store = await crawler.open_key_value_store()
     # Ensure that local state is pushed back to kvs.
     await store.persist_autosaved_values()
     assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY))['counter'] == 2

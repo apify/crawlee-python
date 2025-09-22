@@ -30,7 +30,7 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context
     AdaptiveContextError,
 )
 from crawlee.statistics import Statistics
-from crawlee.storages import Dataset, KeyValueStore
+from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterator
@@ -461,7 +461,7 @@ async def test_adaptive_crawler_exceptions_in_sub_crawlers(*, error_in_pw_crawle
 
     await crawler.run(test_urls[:1])
 
-    dataset = await Dataset.open()
+    dataset = await crawler.open_dataset()
     stored_results = [item async for item in dataset.iterate_items()]
 
     if error_in_pw_crawler:

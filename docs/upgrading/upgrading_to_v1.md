@@ -214,13 +214,50 @@ service_locator.set_storage_client(MemoryStorageClient())  # Raises an error
 
 ## BasicCrawler changes
 
-### Removed helper methods for opening storages
-- `BasicCrawler.get_dataset` was removed.
-- `BasicCrawler.get_key_value_store` was removed.
+### Renamed methods for opening storages
+- `BasicCrawler.get_dataset` renamed to `BasicCrawler.open_dataset`
+- `BasicCrawler.get_key_value_store` renamed to `BasicCrawler.open_key_value_store`
 
+### Added method for opening RequestQueue that uses configuration and storage client of the crawler
+- `BasicCrawler.open_request_queue`
 
 ### BasicCrawler has its own instance of ServiceLocator to track its own services
-Explicitly passed services to the crawler can be different the global ones accessible in `crawlee.service_locator`. `BasicCrawler` no longer causes the global services in `service_locator` to be set to the crawler's explicitly passed services. This allows two crawlers with different services at the same time.
+Explicitly passed services to the crawler can be different the global ones accessible in `crawlee.service_locator`. `BasicCrawler` no longer causes the global services in `service_locator` to be set to the crawler's explicitly passed services.
+
+**Before (v0.6):**
+
+```python
+from crawlee import service_locator
+from crawlee.crawlers import BasicCrawler
+from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storages import Dataset
+
+
+async def main() -> None:
+    custom_storage_client = MemoryStorageClient()
+    crawler = BasicCrawler(storage_client=custom_storage_client)
+
+    assert service_locator.get_storage_client() is custom_storage_client
+    assert await crawler.get_dataset() is await Dataset.open()
+```
+**Now (v1.0):**
+
+```python
+from crawlee import service_locator
+from crawlee.crawlers import BasicCrawler
+from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storages import Dataset
+
+
+async def main() -> None:
+    custom_storage_client = MemoryStorageClient()
+    crawler = BasicCrawler(storage_client=custom_storage_client)
+
+    assert service_locator.get_storage_client() is not custom_storage_client
+    assert await crawler.open_dataset() is not await Dataset.open()
+```
+
+This allows two crawlers with different services at the same time.
 
 **Now (v1.0):**
 
