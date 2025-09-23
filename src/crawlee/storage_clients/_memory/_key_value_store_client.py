@@ -8,7 +8,7 @@ from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import infer_mime_type
-from crawlee._utils.limit_kwargs import limit_kwarg_count
+from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
@@ -75,7 +75,7 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
             ValueError: If both name and alias are provided.
         """
         # Validate input parameters.
-        limit_kwarg_count(alias=alias, name=name, id=id)
+        raise_if_too_many_kwargs(id=id, name=name, alias=alias)
 
         # Create a new key-value store
         store_id = id or crypto_random_object_id()

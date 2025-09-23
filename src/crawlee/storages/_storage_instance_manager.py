@@ -5,7 +5,7 @@ from collections.abc import Coroutine, Hashable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, TypeVar
 
-from crawlee._utils.limit_kwargs import limit_kwarg_count
+from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
 
 if TYPE_CHECKING:
@@ -96,7 +96,7 @@ class StorageInstanceManager:
                 )
 
             # Validate input parameters.
-            limit_kwarg_count(alias=alias, name=name, id=id)
+            raise_if_too_many_kwargs(id=id, name=name, alias=alias)
 
             # Auto-set alias='default' when no parameters are specified.
             # Default unnamed storage is equal to alias=default unnamed storage.

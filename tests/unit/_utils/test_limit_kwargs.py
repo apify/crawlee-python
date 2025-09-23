@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 
-from crawlee._utils.limit_kwargs import limit_kwarg_count
+from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 
 
 @pytest.mark.parametrize(
@@ -22,7 +22,7 @@ from crawlee._utils.limit_kwargs import limit_kwarg_count
 def test_limit_kwargs_default(kwargs: dict[str, Any], *, should_raise: bool) -> None:
     context = pytest.raises(ValueError, match=r'^Only one of .*') if should_raise else nullcontext()
     with context:
-        limit_kwarg_count(**kwargs)
+        raise_if_too_many_kwargs(**kwargs)
 
 
 @pytest.mark.parametrize(
@@ -35,4 +35,4 @@ def test_limit_kwargs_default(kwargs: dict[str, Any], *, should_raise: bool) -> 
 def test_limit_kwargs(kwargs: dict[str, Any], *, should_raise: bool) -> None:
     context = pytest.raises(ValueError, match=r'^Only one of .*') if should_raise else nullcontext()
     with context:
-        limit_kwarg_count(max_kwargs=2, **kwargs)
+        raise_if_too_many_kwargs(max_kwargs=2, **kwargs)

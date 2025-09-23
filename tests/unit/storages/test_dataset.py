@@ -150,7 +150,7 @@ async def test_open_with_id_and_name(
     storage_client: StorageClient,
 ) -> None:
     """Test that open() raises an error when both id and name are provided."""
-    with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
+    with pytest.raises(ValueError, match=r'Only one of "id", "name", "alias" can be specified, not multiple.'):
         await Dataset.open(
             id='some-id',
             name='some-name',
@@ -651,7 +651,7 @@ async def test_alias_with_id_error(
     storage_client: StorageClient,
 ) -> None:
     """Test that providing both alias and id raises error."""
-    with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
+    with pytest.raises(ValueError, match=r'Only one of "id", "name", "alias" can be specified, not multiple.'):
         await Dataset.open(
             id='some-id',
             alias='some-alias',
@@ -663,7 +663,7 @@ async def test_alias_with_name_error(
     storage_client: StorageClient,
 ) -> None:
     """Test that providing both alias and name raises error."""
-    with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
+    with pytest.raises(ValueError, match=r'Only one of "id", "name", "alias" can be specified, not multiple.'):
         await Dataset.open(
             name='some-name',
             alias='some-alias',
@@ -675,7 +675,7 @@ async def test_alias_with_all_parameters_error(
     storage_client: StorageClient,
 ) -> None:
     """Test that providing id, name, and alias raises error."""
-    with pytest.raises(ValueError, match=r'Only one of "id", "name", or "alias" can be specified, not multiple.'):
+    with pytest.raises(ValueError, match=r'Only one of "id", "name", "alias" can be specified, not multiple.'):
         await Dataset.open(
             id='some-id',
             name='some-name',

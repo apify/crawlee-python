@@ -14,7 +14,7 @@ from typing_extensions import override
 from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import atomic_write, json_dumps
-from crawlee._utils.limit_kwargs import limit_kwarg_count
+from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
@@ -115,7 +115,7 @@ class FileSystemDatasetClient(DatasetClient):
                 or if both name and alias are provided.
         """
         # Validate input parameters.
-        limit_kwarg_count(alias=alias, name=name, id=id)
+        raise_if_too_many_kwargs(id=id, name=name, alias=alias)
 
         dataset_base_path = Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
 
