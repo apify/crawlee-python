@@ -82,7 +82,7 @@ class StorageInstanceManager:
         name: str | None,
         alias: str | None,
         client_opener_coro: ClientOpenerCoro,
-        additional_cache_key: Hashable = '',
+        storage_client_cache_key: Hashable = '',
     ) -> T:
         """Open a storage instance with caching support.
 
@@ -92,7 +92,7 @@ class StorageInstanceManager:
             name: Storage name. (global scope, persists across runs).
             alias: Storage alias (run scope, creates unnamed storage).
             client_opener_coro: Coroutine to open the storage client when storage instance not found in cache.
-            additional_cache_key: Additional optional key to differentiate cache entries.
+            storage_client_cache_key: Additional optional key from storage client to differentiate cache entries.
 
         Returns:
             The storage instance.
@@ -117,29 +117,31 @@ class StorageInstanceManager:
                 alias = self._DEFAULT_STORAGE_ALIAS
 
             # Check cache
-            if id is not None and (cached_instance := self._cache.by_id[cls][id].get(additional_cache_key)):
+            if id is not None and (cached_instance := self._cache.by_id[cls][id].get(storage_client_cache_key)):
                 if isinstance(cached_instance, cls):
                     return cached_instance
                 raise RuntimeError('Cached instance type mismatch.')
 
-            if name is not None and (cached_instance := self._cache.by_name[cls][name].get(additional_cache_key)):
+            if name is not None and (cached_instance := self._cache.by_name[cls][name].get(storage_client_cache_key)):
                 if isinstance(cached_instance, cls):
                     return cached_instance
                 raise RuntimeError('Cached instance type mismatch.')
 
-            if alias is not None and (cached_instance := self._cache.by_alias[cls][alias].get(additional_cache_key)):
+            if alias is not None and (
+                cached_instance := self._cache.by_alias[cls][alias].get(storage_client_cache_key)
+            ):
                 if isinstance(cached_instance, cls):
                     return cached_instance
                 raise RuntimeError('Cached instance type mismatch.')
 
             # Check for conflicts between named and alias storages
-            if alias and (self._cache.by_name[cls][alias].get(additional_cache_key)):
+            if alias and (self._cache.by_name[cls][alias].get(storage_client_cache_key)):
                 raise ValueError(
                     f'Cannot create alias storage "{alias}" because a named storage with the same name already exists. '
                     f'Use a different alias or drop the existing named storage first.'
                 )
 
-            if name and (self._cache.by_alias[cls][name].get(additional_cache_key)):
+            if name and (self._cache.by_alias[cls][name].get(storage_client_cache_key)):
                 raise ValueError(
                     f'Cannot create named storage "{name}" because an alias storage with the same name already exists. '
                     f'Use a different name or drop the existing alias storage first.'
@@ -156,15 +158,15 @@ class StorageInstanceManager:
 
             # Cache the instance.
             # Always cache by id.
-            self._cache.by_id[cls][instance.id][additional_cache_key] = instance
+            self._cache.by_id[cls][instance.id][storage_client_cache_key] = instance
 
             # Cache named storage.
             if instance_name is not None:
-                self._cache.by_name[cls][instance_name][additional_cache_key] = instance
+                self._cache.by_name[cls][instance_name][storage_client_cache_key] = instance
 
             # Cache unnamed storage.
             if alias is not None:
-                self._cache.by_alias[cls][alias][additional_cache_key] = instance
+                self._cache.by_alias[cls][alias][storage_client_cache_key] = instance
 
             return instance
 
