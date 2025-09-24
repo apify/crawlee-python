@@ -32,6 +32,30 @@ class _StorageCache:
     )
     """Cache for storage instances by alias. Example: by_alias[Dataset]['some_alias']['some_additional_cache_key']"""
 
+    def remove_from_cache(self, storage_instance: Storage) -> None:
+        """Remove a storage instance from the cache.
+
+        Args:
+            storage_instance: The storage instance to remove.
+        """
+        storage_type = type(storage_instance)
+
+        # Remove from ID cache
+        for additional_key in self.by_id[storage_type][storage_instance.id]:
+            del self.by_id[storage_type][storage_instance.id][additional_key]
+            break
+
+        # Remove from name cache or alias cache. It can never be in both.
+        if storage_instance.name is not None:
+            for additional_key in self.by_name[storage_type][storage_instance.name]:
+                del self.by_name[storage_type][storage_instance.name][additional_key]
+                break
+        else:
+            for alias_key in self.by_alias[storage_type]:
+                for additional_key in self.by_alias[storage_type][alias_key]:
+                    del self.by_alias[storage_type][alias_key][additional_key]
+                    break
+
 
 ClientOpenerCoro = Coroutine[None, None, DatasetClient | KeyValueStoreClient | RequestQueueClient]
 """Type alias for the client opener function."""
@@ -155,23 +179,7 @@ class StorageInstanceManager:
         Args:
             storage_instance: The storage instance to remove.
         """
-        storage_type = type(storage_instance)
-
-        # Remove from ID cache
-        for additional_key in self._cache.by_id[storage_type][storage_instance.id]:
-            del self._cache.by_id[storage_type][storage_instance.id][additional_key]
-            break
-
-        # Remove from name cache or alias cache. It can never be in both.
-        if storage_instance.name is not None:
-            for additional_key in self._cache.by_name[storage_type][storage_instance.name]:
-                del self._cache.by_name[storage_type][storage_instance.name][additional_key]
-                break
-        else:
-            for alias_key in self._cache.by_alias[storage_type]:
-                for additional_key in self._cache.by_alias[storage_type][alias_key]:
-                    del self._cache.by_alias[storage_type][alias_key][additional_key]
-                    break
+        self._cache.remove_from_cache(storage_instance)
 
     def clear_cache(self) -> None:
         """Clear all cached storage instances."""
