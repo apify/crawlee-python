@@ -118,7 +118,6 @@ class Dataset(Storage):
             name=name,
             alias=alias,
             client_opener_coro=client_opener_coro,
-            storage_client_type=storage_client.__class__,
             additional_cache_key=additional_cache_key,
         )
 

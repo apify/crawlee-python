@@ -130,7 +130,6 @@ class KeyValueStore(Storage):
             name=name,
             client_opener_coro=client_opener_coro,
             alias=alias,
-            storage_client_type=storage_client.__class__,
             additional_cache_key=additional_cache_key,
         )
 

@@ -37,7 +37,7 @@ class FileSystemStorageClient(StorageClient):
     @override
     def get_additional_cache_key(self, configuration: Configuration) -> Hashable:
         # Even different client instances should return same storage if the storage_dir is the same.
-        return configuration.storage_dir
+        return super().get_additional_cache_key(configuration), configuration.storage_dir
 
     @override
     async def create_dataset_client(
