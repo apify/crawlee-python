@@ -30,12 +30,13 @@ class StorageClient(ABC):
     (where applicable), and consistent access patterns across all storage types it supports.
     """
 
-    def get_additional_cache_key(self, configuration: Configuration) -> Hashable:  # noqa: ARG002
-        """Return a cache key that can differentiate between different storages of this client.
+    def get_storage_client_cache_key(self, configuration: Configuration) -> Hashable:  # noqa: ARG002
+        """Return a cache key that can differentiate between different storages of this and other clients.
 
-        Can be based on configuration or on the client itself. By default, returns an empty string.
+        Can be based on configuration or on the client itself. By default, returns a module and name of the client
+        class.
         """
-        return ''
+        return f'{self.__class__.__module__}.{self.__class__.__name__}'
 
     @abstractmethod
     async def create_dataset_client(

@@ -110,7 +110,7 @@ class Dataset(Storage):
         client_opener_coro = storage_client.create_dataset_client(
             id=id, name=name, alias=alias, configuration=configuration
         )
-        additional_cache_key = storage_client.get_additional_cache_key(configuration=configuration)
+        storage_client_cache_key = storage_client.get_storage_client_cache_key(configuration=configuration)
 
         return await service_locator.storage_instance_manager.open_storage_instance(
             cls,
@@ -118,8 +118,7 @@ class Dataset(Storage):
             name=name,
             alias=alias,
             client_opener_coro=client_opener_coro,
-            storage_client_type=storage_client.__class__,
-            additional_cache_key=additional_cache_key,
+            storage_client_cache_key=storage_client_cache_key,
         )
 
     @override
