@@ -33,6 +33,7 @@ All notable changes to this project will be documented in this file.
 - Improve crawler statistics logging ([#1364](https://github.com/apify/crawlee-python/pull/1364)) ([1eb6da5](https://github.com/apify/crawlee-python/commit/1eb6da5dd85870124593dcad877284ccaed9c0ce)) by [@vdusek](https://github.com/vdusek), closes [#1317](https://github.com/apify/crawlee-python/issues/1317)
 - Do not add a request that is already in progress to `MemoryRequestQueueClient` ([#1384](https://github.com/apify/crawlee-python/pull/1384)) ([3af326c](https://github.com/apify/crawlee-python/commit/3af326c9dfa8fffd56a42ca42981374613739e39)) by [@Mantisus](https://github.com/Mantisus), closes [#1383](https://github.com/apify/crawlee-python/issues/1383)
 - Save `RequestQueueState` for `FileSystemRequestQueueClient` in default KVS ([#1411](https://github.com/apify/crawlee-python/pull/1411)) ([6ee60a0](https://github.com/apify/crawlee-python/commit/6ee60a08ac1f9414e1b792f4935cc3799cb5089a)) by [@Mantisus](https://github.com/Mantisus), closes [#1410](https://github.com/apify/crawlee-python/issues/1410)
+- Set default desired concurrency for non-browser crawlers to 10 ([#1419](https://github.com/apify/crawlee-python/pull/1419)) ([1cc9401](https://github.com/apify/crawlee-python/commit/1cc940197600d2539bda967880d7f9d241eb8c3e)) by [@vdusek](https://github.com/vdusek)
 
 ### Refactor
 
