@@ -381,7 +381,7 @@ async def test_isolation_cookies(http_client: HttpClient, server_url: URL) -> No
         ),
         http_client=http_client,
         max_request_retries=10,
-        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
     )
 
     @crawler.router.default_handler
