@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
 - Persist the `SitemapRequestLoader` state ([#1347](https://github.com/apify/crawlee-python/pull/1347)) ([27ef9ad](https://github.com/apify/crawlee-python/commit/27ef9ad194552ea9f1321d91a7a52054be9a8a51)) by [@Mantisus](https://github.com/Mantisus), closes [#1269](https://github.com/apify/crawlee-python/issues/1269)
 - Add support for NDU storages ([#1401](https://github.com/apify/crawlee-python/pull/1401)) ([5dbd212](https://github.com/apify/crawlee-python/commit/5dbd212663e7abc37535713f4c6e3a5bbf30a12e)) by [@vdusek](https://github.com/vdusek), closes [#1175](https://github.com/apify/crawlee-python/issues/1175)
 - Add RQ id, name, alias args to `add_requests` and `enqueue_links` methods ([#1413](https://github.com/apify/crawlee-python/pull/1413)) ([1cae2bc](https://github.com/apify/crawlee-python/commit/1cae2bca0b1508fcb3cb419dc239caf33e20a7ef)) by [@Mantisus](https://github.com/Mantisus), closes [#1402](https://github.com/apify/crawlee-python/issues/1402)
+- Add `SqlStorageClient` based on `sqlalchemy` v2+ ([#1339](https://github.com/apify/crawlee-python/pull/1339)) ([07c75a0](https://github.com/apify/crawlee-python/commit/07c75a078b443b58bfaaeb72eb2aa1439458dc47)) by [@Mantisus](https://github.com/Mantisus), closes [#307](https://github.com/apify/crawlee-python/issues/307)
 
 ### 🐛 Bug Fixes
 
