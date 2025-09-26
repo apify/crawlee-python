@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import logging
 import os
+import warnings
 from typing import TYPE_CHECKING, cast
 
 import pytest
 from curl_cffi import CurlHttpVersion
+from fakeredis import FakeAsyncRedis
 from proxy import Proxy
 from uvicorn.config import Config
 
@@ -26,6 +28,14 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee.http_clients._base import HttpClient
+
+
+@pytest.fixture
+async def suppress_user_warning() -> AsyncGenerator[None, None]:
+    """Suppress user warnings during tests."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', UserWarning)
+        yield
 
 
 @pytest.fixture
@@ -194,3 +204,8 @@ async def http_client(request: pytest.FixtureRequest) -> HttpClient:
     if request.param == 'impit':
         return ImpitHttpClient(http3=False)
     return HttpxHttpClient(http2=False)
+
+
+@pytest.fixture
+def redis_client() -> FakeAsyncRedis:
+    return FakeAsyncRedis()
