@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+from typing import Literal
 
 from redis.asyncio import Redis
 from typing_extensions import override
@@ -40,6 +41,7 @@ class RedisStorageClient(StorageClient):
         *,
         connection_string: str | None = None,
         redis: Redis | None = None,
+        queue_dedup_strategy: Literal['default', 'bloom'] = 'default',
     ) -> None:
         """Initialize the Redis storage client.
 
@@ -47,6 +49,10 @@ class RedisStorageClient(StorageClient):
             connection_string: Redis connection string (e.g., "redis://localhost:6379").
                 Supports standard Redis URL format with optional database selection.
             redis: Pre-configured Redis client instance.
+            queue_dedup_strategy: Strategy for request queue deduplication. Options are:
+                - 'default': Uses Redis sets for exact deduplication.
+                - 'bloom': Uses Redis Bloom filters for probabilistic deduplication with lower memory usage. When using
+                    this approach, there is a possibility 1e-7 that requests will be skipped in the queue.
         """
         if redis is not None and connection_string is not None:
             raise ValueError('Either redis or connection_string must be provided, not both.')
@@ -59,6 +65,8 @@ class RedisStorageClient(StorageClient):
 
         elif connection_string is not None:
             self._redis = Redis.from_url(connection_string)
+
+        self._queue_dedup_strategy = queue_dedup_strategy
 
         # Call the notification only once
         warnings.warn(
@@ -125,6 +133,7 @@ class RedisStorageClient(StorageClient):
             name=name,
             alias=alias,
             redis=self._redis,
+            dedup_strategy=self._queue_dedup_strategy,
         )
 
         await self._purge_if_needed(client, configuration)

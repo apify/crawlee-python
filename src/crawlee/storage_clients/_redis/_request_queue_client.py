@@ -4,7 +4,7 @@ import json
 from collections import deque
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from typing_extensions import NotRequired, override
 
@@ -81,12 +81,21 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     _RECLAIM_INTERVAL = timedelta(seconds=30)
     """Interval to check for stale requests to reclaim."""
 
-    def __init__(self, storage_name: str, storage_id: str, redis: Redis) -> None:
+    def __init__(
+        self,
+        storage_name: str,
+        storage_id: str,
+        redis: Redis,
+        dedup_strategy: Literal['default', 'bloom'] = 'default',
+    ) -> None:
         """Initialize a new instance.
 
         Preferably use the `RedisRequestQueueClient.open` class method to create a new instance.
         """
         super().__init__(storage_name=storage_name, storage_id=storage_id, redis=redis)
+
+        self._dedup_strategy = dedup_strategy
+        """Deduplication strategy for the queue."""
 
         self._pending_fetch_cache: deque[Request] = deque()
         """Cache for requests: ordered by sequence number."""
@@ -104,12 +113,30 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     @property
     def _added_filter_key(self) -> str:
         """Return the Redis key for the added requests Bloom filter."""
+        if self._dedup_strategy != 'bloom':
+            raise RuntimeError('The added requests filter is only available with the bloom deduplication strategy.')
         return f'{self._MAIN_KEY}:{self._storage_name}:added_bloom_filter'
 
     @property
     def _handled_filter_key(self) -> str:
         """Return the Redis key for the handled requests Bloom filter."""
+        if self._dedup_strategy != 'bloom':
+            raise RuntimeError('The handled requests filter is only available with the bloom deduplication strategy.')
         return f'{self._MAIN_KEY}:{self._storage_name}:handled_bloom_filter'
+
+    @property
+    def _pending_set_key(self) -> str:
+        """Return the Redis key for the pending requests set."""
+        if self._dedup_strategy != 'default':
+            raise RuntimeError('The pending requests set is only available with the default deduplication strategy.')
+        return f'{self._MAIN_KEY}:{self._storage_name}:pending_set'
+
+    @property
+    def _handled_set_key(self) -> str:
+        """Return the Redis key for the handled requests set."""
+        if self._dedup_strategy != 'default':
+            raise RuntimeError('The handled requests set is only available with the default deduplication strategy.')
+        return f'{self._MAIN_KEY}:{self._storage_name}:handled_set'
 
     @property
     def _queue_key(self) -> str:
@@ -134,6 +161,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         name: str | None,
         alias: str | None,
         redis: Redis,
+        dedup_strategy: Literal['default', 'bloom'] = 'default',
     ) -> RedisRequestQueueClient:
         """Open or create a new Redis request queue client.
 
@@ -146,6 +174,10 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
             name: The name of the dataset for named (global scope) storages.
             alias: The alias of the dataset for unnamed (run scope) storages.
             redis: Redis client instance.
+            dedup_strategy: Strategy for request queue deduplication. Options are:
+                - 'default': Uses Redis sets for exact deduplication.
+                - 'bloom': Uses Redis Bloom filters for probabilistic deduplication with lower memory usage. When using
+                    this approach, there is a possibility 1e-7 that requests will be skipped in the queue.
 
         Returns:
             An instance for the opened or created storage client.
@@ -162,6 +194,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 'pending_request_count': 0,
                 'total_request_count': 0,
             },
+            instance_kwargs={'dedup_strategy': dedup_strategy},
         )
 
     @override
@@ -170,26 +203,26 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
     @override
     async def drop(self) -> None:
-        await self._drop(
-            extra_keys=[
-                self._added_filter_key,
-                self._handled_filter_key,
-                self._queue_key,
-                self._data_key,
-                self._in_progress_key,
-            ]
-        )
+        if self._dedup_strategy == 'bloom':
+            extra_keys = [self._added_filter_key, self._handled_filter_key]
+        elif self._dedup_strategy == 'default':
+            extra_keys = [self._pending_set_key, self._handled_set_key]
+        else:
+            raise RuntimeError(f'Unknown deduplication strategy: {self._dedup_strategy}')
+        extra_keys.extend([self._queue_key, self._data_key, self._in_progress_key])
+        await self._drop(extra_keys=extra_keys)
 
     @override
     async def purge(self) -> None:
+        if self._dedup_strategy == 'bloom':
+            extra_keys = [self._added_filter_key, self._handled_filter_key]
+        elif self._dedup_strategy == 'default':
+            extra_keys = [self._pending_set_key, self._handled_set_key]
+        else:
+            raise RuntimeError(f'Unknown deduplication strategy: {self._dedup_strategy}')
+        extra_keys.extend([self._queue_key, self._data_key, self._in_progress_key])
         await self._purge(
-            extra_keys=[
-                self._added_filter_key,
-                self._handled_filter_key,
-                self._queue_key,
-                self._data_key,
-                self._in_progress_key,
-            ],
+            extra_keys=extra_keys,
             metadata_kwargs=_QueueMetadataUpdateParams(
                 update_accessed_at=True,
                 update_modified_at=True,
@@ -217,13 +250,17 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         unique_keys = list(requests_by_unique_key.keys())
         # Check which requests are already added or handled
         async with self._get_pipeline(with_execute=False) as pipe:
-            await await_redis_response(pipe.bf().mexists(self._added_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
-            await await_redis_response(pipe.bf().mexists(self._handled_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
+            if self._dedup_strategy == 'default':
+                await await_redis_response(pipe.smismember(self._pending_set_key, unique_keys))
+                await await_redis_response(pipe.smismember(self._handled_set_key, unique_keys))
+            elif self._dedup_strategy == 'bloom':
+                await await_redis_response(pipe.bf().mexists(self._added_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
+                await await_redis_response(pipe.bf().mexists(self._handled_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
 
-            results = await pipe.execute()
+            pipe_results = await pipe.execute()
 
-        added_flags = results[0]
-        handled_flags = results[1]
+        added_pending_flags = pipe_results[0]
+        handled_flags = pipe_results[1]
 
         new_unique_keys = []
         new_request_data = {}
@@ -243,7 +280,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 continue
 
             # Already in queue - skip
-            if added_flags[i]:
+            if added_pending_flags[i]:
                 processed_requests.append(
                     ProcessedRequest(
                         unique_key=unique_key,
@@ -262,7 +299,11 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         if new_unique_keys:
             # Add new requests to the queue atomically, get back which were actually added
             script_results = await self._add_requests_script(
-                keys=[self._added_filter_key, self._queue_key, self._data_key],
+                keys=[
+                    self._added_filter_key if self._dedup_strategy == 'bloom' else self._pending_set_key,
+                    self._queue_key,
+                    self._data_key,
+                ],
                 args=[int(forefront), json.dumps(new_unique_keys), json.dumps(new_request_data)],
             )
             actually_added = set(json.loads(script_results))
@@ -345,14 +386,17 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         # Check if the request is in progress.
-
         check_in_progress = await await_redis_response(self._redis.hexists(self._in_progress_key, request.unique_key))
         if not check_in_progress:
             logger.warning(f'Marking request {request.unique_key} as handled that is not in progress.')
             return None
 
         async with self._get_pipeline() as pipe:
-            await await_redis_response(pipe.bf().add(self._handled_filter_key, request.unique_key))  # type: ignore[no-untyped-call]
+            if self._dedup_strategy == 'default':
+                await await_redis_response(pipe.sadd(self._handled_set_key, request.unique_key))
+                await await_redis_response(pipe.srem(self._pending_set_key, request.unique_key))
+            elif self._dedup_strategy == 'bloom':
+                await await_redis_response(pipe.bf().add(self._handled_filter_key, request.unique_key))  # type: ignore[no-untyped-call]
 
             await await_redis_response(pipe.hdel(self._in_progress_key, request.unique_key))
             await await_redis_response(pipe.hdel(self._data_key, request.unique_key))
@@ -439,13 +483,17 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         """Ensure Lua scripts are loaded in Redis."""
         self._fetch_script = await self._create_script('atomic_fetch_request.lua')
         self._reclaim_stale_script = await self._create_script('reclaim_stale_requests.lua')
-        self._add_requests_script = await self._create_script('atomic_add_requests.lua')
+        if self._dedup_strategy == 'bloom':
+            self._add_requests_script = await self._create_script('atomic_bloom_add_requests.lua')
+        elif self._dedup_strategy == 'default':
+            self._add_requests_script = await self._create_script('atomic_set_add_requests.lua')
 
     @override
     async def _create_storage(self, pipeline: Pipeline) -> None:
         # Create Bloom filters for added and handled requests
-        await await_redis_response(pipeline.bf().create(self._added_filter_key, 1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
-        await await_redis_response(pipeline.bf().create(self._handled_filter_key, 1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
+        if self._dedup_strategy == 'bloom':
+            await await_redis_response(pipeline.bf().create(self._added_filter_key, 1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
+            await await_redis_response(pipeline.bf().create(self._handled_filter_key, 1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
 
     async def _reclaim_stale_requests(self) -> None:
         """Reclaim requests that have been in progress for too long."""

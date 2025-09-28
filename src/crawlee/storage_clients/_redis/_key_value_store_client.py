@@ -97,6 +97,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             redis=redis,
             metadata_model=KeyValueStoreMetadata,
             extra_metadata_fields={},
+            instance_kwargs={},
         )
 
     @override

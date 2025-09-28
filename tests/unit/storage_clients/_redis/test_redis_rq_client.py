@@ -18,14 +18,15 @@ if TYPE_CHECKING:
     from crawlee.storage_clients._redis import RedisRequestQueueClient
 
 
-@pytest.fixture
+@pytest.fixture(params=['default', 'bloom'])
 async def rq_client(
     redis_client: FakeAsyncRedis,
+    request: pytest.FixtureRequest,
     suppress_user_warning: None,  # noqa: ARG001
 ) -> AsyncGenerator[RedisRequestQueueClient, None]:
     """A fixture for a Redis RQ client."""
-    client = await RedisStorageClient(redis=redis_client).create_rq_client(
-        name='test_request_queue',
+    client = await RedisStorageClient(redis=redis_client, queue_dedup_strategy=request.param).create_rq_client(
+        name='test_request_queue'
     )
     yield client
     await client.drop()
@@ -45,15 +46,16 @@ async def test_base_keys_creation(rq_client: RedisRequestQueueClient) -> None:
     assert kvs_id is not None
     assert (kvs_id.decode() if isinstance(kvs_id, bytes) else kvs_id) == metadata.id
 
-    added_bf = await await_redis_response(
-        rq_client.redis.bf().info('request_queues:test_request_queue:added_bloom_filter')  # type: ignore[no-untyped-call]
-    )
-    assert added_bf is not None
+    if rq_client._dedup_strategy == 'bloom':
+        added_bf = await await_redis_response(
+            rq_client.redis.exists('request_queues:test_request_queue:added_bloom_filter')
+        )
+        assert added_bf == 1
 
-    handled_bf = await await_redis_response(
-        rq_client.redis.bf().info('request_queues:test_request_queue:handled_bloom_filter')  # type: ignore[no-untyped-call]
-    )
-    assert handled_bf is not None
+        handled_bf = await await_redis_response(
+            rq_client.redis.exists('request_queues:test_request_queue:handled_bloom_filter')
+        )
+        assert handled_bf == 1
 
     metadata_data = await await_redis_response(rq_client.redis.json().get('request_queues:test_request_queue:metadata'))
 
@@ -101,6 +103,8 @@ async def test_drop_removes_records(rq_client: RedisRequestQueueClient) -> None:
     rq_data = 'request_queues:test_request_queue:data'
     added_bf = 'request_queues:test_request_queue:added_bloom_filter'
     handled_bf = 'request_queues:test_request_queue:handled_bloom_filter'
+    pending_set = 'request_queues:test_request_queue:pending_set'
+    handled_set = 'request_queues:test_request_queue:handled_set'
     metadata_key = 'request_queues:test_request_queue:metadata'
 
     metadata = await rq_client.get_metadata()
@@ -115,14 +119,22 @@ async def test_drop_removes_records(rq_client: RedisRequestQueueClient) -> None:
 
     rq_queue_exists = await await_redis_response(rq_client.redis.exists(rq_queue))
     rq_data_exists = await await_redis_response(rq_client.redis.exists(rq_data))
-    added_bf_exists = await await_redis_response(rq_client.redis.exists(added_bf))
-    handled_bf_exists = await await_redis_response(rq_client.redis.exists(handled_bf))
     metadata_exists = await await_redis_response(rq_client.redis.exists(metadata_key))
     assert rq_queue_exists == 1
     assert rq_data_exists == 1
-    assert added_bf_exists == 1
-    assert handled_bf_exists == 1
     assert metadata_exists == 1
+
+    if rq_client._dedup_strategy == 'bloom':
+        added_bf_exists = await await_redis_response(rq_client.redis.exists(added_bf))
+        handled_bf_exists = await await_redis_response(rq_client.redis.exists(handled_bf))
+        assert added_bf_exists == 1
+        assert handled_bf_exists == 1
+    elif rq_client._dedup_strategy == 'default':
+        pending_set_exists = await await_redis_response(rq_client.redis.exists(pending_set))
+        handled_set_exists = await await_redis_response(rq_client.redis.exists(handled_set))
+        assert pending_set_exists == 1
+        # No requests marked as handled
+        assert handled_set_exists == 0
 
     # Drop the request queue
     await rq_client.drop()
@@ -134,16 +146,23 @@ async def test_drop_removes_records(rq_client: RedisRequestQueueClient) -> None:
     )
     rq_queue_exists = await await_redis_response(rq_client.redis.exists(rq_queue))
     rq_data_exists = await await_redis_response(rq_client.redis.exists(rq_data))
-    added_bf_exists = await await_redis_response(rq_client.redis.exists(added_bf))
-    handled_bf_exists = await await_redis_response(rq_client.redis.exists(handled_bf))
     metadata_exists = await await_redis_response(rq_client.redis.exists(metadata_key))
     assert name_after_drop is None
     assert rq_id_after_drop is None
     assert rq_queue_exists == 0
     assert rq_data_exists == 0
-    assert added_bf_exists == 0
-    assert handled_bf_exists == 0
     assert metadata_exists == 0
+
+    if rq_client._dedup_strategy == 'bloom':
+        added_bf_exists = await await_redis_response(rq_client.redis.exists(added_bf))
+        handled_bf_exists = await await_redis_response(rq_client.redis.exists(handled_bf))
+        assert added_bf_exists == 0
+        assert handled_bf_exists == 0
+    elif rq_client._dedup_strategy == 'default':
+        pending_set_exists = await await_redis_response(rq_client.redis.exists(pending_set))
+        handled_set_exists = await await_redis_response(rq_client.redis.exists(handled_set))
+        assert pending_set_exists == 0
+        assert handled_set_exists == 0
 
 
 async def test_metadata_file_updates(rq_client: RedisRequestQueueClient) -> None:

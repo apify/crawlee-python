@@ -110,6 +110,7 @@ class RedisClientMixin:
         metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata],
         redis: Redis,
         extra_metadata_fields: dict[str, Any],
+        instance_kwargs: dict[str, Any],
     ) -> Self:
         """Open or create a new Redis storage client.
 
@@ -120,6 +121,7 @@ class RedisClientMixin:
             redis: Redis client instance.
             metadata_model: Pydantic model for metadata validation.
             extra_metadata_fields: Storage-specific metadata fields.
+            instance_kwargs: Additional arguments for the client constructor.
 
         Returns:
             An instance for the opened or created storage client.
@@ -138,7 +140,7 @@ class RedisClientMixin:
             storage_id = metadata_data['id'] if metadata_data is not None else None
         # If both storage_name and storage_id are found, open existing storage
         if storage_name and storage_id:
-            client = cls(storage_name=storage_name, storage_id=storage_id, redis=redis)
+            client = cls(storage_name=storage_name, storage_id=storage_id, redis=redis, **instance_kwargs)
             async with client._get_pipeline() as pipe:
                 await client._update_metadata(pipe, update_accessed_at=True)
         # Otherwise, create a new storage
@@ -152,12 +154,12 @@ class RedisClientMixin:
                 modified_at=now,
                 **extra_metadata_fields,
             )
-            client = cls(storage_name=internal_name, storage_id=metadata.id, redis=redis)
+            client = cls(storage_name=internal_name, storage_id=metadata.id, redis=redis, **instance_kwargs)
             created = await client._create_metadata_and_storage(internal_name, metadata.model_dump())
             # The client was probably not created due to a race condition. Let's try to open it using the name.
             if not created:
                 metadata_data = await cls._get_metadata_by_name(name=internal_name, redis=redis, with_wait=True)
-                client = cls(storage_name=internal_name, storage_id=metadata.id, redis=redis)
+                client = cls(storage_name=internal_name, storage_id=metadata.id, redis=redis, **instance_kwargs)
 
         # Ensure Lua scripts are loaded
         await client._ensure_scripts_loaded()

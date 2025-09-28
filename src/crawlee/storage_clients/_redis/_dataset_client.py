@@ -99,6 +99,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
             redis=redis,
             metadata_model=DatasetMetadata,
             extra_metadata_fields={'item_count': 0},
+            instance_kwargs={},
         )
 
     @override
