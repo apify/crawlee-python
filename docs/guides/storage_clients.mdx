@@ -319,7 +319,7 @@ For advanced scenarios, you can configure <ApiLink to="class/SqlStorageClient">`
     {SQLStorageClientConfigurationExample}
 </CodeBlock>
 
-## Redis storage client
+### Redis storage client
 
 :::warning Experimental feature
 The <ApiLink to="class/RedisStorageClient">`RedisStorageClient`</ApiLink> is experimental. Its API and behavior may change in future releases.
@@ -448,8 +448,10 @@ class Request_Queue_Keys{
     request_queues:[name]:queue - List
     request_queues:[name]:data - Hash
     request_queues:[name]:in_progress - Hash
-    request_queues:[name]:added_bloom_filter - Bloom Filter
-    request_queues:[name]:handled_bloom_filter - Bloom Filter
+    request_queues:[name]:added_bloom_filter - Bloom Filter | bloom queue_dedup_strategy
+    request_queues:[name]:handled_bloom_filter - Bloom Filter | bloom queue_dedup_strategy
+    request_queues:[name]:pending_set - Set | default queue_dedup_strategy
+    request_queues:[name]:handled_set - Set | default queue_dedup_strategy
     request_queues:[name]:metadata - JSON Object
 }
 

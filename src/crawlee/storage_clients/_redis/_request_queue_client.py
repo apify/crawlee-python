@@ -54,8 +54,11 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     - `request_queues:{name}:queue` - Redis list for FIFO request ordering
     - `request_queues:{name}:data` - Redis hash storing serialized Request objects by unique_key
     - `request_queues:{name}:in_progress` - Redis hash tracking requests currently being processed
-    - `request_queues:{name}:added_bloom_filter` - Bloom filter for added request deduplication
-    - `request_queues:{name}:handled_bloom_filter` - Bloom filter for completed request tracking
+    - `request_queues:{name}:added_bloom_filter` - Bloom filter for added request deduplication (`bloom` dedup_strategy)
+    - `request_queues:{name}:handled_bloom_filter` - Bloom filter for completed request tracking (`bloom`
+        dedup_strategy)
+    - `request_queues:{name}:pending_set` - Redis set for added request deduplication (`default` dedup_strategy)
+    - `request_queues:{name}:handled_set` - Redis set for completed request tracking (`default` dedup_strategy)
     - `request_queues:{name}:metadata` - Redis JSON object containing queue metadata
 
     Requests are serialized to JSON for storage and maintain proper FIFO ordering through Redis list
