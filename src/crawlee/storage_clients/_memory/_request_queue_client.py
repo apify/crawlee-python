@@ -10,6 +10,7 @@ from typing_extensions import override
 
 from crawlee import Request
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_clients._base import RequestQueueClient
 from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, RequestQueueMetadata
 
@@ -86,9 +87,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
             ValueError: If both name and alias are provided.
         """
         # Validate input parameters.
-        specified_params = sum(1 for param in [id, name, alias] if param is not None)
-        if specified_params > 1:
-            raise ValueError('Only one of "id", "name", or "alias" can be specified, not multiple.')
+        raise_if_too_many_kwargs(id=id, name=name, alias=alias)
 
         # Create a new queue
         queue_id = id or crypto_random_object_id()

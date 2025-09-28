@@ -5,13 +5,19 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee import service_locator
-from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient, RedisStorageClient, StorageClient
+from crawlee.storage_clients import (
+    FileSystemStorageClient,
+    MemoryStorageClient,
+    RedisStorageClient,
+    SqlStorageClient,
+    StorageClient,
+)
 
 if TYPE_CHECKING:
     from fakeredis import FakeAsyncRedis
 
 
-@pytest.fixture(params=['memory', 'file_system', 'redis'])
+@pytest.fixture(params=['memory', 'file_system', 'sql', 'redis'])
 def storage_client(
     request: pytest.FixtureRequest,
     redis_client: FakeAsyncRedis,
@@ -21,6 +27,8 @@ def storage_client(
     storage_client: StorageClient
     if request.param == 'memory':
         storage_client = MemoryStorageClient()
+    elif request.param == 'sql':
+        storage_client = SqlStorageClient()
     elif request.param == 'redis':
         storage_client = RedisStorageClient(redis=redis_client)
     else:

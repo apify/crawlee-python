@@ -73,16 +73,16 @@ module.exports = {
         gaGtag: true,
         repoUrl: 'https://github.com/apify/crawlee-python',
     },
+    onBrokenLinks: 'throw',
     markdown: {
         mermaid: true,
+        hooks: {
+            onBrokenMarkdownLinks: 'throw',
+        },
     },
     themes: [
         '@docusaurus/theme-mermaid',
     ],
-    onBrokenLinks:
-    /** @type {import('@docusaurus/types').ReportingSeverity} */ ('throw'),
-    onBrokenMarkdownLinks:
-    /** @type {import('@docusaurus/types').ReportingSeverity} */ ('throw'),
     presets: /** @type {import('@docusaurus/types').PresetConfig[]} */ ([
         [
             '@docusaurus/preset-classic',

@@ -17,6 +17,7 @@ from crawlee import Request
 from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import atomic_write, json_dumps
+from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee._utils.recoverable_state import RecoverableState
 from crawlee.storage_clients._base import RequestQueueClient
 from crawlee.storage_clients.models import (
@@ -115,9 +116,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         self._state = RecoverableState[RequestQueueState](
             default_state=RequestQueueState(),
-            persist_state_key='request_queue_state',
+            persist_state_key=f'__RQ_STATE_{self._metadata.id}',
             persistence_enabled=True,
-            persist_state_kvs_name=f'__RQ_STATE_{self._metadata.id}',
             logger=logger,
         )
         """Recoverable state to maintain request ordering, in-progress status, and handled status."""
@@ -165,9 +165,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 or if both name and alias are provided.
         """
         # Validate input parameters.
-        specified_params = sum(1 for param in [id, name, alias] if param is not None)
-        if specified_params > 1:
-            raise ValueError('Only one of "id", "name", or "alias" can be specified, not multiple.')
+        raise_if_too_many_kwargs(id=id, name=name, alias=alias)
 
         rq_base_path = Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
 

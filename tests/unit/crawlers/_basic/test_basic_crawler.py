@@ -799,7 +799,7 @@ async def test_max_requests_per_crawl() -> None:
 
     # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
     crawler = BasicCrawler(
-        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
         max_requests_per_crawl=3,
     )
 
@@ -820,7 +820,7 @@ async def test_max_crawl_depth() -> None:
 
     # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
     crawler = BasicCrawler(
-        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
         max_crawl_depth=2,
     )
 
@@ -859,7 +859,10 @@ async def test_abort_on_error(
 ) -> None:
     starts_urls = []
 
-    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=1), abort_on_error=True)
+    crawler = BasicCrawler(
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+        abort_on_error=True,
+    )
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -991,7 +994,7 @@ async def test_crawler_manual_stop() -> None:
     processed_urls = []
 
     # Set max_concurrency to 1 to ensure testing urls are visited one by one in order.
-    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=1))
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1))
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -1018,8 +1021,8 @@ async def test_crawler_multiple_stops_in_parallel() -> None:
     ]
     processed_urls = []
 
-    # Set max_concurrency to 2 to ensure two urls are being visited in parallel.
-    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=2))
+    # Set concurrency to 2 to ensure two urls are being visited in parallel.
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=2, max_concurrency=2))
 
     both_handlers_started = asyncio.Barrier(2)  # type:ignore[attr-defined]  # Test is skipped in older Python versions.
     only_one_handler_at_a_time = asyncio.Semaphore(1)
@@ -1298,7 +1301,7 @@ async def test_keep_alive(
         keep_alive=keep_alive,
         max_requests_per_crawl=max_requests_per_crawl,
         # If more request can run in parallel, then max_requests_per_crawl is not deterministic.
-        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
     )
     mocked_handler = Mock()
 
@@ -1549,3 +1552,71 @@ async def test_status_message_emit() -> None:
     event_manager.off(event=Event.CRAWLER_STATUS, listener=listener)
 
     assert status_message_listener.called
+
+
+@pytest.mark.parametrize(
+    ('queue_name', 'queue_alias', 'by_id'),
+    [
+        pytest.param('named-queue', None, False, id='with rq_name'),
+        pytest.param(None, 'alias-queue', False, id='with rq_alias'),
+        pytest.param('id-queue', None, True, id='with rq_id'),
+    ],
+)
+async def test_add_requests_with_rq_param(queue_name: str | None, queue_alias: str | None, *, by_id: bool) -> None:
+    crawler = BasicCrawler()
+    rq = await RequestQueue.open(name=queue_name, alias=queue_alias)
+    if by_id:
+        queue_id = rq.id
+        queue_name = None
+    else:
+        queue_id = None
+    visit_urls = set()
+
+    check_requests = [
+        Request.from_url('https://a.placeholder.com'),
+        Request.from_url('https://b.placeholder.com'),
+        Request.from_url('https://c.placeholder.com'),
+    ]
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visit_urls.add(context.request.url)
+        await context.add_requests(check_requests, rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
+
+    await crawler.run(['https://start.placeholder.com'])
+
+    requests_from_queue = []
+    while request := await rq.fetch_next_request():
+        requests_from_queue.append(request)
+
+    assert requests_from_queue == check_requests
+    assert visit_urls == {'https://start.placeholder.com'}
+
+    await rq.drop()
+
+
+@pytest.mark.parametrize(
+    ('queue_name', 'queue_alias', 'queue_id'),
+    [
+        pytest.param('named-queue', 'alias-queue', None, id='rq_name and rq_alias'),
+        pytest.param('named-queue', None, 'id-queue', id='rq_name and rq_id'),
+        pytest.param(None, 'alias-queue', 'id-queue', id='rq_alias and rq_id'),
+        pytest.param('named-queue', 'alias-queue', 'id-queue', id='rq_name and rq_alias and rq_id'),
+    ],
+)
+async def test_add_requests_error_with_multi_params(
+    queue_id: str | None, queue_name: str | None, queue_alias: str | None
+) -> None:
+    crawler = BasicCrawler()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        with pytest.raises(ValueError, match='Only one of `rq_id`, `rq_name` or `rq_alias` can be set'):
+            await context.add_requests(
+                [Request.from_url('https://a.placeholder.com')],
+                rq_id=queue_id,
+                rq_name=queue_name,
+                rq_alias=queue_alias,
+            )
+
+    await crawler.run(['https://start.placeholder.com'])

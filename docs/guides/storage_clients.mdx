@@ -15,6 +15,8 @@ import FileSystemStorageClientBasicExample from '!!raw-loader!roa-loader!./code_
 import FileSystemStorageClientConfigurationExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/file_system_storage_client_configuration_example.py';
 import CustomStorageClientExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/custom_storage_client_example.py';
 import RegisteringStorageClientsExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/registering_storage_clients_example.py';
+import SQLStorageClientBasicExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/sql_storage_client_basic_example.py';
+import SQLStorageClientConfigurationExample from '!!raw-loader!./code_examples/storage_clients/sql_storage_client_configuration_example.py';
 import RedisStorageClientBasicExample from '!!raw-loader!./code_examples/storage_clients/redis_storage_client_basic_example.py';
 import RedisStorageClientConfigurationExample from '!!raw-loader!./code_examples/storage_clients/redis_storage_client_configuration_example.py';
 
@@ -26,6 +28,7 @@ Crawlee provides three main storage client implementations:
 
 - <ApiLink to="class/FileSystemStorageClient">`FileSystemStorageClient`</ApiLink> - Provides persistent file system storage with in-memory caching.
 - <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> - Stores data in memory with no persistence.
+- <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> – Provides persistent storage using a SQL database ([SQLite](https://sqlite.org/) or [PostgreSQL](https://www.postgresql.org/)). Requires installing the extra dependency: 'crawlee[sql_sqlite]' for SQLite or 'crawlee[sql_postgres]' for PostgreSQL.
 - <ApiLink to="class/RedisStorageClient">`RedisStorageClient`</ApiLink> – Provides persistent storage using a [Redis](https://redis.io/) database v8.0+. Requires installing the extra dependency: 'crawlee[redis]'.
 - [`ApifyStorageClient`](https://docs.apify.com/sdk/python/reference/class/ApifyStorageClient) - Manages storage on the [Apify platform](https://apify.com), implemented in the [Apify SDK](https://github.com/apify/apify-sdk-python).
 
@@ -54,6 +57,8 @@ class FileSystemStorageClient
 
 class MemoryStorageClient
 
+class SqlStorageClient
+
 class RedisStorageClient
 
 class ApifyStorageClient
@@ -64,6 +69,7 @@ class ApifyStorageClient
 
 StorageClient --|> FileSystemStorageClient
 StorageClient --|> MemoryStorageClient
+StorageClient --|> SqlStorageClient
 StorageClient --|> RedisStorageClient
 StorageClient --|> ApifyStorageClient
 ```
@@ -131,6 +137,187 @@ The `MemoryStorageClient` does not persist data between runs. All data is lost w
 <RunnableCodeBlock className="language-python" language="python">
     {MemoryStorageClientBasicExample}
 </RunnableCodeBlock>
+
+### SQL storage client
+
+:::warning Experimental feature
+The `SqlStorageClient` is experimental. Its API and behavior may change in future releases.
+:::
+
+The <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> provides persistent storage using a SQL database (SQLite by default, or PostgreSQL). It supports all Crawlee storage types and enables concurrent access from multiple independent clients or processes.
+
+:::note dependencies
+The <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> is not included in the core Crawlee package.
+To use it, you need to install Crawlee with the appropriate extra dependency:
+
+- For SQLite support, run:
+  <code>pip install 'crawlee[sql_sqlite]'</code>
+- For PostgreSQL support, run:
+  <code>pip install 'crawlee[sql_postgres]'</code>
+:::
+
+By default, <ApiLink to="class/SqlStorageClient">SqlStorageClient</ApiLink> uses SQLite.
+To use PostgreSQL instead, just provide a PostgreSQL connection string via the `connection_string` parameter. No other code changes are needed—the same client works for both databases.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {SQLStorageClientBasicExample}
+</RunnableCodeBlock>
+
+Data is organized in relational tables. Below are the main tables and columns used for each storage type:
+
+```mermaid
+---
+config:
+    class:
+        hideEmptyMembersBox: true
+---
+
+classDiagram
+
+%% ========================
+%% Storage Clients
+%% ========================
+
+class SqlDatasetClient {
+    <<Dataset>>
+}
+
+class SqlKeyValueStoreClient {
+    <<Key-value store>>
+}
+
+%% ========================
+%% Dataset Tables
+%% ========================
+
+class datasets {
+    <<table>>
+    + dataset_id (PK)
+    + internal_name
+    + name
+    + accessed_at
+    + created_at
+    + modified_at
+    + item_count
+}
+
+class dataset_records {
+    <<table>>
+    + item_id (PK)
+    + dataset_id (FK)
+    + data
+}
+
+%% ========================
+%% Key-Value Store Tables
+%% ========================
+
+class key_value_stores {
+    <<table>>
+    + key_value_store_id (PK)
+    + internal_name
+    + name
+    + accessed_at
+    + created_at
+    + modified_at
+}
+
+class key_value_store_records {
+    <<table>>
+    + key_value_store_id (FK, PK)
+    + key (PK)
+    + value
+    + content_type
+    + size
+}
+
+%% ========================
+%% Client to Table arrows
+%% ========================
+
+SqlDatasetClient --> datasets
+SqlDatasetClient --> dataset_records
+
+SqlKeyValueStoreClient --> key_value_stores
+SqlKeyValueStoreClient --> key_value_store_records
+```
+```mermaid
+---
+config:
+    class:
+        hideEmptyMembersBox: true
+---
+
+classDiagram
+
+%% ========================
+%% Storage Clients
+%% ========================
+
+class SqlRequestQueueClient {
+    <<Request queue>>
+}
+
+%% ========================
+%% Request Queue Tables
+%% ========================
+
+class request_queues {
+    <<table>>
+    + request_queue_id (PK)
+    + internal_name
+    + name
+    + accessed_at
+    + created_at
+    + modified_at
+    + had_multiple_clients
+    + handled_request_count
+    + pending_request_count
+    + total_request_count
+}
+
+class request_queue_records {
+    <<table>>
+    + request_id (PK)
+    + request_queue_id (FK, PK)
+    + data
+    + sequence_number
+    + is_handled
+    + time_blocked_until
+    + client_key
+}
+
+class request_queue_state {
+    <<table>>
+    + request_queue_id (FK, PK)
+    + sequence_counter
+    + forefront_sequence_counter
+}
+
+%% ========================
+%% Client to Table arrows
+%% ========================
+
+SqlRequestQueueClient --> request_queues
+SqlRequestQueueClient --> request_queue_records
+SqlRequestQueueClient --> request_queue_state
+```
+
+Configuration options for the <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> can be set through environment variables or the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class:
+
+- **`storage_dir`** (env: `CRAWLEE_STORAGE_DIR`, default: `'./storage'`) - The root directory where the default SQLite database will be created if no connection string is provided.
+- **`purge_on_start`** (env: `CRAWLEE_PURGE_ON_START`, default: `True`) - Whether to purge default storages on start.
+
+Configuration options for the <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> can be set via constructor arguments:
+
+- **`connection_string`** (default: SQLite in <ApiLink to="class/Configuration">`Configuration`</ApiLink> storage dir) – SQLAlchemy connection string, e.g. `sqlite+aiosqlite:///my.db` or `postgresql+asyncpg://user:pass@host/db`.
+- **`engine`** – Pre-configured SQLAlchemy AsyncEngine (optional).
+
+For advanced scenarios, you can configure <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> with a custom SQLAlchemy engine and additional options via the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class. This is useful, for example, when connecting to an external PostgreSQL database or customizing connection pooling.
+
+<CodeBlock className="language-python" language="python">
+    {SQLStorageClientConfigurationExample}
+</CodeBlock>
 
 ## Redis storage client
 
