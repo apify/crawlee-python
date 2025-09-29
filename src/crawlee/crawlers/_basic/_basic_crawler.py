@@ -659,7 +659,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request_manager = await self.get_request_manager()
             if purge_request_queue and isinstance(request_manager, RequestQueue):
                 await request_manager.drop()
-                self._request_manager = await RequestQueue.open()
+                self._request_manager = await RequestQueue.open(
+                    storage_client=self._service_locator.get_storage_client(),
+                    configuration=self._service_locator.get_configuration(),
+                )
 
         if requests is not None:
             await self.add_requests(requests)
