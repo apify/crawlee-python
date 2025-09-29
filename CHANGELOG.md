@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.6.13 - **not yet released**
+## [1.0.0](https://github.com/apify/crawlee-python/releases/tag/v1.0.0) (2025-09-29)
 
 ### 🚀 Features
 
@@ -47,7 +46,6 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Refactor storage creation and caching, configuration and services ([#1386](https://github.com/apify/crawlee-python/pull/1386)) ([04649bd](https://github.com/apify/crawlee-python/commit/04649bde60d46b2bc18ae4f6e3fd9667d02a9cef)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1379](https://github.com/apify/crawlee-python/issues/1379)
 
 
-<!-- git-cliff-unreleased-end -->
 
 ## [0.6.12](https://github.com/apify/crawlee-python/releases/tag/v0.6.12) (2025-07-30)
 
