@@ -3306,15 +3306,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@mermaid-js/layout-elk@npm:^0.1.5":
-  version: 0.1.9
-  resolution: "@mermaid-js/layout-elk@npm:0.1.9"
+"@mermaid-js/layout-elk@npm:^0.2.0":
+  version: 0.2.0
+  resolution: "@mermaid-js/layout-elk@npm:0.2.0"
   dependencies:
     d3: "npm:^7.9.0"
     elkjs: "npm:^0.9.3"
   peerDependencies:
     mermaid: ^11.0.2
-  checksum: 10c0/c12b8ea404420fd477bbe87b1f502f1133372116594bd298db44e336eff18d28dd79379c3ffc3ed1fa34e839ad6ba7f7ebc33b60421c15730a6d3d0e48c07b39
+  checksum: 10c0/d4938770adc669dd7e271aa0688838c9c1ff47c75479ab0385dc51c7a4e5e5fc1df3ea9913c1493709b4640fd50064db181a42c1b36d005f20cb8e2537570b29
   languageName: node
   linkType: hard
 
@@ -6946,7 +6946,7 @@ __metadata:
     "@docusaurus/types": "npm:3.9.1"
     "@giscus/react": "npm:^3.0.0"
     "@mdx-js/react": "npm:^3.0.1"
-    "@mermaid-js/layout-elk": "npm:^0.1.5"
+    "@mermaid-js/layout-elk": "npm:^0.2.0"
     "@signalwire/docusaurus-plugin-llms-txt": "npm:^1.2.1"
     "@types/react": "npm:^19.0.0"
     "@typescript-eslint/eslint-plugin": "npm:8.44.0"
