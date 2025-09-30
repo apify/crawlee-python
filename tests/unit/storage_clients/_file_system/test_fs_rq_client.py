@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee import Request
+from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import FileSystemStorageClient
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -76,6 +76,11 @@ async def test_request_file_persistence(rq_client: FileSystemRequestQueueClient)
             request_data = json.load(f)
             assert 'url' in request_data
             assert request_data['url'].startswith('https://example.com/')
+
+async def test_opening_rq_does_not_have_side_effect_on_service_locator(
+    rq_client: FileSystemRequestQueueClient # noqa: ARG001
+) -> None:
+    service_locator.set_storage_client(MemoryStorageClient())
 
 
 async def test_drop_removes_directory(rq_client: FileSystemRequestQueueClient) -> None:

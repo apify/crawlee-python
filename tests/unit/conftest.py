@@ -69,6 +69,9 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
         # Verify that the test environment was set up correctly.
         assert os.environ.get('CRAWLEE_STORAGE_DIR') == str(tmp_path)
 
+        # Clear global cache of autosaved values
+        KeyValueStore._autosaved_values = {}
+
     return _prepare_test_env
 
 
