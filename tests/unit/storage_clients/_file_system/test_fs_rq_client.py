@@ -77,8 +77,9 @@ async def test_request_file_persistence(rq_client: FileSystemRequestQueueClient)
             assert 'url' in request_data
             assert request_data['url'].startswith('https://example.com/')
 
+
 async def test_opening_rq_does_not_have_side_effect_on_service_locator(
-    rq_client: FileSystemRequestQueueClient # noqa: ARG001
+    rq_client: FileSystemRequestQueueClient,  # noqa: ARG001
 ) -> None:
     service_locator.set_storage_client(MemoryStorageClient())
 

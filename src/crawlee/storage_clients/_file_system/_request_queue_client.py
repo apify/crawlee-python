@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee.configuration import Configuration
+    from crawlee.storages import KeyValueStore
 
 logger = getLogger(__name__)
 
@@ -134,13 +135,16 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
     @classmethod
     async def _create_recoverable_state(cls, id: str, configuration: Configuration) -> RecoverableState:
-        from crawlee.storage_clients import FileSystemStorageClient
-        from crawlee.storages import KeyValueStore
-        kvs = await KeyValueStore.open(storage_client=FileSystemStorageClient(),configuration=configuration)
+        async def kvs_factory() -> KeyValueStore:
+            from crawlee.storage_clients import FileSystemStorageClient  # noqa: PLC0415 avoid circular import
+            from crawlee.storages import KeyValueStore  # noqa: PLC0415 avoid circular import
+
+            return await KeyValueStore.open(storage_client=FileSystemStorageClient(), configuration=configuration)
+
         return RecoverableState[RequestQueueState](
             default_state=RequestQueueState(),
             persist_state_key=f'__RQ_STATE_{id}',
-            persist_state_kvs=kvs,
+            persist_state_kvs_factory=kvs_factory,
             persistence_enabled=True,
             logger=logger,
         )
@@ -203,9 +207,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                                 metadata=metadata,
                                 path_to_rq=rq_base_path / rq_dir,
                                 lock=asyncio.Lock(),
-                                recoverable_state=await cls._create_recoverable_state(id=id,
-                                                                                      configuration=configuration),
-
+                                recoverable_state=await cls._create_recoverable_state(
+                                    id=id, configuration=configuration
+                                ),
                             )
                             await client._state.initialize()
                             await client._discover_existing_requests()

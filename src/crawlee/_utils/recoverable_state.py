@@ -9,8 +9,9 @@ from crawlee.events._types import Event, EventPersistStateData
 
 if TYPE_CHECKING:
     import logging
+    from collections.abc import Callable, Coroutine
 
-    from crawlee.storages._key_value_store import KeyValueStore
+    from crawlee.storages import KeyValueStore
 
 TStateModel = TypeVar('TStateModel', bound=BaseModel)
 
@@ -38,7 +39,7 @@ class RecoverableState(Generic[TStateModel]):
         persistence_enabled: Literal[True, False, 'explicit_only'] = False,
         persist_state_kvs_name: str | None = None,
         persist_state_kvs_id: str | None = None,
-        persist_state_kvs: KeyValueStore | None = None,
+        persist_state_kvs_factory: Callable[[], Coroutine[None, None, KeyValueStore]] | None = None,
         logger: logging.Logger,
     ) -> None:
         """Initialize a new recoverable state object.
@@ -53,28 +54,40 @@ class RecoverableState(Generic[TStateModel]):
                 If neither a name nor and id are supplied, the default store will be used.
             persist_state_kvs_id: The identifier of the KeyValueStore to use for persistence.
                 If neither a name nor and id are supplied, the default store will be used.
-            persist_state_kvs: KeyValueStore to use for persistence. If not provided, a system-wide KeyValueStore will
-                be used, based on service locator configuration.
+            persist_state_kvs_factory: Factory that can be awaited to create KeyValueStore to use for persistence. If
+                not provided, a system-wide KeyValueStore will be used, based on service locator configuration.
             logger: A logger instance for logging operations related to state persistence
         """
-        raise_if_too_many_kwargs(persist_state_kvs_name=persist_state_kvs_name,
-                                 persist_state_kvs_id=persist_state_kvs_id,
-                                 key_value_store=persist_state_kvs)
-        if not persist_state_kvs:
+        raise_if_too_many_kwargs(
+            persist_state_kvs_name=persist_state_kvs_name,
+            persist_state_kvs_id=persist_state_kvs_id,
+            persist_state_kvs_factory=persist_state_kvs_factory,
+        )
+        if not persist_state_kvs_factory:
             logger.debug(
                 'No explicit key_value_store set for recoverable state. Recovery will use a system-wide KeyValueStore '
                 'based on service_locator configuration, potentially calling service_locator.set_storage_client in the '
                 'process. It is recommended to initialize RecoverableState with explicit key_value_store to avoid '
-                'global side effects.')
+                'global side effects.'
+            )
 
         self._default_state = default_state
         self._state_type: type[TStateModel] = self._default_state.__class__
         self._state: TStateModel | None = None
         self._persistence_enabled = persistence_enabled
         self._persist_state_key = persist_state_key
-        self._persist_state_kvs_name = persist_state_kvs_name
-        self._persist_state_kvs_id = persist_state_kvs_id
-        self._key_value_store: KeyValueStore | None = persist_state_kvs
+        if persist_state_kvs_factory is None:
+
+            async def kvs_factory() -> KeyValueStore:
+                from crawlee.storages import KeyValueStore  # noqa: PLC0415 avoid circular import
+
+                return await KeyValueStore.open(name=persist_state_kvs_name, id=persist_state_kvs_id)
+
+            self._persist_state_kvs_factory = kvs_factory
+        else:
+            self._persist_state_kvs_factory = persist_state_kvs_factory
+
+        self._key_value_store: KeyValueStore | None = None
         self._log = logger
 
     async def initialize(self) -> TStateModel:
@@ -91,12 +104,8 @@ class RecoverableState(Generic[TStateModel]):
             return self.current_value
 
         # Import here to avoid circular imports.
-        from crawlee.storages._key_value_store import KeyValueStore  # noqa: PLC0415
 
-        if not self._key_value_store:
-            self._key_value_store = await KeyValueStore.open(
-                name=self._persist_state_kvs_name, id=self._persist_state_kvs_id
-            )
+        self._key_value_store = await self._persist_state_kvs_factory()
 
         await self._load_saved_state()
 
