@@ -29,9 +29,12 @@ if TYPE_CHECKING:
     from crawlee.http_clients._base import HttpClient
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 async def suppress_user_warning() -> AsyncGenerator[None, None]:
-    """Suppress user warnings during tests."""
+    """Suppress user warnings during tests.
+
+    Mostly to suppress warnings about the experimental status of the SqlStorageClient.
+    """
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', UserWarning)
         yield
