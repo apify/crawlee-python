@@ -114,7 +114,7 @@ dev = [
     "types-colorama~=0.4.15.20240106",
     "types-psutil~=7.0.0.20250218",
     "types-python-dateutil~=2.9.0.20240316",
-    "uvicorn[standard]~=0.35.0",
+    "uvicorn[standard]~=0.37.0",
 ]
 
 [tool.hatch.build.targets.wheel]
