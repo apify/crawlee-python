@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import os
 import warnings
+from contextlib import closing
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -157,7 +158,10 @@ def http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator[TestServ
     """Create and start an HTTP test server."""
     config = Config(app=app, lifespan='off', loop='auto', port=unused_tcp_port_factory())
     server = TestServer(config=config)
-    yield from serve_in_thread(server)
+    loop_factory = config.get_loop_factory()
+    assert loop_factory
+    with closing(loop_factory()):
+        yield from serve_in_thread(server)
 
 
 @pytest.fixture(scope='session')
@@ -181,7 +185,10 @@ def redirect_http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator
         access_log=False,
     )
     server = TestServer(config=config)
-    yield from serve_in_thread(server)
+    loop_factory = config.get_loop_factory()
+    assert loop_factory
+    with closing(loop_factory()):
+        yield from serve_in_thread(server)
 
 
 @pytest.fixture
