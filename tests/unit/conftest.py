@@ -155,7 +155,7 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
 @pytest.fixture(scope='session')
 def http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator[TestServer]:
     """Create and start an HTTP test server."""
-    config = Config(app=app, lifespan='off', loop='asyncio', port=unused_tcp_port_factory())
+    config = Config(app=app, lifespan='off', loop='auto', port=unused_tcp_port_factory())
     server = TestServer(config=config)
     yield from serve_in_thread(server)
 
@@ -173,7 +173,7 @@ def redirect_http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator
     config = Config(
         app=app,
         lifespan='off',
-        loop='asyncio',
+        loop='auto',
         port=unused_tcp_port_factory(),
         limit_max_requests=100,
         timeout_graceful_shutdown=10,

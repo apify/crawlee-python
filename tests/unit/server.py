@@ -4,7 +4,6 @@ import asyncio
 import base64
 import gzip
 import json
-import sys
 import threading
 import time
 from collections.abc import Awaitable, Callable, Coroutine, Iterator
@@ -457,10 +456,6 @@ class TestServer(Server):
 
     def run(self, sockets: list[socket] | None = None) -> None:
         """Run the server."""
-        # Set the event loop policy in thread with server for Windows and Python 3.12+.
-        # This is necessary because there are problems with closing connections when using `ProactorEventLoop`
-        if sys.version_info >= (3, 12) and sys.platform == 'win32':
-            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         super().run(sockets=sockets)
 
 
