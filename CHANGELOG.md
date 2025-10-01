@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 1.0.1 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- Fix memory leak in `PlaywrightCrawler` on browser context creation ([#1446](https://github.com/apify/crawlee-python/pull/1446)) ([bb181e5](https://github.com/apify/crawlee-python/commit/bb181e58d8070fba38e62d6e57fe981a00e5f035)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1443](https://github.com/apify/crawlee-python/issues/1443)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [1.0.0](https://github.com/apify/crawlee-python/releases/tag/v1.0.0) (2025-09-29)
