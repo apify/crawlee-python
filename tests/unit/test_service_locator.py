@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from crawlee import service_locator
@@ -80,7 +82,6 @@ def test_custom_storage_client() -> None:
     assert storage_client is custom_storage_client
 
 
-@pytest.mark.skip(reason='Flaky Windows test, see https://github.com/apify/crawlee-python/issues/1441.')
 def test_storage_client_overwrite_not_possible() -> None:
     custom_storage_client = MemoryStorageClient()
     service_locator.set_storage_client(custom_storage_client)
@@ -90,7 +91,10 @@ def test_storage_client_overwrite_not_possible() -> None:
         service_locator.set_storage_client(another_custom_storage_client)
 
 
-@pytest.mark.skip(reason='Flaky Windows test, see https://github.com/apify/crawlee-python/issues/1441.')
+@pytest.mark.skipif(
+    os.name == 'nt',
+    reason='Flaky Windows test, see https://github.com/apify/crawlee-python/issues/1441.',
+)
 def test_storage_client_conflict() -> None:
     service_locator.get_storage_client()
     custom_storage_client = MemoryStorageClient()
