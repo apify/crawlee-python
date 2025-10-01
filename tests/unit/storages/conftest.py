@@ -5,10 +5,7 @@ from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 
 
 @pytest.fixture(params=['memory', 'file_system', 'sql'])
-def storage_client(
-    request: pytest.FixtureRequest,
-    suppress_user_warning: None,  # noqa: ARG001
-) -> StorageClient:
+def storage_client(request: pytest.FixtureRequest) -> StorageClient:
     """Parameterized fixture to test with different storage clients."""
     storage_client: StorageClient
     if request.param == 'memory':
