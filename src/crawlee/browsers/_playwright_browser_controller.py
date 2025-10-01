@@ -88,7 +88,7 @@ class PlaywrightBrowserController(BrowserController):
         self._context_creation_lock= Lock()
         return self._context_creation_lock
 
-    async def ensure_browser_context(self,
+    async def _ensure_browser_context(self,
                                      browser_new_context_options: Mapping[str, Any] | None = None,
                                      proxy_info: ProxyInfo | None = None,
                                      ) -> None:
@@ -98,8 +98,6 @@ class PlaywrightBrowserController(BrowserController):
                     browser_new_context_options=browser_new_context_options,
                     proxy_info=proxy_info,
                 )
-
-
 
     @property
     @override
@@ -161,12 +159,6 @@ class PlaywrightBrowserController(BrowserController):
         Raises:
             ValueError: If the browser has reached the maximum number of open pages.
         """
-        if not self._browser_context:
-            self._browser_context = await self._create_browser_context(
-                browser_new_context_options=browser_new_context_options,
-                proxy_info=proxy_info,
-            )
-
         if not self.has_free_capacity:
             raise ValueError('Cannot open more pages in this browser.')
 
@@ -178,11 +170,7 @@ class PlaywrightBrowserController(BrowserController):
             )
             page = await new_context.new_page()
         else:
-            if not self._browser_context:
-                self._browser_context = await self._create_browser_context(
-                    browser_new_context_options=browser_new_context_options,
-                    proxy_info=proxy_info,
-                )
+            await self._ensure_browser_context()
             page = await self._browser_context.new_page()
 
         # Handle page close event
@@ -229,8 +217,8 @@ class PlaywrightBrowserController(BrowserController):
         Create context without headers and without fingerprints if neither `self._header_generator` nor
         `self._fingerprint_generator` is available.
         """
+        start = datetime.now(timezone.utc)
         browser_new_context_options = dict(browser_new_context_options) if browser_new_context_options else {}
-
         if proxy_info:
             if browser_new_context_options.get('proxy'):
                 logger.warning("browser_new_context_options['proxy'] overriden by explicit `proxy_info` argument.")
@@ -242,11 +230,14 @@ class PlaywrightBrowserController(BrowserController):
             )
 
         if self._fingerprint_generator:
-            return await AsyncNewContext(
+
+            c = await AsyncNewContext(
                 browser=self._browser,
                 fingerprint=self._fingerprint_generator.generate(),
                 **browser_new_context_options,
             )
+            logger.warning(f"Fingerprint generation time [s]: {(datetime.now(timezone.utc) - start).total_seconds()}")
+            return c
 
         if self._header_generator:
             extra_http_headers = dict(
@@ -268,5 +259,5 @@ class PlaywrightBrowserController(BrowserController):
         browser_new_context_options['extra_http_headers'] = browser_new_context_options.get(
             'extra_http_headers', extra_http_headers
         )
-
+        logger.warning(f"Fingerprint generation time [s]: {(datetime.now(timezone.utc)-start).total_seconds()}")
         return await self._browser.new_context(**browser_new_context_options)
