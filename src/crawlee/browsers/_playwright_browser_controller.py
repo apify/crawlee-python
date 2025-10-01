@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from asyncio import Lock
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, cast
 
@@ -76,6 +77,29 @@ class PlaywrightBrowserController(BrowserController):
         self._last_page_opened_at = datetime.now(timezone.utc)
 
         self._total_opened_pages = 0
+
+        self._context_creation_lock: Lock | None = None
+
+
+    async def _get_context_creation_lock(self) -> Lock:
+        """Context checking and creation should be done with lock to prevent multiple attempts to create context."""
+        if self._context_creation_lock:
+            return self._context_creation_lock
+        self._context_creation_lock= Lock()
+        return self._context_creation_lock
+
+    async def ensure_browser_context(self,
+                                     browser_new_context_options: Mapping[str, Any] | None = None,
+                                     proxy_info: ProxyInfo | None = None,
+                                     ) -> None:
+        async with await self._get_context_creation_lock():
+            if not self._browser_context:
+                self._browser_context = await self._create_browser_context(
+                    browser_new_context_options=browser_new_context_options,
+                    proxy_info=proxy_info,
+                )
+
+
 
     @property
     @override
