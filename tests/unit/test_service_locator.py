@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import sys
 
 import pytest
 
@@ -9,6 +9,11 @@ from crawlee.configuration import Configuration
 from crawlee.errors import ServiceConflictError
 from crawlee.events import LocalEventManager
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
+
+pytestmark = pytest.mark.skipif(
+    sys.platform == 'win32' and sys.version_info[:2] == (3, 12),
+    reason='Flaky on Windows and Python 3.12; see https://github.com/apify/crawlee-python/issues/1441',
+)
 
 
 def test_default_configuration() -> None:
@@ -91,10 +96,6 @@ def test_storage_client_overwrite_not_possible() -> None:
         service_locator.set_storage_client(another_custom_storage_client)
 
 
-@pytest.mark.skipif(
-    os.name == 'nt',
-    reason='Flaky Windows test, see https://github.com/apify/crawlee-python/issues/1441.',
-)
 def test_storage_client_conflict() -> None:
     service_locator.get_storage_client()
     custom_storage_client = MemoryStorageClient()
