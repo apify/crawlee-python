@@ -80,24 +80,30 @@ class PlaywrightBrowserController(BrowserController):
 
         self._context_creation_lock: Lock | None = None
 
-
     async def _get_context_creation_lock(self) -> Lock:
-        """Context checking and creation should be done with lock to prevent multiple attempts to create context."""
+        """Get context checking and creation lock.
+
+        It should be done with lock to prevent multiple concurrent attempts to create context, which could lead to
+        memory leak as one of the two concurrently created contexts will become orphaned and not properly closed.
+        """
         if self._context_creation_lock:
             return self._context_creation_lock
-        self._context_creation_lock= Lock()
+        self._context_creation_lock = Lock()
         return self._context_creation_lock
 
-    async def _ensure_browser_context(self,
-                                     browser_new_context_options: Mapping[str, Any] | None = None,
-                                     proxy_info: ProxyInfo | None = None,
-                                     ) -> None:
+    async def _get_browser_context(
+        self,
+        browser_new_context_options: Mapping[str, Any] | None = None,
+        proxy_info: ProxyInfo | None = None,
+    ) -> BrowserContext:
+        """Ensure that the browser context is set."""
         async with await self._get_context_creation_lock():
             if not self._browser_context:
                 self._browser_context = await self._create_browser_context(
                     browser_new_context_options=browser_new_context_options,
                     proxy_info=proxy_info,
                 )
+            return self._browser_context
 
     @property
     @override
@@ -170,8 +176,8 @@ class PlaywrightBrowserController(BrowserController):
             )
             page = await new_context.new_page()
         else:
-            await self._ensure_browser_context()
-            page = await self._browser_context.new_page()
+            _browser_context = await self._get_browser_context()
+            page = await _browser_context.new_page()
 
         # Handle page close event
         page.on(event='close', f=self._on_page_close)
@@ -181,7 +187,6 @@ class PlaywrightBrowserController(BrowserController):
         self._last_page_opened_at = datetime.now(timezone.utc)
 
         self._total_opened_pages += 1
-
         return page
 
     @override
@@ -217,7 +222,6 @@ class PlaywrightBrowserController(BrowserController):
         Create context without headers and without fingerprints if neither `self._header_generator` nor
         `self._fingerprint_generator` is available.
         """
-        start = datetime.now(timezone.utc)
         browser_new_context_options = dict(browser_new_context_options) if browser_new_context_options else {}
         if proxy_info:
             if browser_new_context_options.get('proxy'):
@@ -230,14 +234,11 @@ class PlaywrightBrowserController(BrowserController):
             )
 
         if self._fingerprint_generator:
-
-            c = await AsyncNewContext(
+            return await AsyncNewContext(
                 browser=self._browser,
                 fingerprint=self._fingerprint_generator.generate(),
                 **browser_new_context_options,
             )
-            logger.warning(f"Fingerprint generation time [s]: {(datetime.now(timezone.utc) - start).total_seconds()}")
-            return c
 
         if self._header_generator:
             extra_http_headers = dict(
@@ -259,5 +260,4 @@ class PlaywrightBrowserController(BrowserController):
         browser_new_context_options['extra_http_headers'] = browser_new_context_options.get(
             'extra_http_headers', extra_http_headers
         )
-        logger.warning(f"Fingerprint generation time [s]: {(datetime.now(timezone.utc)-start).total_seconds()}")
         return await self._browser.new_context(**browser_new_context_options)
