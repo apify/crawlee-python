@@ -91,20 +91,6 @@ class PlaywrightBrowserController(BrowserController):
         self._context_creation_lock = Lock()
         return self._context_creation_lock
 
-    async def _get_browser_context(
-        self,
-        browser_new_context_options: Mapping[str, Any] | None = None,
-        proxy_info: ProxyInfo | None = None,
-    ) -> BrowserContext:
-        """Ensure that the browser context is set."""
-        async with await self._get_context_creation_lock():
-            if not self._browser_context:
-                self._browser_context = await self._create_browser_context(
-                    browser_new_context_options=browser_new_context_options,
-                    proxy_info=proxy_info,
-                )
-            return self._browser_context
-
     @property
     @override
     def pages(self) -> list[Page]:
@@ -176,8 +162,13 @@ class PlaywrightBrowserController(BrowserController):
             )
             page = await new_context.new_page()
         else:
-            _browser_context = await self._get_browser_context()
-            page = await _browser_context.new_page()
+            async with await self._get_context_creation_lock():
+                if not self._browser_context:
+                    self._browser_context = await self._create_browser_context(
+                        browser_new_context_options=browser_new_context_options,
+                        proxy_info=proxy_info,
+                    )
+            page = await self._browser_context.new_page()
 
         # Handle page close event
         page.on(event='close', f=self._on_page_close)
