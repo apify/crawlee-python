@@ -829,7 +829,7 @@ dev = [
     { name = "types-colorama", specifier = "~=0.4.15.20240106" },
     { name = "types-psutil", specifier = "~=7.0.0.20250218" },
     { name = "types-python-dateutil", specifier = "~=2.9.0.20240316" },
-    { name = "uvicorn", extras = ["standard"], specifier = "~=0.37.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = "~=0.35.0" },
 ]
 
 [[package]]
@@ -3203,16 +3203,16 @@ wheels = [
 
 [[package]]
 name = "uvicorn"
-version = "0.37.0"
+version = "0.35.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "h11" },
     { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/71/57/1616c8274c3442d802621abf5deb230771c7a0fec9414cb6763900eb3868/uvicorn-0.37.0.tar.gz", hash = "sha256:4115c8add6d3fd536c8ee77f0e14a7fd2ebba939fed9b02583a97f80648f9e13", size = 80367, upload-time = "2025-09-23T13:33:47.486Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/42/e0e305207bb88c6b8d3061399c6a961ffe5fbb7e2aa63c9234df7259e9cd/uvicorn-0.35.0.tar.gz", hash = "sha256:bc662f087f7cf2ce11a1d7fd70b90c9f98ef2e2831556dd078d131b96cc94a01", size = 78473, upload-time = "2025-06-28T16:15:46.058Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/85/cd/584a2ceb5532af99dd09e50919e3615ba99aa127e9850eafe5f31ddfdb9a/uvicorn-0.37.0-py3-none-any.whl", hash = "sha256:913b2b88672343739927ce381ff9e2ad62541f9f8289664fa1d1d3803fa2ce6c", size = 67976, upload-time = "2025-09-23T13:33:45.842Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/e2/dc81b1bd1dcfe91735810265e9d26bc8ec5da45b4c0f6237e286819194c3/uvicorn-0.35.0-py3-none-any.whl", hash = "sha256:197535216b25ff9b785e29a0b79199f55222193d47f820816e7da751e9bc8d4a", size = 66406, upload-time = "2025-06-28T16:15:44.816Z" },
 ]
 
 [package.optional-dependencies]
