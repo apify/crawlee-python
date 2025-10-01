@@ -168,6 +168,7 @@ class PlaywrightBrowserController(BrowserController):
         self._pages.append(page)
         self._last_page_opened_at = datetime.now(timezone.utc)
 
+        logger.warning(f'{self.pages_count=}, Contexts={len(self._browser.contexts)}')
         self._total_opened_pages += 1
 
         return page
