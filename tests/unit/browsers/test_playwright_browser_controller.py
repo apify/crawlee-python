@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock
 
 import pytest
 from playwright.async_api import Browser, Playwright, async_playwright
 
-from crawlee.browsers import PlaywrightBrowserController
+from crawlee.browsers import PlaywrightBrowserController, PlaywrightPersistentBrowser
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -106,3 +107,28 @@ async def test_close_browser_with_open_pages(browser: Browser) -> None:
 
     assert controller.pages_count == 0
     assert not controller.is_browser_connected
+
+
+async def test_memory_leak_on_concurrent_context_creation() -> None:
+    """Test that only one browser context is created when multiple pages are opened concurrently."""
+
+    # Prepare mocked browser with relevant methods and attributes
+    mocked_browser = AsyncMock()
+    mocked_context_launcher = AsyncMock()
+
+    async def delayed_launch_persistent_context(*args: Any, **kwargs: Any) -> Any:
+        """Ensure that both calls to create context overlap in time."""
+        await asyncio.sleep(5)  # Simulate delay in creation to make sure race condition happens
+        return await mocked_context_launcher(*args, **kwargs)
+
+    mocked_browser.launch_persistent_context = delayed_launch_persistent_context
+
+    # Create minimal instance of PlaywrightBrowserController with mocked browser
+    controller = PlaywrightBrowserController(
+        PlaywrightPersistentBrowser(mocked_browser, None, {}), header_generator=None, fingerprint_generator=None
+    )
+
+    # Both calls will try to create browser context at the same time, but only one context should be created.
+    await asyncio.gather(controller.new_page(), controller.new_page())
+
+    assert mocked_context_launcher.call_count == 1
