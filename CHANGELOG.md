@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Fix memory leak in `PlaywrightCrawler` on browser context creation ([#1446](https://github.com/apify/crawlee-python/pull/1446)) ([bb181e5](https://github.com/apify/crawlee-python/commit/bb181e58d8070fba38e62d6e57fe981a00e5f035)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1443](https://github.com/apify/crawlee-python/issues/1443)
+- Update templates to handle optional httpx client ([#1440](https://github.com/apify/crawlee-python/pull/1440)) ([c087efd](https://github.com/apify/crawlee-python/commit/c087efd39baedf46ca3e5cae1ddc1acd6396e6c1)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
 <!-- git-cliff-unreleased-end -->
