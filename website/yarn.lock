@@ -273,7 +273,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@apify/docusaurus-plugin-typedoc-api@npm:^4.4.7":
+"@apify/docusaurus-plugin-typedoc-api@npm:^4.4.8":
   version: 4.4.8
   resolution: "@apify/docusaurus-plugin-typedoc-api@npm:4.4.8"
   dependencies:
@@ -6948,7 +6948,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "crawlee@workspace:."
   dependencies:
-    "@apify/docusaurus-plugin-typedoc-api": "npm:^4.4.7"
+    "@apify/docusaurus-plugin-typedoc-api": "npm:^4.4.8"
     "@apify/eslint-config-ts": "npm:^0.4.0"
     "@apify/tsconfig": "npm:^0.1.0"
     "@apify/utilities": "npm:^2.8.0"
