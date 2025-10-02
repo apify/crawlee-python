@@ -829,7 +829,7 @@ dev = [
     { name = "types-colorama", specifier = "~=0.4.15.20240106" },
     { name = "types-psutil", specifier = "~=7.0.0.20250218" },
     { name = "types-python-dateutil", specifier = "~=2.9.0.20240316" },
-    { name = "uvicorn", extras = ["standard"], specifier = "==0.35" },
+    { name = "uvicorn", extras = ["standard"], specifier = "~=0.35.0" },
 ]
 
 [[package]]
