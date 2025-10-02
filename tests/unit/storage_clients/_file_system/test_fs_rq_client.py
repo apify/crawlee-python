@@ -78,9 +78,11 @@ async def test_request_file_persistence(rq_client: FileSystemRequestQueueClient)
             assert request_data['url'].startswith('https://example.com/')
 
 
-async def test_opening_rq_does_not_have_side_effect_on_service_locator(
-    rq_client: FileSystemRequestQueueClient,  # noqa: ARG001
-) -> None:
+async def test_opening_rq_does_not_have_side_effect_on_service_locator(configuration: Configuration) -> None:
+    """Opening request queue client should cause setting storage client in the global service locator."""
+    await FileSystemStorageClient().create_rq_client(name='test_request_queue', configuration=configuration)
+
+    # Set some specific storage client in the service locator. There should be no `ServiceConflictError`.
     service_locator.set_storage_client(MemoryStorageClient())
 
 
