@@ -243,9 +243,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@apify/docusaurus-plugin-typedoc-api@npm:^4.4.7":
-  version: 4.4.7
-  resolution: "@apify/docusaurus-plugin-typedoc-api@npm:4.4.7"
+"@apify/docusaurus-plugin-typedoc-api@npm:^4.4.8":
+  version: 4.4.8
+  resolution: "@apify/docusaurus-plugin-typedoc-api@npm:4.4.8"
   dependencies:
     "@vscode/codicons": "npm:^0.0.35"
     html-entities: "npm:2.3.2"
@@ -264,7 +264,7 @@ __metadata:
     react: ">=18.0.0 || >=19.0.0"
     react-dom: ^18.2.0 || >=19.0.0
     typescript: ^5.0.0
-  checksum: 10c0/54fe6459548368b0c9506cf868bf4a2df2b751b1ffb556fd9f7805ab22c4727b91d49543b7b7c8899fdccfdb6099517e7acb202b6c4e91def34266463efcec7a
+  checksum: 10c0/9fcba5e9c65dfdfb565746c9baef82a40690cbfbbfba17ae33b1d4205213b5c17629a987d0b174d989082b0b5b5e4cc8592dc7bbf08739ea0ed13d1953a26dfc
   languageName: node
   linkType: hard
 
@@ -6735,7 +6735,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "crawlee@workspace:."
   dependencies:
-    "@apify/docusaurus-plugin-typedoc-api": "npm:^4.4.7"
+    "@apify/docusaurus-plugin-typedoc-api": "npm:^4.4.8"
     "@apify/eslint-config-ts": "npm:^0.4.0"
     "@apify/tsconfig": "npm:^0.1.0"
     "@apify/utilities": "npm:^2.8.0"
