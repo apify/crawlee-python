@@ -11,7 +11,7 @@ import traceback
 from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Sequence
 from contextlib import AsyncExitStack, suppress
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, Literal, cast
@@ -56,7 +56,7 @@ from crawlee.errors import (
     SessionError,
     UserDefinedErrorHandlerError,
 )
-from crawlee.events._types import Event, EventCrawlerStatusData
+from crawlee.events._types import Event, EventCrawlerStatusData, EventPersistStateData
 from crawlee.http_clients import ImpitHttpClient
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
@@ -440,6 +440,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._statistics = statistics or cast(
             'Statistics[TStatisticsState]',
             Statistics.with_default_state(
+                persistence_enabled=True,
                 periodic_message_logger=self._logger,
                 statistics_log_format=self._statistics_log_format,
                 log_message='Current request statistics:',
@@ -743,6 +744,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 await exit_stack.enter_async_context(context)  # type: ignore[arg-type]
 
             await self._autoscaled_pool.run()
+
+            # Emit PERSIST_STATE event when crawler is finishing to allow listeners to persist their state if needed
+            if not self.statistics.state.crawler_last_started_at:
+                raise RuntimeError('Statistics.state.crawler_last_started_at not set.')
+            run_duration = datetime.now(timezone.utc) - self.statistics.state.crawler_last_started_at
+            self._statistics.state.crawler_runtime = self.statistics.state.crawler_runtime + run_duration
+            self._service_locator.get_event_manager().emit(
+                event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False)
+            )
+            await asyncio.sleep(10)
 
     async def add_requests(
         self,

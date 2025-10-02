@@ -250,8 +250,7 @@ class Statistics(Generic[TStatisticsState]):
         if self._instance_start is None:
             raise RuntimeError('The Statistics object is not initialized')
 
-        crawler_runtime = datetime.now(timezone.utc) - self._instance_start
-        total_minutes = crawler_runtime.total_seconds() / 60
+        total_minutes = self.state.crawler_runtime.total_seconds() / 60
         state = self._state.current_value
         serialized_state = state.model_dump(by_alias=False)
 
@@ -262,7 +261,7 @@ class Statistics(Generic[TStatisticsState]):
             requests_failed_per_minute=math.floor(state.requests_failed / total_minutes) if total_minutes else 0,
             request_total_duration=state.request_total_finished_duration + state.request_total_failed_duration,
             requests_total=state.requests_failed + state.requests_finished,
-            crawler_runtime=crawler_runtime,
+            crawler_runtime=state.crawler_runtime,
             requests_finished=state.requests_finished,
             requests_failed=state.requests_failed,
             retry_histogram=serialized_state['request_retry_histogram'],

@@ -41,10 +41,10 @@ async def test_storage_not_persisted_when_disabled(tmp_path: Path, server_url: U
     )
     storage_client = MemoryStorageClient()
 
-    crawler = HttpCrawler(
-        configuration=configuration,
-        storage_client=storage_client,
-    )
+    service_locator.set_configuration(configuration)
+    service_locator.set_storage_client(storage_client)
+
+    crawler = HttpCrawler()
 
     @crawler.router.default_handler
     async def default_handler(context: HttpCrawlingContext) -> None:
