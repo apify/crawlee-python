@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
@@ -53,6 +54,7 @@ class MemoryDatasetClient(DatasetClient):
         *,
         id: str | None,
         name: str | None,
+        alias: str | None,
     ) -> MemoryDatasetClient:
         """Open or create a new memory dataset client.
 
@@ -60,14 +62,24 @@ class MemoryDatasetClient(DatasetClient):
         datasets don't check for existing datasets with the same name or ID since all data exists only in memory
         and is lost when the process terminates.
 
+        Alias does not have any effect on the memory storage client implementation, because unnamed storages
+        are supported by default, since data are not persisted.
+
         Args:
             id: The ID of the dataset. If not provided, a random ID will be generated.
-            name: The name of the dataset. If not provided, the dataset will be unnamed.
+            name: The name of the dataset for named (global scope) storages.
+            alias: The alias of the dataset for unnamed (run scope) storages.
 
         Returns:
             An instance for the opened or created storage client.
+
+        Raises:
+            ValueError: If both name and alias are provided, or if neither id, name, nor alias is provided.
         """
-        # Otherwise create a new dataset
+        # Validate input parameters.
+        raise_if_too_many_kwargs(id=id, name=name, alias=alias)
+
+        # Create a new dataset
         dataset_id = id or crypto_random_object_id()
         now = datetime.now(timezone.utc)
 

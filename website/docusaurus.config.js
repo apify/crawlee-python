@@ -73,16 +73,16 @@ module.exports = {
         gaGtag: true,
         repoUrl: 'https://github.com/apify/crawlee-python',
     },
+    onBrokenLinks: 'throw',
     markdown: {
         mermaid: true,
+        hooks: {
+            onBrokenMarkdownLinks: 'throw',
+        },
     },
     themes: [
         '@docusaurus/theme-mermaid',
     ],
-    onBrokenLinks:
-    /** @type {import('@docusaurus/types').ReportingSeverity} */ ('throw'),
-    onBrokenMarkdownLinks:
-    /** @type {import('@docusaurus/types').ReportingSeverity} */ ('throw'),
     presets: /** @type {import('@docusaurus/types').PresetConfig[]} */ ([
         [
             '@docusaurus/preset-classic',
@@ -234,6 +234,10 @@ module.exports = {
             sidebar: {
                 hideable: true,
             },
+        },
+        announcementBar: {
+            id: `crawlee-for-python-v1`,
+            content: `<b><a href="https://github.com/apify/crawlee-python">Crawlee for Python v1.0</a></b> is LIVE. 🎉️ <b><a href="https://www.producthunt.com/posts/crawlee-for-python-v1-0">Support us on Product Hunt!</a> 🥳`,
         },
         navbar: {
             hideOnScroll: true,

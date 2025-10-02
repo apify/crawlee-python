@@ -69,7 +69,7 @@ def _normalize_headers(headers: Mapping[str, str]) -> dict[str, str]:
 class HttpHeaders(RootModel, Mapping[str, str]):
     """A dictionary-like object representing HTTP headers."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     root: Annotated[
         dict[str, str],
@@ -110,9 +110,9 @@ class ConcurrencySettings:
     def __init__(
         self,
         min_concurrency: int = 1,
-        max_concurrency: int = 200,
+        max_concurrency: int = 100,
         max_tasks_per_minute: float = float('inf'),
-        desired_concurrency: int | None = None,
+        desired_concurrency: int = 10,
     ) -> None:
         """Initialize a new instance.
 
@@ -125,21 +125,24 @@ class ConcurrencySettings:
             desired_concurrency: The desired number of tasks that should be running parallel on the start of the pool,
                 if there is a large enough supply of them. By default, it is `min_concurrency`.
         """
-        if desired_concurrency is not None and desired_concurrency < 1:
-            raise ValueError('desired_concurrency must be 1 or larger')
-
         if min_concurrency < 1:
             raise ValueError('min_concurrency must be 1 or larger')
 
         if max_concurrency < min_concurrency:
             raise ValueError('max_concurrency cannot be less than min_concurrency')
 
+        if desired_concurrency < min_concurrency:
+            raise ValueError('desired_concurrency cannot be less than min_concurrency')
+
+        if desired_concurrency > max_concurrency:
+            raise ValueError('desired_concurrency cannot be greater than max_concurrency')
+
         if max_tasks_per_minute <= 0:
             raise ValueError('max_tasks_per_minute must be positive')
 
         self.min_concurrency = min_concurrency
         self.max_concurrency = max_concurrency
-        self.desired_concurrency = desired_concurrency if desired_concurrency is not None else min_concurrency
+        self.desired_concurrency = desired_concurrency
         self.max_tasks_per_minute = max_tasks_per_minute
 
 
@@ -180,6 +183,17 @@ class AddRequestsKwargs(EnqueueLinksKwargs):
     requests: Sequence[str | Request]
     """Requests to be added to the `RequestManager`."""
 
+    rq_id: str | None
+    """ID of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias` can be provided."""
+
+    rq_name: str | None
+    """Name of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias` can be provided.
+    """
+
+    rq_alias: str | None
+    """Alias of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias` can be provided.
+    """
+
 
 class PushDataKwargs(TypedDict):
     """Keyword arguments for dataset's `push_data` method."""
@@ -189,6 +203,7 @@ class PushDataFunctionCall(PushDataKwargs):
     data: list[dict[str, Any]] | dict[str, Any]
     dataset_id: str | None
     dataset_name: str | None
+    dataset_alias: str | None
 
 
 class KeyValueStoreInterface(Protocol):
@@ -255,21 +270,30 @@ class RequestHandlerRunResult:
         self._key_value_store_getter = key_value_store_getter
         self.add_requests_calls = list[AddRequestsKwargs]()
         self.push_data_calls = list[PushDataFunctionCall]()
-        self.key_value_store_changes = dict[tuple[str | None, str | None], KeyValueStoreChangeRecords]()
+        self.key_value_store_changes = dict[tuple[str | None, str | None, str | None], KeyValueStoreChangeRecords]()
 
     async def add_requests(
         self,
         requests: Sequence[str | Request],
+        rq_id: str | None = None,
+        rq_name: str | None = None,
+        rq_alias: str | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> None:
         """Track a call to the `add_requests` context helper."""
-        self.add_requests_calls.append(AddRequestsKwargs(requests=requests, **kwargs))
+        specified_params = sum(1 for param in [rq_id, rq_name, rq_alias] if param is not None)
+        if specified_params > 1:
+            raise ValueError('Only one of `rq_id`, `rq_name` or `rq_alias` can be provided.')
+        self.add_requests_calls.append(
+            AddRequestsKwargs(requests=requests, rq_id=rq_id, rq_name=rq_name, rq_alias=rq_alias, **kwargs)
+        )
 
     async def push_data(
         self,
         data: list[dict[str, Any]] | dict[str, Any],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
+        dataset_alias: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
     ) -> None:
         """Track a call to the `push_data` context helper."""
@@ -278,6 +302,7 @@ class RequestHandlerRunResult:
                 data=data,
                 dataset_id=dataset_id,
                 dataset_name=dataset_name,
+                dataset_alias=dataset_alias,
                 **kwargs,
             )
         )
@@ -287,13 +312,14 @@ class RequestHandlerRunResult:
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
     ) -> KeyValueStoreInterface:
-        if (id, name) not in self.key_value_store_changes:
-            self.key_value_store_changes[id, name] = KeyValueStoreChangeRecords(
-                await self._key_value_store_getter(id=id, name=name)
+        if (id, name, alias) not in self.key_value_store_changes:
+            self.key_value_store_changes[id, name, alias] = KeyValueStoreChangeRecords(
+                await self._key_value_store_getter(id=id, name=name, alias=alias)
             )
 
-        return self.key_value_store_changes[id, name]
+        return self.key_value_store_changes[id, name, alias]
 
 
 @docs_group('Functions')
@@ -307,12 +333,21 @@ class AddRequestsFunction(Protocol):
     def __call__(
         self,
         requests: Sequence[str | Request],
+        rq_id: str | None = None,
+        rq_name: str | None = None,
+        rq_alias: str | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]:
         """Call dunder method.
 
         Args:
             requests: Requests to be added to the `RequestManager`.
+            rq_id: ID of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias` can be
+                provided.
+            rq_name: Name of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias`
+                can be provided.
+            rq_alias: Alias of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias`
+                can be provided.
             **kwargs: Additional keyword arguments.
         """
 
@@ -340,12 +375,21 @@ class EnqueueLinksFunction(Protocol):
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
+        rq_id: str | None = None,
+        rq_name: str | None = None,
+        rq_alias: str | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]: ...
 
     @overload
     def __call__(
-        self, *, requests: Sequence[str | Request] | None = None, **kwargs: Unpack[EnqueueLinksKwargs]
+        self,
+        *,
+        requests: Sequence[str | Request] | None = None,
+        rq_id: str | None = None,
+        rq_name: str | None = None,
+        rq_alias: str | None = None,
+        **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]: ...
 
     def __call__(
@@ -356,6 +400,9 @@ class EnqueueLinksFunction(Protocol):
         user_data: dict[str, Any] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         requests: Sequence[str | Request] | None = None,
+        rq_id: str | None = None,
+        rq_name: str | None = None,
+        rq_alias: str | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, None]:
         """Call enqueue links function.
@@ -373,6 +420,12 @@ class EnqueueLinksFunction(Protocol):
                 - `'skip'` to exclude the request from being enqueued,
                 - `'unchanged'` to use the original request options without modification.
             requests: Requests to be added to the `RequestManager`.
+            rq_id: ID of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias` can be
+                provided.
+            rq_name: Name of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias`
+                can be provided.
+            rq_alias: Alias of the `RequestQueue` to add the requests to. Only one of `rq_id`, `rq_name` or `rq_alias`
+                can be provided.
             **kwargs: Additional keyword arguments.
         """
 
@@ -424,12 +477,14 @@ class GetKeyValueStoreFunction(Protocol):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
     ) -> Coroutine[None, None, KeyValueStore]:
         """Call dunder method.
 
         Args:
             id: The ID of the `KeyValueStore` to get.
-            name: The name of the `KeyValueStore` to get.
+            name: The name of the `KeyValueStore` to get (global scope, named storage).
+            alias: The alias of the `KeyValueStore` to get (run scope, unnamed storage).
         """
 
 
@@ -444,12 +499,14 @@ class GetKeyValueStoreFromRequestHandlerFunction(Protocol):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
     ) -> Coroutine[None, None, KeyValueStoreInterface]:
         """Call dunder method.
 
         Args:
             id: The ID of the `KeyValueStore` to get.
-            name: The name of the `KeyValueStore` to get.
+            name: The name of the `KeyValueStore` to get (global scope, named storage).
+            alias: The alias of the `KeyValueStore` to get (run scope, unnamed storage).
         """
 
 
@@ -466,6 +523,7 @@ class PushDataFunction(Protocol):
         data: list[dict[str, Any]] | dict[str, Any],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
+        dataset_alias: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
     ) -> Coroutine[None, None, None]:
         """Call dunder method.
@@ -473,7 +531,8 @@ class PushDataFunction(Protocol):
         Args:
             data: The data to push to the `Dataset`.
             dataset_id: The ID of the `Dataset` to push the data to.
-            dataset_name: The name of the `Dataset` to push the data to.
+            dataset_name: The name of the `Dataset` to push the data to (global scope, named storage).
+            dataset_alias: The alias of the `Dataset` to push the data to (run scope, unnamed storage).
             **kwargs: Additional keyword arguments.
         """
 

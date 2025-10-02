@@ -3,7 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.6.13 - **not yet released**
+## 1.0.1 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Fix memory leak in `PlaywrightCrawler` on browser context creation ([#1446](https://github.com/apify/crawlee-python/pull/1446)) ([bb181e5](https://github.com/apify/crawlee-python/commit/bb181e58d8070fba38e62d6e57fe981a00e5f035)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1443](https://github.com/apify/crawlee-python/issues/1443)
+- Update templates to handle optional httpx client ([#1440](https://github.com/apify/crawlee-python/pull/1440)) ([c087efd](https://github.com/apify/crawlee-python/commit/c087efd39baedf46ca3e5cae1ddc1acd6396e6c1)) by [@Pijukatel](https://github.com/Pijukatel)
+
+
+<!-- git-cliff-unreleased-end -->
+## [1.0.0](https://github.com/apify/crawlee-python/releases/tag/v1.0.0) (2025-09-29)
 
 ### 🚀 Features
 
@@ -19,6 +28,9 @@ All notable changes to this project will be documented in this file.
 - Persist RequestList state ([#1274](https://github.com/apify/crawlee-python/pull/1274)) ([cc68014](https://github.com/apify/crawlee-python/commit/cc680147ba3cc8b35b9da70274e53e6f5dd92434)) by [@janbuchar](https://github.com/janbuchar), closes [#99](https://github.com/apify/crawlee-python/issues/99)
 - Persist `DefaultRenderingTypePredictor` state ([#1340](https://github.com/apify/crawlee-python/pull/1340)) ([fad4c25](https://github.com/apify/crawlee-python/commit/fad4c25fc712915c4a45b24e3290b6f5dbd8a683)) by [@Mantisus](https://github.com/Mantisus), closes [#1272](https://github.com/apify/crawlee-python/issues/1272)
 - Persist the `SitemapRequestLoader` state ([#1347](https://github.com/apify/crawlee-python/pull/1347)) ([27ef9ad](https://github.com/apify/crawlee-python/commit/27ef9ad194552ea9f1321d91a7a52054be9a8a51)) by [@Mantisus](https://github.com/Mantisus), closes [#1269](https://github.com/apify/crawlee-python/issues/1269)
+- Add support for NDU storages ([#1401](https://github.com/apify/crawlee-python/pull/1401)) ([5dbd212](https://github.com/apify/crawlee-python/commit/5dbd212663e7abc37535713f4c6e3a5bbf30a12e)) by [@vdusek](https://github.com/vdusek), closes [#1175](https://github.com/apify/crawlee-python/issues/1175)
+- Add RQ id, name, alias args to `add_requests` and `enqueue_links` methods ([#1413](https://github.com/apify/crawlee-python/pull/1413)) ([1cae2bc](https://github.com/apify/crawlee-python/commit/1cae2bca0b1508fcb3cb419dc239caf33e20a7ef)) by [@Mantisus](https://github.com/Mantisus), closes [#1402](https://github.com/apify/crawlee-python/issues/1402)
+- Add `SqlStorageClient` based on `sqlalchemy` v2+ ([#1339](https://github.com/apify/crawlee-python/pull/1339)) ([07c75a0](https://github.com/apify/crawlee-python/commit/07c75a078b443b58bfaaeb72eb2aa1439458dc47)) by [@Mantisus](https://github.com/Mantisus), closes [#307](https://github.com/apify/crawlee-python/issues/307)
 
 ### 🐛 Bug Fixes
 
@@ -30,6 +42,8 @@ All notable changes to this project will be documented in this file.
 - Include reason in the session rotation warning logs ([#1363](https://github.com/apify/crawlee-python/pull/1363)) ([d6d7a45](https://github.com/apify/crawlee-python/commit/d6d7a45dd64a906419d9552c45062d726cbb1a0f)) by [@vdusek](https://github.com/vdusek), closes [#1318](https://github.com/apify/crawlee-python/issues/1318)
 - Improve crawler statistics logging ([#1364](https://github.com/apify/crawlee-python/pull/1364)) ([1eb6da5](https://github.com/apify/crawlee-python/commit/1eb6da5dd85870124593dcad877284ccaed9c0ce)) by [@vdusek](https://github.com/vdusek), closes [#1317](https://github.com/apify/crawlee-python/issues/1317)
 - Do not add a request that is already in progress to `MemoryRequestQueueClient` ([#1384](https://github.com/apify/crawlee-python/pull/1384)) ([3af326c](https://github.com/apify/crawlee-python/commit/3af326c9dfa8fffd56a42ca42981374613739e39)) by [@Mantisus](https://github.com/Mantisus), closes [#1383](https://github.com/apify/crawlee-python/issues/1383)
+- Save `RequestQueueState` for `FileSystemRequestQueueClient` in default KVS ([#1411](https://github.com/apify/crawlee-python/pull/1411)) ([6ee60a0](https://github.com/apify/crawlee-python/commit/6ee60a08ac1f9414e1b792f4935cc3799cb5089a)) by [@Mantisus](https://github.com/Mantisus), closes [#1410](https://github.com/apify/crawlee-python/issues/1410)
+- Set default desired concurrency for non-browser crawlers to 10 ([#1419](https://github.com/apify/crawlee-python/pull/1419)) ([1cc9401](https://github.com/apify/crawlee-python/commit/1cc940197600d2539bda967880d7f9d241eb8c3e)) by [@vdusek](https://github.com/vdusek)
 
 ### Refactor
 
@@ -39,9 +53,9 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Replace `HttpxHttpClient` with `ImpitHttpClient` as default HTTP client ([#1307](https://github.com/apify/crawlee-python/pull/1307)) ([c803a97](https://github.com/apify/crawlee-python/commit/c803a976776a76846866d533e3a3ee8144e248c4)) by [@Mantisus](https://github.com/Mantisus), closes [#1079](https://github.com/apify/crawlee-python/issues/1079)
 - [**breaking**] Change Dataset unwind parameter to accept list of strings ([#1357](https://github.com/apify/crawlee-python/pull/1357)) ([862a203](https://github.com/apify/crawlee-python/commit/862a20398f00fe91802fe7a1ccd58b05aee053a1)) by [@vdusek](https://github.com/vdusek)
 - [**breaking**] Remove `Request.id` field ([#1366](https://github.com/apify/crawlee-python/pull/1366)) ([32f3580](https://github.com/apify/crawlee-python/commit/32f3580e9775a871924ab1233085d0c549c4cd52)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1358](https://github.com/apify/crawlee-python/issues/1358)
+- [**breaking**] Refactor storage creation and caching, configuration and services ([#1386](https://github.com/apify/crawlee-python/pull/1386)) ([04649bd](https://github.com/apify/crawlee-python/commit/04649bde60d46b2bc18ae4f6e3fd9667d02a9cef)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1379](https://github.com/apify/crawlee-python/issues/1379)
 
 
-<!-- git-cliff-unreleased-end -->
 
 ## [0.6.12](https://github.com/apify/crawlee-python/releases/tag/v0.6.12) (2025-07-30)
 

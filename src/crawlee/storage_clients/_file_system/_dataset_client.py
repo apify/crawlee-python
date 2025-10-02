@@ -14,6 +14,7 @@ from typing_extensions import override
 from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import atomic_write, json_dumps
+from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
@@ -56,7 +57,7 @@ class FileSystemDatasetClient(DatasetClient):
         self,
         *,
         metadata: DatasetMetadata,
-        storage_dir: Path,
+        path_to_dataset: Path,
         lock: asyncio.Lock,
     ) -> None:
         """Initialize a new instance.
@@ -65,8 +66,8 @@ class FileSystemDatasetClient(DatasetClient):
         """
         self._metadata = metadata
 
-        self._storage_dir = storage_dir
-        """The base directory where the storage data are being persisted."""
+        self._path_to_dataset = path_to_dataset
+        """The full path to the dataset directory."""
 
         self._lock = lock
         """A lock to ensure that only one operation is performed at a time."""
@@ -78,10 +79,7 @@ class FileSystemDatasetClient(DatasetClient):
     @property
     def path_to_dataset(self) -> Path:
         """The full path to the dataset directory."""
-        if self._metadata.name is None:
-            return self._storage_dir / self._STORAGE_SUBDIR / self._STORAGE_SUBSUBDIR_DEFAULT
-
-        return self._storage_dir / self._STORAGE_SUBDIR / self._metadata.name
+        return self._path_to_dataset
 
     @property
     def path_to_metadata(self) -> Path:
@@ -94,6 +92,7 @@ class FileSystemDatasetClient(DatasetClient):
         *,
         id: str | None,
         name: str | None,
+        alias: str | None,
         configuration: Configuration,
     ) -> FileSystemDatasetClient:
         """Open or create a file system dataset client.
@@ -104,17 +103,21 @@ class FileSystemDatasetClient(DatasetClient):
 
         Args:
             id: The ID of the dataset to open. If provided, searches for existing dataset by ID.
-            name: The name of the dataset to open. If not provided, uses the default dataset.
+            name: The name of the dataset for named (global scope) storages.
+            alias: The alias of the dataset for unnamed (run scope) storages.
             configuration: The configuration object containing storage directory settings.
 
         Returns:
             An instance for the opened or created storage client.
 
         Raises:
-            ValueError: If a dataset with the specified ID is not found, or if metadata is invalid.
+            ValueError: If a dataset with the specified ID is not found, if metadata is invalid,
+                or if both name and alias are provided.
         """
-        storage_dir = Path(configuration.storage_dir)
-        dataset_base_path = storage_dir / cls._STORAGE_SUBDIR
+        # Validate input parameters.
+        raise_if_too_many_kwargs(id=id, name=name, alias=alias)
+
+        dataset_base_path = Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
 
         if not dataset_base_path.exists():
             await asyncio.to_thread(dataset_base_path.mkdir, parents=True, exist_ok=True)
@@ -126,19 +129,19 @@ class FileSystemDatasetClient(DatasetClient):
                 if not dataset_dir.is_dir():
                     continue
 
-                metadata_path = dataset_dir / METADATA_FILENAME
-                if not metadata_path.exists():
+                path_to_metadata = dataset_dir / METADATA_FILENAME
+                if not path_to_metadata.exists():
                     continue
 
                 try:
-                    file = await asyncio.to_thread(metadata_path.open)
+                    file = await asyncio.to_thread(path_to_metadata.open)
                     try:
                         file_content = json.load(file)
                         metadata = DatasetMetadata(**file_content)
                         if metadata.id == id:
                             client = cls(
                                 metadata=metadata,
-                                storage_dir=storage_dir,
+                                path_to_dataset=dataset_base_path / dataset_dir,
                                 lock=asyncio.Lock(),
                             )
                             await client._update_metadata(update_accessed_at=True)
@@ -152,16 +155,15 @@ class FileSystemDatasetClient(DatasetClient):
             if not found:
                 raise ValueError(f'Dataset with ID "{id}" not found')
 
-        # Get a new instance by name.
+        # Get a new instance by name or alias.
         else:
-            dataset_path = (
-                dataset_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT if name is None else dataset_base_path / name
-            )
-            metadata_path = dataset_path / METADATA_FILENAME
+            dataset_dir = Path(name) if name else Path(alias) if alias else Path('default')
+            path_to_dataset = dataset_base_path / dataset_dir
+            path_to_metadata = path_to_dataset / METADATA_FILENAME
 
             # If the dataset directory exists, reconstruct the client from the metadata file.
-            if dataset_path.exists() and metadata_path.exists():
-                file = await asyncio.to_thread(open, metadata_path)
+            if path_to_dataset.exists() and path_to_metadata.exists():
+                file = await asyncio.to_thread(open, path_to_metadata)
                 try:
                     file_content = json.load(file)
                 finally:
@@ -169,11 +171,11 @@ class FileSystemDatasetClient(DatasetClient):
                 try:
                     metadata = DatasetMetadata(**file_content)
                 except ValidationError as exc:
-                    raise ValueError(f'Invalid metadata file for dataset "{name}"') from exc
+                    raise ValueError(f'Invalid metadata file for dataset "{name or alias}"') from exc
 
                 client = cls(
                     metadata=metadata,
-                    storage_dir=storage_dir,
+                    path_to_dataset=path_to_dataset,
                     lock=asyncio.Lock(),
                 )
 
@@ -192,7 +194,7 @@ class FileSystemDatasetClient(DatasetClient):
                 )
                 client = cls(
                     metadata=metadata,
-                    storage_dir=storage_dir,
+                    path_to_dataset=path_to_dataset,
                     lock=asyncio.Lock(),
                 )
                 await client._update_metadata()

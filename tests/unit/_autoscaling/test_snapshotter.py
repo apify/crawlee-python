@@ -130,19 +130,19 @@ async def test_get_cpu_sample(snapshotter: Snapshotter) -> None:
 async def test_methods_raise_error_when_not_active(snapshotter: Snapshotter) -> None:
     assert snapshotter.active is False
 
-    with pytest.raises(RuntimeError, match='Snapshotter is not active.'):
+    with pytest.raises(RuntimeError, match=r'Snapshotter is not active.'):
         snapshotter.get_cpu_sample()
 
-    with pytest.raises(RuntimeError, match='Snapshotter is not active.'):
+    with pytest.raises(RuntimeError, match=r'Snapshotter is not active.'):
         snapshotter.get_memory_sample()
 
-    with pytest.raises(RuntimeError, match='Snapshotter is not active.'):
+    with pytest.raises(RuntimeError, match=r'Snapshotter is not active.'):
         snapshotter.get_event_loop_sample()
 
-    with pytest.raises(RuntimeError, match='Snapshotter is not active.'):
+    with pytest.raises(RuntimeError, match=r'Snapshotter is not active.'):
         snapshotter.get_client_sample()
 
-    with pytest.raises(RuntimeError, match='Snapshotter is already active.'):
+    with pytest.raises(RuntimeError, match=r'Snapshotter is already active.'):
         async with snapshotter, snapshotter:
             pass
 
@@ -225,7 +225,7 @@ def test_snapshot_pruning_keeps_recent_records_unaffected(snapshotter: Snapshott
 
 
 def test_memory_load_evaluation_logs_warning_on_high_usage(caplog: pytest.LogCaptureFixture) -> None:
-    config = Configuration(memory_mbytes=ByteSize.from_gb(8).bytes)
+    config = Configuration(memory_mbytes=ByteSize.from_gb(8).to_mb())
 
     snapshotter = Snapshotter.from_config(config)
 

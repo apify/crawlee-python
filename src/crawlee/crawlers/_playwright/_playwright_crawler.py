@@ -12,6 +12,7 @@ from typing_extensions import NotRequired, TypedDict, TypeVar
 
 from crawlee import service_locator
 from crawlee._request import Request, RequestOptions
+from crawlee._types import ConcurrencySettings
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
 from crawlee._utils.robots import RobotsTxtFile
@@ -193,6 +194,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         self._pre_navigation_hooks: list[Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]] = []
 
         kwargs['http_client'] = PlaywrightHttpClient() if not kwargs.get('http_client') else kwargs['http_client']
+
+        # Set default concurrency settings for browser crawlers if not provided
+        if 'concurrency_settings' not in kwargs or kwargs['concurrency_settings'] is None:
+            kwargs['concurrency_settings'] = ConcurrencySettings(desired_concurrency=1)
 
         super().__init__(**kwargs)
 
@@ -509,9 +514,9 @@ class _PlaywrightCrawlerAdditionalOptions(TypedDict):
 
 
 class PlaywrightCrawlerOptions(
-    Generic[TCrawlingContext, TStatisticsState],
     _PlaywrightCrawlerAdditionalOptions,
     BasicCrawlerOptions[TCrawlingContext, StatisticsState],
+    Generic[TCrawlingContext, TStatisticsState],
 ):
     """Arguments for the `AbstractHttpCrawler` constructor.
 

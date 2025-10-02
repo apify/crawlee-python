@@ -15,6 +15,7 @@ from typing_extensions import override
 from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import atomic_write, infer_mime_type, json_dumps
+from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
@@ -55,7 +56,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         self,
         *,
         metadata: KeyValueStoreMetadata,
-        storage_dir: Path,
+        path_to_kvs: Path,
         lock: asyncio.Lock,
     ) -> None:
         """Initialize a new instance.
@@ -64,8 +65,8 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         """
         self._metadata = metadata
 
-        self._storage_dir = storage_dir
-        """The base directory where the storage data are being persisted."""
+        self._path_to_kvs = path_to_kvs
+        """The full path to the key-value store directory."""
 
         self._lock = lock
         """A lock to ensure that only one operation is performed at a time."""
@@ -77,10 +78,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
     @property
     def path_to_kvs(self) -> Path:
         """The full path to the key-value store directory."""
-        if self._metadata.name is None:
-            return self._storage_dir / self._STORAGE_SUBDIR / self._STORAGE_SUBSUBDIR_DEFAULT
-
-        return self._storage_dir / self._STORAGE_SUBDIR / self._metadata.name
+        return self._path_to_kvs
 
     @property
     def path_to_metadata(self) -> Path:
@@ -93,6 +91,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         *,
         id: str | None,
         name: str | None,
+        alias: str | None,
         configuration: Configuration,
     ) -> FileSystemKeyValueStoreClient:
         """Open or create a file system key-value store client.
@@ -103,17 +102,21 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         Args:
             id: The ID of the key-value store to open. If provided, searches for existing store by ID.
-            name: The name of the key-value store to open. If not provided, uses the default store.
+            name: The name of the key-value store for named (global scope) storages.
+            alias: The alias of the key-value store for unnamed (run scope) storages.
             configuration: The configuration object containing storage directory settings.
 
         Returns:
             An instance for the opened or created storage client.
 
         Raises:
-            ValueError: If a store with the specified ID is not found, or if metadata is invalid.
+            ValueError: If a store with the specified ID is not found, if metadata is invalid,
+                or if both name and alias are provided.
         """
-        storage_dir = Path(configuration.storage_dir)
-        kvs_base_path = storage_dir / cls._STORAGE_SUBDIR
+        # Validate input parameters.
+        raise_if_too_many_kwargs(id=id, name=name, alias=alias)
+
+        kvs_base_path = Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
 
         if not kvs_base_path.exists():
             await asyncio.to_thread(kvs_base_path.mkdir, parents=True, exist_ok=True)
@@ -125,19 +128,19 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                 if not kvs_dir.is_dir():
                     continue
 
-                metadata_path = kvs_dir / METADATA_FILENAME
-                if not metadata_path.exists():
+                path_to_metadata = kvs_dir / METADATA_FILENAME
+                if not path_to_metadata.exists():
                     continue
 
                 try:
-                    file = await asyncio.to_thread(metadata_path.open)
+                    file = await asyncio.to_thread(path_to_metadata.open)
                     try:
                         file_content = json.load(file)
                         metadata = KeyValueStoreMetadata(**file_content)
                         if metadata.id == id:
                             client = cls(
                                 metadata=metadata,
-                                storage_dir=storage_dir,
+                                path_to_kvs=kvs_base_path / kvs_dir,
                                 lock=asyncio.Lock(),
                             )
                             await client._update_metadata(update_accessed_at=True)
@@ -151,14 +154,15 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             if not found:
                 raise ValueError(f'Key-value store with ID "{id}" not found.')
 
-        # Get a new instance by name.
+        # Get a new instance by name or alias.
         else:
-            kvs_path = kvs_base_path / cls._STORAGE_SUBSUBDIR_DEFAULT if name is None else kvs_base_path / name
-            metadata_path = kvs_path / METADATA_FILENAME
+            kvs_dir = Path(name) if name else Path(alias) if alias else Path('default')
+            path_to_kvs = kvs_base_path / kvs_dir
+            path_to_metadata = path_to_kvs / METADATA_FILENAME
 
             # If the key-value store directory exists, reconstruct the client from the metadata file.
-            if kvs_path.exists() and metadata_path.exists():
-                file = await asyncio.to_thread(open, metadata_path)
+            if path_to_kvs.exists() and path_to_metadata.exists():
+                file = await asyncio.to_thread(open, path_to_metadata)
                 try:
                     file_content = json.load(file)
                 finally:
@@ -166,11 +170,11 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                 try:
                     metadata = KeyValueStoreMetadata(**file_content)
                 except ValidationError as exc:
-                    raise ValueError(f'Invalid metadata file for key-value store "{name}"') from exc
+                    raise ValueError(f'Invalid metadata file for key-value store "{name or alias}"') from exc
 
                 client = cls(
                     metadata=metadata,
-                    storage_dir=storage_dir,
+                    path_to_kvs=path_to_kvs,
                     lock=asyncio.Lock(),
                 )
 
@@ -188,7 +192,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                 )
                 client = cls(
                     metadata=metadata,
-                    storage_dir=storage_dir,
+                    path_to_kvs=path_to_kvs,
                     lock=asyncio.Lock(),
                 )
                 await client._update_metadata()

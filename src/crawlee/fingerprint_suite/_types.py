@@ -11,7 +11,7 @@ SupportedBrowserType = Literal['chrome', 'firefox', 'safari', 'edge']
 
 
 class ScreenOptions(BaseModel):
-    model_config = ConfigDict(extra='forbid', populate_by_name=True)
+    model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
 
     """Defines the screen constrains for the fingerprint generator."""
 
@@ -31,7 +31,7 @@ class ScreenOptions(BaseModel):
 class HeaderGeneratorOptions(BaseModel):
     """Collection of header related attributes that can be used by the fingerprint generator."""
 
-    model_config = ConfigDict(extra='forbid', populate_by_name=True)
+    model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
 
     browsers: list[SupportedBrowserType] | None = None
     """List of BrowserSpecifications to generate the headers for."""
