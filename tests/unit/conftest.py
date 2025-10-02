@@ -17,6 +17,7 @@ from crawlee import service_locator
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_network
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient, ImpitHttpClient
 from crawlee.proxy_configuration import ProxyInfo
+from crawlee.statistics import Statistics
 from crawlee.storages import KeyValueStore
 from tests.unit.server import TestServer, app, serve_in_thread
 
@@ -71,6 +72,10 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
 
         # Verify that the test environment was set up correctly.
         assert os.environ.get('CRAWLEE_STORAGE_DIR') == str(tmp_path)
+
+        # Reset global class variables to ensure test isolation.
+        KeyValueStore._autosaved_values = {}
+        Statistics._Statistics__next_id = 0  # type:ignore[attr-defined] # Mangled attribute
 
     return _prepare_test_env
 
