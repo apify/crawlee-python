@@ -440,7 +440,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._statistics = statistics or cast(
             'Statistics[TStatisticsState]',
             Statistics.with_default_state(
-                persistence_enabled=True,
+                persistence_enabled=True, # TODO: Why does changing this to True breaks unrelated tests?
                 periodic_message_logger=self._logger,
                 statistics_log_format=self._statistics_log_format,
                 log_message='Current request statistics:',
@@ -753,7 +753,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             self._service_locator.get_event_manager().emit(
                 event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False)
             )
-            await asyncio.sleep(10)
 
     async def add_requests(
         self,
