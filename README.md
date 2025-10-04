@@ -213,3 +213,11 @@ Your code contributions are welcome, and you'll be praised for eternity! If you 
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](https://github.com/apify/crawlee-python/blob/master/LICENSE) file for details.
+
+## Docs Versioning
+
+Crawlee documentation uses version numbers to track updates. Example:
+
+- v1.0.0 → Initial release
+- v1.1.0 → Added new guides
+- v1.2.0 → Minor fixes and typos
