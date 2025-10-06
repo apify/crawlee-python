@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, TypeVar
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
 
+from ._utils import validate_storage_name
+
 if TYPE_CHECKING:
     from ._base import Storage
 
@@ -145,6 +147,10 @@ class StorageInstanceManager:
                     f'Cannot create named storage "{name}" because an alias storage with the same name already exists. '
                     f'Use a different name or drop the existing alias storage first.'
                 )
+
+            # Validate storage name
+            if name is not None:
+                validate_storage_name(name)
 
             # Create new instance
             client: KeyValueStoreClient | DatasetClient | RequestQueueClient
