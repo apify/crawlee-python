@@ -44,7 +44,9 @@ class Storage(ABC):
 
         Args:
             id: The storage ID.
-            name: The storage name (global scope, persists across runs).
+            name: The storage name (global scope, persists across runs). Name can only contain letters "a" through "z",
+                the digits "0" through "9", and the hyphen ("-") but only in the middle of the string
+                (e.g. "my-value-1")
             alias: The storage alias (run scope, creates unnamed storage).
             configuration: Configuration object used during the storage creation or restoration process.
             storage_client: Underlying storage client to use. If not provided, the default global storage client

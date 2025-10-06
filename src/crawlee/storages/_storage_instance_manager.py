@@ -92,7 +92,9 @@ class StorageInstanceManager:
         Args:
             cls: The storage class to instantiate.
             id: Storage ID.
-            name: Storage name. (global scope, persists across runs).
+            name: Storage name. (global scope, persists across runs). Name can only contain letters "a" through "z",
+                the digits "0" through "9", and the hyphen ("-") but only in the middle of the string
+                (e.g. "my-value-1")
             alias: Storage alias (run scope, creates unnamed storage).
             client_opener_coro: Coroutine to open the storage client when storage instance not found in cache.
             storage_client_cache_key: Additional optional key from storage client to differentiate cache entries.
