@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Use Self type in the open() method of storage clients ([#1462](https://github.com/apify/crawlee-python/pull/1462)) ([4ec6f6c](https://github.com/apify/crawlee-python/commit/4ec6f6c08f81632197f602ff99151338b3eba6e7)) by [@janbuchar](https://github.com/janbuchar)
+- Add storages name validation ([#1457](https://github.com/apify/crawlee-python/pull/1457)) ([84de11a](https://github.com/apify/crawlee-python/commit/84de11a3a603503076f5b7df487c9abab68a9015)) by [@Mantisus](https://github.com/Mantisus), closes [#1434](https://github.com/apify/crawlee-python/issues/1434)
 
 
 <!-- git-cliff-unreleased-end -->
