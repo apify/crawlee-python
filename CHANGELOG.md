@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 1.0.2 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- Use Self type in the open() method of storage clients ([#1462](https://github.com/apify/crawlee-python/pull/1462)) ([4ec6f6c](https://github.com/apify/crawlee-python/commit/4ec6f6c08f81632197f602ff99151338b3eba6e7)) by [@janbuchar](https://github.com/janbuchar)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [1.0.1](https://github.com/apify/crawlee-python/releases/tag/v1.0.1) (2025-10-06)
