@@ -17,7 +17,10 @@ from crawlee.statistics import FinalStatistics, StatisticsState
 from crawlee.statistics._error_tracker import ErrorTracker
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
     from types import TracebackType
+
+    from crawlee.storages import KeyValueStore
 
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 TNewStatisticsState = TypeVar('TNewStatisticsState', bound=StatisticsState, default=StatisticsState)
@@ -70,6 +73,7 @@ class Statistics(Generic[TStatisticsState]):
         persistence_enabled: bool | Literal['explicit_only'] = False,
         persist_state_kvs_name: str | None = None,
         persist_state_key: str | None = None,
+        persist_state_kvs_factory: Callable[[], Coroutine[None, None, KeyValueStore]] | None = None,
         log_message: str = 'Statistics',
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
@@ -95,6 +99,7 @@ class Statistics(Generic[TStatisticsState]):
             persist_state_key=persist_state_key or f'SDK_CRAWLER_STATISTICS_{self._id}',
             persistence_enabled=persistence_enabled,
             persist_state_kvs_name=persist_state_kvs_name,
+            persist_state_kvs_factory=persist_state_kvs_factory,
             logger=logger,
         )
 
@@ -110,8 +115,8 @@ class Statistics(Generic[TStatisticsState]):
         """Create near copy of the `Statistics` with replaced `state_model`."""
         new_statistics: Statistics[TNewStatisticsState] = Statistics(
             persistence_enabled=self._state._persistence_enabled,  # noqa: SLF001
-            persist_state_kvs_name=self._state._persist_state_kvs_name,  # noqa: SLF001
             persist_state_key=self._state._persist_state_key,  # noqa: SLF001
+            persist_state_kvs_factory=self._state._persist_state_kvs_factory,  # noqa: SLF001
             log_message=self._log_message,
             periodic_message_logger=self._periodic_message_logger,
             state_model=state_model,

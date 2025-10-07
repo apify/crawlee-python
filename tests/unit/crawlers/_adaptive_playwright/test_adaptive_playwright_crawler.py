@@ -493,7 +493,6 @@ async def test_adaptive_playwright_crawler_statistics_in_init() -> None:
     assert type(crawler._statistics.state) is AdaptivePlaywrightCrawlerStatisticState
 
     assert crawler._statistics._state._persistence_enabled == persistence_enabled
-    assert crawler._statistics._state._persist_state_kvs_name == persist_state_kvs_name
     assert crawler._statistics._state._persist_state_key == persist_state_key
 
     assert crawler._statistics._log_message == log_message
