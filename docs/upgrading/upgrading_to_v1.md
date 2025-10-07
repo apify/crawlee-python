@@ -333,3 +333,7 @@ async def main() -> None:
 
     await crawler.run(['https://crawlee.dev/'])
 ```
+
+### New storage naming restrictions
+
+We added naming restrictions for storages to align with Apify Platform requirements and avoid potential conflicts. Storage names can only contain letters "a" through "z" (both uppercase and lowercase), digits "0" through "9", and hyphens ("-") but only in the middle of the string (e.g., "my-storage-1").
