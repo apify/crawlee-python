@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING
 
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from crawlee import Request
 from crawlee._utils.crypto import crypto_random_object_id
@@ -65,7 +65,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
         id: str | None,
         name: str | None,
         alias: str | None,
-    ) -> MemoryRequestQueueClient:
+    ) -> Self:
         """Open or create a new memory request queue client.
 
         This method creates a new in-memory request queue instance. Unlike persistent storage implementations,

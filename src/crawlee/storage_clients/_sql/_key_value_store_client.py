@@ -5,7 +5,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import delete, select
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from crawlee._utils.file import infer_mime_type
 from crawlee.storage_clients._base import KeyValueStoreClient
@@ -77,7 +77,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         name: str | None,
         alias: str | None,
         storage_client: SqlStorageClient,
-    ) -> SqlKeyValueStoreClient:
+    ) -> Self:
         """Open or create a SQL key-value store client.
 
         This method attempts to open an existing key-value store from the SQL database. If a KVS with the specified

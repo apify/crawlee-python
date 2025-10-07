@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only
-from typing_extensions import NotRequired, override
+from typing_extensions import NotRequired, Self, override
 
 from crawlee import Request
 from crawlee._utils.crypto import crypto_random_object_id
@@ -119,7 +119,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         name: str | None,
         alias: str | None,
         storage_client: SqlStorageClient,
-    ) -> SqlRequestQueueClient:
+    ) -> Self:
         """Open an existing request queue or create a new one.
 
         This method first tries to find an existing queue by ID or name.

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
@@ -55,7 +55,7 @@ class MemoryDatasetClient(DatasetClient):
         id: str | None,
         name: str | None,
         alias: str | None,
-    ) -> MemoryDatasetClient:
+    ) -> Self:
         """Open or create a new memory dataset client.
 
         This method creates a new in-memory dataset instance. Unlike persistent storage implementations, memory
