@@ -17,6 +17,9 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.0](https://github.com/apify/crawlee-python/releases/tag/v1.0.0) (2025-09-29)
 
+- Check out the [Release blog post](https://crawlee.dev/blog/crawlee-for-python-v1) for more details.
+- Check out the [Upgrading guide](https://crawlee.dev/python/docs/upgrading/upgrading-to-v1) to ensure a smooth update.
+
 ### 🚀 Features
 
 - Add utility for load and parse Sitemap and `SitemapRequestLoader` ([#1169](https://github.com/apify/crawlee-python/pull/1169)) ([66599f8](https://github.com/apify/crawlee-python/commit/66599f8d085f3a8622e130019b6fdce2325737de)) by [@Mantisus](https://github.com/Mantisus), closes [#1161](https://github.com/apify/crawlee-python/issues/1161)
@@ -199,6 +202,9 @@ All notable changes to this project will be documented in this file.
 
 ## [0.6.0](https://github.com/apify/crawlee-python/releases/tag/v0.6.0) (2025-03-03)
 
+- Check out the [Release blog post](https://crawlee.dev/blog/crawlee-for-python-v06) for more details.
+- Check out the [Upgrading guide](https://crawlee.dev/python/docs/upgrading/upgrading-to-v0x#upgrading-to-v06) to ensure a smooth update.
+
 ### 🚀 Features
 
 - Integrate browserforge fingerprints ([#829](https://github.com/apify/crawlee-python/pull/829)) ([2b156b4](https://github.com/apify/crawlee-python/commit/2b156b4ba688f9111195422e6058dff30eb1f782)) by [@Pijukatel](https://github.com/Pijukatel), closes [#549](https://github.com/apify/crawlee-python/issues/549)
@@ -278,6 +284,9 @@ All notable changes to this project will be documented in this file.
 
 
 ## [0.5.0](https://github.com/apify/crawlee-python/releases/tag/v0.5.0) (2025-01-02)
+
+- Check out the [Release blog post](https://crawlee.dev/blog/crawlee-for-python-v05) for more details.
+- Check out the [Upgrading guide](https://crawlee.dev/python/docs/upgrading/upgrading-to-v0x#upgrading-to-v05) to ensure a smooth update.
 
 ### 🚀 Features
 
@@ -369,6 +378,8 @@ All notable changes to this project will be documented in this file.
 
 
 ## [0.4.0](https://github.com/apify/crawlee-python/releases/tag/v0.4.0) (2024-11-01)
+
+- Check out the [Upgrading guide](https://crawlee.dev/python/docs/upgrading/upgrading-to-v0x#upgrading-to-v04) to ensure a smooth update.
 
 ### 🚀 Features
 
@@ -478,6 +489,8 @@ All notable changes to this project will be documented in this file.
 
 
 ## [0.3.0](https://github.com/apify/crawlee-python/releases/tag/v0.3.0) (2024-08-27)
+
+- Check out the [Upgrading guide](https://crawlee.dev/python/docs/upgrading/upgrading-to-v0x#upgrading-to-v03) to ensure a smooth update.
 
 ### 🚀 Features
 
