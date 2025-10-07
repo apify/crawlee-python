@@ -336,4 +336,4 @@ async def main() -> None:
 
 ### New storage naming restrictions
 
-We added naming restrictions for storages to align with Apify Platform requirements and avoid potential conflicts. Storage names can only contain letters "a" through "z" (both uppercase and lowercase), digits "0" through "9", and hyphens ("-") but only in the middle of the string (e.g., "my-storage-1").
+We've introduced naming restrictions for storages to ensure compatibility with Apify Platform requirements and prevent potential conflicts. Storage names may include only letters (a–z, A–Z), digits (0–9), and hyphens (-), with hyphens allowed only in the middle of the name (for example, my-storage-1).
