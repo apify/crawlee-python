@@ -13,6 +13,7 @@ from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.request_loaders import RequestManager
 
 from ._base import Storage
+from ._utils import validate_storage_name
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -80,6 +81,8 @@ class RequestQueue(Storage, RequestManager):
             id: The unique identifier of the storage.
             name: The name of the storage, if available.
         """
+        validate_storage_name(name)
+
         self._client = client
         self._id = id
         self._name = name

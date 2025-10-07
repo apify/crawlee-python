@@ -38,7 +38,7 @@ async def test_crawler_instrumentor_capability(server_url: URL) -> None:
 
     # Generate first telemetry data from `Dataset` public methods.
     # `Dataset` is in `instrument_classes` argument, and thus it's public methods are instrumented.
-    dataset = await Dataset.open(name='test_dataset')
+    dataset = await Dataset.open(name='test-dataset')
     await dataset.drop()
 
     # Other traces will be from crawler run.
