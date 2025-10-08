@@ -44,7 +44,7 @@ jobs:
         run: pipx install poetry
 
       - name: Set up uv package manager
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
