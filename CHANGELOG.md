@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.0.2 - **not yet released**
+## [1.0.2](https://github.com/apify/crawlee-python/releases/tag/v1.0.2) (2025-10-08)
 
 ### 🐛 Bug Fixes
 
@@ -12,7 +11,6 @@ All notable changes to this project will be documented in this file.
 - Pin pydantic version to &lt;2.12.0 to avoid compatibility issues ([#1467](https://github.com/apify/crawlee-python/pull/1467)) ([f11b86f](https://github.com/apify/crawlee-python/commit/f11b86f7ed57f98e83dc1b52f15f2017a919bf59)) by [@vdusek](https://github.com/vdusek)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.0.1](https://github.com/apify/crawlee-python/releases/tag/v1.0.1) (2025-10-06)
 
 ### 🐛 Bug Fixes
