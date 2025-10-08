@@ -832,7 +832,7 @@ requires-dist = [
     { name = "playwright", marker = "extra == 'playwright'", specifier = ">=1.27.0" },
     { name = "protego", specifier = ">=0.5.0" },
     { name = "psutil", specifier = ">=6.0.0" },
-    { name = "pydantic", specifier = ">=2.11.0,<2.12.0" },
+    { name = "pydantic", specifier = ">=2.11.0" },
     { name = "pydantic-settings", specifier = ">=2.2.0,!=2.7.0,!=2.7.1,!=2.8.0" },
     { name = "pyee", specifier = ">=9.0.0" },
     { name = "rich", marker = "extra == 'cli'", specifier = ">=13.9.0" },

@@ -185,9 +185,6 @@ class Request(BaseModel):
     method: HttpMethod = 'GET'
     """HTTP request method."""
 
-    headers: Annotated[HttpHeaders, Field(default_factory=HttpHeaders)] = HttpHeaders()
-    """HTTP request headers."""
-
     payload: Annotated[
         HttpPayload | None,
         BeforeValidator(lambda v: v.encode() if isinstance(v, str) else v),
@@ -195,23 +192,37 @@ class Request(BaseModel):
     ] = None
     """HTTP request payload."""
 
-    user_data: Annotated[
-        dict[str, JsonSerializable],  # Internally, the model contains `UserData`, this is just for convenience
-        Field(alias='userData', default_factory=lambda: UserData()),
-        PlainValidator(user_data_adapter.validate_python),
-        PlainSerializer(
-            lambda instance: user_data_adapter.dump_python(
-                instance,
-                by_alias=True,
-                exclude_none=True,
-                exclude_unset=True,
-                exclude_defaults=True,
-            )
-        ),
-    ] = {}
-    """Custom user data assigned to the request. Use this to save any request related data to the
-    request's scope, keeping them accessible on retries, failures etc.
-    """
+    # Workaround for pydantic 2.12 and mypy type checking issue for Annotated with default_factory
+    if TYPE_CHECKING:
+        headers: HttpHeaders = HttpHeaders()
+        """HTTP request headers."""
+
+        user_data: dict[str, JsonSerializable] = {}
+        """Custom user data assigned to the request. Use this to save any request related data to the
+        request's scope, keeping them accessible on retries, failures etc.
+        """
+
+    else:
+        headers: Annotated[HttpHeaders, Field(default_factory=HttpHeaders)]
+        """HTTP request headers."""
+
+        user_data: Annotated[
+            dict[str, JsonSerializable],  # Internally, the model contains `UserData`, this is just for convenience
+            Field(alias='userData', default_factory=lambda: UserData()),
+            PlainValidator(user_data_adapter.validate_python),
+            PlainSerializer(
+                lambda instance: user_data_adapter.dump_python(
+                    instance,
+                    by_alias=True,
+                    exclude_none=True,
+                    exclude_unset=True,
+                    exclude_defaults=True,
+                )
+            ),
+        ]
+        """Custom user data assigned to the request. Use this to save any request related data to the
+        request's scope, keeping them accessible on retries, failures etc.
+        """
 
     retry_count: Annotated[int, Field(alias='retryCount')] = 0
     """Number of times the request has been retried."""
