@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 1.0.3 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- Add support for Pydantic v2.12 ([#1471](https://github.com/apify/crawlee-python/pull/1471)) ([35c1108](https://github.com/apify/crawlee-python/commit/35c110878c2f445a2866be2522ea8703e9b371dd)) by [@Mantisus](https://github.com/Mantisus), closes [#1464](https://github.com/apify/crawlee-python/issues/1464)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [1.0.2](https://github.com/apify/crawlee-python/releases/tag/v1.0.2) (2025-10-08)
