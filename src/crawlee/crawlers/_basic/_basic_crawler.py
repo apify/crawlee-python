@@ -1483,12 +1483,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             raise
 
     async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
-        await wait_for(
-            lambda: self._context_pipeline(context, self.router),
-            timeout=self._request_handler_timeout,
-            timeout_message=f'{self._request_handler_timeout_text}'
-            f' {self._request_handler_timeout.total_seconds()} seconds',
-            logger=self._logger,
+        await self._context_pipeline(
+            context,
+            lambda final_context: wait_for(
+                lambda: self.router(final_context),
+                timeout=self._request_handler_timeout,
+                timeout_message=f'{self._request_handler_timeout_text}'
+                f' {self._request_handler_timeout.total_seconds()} seconds',
+                logger=self._logger,
+            ),
         )
 
     def _raise_for_error_status_code(self, status_code: int) -> None:
