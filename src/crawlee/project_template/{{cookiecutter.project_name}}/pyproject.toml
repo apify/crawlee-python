@@ -19,7 +19,7 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.10,<4.0"
 dependencies = [
-    "crawlee[{{ extras|join(',') }}]",
+    "crawlee[{{ extras|join(',') }}]==0.6.12",
     # % if cookiecutter.crawler_type == 'playwright-camoufox'
     "camoufox[geoip]~=0.4.5",
     # % endif
