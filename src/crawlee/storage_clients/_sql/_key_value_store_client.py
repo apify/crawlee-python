@@ -228,6 +228,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
             # Delete the record if it exists
             result = await session.execute(stmt)
             result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
+
             # Update metadata if we actually deleted something
             if result.rowcount > 0:
                 await self._update_metadata(

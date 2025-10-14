@@ -500,9 +500,11 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         async with self.get_session() as session:
             result = await session.execute(stmt)
             result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
+
             if result.rowcount == 0:
                 logger.warning(f'Request {request.unique_key} not found in database.')
                 return None
+
             await self._update_metadata(
                 session,
                 **_QueueMetadataUpdateParams(
