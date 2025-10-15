@@ -33,9 +33,9 @@ async def main() -> None:
             fingerprint_generator=None,
             # Set user data directory to temp folder
             user_data_dir=tmp_profile_dir,
+            # Use the installed Chrome browser
+            use_chrome=True,
             browser_launch_options={
-                # Use installed Chrome browser
-                'channel': 'chrome',
                 # Slow down actions to mimic human behavior
                 'slow_mo': 200,
                 'args': [

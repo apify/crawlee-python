@@ -50,6 +50,7 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
         browser_new_context_options: dict[str, Any] | None = None,
         max_open_pages_per_browser: int = 20,
         use_incognito_pages: bool = False,
+        use_chrome: bool | None = None,
         fingerprint_generator: FingerprintGenerator | None = None,
     ) -> None:
         """Initialize a new instance.
@@ -68,10 +69,16 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
                 Once reached, a new browser instance will be launched to handle the excess.
             use_incognito_pages: By default pages share the same browser context. If set to True each page uses its
                 own context that is destroyed once the page is closed or crashes.
+            use_chrome: Whether to use the installed Chrome browser (if available) instead of the default
+                Chromium browser that comes bundled with Playwright. This option is only relevant when
+                `browser_type` is set to 'chromium'.
             fingerprint_generator: An optional instance of implementation of `FingerprintGenerator` that is used
                 to generate browser fingerprints together with consistent headers.
         """
         config = service_locator.get_configuration()
+
+        if use_chrome and browser_type != 'chromium':
+            raise ValueError('`use_chrome` can only be used with `chromium` `browser_type`.')
 
         # Default browser launch options are based on the configuration.
         default_launch_browser_options: dict[str, Any] = {
@@ -79,6 +86,14 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
             'executable_path': config.default_browser_path,
             'chromium_sandbox': not config.disable_browser_sandbox,
         }
+
+        if use_chrome and default_launch_browser_options['executable_path']:
+            raise ValueError(
+                'Cannot use `use_chrome` with `Configuration.default_browser_path` or `executable_path` set.'
+            )
+
+        if use_chrome:
+            default_launch_browser_options['channel'] = 'chrome'
 
         self._browser_type: BrowserType = browser_type
         self._browser_launch_options: dict[str, Any] = default_launch_browser_options | (browser_launch_options or {})

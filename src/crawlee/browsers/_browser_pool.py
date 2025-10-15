@@ -113,6 +113,7 @@ class BrowserPool:
         headless: bool | None = None,
         fingerprint_generator: FingerprintGenerator | None = None,
         use_incognito_pages: bool | None = False,
+        use_chrome: bool | None = None,
         **kwargs: Any,
     ) -> BrowserPool:
         """Initialize a new instance with a single `PlaywrightBrowserPlugin` configured with the provided options.
@@ -132,6 +133,9 @@ class BrowserPool:
                 to generate browser fingerprints together with consistent headers.
             use_incognito_pages: By default pages share the same browser context. If set to True each page uses its
                 own context that is destroyed once the page is closed or crashes.
+            use_chrome: Whether to use the installed Chrome browser (if available) instead of the default
+                Chromium browser that comes bundled with Playwright. This option is only relevant when
+                `browser_type` is set to 'chromium'.
             kwargs: Additional arguments for default constructor.
         """
         plugin_options: dict = defaultdict(dict)
@@ -143,6 +147,9 @@ class BrowserPool:
 
         if use_incognito_pages is not None:
             plugin_options['use_incognito_pages'] = use_incognito_pages
+
+        if use_chrome is not None:
+            plugin_options['use_chrome'] = use_chrome
 
         if browser_type:
             plugin_options['browser_type'] = browser_type
