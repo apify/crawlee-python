@@ -47,7 +47,7 @@ async def test_crawler_instrumentor_capability(server_url: URL) -> None:
     crawler = ParselCrawler(
         max_requests_per_crawl=1,
         request_handler=mock.AsyncMock(),
-        concurrency_settings=ConcurrencySettings(desired_concurrency=1),
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
     )
 
     # Run crawler and generate more telemetry data.
@@ -91,16 +91,8 @@ async def test_crawler_instrumentor_capability(server_url: URL) -> None:
     assert telemetry_data[-1]['attributes']['code.function.name'] == 'BasicCrawler.__run_task_function'
     assert telemetry_data[-1]['resource']['attributes'] == dict(resource.attributes)
 
-    last_run_fuction_data = None
-    for data in telemetry_data[-1::-1]:  # Iterate backwards to find the last run __run_task_function
-        if data['name'] == '__run_task_function':
-            last_run_fuction_data = data
-            break
-
-    assert last_run_fuction_data is not None
-
     # Processing of the request is in the same trace.
-    assert telemetry_data[3]['context']['trace_id'] == last_run_fuction_data['context']['trace_id']
+    assert telemetry_data[3]['context']['trace_id'] == telemetry_data[-1]['context']['trace_id']
 
     # Check that trace_ids of unrelated traces are not the same.
-    assert telemetry_data[0]['context']['trace_id'] != last_run_fuction_data['context']['trace_id']
+    assert telemetry_data[0]['context']['trace_id'] != telemetry_data[-1]['context']['trace_id']
