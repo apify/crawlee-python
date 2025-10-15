@@ -440,7 +440,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._statistics = statistics or cast(
             'Statistics[TStatisticsState]',
             Statistics.with_default_state(
-                persistence_enabled=True, # TODO: Why does changing this to True breaks unrelated tests?
+                persistence_enabled=True,
                 periodic_message_logger=self._logger,
                 statistics_log_format=self._statistics_log_format,
                 log_message='Current request statistics:',
@@ -722,8 +722,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def _run_crawler(self) -> None:
         event_manager = self._service_locator.get_event_manager()
 
-        self._crawler_state_rec_task.start()
-
         # Collect the context managers to be entered. Context managers that are already active are excluded,
         # as they were likely entered by the caller, who will also be responsible for exiting them.
         contexts_to_enter = [
@@ -743,6 +741,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             for context in contexts_to_enter:
                 await exit_stack.enter_async_context(context)  # type: ignore[arg-type]
 
+            self._crawler_state_rec_task.start()
             await self._autoscaled_pool.run()
 
             # Emit PERSIST_STATE event when crawler is finishing to allow listeners to persist their state if needed
