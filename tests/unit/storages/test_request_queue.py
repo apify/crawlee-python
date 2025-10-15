@@ -1291,3 +1291,27 @@ async def test_validate_name(storage_client: StorageClient, name: str, *, is_val
     else:
         with pytest.raises(ValueError, match=rf'Invalid storage name "{name}".*'):
             await RequestQueue.open(name=name, storage_client=storage_client)
+
+
+async def test_reclaim_request_with_change_state(rq: RequestQueue) -> None:
+    """Test reclaiming a request and changing its state."""
+    # Add a request
+    await rq.add_request(Request.from_url('https://example.com/original', user_data={'state': 'original'}))
+
+    # Fetch the request
+    request = await rq.fetch_next_request()
+    assert request is not None
+    assert request.url == 'https://example.com/original'
+    assert request.user_data['state'] == 'original'
+
+    # Reclaim the request with modified user data
+    request.user_data['state'] = 'modified'
+    result = await rq.reclaim_request(request)
+    assert result is not None
+    assert result.was_already_handled is False
+
+    # Fetch the reclaimed request
+    reclaimed_request = await rq.fetch_next_request()
+    assert reclaimed_request is not None
+    assert reclaimed_request.url == 'https://example.com/original'
+    assert reclaimed_request.user_data['state'] == 'modified'

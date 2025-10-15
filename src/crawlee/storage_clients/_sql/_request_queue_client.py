@@ -546,12 +546,20 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 block_until = now + timedelta(seconds=self._BLOCK_REQUEST_TIME)
                 # Extend blocking for forefront request, it is considered blocked by the current client.
                 stmt = stmt.values(
-                    sequence_number=new_sequence, time_blocked_until=block_until, client_key=self.client_key
+                    sequence_number=new_sequence,
+                    time_blocked_until=block_until,
+                    client_key=self.client_key,
+                    data=request.model_dump_json(),
                 )
             else:
                 new_sequence = state.sequence_counter
                 state.sequence_counter += 1
-                stmt = stmt.values(sequence_number=new_sequence, time_blocked_until=None, client_key=None)
+                stmt = stmt.values(
+                    sequence_number=new_sequence,
+                    time_blocked_until=None,
+                    client_key=None,
+                    data=request.model_dump_json(),
+                )
 
             result = await session.execute(stmt)
             result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
