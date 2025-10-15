@@ -5,6 +5,7 @@ import asyncio
 import concurrent
 import json
 import logging
+import multiprocessing
 import os
 import sys
 import time
@@ -1678,7 +1679,7 @@ async def test_crawler_statistics_persistence(tmp_path: Path) -> None:
 
     This test simulates starting the crawler process twice, and checks that the statistics include first run."""
 
-    with concurrent.futures.ProcessPoolExecutor() as executor:
+    with concurrent.futures.ProcessPoolExecutor(mp_context=multiprocessing.get_context('fork')) as executor:
         # Crawl 2 requests in the first run and automatically persist the state.
         first_run_state = executor.submit(
             _process_run_crawler,

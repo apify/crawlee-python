@@ -690,7 +690,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         except CancelledError:
             pass
         finally:
-            await self._crawler_state_rec_task.stop()
             if threading.current_thread() is threading.main_thread():
                 with suppress(NotImplementedError):
                     asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
@@ -742,7 +741,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 await exit_stack.enter_async_context(context)  # type: ignore[arg-type]
 
             self._crawler_state_rec_task.start()
-            await self._autoscaled_pool.run()
+            try:
+                await self._autoscaled_pool.run()
+            finally:
+                await self._crawler_state_rec_task.stop()
 
             # Emit PERSIST_STATE event when crawler is finishing to allow listeners to persist their state if needed
             if not self.statistics.state.crawler_last_started_at:
