@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
@@ -93,7 +93,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         name: str | None,
         alias: str | None,
         configuration: Configuration,
-    ) -> FileSystemKeyValueStoreClient:
+    ) -> Self:
         """Open or create a file system key-value store client.
 
         This method attempts to open an existing key-value store from the file system. If a KVS with the specified

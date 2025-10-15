@@ -473,7 +473,7 @@ async def test_adaptive_crawler_exceptions_in_sub_crawlers(*, error_in_pw_crawle
 async def test_adaptive_playwright_crawler_statistics_in_init() -> None:
     """Tests that adaptive crawler uses created AdaptivePlaywrightCrawlerStatistics from inputted Statistics."""
     persistence_enabled = True
-    persist_state_kvs_name = 'some name'
+    persist_state_kvs_name = 'some-name'
     persist_state_key = 'come key'
     log_message = 'some message'
     periodic_message_logger = logging.getLogger('some logger')

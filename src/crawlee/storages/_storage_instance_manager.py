@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, TypeVar
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
 
+from ._utils import validate_storage_name
+
 if TYPE_CHECKING:
     from ._base import Storage
 
@@ -90,7 +92,9 @@ class StorageInstanceManager:
         Args:
             cls: The storage class to instantiate.
             id: Storage ID.
-            name: Storage name. (global scope, persists across runs).
+            name: Storage name. (global scope, persists across runs). Name can only contain letters "a" through "z",
+                the digits "0" through "9", and the hyphen ("-") but only in the middle of the string
+                (e.g. "my-value-1").
             alias: Storage alias (run scope, creates unnamed storage).
             client_opener_coro: Coroutine to open the storage client when storage instance not found in cache.
             storage_client_cache_key: Additional optional key from storage client to differentiate cache entries.
@@ -145,6 +149,10 @@ class StorageInstanceManager:
                     f'Cannot create named storage "{name}" because an alias storage with the same name already exists. '
                     f'Use a different name or drop the existing alias storage first.'
                 )
+
+            # Validate storage name
+            if name is not None:
+                validate_storage_name(name)
 
             # Create new instance
             client: KeyValueStoreClient | DatasetClient | RequestQueueClient

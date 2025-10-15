@@ -1,8 +1,10 @@
 import io
 import json
+import os
 import re
 from unittest import mock
 
+import pytest
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
@@ -14,6 +16,10 @@ from crawlee.otel.crawler_instrumentor import CrawlerInstrumentor
 from crawlee.storages import Dataset
 
 
+@pytest.mark.skipif(
+    os.name == 'nt',
+    reason='This test is flaky on Windows, see https://github.com/apify/crawlee-python/issues/1469.',
+)
 async def test_crawler_instrumentor_capability(server_url: URL) -> None:
     """Test OpenTelemetry instrumentation capability of the crawler.
 
@@ -38,7 +44,7 @@ async def test_crawler_instrumentor_capability(server_url: URL) -> None:
 
     # Generate first telemetry data from `Dataset` public methods.
     # `Dataset` is in `instrument_classes` argument, and thus it's public methods are instrumented.
-    dataset = await Dataset.open(name='test_dataset')
+    dataset = await Dataset.open(name='test-dataset')
     await dataset.drop()
 
     # Other traces will be from crawler run.

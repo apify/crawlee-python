@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ValidationError
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from crawlee import Request
 from crawlee._consts import METADATA_FILENAME
@@ -157,7 +157,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         name: str | None,
         alias: str | None,
         configuration: Configuration,
-    ) -> FileSystemRequestQueueClient:
+    ) -> Self:
         """Open or create a file system request queue client.
 
         This method attempts to open an existing request queue from the file system. If a queue with the specified

@@ -149,7 +149,7 @@ class SqlStorageClient(StorageClient):
                     # Raise an error if the new version creates breaking changes in the database schema.
                     if db_version and db_version != __version__:
                         warnings.warn(
-                            f'Database version {db_version.version} does not match library version {__version__}. '
+                            f'Database version {db_version} does not match library version {__version__}. '
                             'This may lead to unexpected behavior. Drop the db if you want to make sure that '
                             'everything will work fine.',
                             category=UserWarning,

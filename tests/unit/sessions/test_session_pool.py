@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 MAX_POOL_SIZE = 3
-KVS_NAME = 'test_session_pool'
+KVS_NAME = 'test-session-pool'
 PERSIST_STATE_KEY = 'crawlee_session_pool_state'
 
 

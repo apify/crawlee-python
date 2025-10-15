@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 async def dataset_client() -> AsyncGenerator[MemoryDatasetClient, None]:
     """Fixture that provides a fresh memory dataset client for each test."""
-    client = await MemoryStorageClient().create_dataset_client(name='test_dataset')
+    client = await MemoryStorageClient().create_dataset_client(name='test-dataset')
     yield client
     await client.drop()
 
@@ -25,7 +25,7 @@ async def test_memory_specific_purge_behavior() -> None:
     """Test memory-specific purge behavior and in-memory storage characteristics."""
     # Create dataset and add data
     dataset_client1 = await MemoryStorageClient().create_dataset_client(
-        name='test_purge_dataset',
+        name='test-purge-dataset',
     )
     await dataset_client1.push_data({'item': 'initial data'})
 
@@ -35,7 +35,7 @@ async def test_memory_specific_purge_behavior() -> None:
 
     # Reopen with same storage client instance
     dataset_client2 = await MemoryStorageClient().create_dataset_client(
-        name='test_purge_dataset',
+        name='test-purge-dataset',
     )
 
     # Verify data was purged (memory storage specific behavior)
