@@ -200,9 +200,9 @@ def redirect_server_url(redirect_http_server: TestServer) -> URL:
 
 @pytest.fixture(
     params=[
+        pytest.param('curl', id='curl'),
         pytest.param('httpx', id='httpx'),
         pytest.param('impit', id='impit'),
-        pytest.param('curl', id='curl'),
     ]
 )
 async def http_client(request: pytest.FixtureRequest) -> HttpClient:
