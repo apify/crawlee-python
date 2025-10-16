@@ -58,7 +58,10 @@ adaptive-crawler = [
 ]
 beautifulsoup = ["beautifulsoup4[lxml]>=4.12.0", "html5lib>=1.0"]
 cli = ["cookiecutter>=2.6.0", "inquirer>=3.3.0", "rich>=13.9.0", "typer>=0.12.0"]
-curl-impersonate = ["curl-cffi>=0.9.0", "cffi<2.0.0"]
+curl-impersonate = [
+    "curl-cffi>=0.9.0",
+    "cffi<2.0.0" # https://github.com/apify/crawlee-python/issues/1494
+]
 httpx = ["httpx[brotli,http2,zstd]>=0.27.0", "apify_fingerprint_datapoints>=0.0.2", "browserforge>=1.2.3"]
 parsel = ["parsel>=1.10.0"]
 playwright = ["playwright>=1.27.0", "apify_fingerprint_datapoints>=0.0.2", "browserforge>=1.2.3"]
