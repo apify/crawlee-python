@@ -5,7 +5,6 @@ import asyncio
 import concurrent
 import json
 import logging
-import multiprocessing
 import os
 import sys
 import time
@@ -1650,7 +1649,7 @@ async def test_crawler_purge_request_queue_uses_same_storage_client() -> None:
 async def _run_crawler(requests: list[str], storage_dir: str) -> StatisticsState:
     """Run crawler and return its statistics state.
 
-    Must be defined like this to be picklable for ProcessPoolExecutor."""
+    Must be defined like this to be pickable for ProcessPoolExecutor."""
     service_locator.set_configuration(
         Configuration(
             crawlee_storage_dir=storage_dir,  # type: ignore[call-arg]
@@ -1679,7 +1678,7 @@ async def test_crawler_statistics_persistence(tmp_path: Path) -> None:
 
     This test simulates starting the crawler process twice, and checks that the statistics include first run."""
 
-    with concurrent.futures.ProcessPoolExecutor(mp_context=multiprocessing.get_context('fork')) as executor:
+    with concurrent.futures.ProcessPoolExecutor() as executor:
         # Crawl 2 requests in the first run and automatically persist the state.
         first_run_state = executor.submit(
             _process_run_crawler,
@@ -1688,6 +1687,8 @@ async def test_crawler_statistics_persistence(tmp_path: Path) -> None:
         ).result()
         assert first_run_state.requests_finished == 2
 
+    # Do not reuse the executor to simulate a fresh process to avoid modified class attributes.
+    with concurrent.futures.ProcessPoolExecutor() as executor:
         # Crawl 1 additional requests in the second run, but use previously automatically persisted state.
         second_run_state = executor.submit(
             _process_run_crawler, requests=['https://c.placeholder.com'], storage_dir=str(tmp_path)
