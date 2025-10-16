@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import pytest
@@ -38,13 +39,13 @@ async def test_open_creates_new_rq(
 ) -> None:
     """Test that open() creates a new request queue with proper metadata."""
     rq = await RequestQueue.open(
-        name='new_request_queue',
+        name='new-request-queue',
         storage_client=storage_client,
     )
 
     # Verify request queue properties
     assert rq.id is not None
-    assert rq.name == 'new_request_queue'
+    assert rq.name == 'new-request-queue'
     metadata = await rq.get_metadata()
     assert metadata.pending_request_count == 0
     assert metadata.handled_request_count == 0
@@ -94,7 +95,7 @@ async def test_open_by_id(
     """Test opening a request queue by its ID."""
     # First create a request queue by name
     rq1 = await RequestQueue.open(
-        name='rq_by_id_test',
+        name='rq-by-id-test',
         storage_client=storage_client,
     )
 
@@ -109,7 +110,7 @@ async def test_open_by_id(
 
     # Verify it's the same request queue
     assert rq2.id == rq1.id
-    assert rq2.name == 'rq_by_id_test'
+    assert rq2.name == 'rq-by-id-test'
 
     # Verify the request is still there
     request = await rq2.fetch_next_request()
@@ -421,6 +422,36 @@ async def test_is_empty(rq: RequestQueue) -> None:
     assert await rq.is_empty() is True
 
 
+@pytest.mark.parametrize(
+    ('wait_for_all'),
+    [
+        pytest.param(True, id='wait for all'),
+        pytest.param(False, id='don`t wait for all'),
+    ],
+)
+async def test_add_requests_wait_for_all(rq: RequestQueue, *, wait_for_all: bool) -> None:
+    """Test adding requests with wait_for_all_requests_to_be_added option."""
+    urls = [f'https://example.com/{i}' for i in range(15)]
+
+    # Add requests without waiting
+    await rq.add_requests(
+        urls,
+        batch_size=5,
+        wait_for_all_requests_to_be_added=wait_for_all,
+        wait_time_between_batches=timedelta(milliseconds=100),
+    )
+
+    if not wait_for_all:
+        # Immediately after adding, the total count may be less than 15 due to background processing
+        assert await rq.get_total_count() <= 15
+
+        # Wait a 250 milliseconds for background tasks to complete
+        await asyncio.sleep(0.25)
+
+    # Verify all requests were added
+    assert await rq.get_total_count() == 15
+
+
 async def test_is_finished(rq: RequestQueue) -> None:
     """Test checking if a request queue is finished."""
     # Initially the queue should be finished (empty and no background tasks)
@@ -478,7 +509,7 @@ async def test_drop(
 ) -> None:
     """Test dropping a request queue removes it from cache and clears its data."""
     rq = await RequestQueue.open(
-        name='drop_test',
+        name='drop-test',
         storage_client=storage_client,
     )
 
@@ -490,7 +521,7 @@ async def test_drop(
 
     # Verify request queue is empty (by creating a new one with the same name)
     new_rq = await RequestQueue.open(
-        name='drop_test',
+        name='drop-test',
         storage_client=storage_client,
     )
 
@@ -565,7 +596,7 @@ async def test_purge(
     """Test purging a request queue removes all requests but keeps the queue itself."""
     # First create a request queue
     rq = await RequestQueue.open(
-        name='purge_test_queue',
+        name='purge-test-queue',
         storage_client=storage_client,
     )
 
@@ -592,7 +623,7 @@ async def test_purge(
 
     # Verify the queue still exists but is empty
     assert rq.id == queue_id  # Same ID preserved
-    assert rq.name == 'purge_test_queue'  # Same name preserved
+    assert rq.name == 'purge-test-queue'  # Same name preserved
 
     # Queue should be empty now
     metadata = await rq.get_metadata()
@@ -853,34 +884,34 @@ async def test_named_vs_alias_conflict_detection(
     """Test that conflicts between named and alias storages are detected."""
     # Test 1: Create named storage first, then try alias with same name
     named_rq = await RequestQueue.open(
-        name='conflict_test',
+        name='conflict-test',
         storage_client=storage_client,
     )
-    assert named_rq.name == 'conflict_test'
+    assert named_rq.name == 'conflict-test'
 
     # Try to create alias with same name - should raise error
-    with pytest.raises(ValueError, match=r'Cannot create alias storage "conflict_test".*already exists'):
-        await RequestQueue.open(alias='conflict_test', storage_client=storage_client)
+    with pytest.raises(ValueError, match=r'Cannot create alias storage "conflict-test".*already exists'):
+        await RequestQueue.open(alias='conflict-test', storage_client=storage_client)
 
     # Clean up
     await named_rq.drop()
 
     # Test 2: Create alias first, then try named with same name
-    alias_rq = await RequestQueue.open(alias='conflict_test2', storage_client=storage_client)
+    alias_rq = await RequestQueue.open(alias='conflict-test2', storage_client=storage_client)
     assert alias_rq.name is None  # Alias storages have no name
 
     # Try to create named with same name - should raise error
-    with pytest.raises(ValueError, match=r'Cannot create named storage "conflict_test2".*already exists'):
-        await RequestQueue.open(name='conflict_test2', storage_client=storage_client)
+    with pytest.raises(ValueError, match=r'Cannot create named storage "conflict-test2".*already exists'):
+        await RequestQueue.open(name='conflict-test2', storage_client=storage_client)
 
     # Clean up
     await alias_rq.drop()
 
     # Test 3: Different names should work fine
-    named_rq_ok = await RequestQueue.open(name='different_name')
-    alias_rq_ok = await RequestQueue.open(alias='different_alias')
+    named_rq_ok = await RequestQueue.open(name='different-name')
+    alias_rq_ok = await RequestQueue.open(alias='different-alias')
 
-    assert named_rq_ok.name == 'different_name'
+    assert named_rq_ok.name == 'different-name'
     assert alias_rq_ok.name is None
 
     # Clean up
@@ -916,12 +947,12 @@ async def test_alias_vs_named_isolation(
     """Test that alias and named request queues with same identifier are isolated."""
     # Create named request queue
     named_rq = await RequestQueue.open(
-        name='test_identifier',
+        name='test-identifier',
         storage_client=storage_client,
     )
 
     # Verify named request queue
-    assert named_rq.name == 'test_identifier'
+    assert named_rq.name == 'test-identifier'
     await named_rq.add_request('https://named.example.com')
 
     # Clean up named request queue first
@@ -929,7 +960,7 @@ async def test_alias_vs_named_isolation(
 
     # Now create alias request queue with same identifier (should work after cleanup)
     alias_rq = await RequestQueue.open(
-        alias='test_identifier',
+        alias='test-identifier',
         storage_client=storage_client,
     )
 
@@ -1015,13 +1046,13 @@ async def test_purge_on_start_enabled(storage_client: StorageClient) -> None:
     )
 
     alias_rq = await RequestQueue.open(
-        alias='purge_test_alias',
+        alias='purge-test-alias',
         storage_client=storage_client,
         configuration=configuration,
     )
 
     named_rq = await RequestQueue.open(
-        name='purge_test_named',
+        name='purge-test-named',
         storage_client=storage_client,
         configuration=configuration,
     )
@@ -1080,7 +1111,7 @@ async def test_purge_on_start_enabled(storage_client: StorageClient) -> None:
     # Verify that default and alias storages are unnamed
     assert default_metadata.name is None
     assert alias_metadata.name is None
-    assert named_metadata.name == 'purge_test_named'
+    assert named_metadata.name == 'purge-test-named'
 
     # Clear storage cache to simulate "reopening" storages
     service_locator.storage_instance_manager.clear_cache()
@@ -1091,12 +1122,12 @@ async def test_purge_on_start_enabled(storage_client: StorageClient) -> None:
         configuration=configuration,
     )
     alias_rq_2 = await RequestQueue.open(
-        alias='purge_test_alias',
+        alias='purge-test-alias',
         storage_client=storage_client,
         configuration=configuration,
     )
     named_rq_2 = await RequestQueue.open(
-        name='purge_test_named',
+        name='purge-test-named',
         storage_client=storage_client,
         configuration=configuration,
     )
@@ -1141,13 +1172,13 @@ async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
     )
 
     alias_rq = await RequestQueue.open(
-        alias='purge_test_alias',
+        alias='purge-test-alias',
         storage_client=storage_client,
         configuration=configuration,
     )
 
     named_rq = await RequestQueue.open(
-        name='purge_test_named',
+        name='purge-test-named',
         storage_client=storage_client,
         configuration=configuration,
     )
@@ -1206,7 +1237,7 @@ async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
     # Verify that default and alias storages are unnamed
     assert default_metadata.name is None
     assert alias_metadata.name is None
-    assert named_metadata.name == 'purge_test_named'
+    assert named_metadata.name == 'purge-test-named'
 
     # Clear storage cache to simulate "reopening" storages
     service_locator.storage_instance_manager.clear_cache()
@@ -1217,12 +1248,12 @@ async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
         configuration=configuration,
     )
     alias_rq_2 = await RequestQueue.open(
-        alias='purge_test_alias',
+        alias='purge-test-alias',
         storage_client=storage_client,
         configuration=configuration,
     )
     named_rq_2 = await RequestQueue.open(
-        name='purge_test_named',
+        name='purge-test-named',
         storage_client=storage_client,
         configuration=configuration,
     )
@@ -1259,3 +1290,59 @@ async def test_name_default_not_allowed(storage_client: StorageClient) -> None:
         f'it is reserved for default alias.',
     ):
         await RequestQueue.open(name=StorageInstanceManager._DEFAULT_STORAGE_ALIAS, storage_client=storage_client)
+
+
+@pytest.mark.parametrize(
+    ('name', 'is_valid'),
+    [
+        pytest.param('F', True, id='single-char'),
+        pytest.param('7', True, id='single-digit'),
+        pytest.param('FtghdfseySds', True, id='mixed-case'),
+        pytest.param('125673450', True, id='all-digits'),
+        pytest.param('Ft2134Sfe0O1hf', True, id='mixed-alphanumeric'),
+        pytest.param('name-with-dashes', True, id='dashes'),
+        pytest.param('1-value', True, id='number start'),
+        pytest.param('value-1', True, id='number end'),
+        pytest.param('test-1-value', True, id='number middle'),
+        pytest.param('test-------value', True, id='multiple-dashes'),
+        pytest.param('test-VALUES-test', True, id='multiple-cases'),
+        pytest.param('name_with_underscores', False, id='underscores'),
+        pytest.param('name with spaces', False, id='spaces'),
+        pytest.param('-test', False, id='dashes start'),
+        pytest.param('test-', False, id='dashes end'),
+    ],
+)
+async def test_validate_name(storage_client: StorageClient, name: str, *, is_valid: bool) -> None:
+    """Test name validation logic."""
+    if is_valid:
+        # Should not raise
+        dataset = await RequestQueue.open(name=name, storage_client=storage_client)
+        assert dataset.name == name
+        await dataset.drop()
+    else:
+        with pytest.raises(ValueError, match=rf'Invalid storage name "{name}".*'):
+            await RequestQueue.open(name=name, storage_client=storage_client)
+
+
+async def test_reclaim_request_with_change_state(rq: RequestQueue) -> None:
+    """Test reclaiming a request and changing its state."""
+    # Add a request
+    await rq.add_request(Request.from_url('https://example.com/original', user_data={'state': 'original'}))
+
+    # Fetch the request
+    request = await rq.fetch_next_request()
+    assert request is not None
+    assert request.url == 'https://example.com/original'
+    assert request.user_data['state'] == 'original'
+
+    # Reclaim the request with modified user data
+    request.user_data['state'] = 'modified'
+    result = await rq.reclaim_request(request)
+    assert result is not None
+    assert result.was_already_handled is False
+
+    # Fetch the reclaimed request
+    reclaimed_request = await rq.fetch_next_request()
+    assert reclaimed_request is not None
+    assert reclaimed_request.url == 'https://example.com/original'
+    assert reclaimed_request.user_data['state'] == 'modified'

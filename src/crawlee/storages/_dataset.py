@@ -12,6 +12,7 @@ from crawlee._utils.file import export_csv_to_stream, export_json_to_stream
 
 from ._base import Storage
 from ._key_value_store import KeyValueStore
+from ._utils import validate_storage_name
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -75,6 +76,8 @@ class Dataset(Storage):
             id: The unique identifier of the storage.
             name: The name of the storage, if available.
         """
+        validate_storage_name(name)
+
         self._client = client
         self._id = id
         self._name = name

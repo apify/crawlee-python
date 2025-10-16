@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 async def kvs_client() -> AsyncGenerator[MemoryKeyValueStoreClient, None]:
     """Fixture that provides a fresh memory key-value store client for each test."""
-    client = await MemoryStorageClient().create_kvs_client(name='test_kvs')
+    client = await MemoryStorageClient().create_kvs_client(name='test-kvs')
     yield client
     await client.drop()
 
@@ -26,7 +26,7 @@ async def test_memory_specific_purge_behavior() -> None:
 
     # Create KVS and add data
     kvs_client1 = await MemoryStorageClient().create_kvs_client(
-        name='test_purge_kvs',
+        name='test-purge-kvs',
     )
     await kvs_client1.set_value(key='test-key', value='initial value')
 
@@ -37,7 +37,7 @@ async def test_memory_specific_purge_behavior() -> None:
 
     # Reopen with same storage client instance
     kvs_client2 = await MemoryStorageClient().create_kvs_client(
-        name='test_purge_kvs',
+        name='test-purge-kvs',
     )
 
     # Verify value was purged (memory storage specific behavior)

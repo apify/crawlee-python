@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
@@ -94,7 +94,7 @@ class FileSystemDatasetClient(DatasetClient):
         name: str | None,
         alias: str | None,
         configuration: Configuration,
-    ) -> FileSystemDatasetClient:
+    ) -> Self:
         """Open or create a file system dataset client.
 
         This method attempts to open an existing dataset from the file system. If a dataset with the specified ID

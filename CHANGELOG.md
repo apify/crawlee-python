@@ -3,7 +3,27 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 1.0.1 - **not yet released**
+## 1.0.3 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Add support for Pydantic v2.12 ([#1471](https://github.com/apify/crawlee-python/pull/1471)) ([35c1108](https://github.com/apify/crawlee-python/commit/35c110878c2f445a2866be2522ea8703e9b371dd)) by [@Mantisus](https://github.com/Mantisus), closes [#1464](https://github.com/apify/crawlee-python/issues/1464)
+- Fix database version warning message ([#1485](https://github.com/apify/crawlee-python/pull/1485)) ([18a545e](https://github.com/apify/crawlee-python/commit/18a545ee8add92e844acd0068f9cb8580a82e1c9)) by [@Mantisus](https://github.com/Mantisus)
+- Fix `reclaim_request` in `SqlRequestQueueClient` to correctly update the request state ([#1486](https://github.com/apify/crawlee-python/pull/1486)) ([1502469](https://github.com/apify/crawlee-python/commit/150246957f8f7f1ceb77bb77e3a02a903c50cae1)) by [@Mantisus](https://github.com/Mantisus), closes [#1484](https://github.com/apify/crawlee-python/issues/1484)
+- Fix `KeyValueStore.auto_saved_value` failing in some scenarios ([#1438](https://github.com/apify/crawlee-python/pull/1438)) ([b35dee7](https://github.com/apify/crawlee-python/commit/b35dee78180e57161b826641d45a61b8d8f6ef51)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1354](https://github.com/apify/crawlee-python/issues/1354)
+
+
+<!-- git-cliff-unreleased-end -->
+## [1.0.2](https://github.com/apify/crawlee-python/releases/tag/v1.0.2) (2025-10-08)
+
+### 🐛 Bug Fixes
+
+- Use Self type in the open() method of storage clients ([#1462](https://github.com/apify/crawlee-python/pull/1462)) ([4ec6f6c](https://github.com/apify/crawlee-python/commit/4ec6f6c08f81632197f602ff99151338b3eba6e7)) by [@janbuchar](https://github.com/janbuchar)
+- Add storages name validation ([#1457](https://github.com/apify/crawlee-python/pull/1457)) ([84de11a](https://github.com/apify/crawlee-python/commit/84de11a3a603503076f5b7df487c9abab68a9015)) by [@Mantisus](https://github.com/Mantisus), closes [#1434](https://github.com/apify/crawlee-python/issues/1434)
+- Pin pydantic version to &lt;2.12.0 to avoid compatibility issues ([#1467](https://github.com/apify/crawlee-python/pull/1467)) ([f11b86f](https://github.com/apify/crawlee-python/commit/f11b86f7ed57f98e83dc1b52f15f2017a919bf59)) by [@vdusek](https://github.com/vdusek)
+
+
+## [1.0.1](https://github.com/apify/crawlee-python/releases/tag/v1.0.1) (2025-10-06)
 
 ### 🐛 Bug Fixes
 
@@ -11,8 +31,10 @@ All notable changes to this project will be documented in this file.
 - Update templates to handle optional httpx client ([#1440](https://github.com/apify/crawlee-python/pull/1440)) ([c087efd](https://github.com/apify/crawlee-python/commit/c087efd39baedf46ca3e5cae1ddc1acd6396e6c1)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.0.0](https://github.com/apify/crawlee-python/releases/tag/v1.0.0) (2025-09-29)
+
+- Check out the [Release blog post](https://crawlee.dev/blog/crawlee-for-python-v1) for more details.
+- Check out the [Upgrading guide](https://crawlee.dev/python/docs/upgrading/upgrading-to-v1) to ensure a smooth update.
 
 ### 🚀 Features
 
@@ -196,6 +218,9 @@ All notable changes to this project will be documented in this file.
 
 ## [0.6.0](https://github.com/apify/crawlee-python/releases/tag/v0.6.0) (2025-03-03)
 
+- Check out the [Release blog post](https://crawlee.dev/blog/crawlee-for-python-v06) for more details.
+- Check out the [Upgrading guide](https://crawlee.dev/python/docs/upgrading/upgrading-to-v0x#upgrading-to-v06) to ensure a smooth update.
+
 ### 🚀 Features
 
 - Integrate browserforge fingerprints ([#829](https://github.com/apify/crawlee-python/pull/829)) ([2b156b4](https://github.com/apify/crawlee-python/commit/2b156b4ba688f9111195422e6058dff30eb1f782)) by [@Pijukatel](https://github.com/Pijukatel), closes [#549](https://github.com/apify/crawlee-python/issues/549)
@@ -275,6 +300,9 @@ All notable changes to this project will be documented in this file.
 
 
 ## [0.5.0](https://github.com/apify/crawlee-python/releases/tag/v0.5.0) (2025-01-02)
+
+- Check out the [Release blog post](https://crawlee.dev/blog/crawlee-for-python-v05) for more details.
+- Check out the [Upgrading guide](https://crawlee.dev/python/docs/upgrading/upgrading-to-v0x#upgrading-to-v05) to ensure a smooth update.
 
 ### 🚀 Features
 
@@ -366,6 +394,8 @@ All notable changes to this project will be documented in this file.
 
 
 ## [0.4.0](https://github.com/apify/crawlee-python/releases/tag/v0.4.0) (2024-11-01)
+
+- Check out the [Upgrading guide](https://crawlee.dev/python/docs/upgrading/upgrading-to-v0x#upgrading-to-v04) to ensure a smooth update.
 
 ### 🚀 Features
 
@@ -475,6 +505,8 @@ All notable changes to this project will be documented in this file.
 
 
 ## [0.3.0](https://github.com/apify/crawlee-python/releases/tag/v0.3.0) (2024-08-27)
+
+- Check out the [Upgrading guide](https://crawlee.dev/python/docs/upgrading/upgrading-to-v0x#upgrading-to-v03) to ensure a smooth update.
 
 ### 🚀 Features
 

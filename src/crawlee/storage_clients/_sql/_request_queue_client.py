@@ -5,12 +5,12 @@ from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from hashlib import sha256
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import CursorResult, func, or_, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only
-from typing_extensions import NotRequired, override
+from typing_extensions import NotRequired, Self, override
 
 from crawlee import Request
 from crawlee._utils.crypto import crypto_random_object_id
@@ -119,7 +119,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         name: str | None,
         alias: str | None,
         storage_client: SqlStorageClient,
-    ) -> SqlRequestQueueClient:
+    ) -> Self:
         """Open an existing request queue or create a new one.
 
         This method first tries to find an existing queue by ID or name.
@@ -231,6 +231,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
         async with self.get_session() as session:
             result = await session.execute(stmt)
+            result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
             existing_requests = {req.request_id: req for req in result.scalars()}
             state = await self._get_state(session)
             insert_values: list[dict] = []
@@ -498,9 +499,12 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         )
         async with self.get_session() as session:
             result = await session.execute(stmt)
+            result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
+
             if result.rowcount == 0:
                 logger.warning(f'Request {request.unique_key} not found in database.')
                 return None
+
             await self._update_metadata(
                 session,
                 **_QueueMetadataUpdateParams(
@@ -542,14 +546,24 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 block_until = now + timedelta(seconds=self._BLOCK_REQUEST_TIME)
                 # Extend blocking for forefront request, it is considered blocked by the current client.
                 stmt = stmt.values(
-                    sequence_number=new_sequence, time_blocked_until=block_until, client_key=self.client_key
+                    sequence_number=new_sequence,
+                    time_blocked_until=block_until,
+                    client_key=self.client_key,
+                    data=request.model_dump_json(),
                 )
             else:
                 new_sequence = state.sequence_counter
                 state.sequence_counter += 1
-                stmt = stmt.values(sequence_number=new_sequence, time_blocked_until=None, client_key=None)
+                stmt = stmt.values(
+                    sequence_number=new_sequence,
+                    time_blocked_until=None,
+                    client_key=None,
+                    data=request.model_dump_json(),
+                )
 
             result = await session.execute(stmt)
+            result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
+
             if result.rowcount == 0:
                 logger.warning(f'Request {request.unique_key} not found in database.')
                 return None

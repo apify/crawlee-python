@@ -40,7 +40,7 @@ async def kvs_client(
     async with SqlStorageClient() as storage_client:
         monkeypatch.setattr(storage_client, '_accessed_modified_update_interval', timedelta(seconds=0))
         client = await storage_client.create_kvs_client(
-            name='test_kvs',
+            name='test-kvs',
             configuration=configuration,
         )
         monkeypatch.setattr(client, '_accessed_modified_update_interval', timedelta(seconds=0))
@@ -60,7 +60,7 @@ async def test_create_tables_with_connection_string(configuration: Configuration
 
     async with SqlStorageClient(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_client:
         await storage_client.create_kvs_client(
-            name='new_kvs',
+            name='new-kvs',
             configuration=configuration,
         )
 
@@ -78,7 +78,7 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
 
     async with SqlStorageClient(engine=engine) as storage_client:
         await storage_client.create_kvs_client(
-            name='new_kvs',
+            name='new-kvs',
             configuration=configuration,
         )
 
@@ -92,7 +92,7 @@ async def test_tables_and_metadata_record(configuration: Configuration) -> None:
     """Test that SQL key-value store creates proper tables and metadata records."""
     async with SqlStorageClient() as storage_client:
         client = await storage_client.create_kvs_client(
-            name='new_kvs',
+            name='new-kvs',
             configuration=configuration,
         )
 
@@ -104,12 +104,12 @@ async def test_tables_and_metadata_record(configuration: Configuration) -> None:
             assert 'key_value_store_records' in tables
 
         async with client.get_session() as session:
-            stmt = select(KeyValueStoreMetadataDb).where(KeyValueStoreMetadataDb.name == 'new_kvs')
+            stmt = select(KeyValueStoreMetadataDb).where(KeyValueStoreMetadataDb.name == 'new-kvs')
             result = await session.execute(stmt)
             orm_metadata = result.scalar_one_or_none()
             metadata = KeyValueStoreMetadata.model_validate(orm_metadata)
             assert metadata.id == client_metadata.id
-            assert metadata.name == 'new_kvs'
+            assert metadata.name == 'new-kvs'
 
         await client.drop()
 
