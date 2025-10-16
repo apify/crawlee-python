@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import pytest
@@ -419,6 +420,36 @@ async def test_is_empty(rq: RequestQueue) -> None:
 
     # Queue should be empty again
     assert await rq.is_empty() is True
+
+
+@pytest.mark.parametrize(
+    ('wait_for_all'),
+    [
+        pytest.param(True, id='wait for all'),
+        pytest.param(False, id='don`t wait for all'),
+    ],
+)
+async def test_add_requests_wait_for_all(rq: RequestQueue, *, wait_for_all: bool) -> None:
+    """Test adding requests with wait_for_all_requests_to_be_added option."""
+    urls = [f'https://example.com/{i}' for i in range(15)]
+
+    # Add requests without waiting
+    await rq.add_requests(
+        urls,
+        batch_size=5,
+        wait_for_all_requests_to_be_added=wait_for_all,
+        wait_time_between_batches=timedelta(milliseconds=100),
+    )
+
+    if not wait_for_all:
+        # Immediately after adding, the total count may be less than 15 due to background processing
+        assert await rq.get_total_count() <= 15
+
+        # Wait a 250 milliseconds for background tasks to complete
+        await asyncio.sleep(0.25)
+
+    # Verify all requests were added
+    assert await rq.get_total_count() == 15
 
 
 async def test_is_finished(rq: RequestQueue) -> None:
