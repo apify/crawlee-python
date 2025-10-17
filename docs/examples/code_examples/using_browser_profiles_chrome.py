@@ -27,14 +27,12 @@ async def main() -> None:
 
         crawler = PlaywrightCrawler(
             headless=False,
-            # Use chromium for Chrome compatibility
-            browser_type='chromium',
+            # Use the installed Chrome browser
+            browser_type='chrome',
             # Disable fingerprints to preserve profile identity
             fingerprint_generator=None,
             # Set user data directory to temp folder
             user_data_dir=tmp_profile_dir,
-            # Use the installed Chrome browser
-            use_chrome=True,
             browser_launch_options={
                 # Slow down actions to mimic human behavior
                 'slow_mo': 200,

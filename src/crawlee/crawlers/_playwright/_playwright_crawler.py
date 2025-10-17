@@ -106,7 +106,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         fingerprint_generator: FingerprintGenerator | None | Literal['default'] = 'default',
         headless: bool | None = None,
         use_incognito_pages: bool | None = None,
-        use_chrome: bool | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext, StatisticsState]],
     ) -> None:
         """Initialize a new instance.
@@ -115,7 +114,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.
             user_data_dir: Path to a user data directory, which stores browser session data like cookies
                 and local storage.
-            browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
+            browser_type: The type of browser to launch ('chromium', 'firefox', 'webkit' or 'chrome'). Use `chrome` to
+                use the installed Chrome browser instead of Chromium.
                 This option should not be used if `browser_pool` is provided.
             browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
                 directly to Playwright's `browser_type.launch` method. For more details, refer to the
@@ -132,10 +132,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             use_incognito_pages: By default pages share the same browser context. If set to True each page uses its
                 own context that is destroyed once the page is closed or crashes.
                 This option should not be used if `browser_pool` is provided.
-            use_chrome: Whether to use the installed Chrome browser (if available) instead of the default
-                Chromium browser that comes bundled with Playwright. This option is only relevant when
-                `browser_type` is set to 'chromium'.
-                This option should not be used if `browser_pool` is provided.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         configuration = kwargs.pop('configuration', None)
@@ -149,7 +145,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 for param in (
                     user_data_dir,
                     use_incognito_pages,
-                    use_chrome,
                     headless,
                     browser_type,
                     browser_launch_options,
@@ -159,7 +154,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             ):
                 raise ValueError(
                     'You cannot provide `headless`, `browser_type`, `browser_launch_options`, '
-                    '`browser_new_context_options`, `use_incognito_pages`, `use_chrome`, `user_data_dir` or'
+                    '`browser_new_context_options`, `use_incognito_pages`, `user_data_dir` or'
                     '`fingerprint_generator` arguments when `browser_pool` is provided.'
                 )
 
@@ -182,7 +177,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 browser_launch_options=browser_launch_options,
                 browser_new_context_options=browser_new_context_options,
                 use_incognito_pages=use_incognito_pages,
-                use_chrome=use_chrome,
                 fingerprint_generator=fingerprint_generator,
             )
 
@@ -501,7 +495,8 @@ class _PlaywrightCrawlerAdditionalOptions(TypedDict):
     """A `BrowserPool` instance to be used for launching the browsers and getting pages."""
 
     browser_type: NotRequired[BrowserType]
-    """The type of browser to launch ('chromium', 'firefox', or 'webkit').
+    """The type of browser to launch ('chromium', 'firefox', 'webkit' or 'chrome'). Use `chrome` to
+    use the installed Chrome browser instead of Chromium.
     This option should not be used if `browser_pool` is provided."""
 
     browser_launch_options: NotRequired[Mapping[str, Any]]

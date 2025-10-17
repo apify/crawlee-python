@@ -71,20 +71,11 @@ async def test_methods_raise_error_when_not_active() -> None:
         assert plugin.active is True
 
 
-async def raise_error_if_use_chrome_and_executable_path() -> None:
+async def raise_error_if_chrome_and_executable_path() -> None:
     with pytest.raises(
         ValueError, match=r'Cannot use `use_chrome` with `Configuration.default_browser_path` or `executable_path` set.'
     ):
         PlaywrightBrowserPlugin(
-            browser_type='chromium',
-            use_chrome=True,
+            browser_type='chrome',
             browser_launch_options={'executable_path': '/path/to/chrome'},
-        )
-
-
-async def raise_error_if_use_chrome_with_firefox() -> None:
-    with pytest.raises(ValueError, match=r'`use_chrome` can only be used with `chromium` `browser_type`.'):
-        PlaywrightBrowserPlugin(
-            browser_type='firefox',
-            use_chrome=True,
         )
