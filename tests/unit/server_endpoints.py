@@ -14,6 +14,7 @@ START_ENQUEUE = b"""\
 <body>
     <a href="/sub_index" class="foo">Link 1</a>
     <a href="/page_1">Link 2</a>
+    <a href="mailto:test@test.com">test@test.com</a>
 </body></html>"""
 
 SECONDARY_INDEX = b"""\

@@ -30,7 +30,7 @@ async def test_basic(server_url: URL, http_client: HttpClient) -> None:
     assert handler.called
 
     # The handler should find two links
-    assert len(handler.call_args[0][0]) == 2
+    assert len(handler.call_args[0][0]) == 3
 
 
 async def test_enqueue_links(redirect_server_url: URL, server_url: URL, http_client: HttpClient) -> None:
