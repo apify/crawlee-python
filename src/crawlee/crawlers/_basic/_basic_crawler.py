@@ -11,7 +11,7 @@ import traceback
 from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Sequence
 from contextlib import AsyncExitStack, suppress
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, Literal, cast
@@ -740,20 +740,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             for context in contexts_to_enter:
                 await exit_stack.enter_async_context(context)  # type: ignore[arg-type]
 
-            self._crawler_state_rec_task.start()
-            try:
+            async with self._crawler_state_rec_task:
                 await self._autoscaled_pool.run()
-            finally:
-                await self._crawler_state_rec_task.stop()
 
             # Emit PERSIST_STATE event when crawler is finishing to allow listeners to persist their state if needed
-            if not self.statistics.state.crawler_last_started_at:
-                raise RuntimeError('Statistics.state.crawler_last_started_at not set.')
-            run_duration = datetime.now(timezone.utc) - self.statistics.state.crawler_last_started_at
-            self._statistics.state.crawler_runtime = self.statistics.state.crawler_runtime + run_duration
-            self._service_locator.get_event_manager().emit(
-                event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False)
-            )
+            event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
 
     async def add_requests(
         self,

@@ -96,7 +96,7 @@ class Statistics(Generic[TStatisticsState]):
 
         self._state = RecoverableState(
             default_state=state_model(stats_id=self._id),
-            persist_state_key=persist_state_key or f'SDK_CRAWLER_STATISTICS_{self._id}',
+            persist_state_key=persist_state_key or f'__CRAWLER_STATISTICS_{self._id}',
             persistence_enabled=persistence_enabled,
             persist_state_kvs_name=persist_state_kvs_name,
             persist_state_kvs_factory=persist_state_kvs_factory,
@@ -187,7 +187,10 @@ class Statistics(Generic[TStatisticsState]):
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        self._state.current_value.crawler_finished_at = datetime.now(timezone.utc)
+        if not self.state.crawler_last_started_at:
+            raise RuntimeError('Statistics.state.crawler_last_started_at not set.')
+        self.state.crawler_finished_at = datetime.now(timezone.utc)
+        self.state.crawler_runtime += self.state.crawler_finished_at - self.state.crawler_last_started_at
 
         await self._state.teardown()
 
