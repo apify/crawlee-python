@@ -29,8 +29,9 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statisti
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
     AdaptiveContextError,
 )
+from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
-from crawlee.storages import KeyValueStore
+from crawlee.storages import KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterator
@@ -727,3 +728,40 @@ async def test_adaptive_context_query_non_existing_element(test_urls: list[str])
     await crawler.run(test_urls[:1])
 
     mocked_h3_handler.assert_called_once_with(None)
+
+
+async def test_change_context_state_after_handling(server_url: URL) -> None:
+    """Test that context state is saved after handling the request."""
+    static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+
+    test_mapper = {}
+    request_queue = await RequestQueue.open(name='state-test')
+    async with SessionPool() as session_pool:
+        crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+            rendering_type_predictor=static_only_predictor_no_detection,
+            session_pool=session_pool,
+            request_manager=request_queue,
+        )
+
+        @crawler.router.default_handler
+        async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+            if context.session is not None:
+                test_mapper['session_id'] = context.session.id
+                context.session.user_data['session_state'] = True
+            context.request.user_data['request_state'] = True
+
+        request = Request.from_url(str(server_url))
+
+        await crawler.run([request])
+
+        assert test_mapper['session_id'] is not None
+
+        session = await session_pool.get_session_by_id(test_mapper['session_id'])
+        check_request = await request_queue.get_request(request.unique_key)
+
+        assert session is not None
+        assert check_request is not None
+        assert session.user_data.get('session_state') is True
+        assert check_request.user_data.get('request_state') is True
+
+        await request_queue.drop()
