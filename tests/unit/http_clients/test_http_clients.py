@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -163,6 +164,10 @@ async def test_send_request_allow_redirects_false(custom_http_client: HttpClient
 
 
 async def test_stream(http_client: HttpClient, server_url: URL) -> None:
+    # TODO: Remove this skip when #1494 is resolved.
+    if isinstance(http_client, CurlImpersonateHttpClient) and sys.platform != 'linux':
+        pytest.skip('Curl stream is flaky on Windows, see #1494.')
+
     content_body: bytes = b''
 
     async with http_client.stream(str(server_url)) as response:

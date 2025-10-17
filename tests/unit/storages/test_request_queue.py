@@ -11,7 +11,7 @@ import pytest
 
 from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import StorageClient
+from crawlee.storage_clients import MemoryStorageClient, StorageClient
 from crawlee.storages import RequestQueue
 from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
@@ -1034,7 +1034,7 @@ async def test_purge_on_start_enabled(storage_client: StorageClient) -> None:
     """Test purge behavior when purge_on_start=True: named storages retain data, unnamed storages are purged."""
 
     # Skip this test for memory storage since it doesn't persist data between client instances.
-    if storage_client.__class__.__name__ == 'MemoryStorageClient':
+    if isinstance(storage_client, MemoryStorageClient):
         pytest.skip('Memory storage does not persist data between client instances.')
 
     configuration = Configuration(purge_on_start=True)
@@ -1160,7 +1160,7 @@ async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
     """Test purge behavior when purge_on_start=False: all storages retain data regardless of type."""
 
     # Skip this test for memory storage since it doesn't persist data between client instances.
-    if storage_client.__class__.__name__ == 'MemoryStorageClient':
+    if isinstance(storage_client, MemoryStorageClient):
         pytest.skip('Memory storage does not persist data between client instances.')
 
     configuration = Configuration(purge_on_start=False)
