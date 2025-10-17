@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -426,11 +427,20 @@ async def test_is_empty(rq: RequestQueue) -> None:
     ('wait_for_all'),
     [
         pytest.param(True, id='wait for all'),
-        pytest.param(False, id='don`t wait for all'),
+        pytest.param(False, id='do not wait for all'),
     ],
 )
-async def test_add_requests_wait_for_all(rq: RequestQueue, *, wait_for_all: bool) -> None:
+async def test_add_requests_wait_for_all(
+    request: pytest.FixtureRequest,
+    rq: RequestQueue,
+    *,
+    wait_for_all: bool,
+) -> None:
     """Test adding requests with wait_for_all_requests_to_be_added option."""
+    # TODO: Remove this skip when #1498 is resolved.
+    if request.param['wait_for_all'] == 'do not wait for all' and sys.platform != 'linux':
+        pytest.skip('Flaky test on Windows, see #1498.')
+
     urls = [f'https://example.com/{i}' for i in range(15)]
 
     # Add requests without waiting

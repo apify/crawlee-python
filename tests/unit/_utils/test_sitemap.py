@@ -1,11 +1,14 @@
 import base64
 import gzip
+import sys
 from datetime import datetime
 
+import pytest
 from yarl import URL
 
 from crawlee._utils.sitemap import Sitemap, SitemapUrl, parse_sitemap
 from crawlee.http_clients._base import HttpClient
+from crawlee.http_clients._curl_impersonate import CurlImpersonateHttpClient
 
 BASIC_SITEMAP = """
 <?xml version="1.0" encoding="UTF-8"?>
@@ -95,6 +98,10 @@ async def test_gzipped_sitemap(server_url: URL, http_client: HttpClient) -> None
 
 async def test_gzipped_sitemap_with_invalid_data(server_url: URL, http_client: HttpClient) -> None:
     """Test loading a invalid gzipped sitemap with correct type and .xml.gz url."""
+    # TODO: Remove this skip when #1460 is resolved.
+    if isinstance(http_client, CurlImpersonateHttpClient) and sys.platform != 'linux':
+        pytest.skip('Flaky with Curl on Windows, see #1460.')
+
     compress_data = compress_gzip(BASIC_SITEMAP)
     invalid_gzipped_data = encode_base64(compress_data[:30])
     sitemap_url = (server_url / 'sitemap.xml.gz').with_query(base64=invalid_gzipped_data, c_type='application/gzip')
