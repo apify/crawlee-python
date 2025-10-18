@@ -34,8 +34,8 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
 
     It is a plugin designed to manage browser instances using the Playwright automation library. It acts as a factory
     for creating new browser instances and provides a unified interface for interacting with different browser types
-    (chromium, firefox, and webkit). This class integrates configuration options for browser launches (headless mode,
-    executable paths, sandboxing, ...). It also manages browser contexts and the number of pages open within each
+    (chromium, firefox, webkit and chrome). This class integrates configuration options for browser launches (headless
+    mode, executable paths, sandboxing, ...). It also manages browser contexts and the number of pages open within each
     browser instance, ensuring that resource limits are respected.
     """
 
@@ -55,7 +55,8 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
         """Initialize a new instance.
 
         Args:
-            browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
+            browser_type: The type of browser to launch ('chromium', 'firefox', 'webkit' or 'chrome'). Use `chrome` to
+                use the installed Chrome browser instead of Chromium.
             user_data_dir: Path to a User Data Directory, which stores browser session data like cookies and local
                 storage.
             browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
@@ -79,6 +80,15 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
             'executable_path': config.default_browser_path,
             'chromium_sandbox': not config.disable_browser_sandbox,
         }
+
+        if browser_type == 'chrome' and default_launch_browser_options['executable_path']:
+            raise ValueError(
+                'Cannot use browser_type `chrome` with `Configuration.default_browser_path` or `executable_path` set.'
+            )
+
+        if browser_type == 'chrome':
+            browser_type = 'chromium'
+            default_launch_browser_options['channel'] = 'chrome'
 
         self._browser_type: BrowserType = browser_type
         self._browser_launch_options: dict[str, Any] = default_launch_browser_options | (browser_launch_options or {})
