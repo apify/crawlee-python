@@ -366,7 +366,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             links_iterator: Iterator[str] = iter(
                 [url for element in elements if (url := await element.get_attribute('href')) is not None]
             )
-            links_iterator = to_absolute_url_iterator(context.request.loaded_url or context.request.url, links_iterator)
+            links_iterator = to_absolute_url_iterator(
+                context.request.loaded_url or context.request.url, links_iterator, logger=context.log
+            )
 
             if robots_txt_file:
                 skipped, links_iterator = partition(lambda url: robots_txt_file.is_allowed(url), links_iterator)
