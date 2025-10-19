@@ -95,7 +95,9 @@ class SqlStorageClient(StorageClient):
         await self.close()
 
     def __deepcopy__(self, memo: dict[int, Any] | None) -> SqlStorageClient:
-        # AsyncEngine is not deepcopy-able, reuse the same instance
+        # Required for compatibility with `AdaptivePlaywrightCrawler`. Solves the problem that `AsyncEngine`
+        # does not support `deepcopy`.
+
         if memo is None:
             memo = {}
 
@@ -105,6 +107,7 @@ class SqlStorageClient(StorageClient):
         # Suppress warnings about experimental feature during deepcopy
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', UserWarning)
+            # Reuse the same instance of AsyncEngine if already created
             if self._engine is not None:
                 new_client = self.__class__(engine=self._engine)
             else:
