@@ -32,16 +32,17 @@ type-check:
 unit-tests:
 	uv run pytest --numprocesses=1 -vv tests/unit -m "run_alone"
 	# Temp, run tests 10 times to find flakiness
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone" -k "test_service_locator or [curl]"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone" -k "test_service_locator or [curl]"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone" -k "test_service_locator or [curl]"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone" -k "test_service_locator or [curl]"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone" -k "test_service_locator or [curl]"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone" -k "test_service_locator or [curl]"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone" -k "test_service_locator or [curl]"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone" -k "test_service_locator or [curl]"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone" -k "test_service_locator or [curl]"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone" -k "test_service_locator or [curl]"
+	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
+	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
+	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
+	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
+	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
+	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
+	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
+	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
+	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
+	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
+
 
 unit-tests-cov:
 	uv run pytest --numprocesses=1 -vv --cov=src/crawlee tests/unit -m "run_alone"
