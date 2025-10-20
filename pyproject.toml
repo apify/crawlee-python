@@ -63,8 +63,7 @@ curl-impersonate = [
     "cffi<2.0.0", # https://github.com/apify/crawlee-python/issues/1494
     "pycparser<2.22",
     "certifi<2025.10.5",
-    "propcache<0.4.0",
-    "yarl<1.21.0"
+    "propcache<0.4.0"
 ]
 httpx = ["httpx[brotli,http2,zstd]>=0.27.0", "apify_fingerprint_datapoints>=0.0.2", "browserforge>=1.2.3"]
 parsel = ["parsel>=1.10.0"]
