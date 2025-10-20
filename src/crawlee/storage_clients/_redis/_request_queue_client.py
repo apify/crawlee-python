@@ -448,6 +448,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 self._pending_fetch_cache.appendleft(request)
             else:
                 await await_redis_response(pipe.rpush(self._queue_key, request.unique_key))
+                await await_redis_response(pipe.hset(self._data_key, request.unique_key, request.model_dump_json()))
                 await await_redis_response(pipe.hdel(self._in_progress_key, request.unique_key))
             await self._update_metadata(
                 pipe,
