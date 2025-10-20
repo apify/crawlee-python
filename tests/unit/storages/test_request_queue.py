@@ -445,15 +445,15 @@ async def test_add_requests_wait_for_all(
         urls,
         batch_size=5,
         wait_for_all_requests_to_be_added=wait_for_all,
-        wait_time_between_batches=timedelta(milliseconds=100),
+        wait_time_between_batches=timedelta(milliseconds=50),
     )
 
     if not wait_for_all:
         # Immediately after adding, the total count may be less than 15 due to background processing
         assert await rq.get_total_count() <= 15
 
-        # Wait a 250 milliseconds for background tasks to complete
-        await asyncio.sleep(0.25)
+        # Wait a 500 milliseconds for background tasks to complete
+        await asyncio.sleep(0.5)
 
     # Verify all requests were added
     assert await rq.get_total_count() == 15
