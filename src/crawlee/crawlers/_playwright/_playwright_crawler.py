@@ -154,7 +154,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             ):
                 raise ValueError(
                     'You cannot provide `headless`, `browser_type`, `browser_launch_options`, '
-                    '`browser_new_context_options`, `use_incognito_pages`, `user_data_dir` or'
+                    '`browser_new_context_options`, `use_incognito_pages`, `user_data_dir` or '
                     '`fingerprint_generator` arguments when `browser_pool` is provided.'
                 )
 
