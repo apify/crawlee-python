@@ -37,7 +37,7 @@ jobs:
     name: Wait for code checks to pass
     runs-on: ubuntu-latest
     steps:
-      - uses: lewagon/wait-on-check-action@v1.4.0
+      - uses: lewagon/wait-on-check-action@v1.4.1
         with:
           ref: ${{ github.ref }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}

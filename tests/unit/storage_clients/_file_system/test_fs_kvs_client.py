@@ -27,14 +27,14 @@ def configuration(tmp_path: Path) -> Configuration:
 @pytest.fixture
 async def kvs_client(configuration: Configuration) -> AsyncGenerator[FileSystemKeyValueStoreClient, None]:
     """A fixture for a file system key-value store client."""
-    client = await FileSystemStorageClient().create_kvs_client(name='test_kvs', configuration=configuration)
+    client = await FileSystemStorageClient().create_kvs_client(name='test-kvs', configuration=configuration)
     yield client
     await client.drop()
 
 
 async def test_file_and_directory_creation(configuration: Configuration) -> None:
     """Test that file system KVS creates proper files and directories."""
-    client = await FileSystemStorageClient().create_kvs_client(name='new_kvs', configuration=configuration)
+    client = await FileSystemStorageClient().create_kvs_client(name='new-kvs', configuration=configuration)
 
     # Verify files were created
     assert client.path_to_kvs.exists()
@@ -44,7 +44,7 @@ async def test_file_and_directory_creation(configuration: Configuration) -> None
     with client.path_to_metadata.open() as f:
         metadata = json.load(f)
         assert metadata['id'] == (await client.get_metadata()).id
-        assert metadata['name'] == 'new_kvs'
+        assert metadata['name'] == 'new-kvs'
 
     await client.drop()
 

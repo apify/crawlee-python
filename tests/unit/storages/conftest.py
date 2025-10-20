@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 def storage_client(
     request: pytest.FixtureRequest,
     redis_client: FakeAsyncRedis,
-    suppress_user_warning: None,  # noqa: ARG001
 ) -> StorageClient:
     """Parameterized fixture to test with different storage clients."""
     storage_client: StorageClient

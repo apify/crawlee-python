@@ -3,17 +3,7 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    Literal,
-    Protocol,
-    TypedDict,
-    TypeVar,
-    cast,
-    overload,
-)
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, TypedDict, TypeVar, cast, overload
 
 from pydantic import ConfigDict, Field, PlainValidator, RootModel
 
@@ -71,11 +61,15 @@ class HttpHeaders(RootModel, Mapping[str, str]):
 
     model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
-    root: Annotated[
-        dict[str, str],
-        PlainValidator(lambda value: _normalize_headers(value)),
-        Field(default_factory=dict),
-    ] = {}
+    # Workaround for pydantic 2.12 and mypy type checking issue for Annotated with default_factory
+    if TYPE_CHECKING:
+        root: dict[str, str] = {}
+    else:
+        root: Annotated[
+            dict[str, str],
+            PlainValidator(lambda value: _normalize_headers(value)),
+            Field(default_factory=dict),
+        ]
 
     def __getitem__(self, key: str) -> str:
         return self.root[key.lower()]

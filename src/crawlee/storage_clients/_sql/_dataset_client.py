@@ -4,7 +4,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Select, insert, select
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
@@ -78,7 +78,7 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
         name: str | None,
         alias: str | None,
         storage_client: SqlStorageClient,
-    ) -> SqlDatasetClient:
+    ) -> Self:
         """Open an existing dataset or create a new one.
 
         Args:

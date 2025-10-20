@@ -15,6 +15,7 @@ from crawlee._utils.recoverable_state import RecoverableState
 from crawlee.storage_clients.models import KeyValueStoreMetadata
 
 from ._base import Storage
+from ._utils import validate_storage_name
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -84,6 +85,8 @@ class KeyValueStore(Storage):
             id: The unique identifier of the storage.
             name: The name of the storage, if available.
         """
+        validate_storage_name(name)
+
         self._client = client
         self._id = id
         self._name = name
@@ -278,11 +281,14 @@ class KeyValueStore(Storage):
             if key in cache:
                 return cache[key].current_value.root
 
+            async def kvs_factory() -> KeyValueStore:
+                return self
+
             cache[key] = recoverable_state = RecoverableState(
                 default_state=AutosavedValue(default_value),
-                persistence_enabled=True,
-                persist_state_kvs_id=self.id,
                 persist_state_key=key,
+                persistence_enabled=True,
+                persist_state_kvs_factory=kvs_factory,
                 logger=logger,
             )
 

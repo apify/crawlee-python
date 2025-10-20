@@ -4,7 +4,7 @@ import sys
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import infer_mime_type
@@ -53,7 +53,7 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         id: str | None,
         name: str | None,
         alias: str | None,
-    ) -> MemoryKeyValueStoreClient:
+    ) -> Self:
         """Open or create a new memory key-value store client.
 
         This method creates a new in-memory key-value store instance. Unlike persistent storage implementations,

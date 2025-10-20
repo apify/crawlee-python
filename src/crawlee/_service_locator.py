@@ -38,7 +38,7 @@ class ServiceLocator:
     def get_configuration(self) -> Configuration:
         """Get the configuration."""
         if self._configuration is None:
-            logger.warning('No configuration set, implicitly creating and using default Configuration.')
+            logger.debug('No configuration set, implicitly creating and using default Configuration.')
             self._configuration = Configuration()
 
         return self._configuration
@@ -63,9 +63,9 @@ class ServiceLocator:
     def get_event_manager(self) -> EventManager:
         """Get the event manager."""
         if self._event_manager is None:
-            logger.warning('No event manager set, implicitly creating and using default LocalEventManager.')
+            logger.debug('No event manager set, implicitly creating and using default LocalEventManager.')
             if self._configuration is None:
-                logger.warning(
+                logger.debug(
                     'Implicit creation of event manager will implicitly set configuration as side effect. '
                     'It is advised to explicitly first set the configuration instead.'
                 )
@@ -93,7 +93,7 @@ class ServiceLocator:
     def get_storage_client(self) -> StorageClient:
         """Get the storage client."""
         if self._storage_client is None:
-            logger.warning('No storage client set, implicitly creating and using default FileSystemStorageClient.')
+            logger.debug('No storage client set, implicitly creating and using default FileSystemStorageClient.')
             if self._configuration is None:
                 logger.warning(
                     'Implicit creation of storage client will implicitly set configuration as side effect. '

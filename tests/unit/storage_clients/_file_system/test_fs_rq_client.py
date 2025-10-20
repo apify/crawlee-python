@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee import Request
+from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import FileSystemStorageClient
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -28,7 +28,7 @@ def configuration(tmp_path: Path) -> Configuration:
 async def rq_client() -> AsyncGenerator[FileSystemRequestQueueClient, None]:
     """A fixture for a file system request queue client."""
     client = await FileSystemStorageClient().create_rq_client(
-        name='test_request_queue',
+        name='test-request-queue',
     )
     yield client
     await client.drop()
@@ -36,7 +36,7 @@ async def rq_client() -> AsyncGenerator[FileSystemRequestQueueClient, None]:
 
 async def test_file_and_directory_creation() -> None:
     """Test that file system RQ creates proper files and directories."""
-    client = await FileSystemStorageClient().create_rq_client(name='new_request_queue')
+    client = await FileSystemStorageClient().create_rq_client(name='new-request-queue')
 
     # Verify files were created
     assert client.path_to_rq.exists()
@@ -46,7 +46,7 @@ async def test_file_and_directory_creation() -> None:
     with client.path_to_metadata.open() as f:
         metadata = json.load(f)
         assert metadata['id'] == (await client.get_metadata()).id
-        assert metadata['name'] == 'new_request_queue'
+        assert metadata['name'] == 'new-request-queue'
 
     await client.drop()
 
@@ -76,6 +76,14 @@ async def test_request_file_persistence(rq_client: FileSystemRequestQueueClient)
             request_data = json.load(f)
             assert 'url' in request_data
             assert request_data['url'].startswith('https://example.com/')
+
+
+async def test_opening_rq_does_not_have_side_effect_on_service_locator(configuration: Configuration) -> None:
+    """Opening request queue client should cause setting storage client in the global service locator."""
+    await FileSystemStorageClient().create_rq_client(name='test_request_queue', configuration=configuration)
+
+    # Set some specific storage client in the service locator. There should be no `ServiceConflictError`.
+    service_locator.set_storage_client(MemoryStorageClient())
 
 
 async def test_drop_removes_directory(rq_client: FileSystemRequestQueueClient) -> None:
