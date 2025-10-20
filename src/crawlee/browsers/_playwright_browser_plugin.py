@@ -55,8 +55,10 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
         """Initialize a new instance.
 
         Args:
-            browser_type: The type of browser to launch ('chromium', 'firefox', 'webkit' or 'chrome'). Use `chrome` to
-                use the installed Chrome browser instead of Chromium.
+            browser_type: The type of browser to launch:
+                - 'chromium', 'firefox', 'webkit': Use Playwright-managed browsers
+                - 'chrome': Use your locally installed Google Chrome browser. Requires Google Chrome to be installed on
+                    the system.
             user_data_dir: Path to a User Data Directory, which stores browser session data like cookies and local
                 storage.
             browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
@@ -86,8 +88,10 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
                 'Cannot use browser_type `chrome` with `Configuration.default_browser_path` or `executable_path` set.'
             )
 
+        # Map 'chrome' to 'chromium' with the 'chrome' channel.
         if browser_type == 'chrome':
             browser_type = 'chromium'
+            # Chromium parameter 'channel' set to 'chrome' enables using installed Google Chrome.
             default_launch_browser_options['channel'] = 'chrome'
 
         self._browser_type: BrowserType = browser_type
