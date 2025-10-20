@@ -32,16 +32,7 @@ type-check:
 unit-tests:
 	uv run pytest --numprocesses=1 -vv tests/unit -m "run_alone"
 	# Temp, run tests 10 times to find flakiness
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
+	export PYTEST_XDIST_DEBUG=1 &&	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone" --capture=no
 
 
 unit-tests-cov:
