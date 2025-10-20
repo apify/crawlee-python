@@ -67,8 +67,7 @@ curl-impersonate = [
     "yarl<1.21.0",
     "anyio<4.11.0",
     "blessed<1.22.0",
-    "click<8.3.0",
-    "grpcio==1.74.0",
+    "click<8.3.0"
 ]
 httpx = ["httpx[brotli,http2,zstd]>=0.27.0", "apify_fingerprint_datapoints>=0.0.2", "browserforge>=1.2.3"]
 parsel = ["parsel>=1.10.0"]
