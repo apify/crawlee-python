@@ -731,6 +731,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 self._statistics,
                 self._session_pool if self._use_session_pool else None,
                 self._http_client,
+                self._crawler_state_rec_task,
                 *self._additional_context_managers,
             )
             if cm and getattr(cm, 'active', False) is False
@@ -740,8 +741,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             for context in contexts_to_enter:
                 await exit_stack.enter_async_context(context)  # type: ignore[arg-type]
 
-            async with self._crawler_state_rec_task:
-                await self._autoscaled_pool.run()
+            await self._autoscaled_pool.run()
 
             # Emit PERSIST_STATE event when crawler is finishing to allow listeners to persist their state if needed
             event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
