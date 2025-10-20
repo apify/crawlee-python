@@ -45,7 +45,6 @@ dependencies = [
     "tldextract>=5.1.0",
     "typing-extensions>=4.1.0",
     "yarl>=1.18.0",
-    "psutil"
 ]
 
 [project.optional-dependencies]
@@ -70,7 +69,6 @@ curl-impersonate = [
     "blessed<1.22.0",
     "click<8.3.0",
     "grpcio==1.74.0",
-    "lxml==6.0.1",
 ]
 httpx = ["httpx[brotli,http2,zstd]>=0.27.0", "apify_fingerprint_datapoints>=0.0.2", "browserforge>=1.2.3"]
 parsel = ["parsel>=1.10.0"]
