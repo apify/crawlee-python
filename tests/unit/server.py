@@ -459,7 +459,7 @@ class TestServer(Server):
         """Run the server."""
         # Set the event loop policy in thread with server for Windows and Python 3.12+.
         # This is necessary because there are problems with closing connections when using `ProactorEventLoop`
-        if sys.version_info >= (3, 12) and sys.platform == 'win32':
+        if sys.platform == 'win32':
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         super().run(sockets=sockets)
 

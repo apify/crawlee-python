@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+import sys
 import warnings
 from typing import TYPE_CHECKING, cast
 
@@ -76,6 +78,9 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
         # Reset global class variables to ensure test isolation.
         KeyValueStore._autosaved_values = {}
         Statistics._Statistics__next_id = 0  # type:ignore[attr-defined] # Mangled attribute
+
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     return _prepare_test_env
 
