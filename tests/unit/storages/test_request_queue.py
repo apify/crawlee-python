@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
@@ -423,8 +422,6 @@ async def test_is_empty(rq: RequestQueue) -> None:
     assert await rq.is_empty() is True
 
 
-# TODO: Remove this skip when #1498 is resolved.
-@pytest.mark.skipif(sys.platform != 'linux', reason='Flaky test on Windows, see #1498.')
 @pytest.mark.parametrize(
     ('wait_for_all'),
     [
