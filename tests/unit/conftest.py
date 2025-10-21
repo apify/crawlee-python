@@ -165,7 +165,7 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
     await kvs.drop()
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture()
 def http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator[TestServer]:
     """Create and start an HTTP test server."""
     config = Config(app=app, lifespan='off', loop='asyncio', port=unused_tcp_port_factory())
@@ -173,7 +173,7 @@ def http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator[TestServ
     yield from serve_in_thread(server)
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture()
 def server_url(http_server: TestServer) -> URL:
     """Provide the base URL of the test server."""
     return http_server.url
