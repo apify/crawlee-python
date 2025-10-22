@@ -52,7 +52,7 @@ class RedisStorageClient(StorageClient):
             queue_dedup_strategy: Strategy for request queue deduplication. Options are:
                 - 'default': Uses Redis sets for exact deduplication.
                 - 'bloom': Uses Redis Bloom filters for probabilistic deduplication with lower memory usage. When using
-                    this approach, there is a possibility 1e-7 that requests will be skipped in the queue.
+                    this approach, approximately 1 in 1e-7 requests will be falsely considered duplicate.
         """
         if redis is not None and connection_string is not None:
             raise ValueError('Either redis or connection_string must be provided, not both.')
