@@ -42,9 +42,6 @@ class ServiceConflictError(Exception):
     """Raised when attempting to reassign a service in service container that is already in use."""
 
     def __init__(self, service: type, new_value: object, existing_value: object) -> None:
-        self.service = service
-        self.new_value = new_value
-        self.existing_value = existing_value
         super().__init__(
             f'Service {service.__name__} is already in use. Existing value: {existing_value}, '
             f'attempted new value: {new_value}.'

@@ -3,10 +3,8 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
-import sys
 import warnings
 from typing import TYPE_CHECKING, cast
 
@@ -78,9 +76,6 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
         # Reset global class variables to ensure test isolation.
         KeyValueStore._autosaved_values = {}
         Statistics._Statistics__next_id = 0  # type:ignore[attr-defined] # Mangled attribute
-
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     return _prepare_test_env
 
@@ -165,7 +160,7 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
     await kvs.drop()
 
 
-@pytest.fixture()
+@pytest.fixture(scope='session')
 def http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator[TestServer]:
     """Create and start an HTTP test server."""
     config = Config(app=app, lifespan='off', loop='asyncio', port=unused_tcp_port_factory())
@@ -173,7 +168,7 @@ def http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator[TestServ
     yield from serve_in_thread(server)
 
 
-@pytest.fixture()
+@pytest.fixture(scope='session')
 def server_url(http_server: TestServer) -> URL:
     """Provide the base URL of the test server."""
     return http_server.url
@@ -205,9 +200,9 @@ def redirect_server_url(redirect_http_server: TestServer) -> URL:
 
 @pytest.fixture(
     params=[
-        pytest.param('curl', id='curl'),
         pytest.param('httpx', id='httpx'),
         pytest.param('impit', id='impit'),
+        pytest.param('curl', id='curl'),
     ]
 )
 async def http_client(request: pytest.FixtureRequest) -> HttpClient:
