@@ -31,7 +31,7 @@ async def test_basic(server_url: URL, http_client: HttpClient) -> None:
 
     assert handler.called
 
-    # The handler should find two links
+    # The handler should find three links
     assert len(handler.call_args[0][0]) == 3
 
 
