@@ -4,7 +4,6 @@ import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from logging import getLogger
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, TypedDict, overload
 
 from crawlee._utils.crypto import crypto_random_object_id
@@ -192,8 +191,7 @@ class RedisClientMixin:
 
     async def _create_script(self, script_name: str) -> AsyncScript:
         """Load a Lua script from a file and return a Script object."""
-        script_path = Path(__file__).parent / 'lua_scripts' / script_name
-        script_content = await asyncio.to_thread(read_lua_script, script_path)
+        script_content = await asyncio.to_thread(read_lua_script, script_name)
 
         return self._redis.register_script(script_content)
 

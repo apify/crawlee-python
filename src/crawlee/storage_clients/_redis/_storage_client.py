@@ -42,6 +42,7 @@ class RedisStorageClient(StorageClient):
         connection_string: str | None = None,
         redis: Redis | None = None,
         queue_dedup_strategy: Literal['default', 'bloom'] = 'default',
+        queue_bloom_error_rate: float = 1e-7,
     ) -> None:
         """Initialize the Redis storage client.
 
@@ -53,6 +54,8 @@ class RedisStorageClient(StorageClient):
                 - 'default': Uses Redis sets for exact deduplication.
                 - 'bloom': Uses Redis Bloom filters for probabilistic deduplication with lower memory usage. When using
                     this approach, approximately 1 in 1e-7 requests will be falsely considered duplicate.
+            queue_bloom_error_rate: Desired false positive rate for Bloom filter deduplication. Only relevant if
+                `queue_dedup_strategy` is set to 'bloom'.
         """
         match (redis, connection_string):
             case (None, None):
@@ -65,10 +68,14 @@ class RedisStorageClient(StorageClient):
                 raise ValueError('Either redis or connection_string must be provided, not both.')
 
         self._queue_dedup_strategy = queue_dedup_strategy
+        self._queue_bloom_error_rate = queue_bloom_error_rate
 
         # Call the notification only once
         warnings.warn(
-            'The RedisStorageClient is experimental and may change or be removed in future releases.',
+            (
+                'RedisStorageClient is experimental and its API, behavior, and key structure may change in future '
+                'releases.'
+            ),
             category=UserWarning,
             stacklevel=2,
         )
@@ -132,6 +139,7 @@ class RedisStorageClient(StorageClient):
             alias=alias,
             redis=self._redis,
             dedup_strategy=self._queue_dedup_strategy,
+            bloom_error_rate=self._queue_bloom_error_rate,
         )
 
         await self._purge_if_needed(client, configuration)

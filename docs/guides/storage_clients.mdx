@@ -336,6 +336,10 @@ To use it, you need to install Crawlee with the Redis extra dependency:
 Additionally, Redis version 8.0 or higher is required.
 :::
 
+:::note Redis persistence
+Data persistence in Redis depends on your [database configuration](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/).
+:::
+
 The client requires either a Redis connection string or a pre-configured Redis client instance. Use a pre-configured client when you need custom Redis settings such as connection pooling, timeouts, or SSL/TLS encryption.
 
 <CodeBlock className="language-python" language="python">

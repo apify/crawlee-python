@@ -16,7 +16,8 @@ async def await_redis_response(response: Awaitable[T] | T) -> T:
     return await response if isinstance(response, Awaitable) else response
 
 
-def read_lua_script(file_path: Path) -> str:
+def read_lua_script(script_name: str) -> str:
     """Read a Lua script from a file."""
+    file_path = Path(__file__).parent / 'lua_scripts' / script_name
     with file_path.open('r', encoding='utf-8') as file:
         return file.read()

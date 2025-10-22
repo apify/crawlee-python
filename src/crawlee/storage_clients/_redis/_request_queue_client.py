@@ -90,6 +90,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         storage_id: str,
         redis: Redis,
         dedup_strategy: Literal['default', 'bloom'] = 'default',
+        bloom_error_rate: float = 1e-7,
     ) -> None:
         """Initialize a new instance.
 
@@ -99,6 +100,9 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
         self._dedup_strategy = dedup_strategy
         """Deduplication strategy for the queue."""
+
+        self._bloom_error_rate = bloom_error_rate
+        """Desired false positive rate for Bloom filters."""
 
         self._pending_fetch_cache: deque[Request] = deque()
         """Cache for requests: ordered by sequence number."""
@@ -165,6 +169,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         alias: str | None,
         redis: Redis,
         dedup_strategy: Literal['default', 'bloom'] = 'default',
+        bloom_error_rate: float = 1e-7,
     ) -> RedisRequestQueueClient:
         """Open or create a new Redis request queue client.
 
@@ -181,6 +186,8 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 - 'default': Uses Redis sets for exact deduplication.
                 - 'bloom': Uses Redis Bloom filters for probabilistic deduplication with lower memory usage. When using
                     this approach, there is a possibility 1e-7 that requests will be skipped in the queue.
+            bloom_error_rate: Desired false positive rate for Bloom filter deduplication. Only relevant if
+                `dedup_strategy` is set to 'bloom'.
 
         Returns:
             An instance for the opened or created storage client.
@@ -197,7 +204,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 'pending_request_count': 0,
                 'total_request_count': 0,
             },
-            instance_kwargs={'dedup_strategy': dedup_strategy},
+            instance_kwargs={'dedup_strategy': dedup_strategy, 'bloom_error_rate': bloom_error_rate},
         )
 
     @override
@@ -490,10 +497,14 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         # Create Bloom filters for added and handled requests
         if self._dedup_strategy == 'bloom':
             await await_redis_response(
-                pipeline.bf().create(self._added_filter_key, errorRate=1e-7, capacity=100000, expansion=10)  # type: ignore[no-untyped-call]
+                pipeline.bf().create(
+                    self._added_filter_key, errorRate=self._bloom_error_rate, capacity=100000, expansion=10
+                )  # type: ignore[no-untyped-call]
             )
             await await_redis_response(
-                pipeline.bf().create(self._handled_filter_key, errorRate=1e-7, capacity=100000, expansion=10)  # type: ignore[no-untyped-call]
+                pipeline.bf().create(
+                    self._handled_filter_key, errorRate=self._bloom_error_rate, capacity=100000, expansion=10
+                )  # type: ignore[no-untyped-call]
             )
 
     async def _reclaim_stale_requests(self) -> None:
