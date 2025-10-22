@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
@@ -93,32 +93,6 @@ class SqlStorageClient(StorageClient):
     ) -> None:
         """Async context manager exit."""
         await self.close()
-
-    def __deepcopy__(self, memo: dict[int, Any] | None) -> SqlStorageClient:
-        # Required for compatibility with `AdaptivePlaywrightCrawler`. Solves the problem that `AsyncEngine`
-        # does not support `deepcopy`.
-
-        if memo is None:
-            memo = {}
-
-        if id(self) in memo:
-            return cast('SqlStorageClient', memo[id(self)])
-
-        # Suppress warnings about experimental feature during deepcopy
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore', UserWarning)
-            # Reuse the same instance of AsyncEngine if already created
-            if self._engine is not None:
-                new_client = self.__class__(engine=self._engine)
-            else:
-                new_client = self.__class__(connection_string=self._connection_string)
-
-        # Copy simple attributes
-        for attr in ('_initialized', '_dialect_name', '_default_flag', '_accessed_modified_update_interval'):
-            setattr(new_client, attr, getattr(self, attr))
-
-        memo[id(self)] = new_client
-        return new_client
 
     @property
     def engine(self) -> AsyncEngine:

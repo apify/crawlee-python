@@ -25,7 +25,6 @@ from crawlee.crawlers import (
     PlaywrightCrawlingContext,
     PlaywrightPreNavCrawlingContext,
 )
-from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
 from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.statistics import Statistics, StatisticsState
@@ -51,6 +50,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
+    from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
     from crawlee.crawlers._playwright._playwright_crawler import _PlaywrightCrawlerAdditionalOptions
 
 
@@ -166,11 +166,11 @@ class AdaptivePlaywrightCrawler(
         # Each sub crawler will use custom logger .
         static_logger = getLogger('Subcrawler_static')
         static_logger.setLevel(logging.ERROR)
-        basic_crawler_kwargs_for_static_crawler = _BasicCrawlerOptions({'_logger': static_logger, **kwargs})
+        basic_crawler_kwargs_for_static_crawler: _BasicCrawlerOptions = {'_logger': static_logger, **kwargs}
 
         pw_logger = getLogger('Subcrawler_playwright')
         pw_logger.setLevel(logging.ERROR)
-        basic_crawler_kwargs_for_pw_crawler = _BasicCrawlerOptions({'_logger': pw_logger, **kwargs})
+        basic_crawler_kwargs_for_pw_crawler: _BasicCrawlerOptions = {'_logger': pw_logger, **kwargs}
 
         # Initialize sub crawlers to create their pipelines.
         static_crawler_class = AbstractHttpCrawler.create_parsed_http_crawler_class(static_parser=static_parser)
