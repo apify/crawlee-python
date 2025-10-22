@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import logging
 import os
+import re
+import time
 import warnings
 from typing import TYPE_CHECKING, cast
 
@@ -161,8 +163,15 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
 
 
 @pytest.fixture(scope='session')
-def http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator[TestServer]:
+def http_server(unused_tcp_port_factory: Callable[[], int], worker_id: str) -> Iterator[TestServer]:
     """Create and start an HTTP test server."""
+    if m := (re.search(r'\d+(\.\d+)?', worker_id)):
+        extra_delay = int(m[0])
+    delay = 0 if worker_id == 'master' else 1 + extra_delay
+
+    print(f'Worker {worker_id} sleeping for {delay} seconds to avoid port conflicts')
+    time.sleep(delay)
+
     config = Config(app=app, lifespan='off', loop='asyncio', port=unused_tcp_port_factory())
     server = TestServer(config=config)
     yield from serve_in_thread(server)
