@@ -31,7 +31,7 @@ type-check:
 
 unit-tests:
 	uv run pytest --numprocesses=1 -vv tests/unit -m "run_alone"
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
+	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone" --randomly-seed=666
 
 unit-tests-cov:
 	uv run pytest --numprocesses=1 -vv --cov=src/crawlee tests/unit -m "run_alone"

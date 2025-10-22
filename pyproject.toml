@@ -42,6 +42,7 @@ dependencies = [
     "pydantic-settings>=2.2.0,!=2.7.0,!=2.7.1,!=2.8.0",
     "pydantic>=2.11.0",
     "pyee>=9.0.0",
+    "pytest-randomly>=4.0.1",
     "tldextract>=5.1.0",
     "typing-extensions>=4.1.0",
     "yarl>=1.18.0",
