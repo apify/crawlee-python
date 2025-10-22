@@ -54,17 +54,15 @@ class RedisStorageClient(StorageClient):
                 - 'bloom': Uses Redis Bloom filters for probabilistic deduplication with lower memory usage. When using
                     this approach, approximately 1 in 1e-7 requests will be falsely considered duplicate.
         """
-        if redis is not None and connection_string is not None:
-            raise ValueError('Either redis or connection_string must be provided, not both.')
-
-        if redis is None and connection_string is None:
-            raise ValueError('Either redis or connection_string must be provided.')
-
-        if redis is not None:
-            self._redis = redis
-
-        elif connection_string is not None:
-            self._redis = Redis.from_url(connection_string)
+        match (redis, connection_string):
+            case (None, None):
+                raise ValueError('Either redis or connection_string must be provided.')
+            case (Redis(), None):
+                self._redis = redis
+            case (None, str()):
+                self._redis = Redis.from_url(connection_string)
+            case (Redis(), str()):
+                raise ValueError('Either redis or connection_string must be provided, not both.')
 
         self._queue_dedup_strategy = queue_dedup_strategy
 

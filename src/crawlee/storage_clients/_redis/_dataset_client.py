@@ -125,13 +125,14 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
             data = [data]
 
         async with self._get_pipeline() as pipe:
+            # TODO: https://github.com/redis/redis-py/issues/3780
             # Incorrect signature for args type in redis-py
+            # Remove this when the typing is fixed.
             pipe.json().arrappend(self._items_key, '$', *data)  # type: ignore[arg-type]
-            delta_item_count = len(data)
             await self._update_metadata(
                 pipe,
                 **_DatasetMetadataUpdateParams(
-                    update_accessed_at=True, update_modified_at=True, delta_item_count=delta_item_count
+                    update_accessed_at=True, update_modified_at=True, delta_item_count=len(data)
                 ),
             )
 
@@ -152,7 +153,6 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         view: str | None = None,
     ) -> DatasetItemsListPage:
         # Check for unsupported arguments and log a warning if found
-        # When implementing, explore the capabilities of jsonpath to determine what can be done at the Redis level.
         unsupported_args: dict[str, Any] = {
             'clean': clean,
             'fields': fields,
@@ -176,20 +176,19 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         json_path = '$'
 
         # Apply sorting and pagination
-        if desc:
-            if offset and limit is not None:
-                json_path += f'[-{offset + limit}:-{offset}]'
-            elif limit is not None:
+        match (desc, offset, limit):
+            case (True, 0, int()):
                 json_path += f'[-{limit}:]'
-            elif offset:
+            case (True, int(), None):
                 json_path += f'[:-{offset}]'
-        else:  # noqa: PLR5501 # not a mistake, just to please the linter
-            if offset and limit is not None:
-                json_path += f'[{offset}:{offset + limit}]'
-            elif limit is not None:
+            case (True, int(), int()):
+                json_path += f'[-{offset + limit}:-{offset}]'
+            case (False, 0, int()):
                 json_path += f'[:{limit}]'
-            elif offset:
+            case (False, int(), None):
                 json_path += f'[{offset}:]'
+            case (False, int(), int()):
+                json_path += f'[{offset}:{offset + limit}]'
 
         if json_path == '$':
             json_path = '$[*]'
@@ -286,11 +285,10 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
                 continue
 
             # Reverse batch if desc order (since we got items in normal order but need desc)
-            if desc:
-                batch_items = list(reversed(batch_items))
+            items_iter = reversed(batch_items) if desc else iter(batch_items)
 
             # Yield items from batch
-            for item in batch_items:
+            for item in items_iter:
                 # Apply skip_empty filter
                 if skip_empty and not item:
                     continue

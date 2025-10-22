@@ -79,7 +79,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     """Maximum number of requests to fetch in a single batch operation."""
 
     _BLOCK_REQUEST_TIME = 300_000  # milliseconds
-    """Time in milliseconds to block a fetched request before it can be reclaimed."""
+    """Time in milliseconds to block a fetched request for other clients before it can be autoreclaimed."""
 
     _RECLAIM_INTERVAL = timedelta(seconds=30)
     """Interval to check for stale requests to reclaim."""
@@ -314,23 +314,16 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
             delta_pending = len(actually_added)
             delta_total = len(actually_added)
 
-            for unique_key in new_unique_keys:
-                if unique_key in actually_added:
-                    processed_requests.append(
-                        ProcessedRequest(
-                            unique_key=unique_key,
-                            was_already_present=False,
-                            was_already_handled=False,
-                        )
+            processed_requests.extend(
+                [
+                    ProcessedRequest(
+                        unique_key=unique_key,
+                        was_already_present=unique_key not in actually_added,
+                        was_already_handled=False,
                     )
-                else:
-                    processed_requests.append(
-                        ProcessedRequest(
-                            unique_key=unique_key,
-                            was_already_present=True,
-                            was_already_handled=False,
-                        )
-                    )
+                    for unique_key in new_unique_keys
+                ]
+            )
 
         async with self._get_pipeline() as pipe:
             await self._update_metadata(
@@ -496,8 +489,12 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     async def _create_storage(self, pipeline: Pipeline) -> None:
         # Create Bloom filters for added and handled requests
         if self._dedup_strategy == 'bloom':
-            await await_redis_response(pipeline.bf().create(self._added_filter_key, 1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
-            await await_redis_response(pipeline.bf().create(self._handled_filter_key, 1e-7, 100000, expansion=10))  # type: ignore[no-untyped-call]
+            await await_redis_response(
+                pipeline.bf().create(self._added_filter_key, errorRate=1e-7, capacity=100000, expansion=10)  # type: ignore[no-untyped-call]
+            )
+            await await_redis_response(
+                pipeline.bf().create(self._handled_filter_key, errorRate=1e-7, capacity=100000, expansion=10)  # type: ignore[no-untyped-call]
+            )
 
     async def _reclaim_stale_requests(self) -> None:
         """Reclaim requests that have been in progress for too long."""
