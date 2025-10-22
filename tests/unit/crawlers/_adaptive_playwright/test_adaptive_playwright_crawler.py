@@ -30,10 +30,12 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context
     AdaptiveContextError,
 )
 from crawlee.statistics import Statistics
+from crawlee.storage_clients import SqlStorageClient
 from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterator
+    from pathlib import Path
 
     from yarl import URL
 
@@ -726,3 +728,23 @@ async def test_adaptive_context_query_non_existing_element(test_urls: list[str])
     await crawler.run(test_urls[:1])
 
     mocked_h3_handler.assert_called_once_with(None)
+
+
+async def test_adaptive_playwright_crawler_with_sql_storage(test_urls: list[str], tmp_path: Path) -> None:
+    """Tests that AdaptivePlaywrightCrawler can be initialized with SqlStorageClient."""
+    storage_dir = tmp_path / 'test_table.db'
+
+    async with SqlStorageClient(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_client:
+        crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+            storage_client=storage_client,
+        )
+
+        mocked_handler = Mock()
+
+        @crawler.router.default_handler
+        async def request_handler(_context: AdaptivePlaywrightCrawlingContext) -> None:
+            mocked_handler()
+
+        await crawler.run(test_urls[:1])
+
+        mocked_handler.assert_called()
