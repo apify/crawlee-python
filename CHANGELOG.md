@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Respect `enqueue_strategy` in `enqueue_links` ([#1505](https://github.com/apify/crawlee-python/pull/1505)) ([6ee04bc](https://github.com/apify/crawlee-python/commit/6ee04bc08c50a70f2e956a79d4ce5072a726c3a8)) by [@Mantisus](https://github.com/Mantisus), closes [#1504](https://github.com/apify/crawlee-python/issues/1504)
+- Exclude incorrect links before checking `robots.txt` ([#1502](https://github.com/apify/crawlee-python/pull/1502)) ([3273da5](https://github.com/apify/crawlee-python/commit/3273da5fee62ec9254666b376f382474c3532a56)) by [@Mantisus](https://github.com/Mantisus), closes [#1499](https://github.com/apify/crawlee-python/issues/1499)
 
 
 <!-- git-cliff-unreleased-end -->
