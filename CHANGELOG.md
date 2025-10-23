@@ -3,14 +3,26 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 1.0.3 - **not yet released**
+## 1.0.4 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Respect `enqueue_strategy` in `enqueue_links` ([#1505](https://github.com/apify/crawlee-python/pull/1505)) ([6ee04bc](https://github.com/apify/crawlee-python/commit/6ee04bc08c50a70f2e956a79d4ce5072a726c3a8)) by [@Mantisus](https://github.com/Mantisus), closes [#1504](https://github.com/apify/crawlee-python/issues/1504)
+- Exclude incorrect links before checking `robots.txt` ([#1502](https://github.com/apify/crawlee-python/pull/1502)) ([3273da5](https://github.com/apify/crawlee-python/commit/3273da5fee62ec9254666b376f382474c3532a56)) by [@Mantisus](https://github.com/Mantisus), closes [#1499](https://github.com/apify/crawlee-python/issues/1499)
+- Resolve compatibility issue between `SqlStorageClient` and `AdaptivePlaywrightCrawler` ([#1496](https://github.com/apify/crawlee-python/pull/1496)) ([ce172c4](https://github.com/apify/crawlee-python/commit/ce172c425a8643a1d4c919db4f5e5a6e47e91deb)) by [@Mantisus](https://github.com/Mantisus), closes [#1495](https://github.com/apify/crawlee-python/issues/1495)
+
+
+<!-- git-cliff-unreleased-end -->
+## [1.0.3](https://github.com/apify/crawlee-python/releases/tag/v1.0.3) (2025-10-17)
 
 ### 🐛 Bug Fixes
 
 - Add support for Pydantic v2.12 ([#1471](https://github.com/apify/crawlee-python/pull/1471)) ([35c1108](https://github.com/apify/crawlee-python/commit/35c110878c2f445a2866be2522ea8703e9b371dd)) by [@Mantisus](https://github.com/Mantisus), closes [#1464](https://github.com/apify/crawlee-python/issues/1464)
+- Fix database version warning message ([#1485](https://github.com/apify/crawlee-python/pull/1485)) ([18a545e](https://github.com/apify/crawlee-python/commit/18a545ee8add92e844acd0068f9cb8580a82e1c9)) by [@Mantisus](https://github.com/Mantisus)
+- Fix `reclaim_request` in `SqlRequestQueueClient` to correctly update the request state ([#1486](https://github.com/apify/crawlee-python/pull/1486)) ([1502469](https://github.com/apify/crawlee-python/commit/150246957f8f7f1ceb77bb77e3a02a903c50cae1)) by [@Mantisus](https://github.com/Mantisus), closes [#1484](https://github.com/apify/crawlee-python/issues/1484)
+- Fix `KeyValueStore.auto_saved_value` failing in some scenarios ([#1438](https://github.com/apify/crawlee-python/pull/1438)) ([b35dee7](https://github.com/apify/crawlee-python/commit/b35dee78180e57161b826641d45a61b8d8f6ef51)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1354](https://github.com/apify/crawlee-python/issues/1354)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.0.2](https://github.com/apify/crawlee-python/releases/tag/v1.0.2) (2025-10-08)
 
 ### 🐛 Bug Fixes

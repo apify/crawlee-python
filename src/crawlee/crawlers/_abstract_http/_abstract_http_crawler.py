@@ -167,7 +167,9 @@ class AbstractHttpCrawler(
             kwargs.setdefault('strategy', 'same-hostname')
 
             links_iterator: Iterator[str] = iter(self._parser.find_links(parsed_content, selector=selector))
-            links_iterator = to_absolute_url_iterator(context.request.loaded_url or context.request.url, links_iterator)
+            links_iterator = to_absolute_url_iterator(
+                context.request.loaded_url or context.request.url, links_iterator, logger=context.log
+            )
 
             if robots_txt_file:
                 skipped, links_iterator = partition(lambda url: robots_txt_file.is_allowed(url), links_iterator)

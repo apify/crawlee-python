@@ -335,7 +335,7 @@ async def _fetch_and_process_sitemap(
                         # Check if the first chunk is a valid gzip header
                         if first_chunk and raw_chunk.startswith(b'\x1f\x8b'):
                             decompressor = zlib.decompressobj(zlib.MAX_WBITS | 16)
-                            first_chunk = False
+                        first_chunk = False
 
                         chunk = decompressor.decompress(raw_chunk) if decompressor else raw_chunk
                         text_chunk = decoder.decode(chunk)

@@ -4,13 +4,14 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import pytest
 
 from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import StorageClient
+from crawlee.storage_clients import MemoryStorageClient, StorageClient
 from crawlee.storages import RequestQueue
 from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
@@ -419,6 +420,40 @@ async def test_is_empty(rq: RequestQueue) -> None:
 
     # Queue should be empty again
     assert await rq.is_empty() is True
+
+
+@pytest.mark.parametrize(
+    ('wait_for_all'),
+    [
+        pytest.param(True, id='wait for all'),
+        pytest.param(False, id='do not wait for all'),
+    ],
+)
+async def test_add_requests_wait_for_all(
+    rq: RequestQueue,
+    *,
+    wait_for_all: bool,
+) -> None:
+    """Test adding requests with wait_for_all_requests_to_be_added option."""
+    urls = [f'https://example.com/{i}' for i in range(15)]
+
+    # Add requests without waiting
+    await rq.add_requests(
+        urls,
+        batch_size=5,
+        wait_for_all_requests_to_be_added=wait_for_all,
+        wait_time_between_batches=timedelta(milliseconds=50),
+    )
+
+    if not wait_for_all:
+        # Immediately after adding, the total count may be less than 15 due to background processing
+        assert await rq.get_total_count() <= 15
+
+        # Wait a 500 milliseconds for background tasks to complete
+        await asyncio.sleep(0.5)
+
+    # Verify all requests were added
+    assert await rq.get_total_count() == 15
 
 
 async def test_is_finished(rq: RequestQueue) -> None:
@@ -1003,7 +1038,7 @@ async def test_purge_on_start_enabled(storage_client: StorageClient) -> None:
     """Test purge behavior when purge_on_start=True: named storages retain data, unnamed storages are purged."""
 
     # Skip this test for memory storage since it doesn't persist data between client instances.
-    if storage_client.__class__.__name__ == 'MemoryStorageClient':
+    if isinstance(storage_client, MemoryStorageClient):
         pytest.skip('Memory storage does not persist data between client instances.')
 
     configuration = Configuration(purge_on_start=True)
@@ -1129,7 +1164,7 @@ async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
     """Test purge behavior when purge_on_start=False: all storages retain data regardless of type."""
 
     # Skip this test for memory storage since it doesn't persist data between client instances.
-    if storage_client.__class__.__name__ == 'MemoryStorageClient':
+    if isinstance(storage_client, MemoryStorageClient):
         pytest.skip('Memory storage does not persist data between client instances.')
 
     configuration = Configuration(purge_on_start=False)
@@ -1291,3 +1326,27 @@ async def test_validate_name(storage_client: StorageClient, name: str, *, is_val
     else:
         with pytest.raises(ValueError, match=rf'Invalid storage name "{name}".*'):
             await RequestQueue.open(name=name, storage_client=storage_client)
+
+
+async def test_reclaim_request_with_change_state(rq: RequestQueue) -> None:
+    """Test reclaiming a request and changing its state."""
+    # Add a request
+    await rq.add_request(Request.from_url('https://example.com/original', user_data={'state': 'original'}))
+
+    # Fetch the request
+    request = await rq.fetch_next_request()
+    assert request is not None
+    assert request.url == 'https://example.com/original'
+    assert request.user_data['state'] == 'original'
+
+    # Reclaim the request with modified user data
+    request.user_data['state'] = 'modified'
+    result = await rq.reclaim_request(request)
+    assert result is not None
+    assert result.was_already_handled is False
+
+    # Fetch the reclaimed request
+    reclaimed_request = await rq.fetch_next_request()
+    assert reclaimed_request is not None
+    assert reclaimed_request.url == 'https://example.com/original'
+    assert reclaimed_request.user_data['state'] == 'modified'

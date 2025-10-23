@@ -972,6 +972,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                         label=label,
                         user_data=user_data,
                         transform_request_function=transform_request_function,
+                        **kwargs,
                     ),
                     rq_id=rq_id,
                     rq_name=rq_name,

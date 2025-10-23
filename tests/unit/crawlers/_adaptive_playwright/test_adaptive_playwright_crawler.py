@@ -31,10 +31,12 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context
 )
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
+from crawlee.storage_clients import SqlStorageClient
 from crawlee.storages import KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterator
+    from pathlib import Path
 
     from yarl import URL
 
@@ -494,7 +496,6 @@ async def test_adaptive_playwright_crawler_statistics_in_init() -> None:
     assert type(crawler._statistics.state) is AdaptivePlaywrightCrawlerStatisticState
 
     assert crawler._statistics._state._persistence_enabled == persistence_enabled
-    assert crawler._statistics._state._persist_state_kvs_name == persist_state_kvs_name
     assert crawler._statistics._state._persist_state_key == persist_state_key
 
     assert crawler._statistics._log_message == log_message
@@ -806,3 +807,23 @@ async def test_change_context_state_after_handling(test_input: TestInput, server
         assert check_request.user_data.get('request_state') == ['initial', 'handler']
 
         await request_queue.drop()
+
+
+async def test_adaptive_playwright_crawler_with_sql_storage(test_urls: list[str], tmp_path: Path) -> None:
+    """Tests that AdaptivePlaywrightCrawler can be initialized with SqlStorageClient."""
+    storage_dir = tmp_path / 'test_table.db'
+
+    async with SqlStorageClient(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_client:
+        crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+            storage_client=storage_client,
+        )
+
+        mocked_handler = Mock()
+
+        @crawler.router.default_handler
+        async def request_handler(_context: AdaptivePlaywrightCrawlingContext) -> None:
+            mocked_handler()
+
+        await crawler.run(test_urls[:1])
+
+        mocked_handler.assert_called()

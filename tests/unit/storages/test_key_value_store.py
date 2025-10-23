@@ -10,13 +10,13 @@ import pytest
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient, SqlStorageClient, StorageClient
 from crawlee.storages import KeyValueStore
 from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
-
-    from crawlee.storage_clients import StorageClient
+    from pathlib import Path
 
 
 @pytest.fixture
@@ -898,7 +898,7 @@ async def test_purge_on_start_enabled(storage_client: StorageClient) -> None:
     """Test purge behavior when purge_on_start=True: named storages retain data, unnamed storages are purged."""
 
     # Skip this test for memory storage since it doesn't persist data between client instances.
-    if storage_client.__class__.__name__ == 'MemoryStorageClient':
+    if isinstance(storage_client, MemoryStorageClient):
         pytest.skip('Memory storage does not persist data between client instances.')
 
     configuration = Configuration(purge_on_start=True)
@@ -984,7 +984,7 @@ async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
     """Test purge behavior when purge_on_start=False: all storages retain data regardless of type."""
 
     # Skip this test for memory storage since it doesn't persist data between client instances.
-    if storage_client.__class__.__name__ == 'MemoryStorageClient':
+    if isinstance(storage_client, MemoryStorageClient):
         pytest.skip('Memory storage does not persist data between client instances.')
 
     configuration = Configuration(purge_on_start=False)
@@ -1095,3 +1095,43 @@ async def test_validate_name(storage_client: StorageClient, name: str, *, is_val
     else:
         with pytest.raises(ValueError, match=rf'Invalid storage name "{name}".*'):
             await KeyValueStore.open(name=name, storage_client=storage_client)
+
+
+@pytest.mark.parametrize(
+    'tested_storage_client',
+    [
+        pytest.param(MemoryStorageClient(), id='tested=MemoryStorageClient'),
+        pytest.param(FileSystemStorageClient(), id='tested=FileSystemStorageClient'),
+        pytest.param(SqlStorageClient(), id='tested=SqlStorageClient'),
+    ],
+)
+@pytest.mark.parametrize(
+    'global_storage_client',
+    [
+        pytest.param(MemoryStorageClient(), id='global=MemoryStorageClient'),
+        pytest.param(FileSystemStorageClient(), id='global=FileSystemStorageClient'),
+        pytest.param(SqlStorageClient(), id='global=SqlStorageClient'),
+    ],
+)
+async def test_get_auto_saved_value_various_global_clients(
+    tmp_path: Path, tested_storage_client: StorageClient, global_storage_client: StorageClient
+) -> None:
+    """Ensure that persistence is working for all clients regardless of what is set in service locator."""
+    service_locator.set_configuration(
+        Configuration(
+            crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+            purge_on_start=True,
+        )
+    )
+    service_locator.set_storage_client(global_storage_client)
+
+    kvs = await KeyValueStore.open(storage_client=tested_storage_client)
+    values_kvs = {'key': 'some_value'}
+    test_key = 'test_key'
+
+    autosaved_value_kvs = await kvs.get_auto_saved_value(test_key)
+    assert autosaved_value_kvs == {}
+    autosaved_value_kvs.update(values_kvs)
+    await kvs.persist_autosaved_values()
+
+    assert await kvs.get_value(test_key) == autosaved_value_kvs
