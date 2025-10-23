@@ -437,15 +437,23 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._statistics_log_format = statistics_log_format
 
         # Statistics
-        self._statistics = statistics or cast(
-            'Statistics[TStatisticsState]',
-            Statistics.with_default_state(
-                persistence_enabled=True,
-                periodic_message_logger=self._logger,
-                statistics_log_format=self._statistics_log_format,
-                log_message='Current request statistics:',
-            ),
-        )
+        if statistics:
+            self._statistics = statistics
+        else:
+
+            async def persist_state_factory() -> KeyValueStore:
+                return await self.get_key_value_store()
+
+            self._statistics = cast(
+                'Statistics[TStatisticsState]',
+                Statistics.with_default_state(
+                    persistence_enabled=True,
+                    periodic_message_logger=self._logger,
+                    statistics_log_format=self._statistics_log_format,
+                    log_message='Current request statistics:',
+                    persist_state_kvs_factory=persist_state_factory,
+                ),
+            )
 
         # Additional context managers to enter and exit
         self._additional_context_managers = _additional_context_managers or []
