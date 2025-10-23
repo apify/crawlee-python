@@ -462,7 +462,7 @@ class AdaptivePlaywrightCrawler(
         Uses object.__setattr__ to bypass frozen dataclass restrictions,
         allowing state synchronization after isolated crawler execution.
         """
-        updating_attributes = ('request', 'session', 'proxy_info')
+        updating_attributes = ('request', 'session')
 
         for attr_name in updating_attributes:
             original_obj = getattr(context, attr_name, None)

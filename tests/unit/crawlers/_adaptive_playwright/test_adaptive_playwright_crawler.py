@@ -730,38 +730,79 @@ async def test_adaptive_context_query_non_existing_element(test_urls: list[str])
     mocked_h3_handler.assert_called_once_with(None)
 
 
-async def test_change_context_state_after_handling(server_url: URL) -> None:
+@pytest.mark.parametrize(
+    'test_input',
+    [
+        pytest.param(
+            TestInput(
+                expected_pw_count=0,
+                expected_static_count=2,
+                rendering_types=cycle(['static']),
+                detection_probability_recommendation=cycle([0]),
+            ),
+            id='Static only',
+        ),
+        pytest.param(
+            TestInput(
+                expected_pw_count=2,
+                expected_static_count=0,
+                rendering_types=cycle(['client only']),
+                detection_probability_recommendation=cycle([0]),
+            ),
+            id='Client only',
+        ),
+        pytest.param(
+            TestInput(
+                expected_pw_count=2,
+                expected_static_count=2,
+                rendering_types=cycle(['static', 'client only']),
+                detection_probability_recommendation=cycle([1]),
+            ),
+            id='Enforced rendering type detection',
+        ),
+    ],
+)
+async def test_change_context_state_after_handling(test_input: TestInput, server_url: URL) -> None:
     """Test that context state is saved after handling the request."""
-    static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+    predictor = _SimpleRenderingTypePredictor(
+        rendering_types=test_input.rendering_types,
+        detection_probability_recommendation=test_input.detection_probability_recommendation,
+    )
 
-    test_mapper = {}
     request_queue = await RequestQueue.open(name='state-test')
+    used_session_id = None
+
     async with SessionPool() as session_pool:
         crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
-            rendering_type_predictor=static_only_predictor_no_detection,
+            rendering_type_predictor=predictor,
             session_pool=session_pool,
             request_manager=request_queue,
         )
 
         @crawler.router.default_handler
         async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-            if context.session is not None:
-                test_mapper['session_id'] = context.session.id
-                context.session.user_data['session_state'] = True
-            context.request.user_data['request_state'] = True
+            nonlocal used_session_id
 
-        request = Request.from_url(str(server_url))
+            if context.session is not None:
+                used_session_id = context.session.id
+                context.session.user_data['session_state'] = True
+
+            if isinstance(context.request.user_data['request_state'], list):
+                context.request.user_data['request_state'].append('handler')
+
+        request = Request.from_url(str(server_url), user_data={'request_state': ['initial']})
 
         await crawler.run([request])
 
-        assert test_mapper['session_id'] is not None
+        assert used_session_id is not None
 
-        session = await session_pool.get_session_by_id(test_mapper['session_id'])
+        session = await session_pool.get_session_by_id(used_session_id)
         check_request = await request_queue.get_request(request.unique_key)
 
         assert session is not None
         assert check_request is not None
         assert session.user_data.get('session_state') is True
-        assert check_request.user_data.get('request_state') is True
+        # Check that request user data was updated in the handler and only onse.
+        assert check_request.user_data.get('request_state') == ['initial', 'handler']
 
         await request_queue.drop()
