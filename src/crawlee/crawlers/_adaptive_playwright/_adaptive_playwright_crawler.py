@@ -149,10 +149,6 @@ class AdaptivePlaywrightCrawler(
                 non-default configuration.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
-        # Some sub crawler kwargs are internally modified. Prepare copies.
-        basic_crawler_kwargs_for_static_crawler = deepcopy(kwargs)
-        basic_crawler_kwargs_for_pw_crawler = deepcopy(kwargs)
-
         # Adaptive crawling related.
         self.rendering_type_predictor = rendering_type_predictor or DefaultRenderingTypePredictor()
         self.result_checker = result_checker or (lambda _: True)
@@ -170,11 +166,11 @@ class AdaptivePlaywrightCrawler(
         # Each sub crawler will use custom logger .
         static_logger = getLogger('Subcrawler_static')
         static_logger.setLevel(logging.ERROR)
-        basic_crawler_kwargs_for_static_crawler['_logger'] = static_logger
+        basic_crawler_kwargs_for_static_crawler: _BasicCrawlerOptions = {'_logger': static_logger, **kwargs}
 
         pw_logger = getLogger('Subcrawler_playwright')
         pw_logger.setLevel(logging.ERROR)
-        basic_crawler_kwargs_for_pw_crawler['_logger'] = pw_logger
+        basic_crawler_kwargs_for_pw_crawler: _BasicCrawlerOptions = {'_logger': pw_logger, **kwargs}
 
         # Initialize sub crawlers to create their pipelines.
         static_crawler_class = AbstractHttpCrawler.create_parsed_http_crawler_class(static_parser=static_parser)
