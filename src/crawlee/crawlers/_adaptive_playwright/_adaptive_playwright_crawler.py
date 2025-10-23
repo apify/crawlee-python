@@ -458,24 +458,22 @@ class AdaptivePlaywrightCrawler(
         Uses object.__setattr__ to bypass frozen dataclass restrictions,
         allowing state synchronization after isolated crawler execution.
         """
-        updating_attributes = ('request', 'session')
+        updating_attributes = {
+            'request': ('headers', 'user_data'),
+            'session': ('_user_data', '_usage_count', '_error_score', '_cookies'),
+        }
 
-        for attr_name in updating_attributes:
-            original_obj = getattr(context, attr_name, None)
-            updated_obj = getattr(context_copy, attr_name, None)
+        for attr, sub_attrs in updating_attributes.items():
+            original_sub_obj = getattr(context, attr)
+            copy_sub_obj = getattr(context_copy, attr)
 
-            # Skip if either object is None or they are the same object
-            if (
-                original_obj is None
-                or updated_obj is None
-                or original_obj is updated_obj
-                or not hasattr(updated_obj, '__dict__')
-            ):
+            # Check that both sub objects are not None
+            if original_sub_obj is None or copy_sub_obj is None:
                 continue
 
-            # Copy all attributes using __dict__
-            for obj_attr_name, obj_attr_value in updated_obj.__dict__.items():
-                object.__setattr__(original_obj, obj_attr_name, obj_attr_value)
+            for sub_attr in sub_attrs:
+                new_value = getattr(copy_sub_obj, sub_attr)
+                object.__setattr__(original_sub_obj, sub_attr, new_value)
 
 
 @dataclass(frozen=True)
