@@ -207,7 +207,7 @@ def redirect_server_url(redirect_http_server: TestServer) -> URL:
 )
 async def http_client(request: pytest.FixtureRequest) -> AsyncGenerator[HttpClient, None]:
     class_client: type[HttpClient]
-    # test 4
+    # test 5
     if request.param == 'curl':
         class_client = CurlImpersonateHttpClient
         kwargs: dict[str, Any] = {'http_version': CurlHttpVersion.V1_1}
