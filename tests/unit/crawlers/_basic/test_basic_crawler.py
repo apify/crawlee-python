@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent
 import json
 import logging
 import os
@@ -1643,3 +1644,60 @@ async def test_crawler_purge_request_queue_uses_same_storage_client() -> None:
 
     # Crawler should not fall back to the default storage after the purge
     assert await unrelated_rq.fetch_next_request() == unrelated_request
+
+
+async def _run_crawler(requests: list[str], storage_dir: str) -> StatisticsState:
+    """Run crawler and return its statistics state.
+
+    Must be defined like this to be pickable for ProcessPoolExecutor."""
+    service_locator.set_configuration(
+        Configuration(
+            crawlee_storage_dir=storage_dir,  # type: ignore[call-arg]
+            purge_on_start=False,
+        )
+    )
+
+    async def request_handler(context: BasicCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url} ...')
+
+    crawler = BasicCrawler(
+        request_handler=request_handler,
+        concurrency_settings=ConcurrencySettings(max_concurrency=1, desired_concurrency=1),
+    )
+
+    await crawler.run(requests)
+    return crawler.statistics.state
+
+
+def _process_run_crawler(requests: list[str], storage_dir: str) -> StatisticsState:
+    return asyncio.run(_run_crawler(requests=requests, storage_dir=storage_dir))
+
+
+async def test_crawler_statistics_persistence(tmp_path: Path) -> None:
+    """Test that crawler statistics persist and are loaded correctly.
+
+    This test simulates starting the crawler process twice, and checks that the statistics include first run."""
+
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        # Crawl 2 requests in the first run and automatically persist the state.
+        first_run_state = executor.submit(
+            _process_run_crawler,
+            requests=['https://a.placeholder.com', 'https://b.placeholder.com'],
+            storage_dir=str(tmp_path),
+        ).result()
+        assert first_run_state.requests_finished == 2
+
+    # Do not reuse the executor to simulate a fresh process to avoid modified class attributes.
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        # Crawl 1 additional requests in the second run, but use previously automatically persisted state.
+        second_run_state = executor.submit(
+            _process_run_crawler, requests=['https://c.placeholder.com'], storage_dir=str(tmp_path)
+        ).result()
+        assert second_run_state.requests_finished == 3
+
+    assert first_run_state.crawler_started_at == second_run_state.crawler_started_at
+    assert first_run_state.crawler_finished_at
+    assert second_run_state.crawler_finished_at
+
+    assert first_run_state.crawler_finished_at < second_run_state.crawler_finished_at
+    assert first_run_state.crawler_runtime < second_run_state.crawler_runtime

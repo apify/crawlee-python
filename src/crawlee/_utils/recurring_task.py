@@ -7,6 +7,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
     from datetime import timedelta
+    from types import TracebackType
+
+    from typing_extensions import Self
 
 logger = getLogger(__name__)
 
@@ -25,6 +28,18 @@ class RecurringTask:
         self.func = func
         self.delay = delay
         self.task: asyncio.Task | None = None
+
+    async def __aenter__(self) -> Self:
+        self.start()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
+        await self.stop()
 
     async def _wrapper(self) -> None:
         """Continuously execute the provided function with the specified delay.
