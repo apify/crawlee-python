@@ -79,7 +79,7 @@ sql_sqlite = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
     "aiosqlite>=0.21.0",
 ]
-redis = ["redis[hiredis] >= 6.4.0"]
+redis = ["redis[hiredis] >= 7.0.0"]
 
 [project.scripts]
 crawlee = "crawlee._cli:cli"

@@ -125,10 +125,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
             data = [data]
 
         async with self._get_pipeline() as pipe:
-            # TODO: https://github.com/redis/redis-py/issues/3780
-            # Incorrect signature for args type in redis-py
-            # Remove this when the typing is fixed.
-            pipe.json().arrappend(self._items_key, '$', *data)  # type: ignore[arg-type]
+            pipe.json().arrappend(self._items_key, '$', *data)
             await self._update_metadata(
                 pipe,
                 **_DatasetMetadataUpdateParams(

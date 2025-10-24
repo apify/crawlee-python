@@ -75,7 +75,7 @@ async def test_request_records_persistence(rq_client: RedisRequestQueueClient) -
 
     # Verify request records are created
     request_queue_response = await await_redis_response(
-        rq_client.redis.lmpop(1, 'request_queues:test_request_queue:queue', direction='left', count=10)  # type: ignore[arg-type] # redis-py typing is broken
+        rq_client.redis.lmpop(1, 'request_queues:test_request_queue:queue', direction='left', count=10)
     )
     assert request_queue_response is not None
     assert isinstance(request_queue_response, list)
