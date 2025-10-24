@@ -29,10 +29,10 @@ def _patch_crawlee_version_in_requirements_txt_based_project(project_path: Path,
     with requirements_path.open() as f:
         modified_lines = []
         for line in f:
-            if 'crawlee' in line:
-                modified_lines.append(f'./{wheel_path.name}{crawlee_extras}\n')
-            else:
-                modified_lines.append(line)
+            # if 'crawlee' in line:
+                # modified_lines.append(f'./{wheel_path.name}{crawlee_extras}\n')
+            # else:
+            modified_lines.append(line)
     with requirements_path.open('w') as f:
         f.write(''.join(modified_lines))
 
@@ -42,13 +42,13 @@ def _patch_crawlee_version_in_requirements_txt_based_project(project_path: Path,
         modified_lines = []
         for line in f:
             modified_lines.append(line)
-            if line.startswith('COPY requirements.txt ./'):
+            if line.startswith('COPY') and 'requirements.txt' in line:
                 modified_lines.extend(
                     [
-                        f'COPY {wheel_path.name} ./\n',
+                        # f'COPY {wheel_path.name} ./\n',
                         # If no crawlee version bump, pip might be lazy and take existing pre-installed crawlee version,
                         # make sure that one is patched as well.
-                        f'RUN pip install ./{wheel_path.name}{crawlee_extras} --force-reinstall\n',
+                        # f'RUN pip install ./{wheel_path.name}{crawlee_extras} --force-reinstall\n',
                     ]
                 )
     with dockerfile_path.open('w') as f:
@@ -69,7 +69,7 @@ def _patch_crawlee_version_in_pyproject_toml_based_project(project_path: Path, w
         modified_lines = []
         for line in f:
             modified_lines.append(line)
-            if line.startswith('COPY pyproject.toml'):
+            if line.startswith('COPY') and 'pyproject.toml' in line:
                 if 'uv.lock' in line:
                     package_manager = 'uv'
                 elif 'poetry.lock' in line:
@@ -90,12 +90,12 @@ def _patch_crawlee_version_in_pyproject_toml_based_project(project_path: Path, w
                 # and so the absolute path(in the container) is generated when running `add` command in the container.
                 modified_lines.extend(
                     [
-                        f'COPY {wheel_path.name} ./\n',
+                        # f'COPY {wheel_path.name} ./\n',
                         # If no crawlee version bump, poetry might be lazy and take existing pre-installed crawlee
                         # version, make sure that one is patched as well.
-                        f'RUN pip install ./{wheel_path.name}{crawlee_extras} --force-reinstall\n',
-                        f'RUN {package_manager} add ./{wheel_path.name}{crawlee_extras}\n',
-                        f'RUN {package_manager} lock\n',
+                        # f'RUN pip install ./{wheel_path.name}{crawlee_extras} --force-reinstall\n',
+                        # f'RUN {package_manager} add ./{wheel_path.name}{crawlee_extras}\n',
+                        # f'RUN {package_manager} lock\n',
                     ]
                 )
     with dockerfile_path.open('w') as f:
