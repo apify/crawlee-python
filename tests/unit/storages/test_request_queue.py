@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
@@ -423,8 +422,6 @@ async def test_is_empty(rq: RequestQueue) -> None:
     assert await rq.is_empty() is True
 
 
-# TODO: Remove this skip when #1498 is resolved.
-@pytest.mark.skipif(sys.platform != 'linux', reason='Flaky test on Windows, see #1498.')
 @pytest.mark.parametrize(
     ('wait_for_all'),
     [
@@ -445,15 +442,16 @@ async def test_add_requests_wait_for_all(
         urls,
         batch_size=5,
         wait_for_all_requests_to_be_added=wait_for_all,
-        wait_time_between_batches=timedelta(milliseconds=100),
+        wait_time_between_batches=timedelta(milliseconds=50),
     )
 
     if not wait_for_all:
         # Immediately after adding, the total count may be less than 15 due to background processing
         assert await rq.get_total_count() <= 15
 
-        # Wait a 250 milliseconds for background tasks to complete
-        await asyncio.sleep(0.25)
+        # Wait for background tasks to complete
+        while await rq.get_total_count() < 15:  # noqa: ASYNC110
+            await asyncio.sleep(0.1)
 
     # Verify all requests were added
     assert await rq.get_total_count() == 15

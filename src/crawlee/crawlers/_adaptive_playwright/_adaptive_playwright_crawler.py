@@ -149,10 +149,6 @@ class AdaptivePlaywrightCrawler(
                 non-default configuration.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
-        # Some sub crawler kwargs are internally modified. Prepare copies.
-        basic_crawler_kwargs_for_static_crawler = deepcopy(kwargs)
-        basic_crawler_kwargs_for_pw_crawler = deepcopy(kwargs)
-
         # Adaptive crawling related.
         self.rendering_type_predictor = rendering_type_predictor or DefaultRenderingTypePredictor()
         self.result_checker = result_checker or (lambda _: True)
@@ -170,11 +166,11 @@ class AdaptivePlaywrightCrawler(
         # Each sub crawler will use custom logger .
         static_logger = getLogger('Subcrawler_static')
         static_logger.setLevel(logging.ERROR)
-        basic_crawler_kwargs_for_static_crawler['_logger'] = static_logger
+        basic_crawler_kwargs_for_static_crawler: _BasicCrawlerOptions = {'_logger': static_logger, **kwargs}
 
         pw_logger = getLogger('Subcrawler_playwright')
         pw_logger.setLevel(logging.ERROR)
-        basic_crawler_kwargs_for_pw_crawler['_logger'] = pw_logger
+        basic_crawler_kwargs_for_pw_crawler: _BasicCrawlerOptions = {'_logger': pw_logger, **kwargs}
 
         # Initialize sub crawlers to create their pipelines.
         static_crawler_class = AbstractHttpCrawler.create_parsed_http_crawler_class(static_parser=static_parser)
@@ -319,7 +315,7 @@ class AdaptivePlaywrightCrawler(
                 ),
                 logger=self._logger,
             )
-            return SubCrawlerRun(result=result)
+            return SubCrawlerRun(result=result, run_context=context_linked_to_result)
         except Exception as e:
             return SubCrawlerRun(exception=e)
 
@@ -375,7 +371,8 @@ class AdaptivePlaywrightCrawler(
                 self.track_http_only_request_handler_runs()
 
                 static_run = await self._crawl_one(rendering_type='static', context=context)
-                if static_run.result and self.result_checker(static_run.result):
+                if static_run.result and static_run.run_context and self.result_checker(static_run.result):
+                    self._update_context_from_copy(context, static_run.run_context)
                     self._context_result_map[context] = static_run.result
                     return
                 if static_run.exception:
@@ -406,13 +403,10 @@ class AdaptivePlaywrightCrawler(
         if pw_run.exception is not None:
             raise pw_run.exception
 
-        if pw_run.result:
-            self._context_result_map[context] = pw_run.result
-
+        if pw_run.result and pw_run.run_context:
             if should_detect_rendering_type:
                 detection_result: RenderingType
                 static_run = await self._crawl_one('static', context=context, state=old_state_copy)
-
                 if static_run.result and self.result_comparator(static_run.result, pw_run.result):
                     detection_result = 'static'
                 else:
@@ -420,6 +414,9 @@ class AdaptivePlaywrightCrawler(
 
                 context.log.debug(f'Detected rendering type {detection_result} for {context.request.url}')
                 self.rendering_type_predictor.store_result(context.request, detection_result)
+
+            self._update_context_from_copy(context, pw_run.run_context)
+            self._context_result_map[context] = pw_run.result
 
     def pre_navigation_hook(
         self,
@@ -455,8 +452,32 @@ class AdaptivePlaywrightCrawler(
     def track_rendering_type_mispredictions(self) -> None:
         self.statistics.state.rendering_type_mispredictions += 1
 
+    def _update_context_from_copy(self, context: BasicCrawlingContext, context_copy: BasicCrawlingContext) -> None:
+        """Update mutable fields of `context` from `context_copy`.
+
+        Uses object.__setattr__ to bypass frozen dataclass restrictions,
+        allowing state synchronization after isolated crawler execution.
+        """
+        updating_attributes = {
+            'request': ('headers', 'user_data'),
+            'session': ('_user_data', '_usage_count', '_error_score', '_cookies'),
+        }
+
+        for attr, sub_attrs in updating_attributes.items():
+            original_sub_obj = getattr(context, attr)
+            copy_sub_obj = getattr(context_copy, attr)
+
+            # Check that both sub objects are not None
+            if original_sub_obj is None or copy_sub_obj is None:
+                continue
+
+            for sub_attr in sub_attrs:
+                new_value = getattr(copy_sub_obj, sub_attr)
+                object.__setattr__(original_sub_obj, sub_attr, new_value)
+
 
 @dataclass(frozen=True)
 class SubCrawlerRun:
     result: RequestHandlerRunResult | None = None
     exception: Exception | None = None
+    run_context: BasicCrawlingContext | None = None

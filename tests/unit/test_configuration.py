@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
+from crawlee.statistics import Statistics
 from crawlee.storage_clients import MemoryStorageClient
 from crawlee.storage_clients._file_system._storage_client import FileSystemStorageClient
 
@@ -35,16 +36,14 @@ def test_global_configuration_works_reversed() -> None:
     )
 
 
-async def test_storage_not_persisted_when_disabled(tmp_path: Path, server_url: URL) -> None:
-    configuration = Configuration(
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+async def test_storage_not_persisted_when_non_persistable_storage_used(tmp_path: Path, server_url: URL) -> None:
+    """Make the Crawler use MemoryStorageClient which can't persist state."""
+    service_locator.set_configuration(
+        Configuration(
+            crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        )
     )
-    storage_client = MemoryStorageClient()
-
-    crawler = HttpCrawler(
-        configuration=configuration,
-        storage_client=storage_client,
-    )
+    crawler = HttpCrawler(storage_client=MemoryStorageClient())
 
     @crawler.router.default_handler
     async def default_handler(context: HttpCrawlingContext) -> None:
@@ -55,6 +54,33 @@ async def test_storage_not_persisted_when_disabled(tmp_path: Path, server_url: U
     # Verify that no files were created in the storage directory.
     content = list(tmp_path.iterdir())
     assert content == [], 'Expected the storage directory to be empty, but it is not.'
+
+
+async def test_storage_persisted_with_explicit_statistics_with_persistable_storage(
+    tmp_path: Path, server_url: URL
+) -> None:
+    """Make the Crawler use MemoryStorageClient which can't persist state,
+    but pass explicit statistics to it which will use global FileSystemStorageClient() that can persist state."""
+
+    configuration = Configuration(
+        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+    )
+    service_locator.set_configuration(configuration)
+    service_locator.set_storage_client(FileSystemStorageClient())
+
+    crawler = HttpCrawler(
+        storage_client=MemoryStorageClient(), statistics=Statistics.with_default_state(persistence_enabled=True)
+    )
+
+    @crawler.router.default_handler
+    async def default_handler(context: HttpCrawlingContext) -> None:
+        await context.push_data({'url': context.request.url})
+
+    await crawler.run([str(server_url)])
+
+    # Verify that files were created in the storage directory.
+    content = list(tmp_path.iterdir())
+    assert content != [], 'Expected the storage directory to contain files, but it does not.'
 
 
 async def test_storage_persisted_when_enabled(tmp_path: Path, server_url: URL) -> None:

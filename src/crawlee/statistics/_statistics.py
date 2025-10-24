@@ -96,7 +96,7 @@ class Statistics(Generic[TStatisticsState]):
 
         self._state = RecoverableState(
             default_state=state_model(stats_id=self._id),
-            persist_state_key=persist_state_key or f'SDK_CRAWLER_STATISTICS_{self._id}',
+            persist_state_key=persist_state_key or f'__CRAWLER_STATISTICS_{self._id}',
             persistence_enabled=persistence_enabled,
             persist_state_kvs_name=persist_state_kvs_name,
             persist_state_kvs_factory=persist_state_kvs_factory,
@@ -130,6 +130,7 @@ class Statistics(Generic[TStatisticsState]):
         persistence_enabled: bool = False,
         persist_state_kvs_name: str | None = None,
         persist_state_key: str | None = None,
+        persist_state_kvs_factory: Callable[[], Coroutine[None, None, KeyValueStore]] | None = None,
         log_message: str = 'Statistics',
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
@@ -141,6 +142,7 @@ class Statistics(Generic[TStatisticsState]):
             persistence_enabled=persistence_enabled,
             persist_state_kvs_name=persist_state_kvs_name,
             persist_state_key=persist_state_key,
+            persist_state_kvs_factory=persist_state_kvs_factory,
             log_message=log_message,
             periodic_message_logger=periodic_message_logger,
             log_interval=log_interval,
@@ -187,7 +189,10 @@ class Statistics(Generic[TStatisticsState]):
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        self._state.current_value.crawler_finished_at = datetime.now(timezone.utc)
+        if not self.state.crawler_last_started_at:
+            raise RuntimeError('Statistics.state.crawler_last_started_at not set.')
+        self.state.crawler_finished_at = datetime.now(timezone.utc)
+        self.state.crawler_runtime += self.state.crawler_finished_at - self.state.crawler_last_started_at
 
         await self._state.teardown()
 
@@ -255,8 +260,7 @@ class Statistics(Generic[TStatisticsState]):
         if self._instance_start is None:
             raise RuntimeError('The Statistics object is not initialized')
 
-        crawler_runtime = datetime.now(timezone.utc) - self._instance_start
-        total_minutes = crawler_runtime.total_seconds() / 60
+        total_minutes = self.state.crawler_runtime.total_seconds() / 60
         state = self._state.current_value
         serialized_state = state.model_dump(by_alias=False)
 
@@ -267,7 +271,7 @@ class Statistics(Generic[TStatisticsState]):
             requests_failed_per_minute=math.floor(state.requests_failed / total_minutes) if total_minutes else 0,
             request_total_duration=state.request_total_finished_duration + state.request_total_failed_duration,
             requests_total=state.requests_failed + state.requests_finished,
-            crawler_runtime=crawler_runtime,
+            crawler_runtime=state.crawler_runtime,
             requests_finished=state.requests_finished,
             requests_failed=state.requests_failed,
             retry_histogram=serialized_state['request_retry_histogram'],
