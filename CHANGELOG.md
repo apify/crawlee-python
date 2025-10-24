@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.0.4 - **not yet released**
+## [1.0.4](https://github.com/apify/crawlee-python/releases/tag/v1.0.4) (2025-10-24)
 
 ### 🐛 Bug Fixes
 
@@ -11,9 +10,9 @@ All notable changes to this project will be documented in this file.
 - Exclude incorrect links before checking `robots.txt` ([#1502](https://github.com/apify/crawlee-python/pull/1502)) ([3273da5](https://github.com/apify/crawlee-python/commit/3273da5fee62ec9254666b376f382474c3532a56)) by [@Mantisus](https://github.com/Mantisus), closes [#1499](https://github.com/apify/crawlee-python/issues/1499)
 - Resolve compatibility issue between `SqlStorageClient` and `AdaptivePlaywrightCrawler` ([#1496](https://github.com/apify/crawlee-python/pull/1496)) ([ce172c4](https://github.com/apify/crawlee-python/commit/ce172c425a8643a1d4c919db4f5e5a6e47e91deb)) by [@Mantisus](https://github.com/Mantisus), closes [#1495](https://github.com/apify/crawlee-python/issues/1495)
 - Fix `BasicCrawler` statistics persistence ([#1490](https://github.com/apify/crawlee-python/pull/1490)) ([1eb1c19](https://github.com/apify/crawlee-python/commit/1eb1c19aa6f9dda4a0e3f7eda23f77a554f95076)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1501](https://github.com/apify/crawlee-python/issues/1501)
+- Save context state in result for `AdaptivePlaywrightCrawler` after isolated processing in `SubCrawler` ([#1488](https://github.com/apify/crawlee-python/pull/1488)) ([62b7c70](https://github.com/apify/crawlee-python/commit/62b7c70b54085fc65a660062028014f4502beba9)) by [@Mantisus](https://github.com/Mantisus), closes [#1483](https://github.com/apify/crawlee-python/issues/1483)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.0.3](https://github.com/apify/crawlee-python/releases/tag/v1.0.3) (2025-10-17)
 
 ### 🐛 Bug Fixes
