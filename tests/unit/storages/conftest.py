@@ -1,17 +1,40 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 
 from crawlee import service_locator
-from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient, SqlStorageClient, StorageClient
+from crawlee.storage_clients import (
+    FileSystemStorageClient,
+    MemoryStorageClient,
+    RedisStorageClient,
+    SqlStorageClient,
+    StorageClient,
+)
+
+if TYPE_CHECKING:
+    from fakeredis import FakeAsyncRedis
 
 
-@pytest.fixture(params=['memory', 'file_system', 'sql'])
-def storage_client(request: pytest.FixtureRequest) -> StorageClient:
+@pytest.fixture(params=['memory', 'file_system', 'sql', 'redis_default', 'redis_bloom'])
+def storage_client(
+    request: pytest.FixtureRequest,
+    redis_client: FakeAsyncRedis,
+) -> StorageClient:
     """Parameterized fixture to test with different storage clients."""
     storage_client: StorageClient
-    if request.param == 'memory':
+
+    storage_type = request.param
+
+    if storage_type == 'memory':
         storage_client = MemoryStorageClient()
-    elif request.param == 'sql':
+    elif storage_type == 'sql':
         storage_client = SqlStorageClient()
+    elif storage_type == 'redis_default':
+        storage_client = RedisStorageClient(redis=redis_client, queue_dedup_strategy='default')
+    elif storage_type == 'redis_bloom':
+        storage_client = RedisStorageClient(redis=redis_client, queue_dedup_strategy='bloom')
     else:
         storage_client = FileSystemStorageClient()
     service_locator.set_storage_client(storage_client)

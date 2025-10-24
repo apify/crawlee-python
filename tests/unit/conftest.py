@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from curl_cffi import CurlHttpVersion
+from fakeredis import FakeAsyncRedis
 from proxy import Proxy
 from uvicorn.config import Config
 
@@ -218,3 +219,8 @@ async def http_client(request: pytest.FixtureRequest) -> AsyncGenerator[HttpClie
         kwargs = {'http2': True}
     async with class_client(**kwargs) as client:
         yield client
+
+
+@pytest.fixture
+def redis_client() -> FakeAsyncRedis:
+    return FakeAsyncRedis()
