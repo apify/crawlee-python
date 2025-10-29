@@ -216,7 +216,7 @@ class PlaywrightBrowserController(BrowserController):
         browser_new_context_options = dict(browser_new_context_options) if browser_new_context_options else {}
         if proxy_info:
             if browser_new_context_options.get('proxy'):
-                logger.warning("browser_new_context_options['proxy'] overriden by explicit `proxy_info` argument.")
+                logger.warning("browser_new_context_options['proxy'] overridden by explicit `proxy_info` argument.")
 
             browser_new_context_options['proxy'] = ProxySettings(
                 server=f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
