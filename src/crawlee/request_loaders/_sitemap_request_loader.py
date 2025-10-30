@@ -323,6 +323,7 @@ class SitemapRequestLoader(RequestLoader):
                 if self._transform_request_function:
                     transform_request_option = self._transform_request_function(request_option)
                     if transform_request_option == 'skip':
+                        state.total_count -= 1
                         continue
                     if transform_request_option != 'unchanged':
                         request_option = transform_request_option
