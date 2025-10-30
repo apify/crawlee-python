@@ -4,6 +4,7 @@ import gzip
 
 from yarl import URL
 
+from crawlee import RequestOptions, RequestTransformAction
 from crawlee.http_clients._base import HttpClient
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
 from crawlee.storages import KeyValueStore
@@ -172,3 +173,24 @@ async def test_recovery_data_persistence_for_sitemap_loading(
 
     assert item is not None
     assert item.url == next_item_in_kvs
+
+
+async def test_transform_request_function(server_url: URL, http_client: HttpClient) -> None:
+    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+
+    def transform_request(request_options: RequestOptions) -> RequestOptions | RequestTransformAction:
+        request_options['user_data'] = {'transformed': True}
+        return request_options
+
+    sitemap_loader = SitemapRequestLoader(
+        [str(sitemap_url)],
+        http_client=http_client,
+        transform_request_function=transform_request,
+    )
+
+    while not await sitemap_loader.is_finished():
+        request = await sitemap_loader.fetch_next_request()
+        assert request is not None
+        assert request.user_data.get('transformed') is True
+
+        await sitemap_loader.mark_request_as_handled(request)
