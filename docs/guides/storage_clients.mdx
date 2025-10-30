@@ -28,8 +28,8 @@ Crawlee provides three main storage client implementations:
 
 - <ApiLink to="class/FileSystemStorageClient">`FileSystemStorageClient`</ApiLink> - Provides persistent file system storage with in-memory caching.
 - <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> - Stores data in memory with no persistence.
-- <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> – Provides persistent storage using a SQL database ([SQLite](https://sqlite.org/) or [PostgreSQL](https://www.postgresql.org/)). Requires installing the extra dependency: 'crawlee[sql_sqlite]' for SQLite or 'crawlee[sql_postgres]' for PostgreSQL.
-- <ApiLink to="class/RedisStorageClient">`RedisStorageClient`</ApiLink> – Provides persistent storage using a [Redis](https://redis.io/) database v8.0+. Requires installing the extra dependency `crawlee[redis]`.
+- <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> - Provides persistent storage using a SQL database ([SQLite](https://sqlite.org/) or [PostgreSQL](https://www.postgresql.org/)). Requires installing the extra dependency: `crawlee[sql_sqlite]` for SQLite or `crawlee[sql_postgres]` for PostgreSQL.
+- <ApiLink to="class/RedisStorageClient">`RedisStorageClient`</ApiLink> - Provides persistent storage using a [Redis](https://redis.io/) database v8.0+. Requires installing the extra dependency `crawlee[redis]`.
 - [`ApifyStorageClient`](https://docs.apify.com/sdk/python/reference/class/ApifyStorageClient) - Manages storage on the [Apify platform](https://apify.com), implemented in the [Apify SDK](https://github.com/apify/apify-sdk-python).
 
 ```mermaid
@@ -310,8 +310,8 @@ Configuration options for the <ApiLink to="class/SqlStorageClient">`SqlStorageCl
 
 Configuration options for the <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> can be set via constructor arguments:
 
-- **`connection_string`** (default: SQLite in <ApiLink to="class/Configuration">`Configuration`</ApiLink> storage dir) – SQLAlchemy connection string, e.g. `sqlite+aiosqlite:///my.db` or `postgresql+asyncpg://user:pass@host/db`.
-- **`engine`** – Pre-configured SQLAlchemy AsyncEngine (optional).
+- **`connection_string`** (default: SQLite in <ApiLink to="class/Configuration">`Configuration`</ApiLink> storage dir) - SQLAlchemy connection string, e.g. `sqlite+aiosqlite:///my.db` or `postgresql+asyncpg://user:pass@host/db`.
+- **`engine`** - Pre-configured SQLAlchemy AsyncEngine (optional).
 
 For advanced scenarios, you can configure <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> with a custom SQLAlchemy engine and additional options via the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class. This is useful, for example, when connecting to an external PostgreSQL database or customizing connection pooling.
 
@@ -369,12 +369,12 @@ class RedisDatasetClient {
 %% Dataset Keys
 %% ========================
 
-class Dataset_Keys {
+class DatasetKeys {
     datasets:[name]:items - JSON Array
     datasets:[name]:metadata - JSON Object
 }
 
-class Datasets_Indexes {
+class DatasetsIndexes {
     datasets:id_to_name - Hash
     datasets:name_to_id - Hash
 }
@@ -383,8 +383,8 @@ class Datasets_Indexes {
 %% Client to Keys arrows
 %% ========================
 
-RedisDatasetClient --> Dataset_Keys
-RedisDatasetClient --> Datasets_Indexes
+RedisDatasetClient --> DatasetKeys
+RedisDatasetClient --> DatasetsIndexes
 ```
 
 ```mermaid
@@ -408,13 +408,13 @@ class RedisKeyValueStoreClient {
 %% Key-Value Store Keys
 %% ========================
 
-class Key_Value_Store_Keys {
+class KeyValueStoreKeys {
     key_value_stores:[name]:items - Hash
     key_value_stores:[name]:metadata_items - Hash
     key_value_stores:[name]:metadata - JSON Object
 }
 
-class Key_Value_Stores_Indexes {
+class KeyValueStoresIndexes {
     key_value_stores:id_to_name - Hash
     key_value_stores:name_to_id - Hash
 }
@@ -423,8 +423,8 @@ class Key_Value_Stores_Indexes {
 %% Client to Keys arrows
 %% ========================
 
-RedisKeyValueStoreClient --> Key_Value_Store_Keys
-RedisKeyValueStoreClient --> Key_Value_Stores_Indexes
+RedisKeyValueStoreClient --> KeyValueStoreKeys
+RedisKeyValueStoreClient --> KeyValueStoresIndexes
 ```
 
 ```mermaid
@@ -448,7 +448,7 @@ class RedisRequestQueueClient {
 %% Request Queue Keys
 %% ========================
 
-class Request_Queue_Keys{
+class RequestQueueKeys{
     request_queues:[name]:queue - List
     request_queues:[name]:data - Hash
     request_queues:[name]:in_progress - Hash
@@ -459,7 +459,7 @@ class Request_Queue_Keys{
     request_queues:[name]:metadata - JSON Object
 }
 
-class Request_Queues_Indexes {
+class RequestQueuesIndexes {
     request_queues:id_to_name - Hash
     request_queues:name_to_id - Hash
 }
@@ -468,8 +468,8 @@ class Request_Queues_Indexes {
 %% Client to Keys arrows
 %% ========================
 
-RedisRequestQueueClient --> Request_Queue_Keys
-RedisRequestQueueClient --> Request_Queues_Indexes
+RedisRequestQueueClient --> RequestQueueKeys
+RedisRequestQueueClient --> RequestQueuesIndexes
 ```
 
 Configuration options for the <ApiLink to="class/RedisStorageClient">`RedisStorageClient`</ApiLink> can be set through environment variables or the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class:
@@ -478,8 +478,8 @@ Configuration options for the <ApiLink to="class/RedisStorageClient">`RedisStora
 
 Configuration options for the <ApiLink to="class/RedisStorageClient">`RedisStorageClient`</ApiLink> can be set via constructor arguments:
 
-- **`connection_string`** – Redis connection string, e.g. `redis://localhost:6379/0`.
-- **`redis`** – Pre-configured Redis client instance (optional).
+- **`connection_string`** - Redis connection string, e.g. `redis://localhost:6379/0`.
+- **`redis`** - Pre-configured Redis client instance (optional).
 
 <CodeBlock className="language-python" language="python">
     {RedisStorageClientConfigurationExample}

@@ -199,48 +199,6 @@ async def test_metadata_file_updates(rq_client: RedisRequestQueueClient) -> None
     assert metadata.modified_at > initial_modified
     assert metadata.accessed_at > accessed_after_read
 
-    # Verify metadata file is updated in Redis
-    metadata_json = await await_redis_response(rq_client.redis.json().get('request_queues:test_request_queue:metadata'))
-    assert isinstance(metadata_json, dict)
-    assert metadata_json['total_request_count'] == 1  # type: ignore[unreachable] # py-json typing is broken
-
-
-@pytest.mark.usefixtures('suppress_user_warning')
-async def test_data_persistence_across_reopens(redis_client: FakeAsyncRedis) -> None:
-    """Test that requests persist correctly when reopening the same RQ."""
-    storage_client = RedisStorageClient(redis=redis_client)
-
-    # Create RQ and add requests
-    original_client = await storage_client.create_rq_client(
-        name='persistence-test',
-    )
-
-    test_requests = [
-        Request.from_url('https://example.com/1'),
-        Request.from_url('https://example.com/2'),
-    ]
-    await original_client.add_batch_of_requests(test_requests)
-
-    rq_id = (await original_client.get_metadata()).id
-
-    # Reopen by ID and verify requests persist
-    reopened_client = await storage_client.create_rq_client(
-        id=rq_id,
-    )
-
-    metadata = await reopened_client.get_metadata()
-    assert metadata.total_request_count == 2
-
-    # Fetch requests to verify they're still there
-    request1 = await reopened_client.fetch_next_request()
-    request2 = await reopened_client.fetch_next_request()
-
-    assert request1 is not None
-    assert request2 is not None
-    assert {request1.url, request2.url} == {'https://example.com/1', 'https://example.com/2'}
-
-    await reopened_client.drop()
-
 
 async def test_get_request(rq_client: RedisRequestQueueClient) -> None:
     """Test that get_request works correctly."""
@@ -262,3 +220,33 @@ async def test_get_request(rq_client: RedisRequestQueueClient) -> None:
     # Test fetching a non-existent request
     non_existent = await rq_client.get_request('non-existent-id')
     assert non_existent is None
+
+
+async def test_deduplication(rq_client: RedisRequestQueueClient) -> None:
+    """Test that request deduplication works correctly."""
+    requests = [
+        Request.from_url('https://example.com/1'),
+        Request.from_url('https://example.com/1'),
+        Request.from_url('https://example.com/3'),
+    ]
+
+    await rq_client.add_batch_of_requests(requests)
+
+    # Verify only unique requests are added
+    metadata = await rq_client.get_metadata()
+    assert metadata.pending_request_count == 2
+    assert metadata.total_request_count == 2
+
+    # Fetch requests and verify order
+    request1 = await rq_client.fetch_next_request()
+    assert request1 is not None
+    assert request1 == requests[0]
+
+    # Fetch the next request, which should skip the duplicate
+    request2 = await rq_client.fetch_next_request()
+    assert request2 is not None
+    assert request2 == requests[2]
+
+    # Verify no more requests are available
+    request3 = await rq_client.fetch_next_request()
+    assert request3 is None

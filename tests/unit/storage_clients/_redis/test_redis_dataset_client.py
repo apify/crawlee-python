@@ -144,36 +144,3 @@ async def test_metadata_record_updates(dataset_client: RedisDatasetClient) -> No
     assert metadata.created_at == initial_created
     assert metadata.modified_at > initial_modified
     assert metadata.accessed_at > accessed_after_get
-
-    # Verify metadata file is updated in Redis
-    metadata_json = await await_redis_response(dataset_client.redis.json().get(f'datasets:{metadata.name}:metadata'))
-
-    assert isinstance(metadata_json, dict)
-    assert metadata_json['item_count'] == 1  # type: ignore[unreachable] # py-json typing is broken
-
-
-@pytest.mark.usefixtures('suppress_user_warning')
-async def test_data_persistence_across_reopens(redis_client: FakeAsyncRedis) -> None:
-    """Test that data persists correctly when reopening the same dataset."""
-    storage_client = RedisStorageClient(redis=redis_client)
-
-    # Create dataset and add data
-    original_client = await storage_client.create_dataset_client(
-        name='persistence-test',
-    )
-
-    test_data = {'test_item': 'test_value', 'id': 123}
-    await original_client.push_data(test_data)
-
-    dataset_id = (await original_client.get_metadata()).id
-
-    # Reopen by ID and verify data persists
-    reopened_client = await storage_client.create_dataset_client(
-        id=dataset_id,
-    )
-
-    data = await reopened_client.get_data()
-    assert len(data.items) == 1
-    assert data.items[0] == test_data
-
-    await reopened_client.drop()

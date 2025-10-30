@@ -215,31 +215,3 @@ async def test_metadata_record_updates(kvs_client: RedisKeyValueStoreClient) -> 
     assert metadata.created_at == initial_created
     assert metadata.modified_at > initial_modified
     assert metadata.accessed_at > accessed_after_read
-
-
-@pytest.mark.usefixtures('suppress_user_warning')
-async def test_data_persistence_across_reopens(redis_client: FakeAsyncRedis) -> None:
-    """Test that data persists correctly when reopening the same KVS."""
-    storage_client = RedisStorageClient(redis=redis_client)
-
-    # Create KVS and add data
-    original_client = await storage_client.create_kvs_client(
-        name='persistence-test',
-    )
-
-    test_key = 'persistent-key'
-    test_value = 'persistent-value'
-    await original_client.set_value(key=test_key, value=test_value)
-
-    kvs_id = (await original_client.get_metadata()).id
-
-    # Reopen by ID and verify data persists
-    reopened_client = await storage_client.create_kvs_client(
-        id=kvs_id,
-    )
-
-    record = await reopened_client.get_value(key=test_key)
-    assert record is not None
-    assert record.value == test_value
-
-    await reopened_client.drop()

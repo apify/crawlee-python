@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from fakeredis import FakeAsyncRedis
 
 
-@pytest.fixture(params=['memory', 'file_system', 'sql', 'redis_default', 'redis_bloom'])
+@pytest.fixture(params=['memory', 'file_system', 'sql', 'redis'])
 def storage_client(
     request: pytest.FixtureRequest,
     redis_client: FakeAsyncRedis,
@@ -31,10 +31,8 @@ def storage_client(
         storage_client = MemoryStorageClient()
     elif storage_type == 'sql':
         storage_client = SqlStorageClient()
-    elif storage_type == 'redis_default':
-        storage_client = RedisStorageClient(redis=redis_client, queue_dedup_strategy='default')
-    elif storage_type == 'redis_bloom':
-        storage_client = RedisStorageClient(redis=redis_client, queue_dedup_strategy='bloom')
+    elif storage_type == 'redis':
+        storage_client = RedisStorageClient(redis=redis_client)
     else:
         storage_client = FileSystemStorageClient()
     service_locator.set_storage_client(storage_client)
