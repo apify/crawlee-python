@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from logging import getLogger
 from typing import TYPE_CHECKING
 
 from protego import Protego
@@ -13,6 +14,9 @@ if TYPE_CHECKING:
 
     from crawlee.http_clients import HttpClient
     from crawlee.proxy_configuration import ProxyInfo
+
+
+logger = getLogger(__name__)
 
 
 class RobotsTxtFile:
@@ -56,12 +60,20 @@ class RobotsTxtFile:
             http_client: The `HttpClient` instance used to perform the network request for fetching the robots.txt file.
             proxy_info: Optional `ProxyInfo` to be used when fetching the robots.txt file. If None, no proxy is used.
         """
-        response = await http_client.send_request(url, proxy_info=proxy_info)
-        body = (
-            b'User-agent: *\nAllow: /' if is_status_code_client_error(response.status_code) else await response.read()
-        )
+        try:
+            response = await http_client.send_request(url, proxy_info=proxy_info)
 
-        robots = Protego.parse(body.decode('utf-8'))
+            body = (
+                b'User-agent: *\nAllow: /'
+                if is_status_code_client_error(response.status_code)
+                else await response.read()
+            )
+            robots = Protego.parse(body.decode('utf-8'))
+
+        except Exception as e:
+            logger.warning(f'Failed to fetch from robots.txt from "{url}" with error: "{e}"')
+
+            robots = Protego.parse('User-agent: *\nAllow: /')
 
         return cls(url, robots, http_client=http_client, proxy_info=proxy_info)
 
