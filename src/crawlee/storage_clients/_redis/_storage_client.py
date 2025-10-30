@@ -28,8 +28,8 @@ class RedisStorageClient(StorageClient):
 
     Storage types use the following Redis data structures:
     - **Datasets**: Redis JSON arrays for item storage with metadata in JSON objects
-    - **Key-Value Stores**: Redis hashes for key-value pairs with separate metadata storage
-    - **Request Queues**: Redis lists for FIFO queuing, hashes for request data and in-progress tracking,
+    - **Key-value stores**: Redis hashes for key-value pairs with separate metadata storage
+    - **Request queues**: Redis lists for FIFO queuing, hashes for request data and in-progress tracking,
       and Bloom filters for request deduplication
 
     Warning:
