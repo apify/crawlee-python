@@ -188,9 +188,22 @@ async def test_transform_request_function(server_url: URL, http_client: HttpClie
         transform_request_function=transform_request,
     )
 
+    extracted_urls = set()
+
     while not await sitemap_loader.is_finished():
         request = await sitemap_loader.fetch_next_request()
         assert request is not None
         assert request.user_data.get('transformed') is True
 
+        extracted_urls.add(request.url)
+
         await sitemap_loader.mark_request_as_handled(request)
+
+    assert len(extracted_urls) == 5
+    assert extracted_urls == {
+        'http://not-exists.com/',
+        'http://not-exists.com/catalog?item=12&desc=vacation_hawaii',
+        'http://not-exists.com/catalog?item=73&desc=vacation_new_zealand',
+        'http://not-exists.com/catalog?item=74&desc=vacation_newfoundland',
+        'http://not-exists.com/catalog?item=83&desc=vacation_usa',
+    }
