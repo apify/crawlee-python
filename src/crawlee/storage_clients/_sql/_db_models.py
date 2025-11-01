@@ -206,7 +206,7 @@ class RequestDb(Base):
             'request_queue_id',
             'is_handled',
             'sequence_number',
-            postgresql_where=text('is_handled = false'),
+            postgresql_where=text('is_handled is false'),
         ),
     )
 
