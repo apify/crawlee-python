@@ -205,9 +205,8 @@ class RequestDb(Base):
             'idx_fetch_available',
             'request_queue_id',
             'is_handled',
-            'time_blocked_until',
             'sequence_number',
-            postgresql_where=text('is_handled = false'),
+            postgresql_where=text('is_handled is false'),
         ),
     )
 
