@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 
 - Add `chrome` `BrowserType` for `PlaywrightCrawler` to use the Chrome browser ([#1487](https://github.com/apify/crawlee-python/pull/1487)) ([b06937b](https://github.com/apify/crawlee-python/commit/b06937bbc3afe3c936b554bfc503365c1b2c526b)) by [@Mantisus](https://github.com/Mantisus), closes [#1071](https://github.com/apify/crawlee-python/issues/1071)
 
+### 🐛 Bug Fixes
+
+- Improve indexing of the `request_queue_records` table for `SqlRequestQueueClient` ([#1527](https://github.com/apify/crawlee-python/pull/1527)) ([6509534](https://github.com/apify/crawlee-python/commit/65095346a9d8b703b10c91e0510154c3c48a4176)) by [@Mantisus](https://github.com/Mantisus), closes [#1526](https://github.com/apify/crawlee-python/issues/1526)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [1.0.4](https://github.com/apify/crawlee-python/releases/tag/v1.0.4) (2025-10-24)
