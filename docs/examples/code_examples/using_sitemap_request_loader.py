@@ -17,6 +17,8 @@ def create_transform_request(
     def transform_request(
         request_options: RequestOptions,
     ) -> RequestOptions | RequestTransformAction:
+        # According to the Sitemap protocol, all URLs in a Sitemap must be from a single
+        # host.
         request_host = URL(request_options['url']).host
 
         if request_host and (mapping_data := data_mapper.get(request_host)):
