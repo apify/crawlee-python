@@ -126,9 +126,9 @@ async def test_handles_client_errors(
         pytest.param([], True, 4, 1, id='default_behavior'),
         # error without retry for all 4xx statuses
         pytest.param([], False, 0, 1, id='default_behavior_without_session_pool'),
-        # take as successful status codes from the `ignore_http_error_status_codes` list with Sessoion Pool
+        # take as successful status codes from the `ignore_http_error_status_codes` list with Session Pool
         pytest.param([403], True, 0, 0, id='ignore_error_status_codes'),
-        # take as successful status codes from the `ignore_http_error_status_codes` list without Sessoion Pool
+        # take as successful status codes from the `ignore_http_error_status_codes` list without Session Pool
         pytest.param([403], False, 0, 0, id='ignore_error_status_codes_without_session_pool'),
     ],
 )
