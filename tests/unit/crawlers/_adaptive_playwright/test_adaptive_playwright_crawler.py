@@ -292,7 +292,7 @@ async def test_playwright_only_hook(test_urls: list[str]) -> None:
 
     await crawler.run(test_urls[:1])
 
-    # Default behavior. Hook is called everytime, both static sub crawler and playwright sub crawler.
+    # Default behavior. Hook is called every time, both static sub crawler and playwright sub crawler.
     pre_nav_hook_common.assert_has_calls([call(test_urls[0]), call(test_urls[0])])
     # Hook is called only by playwright sub crawler.
     pre_nav_hook_playwright.assert_called_once_with('about:blank')
@@ -433,13 +433,13 @@ async def test_adaptive_crawling_statistics(test_urls: list[str]) -> None:
     ],
 )
 async def test_adaptive_crawler_exceptions_in_sub_crawlers(*, error_in_pw_crawler: bool, test_urls: list[str]) -> None:
-    """Test that correct results are commited when exceptions are raised in sub crawlers.
+    """Test that correct results are committed when exceptions are raised in sub crawlers.
 
     Exception in bs sub crawler will be logged and pw sub crawler used instead.
     Any result from bs sub crawler will be discarded, result form pw crawler will be saved instead.
     (But global state modifications through `use_state` will not be reverted!!!)
 
-    Exception in pw sub crawler will prevent any result from being commited. Even if `push_data` was called before
+    Exception in pw sub crawler will prevent any result from being committed. Even if `push_data` was called before
     the exception
     """
     static_only_no_detection_predictor = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
