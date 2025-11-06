@@ -63,5 +63,8 @@
         "stream-browserify": "^3.0.0",
         "unist-util-visit": "^5.0.0"
     },
+    "resolutions": {
+        "@rspack/core": "<1.6.0"
+    },
     "packageManager": "yarn@4.10.3"
 }
