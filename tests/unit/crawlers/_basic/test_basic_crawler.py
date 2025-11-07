@@ -1703,7 +1703,7 @@ async def test_crawler_statistics_persistence(tmp_path: Path) -> None:
     assert first_run_state.crawler_runtime < second_run_state.crawler_runtime
 
 
-async def test_crawler_intermediate_statistics(tmp_path: Path) -> None:
+async def test_crawler_intermediate_statistics() -> None:
     """Test that crawler statistics are correctly updating total runtime on every calculate call."""
     crawler = BasicCrawler()
     check_time = timedelta(seconds=0.1)
