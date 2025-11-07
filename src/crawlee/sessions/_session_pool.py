@@ -163,7 +163,7 @@ class SessionPool:
     def add_session(self, session: Session) -> None:
         """Add an externally created session to the pool.
 
-        This is intened only for the cases when you want to add a session that was created outside of the pool.
+        This is intended only for the cases when you want to add a session that was created outside of the pool.
         Otherwise, the pool will create new sessions automatically.
 
         Args:

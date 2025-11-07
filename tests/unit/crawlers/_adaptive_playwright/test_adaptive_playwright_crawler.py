@@ -568,7 +568,7 @@ async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[st
     Handler tries to locate two elements h1 and h2.
     h1 exists immediately, h2 is created dynamically by inline JS snippet embedded in the html.
     Create situation where page is crawled with static sub crawler first.
-    Static sub crawler should be able to locate only h1. It wil try to wait for h2, trying to wait for h2 will trigger
+    Static sub crawler should be able to locate only h1. It will try to wait for h2, trying to wait for h2 will trigger
     `AdaptiveContextError` which will force the adaptive crawler to try playwright sub crawler instead. Playwright sub
     crawler is able to wait for the h2 element."""
 
@@ -610,7 +610,7 @@ async def test_adaptive_context_query_selector_parsel(test_urls: list[str]) -> N
     Handler tries to locate two elements h1 and h2.
     h1 exists immediately, h2 is created dynamically by inline JS snippet embedded in the html.
     Create situation where page is crawled with static sub crawler first.
-    Static sub crawler should be able to locate only h1. It wil try to wait for h2, trying to wait for h2 will trigger
+    Static sub crawler should be able to locate only h1. It will try to wait for h2, trying to wait for h2 will trigger
     `AdaptiveContextError` which will force the adaptive crawler to try playwright sub crawler instead. Playwright sub
     crawler is able to wait for the h2 element."""
 
