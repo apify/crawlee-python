@@ -135,7 +135,7 @@ class Statistics(Generic[TStatisticsState]):
         persist_state_kvs_factory: Callable[[], Coroutine[None, None, KeyValueStore]] | None = None,
         log_message: str = 'Statistics',
         periodic_message_logger: Logger | None = None,
-        log_interval: timedelta = timedelta(seconds=5),
+        log_interval: timedelta = timedelta(minutes=1),
         statistics_log_format: Literal['table', 'inline'] = 'table',
         save_error_snapshots: bool = False,
     ) -> Statistics[StatisticsState]:
