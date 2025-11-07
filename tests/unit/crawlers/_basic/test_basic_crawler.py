@@ -228,7 +228,7 @@ async def test_calls_error_handler() -> None:
         assert isinstance(error_call.error, RuntimeError)
 
 
-async def test_calls_error_handler_for_sesion_errors() -> None:
+async def test_calls_error_handler_for_session_errors() -> None:
     crawler = BasicCrawler(
         max_session_rotations=1,
     )
@@ -1045,7 +1045,7 @@ async def test_crawler_multiple_stops_in_parallel() -> None:
     assert stats.requests_finished == 2
 
 
-async def test_services_no_side_effet_on_crawler_init() -> None:
+async def test_services_no_side_effect_on_crawler_init() -> None:
     custom_configuration = Configuration()
     custom_event_manager = LocalEventManager.from_config(custom_configuration)
     custom_storage_client = MemoryStorageClient()
