@@ -1102,7 +1102,7 @@ async def test_services_crawlers_can_use_different_services() -> None:
 
 async def test_crawler_uses_default_storages(tmp_path: Path) -> None:
     configuration = Configuration(
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        storage_dir=str(tmp_path),
         purge_on_start=True,
     )
     service_locator.set_configuration(configuration)
@@ -1120,7 +1120,7 @@ async def test_crawler_uses_default_storages(tmp_path: Path) -> None:
 
 async def test_crawler_can_use_other_storages(tmp_path: Path) -> None:
     configuration = Configuration(
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        storage_dir=str(tmp_path),
         purge_on_start=True,
     )
     service_locator.set_configuration(configuration)
@@ -1148,11 +1148,11 @@ async def test_crawler_can_use_other_storages_of_same_type(tmp_path: Path) -> No
     }
 
     configuration_a = Configuration(
-        crawlee_storage_dir=str(a_path),  # type: ignore[call-arg]
+        storage_dir=str(a_path),
         purge_on_start=True,
     )
     configuration_b = Configuration(
-        crawlee_storage_dir=str(b_path),  # type: ignore[call-arg]
+        storage_dir=str(b_path),
         purge_on_start=True,
     )
 
@@ -1652,7 +1652,7 @@ async def _run_crawler(requests: list[str], storage_dir: str) -> StatisticsState
     Must be defined like this to be pickable for ProcessPoolExecutor."""
     service_locator.set_configuration(
         Configuration(
-            crawlee_storage_dir=storage_dir,  # type: ignore[call-arg]
+            storage_dir=storage_dir,
             purge_on_start=False,
         )
     )

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 def configuration(tmp_path: Path) -> Configuration:
     return Configuration(
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        storage_dir=str(tmp_path),
     )
 
 

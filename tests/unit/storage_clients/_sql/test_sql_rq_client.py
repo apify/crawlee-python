@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 def configuration(tmp_path: Path) -> Configuration:
     """Temporary configuration for tests."""
     return Configuration(
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        storage_dir=str(tmp_path),
     )
 
 
