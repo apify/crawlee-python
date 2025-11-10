@@ -7,7 +7,8 @@ from hashlib import sha256
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy import CursorResult, func, or_, select, update
+from sqlalchemy import CursorResult, exists, func, or_, select, update
+from sqlalchemy import func as sql_func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only
 from typing_extensions import NotRequired, Self, override
@@ -23,12 +24,13 @@ from crawlee.storage_clients.models import (
 )
 
 from ._client_mixin import MetadataUpdateParams, SqlClientMixin
-from ._db_models import RequestDb, RequestQueueMetadataDb, RequestQueueStateDb
+from ._db_models import RequestDb, RequestQueueMetadataBufferDb, RequestQueueMetadataDb, RequestQueueStateDb
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.sql import ColumnElement
 
     from ._storage_client import SqlStorageClient
 
@@ -93,6 +95,9 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
     """Number of seconds for which a request is considered blocked in the database after being fetched for processing.
     """
 
+    _BUFFER_TABLE = RequestQueueMetadataBufferDb
+    """SQLAlchemy model for metadata buffer."""
+
     def __init__(
         self,
         *,
@@ -110,6 +115,9 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
         self.client_key = crypto_random_object_id(length=32)[:32]
         """Unique identifier for this client instance."""
+
+        self._had_multiple_clients = False
+        """Indicates whether the queue has been accessed by multiple clients."""
 
     @classmethod
     async def open(
@@ -155,7 +163,9 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
     @override
     async def get_metadata(self) -> RequestQueueMetadata:
         # The database is a single place of truth
-        return await self._get_metadata(RequestQueueMetadata)
+        metadata = await self._get_metadata(RequestQueueMetadata)
+        self._had_multiple_clients = metadata.had_multiple_clients
+        return metadata
 
     @override
     async def drop(self) -> None:
@@ -338,14 +348,10 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                     insert_stmt_with_ignore = self._build_insert_stmt_with_ignore(self._ITEM_TABLE, insert_values)
                     await session.execute(insert_stmt_with_ignore)
 
-            await self._update_metadata(
+            await self._add_buffer_record(
                 session,
-                **_QueueMetadataUpdateParams(
-                    recalculate=metadata_recalculate,
-                    update_modified_at=True,
-                    update_accessed_at=True,
-                    force=metadata_recalculate,
-                ),
+                recalculate=metadata_recalculate,
+                update_modified_at=True,
             )
 
             try:
@@ -383,7 +389,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         stmt = select(self._ITEM_TABLE).where(
             self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.request_id == request_id
         )
-        async with self.get_session() as session:
+        async with self.get_session(with_simple_commit=True) as session:
             result = await session.execute(stmt)
             request_db = result.scalar_one_or_none()
 
@@ -391,11 +397,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 logger.warning(f'Request with ID "{unique_key}" not found in the queue.')
                 return None
 
-            updated = await self._update_metadata(session, update_accessed_at=True)
-
-            # Commit updates to the metadata
-            if updated:
-                await session.commit()
+            await self._add_buffer_record(session)
 
         return Request.model_validate_json(request_db.data)
 
@@ -413,14 +415,14 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             select(self._ITEM_TABLE)
             .where(
                 self._ITEM_TABLE.request_queue_id == self._id,
-                self._ITEM_TABLE.is_handled.is_(False),
+                self._ITEM_TABLE.is_handled == False,  # noqa: E712
                 or_(self._ITEM_TABLE.time_blocked_until.is_(None), self._ITEM_TABLE.time_blocked_until < now),
             )
             .order_by(self._ITEM_TABLE.sequence_number.asc())
             .limit(self._MAX_BATCH_FETCH_SIZE)
         )
 
-        async with self.get_session() as session:
+        async with self.get_session(with_simple_commit=True) as session:
             # We use the `skip_locked` database mechanism to prevent the 'interception' of requests by another client
             if dialect == 'postgresql':
                 stmt = stmt.with_for_update(skip_locked=True)
@@ -456,7 +458,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                     .where(
                         self._ITEM_TABLE.request_queue_id == self._id,
                         self._ITEM_TABLE.request_id.in_(request_ids),
-                        self._ITEM_TABLE.is_handled.is_(False),
+                        self._ITEM_TABLE.is_handled == False,  # noqa: E712
                         or_(self._ITEM_TABLE.time_blocked_until.is_(None), self._ITEM_TABLE.time_blocked_until < now),
                     )
                     .values(time_blocked_until=block_until, client_key=self.client_key)
@@ -470,9 +472,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                     await session.rollback()
                     return None
 
-            await self._update_metadata(session, **_QueueMetadataUpdateParams(update_accessed_at=True))
-
-            await session.commit()
+            await self._add_buffer_record(session)
 
         requests = [Request.model_validate_json(r.data) for r in requests_db if r.request_id in blocked_ids]
 
@@ -497,7 +497,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             .where(self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.request_id == request_id)
             .values(is_handled=True, time_blocked_until=None, client_key=None, data=request.model_dump_json())
         )
-        async with self.get_session() as session:
+        async with self.get_session(with_simple_commit=True) as session:
             result = await session.execute(stmt)
             result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
 
@@ -505,17 +505,9 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 logger.warning(f'Request {request.unique_key} not found in database.')
                 return None
 
-            await self._update_metadata(
-                session,
-                **_QueueMetadataUpdateParams(
-                    delta_handled_request_count=1,
-                    delta_pending_request_count=-1,
-                    update_modified_at=True,
-                    update_accessed_at=True,
-                    force=True,
-                ),
+            await self._add_buffer_record(
+                session, update_modified_at=True, delta_pending_request_count=-1, delta_handled_request_count=1
             )
-            await session.commit()
         return ProcessedRequest(
             unique_key=request.unique_key,
             was_already_present=True,
@@ -567,9 +559,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             if result.rowcount == 0:
                 logger.warning(f'Request {request.unique_key} not found in database.')
                 return None
-            await self._update_metadata(
-                session, **_QueueMetadataUpdateParams(update_modified_at=True, update_accessed_at=True)
-            )
+            await self._add_buffer_record(session, update_modified_at=True)
 
         # put the forefront request at the beginning of the cache
         if forefront:
@@ -587,30 +577,30 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         if self._pending_fetch_cache:
             return False
 
-        # Check database for unhandled requests
-        async with self.get_session() as session:
-            metadata_orm = await session.get(self._METADATA_TABLE, self._id)
-            if not metadata_orm:
-                raise ValueError(f'Request queue with ID "{self._id}" not found.')
+        metadata = await self.get_metadata()
 
-            empty = metadata_orm.pending_request_count == 0
+        async with self.get_session(with_simple_commit=True) as session:
+            # If there are no pending requests, check if there are any buffered updates
+            if metadata.pending_request_count == 0:
+                buffer_check_stmt = select(
+                    exists().where(
+                        (self._BUFFER_TABLE.storage_id == self._id)
+                        & (
+                            (self._BUFFER_TABLE.delta_pending_count != 0) | (self._BUFFER_TABLE.need_recalc == True)  # noqa: E712
+                        )
+                    )
+                )
+                buffer_result = await session.execute(buffer_check_stmt)
+                has_pending_buffer_updates = buffer_result.scalar()
 
-            updated = await self._update_metadata(
-                session,
-                **_QueueMetadataUpdateParams(
-                    update_accessed_at=True,
-                    # With multi-client access, counters may become out of sync.
-                    # If the queue is not empty, we perform a recalculation to synchronize the counters in the metadata.
-                    recalculate=not empty,
-                    update_modified_at=not empty,
-                ),
-            )
+                await self._add_buffer_record(session)
+                # If there are no pending requests and no buffered updates, the queue is empty
+                return not has_pending_buffer_updates
 
-            # Commit updates to the metadata
-            if updated:
-                await session.commit()
+            # There are pending requests (may be inaccurate), ensure recalculated metadata
+            await self._add_buffer_record(session, update_modified_at=True, recalculate=True)
 
-        return empty
+        return False
 
     async def _get_state(self, session: AsyncSession) -> RequestQueueStateDb:
         """Get the current state of the request queue."""
@@ -718,3 +708,123 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         hashed_key = sha256(unique_key.encode('utf-8')).hexdigest()
         name_length = 15
         return int(hashed_key[:name_length], 16)
+
+    def _prepare_buffer_data(
+        self,
+        delta_handled_request_count: int | None = None,
+        delta_pending_request_count: int | None = None,
+        delta_total_request_count: int | None = None,
+        *,
+        recalculate: bool = False,
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        """Prepare key-value store specific buffer data.
+
+        For KeyValueStore, we don't have specific metadata fields to track in buffer,
+        so we just return empty dict. The base buffer will handle accessed_at/modified_at.
+
+        Args:
+            delta_handled_request_count: If provided, add this value to the handled_request_count.
+            delta_pending_request_count: If provided, add this value to the pending_request_count.
+            delta_total_request_count: If provided, add this value to the total_request_count.
+            recalculate: If True, recalculate the pending_request_count, and total_request_count on request table.
+            **kwargs: Additional arguments (unused for key-value store).
+
+        Returns:
+            Empty dict as key-value stores don't have specific metadata fields.
+        """
+        buffer_data: dict[str, Any] = {
+            'client_id': self.client_key,
+        }
+
+        if delta_handled_request_count:
+            buffer_data['delta_handled_count'] = delta_handled_request_count
+
+        if delta_pending_request_count:
+            buffer_data['delta_pending_count'] = delta_pending_request_count
+
+        if delta_total_request_count:
+            buffer_data['delta_total_count'] = delta_total_request_count
+
+        if recalculate:
+            buffer_data['need_recalc'] = True
+
+        return buffer_data
+
+    async def _apply_buffer_updates(self, session: AsyncSession, max_buffer_id: int) -> None:
+        """Apply aggregated buffer updates to key-value store metadata.
+
+        For KeyValueStore, we aggregate accessed_at and modified_at timestamps
+        from buffer records and apply them to the metadata.
+
+        Args:
+            session: Active database session.
+            max_buffer_id: Maximum buffer record ID to process (inclusive).
+        """
+        # Get aggregated timestamps from buffer records
+
+        aggregations: list[ColumnElement[Any]] = [
+            sql_func.max(self._BUFFER_TABLE.accessed_at).label('max_accessed_at'),
+            sql_func.max(self._BUFFER_TABLE.modified_at).label('max_modified_at'),
+            sql_func.sum(self._BUFFER_TABLE.delta_handled_count).label('delta_handled_count'),
+            sql_func.sum(self._BUFFER_TABLE.delta_pending_count).label('delta_pending_count'),
+            sql_func.sum(self._BUFFER_TABLE.delta_total_count).label('delta_total_count'),
+        ]
+
+        if not self._had_multiple_clients:
+            aggregations.append(
+                sql_func.count(sql_func.distinct(self._BUFFER_TABLE.client_id)).label('unique_clients_count')
+            )
+
+        if self._storage_client.get_dialect_name() == 'postgresql':
+            aggregations.append(sql_func.bool_or(self._BUFFER_TABLE.need_recalc).label('need_recalc'))
+        else:
+            aggregations.append(sql_func.max(self._BUFFER_TABLE.need_recalc).label('need_recalc'))
+
+        aggregation_stmt = select(*aggregations).where(
+            self._BUFFER_TABLE.storage_id == self._id, self._BUFFER_TABLE.id <= max_buffer_id
+        )
+
+        result = await session.execute(aggregation_stmt)
+        row = result.first()
+
+        if not row:
+            return
+
+        # Prepare updates for metadata
+        values_to_update = {
+            'accessed_at': row.max_accessed_at,
+        }
+
+        if row.max_modified_at:
+            values_to_update['modified_at'] = row.max_modified_at
+
+        if not self._had_multiple_clients and row.unique_clients_count > 1:
+            values_to_update['had_multiple_clients'] = True
+
+        if row.need_recalc:
+            values_to_update['pending_request_count'] = (
+                select(func.count())
+                .select_from(self._ITEM_TABLE)
+                .where(self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.is_handled == False)  # noqa: E712
+                .scalar_subquery()
+            )
+        else:
+            if row.delta_handled_count:
+                values_to_update['handled_request_count'] = (
+                    self._METADATA_TABLE.handled_request_count + row.delta_handled_count
+                )
+
+            if row.delta_pending_count:
+                values_to_update['pending_request_count'] = (
+                    self._METADATA_TABLE.pending_request_count + row.delta_pending_count
+                )
+
+            if row.delta_total_count:
+                values_to_update['total_request_count'] = (
+                    self._METADATA_TABLE.total_request_count + row.delta_total_count
+                )
+
+        update_stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id).values(**values_to_update)
+
+        await session.execute(update_stmt)

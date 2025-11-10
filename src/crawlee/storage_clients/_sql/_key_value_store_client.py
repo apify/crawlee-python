@@ -4,18 +4,25 @@ import json
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy import CursorResult, delete, select
+from sqlalchemy import CursorResult, delete, select, update
+from sqlalchemy import func as sql_func
 from typing_extensions import Self, override
 
 from crawlee._utils.file import infer_mime_type
 from crawlee.storage_clients._base import KeyValueStoreClient
-from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
+from crawlee.storage_clients.models import (
+    KeyValueStoreMetadata,
+    KeyValueStoreRecord,
+    KeyValueStoreRecordMetadata,
+)
 
 from ._client_mixin import MetadataUpdateParams, SqlClientMixin
-from ._db_models import KeyValueStoreMetadataDb, KeyValueStoreRecordDb
+from ._db_models import KeyValueStoreMetadataBufferDb, KeyValueStoreMetadataDb, KeyValueStoreRecordDb
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
     from ._storage_client import SqlStorageClient
 
@@ -56,6 +63,9 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
     _CLIENT_TYPE = 'Key-value store'
     """Human-readable client type for error messages."""
+
+    _BUFFER_TABLE = KeyValueStoreMetadataBufferDb
+    """SQLAlchemy model for metadata buffer."""
 
     def __init__(
         self,
@@ -165,9 +175,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         async with self.get_session(with_simple_commit=True) as session:
             await session.execute(upsert_stmt)
 
-            await self._update_metadata(
-                session, **MetadataUpdateParams(update_accessed_at=True, update_modified_at=True)
-            )
+            await self._add_buffer_record(session, update_modified_at=True)
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
@@ -175,15 +183,11 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         stmt = select(self._ITEM_TABLE).where(
             self._ITEM_TABLE.key_value_store_id == self._id, self._ITEM_TABLE.key == key
         )
-        async with self.get_session() as session:
+        async with self.get_session(with_simple_commit=True) as session:
             result = await session.execute(stmt)
             record_db = result.scalar_one_or_none()
 
-            updated = await self._update_metadata(session, **MetadataUpdateParams(update_accessed_at=True))
-
-            # Commit updates to the metadata
-            if updated:
-                await session.commit()
+            await self._add_buffer_record(session)
 
         if not record_db:
             return None
@@ -231,11 +235,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
             # Update metadata if we actually deleted something
             if result.rowcount > 0:
-                await self._update_metadata(
-                    session, **MetadataUpdateParams(update_accessed_at=True, update_modified_at=True)
-                )
-
-                await session.commit()
+                await self._add_buffer_record(session, update_accessed_at=True, update_modified_at=True)
 
     @override
     async def iterate_keys(
@@ -259,7 +259,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         if limit is not None:
             stmt = stmt.limit(limit)
 
-        async with self.get_session() as session:
+        async with self.get_session(with_simple_commit=True) as session:
             result = await session.stream(stmt.execution_options(stream_results=True))
 
             async for row in result:
@@ -269,26 +269,18 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
                     size=row.size,
                 )
 
-            updated = await self._update_metadata(session, **MetadataUpdateParams(update_accessed_at=True))
-
-            # Commit updates to the metadata
-            if updated:
-                await session.commit()
+            await self._update_metadata(session, **MetadataUpdateParams(update_accessed_at=True))
 
     @override
     async def record_exists(self, *, key: str) -> bool:
         stmt = select(self._ITEM_TABLE.key).where(
             self._ITEM_TABLE.key_value_store_id == self._id, self._ITEM_TABLE.key == key
         )
-        async with self.get_session() as session:
+        async with self.get_session(with_simple_commit=True) as session:
             # Check if record exists
             result = await session.execute(stmt)
 
-            updated = await self._update_metadata(session, **MetadataUpdateParams(update_accessed_at=True))
-
-            # Commit updates to the metadata
-            if updated:
-                await session.commit()
+            await self._add_buffer_record(session)
 
             return result.scalar_one_or_none() is not None
 
@@ -298,3 +290,51 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
     def _specific_update_metadata(self, **_kwargs: dict[str, Any]) -> dict[str, Any]:
         return {}
+
+    def _prepare_buffer_data(self, **_kwargs: Any) -> dict[str, Any]:
+        """Prepare key-value store specific buffer data.
+
+        For KeyValueStore, we don't have specific metadata fields to track in buffer,
+        so we just return empty dict. The base buffer will handle accessed_at/modified_at.
+
+        Args:
+            **kwargs: Additional arguments (unused for key-value store).
+
+        Returns:
+            Empty dict as key-value stores don't have specific metadata fields.
+        """
+        return {}
+
+    async def _apply_buffer_updates(self, session: AsyncSession, max_buffer_id: int) -> None:
+        """Apply aggregated buffer updates to key-value store metadata.
+
+        For KeyValueStore, we aggregate accessed_at and modified_at timestamps
+        from buffer records and apply them to the metadata.
+
+        Args:
+            session: Active database session.
+            max_buffer_id: Maximum buffer record ID to process (inclusive).
+        """
+        # Get aggregated timestamps from buffer records
+        aggregation_stmt = select(
+            sql_func.max(self._BUFFER_TABLE.accessed_at).label('max_accessed_at'),
+            sql_func.max(self._BUFFER_TABLE.modified_at).label('max_modified_at'),
+        ).where(self._BUFFER_TABLE.storage_id == self._id, self._BUFFER_TABLE.id <= max_buffer_id)
+
+        result = await session.execute(aggregation_stmt)
+        row = result.first()
+
+        if not row:
+            return
+
+        # Prepare updates for metadata
+        values_to_update = {
+            'accessed_at': row.max_accessed_at,
+        }
+
+        if row.max_modified_at:
+            values_to_update['modified_at'] = row.max_modified_at
+
+        update_stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id).values(**values_to_update)
+
+        await session.execute(update_stmt)

@@ -3,19 +3,21 @@ from __future__ import annotations
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Select, insert, select
+from sqlalchemy import Select, insert, select, update
+from sqlalchemy import func as sql_func
 from typing_extensions import Self, override
 
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 from ._client_mixin import MetadataUpdateParams, SqlClientMixin
-from ._db_models import DatasetItemDb, DatasetMetadataDb
+from ._db_models import DatasetItemDb, DatasetMetadataBufferDb, DatasetMetadataDb
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from sqlalchemy import Select
+    from sqlalchemy.ext.asyncio import AsyncSession
     from typing_extensions import NotRequired
 
     from ._storage_client import SqlStorageClient
@@ -57,6 +59,9 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
 
     _CLIENT_TYPE = 'Dataset'
     """Human-readable client type for error messages."""
+
+    _BUFFER_TABLE = DatasetMetadataBufferDb
+    """SQLAlchemy model for metadata buffer."""
 
     def __init__(
         self,
@@ -126,7 +131,6 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
                 new_item_count=0,
                 update_accessed_at=True,
                 update_modified_at=True,
-                force=True,
             )
         )
 
@@ -135,23 +139,13 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
         if not isinstance(data, list):
             data = [data]
 
-        db_items: list[dict[str, Any]] = []
         db_items = [{'dataset_id': self._id, 'data': item} for item in data]
         stmt = insert(self._ITEM_TABLE).values(db_items)
 
         async with self.get_session(with_simple_commit=True) as session:
             await session.execute(stmt)
 
-            await self._update_metadata(
-                session,
-                **_DatasetMetadataUpdateParams(
-                    update_accessed_at=True,
-                    update_modified_at=True,
-                    delta_item_count=len(data),
-                    new_item_count=len(data),
-                    force=True,
-                ),
-            )
+            await self._add_buffer_record(session, update_modified_at=True, delta_item_count=len(data))
 
     @override
     async def get_data(
@@ -183,15 +177,11 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
             view=view,
         )
 
-        async with self.get_session() as session:
+        async with self.get_session(with_simple_commit=True) as session:
             result = await session.execute(stmt)
             db_items = result.scalars().all()
 
-            updated = await self._update_metadata(session, **_DatasetMetadataUpdateParams(update_accessed_at=True))
-
-            # Commit updates to the metadata
-            if updated:
-                await session.commit()
+            await self._add_buffer_record(session)
 
         items = [db_item.data for db_item in db_items]
         metadata = await self.get_metadata()
@@ -230,17 +220,13 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
             skip_hidden=skip_hidden,
         )
 
-        async with self.get_session() as session:
+        async with self.get_session(with_simple_commit=True) as session:
             db_items = await session.stream_scalars(stmt)
 
             async for db_item in db_items:
                 yield db_item.data
 
-            updated = await self._update_metadata(session, **_DatasetMetadataUpdateParams(update_accessed_at=True))
-
-            # Commit updates to the metadata
-            if updated:
-                await session.commit()
+            await self._add_buffer_record(session)
 
     def _prepare_get_stmt(
         self,
@@ -308,3 +294,60 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
             values_to_set['item_count'] = self._METADATA_TABLE.item_count + delta_item_count
 
         return values_to_set
+
+    def _prepare_buffer_data(self, delta_item_count: int | None = None, **_kwargs: Any) -> dict[str, Any]:
+        """Prepare key-value store specific buffer data.
+
+        For KeyValueStore, we don't have specific metadata fields to track in buffer,
+        so we just return empty dict. The base buffer will handle accessed_at/modified_at.
+
+        Args:
+            delta_item_count: If provided, add this value to the current item count.
+            **kwargs: Additional arguments (unused for key-value store).
+
+        Returns:
+            Empty dict as key-value stores don't have specific metadata fields.
+        """
+        buffer_data = {}
+        if delta_item_count is not None:
+            buffer_data['delta_item_count'] = delta_item_count
+
+        return buffer_data
+
+    async def _apply_buffer_updates(self, session: AsyncSession, max_buffer_id: int) -> None:
+        """Apply aggregated buffer updates to key-value store metadata.
+
+        For KeyValueStore, we aggregate accessed_at and modified_at timestamps
+        from buffer records and apply them to the metadata.
+
+        Args:
+            session: Active database session.
+            max_buffer_id: Maximum buffer record ID to process (inclusive).
+        """
+        # Get aggregated timestamps from buffer records
+        aggregation_stmt = select(
+            sql_func.max(self._BUFFER_TABLE.accessed_at).label('max_accessed_at'),
+            sql_func.max(self._BUFFER_TABLE.modified_at).label('max_modified_at'),
+            sql_func.sum(self._BUFFER_TABLE.delta_item_count).label('delta_item_count'),
+        ).where(self._BUFFER_TABLE.storage_id == self._id, self._BUFFER_TABLE.id <= max_buffer_id)
+
+        result = await session.execute(aggregation_stmt)
+        row = result.first()
+
+        if not row:
+            return
+
+        # Prepare updates for metadata
+        values_to_update = {
+            'accessed_at': row.max_accessed_at,
+        }
+
+        if row.max_modified_at:
+            values_to_update['modified_at'] = row.max_modified_at
+
+        if row.delta_item_count:
+            values_to_update['item_count'] = self._METADATA_TABLE.item_count + row.delta_item_count
+
+        update_stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id).values(**values_to_update)
+
+        await session.execute(update_stmt)
