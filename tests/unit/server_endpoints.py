@@ -35,6 +35,16 @@ INCAPSULA = b"""\
     </iframe>
 </body></html>"""
 
+PROBLEMATIC_LINKS = b"""\
+<html><head>
+    <title>Hello</title>
+</head>
+<body>
+    <a href="https://budplaceholder.com/">Placeholder</a>
+    <a href="mailto:test@test.com">test@test.com</a>
+    <a href=https://avatars.githubusercontent.com/apify>Apify avatar/a>
+</body></html>"""
+
 GENERIC_RESPONSE = b"""\
 <html><head>
     <title>Hello</title>

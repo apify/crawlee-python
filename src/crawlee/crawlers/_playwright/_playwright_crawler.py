@@ -114,7 +114,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.
             user_data_dir: Path to a user data directory, which stores browser session data like cookies
                 and local storage.
-            browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
+            browser_type: The type of browser to launch:
+                - 'chromium', 'firefox', 'webkit': Use Playwright-managed browsers
+                - 'chrome': Use your locally installed Google Chrome browser. Requires Google Chrome to be installed on
+                    the system.
                 This option should not be used if `browser_pool` is provided.
             browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
                 directly to Playwright's `browser_type.launch` method. For more details, refer to the
@@ -153,7 +156,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             ):
                 raise ValueError(
                     'You cannot provide `headless`, `browser_type`, `browser_launch_options`, '
-                    '`browser_new_context_options`, `use_incognito_pages`, `user_data_dir`  or'
+                    '`browser_new_context_options`, `use_incognito_pages`, `user_data_dir` or '
                     '`fingerprint_generator` arguments when `browser_pool` is provided.'
                 )
 
@@ -496,7 +499,9 @@ class _PlaywrightCrawlerAdditionalOptions(TypedDict):
     """A `BrowserPool` instance to be used for launching the browsers and getting pages."""
 
     browser_type: NotRequired[BrowserType]
-    """The type of browser to launch ('chromium', 'firefox', or 'webkit').
+    """The type of browser to launch:
+    - 'chromium', 'firefox', 'webkit': Use Playwright-managed browsers
+    - 'chrome': Use your locally installed Google Chrome browser. Requires Google Chrome to be installed on the system.
     This option should not be used if `browser_pool` is provided."""
 
     browser_launch_options: NotRequired[Mapping[str, Any]]

@@ -30,6 +30,7 @@ htmlcov
 # IDE, editors
 .vscode
 .idea
+*~
 .DS_Store
 .nvim.lua
 Session.vim

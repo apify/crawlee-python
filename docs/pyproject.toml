@@ -1,4 +1,4 @@
-# Line lenght different from the rest of the code to make sure that the example codes visualised on the generated
+# Line length different from the rest of the code to make sure that the example codes visualised on the generated
 # documentation webpages are shown without vertical slider to make them more readable.
 
 [tool.ruff]

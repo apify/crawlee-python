@@ -90,6 +90,11 @@ class SitemapRequestLoaderState(BaseModel):
 class SitemapRequestLoader(RequestLoader):
     """A request loader that reads URLs from sitemap(s).
 
+    The loader is designed to handle sitemaps that follow the format described in the Sitemaps protocol
+    (https://www.sitemaps.org/protocol.html). It supports both XML and plain text sitemap formats.
+    Note that HTML pages containing links are not supported - those should be handled by regular crawlers
+    and the `enqueue_links` functionality.
+
     The loader fetches and parses sitemaps in the background, allowing crawling to start
     before all URLs are loaded. It supports filtering URLs using glob and regex patterns.
 

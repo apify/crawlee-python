@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.0.5 - **not yet released**
+
+### 🚀 Features
+
+- Add `chrome` `BrowserType` for `PlaywrightCrawler` to use the Chrome browser ([#1487](https://github.com/apify/crawlee-python/pull/1487)) ([b06937b](https://github.com/apify/crawlee-python/commit/b06937bbc3afe3c936b554bfc503365c1b2c526b)) by [@Mantisus](https://github.com/Mantisus), closes [#1071](https://github.com/apify/crawlee-python/issues/1071)
+
+### 🐛 Bug Fixes
+
+- Improve indexing of the `request_queue_records` table for `SqlRequestQueueClient` ([#1527](https://github.com/apify/crawlee-python/pull/1527)) ([6509534](https://github.com/apify/crawlee-python/commit/65095346a9d8b703b10c91e0510154c3c48a4176)) by [@Mantisus](https://github.com/Mantisus), closes [#1526](https://github.com/apify/crawlee-python/issues/1526)
+- Improve error handling for `RobotsTxtFile.load` ([#1524](https://github.com/apify/crawlee-python/pull/1524)) ([596a311](https://github.com/apify/crawlee-python/commit/596a31184914a254b3e7a81fd2f48ea8eda7db49)) by [@Mantisus](https://github.com/Mantisus)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.0.4](https://github.com/apify/crawlee-python/releases/tag/v1.0.4) (2025-10-24)
 
 ### 🐛 Bug Fixes
@@ -268,7 +282,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
-- Fix session managment with retire ([#947](https://github.com/apify/crawlee-python/pull/947)) ([caee03f](https://github.com/apify/crawlee-python/commit/caee03fe3a43cc1d7a8d3f9e19b42df1bdb1c0aa)) by [@Mantisus](https://github.com/Mantisus)
+- Fix session management with retire ([#947](https://github.com/apify/crawlee-python/pull/947)) ([caee03f](https://github.com/apify/crawlee-python/commit/caee03fe3a43cc1d7a8d3f9e19b42df1bdb1c0aa)) by [@Mantisus](https://github.com/Mantisus)
 - Fix templates - poetry-plugin-export version and camoufox template name ([#952](https://github.com/apify/crawlee-python/pull/952)) ([7addea6](https://github.com/apify/crawlee-python/commit/7addea6605359cceba208e16ec9131724bdb3e9b)) by [@Pijukatel](https://github.com/Pijukatel), closes [#951](https://github.com/apify/crawlee-python/issues/951)
 - Fix convert relative link to absolute in `enqueue_links` for response with redirect ([#956](https://github.com/apify/crawlee-python/pull/956)) ([694102e](https://github.com/apify/crawlee-python/commit/694102e163bb9021a4830d2545d153f6f8f3de90)) by [@Mantisus](https://github.com/Mantisus), closes [#955](https://github.com/apify/crawlee-python/issues/955)
 - Fix `CurlImpersonateHttpClient` cookies handler ([#946](https://github.com/apify/crawlee-python/pull/946)) ([ed415c4](https://github.com/apify/crawlee-python/commit/ed415c433da2a40b0ee62534f0730d0737e991b8)) by [@Mantisus](https://github.com/Mantisus)

@@ -77,7 +77,8 @@ def _patch_crawlee_version_in_pyproject_toml_based_project(project_path: Path, w
                 else:
                     raise RuntimeError('This does not look like a uv or poetry based project.')
 
-                # Create lock file that is expected by the docker to exist(Even though it wil be patched in the docker).
+                # Create lock file that is expected by the docker to exist (even though it will be patched
+                # in the docker).
                 subprocess.run(
                     args=[package_manager, 'lock'],
                     cwd=str(project_path),
@@ -87,7 +88,7 @@ def _patch_crawlee_version_in_pyproject_toml_based_project(project_path: Path, w
 
                 # Add command to copy .whl to the docker image and update project with it.
                 # Patching in docker file due to the poetry not properly supporting relative paths for wheel packages
-                # and so the absolute path(in the container) is generated when running `add` command in the container.
+                # and so the absolute path (in the container) is generated when running `add` command in the container.
                 modified_lines.extend(
                     [
                         f'COPY {wheel_path.name} ./\n',

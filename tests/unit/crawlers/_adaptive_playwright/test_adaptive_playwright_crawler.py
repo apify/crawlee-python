@@ -292,7 +292,7 @@ async def test_playwright_only_hook(test_urls: list[str]) -> None:
 
     await crawler.run(test_urls[:1])
 
-    # Default behavior. Hook is called everytime, both static sub crawler and playwright sub crawler.
+    # Default behavior. Hook is called every time, both static sub crawler and playwright sub crawler.
     pre_nav_hook_common.assert_has_calls([call(test_urls[0]), call(test_urls[0])])
     # Hook is called only by playwright sub crawler.
     pre_nav_hook_playwright.assert_called_once_with('about:blank')
@@ -433,13 +433,13 @@ async def test_adaptive_crawling_statistics(test_urls: list[str]) -> None:
     ],
 )
 async def test_adaptive_crawler_exceptions_in_sub_crawlers(*, error_in_pw_crawler: bool, test_urls: list[str]) -> None:
-    """Test that correct results are commited when exceptions are raised in sub crawlers.
+    """Test that correct results are committed when exceptions are raised in sub crawlers.
 
     Exception in bs sub crawler will be logged and pw sub crawler used instead.
     Any result from bs sub crawler will be discarded, result form pw crawler will be saved instead.
     (But global state modifications through `use_state` will not be reverted!!!)
 
-    Exception in pw sub crawler will prevent any result from being commited. Even if `push_data` was called before
+    Exception in pw sub crawler will prevent any result from being committed. Even if `push_data` was called before
     the exception
     """
     static_only_no_detection_predictor = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
@@ -568,7 +568,7 @@ async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[st
     Handler tries to locate two elements h1 and h2.
     h1 exists immediately, h2 is created dynamically by inline JS snippet embedded in the html.
     Create situation where page is crawled with static sub crawler first.
-    Static sub crawler should be able to locate only h1. It wil try to wait for h2, trying to wait for h2 will trigger
+    Static sub crawler should be able to locate only h1. It will try to wait for h2, trying to wait for h2 will trigger
     `AdaptiveContextError` which will force the adaptive crawler to try playwright sub crawler instead. Playwright sub
     crawler is able to wait for the h2 element."""
 
@@ -610,7 +610,7 @@ async def test_adaptive_context_query_selector_parsel(test_urls: list[str]) -> N
     Handler tries to locate two elements h1 and h2.
     h1 exists immediately, h2 is created dynamically by inline JS snippet embedded in the html.
     Create situation where page is crawled with static sub crawler first.
-    Static sub crawler should be able to locate only h1. It wil try to wait for h2, trying to wait for h2 will trigger
+    Static sub crawler should be able to locate only h1. It will try to wait for h2, trying to wait for h2 will trigger
     `AdaptiveContextError` which will force the adaptive crawler to try playwright sub crawler instead. Playwright sub
     crawler is able to wait for the h2 element."""
 
