@@ -4,6 +4,9 @@
 # This is default for local testing, but GitHub workflows override it to a higher value in CI
 E2E_TESTS_CONCURRENCY = 1
 
+# Placeholder token; replace with a real one for local docs testing if needed
+APIFY_TOKEN = apify_api_token_placeholder
+
 clean:
 	rm -rf .mypy_cache .pytest_cache .ruff_cache build dist htmlcov .coverage
 
@@ -55,4 +58,4 @@ build-docs:
 	cd website && corepack enable && yarn && uv run yarn build
 
 run-docs: build-api-reference
-	cd website && corepack enable && yarn && uv run yarn start
+	export APIFY_SIGNING_TOKEN=$(APIFY_TOKEN) && cd website && corepack enable && yarn && uv run yarn start
