@@ -211,7 +211,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         transaction_processed_requests = []
         transaction_processed_requests_unique_keys = set()
 
-        metadata_recalculate = False
+        approximate_new_request = 0
 
         # Deduplicate requests by unique_key upfront
         unique_requests = {}
@@ -263,7 +263,6 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                         state.sequence_counter += 1
 
                     insert_values.append(value)
-                    metadata_recalculate = True
                     transaction_processed_requests.append(
                         ProcessedRequest(
                             unique_key=request.unique_key,
@@ -341,16 +340,20 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                         update_columns=['sequence_number'],
                         conflict_cols=['request_id', 'request_queue_id'],
                     )
-                    await session.execute(upsert_stmt)
+                    result = await session.execute(upsert_stmt)
                 else:
                     # If the request already exists in the database, we ignore this request when inserting.
                     insert_stmt_with_ignore = self._build_insert_stmt_with_ignore(self._ITEM_TABLE, insert_values)
-                    await session.execute(insert_stmt_with_ignore)
+                    result = await session.execute(insert_stmt_with_ignore)
+
+                result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
+                approximate_new_request += result.rowcount
 
             await self._add_buffer_record(
                 session,
-                recalculate=metadata_recalculate,
                 update_modified_at=True,
+                delta_pending_request_count=approximate_new_request,
+                delta_total_request_count=approximate_new_request,
             )
 
             try:
