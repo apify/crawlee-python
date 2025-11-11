@@ -48,7 +48,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-all = ["crawlee[adaptive-crawler,beautifulsoup,cli,curl-impersonate,httpx,parsel,playwright,otel,sql_sqlite,sql_postgres]"]
+all = ["crawlee[adaptive-crawler,beautifulsoup,cli,curl-impersonate,httpx,parsel,playwright,otel,sql_sqlite,sql_postgres,redis]"]
 adaptive-crawler = [
     "jaro-winkler>=2.0.3",
     "playwright>=1.27.0",
@@ -79,6 +79,7 @@ sql_sqlite = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
     "aiosqlite>=0.21.0",
 ]
+redis = ["redis[hiredis] >= 7.0.0"]
 
 [project.scripts]
 crawlee = "crawlee._cli:cli"
@@ -98,6 +99,7 @@ dev = [
     "apify_client", # For e2e tests.
     "build<2.0.0", # For e2e tests.
     "dycw-pytest-only<3.0.0",
+    "fakeredis[probabilistic,json,lua]<3.0.0",
     "mypy~=1.18.0",
     "pre-commit<5.0.0",
     "proxy-py<3.0.0",

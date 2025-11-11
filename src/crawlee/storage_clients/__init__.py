@@ -13,9 +13,13 @@ _install_import_hook(__name__)
 with _try_import(__name__, 'SqlStorageClient'):
     from ._sql import SqlStorageClient
 
+with _try_import(__name__, 'RedisStorageClient'):
+    from ._redis import RedisStorageClient
+
 __all__ = [
     'FileSystemStorageClient',
     'MemoryStorageClient',
+    'RedisStorageClient',
     'SqlStorageClient',
     'StorageClient',
 ]
