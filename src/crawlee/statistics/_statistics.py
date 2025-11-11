@@ -110,7 +110,7 @@ class Statistics(Generic[TStatisticsState]):
         # Flag to indicate the context state.
         self._active = False
 
-        # Pre-existing runtime offset when importing existing statistics.
+        # Pre-existing runtime offset, that can be non-zero when restoring serialized state from KVS.
         self._runtime_offset = timedelta(seconds=0)
 
     def replace_state_model(self, state_model: type[TNewStatisticsState]) -> Statistics[TNewStatisticsState]:
