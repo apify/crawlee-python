@@ -883,7 +883,7 @@ dev = [
     { name = "apify-client" },
     { name = "build", specifier = "<2.0.0" },
     { name = "dycw-pytest-only", specifier = "<3.0.0" },
-    { name = "fakeredis", extras = ["probabilistic", "json", "lua"], specifier = "~=2.32.0" },
+    { name = "fakeredis", extras = ["probabilistic", "json", "lua"], specifier = "<3.0.0" },
     { name = "mypy", specifier = "~=1.18.0" },
     { name = "pre-commit", specifier = "<5.0.0" },
     { name = "proxy-py", specifier = "<3.0.0" },
