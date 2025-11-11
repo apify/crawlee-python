@@ -900,7 +900,7 @@ dev = [
     { name = "types-colorama", specifier = "<1.0.0" },
     { name = "types-psutil", specifier = "<8.0.0" },
     { name = "types-python-dateutil", specifier = "<3.0.0" },
-    { name = "uvicorn", extras = ["standard"], specifier = "~=0.35.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = "<1.0.0" },
 ]
 
 [[package]]
