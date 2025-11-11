@@ -151,9 +151,8 @@ class SqlStorageClient(StorageClient):
                         )
                     elif not db_version:
                         await conn.execute(insert(VersionDb).values(version=__version__))
-                except (IntegrityError, OperationalError) as e:
+                except (IntegrityError, OperationalError):
                     await conn.rollback()
-                    raise RuntimeError('Error initializing database') from e
 
             self._initialized = True
 
