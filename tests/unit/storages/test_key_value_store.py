@@ -1,6 +1,3 @@
-# TODO: Update crawlee_storage_dir args once the Pydantic bug is fixed
-# https://github.com/apify/crawlee-python/issues/146
-
 from __future__ import annotations
 
 import json
@@ -1119,7 +1116,7 @@ async def test_get_auto_saved_value_various_global_clients(
     """Ensure that persistence is working for all clients regardless of what is set in service locator."""
     service_locator.set_configuration(
         Configuration(
-            crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+            storage_dir=str(tmp_path),
             purge_on_start=True,
         )
     )
