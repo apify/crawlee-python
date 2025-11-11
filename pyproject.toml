@@ -99,7 +99,7 @@ dev = [
     "apify_client", # For e2e tests.
     "build<2.0.0", # For e2e tests.
     "dycw-pytest-only<3.0.0",
-    "fakeredis[probabilistic,json,lua]~=2.32.0",
+    "fakeredis[probabilistic,json,lua]<3.0.0",
     "mypy~=1.18.0",
     "pre-commit<5.0.0",
     "proxy-py<3.0.0",
