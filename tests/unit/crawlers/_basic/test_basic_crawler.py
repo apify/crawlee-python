@@ -1701,3 +1701,29 @@ async def test_crawler_statistics_persistence(tmp_path: Path) -> None:
 
     assert first_run_state.crawler_finished_at < second_run_state.crawler_finished_at
     assert first_run_state.crawler_runtime < second_run_state.crawler_runtime
+
+
+async def test_crawler_intermediate_statistics() -> None:
+    """Test that crawler statistics are correctly updating total runtime on every calculate call."""
+    crawler = BasicCrawler()
+    check_time = timedelta(seconds=0.1)
+
+    async def wait_for_statistics_initialization() -> None:
+        while not crawler.statistics.active:  # noqa: ASYNC110 # It is ok for tests.
+            await asyncio.sleep(0.1)
+
+    @crawler.router.default_handler
+    async def handler(_: BasicCrawlingContext) -> None:
+        await asyncio.sleep(check_time.total_seconds() * 5)
+
+    # Start crawler and wait until statistics are initialized.
+    crawler_task = asyncio.create_task(crawler.run(['https://a.placeholder.com']))
+    await wait_for_statistics_initialization()
+
+    # Wait some time and check that runtime is updated.
+    await asyncio.sleep(check_time.total_seconds())
+    crawler.statistics.calculate()
+    assert crawler.statistics.state.crawler_runtime >= check_time
+
+    # Wait for crawler to finish
+    await crawler_task
