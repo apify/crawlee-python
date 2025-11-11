@@ -1,6 +1,3 @@
-# TODO: Update crawlee_storage_dir args once the Pydantic bug is fixed
-# https://github.com/apify/crawlee-python/issues/146
-
 from __future__ import annotations
 
 import logging
@@ -10,6 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from curl_cffi import CurlHttpVersion
+from fakeredis import FakeAsyncRedis
 from proxy import Proxy
 from uvicorn.config import Config
 
@@ -218,3 +216,8 @@ async def http_client(request: pytest.FixtureRequest) -> AsyncGenerator[HttpClie
         kwargs = {'http2': True}
     async with class_client(**kwargs) as client:
         yield client
+
+
+@pytest.fixture
+def redis_client() -> FakeAsyncRedis:
+    return FakeAsyncRedis()

@@ -71,7 +71,6 @@ class _NonPersistentStatistics(Statistics):
     async def __aenter__(self) -> Self:
         self._active = True
         await self._state.initialize()
-        self._after_initialize()
         return self
 
     async def __aexit__(

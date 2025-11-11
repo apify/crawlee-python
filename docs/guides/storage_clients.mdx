@@ -17,6 +17,8 @@ import CustomStorageClientExample from '!!raw-loader!roa-loader!./code_examples/
 import RegisteringStorageClientsExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/registering_storage_clients_example.py';
 import SQLStorageClientBasicExample from '!!raw-loader!roa-loader!./code_examples/storage_clients/sql_storage_client_basic_example.py';
 import SQLStorageClientConfigurationExample from '!!raw-loader!./code_examples/storage_clients/sql_storage_client_configuration_example.py';
+import RedisStorageClientBasicExample from '!!raw-loader!./code_examples/storage_clients/redis_storage_client_basic_example.py';
+import RedisStorageClientConfigurationExample from '!!raw-loader!./code_examples/storage_clients/redis_storage_client_configuration_example.py';
 
 Storage clients provide a unified interface for interacting with <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, regardless of the underlying implementation. They handle operations like creating, reading, updating, and deleting storage instances, as well as managing data persistence and cleanup. This abstraction makes it easy to switch between different environments, such as local development and cloud production setups.
 
@@ -26,7 +28,8 @@ Crawlee provides three main storage client implementations:
 
 - <ApiLink to="class/FileSystemStorageClient">`FileSystemStorageClient`</ApiLink> - Provides persistent file system storage with in-memory caching.
 - <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> - Stores data in memory with no persistence.
-- <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> – Provides persistent storage using a SQL database ([SQLite](https://sqlite.org/) or [PostgreSQL](https://www.postgresql.org/)). Requires installing the extra dependency: 'crawlee[sql_sqlite]' for SQLite or 'crawlee[sql_postgres]' for PostgreSQL.
+- <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> - Provides persistent storage using a SQL database ([SQLite](https://sqlite.org/) or [PostgreSQL](https://www.postgresql.org/)). Requires installing the extra dependency: `crawlee[sql_sqlite]` for SQLite or `crawlee[sql_postgres]` for PostgreSQL.
+- <ApiLink to="class/RedisStorageClient">`RedisStorageClient`</ApiLink> - Provides persistent storage using a [Redis](https://redis.io/) database v8.0+. Requires installing the extra dependency `crawlee[redis]`.
 - [`ApifyStorageClient`](https://docs.apify.com/sdk/python/reference/class/ApifyStorageClient) - Manages storage on the [Apify platform](https://apify.com), implemented in the [Apify SDK](https://github.com/apify/apify-sdk-python).
 
 ```mermaid
@@ -56,6 +59,8 @@ class MemoryStorageClient
 
 class SqlStorageClient
 
+class RedisStorageClient
+
 class ApifyStorageClient
 
 %% ========================
@@ -65,6 +70,7 @@ class ApifyStorageClient
 StorageClient --|> FileSystemStorageClient
 StorageClient --|> MemoryStorageClient
 StorageClient --|> SqlStorageClient
+StorageClient --|> RedisStorageClient
 StorageClient --|> ApifyStorageClient
 ```
 
@@ -304,13 +310,179 @@ Configuration options for the <ApiLink to="class/SqlStorageClient">`SqlStorageCl
 
 Configuration options for the <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> can be set via constructor arguments:
 
-- **`connection_string`** (default: SQLite in <ApiLink to="class/Configuration">`Configuration`</ApiLink> storage dir) – SQLAlchemy connection string, e.g. `sqlite+aiosqlite:///my.db` or `postgresql+asyncpg://user:pass@host/db`.
-- **`engine`** – Pre-configured SQLAlchemy AsyncEngine (optional).
+- **`connection_string`** (default: SQLite in <ApiLink to="class/Configuration">`Configuration`</ApiLink> storage dir) - SQLAlchemy connection string, e.g. `sqlite+aiosqlite:///my.db` or `postgresql+asyncpg://user:pass@host/db`.
+- **`engine`** - Pre-configured SQLAlchemy AsyncEngine (optional).
 
 For advanced scenarios, you can configure <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> with a custom SQLAlchemy engine and additional options via the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class. This is useful, for example, when connecting to an external PostgreSQL database or customizing connection pooling.
 
 <CodeBlock className="language-python" language="python">
     {SQLStorageClientConfigurationExample}
+</CodeBlock>
+
+### Redis storage client
+
+:::warning Experimental feature
+The <ApiLink to="class/RedisStorageClient">`RedisStorageClient`</ApiLink> is experimental. Its API and behavior may change in future releases.
+:::
+
+The <ApiLink to="class/RedisStorageClient">`RedisStorageClient`</ApiLink> provides persistent storage using [Redis](https://redis.io/) database. It supports concurrent access from multiple independent clients or processes and uses Redis native data structures for efficient operations.
+
+:::note dependencies
+The <ApiLink to="class/RedisStorageClient">`RedisStorageClient`</ApiLink> is not included in the core Crawlee package.
+To use it, you need to install Crawlee with the Redis extra dependency:
+
+<code>pip install 'crawlee[redis]'</code>
+
+Additionally, Redis version 8.0 or higher is required.
+:::
+
+:::note Redis persistence
+Data persistence in Redis depends on your [database configuration](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/).
+:::
+
+The client requires either a Redis connection string or a pre-configured Redis client instance. Use a pre-configured client when you need custom Redis settings such as connection pooling, timeouts, or SSL/TLS encryption.
+
+<CodeBlock className="language-python" language="python">
+    {RedisStorageClientBasicExample}
+</CodeBlock>
+
+Data is organized using Redis key patterns. Below are the main data structures used for each storage type:
+
+```mermaid
+---
+config:
+    class:
+        hideEmptyMembersBox: true
+---
+
+classDiagram
+
+%% ========================
+%% Storage Client
+%% ========================
+
+class RedisDatasetClient {
+    <<Dataset>>
+}
+
+%% ========================
+%% Dataset Keys
+%% ========================
+
+class DatasetKeys {
+    datasets:[name]:items - JSON Array
+    datasets:[name]:metadata - JSON Object
+}
+
+class DatasetsIndexes {
+    datasets:id_to_name - Hash
+    datasets:name_to_id - Hash
+}
+
+%% ========================
+%% Client to Keys arrows
+%% ========================
+
+RedisDatasetClient --> DatasetKeys
+RedisDatasetClient --> DatasetsIndexes
+```
+
+```mermaid
+---
+config:
+    class:
+        hideEmptyMembersBox: true
+---
+
+classDiagram
+
+%% ========================
+%% Storage Clients
+%% ========================
+
+class RedisKeyValueStoreClient {
+    <<Key-value store>>
+}
+
+%% ========================
+%% Key-Value Store Keys
+%% ========================
+
+class KeyValueStoreKeys {
+    key_value_stores:[name]:items - Hash
+    key_value_stores:[name]:metadata_items - Hash
+    key_value_stores:[name]:metadata - JSON Object
+}
+
+class KeyValueStoresIndexes {
+    key_value_stores:id_to_name - Hash
+    key_value_stores:name_to_id - Hash
+}
+
+%% ========================
+%% Client to Keys arrows
+%% ========================
+
+RedisKeyValueStoreClient --> KeyValueStoreKeys
+RedisKeyValueStoreClient --> KeyValueStoresIndexes
+```
+
+```mermaid
+---
+config:
+    class:
+        hideEmptyMembersBox: true
+---
+
+classDiagram
+
+%% ========================
+%% Storage Clients
+%% ========================
+
+class RedisRequestQueueClient {
+    <<Request queue>>
+}
+
+%% ========================
+%% Request Queue Keys
+%% ========================
+
+class RequestQueueKeys{
+    request_queues:[name]:queue - List
+    request_queues:[name]:data - Hash
+    request_queues:[name]:in_progress - Hash
+    request_queues:[name]:added_bloom_filter - Bloom Filter | bloom queue_dedup_strategy
+    request_queues:[name]:handled_bloom_filter - Bloom Filter | bloom queue_dedup_strategy
+    request_queues:[name]:pending_set - Set | default queue_dedup_strategy
+    request_queues:[name]:handled_set - Set | default queue_dedup_strategy
+    request_queues:[name]:metadata - JSON Object
+}
+
+class RequestQueuesIndexes {
+    request_queues:id_to_name - Hash
+    request_queues:name_to_id - Hash
+}
+
+%% ========================
+%% Client to Keys arrows
+%% ========================
+
+RedisRequestQueueClient --> RequestQueueKeys
+RedisRequestQueueClient --> RequestQueuesIndexes
+```
+
+Configuration options for the <ApiLink to="class/RedisStorageClient">`RedisStorageClient`</ApiLink> can be set through environment variables or the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class:
+
+- **`purge_on_start`** (env: `CRAWLEE_PURGE_ON_START`, default: `True`) - Whether to purge default storages on start.
+
+Configuration options for the <ApiLink to="class/RedisStorageClient">`RedisStorageClient`</ApiLink> can be set via constructor arguments:
+
+- **`connection_string`** - Redis connection string, e.g. `redis://localhost:6379/0`.
+- **`redis`** - Pre-configured Redis client instance (optional).
+
+<CodeBlock className="language-python" language="python">
+    {RedisStorageClientConfigurationExample}
 </CodeBlock>
 
 ## Creating a custom storage client

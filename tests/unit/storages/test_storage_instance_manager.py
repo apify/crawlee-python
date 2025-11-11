@@ -22,10 +22,7 @@ def storage_type(request: pytest.FixtureRequest) -> type[Storage]:
 
 
 async def test_unique_storage_by_storage_client(tmp_path: Path, storage_type: type[Storage]) -> None:
-    config = Configuration(
-        purge_on_start=True,
-    )
-    config.storage_dir = str(tmp_path)
+    config = Configuration(purge_on_start=True, storage_dir=str(tmp_path))
 
     storage_1 = await storage_type.open(storage_client=MemoryStorageClient(), configuration=config)
     storage_2 = await storage_type.open(storage_client=FileSystemStorageClient(), configuration=config)
@@ -33,10 +30,7 @@ async def test_unique_storage_by_storage_client(tmp_path: Path, storage_type: ty
 
 
 async def test_same_storage_when_different_client(tmp_path: Path, storage_type: type[Storage]) -> None:
-    config = Configuration(
-        purge_on_start=True,
-    )
-    config.storage_dir = str(tmp_path)
+    config = Configuration(purge_on_start=True, storage_dir=str(tmp_path))
 
     storage_1 = await storage_type.open(storage_client=MemoryStorageClient(), configuration=config)
     storage_2 = await storage_type.open(storage_client=MemoryStorageClient(), configuration=config)
@@ -44,10 +38,7 @@ async def test_same_storage_when_different_client(tmp_path: Path, storage_type: 
 
 
 async def test_unique_storage_by_storage_type(tmp_path: Path) -> None:
-    config = Configuration(
-        purge_on_start=True,
-    )
-    config.storage_dir = str(tmp_path)
+    config = Configuration(purge_on_start=True, storage_dir=str(tmp_path))
     storage_client = MemoryStorageClient()
 
     kvs = await KeyValueStore.open(storage_client=storage_client, configuration=config)
@@ -71,11 +62,9 @@ async def test_unique_storage_by_unique_cache_key_different_path(tmp_path: Path,
     path_1.mkdir()
     path_2.mkdir()
 
-    config_1 = Configuration()
-    config_1.storage_dir = str(path_1)
+    config_1 = Configuration(storage_dir=str(path_1))
 
-    config_2 = Configuration()
-    config_2.storage_dir = str(path_2)
+    config_2 = Configuration(storage_dir=str(path_2))
 
     storage_client = FileSystemStorageClient()
 
@@ -87,11 +76,9 @@ async def test_unique_storage_by_unique_cache_key_different_path(tmp_path: Path,
 async def test_unique_storage_by_unique_cache_key_same_path(tmp_path: Path, storage_type: type[Storage]) -> None:
     """Test that StorageInstanceManager support unique cache key. Different configs with same storage_dir create same
     storage."""
-    config_1 = Configuration()
-    config_1.storage_dir = str(tmp_path)
+    config_1 = Configuration(storage_dir=str(tmp_path))
 
-    config_2 = Configuration()
-    config_2.storage_dir = str(tmp_path)
+    config_2 = Configuration(storage_dir=str(tmp_path))
 
     storage_client = FileSystemStorageClient()
 

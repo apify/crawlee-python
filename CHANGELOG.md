@@ -8,11 +8,13 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Add `chrome` `BrowserType` for `PlaywrightCrawler` to use the Chrome browser ([#1487](https://github.com/apify/crawlee-python/pull/1487)) ([b06937b](https://github.com/apify/crawlee-python/commit/b06937bbc3afe3c936b554bfc503365c1b2c526b)) by [@Mantisus](https://github.com/Mantisus), closes [#1071](https://github.com/apify/crawlee-python/issues/1071)
+- Add `RedisStorageClient` based on Redis v8.0+ ([#1406](https://github.com/apify/crawlee-python/pull/1406)) ([d08d13d](https://github.com/apify/crawlee-python/commit/d08d13d39203c24ab61fe254b0956d6744db3b5f)) by [@Mantisus](https://github.com/Mantisus)
 
 ### 🐛 Bug Fixes
 
 - Improve indexing of the `request_queue_records` table for `SqlRequestQueueClient` ([#1527](https://github.com/apify/crawlee-python/pull/1527)) ([6509534](https://github.com/apify/crawlee-python/commit/65095346a9d8b703b10c91e0510154c3c48a4176)) by [@Mantisus](https://github.com/Mantisus), closes [#1526](https://github.com/apify/crawlee-python/issues/1526)
 - Improve error handling for `RobotsTxtFile.load` ([#1524](https://github.com/apify/crawlee-python/pull/1524)) ([596a311](https://github.com/apify/crawlee-python/commit/596a31184914a254b3e7a81fd2f48ea8eda7db49)) by [@Mantisus](https://github.com/Mantisus)
+- Fix `crawler_runtime` not being updated during run and only in the end ([#1540](https://github.com/apify/crawlee-python/pull/1540)) ([0d6c3f6](https://github.com/apify/crawlee-python/commit/0d6c3f6d3337ddb6cab4873747c28cf95605d550)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1541](https://github.com/apify/crawlee-python/issues/1541)
 
 
 <!-- git-cliff-unreleased-end -->

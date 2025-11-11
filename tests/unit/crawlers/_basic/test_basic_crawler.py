@@ -1102,7 +1102,7 @@ async def test_services_crawlers_can_use_different_services() -> None:
 
 async def test_crawler_uses_default_storages(tmp_path: Path) -> None:
     configuration = Configuration(
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        storage_dir=str(tmp_path),
         purge_on_start=True,
     )
     service_locator.set_configuration(configuration)
@@ -1120,7 +1120,7 @@ async def test_crawler_uses_default_storages(tmp_path: Path) -> None:
 
 async def test_crawler_can_use_other_storages(tmp_path: Path) -> None:
     configuration = Configuration(
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        storage_dir=str(tmp_path),
         purge_on_start=True,
     )
     service_locator.set_configuration(configuration)
@@ -1148,11 +1148,11 @@ async def test_crawler_can_use_other_storages_of_same_type(tmp_path: Path) -> No
     }
 
     configuration_a = Configuration(
-        crawlee_storage_dir=str(a_path),  # type: ignore[call-arg]
+        storage_dir=str(a_path),
         purge_on_start=True,
     )
     configuration_b = Configuration(
-        crawlee_storage_dir=str(b_path),  # type: ignore[call-arg]
+        storage_dir=str(b_path),
         purge_on_start=True,
     )
 
@@ -1652,7 +1652,7 @@ async def _run_crawler(requests: list[str], storage_dir: str) -> StatisticsState
     Must be defined like this to be pickable for ProcessPoolExecutor."""
     service_locator.set_configuration(
         Configuration(
-            crawlee_storage_dir=storage_dir,  # type: ignore[call-arg]
+            storage_dir=storage_dir,
             purge_on_start=False,
         )
     )
@@ -1701,3 +1701,29 @@ async def test_crawler_statistics_persistence(tmp_path: Path) -> None:
 
     assert first_run_state.crawler_finished_at < second_run_state.crawler_finished_at
     assert first_run_state.crawler_runtime < second_run_state.crawler_runtime
+
+
+async def test_crawler_intermediate_statistics() -> None:
+    """Test that crawler statistics are correctly updating total runtime on every calculate call."""
+    crawler = BasicCrawler()
+    check_time = timedelta(seconds=0.1)
+
+    async def wait_for_statistics_initialization() -> None:
+        while not crawler.statistics.active:  # noqa: ASYNC110 # It is ok for tests.
+            await asyncio.sleep(0.1)
+
+    @crawler.router.default_handler
+    async def handler(_: BasicCrawlingContext) -> None:
+        await asyncio.sleep(check_time.total_seconds() * 5)
+
+    # Start crawler and wait until statistics are initialized.
+    crawler_task = asyncio.create_task(crawler.run(['https://a.placeholder.com']))
+    await wait_for_statistics_initialization()
+
+    # Wait some time and check that runtime is updated.
+    await asyncio.sleep(check_time.total_seconds())
+    crawler.statistics.calculate()
+    assert crawler.statistics.state.crawler_runtime >= check_time
+
+    # Wait for crawler to finish
+    await crawler_task

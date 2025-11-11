@@ -1,6 +1,3 @@
-# TODO: Update crawlee_storage_dir args once the Pydantic bug is fixed
-# https://github.com/apify/crawlee-python/issues/146
-
 from __future__ import annotations
 
 import json
@@ -492,7 +489,7 @@ async def test_export_with_multiple_kwargs(dataset: Dataset, tmp_path: Path) -> 
     custom_dir_name = 'some_dir'
     custom_dir = tmp_path / custom_dir_name
     custom_dir.mkdir()
-    target_configuration = Configuration(crawlee_storage_dir=str(custom_dir))  # type: ignore[call-arg]
+    target_configuration = Configuration(storage_dir=str(custom_dir))
 
     # Set expected values
     expected_exported_data = f'{json.dumps([{"some key": "some data"}])}'

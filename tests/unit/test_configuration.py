@@ -1,6 +1,3 @@
-# TODO: Update crawlee_storage_dir args once the Pydantic bug is fixed
-# https://github.com/apify/crawlee-python/issues/146
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -38,11 +35,7 @@ def test_global_configuration_works_reversed() -> None:
 
 async def test_storage_not_persisted_when_non_persistable_storage_used(tmp_path: Path, server_url: URL) -> None:
     """Make the Crawler use MemoryStorageClient which can't persist state."""
-    service_locator.set_configuration(
-        Configuration(
-            crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
-        )
-    )
+    service_locator.set_configuration(Configuration(storage_dir=str(tmp_path)))
     crawler = HttpCrawler(storage_client=MemoryStorageClient())
 
     @crawler.router.default_handler
@@ -62,9 +55,7 @@ async def test_storage_persisted_with_explicit_statistics_with_persistable_stora
     """Make the Crawler use MemoryStorageClient which can't persist state,
     but pass explicit statistics to it which will use global FileSystemStorageClient() that can persist state."""
 
-    configuration = Configuration(
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
-    )
+    configuration = Configuration(storage_dir=str(tmp_path))
     service_locator.set_configuration(configuration)
     service_locator.set_storage_client(FileSystemStorageClient())
 
@@ -85,7 +76,7 @@ async def test_storage_persisted_with_explicit_statistics_with_persistable_stora
 
 async def test_storage_persisted_when_enabled(tmp_path: Path, server_url: URL) -> None:
     configuration = Configuration(
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        storage_dir=str(tmp_path),
     )
 
     storage_client = FileSystemStorageClient()
