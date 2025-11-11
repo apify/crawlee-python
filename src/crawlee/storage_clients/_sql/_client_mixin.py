@@ -46,7 +46,6 @@ class MetadataUpdateParams(TypedDict, total=False):
 
     update_accessed_at: NotRequired[bool]
     update_modified_at: NotRequired[bool]
-    force: NotRequired[bool]
 
 
 class SqlClientMixin(ABC):
@@ -78,11 +77,6 @@ class SqlClientMixin(ABC):
     def __init__(self, *, id: str, storage_client: SqlStorageClient) -> None:
         self._id = id
         self._storage_client = storage_client
-
-        # Time tracking to reduce database writes during frequent operation
-        self._accessed_at_allow_update_after: datetime | None = None
-        self._modified_at_allow_update_after: datetime | None = None
-        self._accessed_modified_update_interval = storage_client.get_accessed_modified_update_interval()
 
     @classmethod
     async def _open(
@@ -135,8 +129,6 @@ class SqlClientMixin(ABC):
                 **extra_metadata_fields,
             )
             client = cls(id=metadata.id, storage_client=storage_client)
-            client._accessed_at_allow_update_after = now + client._accessed_modified_update_interval
-            client._modified_at_allow_update_after = now + client._accessed_modified_update_interval
             session.add(cls._METADATA_TABLE(**metadata.model_dump(), internal_name=internal_name))
 
         return client
@@ -276,8 +268,8 @@ class SqlClientMixin(ABC):
         Args:
             metadata_kwargs: Arguments to pass to _update_metadata.
         """
-        # Force process buffers to ensure metadata is up to date before purging
-        await self._process_buffers(force=True)
+        # Process buffers to ensure metadata is up to date before purging
+        await self._process_buffers()
 
         stmt = delete(self._ITEM_TABLE).where(self._ITEM_TABLE.storage_id == self._id)
         async with self.get_session(with_simple_commit=True) as session:
@@ -317,46 +309,6 @@ class SqlClientMixin(ABC):
 
             return metadata_model.model_validate(orm_metadata)
 
-    def _default_update_metadata(
-        self, *, update_accessed_at: bool = False, update_modified_at: bool = False, force: bool = False
-    ) -> dict[str, Any]:
-        """Prepare common metadata updates with rate limiting.
-
-        Args:
-            update_accessed_at: Whether to update accessed_at timestamp.
-            update_modified_at: Whether to update modified_at timestamp.
-            force: Whether to force the update regardless of rate limiting.
-        """
-        values_to_set: dict[str, Any] = {}
-        now = datetime.now(timezone.utc)
-
-        # If the record must be updated (for example, when updating counters), we update timestamps and shift the time.
-        if force:
-            if update_modified_at:
-                values_to_set['modified_at'] = now
-                self._modified_at_allow_update_after = now + self._accessed_modified_update_interval
-            if update_accessed_at:
-                values_to_set['accessed_at'] = now
-                self._accessed_at_allow_update_after = now + self._accessed_modified_update_interval
-
-        elif update_modified_at and (
-            self._modified_at_allow_update_after is None or now >= self._modified_at_allow_update_after
-        ):
-            values_to_set['modified_at'] = now
-            self._modified_at_allow_update_after = now + self._accessed_modified_update_interval
-            # The record will be updated, we can update `accessed_at` and shift the time.
-            if update_accessed_at:
-                values_to_set['accessed_at'] = now
-                self._accessed_at_allow_update_after = now + self._accessed_modified_update_interval
-
-        elif update_accessed_at and (
-            self._accessed_at_allow_update_after is None or now >= self._accessed_at_allow_update_after
-        ):
-            values_to_set['accessed_at'] = now
-            self._accessed_at_allow_update_after = now + self._accessed_modified_update_interval
-
-        return values_to_set
-
     @abstractmethod
     def _specific_update_metadata(self, **kwargs: Any) -> dict[str, Any]:
         """Prepare storage-specific metadata updates.
@@ -366,43 +318,6 @@ class SqlClientMixin(ABC):
         Args:
             **kwargs: Storage-specific update parameters.
         """
-
-    async def _update_metadata(
-        self,
-        session: AsyncSession,
-        *,
-        update_accessed_at: bool = False,
-        update_modified_at: bool = False,
-        force: bool = False,
-        **kwargs: Any,
-    ) -> bool:
-        """Update storage metadata combining common and specific fields.
-
-        Args:
-            session: Active database session.
-            update_accessed_at: Whether to update accessed_at timestamp.
-            update_modified_at: Whether to update modified_at timestamp.
-            force: Whether to force the update timestamps regardless of rate limiting.
-            **kwargs: Additional arguments for _specific_update_metadata.
-
-        Returns:
-            True if any updates were made, False otherwise
-        """
-        values_to_set = self._default_update_metadata(
-            update_accessed_at=update_accessed_at, update_modified_at=update_modified_at, force=force
-        )
-
-        values_to_set.update(self._specific_update_metadata(**kwargs))
-
-        if values_to_set:
-            if (stmt := values_to_set.pop('custom_stmt', None)) is None:
-                stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id)
-
-            stmt = stmt.values(**values_to_set)
-            await session.execute(stmt)
-            return True
-
-        return False
 
     @abstractmethod
     def _prepare_buffer_data(self, **kwargs: Any) -> dict[str, Any]:
@@ -416,6 +331,39 @@ class SqlClientMixin(ABC):
             session: Active database session.
             max_buffer_id: Maximum buffer record ID to process.
         """
+
+    async def _update_metadata(
+        self,
+        session: AsyncSession,
+        *,
+        update_accessed_at: bool = False,
+        update_modified_at: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        """Directly update storage metadata combining common and specific fields.
+
+        Args:
+            session: Active database session.
+            update_accessed_at: Whether to update accessed_at timestamp.
+            update_modified_at: Whether to update modified_at timestamp.
+            **kwargs: Additional arguments for _specific_update_metadata.
+        """
+        values_to_set: dict[str, Any] = {}
+        now = datetime.now(timezone.utc)
+
+        if update_accessed_at:
+            values_to_set['accessed_at'] = now
+
+        if update_modified_at:
+            values_to_set['modified_at'] = now
+
+        values_to_set.update(self._specific_update_metadata(**kwargs))
+
+        if values_to_set:
+            stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id)
+
+            stmt = stmt.values(**values_to_set)
+            await session.execute(stmt)
 
     async def _add_buffer_record(
         self,
@@ -441,12 +389,11 @@ class SqlClientMixin(ABC):
 
         session.add(self._BUFFER_TABLE(**values_to_set))
 
-    async def _try_acquire_buffer_lock(self, session: AsyncSession, *, force: bool = False) -> bool:
+    async def _try_acquire_buffer_lock(self, session: AsyncSession) -> bool:
         """Try to acquire buffer processing lock for 200ms.
 
         Args:
             session: Active database session.
-            force: If True, forcefully acquire lock regardless of current state.
 
         Returns:
             True if lock was acquired, False if already locked by another process.
@@ -462,6 +409,7 @@ class SqlClientMixin(ABC):
                     self._METADATA_TABLE.id == self._id,
                     (self._METADATA_TABLE.buffer_locked_until.is_(None))
                     | (self._METADATA_TABLE.buffer_locked_until < now),
+                    select(self._BUFFER_TABLE.id).where(self._BUFFER_TABLE.storage_id == self._id).exists(),
                 )
                 .with_for_update(skip_locked=True)
             )
@@ -472,24 +420,16 @@ class SqlClientMixin(ABC):
                 # Either conditions not met OR row is locked by another process
                 return False
 
-        if force:
-            # Force acquire lock regardless of current state
-            update_stmt = (
-                update(self._METADATA_TABLE)
-                .where(self._METADATA_TABLE.id == self._id)
-                .values(buffer_locked_until=lock_until)
+        # Acquire lock only if not currently locked or lock has expired
+        update_stmt = (
+            update(self._METADATA_TABLE)
+            .where(
+                self._METADATA_TABLE.id == self._id,
+                (self._METADATA_TABLE.buffer_locked_until.is_(None)) | (self._METADATA_TABLE.buffer_locked_until < now),
+                select(self._BUFFER_TABLE.id).where(self._BUFFER_TABLE.storage_id == self._id).exists(),
             )
-        else:
-            # Acquire lock only if not currently locked or lock has expired
-            update_stmt = (
-                update(self._METADATA_TABLE)
-                .where(
-                    self._METADATA_TABLE.id == self._id,
-                    (self._METADATA_TABLE.buffer_locked_until.is_(None))
-                    | (self._METADATA_TABLE.buffer_locked_until < now),
-                )
-                .values(buffer_locked_until=lock_until)
-            )
+            .values(buffer_locked_until=lock_until)
+        )
 
         result = await session.execute(update_stmt)
         result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
@@ -529,15 +469,11 @@ class SqlClientMixin(ABC):
         # Any non-NULL value means there are pending updates
         return locked_until is not None
 
-    async def _process_buffers(self, *, force: bool = False) -> None:
-        """Process pending buffer updates and apply them to metadata.
-
-        Args:
-            force: If True, forcefully acquire lock and process buffers.
-        """
+    async def _process_buffers(self) -> None:
+        """Process pending buffer updates and apply them to metadata."""
         async with self.get_session(with_simple_commit=True) as session:
             # Try to acquire buffer processing lock
-            if not await self._try_acquire_buffer_lock(session, force=force):
+            if not await self._try_acquire_buffer_lock(session):
                 # Another process is currently processing buffers or lock acquisition failed
                 return
 
@@ -551,7 +487,8 @@ class SqlClientMixin(ABC):
             max_buffer_id = result.scalar()
 
             if max_buffer_id is None:
-                # No buffer records to process
+                # No buffer records to process. Release the lock and exit.
+                await self._release_buffer_lock(session)
                 return
 
             # Apply aggregated buffer updates to metadata using only records <= max_buffer_id

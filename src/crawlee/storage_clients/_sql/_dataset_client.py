@@ -272,13 +272,14 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
 
         return stmt.offset(offset).limit(limit)
 
+    @override
     def _specific_update_metadata(
         self,
         new_item_count: int | None = None,
         delta_item_count: int | None = None,
         **_kwargs: dict[str, Any],
     ) -> dict[str, Any]:
-        """Update the dataset metadata in the database.
+        """Directly update the dataset metadata in the database.
 
         Args:
             session: The SQLAlchemy AsyncSession to use for the update.
@@ -295,18 +296,12 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
 
         return values_to_set
 
+    @override
     def _prepare_buffer_data(self, delta_item_count: int | None = None, **_kwargs: Any) -> dict[str, Any]:
-        """Prepare key-value store specific buffer data.
-
-        For KeyValueStore, we don't have specific metadata fields to track in buffer,
-        so we just return empty dict. The base buffer will handle accessed_at/modified_at.
+        """Prepare dataset specific buffer data.
 
         Args:
             delta_item_count: If provided, add this value to the current item count.
-            **kwargs: Additional arguments (unused for key-value store).
-
-        Returns:
-            Empty dict as key-value stores don't have specific metadata fields.
         """
         buffer_data = {}
         if delta_item_count is not None:
@@ -314,17 +309,8 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
 
         return buffer_data
 
+    @override
     async def _apply_buffer_updates(self, session: AsyncSession, max_buffer_id: int) -> None:
-        """Apply aggregated buffer updates to key-value store metadata.
-
-        For KeyValueStore, we aggregate accessed_at and modified_at timestamps
-        from buffer records and apply them to the metadata.
-
-        Args:
-            session: Active database session.
-            max_buffer_id: Maximum buffer record ID to process (inclusive).
-        """
-        # Get aggregated timestamps from buffer records
         aggregation_stmt = select(
             sql_func.max(self._BUFFER_TABLE.accessed_at).label('max_accessed_at'),
             sql_func.max(self._BUFFER_TABLE.modified_at).label('max_modified_at'),

@@ -288,34 +288,21 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
     async def get_public_url(self, *, key: str) -> str:
         raise NotImplementedError('Public URLs are not supported for SQL key-value stores.')
 
+    @override
     def _specific_update_metadata(self, **_kwargs: dict[str, Any]) -> dict[str, Any]:
         return {}
 
+    @override
     def _prepare_buffer_data(self, **_kwargs: Any) -> dict[str, Any]:
         """Prepare key-value store specific buffer data.
 
         For KeyValueStore, we don't have specific metadata fields to track in buffer,
         so we just return empty dict. The base buffer will handle accessed_at/modified_at.
-
-        Args:
-            **kwargs: Additional arguments (unused for key-value store).
-
-        Returns:
-            Empty dict as key-value stores don't have specific metadata fields.
         """
         return {}
 
+    @override
     async def _apply_buffer_updates(self, session: AsyncSession, max_buffer_id: int) -> None:
-        """Apply aggregated buffer updates to key-value store metadata.
-
-        For KeyValueStore, we aggregate accessed_at and modified_at timestamps
-        from buffer records and apply them to the metadata.
-
-        Args:
-            session: Active database session.
-            max_buffer_id: Maximum buffer record ID to process (inclusive).
-        """
-        # Get aggregated timestamps from buffer records
         aggregation_stmt = select(
             sql_func.max(self._BUFFER_TABLE.accessed_at).label('max_accessed_at'),
             sql_func.max(self._BUFFER_TABLE.modified_at).label('max_modified_at'),

@@ -189,7 +189,6 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 update_accessed_at=True,
                 update_modified_at=True,
                 new_pending_request_count=0,
-                force=True,
             )
         )
 
@@ -618,6 +617,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 raise RuntimeError(f'Failed to create or retrieve state for queue {self._id}')
         return orm_state
 
+    @override
     def _specific_update_metadata(
         self,
         new_handled_request_count: int | None = None,
@@ -626,11 +626,10 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         delta_handled_request_count: int | None = None,
         delta_pending_request_count: int | None = None,
         *,
-        recalculate: bool = False,
         update_had_multiple_clients: bool = False,
         **_kwargs: dict[str, Any],
     ) -> dict[str, Any]:
-        """Update the request queue metadata in the database.
+        """Directly update the request queue metadata in the database.
 
         Args:
             session: The SQLAlchemy session to use for database operations.
@@ -639,7 +638,6 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             new_total_request_count: If provided, update the total_request_count to this value.
             delta_handled_request_count: If provided, add this value to the handled_request_count.
             delta_pending_request_count: If provided, add this value to the pending_request_count.
-            recalculate: If True, recalculate the pending_request_count, and total_request_count on request table.
             update_had_multiple_clients: If True, set had_multiple_clients to True.
         """
         values_to_set: dict[str, Any] = {}
@@ -649,48 +647,12 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
         if new_handled_request_count is not None:
             values_to_set['handled_request_count'] = new_handled_request_count
-        elif delta_handled_request_count is not None:
-            values_to_set['handled_request_count'] = (
-                self._METADATA_TABLE.handled_request_count + delta_handled_request_count
-            )
 
         if new_pending_request_count is not None:
             values_to_set['pending_request_count'] = new_pending_request_count
-        elif delta_pending_request_count is not None:
-            values_to_set['pending_request_count'] = (
-                self._METADATA_TABLE.pending_request_count + delta_pending_request_count
-            )
 
         if new_total_request_count is not None:
             values_to_set['total_request_count'] = new_total_request_count
-
-        if recalculate:
-            stmt = (
-                update(self._METADATA_TABLE)
-                .where(self._METADATA_TABLE.request_queue_id == self._id)
-                .values(
-                    pending_request_count=(
-                        select(func.count())
-                        .select_from(self._ITEM_TABLE)
-                        .where(self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.is_handled.is_(False))
-                        .scalar_subquery()
-                    ),
-                    total_request_count=(
-                        select(func.count())
-                        .select_from(self._ITEM_TABLE)
-                        .where(self._ITEM_TABLE.request_queue_id == self._id)
-                        .scalar_subquery()
-                    ),
-                    handled_request_count=(
-                        select(func.count())
-                        .select_from(self._ITEM_TABLE)
-                        .where(self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.is_handled.is_(True))
-                        .scalar_subquery()
-                    ),
-                )
-            )
-
-            values_to_set['custom_stmt'] = stmt
 
         return values_to_set
 
@@ -709,6 +671,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         name_length = 15
         return int(hashed_key[:name_length], 16)
 
+    @override
     def _prepare_buffer_data(
         self,
         delta_handled_request_count: int | None = None,
@@ -718,20 +681,13 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         recalculate: bool = False,
         **_kwargs: Any,
     ) -> dict[str, Any]:
-        """Prepare key-value store specific buffer data.
-
-        For KeyValueStore, we don't have specific metadata fields to track in buffer,
-        so we just return empty dict. The base buffer will handle accessed_at/modified_at.
+        """Prepare request queue specific buffer data.
 
         Args:
             delta_handled_request_count: If provided, add this value to the handled_request_count.
             delta_pending_request_count: If provided, add this value to the pending_request_count.
             delta_total_request_count: If provided, add this value to the total_request_count.
             recalculate: If True, recalculate the pending_request_count, and total_request_count on request table.
-            **kwargs: Additional arguments (unused for key-value store).
-
-        Returns:
-            Empty dict as key-value stores don't have specific metadata fields.
         """
         buffer_data: dict[str, Any] = {
             'client_id': self.client_key,
@@ -751,18 +707,8 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
         return buffer_data
 
+    @override
     async def _apply_buffer_updates(self, session: AsyncSession, max_buffer_id: int) -> None:
-        """Apply aggregated buffer updates to key-value store metadata.
-
-        For KeyValueStore, we aggregate accessed_at and modified_at timestamps
-        from buffer records and apply them to the metadata.
-
-        Args:
-            session: Active database session.
-            max_buffer_id: Maximum buffer record ID to process (inclusive).
-        """
-        # Get aggregated timestamps from buffer records
-
         aggregations: list[ColumnElement[Any]] = [
             sql_func.max(self._BUFFER_TABLE.accessed_at).label('max_accessed_at'),
             sql_func.max(self._BUFFER_TABLE.modified_at).label('max_modified_at'),
@@ -807,6 +753,18 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 select(func.count())
                 .select_from(self._ITEM_TABLE)
                 .where(self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.is_handled == False)  # noqa: E712
+                .scalar_subquery()
+            )
+            values_to_update['total_request_count'] = (
+                select(func.count())
+                .select_from(self._ITEM_TABLE)
+                .where(self._ITEM_TABLE.request_queue_id == self._id)
+                .scalar_subquery()
+            )
+            values_to_update['handled_request_count'] = (
+                select(func.count())
+                .select_from(self._ITEM_TABLE)
+                .where(self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.is_handled == True)  # noqa: E712
                 .scalar_subquery()
             )
         else:

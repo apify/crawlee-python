@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import warnings
-from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -67,9 +66,6 @@ class SqlStorageClient(StorageClient):
         self._initialized = False
         self.session_maker: None | async_sessionmaker[AsyncSession] = None
 
-        # Minimum interval to reduce database load from frequent concurrent metadata updates
-        self._accessed_modified_update_interval = timedelta(seconds=1)
-
         # Flag needed to apply optimizations only for default database
         self._default_flag = self._engine is None and self._connection_string is None
         self._dialect_name: str | None = None
@@ -104,10 +100,6 @@ class SqlStorageClient(StorageClient):
     def get_dialect_name(self) -> str | None:
         """Get the database dialect name."""
         return self._dialect_name
-
-    def get_accessed_modified_update_interval(self) -> timedelta:
-        """Get the interval for accessed and modified updates."""
-        return self._accessed_modified_update_interval
 
     async def initialize(self, configuration: Configuration) -> None:
         """Initialize the database schema.
