@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+from logging import getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -22,6 +23,9 @@ if TYPE_CHECKING:
     from types import TracebackType
 
     from sqlalchemy.ext.asyncio import AsyncSession
+
+
+logger = getLogger(__name__)
 
 
 @docs_group('Storage clients')
@@ -131,9 +135,7 @@ class SqlStorageClient(StorageClient):
                         await conn.execute(text('PRAGMA mmap_size=268435456'))  # 256MB memory mapping
                         await conn.execute(text('PRAGMA foreign_keys=ON'))  # Enforce constraints
                         await conn.execute(text('PRAGMA busy_timeout=30000'))  # 30s busy timeout
-
                     await conn.run_sync(Base.metadata.create_all, checkfirst=True)
-
                     from crawlee import __version__  # Noqa: PLC0415
 
                     db_version = (await conn.execute(select(VersionDb))).scalar_one_or_none()
@@ -149,9 +151,9 @@ class SqlStorageClient(StorageClient):
                         )
                     elif not db_version:
                         await conn.execute(insert(VersionDb).values(version=__version__))
-
-                except (IntegrityError, OperationalError):
+                except (IntegrityError, OperationalError) as e:
                     await conn.rollback()
+                    raise RuntimeError('Error initializing database') from e
 
             self._initialized = True
 

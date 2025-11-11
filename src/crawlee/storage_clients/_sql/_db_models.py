@@ -233,6 +233,11 @@ class RequestDb(Base):
             'sequence_number',
             postgresql_where=text('is_handled = false'),
         ),
+        Index(
+            'idx_count_aggregate',
+            'request_queue_id',
+            'is_handled',
+        ),
     )
 
     request_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -350,6 +355,8 @@ class RequestQueueMetadataBufferDb(MetadataBufferDb, Base):
 
     __tablename__ = 'request_queue_metadata_buffer'
 
+    __table_args__ = (Index('idx_rq_client', 'request_queue_id', 'client_id'),)
+
     request_queue_id: Mapped[str] = mapped_column(
         String(20), ForeignKey('request_queues.request_queue_id', ondelete='CASCADE'), nullable=False, index=True
     )
@@ -373,8 +380,6 @@ class RequestQueueMetadataBufferDb(MetadataBufferDb, Base):
 
     # Relationship back to request queue metadata
     queue: Mapped[RequestQueueMetadataDb] = relationship(back_populates='buffer')
-
-    __table_args__ = (Index('idx_rq_client', 'request_queue_id', 'client_id'),)
 
     storage_id = synonym('request_queue_id')
     """Alias for request_queue_id to match SqlClientMixin expectations."""

@@ -581,6 +581,19 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         async with self.get_session(with_simple_commit=True) as session:
             # If there are no pending requests, check if there are any buffered updates
             if metadata.pending_request_count == 0:
+                # Check for active buffer lock (indicates pending buffer processing)
+                buffer_lock_stmt = select(self._METADATA_TABLE.buffer_locked_until).where(
+                    self._METADATA_TABLE.id == self._id
+                )
+                buffer_lock_result = await session.execute(buffer_lock_stmt)
+                buffer_locked_until = buffer_lock_result.scalar()
+
+                # If buffer is locked, there are pending updates being processed
+                if buffer_locked_until is not None:
+                    await self._add_buffer_record(session)
+                    return False
+
+                # Check if there are any buffered updates that might change the pending count
                 buffer_check_stmt = select(
                     exists().where(
                         (self._BUFFER_TABLE.storage_id == self._id)
