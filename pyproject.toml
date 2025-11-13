@@ -73,7 +73,7 @@ otel = [
 ]
 sql_postgres = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
-    "asyncpg>=0.24.0"
+    "asyncpg>=0.24.0; sys_platform != 'win32' and python_version < '3.14'"
 ]
 sql_sqlite = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
