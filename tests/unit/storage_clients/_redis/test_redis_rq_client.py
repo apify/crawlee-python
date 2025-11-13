@@ -26,7 +26,7 @@ async def rq_client(
     suppress_user_warning: None,  # noqa: ARG001
 ) -> AsyncGenerator[RedisRequestQueueClient, None]:
     """A fixture for a Redis RQ client."""
-    if request.param == 'bloom' and sys.version_info >= (3, 14):
+    if request.param == 'bloom' and sys.platform == 'win32' and sys.version_info >= (3, 14):
         pytest.skip('Bloom filters not supported on Windows with Python 3.14 and fakeredis')
 
     client = await RedisStorageClient(redis=redis_client, queue_dedup_strategy=request.param).create_rq_client(
