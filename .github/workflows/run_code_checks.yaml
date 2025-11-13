@@ -21,13 +21,13 @@ jobs:
     name: Lint check
     uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
     with:
-      python-versions: '["3.10", "3.11", "3.12", "3.13"]'
+      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
 
   type_check:
     name: Type check
     uses: apify/workflows/.github/workflows/python_type_check.yaml@main
     with:
-      python-versions: '["3.10", "3.11", "3.12", "3.13"]'
+      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
 
   unit_tests:
     name: Unit tests
@@ -35,7 +35,7 @@ jobs:
     secrets:
       httpbin_url: ${{ secrets.APIFY_HTTPBIN_TOKEN && format('https://httpbin.apify.actor?token={0}', secrets.APIFY_HTTPBIN_TOKEN) || 'https://httpbin.org'}}
     with:
-      python-versions: '["3.10", "3.11", "3.12", "3.13"]'
+      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
 
   docs_check:
     name: Docs check
