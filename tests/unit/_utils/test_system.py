@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from multiprocessing import Barrier, Process, Value, synchronize
+from multiprocessing import Barrier, Process, Value, set_start_method, synchronize
 from multiprocessing.shared_memory import SharedMemory
 from typing import TYPE_CHECKING
 
@@ -38,6 +38,7 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
     equal to additional_memory_size_estimate_per_unshared_memory_child where the additional shared memory is exactly
     the same as the unshared memory.
     """
+    set_start_method('fork', force=True)
     estimated_memory_expectation = Value('b', False)  # noqa: FBT003  # Common usage pattern for multiprocessing.Value
 
     def parent_process() -> None:
