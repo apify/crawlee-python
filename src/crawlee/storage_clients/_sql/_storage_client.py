@@ -269,6 +269,7 @@ class SqlStorageClient(StorageClient):
                 'Unsupported database. Supported: sqlite, postgresql. Consider using a different database.'
             )
 
+        # TODO: https://github.com/apify/crawlee-python/issues/1555
         if 'postgresql' in connection_string and sys.version_info >= (3, 14):
             raise ValueError(
                 'SqlStorageClient cannot use PostgreSQL with Python 3.14 '
