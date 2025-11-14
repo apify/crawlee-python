@@ -30,7 +30,8 @@ type-check:
 	uv run mypy
 
 unit-tests:
-	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone" -k "test_crawler_statistics_persistence"
+	uv run pytest --numprocesses=1 -vv tests/unit -m "run_alone"
+	uv run pytest --numprocesses=auto -vv tests/unit -m "not run_alone"
 
 unit-tests-cov:
 	uv run pytest --numprocesses=1 -vv --cov=src/crawlee tests/unit -m "run_alone"

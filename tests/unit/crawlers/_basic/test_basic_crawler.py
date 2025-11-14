@@ -1673,7 +1673,7 @@ def _process_run_crawler(requests: list[str], storage_dir: str) -> StatisticsSta
     return asyncio.run(_run_crawler(requests=requests, storage_dir=storage_dir))
 
 
-@pytest.mark.parametrize('_', range(1))
+@pytest.mark.parametrize('_', range(100))
 async def test_crawler_statistics_persistence(tmp_path: Path, _: int) -> None:
     """Test that crawler statistics persist and are loaded correctly.
 
