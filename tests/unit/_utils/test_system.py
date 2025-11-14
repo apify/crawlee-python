@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from multiprocessing import Barrier, Process, Value, synchronize
+from multiprocessing import get_context, synchronize
 from multiprocessing.shared_memory import SharedMemory
 from typing import TYPE_CHECKING
 
@@ -38,7 +38,9 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
     equal to additional_memory_size_estimate_per_unshared_memory_child where the additional shared memory is exactly
     the same as the unshared memory.
     """
-    estimated_memory_expectation = Value('b', False)  # noqa: FBT003  # Common usage pattern for multiprocessing.Value
+
+    ctx = get_context('fork')
+    estimated_memory_expectation = ctx.Value('b', False)  # noqa: FBT003  # Common usage pattern for multiprocessing.Value
 
     def parent_process() -> None:
         extra_memory_size = 1024 * 1024 * 100  # 100 MB
@@ -70,8 +72,8 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
             *, target: Callable, count: int = 1, use_shared_memory: bool = False
         ) -> float:
             processes = []
-            ready = Barrier(parties=count + 1)
-            measured = Barrier(parties=count + 1)
+            ready = ctx.Barrier(parties=count + 1)
+            measured = ctx.Barrier(parties=count + 1)
             shared_memory: None | SharedMemory = None
             memory_before = get_memory_info().current_size
 
@@ -83,7 +85,7 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
                 extra_args = []
 
             for _ in range(count):
-                p = Process(target=target, args=[ready, measured, *extra_args])
+                p = ctx.Process(target=target, args=[ready, measured, *extra_args])
                 p.start()
                 processes.append(p)
 
@@ -129,7 +131,7 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
                 f'{memory_estimation_difference_ratio=}'
             )
 
-    process = Process(target=parent_process)
+    process = ctx.Process(target=parent_process)
     process.start()
     process.join()
 

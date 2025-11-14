@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import warnings
 from logging import getLogger
 from pathlib import Path
@@ -259,6 +260,14 @@ class SqlStorageClient(StorageClient):
         if 'sqlite' not in connection_string and 'postgresql' not in connection_string:
             raise ValueError(
                 'Unsupported database. Supported: sqlite, postgresql. Consider using a different database.'
+            )
+
+        # TODO: https://github.com/apify/crawlee-python/issues/1555
+        if 'postgresql' in connection_string and sys.version_info >= (3, 14):
+            raise ValueError(
+                'SqlStorageClient cannot use PostgreSQL with Python 3.14 '
+                'due to asyncpg compatibility limitations. '
+                'Please use Python 3.13 or earlier, or switch to SQLite.'
             )
 
         self._engine = create_async_engine(

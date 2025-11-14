@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -25,6 +26,10 @@ async def rq_client(
     suppress_user_warning: None,  # noqa: ARG001
 ) -> AsyncGenerator[RedisRequestQueueClient, None]:
     """A fixture for a Redis RQ client."""
+    # TODO: https://github.com/apify/crawlee-python/issues/1554
+    if request.param == 'bloom' and sys.platform == 'win32' and sys.version_info >= (3, 14):
+        pytest.skip('Bloom filters not supported on Windows with Python 3.14 and fakeredis')
+
     client = await RedisStorageClient(redis=redis_client, queue_dedup_strategy=request.param).create_rq_client(
         name='test_request_queue'
     )
