@@ -170,6 +170,7 @@ class Statistics(Generic[TStatisticsState]):
         await self._state.initialize()
 
         self._runtime_offset = self.state.crawler_runtime
+        logger.warning(f'{self._runtime_offset=}')
 
         # Start periodic logging and let it print initial state before activation.
         self._periodic_logger.start()
@@ -200,8 +201,13 @@ class Statistics(Generic[TStatisticsState]):
         # Stop logging and deactivate the statistics to prevent further changes to crawler_runtime
         await self._periodic_logger.stop()
         self.state.crawler_finished_at = datetime.now(timezone.utc)
+
         self.state.crawler_runtime = (
             self._runtime_offset + self.state.crawler_finished_at - self.state.crawler_last_started_at
+        )
+        logger.warning(
+            f'Final runtime update {self._runtime_offset=}, {self.state.crawler_runtime=},'
+            f' this_run_duration={self.state.crawler_finished_at - self.state.crawler_last_started_at}'
         )
 
         self._active = False
@@ -268,6 +274,7 @@ class Statistics(Generic[TStatisticsState]):
             if self.state.crawler_last_started_at
             else timedelta()
         )
+        logger.warning(f'Updating runtime and using {self._runtime_offset=}')
         self.state.crawler_runtime = current_run_duration + self._runtime_offset
 
     def calculate(self) -> FinalStatistics:

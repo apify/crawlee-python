@@ -181,10 +181,6 @@ class RecoverableState(Generic[TStateModel]):
         Args:
             event_data: Optional data associated with a PERSIST_STATE event
         """
-        self._log.debug(
-            f'Persisting RecoverableState (model={self._default_state.__class__.__name__}, event_data={event_data}).'
-        )
-
         if self._key_value_store is None or self._state is None:
             raise RuntimeError('Recoverable state has not yet been initialized')
 
@@ -194,6 +190,9 @@ class RecoverableState(Generic[TStateModel]):
                 self._state.model_dump(mode='json', by_alias=True),
                 'application/json',
             )
+            if hasattr(self._state, 'crawler_runtime'):
+                self._log.warning(f'Persisting {self._state.crawler_runtime}. Event: {event_data}')
+
         else:
             self._log.debug('Persistence is not enabled - not doing anything')
 
@@ -206,3 +205,6 @@ class RecoverableState(Generic[TStateModel]):
             self._state = self._default_state.model_copy(deep=True)
         else:
             self._state = self._state_type.model_validate(stored_state)
+
+        if hasattr(self._state, 'crawler_runtime'):
+            self._log.warning(f'Loading {self._state.crawler_runtime}')
