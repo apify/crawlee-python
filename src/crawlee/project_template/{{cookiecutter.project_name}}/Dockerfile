@@ -7,7 +7,7 @@ FROM apify/actor-python-playwright:3.13
 # Currently camoufox has issues installing on Python 3.13
 FROM apify/actor-python-playwright:3.12
 # % else
-FROM apify/actor-python:3.13
+FROM apify/actor-python:3.14
 # % endif
 
 RUN apt update && apt install -yq git && rm -rf /var/lib/apt/lists/*
