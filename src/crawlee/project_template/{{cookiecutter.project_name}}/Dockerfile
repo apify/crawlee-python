@@ -2,10 +2,10 @@
 # You can see the Docker images from Apify at https://hub.docker.com/r/apify/.
 # You can also use any other image from Docker Hub.
 # % if cookiecutter.crawler_type == 'playwright'
-FROM apify/actor-python-playwright:3.13
+FROM apify/actor-python-playwright:3.14
 # % elif cookiecutter.crawler_type == 'playwright-camoufox'
 # Currently camoufox has issues installing on Python 3.13
-FROM apify/actor-python-playwright:3.12
+FROM apify/actor-python-playwright:3.14
 # % else
 FROM apify/actor-python:3.13
 # % endif
