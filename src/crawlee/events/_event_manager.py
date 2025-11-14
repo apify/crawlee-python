@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 from collections import defaultdict
 from datetime import timedelta
 from functools import wraps
@@ -130,11 +131,13 @@ class EventManager:
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
+        # Stop periodic persist state event periodic emission, manually emit last one to ensure latest state is saved.
+        await self._emit_persist_state_event_rec_task.stop()
+        await self._emit_persist_state_event()
         await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
         self._event_emitter.remove_all_listeners()
         self._listener_tasks.clear()
         self._listeners_to_wrappers.clear()
-        await self._emit_persist_state_event_rec_task.stop()
         self._active = False
 
     @overload
@@ -261,4 +264,5 @@ class EventManager:
 
     async def _emit_persist_state_event(self) -> None:
         """Emit a persist state event with the given migration status."""
+        logging.getLogger().warning('Emiting.....................................')
         self.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))

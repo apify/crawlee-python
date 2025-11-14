@@ -56,7 +56,7 @@ from crawlee.errors import (
     SessionError,
     UserDefinedErrorHandlerError,
 )
-from crawlee.events._types import Event, EventCrawlerStatusData, EventPersistStateData
+from crawlee.events._types import Event, EventCrawlerStatusData
 from crawlee.http_clients import ImpitHttpClient
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
@@ -750,9 +750,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 await exit_stack.enter_async_context(context)  # type: ignore[arg-type]
 
             await self._autoscaled_pool.run()
-
-            # Emit PERSIST_STATE event when crawler is finishing to allow listeners to persist their state if needed
-            event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
 
     async def add_requests(
         self,
