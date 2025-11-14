@@ -52,10 +52,10 @@ class Base(DeclarativeBase):
 class StorageMetadataDb:
     """Base database model for storage metadata."""
 
-    internal_name: Mapped[str] = mapped_column(String, nullable=False, index=True, unique=True)
+    internal_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True, unique=True)
     """Internal unique name for a storage instance based on a name or alias."""
 
-    name: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
     """Human-readable name. None becomes 'default' in database to enforce uniqueness."""
 
     accessed_at: Mapped[datetime] = mapped_column(AwareDateTime, nullable=False)
@@ -248,7 +248,7 @@ class RequestDb(Base):
     )
     """Foreign key to metadata request queue record."""
 
-    data: Mapped[str] = mapped_column(String, nullable=False)
+    data: Mapped[str] = mapped_column(String(1000), nullable=False)
     """JSON-serialized Request object."""
 
     sequence_number: Mapped[int] = mapped_column(Integer, nullable=False)
