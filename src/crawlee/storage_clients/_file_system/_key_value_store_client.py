@@ -324,6 +324,8 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         record_metadata_filepath = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
         record_metadata_content = await json_dumps(record_metadata.model_dump())
 
+        if isinstance(value, dict) and 'crawlerRuntimeMillis' in value:
+            logger.warning(f'Saving to KVS: {value["crawlerRuntimeMillis"]=}')
         async with self._lock:
             # Ensure the key-value store directory exists.
             await asyncio.to_thread(self.path_to_kvs.mkdir, parents=True, exist_ok=True)

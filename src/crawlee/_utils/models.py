@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from contextlib import suppress
 from datetime import timedelta
 from typing import TYPE_CHECKING, Annotated, Any
@@ -17,7 +18,11 @@ def _timedelta_to_ms(td: timedelta | None) -> float | None:
         return float('inf')
     if td is None:
         return td
-    return round(td.total_seconds() * 1000)
+    before_rounding = td.total_seconds() * 1000
+    logging.getLogger().warning(f'{before_rounding=}')
+    after_rounding = round(before_rounding)
+    logging.getLogger().warning(f'{after_rounding=}')
+    return after_rounding
 
 
 def _timedelta_to_secs(td: timedelta | None) -> float | None:

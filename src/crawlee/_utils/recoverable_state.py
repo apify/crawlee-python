@@ -185,14 +185,11 @@ class RecoverableState(Generic[TStateModel]):
             raise RuntimeError('Recoverable state has not yet been initialized')
 
         if self._persistence_enabled is True or self._persistence_enabled == 'explicit_only':
-            await self._key_value_store.set_value(
-                self._persist_state_key,
-                self._state.model_dump(mode='json', by_alias=True),
-                'application/json',
-            )
             if hasattr(self._state, 'crawler_runtime'):
                 self._log.warning(f'Persisting {self._state.crawler_runtime}. Event: {event_data}')
-
+            await self._key_value_store.set_value(
+                self._persist_state_key, self._state.model_dump(mode='json', by_alias=True), 'application/json'
+            )
         else:
             self._log.debug('Persistence is not enabled - not doing anything')
 
