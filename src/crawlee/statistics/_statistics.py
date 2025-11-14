@@ -110,9 +110,6 @@ class Statistics(Generic[TStatisticsState]):
         # Flag to indicate the context state.
         self._active = False
 
-        # Pre-existing runtime offset, that can be non-zero when restoring serialized state from KVS.
-        self._runtime_offset = timedelta(seconds=0)
-
     def replace_state_model(self, state_model: type[TNewStatisticsState]) -> Statistics[TNewStatisticsState]:
         """Create near copy of the `Statistics` with replaced `state_model`."""
         new_statistics: Statistics[TNewStatisticsState] = Statistics(
@@ -168,8 +165,8 @@ class Statistics(Generic[TStatisticsState]):
             raise RuntimeError(f'The {self.__class__.__name__} is already active.')
 
         await self._state.initialize()
-
-        self._runtime_offset = self.state.crawler_runtime
+        # Reset `crawler_finished_at` to indicate a new run in progress.
+        self.state.crawler_finished_at = None
 
         # Start periodic logging and let it print initial state before activation.
         self._periodic_logger.start()
@@ -200,10 +197,6 @@ class Statistics(Generic[TStatisticsState]):
         # Stop logging and deactivate the statistics to prevent further changes to crawler_runtime
         await self._periodic_logger.stop()
         self.state.crawler_finished_at = datetime.now(timezone.utc)
-        self.state.crawler_runtime = (
-            self._runtime_offset + self.state.crawler_finished_at - self.state.crawler_last_started_at
-        )
-
         self._active = False
         await self._state.teardown()
 
@@ -262,20 +255,8 @@ class Statistics(Generic[TStatisticsState]):
 
         del self._requests_in_progress[request_id_or_key]
 
-    def _update_crawler_runtime(self) -> None:
-        current_run_duration = (
-            (datetime.now(timezone.utc) - self.state.crawler_last_started_at)
-            if self.state.crawler_last_started_at
-            else timedelta()
-        )
-        self.state.crawler_runtime = current_run_duration + self._runtime_offset
-
     def calculate(self) -> FinalStatistics:
         """Calculate the current statistics."""
-        if self._active:
-            # Only update state when active. If not, just report the last known runtime.
-            self._update_crawler_runtime()
-
         total_minutes = self.state.crawler_runtime.total_seconds() / 60
         state = self._state.current_value
         serialized_state = state.model_dump(by_alias=False)

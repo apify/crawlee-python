@@ -76,7 +76,6 @@ class StatisticsState(BaseModel):
     crawler_started_at: Annotated[datetime | None, Field(alias='crawlerStartedAt')] = None
     crawler_last_started_at: Annotated[datetime | None, Field(alias='crawlerLastStartTimestamp')] = None
     crawler_finished_at: Annotated[datetime | None, Field(alias='crawlerFinishedAt')] = None
-    crawler_runtime: Annotated[timedelta_ms, Field(alias='crawlerRuntimeMillis')] = timedelta()
     errors: dict[str, Any] = Field(default_factory=dict)
     retry_errors: dict[str, Any] = Field(alias='retryErrors', default_factory=dict)
     requests_with_status_code: dict[str, int] = Field(alias='requestsWithStatusCode', default_factory=dict)
@@ -92,6 +91,20 @@ class StatisticsState(BaseModel):
             return_type=list[int],
         ),
     ] = {}
+
+    # Used to track the crawler runtime, that had already been persisted. This is the runtime from previous runs.
+    _runtime_offset: Annotated[timedelta, Field(exclude=True)] = timedelta()
+
+    def model_post_init(self, /, __context: Any) -> None:
+        self._runtime_offset = self.crawler_runtime or self._runtime_offset
+
+    @computed_field(alias='crawlerRuntimeMillis')  # type: ignore[prop-decorator]
+    @property
+    def crawler_runtime(self) -> timedelta:
+        if self.crawler_last_started_at:
+            finished_at = self.crawler_finished_at or datetime.now(timezone.utc)
+            return self._runtime_offset + finished_at - self.crawler_last_started_at
+        return self._runtime_offset
 
     @computed_field(alias='requestTotalDurationMillis', return_type=timedelta_ms)  # type: ignore[prop-decorator]
     @property
