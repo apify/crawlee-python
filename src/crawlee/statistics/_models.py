@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
@@ -98,9 +99,25 @@ class StatisticsState(BaseModel):
     def model_post_init(self, /, __context: Any) -> None:
         self._runtime_offset = self.crawler_runtime or self._runtime_offset
 
-    @computed_field(alias='crawlerRuntimeMillis')  # type: ignore[prop-decorator]
     @property
     def crawler_runtime(self) -> timedelta:
+        if self.crawler_last_started_at:
+            finished_at = self.crawler_finished_at or datetime.now(timezone.utc)
+            return self._runtime_offset + finished_at - self.crawler_last_started_at
+        return self._runtime_offset
+
+    @crawler_runtime.setter
+    def crawler_runtime(self, value: timedelta) -> None:
+        # Setter for backwards compatibility only, the crawler_runtime is now computed_field, and cant be set manually.
+        warnings.warn(
+            f"Setting 'crawler_runtime' is deprecated and will be removed in a future version."
+            f' Value {value} will not be used.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    @computed_field(alias='crawlerRuntimeMillis')
+    def crawler_runtime_for_serialization(self) -> timedelta:
         if self.crawler_last_started_at:
             finished_at = self.crawler_finished_at or datetime.now(timezone.utc)
             return self._runtime_offset + finished_at - self.crawler_last_started_at
