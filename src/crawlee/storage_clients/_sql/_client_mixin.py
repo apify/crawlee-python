@@ -71,7 +71,7 @@ class SqlClientMixin(ABC):
     _CLIENT_TYPE: ClassVar[str]
     """Human-readable client type for error messages."""
 
-    _BLOCK_BUFFER_TIME = timedelta(milliseconds=200)
+    _BLOCK_BUFFER_TIME = timedelta(seconds=1)
     """Time interval that blocks buffer reading to update metadata."""
 
     def __init__(self, *, id: str, storage_client: SqlStorageClient) -> None:
