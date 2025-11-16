@@ -46,6 +46,7 @@ class _QueueMetadataUpdateParams(MetadataUpdateParams):
     new_total_request_count: NotRequired[int]
     delta_handled_request_count: NotRequired[int]
     delta_pending_request_count: NotRequired[int]
+    delta_total_request_count: NotRequired[int]
     recalculate: NotRequired[bool]
     update_had_multiple_clients: NotRequired[bool]
 
@@ -66,6 +67,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
     - `request_queue_records` table: Contains individual requests with JSON data, unique keys for deduplication,
     sequence numbers for ordering, and processing status flags
     - `request_queue_state` table: Maintains counters for sequence numbers to ensure proper ordering of requests.
+    - `request_queue_metadata_buffer` table: Buffers metadata updates for performance optimization
 
     Requests are serialized to JSON for storage and maintain proper ordering through sequence
     numbers. The implementation provides concurrent access safety through transaction
@@ -184,10 +186,11 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         Resets pending_request_count and handled_request_count to 0 and deletes all records from request_queue_records
         table.
         """
+        now = datetime.now(timezone.utc)
         await self._purge(
             metadata_kwargs=_QueueMetadataUpdateParams(
-                update_accessed_at=True,
-                update_modified_at=True,
+                accessed_at=now,
+                modified_at=now,
                 new_pending_request_count=0,
             )
         )
@@ -362,8 +365,11 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             except SQLAlchemyError as e:
                 await session.rollback()
                 logger.warning(f'Failed to commit session: {e}')
-                await self._update_metadata(
-                    session, recalculate=True, update_modified_at=True, update_accessed_at=True, force=True
+                await self._add_buffer_record(
+                    session,
+                    update_modified_at=True,
+                    delta_pending_request_count=approximate_new_request,
+                    delta_total_request_count=approximate_new_request,
                 )
                 await session.commit()
                 transaction_processed_requests.clear()
@@ -641,11 +647,13 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         new_total_request_count: int | None = None,
         delta_handled_request_count: int | None = None,
         delta_pending_request_count: int | None = None,
+        delta_total_request_count: int | None = None,
         *,
+        recalculate: bool = False,
         update_had_multiple_clients: bool = False,
         **_kwargs: dict[str, Any],
     ) -> dict[str, Any]:
-        """Directly update the request queue metadata in the database.
+        """Update the request queue metadata in the database.
 
         Args:
             session: The SQLAlchemy session to use for database operations.
@@ -654,6 +662,8 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             new_total_request_count: If provided, update the total_request_count to this value.
             delta_handled_request_count: If provided, add this value to the handled_request_count.
             delta_pending_request_count: If provided, add this value to the pending_request_count.
+            delta_total_request_count: If provided, add this value to the total_request_count.
+            recalculate: If True, recalculate the pending_request_count, and total_request_count on request table.
             update_had_multiple_clients: If True, set had_multiple_clients to True.
         """
         values_to_set: dict[str, Any] = {}
@@ -661,14 +671,55 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         if update_had_multiple_clients:
             values_to_set['had_multiple_clients'] = True
 
-        if new_handled_request_count is not None:
-            values_to_set['handled_request_count'] = new_handled_request_count
+        if recalculate:
+            stmt = (
+                update(self._METADATA_TABLE)
+                .where(self._METADATA_TABLE.request_queue_id == self._id)
+                .values(
+                    pending_request_count=(
+                        select(func.count())
+                        .select_from(self._ITEM_TABLE)
+                        .where(self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.is_handled.is_(False))
+                        .scalar_subquery()
+                    ),
+                    total_request_count=(
+                        select(func.count())
+                        .select_from(self._ITEM_TABLE)
+                        .where(self._ITEM_TABLE.request_queue_id == self._id)
+                        .scalar_subquery()
+                    ),
+                    handled_request_count=(
+                        select(func.count())
+                        .select_from(self._ITEM_TABLE)
+                        .where(self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.is_handled.is_(True))
+                        .scalar_subquery()
+                    ),
+                )
+            )
 
-        if new_pending_request_count is not None:
-            values_to_set['pending_request_count'] = new_pending_request_count
+            values_to_set['custom_stmt'] = stmt
 
-        if new_total_request_count is not None:
-            values_to_set['total_request_count'] = new_total_request_count
+        else:
+            if new_handled_request_count is not None:
+                values_to_set['handled_request_count'] = new_handled_request_count
+            elif delta_handled_request_count is not None:
+                values_to_set['handled_request_count'] = (
+                    self._METADATA_TABLE.handled_request_count + delta_handled_request_count
+                )
+
+            if new_pending_request_count is not None:
+                values_to_set['pending_request_count'] = new_pending_request_count
+            elif delta_pending_request_count is not None:
+                values_to_set['pending_request_count'] = (
+                    self._METADATA_TABLE.pending_request_count + delta_pending_request_count
+                )
+
+            if new_total_request_count is not None:
+                values_to_set['total_request_count'] = new_total_request_count
+            elif delta_total_request_count is not None:
+                values_to_set['total_request_count'] = (
+                    self._METADATA_TABLE.total_request_count + delta_total_request_count
+                )
 
         return values_to_set
 
@@ -753,52 +804,15 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         if not row:
             return
 
-        # Prepare updates for metadata
-        values_to_update = {
-            'accessed_at': row.max_accessed_at,
-        }
-
-        if row.max_modified_at:
-            values_to_update['modified_at'] = row.max_modified_at
-
-        if not self._had_multiple_clients and row.unique_clients_count > 1:
-            values_to_update['had_multiple_clients'] = True
-
-        if row.need_recalc:
-            values_to_update['pending_request_count'] = (
-                select(func.count())
-                .select_from(self._ITEM_TABLE)
-                .where(self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.is_handled == False)  # noqa: E712
-                .scalar_subquery()
-            )
-            values_to_update['total_request_count'] = (
-                select(func.count())
-                .select_from(self._ITEM_TABLE)
-                .where(self._ITEM_TABLE.request_queue_id == self._id)
-                .scalar_subquery()
-            )
-            values_to_update['handled_request_count'] = (
-                select(func.count())
-                .select_from(self._ITEM_TABLE)
-                .where(self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.is_handled == True)  # noqa: E712
-                .scalar_subquery()
-            )
-        else:
-            if row.delta_handled_count:
-                values_to_update['handled_request_count'] = (
-                    self._METADATA_TABLE.handled_request_count + row.delta_handled_count
-                )
-
-            if row.delta_pending_count:
-                values_to_update['pending_request_count'] = (
-                    self._METADATA_TABLE.pending_request_count + row.delta_pending_count
-                )
-
-            if row.delta_total_count:
-                values_to_update['total_request_count'] = (
-                    self._METADATA_TABLE.total_request_count + row.delta_total_count
-                )
-
-        update_stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id).values(**values_to_update)
-
-        await session.execute(update_stmt)
+        await self._update_metadata(
+            session,
+            **_QueueMetadataUpdateParams(
+                accessed_at=row.max_accessed_at,
+                modified_at=row.max_modified_at,
+                update_had_multiple_clients=not self._had_multiple_clients and row.unique_clients_count > 1,
+                delta_handled_request_count=row.delta_handled_count,
+                delta_pending_request_count=row.delta_pending_count,
+                delta_total_request_count=row.delta_total_count,
+                recalculate=row.need_recalc,
+            ),
+        )

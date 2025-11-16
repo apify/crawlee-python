@@ -44,8 +44,8 @@ logger = getLogger(__name__)
 class MetadataUpdateParams(TypedDict, total=False):
     """Parameters for updating metadata."""
 
-    update_accessed_at: NotRequired[bool]
-    update_modified_at: NotRequired[bool]
+    accessed_at: NotRequired[datetime]
+    modified_at: NotRequired[datetime]
 
 
 class SqlClientMixin(ABC):
@@ -271,9 +271,11 @@ class SqlClientMixin(ABC):
         # Process buffers to ensure metadata is up to date before purging
         await self._process_buffers()
 
-        stmt = delete(self._ITEM_TABLE).where(self._ITEM_TABLE.storage_id == self._id)
+        stmt_records = delete(self._ITEM_TABLE).where(self._ITEM_TABLE.storage_id == self._id)
+        stmt_buffers = delete(self._BUFFER_TABLE).where(self._BUFFER_TABLE.storage_id == self._id)
         async with self.get_session(with_simple_commit=True) as session:
-            await session.execute(stmt)
+            await session.execute(stmt_records)
+            await session.execute(stmt_buffers)
             await self._update_metadata(session, **metadata_kwargs)
 
     async def _drop(self) -> None:
@@ -336,31 +338,31 @@ class SqlClientMixin(ABC):
         self,
         session: AsyncSession,
         *,
-        update_accessed_at: bool = False,
-        update_modified_at: bool = False,
+        accessed_at: datetime | None = None,
+        modified_at: datetime | None = None,
         **kwargs: Any,
     ) -> None:
         """Directly update storage metadata combining common and specific fields.
 
         Args:
             session: Active database session.
-            update_accessed_at: Whether to update accessed_at timestamp.
-            update_modified_at: Whether to update modified_at timestamp.
+            accessed_at: Datetime to set as accessed_at timestamp.
+            modified_at: Datetime to set as modified_at timestamp.
             **kwargs: Additional arguments for _specific_update_metadata.
         """
         values_to_set: dict[str, Any] = {}
-        now = datetime.now(timezone.utc)
 
-        if update_accessed_at:
-            values_to_set['accessed_at'] = now
+        if accessed_at is not None:
+            values_to_set['accessed_at'] = accessed_at
 
-        if update_modified_at:
-            values_to_set['modified_at'] = now
+        if modified_at is not None:
+            values_to_set['modified_at'] = modified_at
 
         values_to_set.update(self._specific_update_metadata(**kwargs))
 
         if values_to_set:
-            stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id)
+            if (stmt := values_to_set.pop('custom_stmt', None)) is None:
+                stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id)
 
             stmt = stmt.values(**values_to_set)
             await session.execute(stmt)

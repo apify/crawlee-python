@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy import CursorResult, delete, select, update
+from sqlalchemy import CursorResult, delete, select
 from sqlalchemy import func as sql_func
 from typing_extensions import Self, override
 
@@ -41,6 +42,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
     - `key_value_stores` table: Contains store metadata (id, name, timestamps)
     - `key_value_store_records` table: Contains individual key-value pairs with binary value storage, content type,
     and size information
+    - `key_value_store_metadata_buffer` table: Buffers metadata updates for performance optimization
 
     Values are serialized based on their type: JSON objects are stored as formatted JSON,
     text values as UTF-8 encoded strings, and binary data as-is in the `LargeBinary` column.
@@ -134,7 +136,8 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
         Remove all records from key_value_store_records table.
         """
-        await self._purge(metadata_kwargs=MetadataUpdateParams(update_accessed_at=True, update_modified_at=True))
+        now = datetime.now(timezone.utc)
+        await self._purge(metadata_kwargs=MetadataUpdateParams(accessed_at=now, modified_at=now))
 
     @override
     async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
@@ -269,7 +272,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
                     size=row.size,
                 )
 
-            await self._update_metadata(session, **MetadataUpdateParams(update_accessed_at=True))
+            await self._add_buffer_record(session)
 
     @override
     async def record_exists(self, *, key: str) -> bool:
@@ -314,14 +317,10 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         if not row:
             return
 
-        # Prepare updates for metadata
-        values_to_update = {
-            'accessed_at': row.max_accessed_at,
-        }
-
-        if row.max_modified_at:
-            values_to_update['modified_at'] = row.max_modified_at
-
-        update_stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id).values(**values_to_update)
-
-        await session.execute(update_stmt)
+        await self._update_metadata(
+            session,
+            **MetadataUpdateParams(
+                accessed_at=row.max_accessed_at,
+                modified_at=row.max_modified_at,
+            ),
+        )

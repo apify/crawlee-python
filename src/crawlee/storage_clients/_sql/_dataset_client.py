@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Select, insert, select, update
+from sqlalchemy import Select, insert, select
 from sqlalchemy import func as sql_func
 from typing_extensions import Self, override
 
@@ -42,6 +43,7 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
     The dataset data is stored in SQL database tables following the pattern:
     - `datasets` table: Contains dataset metadata (id, name, timestamps, item_count)
     - `dataset_records` table: Contains individual items with JSON data and auto-increment ordering
+    - `dataset_metadata_buffer` table: Buffers metadata updates for performance optimization
 
     Items are stored as a JSON object in SQLite and as JSONB in PostgreSQL. These objects must be JSON-serializable.
     The `item_id` auto-increment primary key ensures insertion order is preserved.
@@ -126,11 +128,12 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
 
         Resets item_count to 0 and deletes all records from dataset_records table.
         """
+        now = datetime.now(timezone.utc)
         await self._purge(
             metadata_kwargs=_DatasetMetadataUpdateParams(
                 new_item_count=0,
-                update_accessed_at=True,
-                update_modified_at=True,
+                accessed_at=now,
+                modified_at=now,
             )
         )
 
@@ -323,17 +326,11 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
         if not row:
             return
 
-        # Prepare updates for metadata
-        values_to_update = {
-            'accessed_at': row.max_accessed_at,
-        }
-
-        if row.max_modified_at:
-            values_to_update['modified_at'] = row.max_modified_at
-
-        if row.delta_item_count:
-            values_to_update['item_count'] = self._METADATA_TABLE.item_count + row.delta_item_count
-
-        update_stmt = update(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id).values(**values_to_update)
-
-        await session.execute(update_stmt)
+        await self._update_metadata(
+            session,
+            **_DatasetMetadataUpdateParams(
+                accessed_at=row.max_accessed_at,
+                modified_at=row.max_modified_at,
+                delta_item_count=row.delta_item_count,
+            ),
+        )
