@@ -248,7 +248,7 @@ class RequestDb(Base):
     )
     """Foreign key to metadata request queue record."""
 
-    data: Mapped[str] = mapped_column(String(1000), nullable=False)
+    data: Mapped[str] = mapped_column(String(5000), nullable=False)
     """JSON-serialized Request object."""
 
     sequence_number: Mapped[int] = mapped_column(Integer, nullable=False)
