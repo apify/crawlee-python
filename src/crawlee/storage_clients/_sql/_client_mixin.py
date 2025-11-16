@@ -452,8 +452,6 @@ class SqlClientMixin(ABC):
 
         await session.execute(stmt)
 
-        await session.flush()
-
     async def _has_pending_buffer_updates(self, session: AsyncSession) -> bool:
         """Check if there are pending buffer updates not yet applied to metadata.
 

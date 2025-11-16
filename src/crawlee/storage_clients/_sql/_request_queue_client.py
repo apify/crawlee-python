@@ -368,8 +368,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 await self._add_buffer_record(
                     session,
                     update_modified_at=True,
-                    delta_pending_request_count=approximate_new_request,
-                    delta_total_request_count=approximate_new_request,
+                    reclaculate=True,
                 )
                 await session.commit()
                 transaction_processed_requests.clear()
