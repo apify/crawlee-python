@@ -273,10 +273,9 @@ class SqlStorageClient(StorageClient):
         self._engine = create_async_engine(
             connection_string,
             future=True,
-            pool_size=5,
-            max_overflow=10,
-            pool_timeout=30,
-            pool_recycle=600,
+            pool_size=10,
+            max_overflow=50,
+            pool_timeout=60,
             pool_pre_ping=True,
             echo=False,
             connect_args={'timeout': 30},

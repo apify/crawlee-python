@@ -208,6 +208,15 @@ class dataset_records {
     + data
 }
 
+class dataset_metadata_buffer {
+    <<table>>
+    + id (PK)
+    + accessed_at
+    + modified_at
+    + dataset_id (FK)
+    + delta_item_count
+}
+
 %% ========================
 %% Key-Value Store Tables
 %% ========================
@@ -231,15 +240,25 @@ class key_value_store_records {
     + size
 }
 
+class key_value_store_metadata_buffer {
+    <<table>>
+    + id (PK)
+    + accessed_at
+    + modified_at
+    + key_value_store_id (FK)
+}
+
 %% ========================
 %% Client to Table arrows
 %% ========================
 
 SqlDatasetClient --> datasets
 SqlDatasetClient --> dataset_records
+SqlDatasetClient --> dataset_metadata_buffer
 
 SqlKeyValueStoreClient --> key_value_stores
 SqlKeyValueStoreClient --> key_value_store_records
+SqlKeyValueStoreClient --> key_value_store_metadata_buffer
 ```
 ```mermaid
 ---
@@ -294,6 +313,19 @@ class request_queue_state {
     + forefront_sequence_counter
 }
 
+class request_queue_metadata_buffer {
+    <<table>>
+    + id (PK)
+    + accessed_at
+    + modified_at
+    + request_queue_id (FK)
+    + client_id
+    + delta_handled_count
+    + delta_pending_count
+    + delta_total_count
+    + need_recalc
+}
+
 %% ========================
 %% Client to Table arrows
 %% ========================
@@ -301,6 +333,7 @@ class request_queue_state {
 SqlRequestQueueClient --> request_queues
 SqlRequestQueueClient --> request_queue_records
 SqlRequestQueueClient --> request_queue_state
+SqlRequestQueueClient --> request_queue_metadata_buffer
 ```
 
 Configuration options for the <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> can be set through environment variables or the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class:

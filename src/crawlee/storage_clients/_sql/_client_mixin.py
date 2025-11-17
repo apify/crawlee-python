@@ -272,10 +272,8 @@ class SqlClientMixin(ABC):
         await self._process_buffers()
 
         stmt_records = delete(self._ITEM_TABLE).where(self._ITEM_TABLE.storage_id == self._id)
-        stmt_buffers = delete(self._BUFFER_TABLE).where(self._BUFFER_TABLE.storage_id == self._id)
         async with self.get_session(with_simple_commit=True) as session:
             await session.execute(stmt_records)
-            await session.execute(stmt_buffers)
             await self._update_metadata(session, **metadata_kwargs)
 
     async def _drop(self) -> None:
