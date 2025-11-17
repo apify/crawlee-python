@@ -470,8 +470,9 @@ class TestServer(Server):
         # Set the event loop policy in thread with server for Windows and Python 3.12+.
         # This is necessary because there are problems with closing connections when using `ProactorEventLoop`
         if sys.version_info >= (3, 12) and sys.platform == 'win32':
-            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+            return asyncio.run(self.serve(sockets=sockets), loop_factory=asyncio.SelectorEventLoop)
         super().run(sockets=sockets)
+        return None
 
 
 def serve_in_thread(server: TestServer) -> Iterator[TestServer]:
