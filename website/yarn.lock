@@ -7032,7 +7032,7 @@ __metadata:
     react: "npm:^19.0.0"
     react-dom: "npm:^19.0.0"
     react-github-btn: "npm:^1.4.0"
-    react-lite-youtube-embed: "npm:^2.3.52"
+    react-lite-youtube-embed: "npm:^3.0.0"
     rimraf: "npm:^6.0.0"
     stream-browserify: "npm:^3.0.0"
     typescript: "npm:5.9.3"
@@ -15137,13 +15137,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-lite-youtube-embed@npm:^2.3.52":
-  version: 2.6.0
-  resolution: "react-lite-youtube-embed@npm:2.6.0"
+"react-lite-youtube-embed@npm:^3.0.0":
+  version: 3.3.1
+  resolution: "react-lite-youtube-embed@npm:3.3.1"
   peerDependencies:
     react: ">=18.2.0"
     react-dom: ">=18.2.0"
-  checksum: 10c0/2d0fc4cd2279f4f45e71195330e57fa32d241038fbc9c43aa22dc1b9a5cc8ecf655b5f2828a0fecec2fd82e0bd4037f930fa69a430696792e908b7a2ff6aac15
+  checksum: 10c0/6a8f80307d064e481f2cae2f1fadde8edcc2e3a321f70e51cdb77e0d10d5ca73d5eb2bf3d1c9d9c2051b894554785a35dddf30a669cae4c7929bf0d0b6bb8bdb
   languageName: node
   linkType: hard
 
