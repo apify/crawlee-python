@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Improve indexing of the `request_queue_records` table for `SqlRequestQueueClient` ([#1527](https://github.com/apify/crawlee-python/pull/1527)) ([6509534](https://github.com/apify/crawlee-python/commit/65095346a9d8b703b10c91e0510154c3c48a4176)) by [@Mantisus](https://github.com/Mantisus), closes [#1526](https://github.com/apify/crawlee-python/issues/1526)
 - Improve error handling for `RobotsTxtFile.load` ([#1524](https://github.com/apify/crawlee-python/pull/1524)) ([596a311](https://github.com/apify/crawlee-python/commit/596a31184914a254b3e7a81fd2f48ea8eda7db49)) by [@Mantisus](https://github.com/Mantisus)
 - Fix `crawler_runtime` not being updated during run and only in the end ([#1540](https://github.com/apify/crawlee-python/pull/1540)) ([0d6c3f6](https://github.com/apify/crawlee-python/commit/0d6c3f6d3337ddb6cab4873747c28cf95605d550)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1541](https://github.com/apify/crawlee-python/issues/1541)
+- Ensure persist state event emission when exiting `EventManager` context ([#1562](https://github.com/apify/crawlee-python/pull/1562)) ([6a44f17](https://github.com/apify/crawlee-python/commit/6a44f172600cbcacebab899082d6efc9105c4e03)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1560](https://github.com/apify/crawlee-python/issues/1560)
 
 
 <!-- git-cliff-unreleased-end -->
