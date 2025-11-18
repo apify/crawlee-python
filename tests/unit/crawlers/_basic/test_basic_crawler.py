@@ -347,6 +347,7 @@ STRATEGY_TEST_URLS = (
     'https://blog.someplace.com/index.html',
     'https://redirect.someplace.com',
     'https://other.place.com/index.html',
+    'https://someplace.jp/',
 )
 
 INCLUDE_TEST_URLS = (
@@ -401,7 +402,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 loaded_url=STRATEGY_TEST_URLS[0],
-                requests=STRATEGY_TEST_URLS[:4],
+                requests=STRATEGY_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(strategy='same-domain'),
                 expected_urls=STRATEGY_TEST_URLS[1:4],
             ),
@@ -411,7 +412,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 loaded_url=STRATEGY_TEST_URLS[0],
-                requests=STRATEGY_TEST_URLS[:4],
+                requests=STRATEGY_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(strategy='same-hostname'),
                 expected_urls=[STRATEGY_TEST_URLS[1]],
             ),
@@ -421,7 +422,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 loaded_url=STRATEGY_TEST_URLS[0],
-                requests=STRATEGY_TEST_URLS[:4],
+                requests=STRATEGY_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(strategy='same-origin'),
                 expected_urls=[],
             ),
