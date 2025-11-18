@@ -1,0 +1,22 @@
+---
+id: using-sitemap-request-loader
+title: Using sitemap request loader
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import SitemapRequestLoaderExample from '!!raw-loader!roa-loader!./code_examples/using_sitemap_request_loader.py';
+
+This example demonstrates how to use <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> to crawl websites that provide `sitemap.xml` files following the [Sitemaps protocol](https://www.sitemaps.org/protocol.html). The <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> processes sitemaps in a streaming fashion without loading them entirely into memory, making it suitable for large sitemaps.
+
+The example shows how to use the `transform_request_function` parameter to configure request options based on URL patterns. This allows you to modify request properties such as labels and user data based on the source URL, enabling different handling logic for different websites or sections.
+
+The following code example implements processing of sitemaps from two different domains (Apify and Crawlee), with different labels assigned to requests based on their host. The `create_transform_request` function maps each host to the corresponding request configuration, while the crawler uses different handlers based on the assigned labels.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {SitemapRequestLoaderExample}
+</RunnableCodeBlock>
+
+For more information about request loaders, see the [Request loaders guide](../guides/request-loaders).
