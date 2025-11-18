@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     import re
     from collections.abc import Callable, Coroutine, Sequence
 
-    from typing_extensions import NotRequired, Required, Unpack
+    from typing_extensions import NotRequired, Required, Self, Unpack
 
     from crawlee import Glob, Request
     from crawlee._request import RequestOptions
@@ -33,6 +33,7 @@ else:
     from pydantic import JsonValue as JsonSerializable
 
 T = TypeVar('T')
+TCrawlingContext = TypeVar('TCrawlingContext')
 
 HttpMethod = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
 
@@ -642,6 +643,25 @@ class BasicCrawlingContext:
     def __hash__(self) -> int:
         """Return hash of the context. Each context is considered unique."""
         return id(self)
+
+    def create_modified_copy(
+        self,
+        push_data: PushDataFunction | None = None,
+        add_requests: AddRequestsFunction | None = None,
+        get_key_value_store: GetKeyValueStoreFromRequestHandlerFunction | None = None,
+    ) -> Self:
+        """Create a modified copy of the crawling context with specified changes."""
+        original_fields = {field.name: getattr(self, field.name) for field in dataclasses.fields(self)}
+        modified_fields = {
+            key: value
+            for key, value in {
+                'push_data': push_data,
+                'add_requests': add_requests,
+                'get_key_value_store': get_key_value_store,
+            }.items()
+            if value
+        }
+        return self.__class__(**{**original_fields, **modified_fields})
 
 
 class GetDataKwargs(TypedDict):

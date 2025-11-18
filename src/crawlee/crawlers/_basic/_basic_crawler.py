@@ -1166,7 +1166,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if self._failed_request_handler:
             try:
-                await self._failed_request_handler(context, error)
+                error_context = context.create_modified_copy(
+                    push_data=self._push_data,
+                    add_requests=self.add_requests,
+                    get_key_value_store=self.get_key_value_store,
+                )
+                await self._failed_request_handler(error_context, error)
             except Exception as e:
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
 

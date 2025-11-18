@@ -284,6 +284,40 @@ async def test_calls_failed_request_handler() -> None:
     assert isinstance(calls[0][1], RuntimeError)
 
 
+async def test_failed_request_handler_uses_context_helpers(tmp_path: Path) -> None:
+    """Test that context helpers used in `failed_request_handler` have effect."""
+    storage_client = FileSystemStorageClient()
+    crawler = BasicCrawler(
+        max_request_retries=1, storage_client=storage_client, configuration=Configuration(storage_dir=str(tmp_path))
+    )
+    test_data = {'some': 'data'}
+    test_key = 'key'
+    test_value = 'value'
+    test_request = Request.from_url('https://d.placeholder.com')
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        if context.request.url == 'https://b.placeholder.com':
+            raise RuntimeError('Arbitrary crash for testing purposes')
+
+    @crawler.failed_request_handler
+    async def failed_request_handler(context: BasicCrawlingContext, error: Exception) -> None:
+        await context.push_data(test_data)
+        await context.add_requests([test_request])
+        kvs = await context.get_key_value_store()
+        await kvs.set_value(test_key, test_value)
+
+    await crawler.run(['https://b.placeholder.com'])
+
+    dataset = await Dataset.open(storage_client=storage_client)
+    kvs = await KeyValueStore.open(storage_client=storage_client)
+    rq = await RequestQueue.open(storage_client=storage_client)
+
+    assert test_value == await kvs.get_value(test_key)
+    assert test_request == await rq.fetch_next_request()
+    assert [test_data] == (await dataset.get_data()).items
+
+
 async def test_handles_error_in_failed_request_handler() -> None:
     crawler = BasicCrawler(max_request_retries=3)
 
