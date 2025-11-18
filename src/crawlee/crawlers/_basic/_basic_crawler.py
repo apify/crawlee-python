@@ -29,6 +29,7 @@ from crawlee._log_config import configure_logger, get_configured_log_level, stri
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._service_locator import ServiceLocator
 from crawlee._types import (
+    AddRequestsFunction,
     BasicCrawlingContext,
     EnqueueLinksKwargs,
     GetKeyValueStoreFromRequestHandlerFunction,
@@ -1168,8 +1169,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             try:
                 error_context = context.create_modified_copy(
                     push_data=self._push_data,
-                    add_requests=self.add_requests,
                     get_key_value_store=self.get_key_value_store,
+                    add_requests=await self._create_context_aware_add_requests(context),
                 )
                 await self._failed_request_handler(error_context, error)
             except Exception as e:
@@ -1261,52 +1262,61 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             else:
                 yield Request.from_url(url)
 
+    async def _open_suitable_request_manager(
+        self, id: str | None, name: str | None, alias: str | None
+    ) -> RequestManager | RequestQueue:
+        if id or name or alias:
+            return await RequestQueue.open(
+                id=id,
+                name=name,
+                alias=alias,
+                storage_client=self._service_locator.get_storage_client(),
+                configuration=self._service_locator.get_configuration(),
+            )
+        return await self.get_request_manager()
+
+    def _get_context_aware_requests(
+        self, requests: Sequence[str | Request], context: BasicCrawlingContext, kwargs: EnqueueLinksKwargs
+    ) -> list[Request]:
+        context_aware_requests = list[Request]()
+        base_url = kwargs.get('base_url') or context.request.loaded_url or context.request.url
+        requests_iterator = self._convert_url_to_request_iterator(requests, base_url)
+        filter_requests_iterator = self._enqueue_links_filter_iterator(requests_iterator, context.request.url, **kwargs)
+        for dst_request in filter_requests_iterator:
+            # Update the crawl depth of the request.
+            dst_request.crawl_depth = context.request.crawl_depth + 1
+
+            if self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth:
+                context_aware_requests.append(dst_request)
+        return context_aware_requests
+
+    async def _create_context_aware_add_requests(self, context: BasicCrawlingContext) -> AddRequestsFunction:
+        """Create add_requests function that adds requests aware of the crawling context."""
+
+        async def context_aware_add_requests(
+            requests: Sequence[str | Request],
+            rq_id: str | None = None,
+            rq_name: str | None = None,
+            rq_alias: str | None = None,
+            **kwargs: Unpack[EnqueueLinksKwargs],
+        ) -> None:
+            request_manager = await self._open_suitable_request_manager(
+                id=rq_id,
+                name=rq_name,
+                alias=rq_alias,
+            )
+            context_aware_requests = self._get_context_aware_requests(requests=requests, context=context, kwargs=kwargs)
+            return await request_manager.add_requests(context_aware_requests)
+
+        return context_aware_add_requests
+
     async def _commit_request_handler_result(self, context: BasicCrawlingContext) -> None:
         """Commit request handler result for the input `context`. Result is taken from `_context_result_map`."""
         result = self._context_result_map[context]
 
-        base_request_manager = await self.get_request_manager()
-
-        origin = context.request.loaded_url or context.request.url
-
         for add_requests_call in result.add_requests_calls:
-            rq_id = add_requests_call.get('rq_id')
-            rq_name = add_requests_call.get('rq_name')
-            rq_alias = add_requests_call.get('rq_alias')
-            specified_params = sum(1 for param in [rq_id, rq_name, rq_alias] if param is not None)
-            if specified_params > 1:
-                raise ValueError('You can only provide one of `rq_id`, `rq_name` or `rq_alias` arguments.')
-            if rq_id or rq_name or rq_alias:
-                request_manager: RequestManager | RequestQueue = await RequestQueue.open(
-                    id=rq_id,
-                    name=rq_name,
-                    alias=rq_alias,
-                    storage_client=self._service_locator.get_storage_client(),
-                    configuration=self._service_locator.get_configuration(),
-                )
-            else:
-                request_manager = base_request_manager
-
-            requests = list[Request]()
-
-            base_url = url if (url := add_requests_call.get('base_url')) else origin
-
-            requests_iterator = self._convert_url_to_request_iterator(add_requests_call['requests'], base_url)
-
-            enqueue_links_kwargs: EnqueueLinksKwargs = {k: v for k, v in add_requests_call.items() if k != 'requests'}  # type: ignore[assignment]
-
-            filter_requests_iterator = self._enqueue_links_filter_iterator(
-                requests_iterator, context.request.url, **enqueue_links_kwargs
-            )
-
-            for dst_request in filter_requests_iterator:
-                # Update the crawl depth of the request.
-                dst_request.crawl_depth = context.request.crawl_depth + 1
-
-                if self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth:
-                    requests.append(dst_request)
-
-            await request_manager.add_requests(requests)
+            context_aware_add_requests = await self._create_context_aware_add_requests(context)
+            await context_aware_add_requests(**add_requests_call)
 
         for push_data_call in result.push_data_calls:
             await self._push_data(**push_data_call)

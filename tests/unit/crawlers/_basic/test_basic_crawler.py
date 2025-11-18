@@ -314,8 +314,8 @@ async def test_failed_request_handler_uses_context_helpers(tmp_path: Path) -> No
     rq = await RequestQueue.open(storage_client=storage_client)
 
     assert test_value == await kvs.get_value(test_key)
-    assert test_request == await rq.fetch_next_request()
     assert [test_data] == (await dataset.get_data()).items
+    assert test_request == await rq.fetch_next_request()
 
 
 async def test_handles_error_in_failed_request_handler() -> None:
