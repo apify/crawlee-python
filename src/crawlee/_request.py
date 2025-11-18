@@ -299,7 +299,7 @@ class Request(BaseModel):
         )
 
         if always_enqueue:
-            unique_key = f'{unique_key}_{crypto_random_object_id()}'
+            unique_key = f'{crypto_random_object_id()}|{unique_key}'
 
         request = cls(
             url=url,
