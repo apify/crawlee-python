@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Add `chrome` `BrowserType` for `PlaywrightCrawler` to use the Chrome browser ([#1487](https://github.com/apify/crawlee-python/pull/1487)) ([b06937b](https://github.com/apify/crawlee-python/commit/b06937bbc3afe3c936b554bfc503365c1b2c526b)) by [@Mantisus](https://github.com/Mantisus), closes [#1071](https://github.com/apify/crawlee-python/issues/1071)
 - Add `RedisStorageClient` based on Redis v8.0+ ([#1406](https://github.com/apify/crawlee-python/pull/1406)) ([d08d13d](https://github.com/apify/crawlee-python/commit/d08d13d39203c24ab61fe254b0956d6744db3b5f)) by [@Mantisus](https://github.com/Mantisus)
 - Add support for Python 3.14 ([#1553](https://github.com/apify/crawlee-python/pull/1553)) ([89e9130](https://github.com/apify/crawlee-python/commit/89e9130cabee0fbc974b29c26483b7fa0edf627c)) by [@Mantisus](https://github.com/Mantisus)
+- Add `transform_request_function` parameter for `SitemapRequestLoader` ([#1525](https://github.com/apify/crawlee-python/pull/1525)) ([dc90127](https://github.com/apify/crawlee-python/commit/dc901271849b239ba2a947e8ebff8e1815e8c4fb)) by [@Mantisus](https://github.com/Mantisus)
 
 ### 🐛 Bug Fixes
 
