@@ -1673,7 +1673,6 @@ def _process_run_crawler(requests: list[str], storage_dir: str) -> StatisticsSta
     return asyncio.run(_run_crawler(requests=requests, storage_dir=storage_dir))
 
 
-@pytest.mark.skip(reason='This test is flaky, see https://github.com/apify/crawlee-python/issues/1560.')
 async def test_crawler_statistics_persistence(tmp_path: Path) -> None:
     """Test that crawler statistics persist and are loaded correctly.
 
