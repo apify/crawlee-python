@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.0.5 - **not yet released**
+## [1.1.0](https://github.com/apify/crawlee-python/releases/tag/v1.1.0) (2025-11-18)
 
 ### 🚀 Features
 
@@ -20,7 +19,6 @@ All notable changes to this project will be documented in this file.
 - Ensure persist state event emission when exiting `EventManager` context ([#1562](https://github.com/apify/crawlee-python/pull/1562)) ([6a44f17](https://github.com/apify/crawlee-python/commit/6a44f172600cbcacebab899082d6efc9105c4e03)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1560](https://github.com/apify/crawlee-python/issues/1560)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.0.4](https://github.com/apify/crawlee-python/releases/tag/v1.0.4) (2025-10-24)
 
 ### 🐛 Bug Fixes
