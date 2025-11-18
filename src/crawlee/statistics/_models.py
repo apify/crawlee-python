@@ -109,6 +109,7 @@ class StatisticsState(BaseModel):
     @crawler_runtime.setter
     def crawler_runtime(self, value: timedelta) -> None:
         # Setter for backwards compatibility only, the crawler_runtime is now computed_field, and cant be set manually.
+        # To be removed in v2 release https://github.com/apify/crawlee-python/issues/1567
         warnings.warn(
             f"Setting 'crawler_runtime' is deprecated and will be removed in a future version."
             f' Value {value} will not be used.',
