@@ -33,7 +33,6 @@ else:
     from pydantic import JsonValue as JsonSerializable
 
 T = TypeVar('T')
-TCrawlingContext = TypeVar('TCrawlingContext')
 
 HttpMethod = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
 
