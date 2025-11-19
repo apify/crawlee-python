@@ -30,7 +30,6 @@ from crawlee._log_config import configure_logger, get_configured_log_level, stri
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._service_locator import ServiceLocator
 from crawlee._types import (
-    AddRequestsFunction,
     BasicCrawlingContext,
     EnqueueLinksKwargs,
     GetKeyValueStoreFromRequestHandlerFunction,
@@ -528,12 +527,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     def _wrap_handler_with_error_context(
         self, handler: Callable[[TCrawlingContext | BasicCrawlingContext, Exception], Awaitable[T]]
     ) -> Callable[[TCrawlingContext | BasicCrawlingContext, Exception], Awaitable[T]]:
+        """Decorate error handlers to make their context helpers usable."""
+
         @functools.wraps(handler)
         async def wrapped_handler(context: TCrawlingContext | BasicCrawlingContext, exception: Exception) -> T:
+            # Original context helpers that are from `RequestHandlerRunResult` will not be commited as the request
+            # failed. Modified context provides context helpers with direct access to the storages.
             error_context = context.create_modified_copy(
                 push_data=self._push_data,
                 get_key_value_store=self.get_key_value_store,
-                add_requests=self._create_context_aware_add_requests(context),
+                add_requests=functools.partial(self._add_requests, context),
             )
             return await handler(error_context, exception)
 
@@ -1290,39 +1293,36 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 context_aware_requests.append(dst_request)
         return context_aware_requests
 
-    def _create_context_aware_add_requests(self, context: BasicCrawlingContext) -> AddRequestsFunction:
-        """Create add_requests function that adds requests aware of the crawling context."""
+    async def _add_requests(
+        self,
+        context: BasicCrawlingContext,
+        requests: Sequence[str | Request],
+        rq_id: str | None = None,
+        rq_name: str | None = None,
+        rq_alias: str | None = None,
+        **kwargs: Unpack[EnqueueLinksKwargs],
+    ) -> None:
+        """Add requests method aware of the crawling context."""
+        if rq_id or rq_name or rq_alias:
+            request_manager: RequestManager = await RequestQueue.open(
+                id=rq_id,
+                name=rq_name,
+                alias=rq_alias,
+                storage_client=self._service_locator.get_storage_client(),
+                configuration=self._service_locator.get_configuration(),
+            )
+        else:
+            request_manager = await self.get_request_manager()
 
-        async def context_aware_add_requests(
-            requests: Sequence[str | Request],
-            rq_id: str | None = None,
-            rq_name: str | None = None,
-            rq_alias: str | None = None,
-            **kwargs: Unpack[EnqueueLinksKwargs],
-        ) -> None:
-            if rq_id or rq_name or rq_alias:
-                request_manager: RequestManager = await RequestQueue.open(
-                    id=rq_id,
-                    name=rq_name,
-                    alias=rq_alias,
-                    storage_client=self._service_locator.get_storage_client(),
-                    configuration=self._service_locator.get_configuration(),
-                )
-            else:
-                request_manager = await self.get_request_manager()
-
-            context_aware_requests = self._get_context_aware_requests(requests=requests, context=context, kwargs=kwargs)
-            return await request_manager.add_requests(context_aware_requests)
-
-        return context_aware_add_requests
+        context_aware_requests = self._get_context_aware_requests(requests=requests, context=context, kwargs=kwargs)
+        return await request_manager.add_requests(context_aware_requests)
 
     async def _commit_request_handler_result(self, context: BasicCrawlingContext) -> None:
         """Commit request handler result for the input `context`. Result is taken from `_context_result_map`."""
         result = self._context_result_map[context]
 
         for add_requests_call in result.add_requests_calls:
-            context_aware_add_requests = self._create_context_aware_add_requests(context)
-            await context_aware_add_requests(**add_requests_call)
+            await functools.partial(self._add_requests, context)(**add_requests_call)
 
         for push_data_call in result.push_data_calls:
             await self._push_data(**push_data_call)
