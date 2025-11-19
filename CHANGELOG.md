@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Unify separators in `unique_key` construction ([#1569](https://github.com/apify/crawlee-python/pull/1569)) ([af46a37](https://github.com/apify/crawlee-python/commit/af46a3733b059a8052489296e172f005def953f7)) by [@vdusek](https://github.com/vdusek), closes [#1512](https://github.com/apify/crawlee-python/issues/1512)
+- Fix `same-domain` strategy ignoring public suffix  ([#1572](https://github.com/apify/crawlee-python/pull/1572)) ([3d018b2](https://github.com/apify/crawlee-python/commit/3d018b21a28a4bee493829783057188d6106a69b)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1571](https://github.com/apify/crawlee-python/issues/1571)
 
 
 <!-- git-cliff-unreleased-end -->
