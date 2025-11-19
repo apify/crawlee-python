@@ -285,7 +285,7 @@ async def test_calls_failed_request_handler() -> None:
 
 
 @pytest.mark.parametrize('handler', ['failed_request_handler', 'error_handler'])
-async def test_handlers_uses_context_helpers(tmp_path: Path, handler: str) -> None:
+async def test_handlers_use_context_helpers(tmp_path: Path, handler: str) -> None:
     """Test that context helpers used in `failed_request_handler` and in `error_handler` have effect."""
     # Prepare crawler
     storage_client = FileSystemStorageClient()
