@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import signal
 import sys
@@ -14,7 +15,7 @@ from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, Literal, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, cast
 from urllib.parse import ParseResult, urlparse
 from weakref import WeakKeyDictionary
 
@@ -96,6 +97,9 @@ if TYPE_CHECKING:
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 TRequestIterator = TypeVar('TRequestIterator', str, Request)
+TParams = ParamSpec('TParams')
+T = TypeVar('T')
+
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Request | None]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 SkippedRequestCallback = Callable[[str, SkippedReason], Awaitable[None]]
@@ -520,6 +524,24 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._logger.info(f'Crawler.stop() was called with following reason: {reason}.')
         self._unexpected_stop = True
 
+    def _wrap_handler_with_error_context(
+        self, handler: Callable[[TCrawlingContext | BasicCrawlingContext, Exception], Awaitable[T]]
+    ) -> Callable[[TCrawlingContext | BasicCrawlingContext, Exception], Awaitable[T]]:
+        """Decorate error handlers to make their context helpers usable."""
+
+        @functools.wraps(handler)
+        async def wrapped_handler(context: TCrawlingContext | BasicCrawlingContext, exception: Exception) -> T:
+            # Original context helpers that are from `RequestHandlerRunResult` will not be commited as the request
+            # failed. Modified context provides context helpers with direct access to the storages.
+            error_context = context.create_modified_copy(
+                push_data=self._push_data,
+                get_key_value_store=self.get_key_value_store,
+                add_requests=functools.partial(self._add_requests, context),
+            )
+            return await handler(error_context, exception)
+
+        return wrapped_handler
+
     def _stop_if_max_requests_count_exceeded(self) -> None:
         """Call `stop` when the maximum number of requests to crawl has been reached."""
         if self._max_requests_per_crawl is None:
@@ -618,7 +640,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         The error handler is invoked after a request handler error occurs and before a retry attempt.
         """
-        self._error_handler = handler
+        self._error_handler = self._wrap_handler_with_error_context(handler)
         return handler
 
     def failed_request_handler(
@@ -628,7 +650,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         The failed request handler is invoked when a request has failed all retry attempts.
         """
-        self._failed_request_handler = handler
+        self._failed_request_handler = self._wrap_handler_with_error_context(handler)
         return handler
 
     def on_skipped_request(self, callback: SkippedRequestCallback) -> SkippedRequestCallback:
@@ -1256,52 +1278,46 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             else:
                 yield Request.from_url(url)
 
+    async def _add_requests(
+        self,
+        context: BasicCrawlingContext,
+        requests: Sequence[str | Request],
+        rq_id: str | None = None,
+        rq_name: str | None = None,
+        rq_alias: str | None = None,
+        **kwargs: Unpack[EnqueueLinksKwargs],
+    ) -> None:
+        """Add requests method aware of the crawling context."""
+        if rq_id or rq_name or rq_alias:
+            request_manager: RequestManager = await RequestQueue.open(
+                id=rq_id,
+                name=rq_name,
+                alias=rq_alias,
+                storage_client=self._service_locator.get_storage_client(),
+                configuration=self._service_locator.get_configuration(),
+            )
+        else:
+            request_manager = await self.get_request_manager()
+
+        context_aware_requests = list[Request]()
+        base_url = kwargs.get('base_url') or context.request.loaded_url or context.request.url
+        requests_iterator = self._convert_url_to_request_iterator(requests, base_url)
+        filter_requests_iterator = self._enqueue_links_filter_iterator(requests_iterator, context.request.url, **kwargs)
+        for dst_request in filter_requests_iterator:
+            # Update the crawl depth of the request.
+            dst_request.crawl_depth = context.request.crawl_depth + 1
+
+            if self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth:
+                context_aware_requests.append(dst_request)
+
+        return await request_manager.add_requests(context_aware_requests)
+
     async def _commit_request_handler_result(self, context: BasicCrawlingContext) -> None:
         """Commit request handler result for the input `context`. Result is taken from `_context_result_map`."""
         result = self._context_result_map[context]
 
-        base_request_manager = await self.get_request_manager()
-
-        origin = context.request.loaded_url or context.request.url
-
         for add_requests_call in result.add_requests_calls:
-            rq_id = add_requests_call.get('rq_id')
-            rq_name = add_requests_call.get('rq_name')
-            rq_alias = add_requests_call.get('rq_alias')
-            specified_params = sum(1 for param in [rq_id, rq_name, rq_alias] if param is not None)
-            if specified_params > 1:
-                raise ValueError('You can only provide one of `rq_id`, `rq_name` or `rq_alias` arguments.')
-            if rq_id or rq_name or rq_alias:
-                request_manager: RequestManager | RequestQueue = await RequestQueue.open(
-                    id=rq_id,
-                    name=rq_name,
-                    alias=rq_alias,
-                    storage_client=self._service_locator.get_storage_client(),
-                    configuration=self._service_locator.get_configuration(),
-                )
-            else:
-                request_manager = base_request_manager
-
-            requests = list[Request]()
-
-            base_url = url if (url := add_requests_call.get('base_url')) else origin
-
-            requests_iterator = self._convert_url_to_request_iterator(add_requests_call['requests'], base_url)
-
-            enqueue_links_kwargs: EnqueueLinksKwargs = {k: v for k, v in add_requests_call.items() if k != 'requests'}  # type: ignore[assignment]
-
-            filter_requests_iterator = self._enqueue_links_filter_iterator(
-                requests_iterator, context.request.url, **enqueue_links_kwargs
-            )
-
-            for dst_request in filter_requests_iterator:
-                # Update the crawl depth of the request.
-                dst_request.crawl_depth = context.request.crawl_depth + 1
-
-                if self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth:
-                    requests.append(dst_request)
-
-            await request_manager.add_requests(requests)
+            await self._add_requests(context, **add_requests_call)
 
         for push_data_call in result.push_data_calls:
             await self._push_data(**push_data_call)
