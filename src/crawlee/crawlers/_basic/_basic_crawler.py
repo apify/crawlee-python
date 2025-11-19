@@ -1043,8 +1043,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return target_url.hostname == origin_url.hostname
 
         if strategy == 'same-domain':
-            origin_domain = self._tld_extractor.extract_str(origin_url.hostname).domain
-            target_domain = self._tld_extractor.extract_str(target_url.hostname).domain
+            origin_domain = self._tld_extractor.extract_str(origin_url.hostname).top_domain_under_public_suffix
+            target_domain = self._tld_extractor.extract_str(target_url.hostname).top_domain_under_public_suffix
             return origin_domain == target_domain
 
         if strategy == 'same-origin':
