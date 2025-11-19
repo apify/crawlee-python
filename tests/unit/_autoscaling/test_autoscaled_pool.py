@@ -330,8 +330,6 @@ async def test_allows_multiple_run_calls(system_status: SystemStatus | Mock) -> 
     assert done_count == 4
 
     done_count = 0
-    await asyncio.sleep(0.2)  # Allow any lingering callbacks to complete
-    done_count = 0  # Reset again to ensure clean state
 
     await pool.run()
     assert done_count == 4
