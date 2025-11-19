@@ -1278,21 +1278,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             else:
                 yield Request.from_url(url)
 
-    def _get_context_aware_requests(
-        self, requests: Sequence[str | Request], context: BasicCrawlingContext, kwargs: EnqueueLinksKwargs
-    ) -> list[Request]:
-        context_aware_requests = list[Request]()
-        base_url = kwargs.get('base_url') or context.request.loaded_url or context.request.url
-        requests_iterator = self._convert_url_to_request_iterator(requests, base_url)
-        filter_requests_iterator = self._enqueue_links_filter_iterator(requests_iterator, context.request.url, **kwargs)
-        for dst_request in filter_requests_iterator:
-            # Update the crawl depth of the request.
-            dst_request.crawl_depth = context.request.crawl_depth + 1
-
-            if self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth:
-                context_aware_requests.append(dst_request)
-        return context_aware_requests
-
     async def _add_requests(
         self,
         context: BasicCrawlingContext,
@@ -1314,7 +1299,17 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         else:
             request_manager = await self.get_request_manager()
 
-        context_aware_requests = self._get_context_aware_requests(requests=requests, context=context, kwargs=kwargs)
+        context_aware_requests = list[Request]()
+        base_url = kwargs.get('base_url') or context.request.loaded_url or context.request.url
+        requests_iterator = self._convert_url_to_request_iterator(requests, base_url)
+        filter_requests_iterator = self._enqueue_links_filter_iterator(requests_iterator, context.request.url, **kwargs)
+        for dst_request in filter_requests_iterator:
+            # Update the crawl depth of the request.
+            dst_request.crawl_depth = context.request.crawl_depth + 1
+
+            if self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth:
+                context_aware_requests.append(dst_request)
+
         return await request_manager.add_requests(context_aware_requests)
 
     async def _commit_request_handler_result(self, context: BasicCrawlingContext) -> None:
