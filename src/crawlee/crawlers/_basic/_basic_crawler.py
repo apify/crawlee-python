@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import signal
 import sys
@@ -14,7 +15,7 @@ from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, Literal, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, cast
 from urllib.parse import ParseResult, urlparse
 from weakref import WeakKeyDictionary
 
@@ -97,6 +98,9 @@ if TYPE_CHECKING:
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 TRequestIterator = TypeVar('TRequestIterator', str, Request)
+TParams = ParamSpec('TParams')
+T = TypeVar('T')
+
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Request | None]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 SkippedRequestCallback = Callable[[str, SkippedReason], Awaitable[None]]
@@ -521,6 +525,20 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._logger.info(f'Crawler.stop() was called with following reason: {reason}.')
         self._unexpected_stop = True
 
+    def _wrap_handler_with_error_context(
+        self, handler: Callable[[TCrawlingContext | BasicCrawlingContext, Exception], Awaitable[T]]
+    ) -> Callable[[TCrawlingContext | BasicCrawlingContext, Exception], Awaitable[T]]:
+        @functools.wraps(handler)
+        async def wrapped_handler(context: TCrawlingContext | BasicCrawlingContext, exception: Exception) -> T:
+            error_context = context.create_modified_copy(
+                push_data=self._push_data,
+                get_key_value_store=self.get_key_value_store,
+                add_requests=self._create_context_aware_add_requests(context),
+            )
+            return await handler(error_context, exception)
+
+        return wrapped_handler
+
     def _stop_if_max_requests_count_exceeded(self) -> None:
         """Call `stop` when the maximum number of requests to crawl has been reached."""
         if self._max_requests_per_crawl is None:
@@ -619,7 +637,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         The error handler is invoked after a request handler error occurs and before a retry attempt.
         """
-        self._error_handler = handler
+        self._error_handler = self._wrap_handler_with_error_context(handler)
         return handler
 
     def failed_request_handler(
@@ -629,7 +647,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         The failed request handler is invoked when a request has failed all retry attempts.
         """
-        self._failed_request_handler = handler
+        self._failed_request_handler = self._wrap_handler_with_error_context(handler)
         return handler
 
     def on_skipped_request(self, callback: SkippedRequestCallback) -> SkippedRequestCallback:
@@ -1167,12 +1185,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if self._failed_request_handler:
             try:
-                error_context = context.create_modified_copy(
-                    push_data=self._push_data,
-                    get_key_value_store=self.get_key_value_store,
-                    add_requests=await self._create_context_aware_add_requests(context),
-                )
-                await self._failed_request_handler(error_context, error)
+                await self._failed_request_handler(context, error)
             except Exception as e:
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
 
@@ -1262,19 +1275,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             else:
                 yield Request.from_url(url)
 
-    async def _open_suitable_request_manager(
-        self, id: str | None, name: str | None, alias: str | None
-    ) -> RequestManager | RequestQueue:
-        if id or name or alias:
-            return await RequestQueue.open(
-                id=id,
-                name=name,
-                alias=alias,
-                storage_client=self._service_locator.get_storage_client(),
-                configuration=self._service_locator.get_configuration(),
-            )
-        return await self.get_request_manager()
-
     def _get_context_aware_requests(
         self, requests: Sequence[str | Request], context: BasicCrawlingContext, kwargs: EnqueueLinksKwargs
     ) -> list[Request]:
@@ -1290,7 +1290,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 context_aware_requests.append(dst_request)
         return context_aware_requests
 
-    async def _create_context_aware_add_requests(self, context: BasicCrawlingContext) -> AddRequestsFunction:
+    def _create_context_aware_add_requests(self, context: BasicCrawlingContext) -> AddRequestsFunction:
         """Create add_requests function that adds requests aware of the crawling context."""
 
         async def context_aware_add_requests(
@@ -1300,11 +1300,17 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             rq_alias: str | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> None:
-            request_manager = await self._open_suitable_request_manager(
-                id=rq_id,
-                name=rq_name,
-                alias=rq_alias,
-            )
+            if rq_id or rq_name or rq_alias:
+                request_manager: RequestManager = await RequestQueue.open(
+                    id=rq_id,
+                    name=rq_name,
+                    alias=rq_alias,
+                    storage_client=self._service_locator.get_storage_client(),
+                    configuration=self._service_locator.get_configuration(),
+                )
+            else:
+                request_manager = await self.get_request_manager()
+
             context_aware_requests = self._get_context_aware_requests(requests=requests, context=context, kwargs=kwargs)
             return await request_manager.add_requests(context_aware_requests)
 
@@ -1315,7 +1321,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         result = self._context_result_map[context]
 
         for add_requests_call in result.add_requests_calls:
-            context_aware_add_requests = await self._create_context_aware_add_requests(context)
+            context_aware_add_requests = self._create_context_aware_add_requests(context)
             await context_aware_add_requests(**add_requests_call)
 
         for push_data_call in result.push_data_calls:

@@ -284,34 +284,40 @@ async def test_calls_failed_request_handler() -> None:
     assert isinstance(calls[0][1], RuntimeError)
 
 
-async def test_failed_request_handler_uses_context_helpers(tmp_path: Path) -> None:
-    """Test that context helpers used in `failed_request_handler` have effect."""
+@pytest.mark.parametrize('handler', ['failed_request_handler', 'error_handler'])
+async def test_handlers_uses_context_helpers(tmp_path: Path, handler: str) -> None:
+    """Test that context helpers used in `failed_request_handler` and in `error_handler` have effect."""
+    # Prepare crawler
     storage_client = FileSystemStorageClient()
     crawler = BasicCrawler(
         max_request_retries=1, storage_client=storage_client, configuration=Configuration(storage_dir=str(tmp_path))
     )
+    # Test data
+    rq_alias = 'other'
     test_data = {'some': 'data'}
     test_key = 'key'
     test_value = 'value'
     test_request = Request.from_url('https://d.placeholder.com')
 
+    # Request handler with injected error
     @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
-        if context.request.url == 'https://b.placeholder.com':
-            raise RuntimeError('Arbitrary crash for testing purposes')
+    async def request_handler(context: BasicCrawlingContext) -> None:
+        raise RuntimeError('Arbitrary crash for testing purposes')
 
-    @crawler.failed_request_handler
-    async def failed_request_handler(context: BasicCrawlingContext, error: Exception) -> None:
+    # Apply one of the handlers
+    @getattr(crawler, handler)  # type:ignore[misc] # Untyped decorator is ok to make the test concise
+    async def handler_implementation(context: BasicCrawlingContext, error: Exception) -> None:
         await context.push_data(test_data)
-        await context.add_requests([test_request])
+        await context.add_requests(requests=[test_request], rq_alias=rq_alias)
         kvs = await context.get_key_value_store()
         await kvs.set_value(test_key, test_value)
 
     await crawler.run(['https://b.placeholder.com'])
 
+    # Verify that the context helpers used in handlers had effect on used storages
     dataset = await Dataset.open(storage_client=storage_client)
     kvs = await KeyValueStore.open(storage_client=storage_client)
-    rq = await RequestQueue.open(storage_client=storage_client)
+    rq = await RequestQueue.open(alias=rq_alias, storage_client=storage_client)
 
     assert test_value == await kvs.get_value(test_key)
     assert [test_data] == (await dataset.get_data()).items
