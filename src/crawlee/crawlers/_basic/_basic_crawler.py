@@ -1322,7 +1322,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         result = self._context_result_map[context]
 
         for add_requests_call in result.add_requests_calls:
-            await functools.partial(self._add_requests, context)(**add_requests_call)
+            await self._add_requests(context, **add_requests_call)
 
         for push_data_call in result.push_data_calls:
             await self._push_data(**push_data_call)
