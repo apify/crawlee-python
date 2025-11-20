@@ -310,14 +310,14 @@ async def test_allows_multiple_run_calls(system_status: SystemStatus | Mock) -> 
     done_count = 0
 
     async def run() -> None:
-        await asyncio.sleep(0.1)
         nonlocal done_count
         done_count += 1
+        await asyncio.sleep(0.1)
 
     pool = AutoscaledPool(
         system_status=system_status,
         run_task_function=run,
-        is_task_ready_function=lambda: future(True),
+        is_task_ready_function=lambda: future(done_count < 4),
         is_finished_function=lambda: future(done_count >= 4),
         concurrency_settings=ConcurrencySettings(
             min_concurrency=4,
@@ -330,8 +330,6 @@ async def test_allows_multiple_run_calls(system_status: SystemStatus | Mock) -> 
     assert done_count == 4
 
     done_count = 0
-    await asyncio.sleep(0.2)  # Allow any lingering callbacks to complete
-    done_count = 0  # Reset again to ensure clean state
 
     await pool.run()
     assert done_count == 4
