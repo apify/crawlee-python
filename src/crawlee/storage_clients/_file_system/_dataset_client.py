@@ -134,7 +134,7 @@ class FileSystemDatasetClient(DatasetClient):
                     continue
 
                 try:
-                    file = await asyncio.to_thread(path_to_metadata.open)
+                    file = await asyncio.to_thread(path_to_metadata.open, 'r', encoding='utf-8')
                     try:
                         file_content = json.load(file)
                         metadata = DatasetMetadata(**file_content)
@@ -163,7 +163,7 @@ class FileSystemDatasetClient(DatasetClient):
 
             # If the dataset directory exists, reconstruct the client from the metadata file.
             if path_to_dataset.exists() and path_to_metadata.exists():
-                file = await asyncio.to_thread(open, path_to_metadata)
+                file = await asyncio.to_thread(open, path_to_metadata, 'r', encoding='utf-8')
                 try:
                     file_content = json.load(file)
                 finally:

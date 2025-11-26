@@ -1132,3 +1132,21 @@ async def test_get_auto_saved_value_various_global_clients(
     await kvs.persist_autosaved_values()
 
     assert await kvs.get_value(test_key) == autosaved_value_kvs
+
+
+async def test_record_with_noascii_chars(kvs: KeyValueStore) -> None:
+    """Test storing and retrieving a record with non-ASCII characters."""
+    init_value = {
+        'record_1': 'Supermaxi El Jardín',
+        'record_2': 'záznam dva',
+        'record_3': '記録三',
+    }
+    key = 'non_ascii_key'
+
+    # Save the record in the key-value store
+    await kvs.set_value(key, init_value)
+
+    # Get the record and verify
+    value = await kvs.get_value(key)
+    assert value is not None
+    assert value == init_value
