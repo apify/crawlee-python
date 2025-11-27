@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import warnings
+from datetime import timedelta
 from functools import partial
 from typing import TYPE_CHECKING, Any, Generic, Literal
 
@@ -106,6 +107,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         fingerprint_generator: FingerprintGenerator | None | Literal['default'] = 'default',
         headless: bool | None = None,
         use_incognito_pages: bool | None = None,
+        navigation_timeout: timedelta | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext, StatisticsState]],
     ) -> None:
         """Initialize a new instance.
@@ -131,6 +133,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             use_incognito_pages: By default pages share the same browser context. If set to True each page uses its
                 own context that is destroyed once the page is closed or crashes.
                 This option should not be used if `browser_pool` is provided.
+            navigation_timeout: Timeout for navigation (the process between opening a Playwright page and calling
+                the request handler)
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         configuration = kwargs.pop('configuration', None)
@@ -198,6 +202,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         # Set default concurrency settings for browser crawlers if not provided
         if 'concurrency_settings' not in kwargs or kwargs['concurrency_settings'] is None:
             kwargs['concurrency_settings'] = ConcurrencySettings(desired_concurrency=1)
+
+        self._navigation_timeout = navigation_timeout or timedelta(minutes=1)
 
         super().__init__(**kwargs)
 
@@ -294,7 +300,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 # Set route_handler only for current request
                 await context.page.route(context.request.url, route_handler)
 
-            response = await context.page.goto(context.request.url)
+            response = await asyncio.wait_for(
+                context.page.goto(context.request.url), timeout=self._navigation_timeout.total_seconds()
+            )
 
             if response is None:
                 raise SessionError(f'Failed to load the URL: {context.request.url}')

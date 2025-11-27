@@ -3,11 +3,12 @@ from __future__ import annotations
 import asyncio
 import logging
 from abc import ABC
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Generic
 
 from more_itertools import partition
 from pydantic import ValidationError
-from typing_extensions import TypeVar
+from typing_extensions import NotRequired, TypeVar
 
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.docs import docs_group
@@ -30,6 +31,19 @@ if TYPE_CHECKING:
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
+
+
+class HttpCrawlerOptions(
+    BasicCrawlerOptions[TCrawlingContext, TStatisticsState],
+    Generic[TCrawlingContext, TStatisticsState],
+):
+    """Arguments for the `AbstractHttpCrawler` constructor.
+
+    It is intended for typing forwarded `__init__` arguments in the subclasses.
+    """
+
+    navigation_timeout: NotRequired[timedelta | None]
+    """Timeout for the HTTP request."""
 
 
 @docs_group('Crawlers')
@@ -56,9 +70,11 @@ class AbstractHttpCrawler(
         self,
         *,
         parser: AbstractHttpParser[TParseResult, TSelectResult],
+        navigation_timeout: timedelta | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext, StatisticsState]],
     ) -> None:
         self._parser = parser
+        self._navigation_timeout = navigation_timeout or timedelta(minutes=1)
         self._pre_navigation_hooks: list[Callable[[BasicCrawlingContext], Awaitable[None]]] = []
 
         if '_context_pipeline' not in kwargs:
@@ -219,6 +235,7 @@ class AbstractHttpCrawler(
             session=context.session,
             proxy_info=context.proxy_info,
             statistics=self._statistics,
+            timeout=self._navigation_timeout,
         )
 
         yield HttpCrawlingContext.from_basic_crawling_context(context=context, http_response=result.http_response)

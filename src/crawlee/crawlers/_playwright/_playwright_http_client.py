@@ -59,6 +59,7 @@ class PlaywrightHttpClient(HttpClient):
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
         statistics: Statistics | None = None,
+        timeout: timedelta | None = None,
     ) -> HttpCrawlingResult:
         raise NotImplementedError('The `crawl` method should not be used for `PlaywrightHttpClient`')
 
@@ -72,6 +73,7 @@ class PlaywrightHttpClient(HttpClient):
         payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
+        timeout: timedelta | None = None,
     ) -> HttpResponse:
         # `proxy_info` are not used because `APIRequestContext` inherits the proxy from `BrowserContext`
         # TODO: Use `session` to restore all the fingerprint headers according to the `BrowserContext`, after resolved
@@ -87,7 +89,11 @@ class PlaywrightHttpClient(HttpClient):
 
         # Proxies appropriate to the browser context are used
         response = await browser_context.request.fetch(
-            url_or_request=url, method=method.lower(), headers=dict(headers) if headers else None, data=payload
+            url_or_request=url,
+            method=method.lower(),
+            headers=dict(headers) if headers else None,
+            data=payload,
+            timeout=timeout.total_seconds() if timeout else None,
         )
 
         return await PlaywrightHttpResponse.from_playwright_response(response, protocol='')

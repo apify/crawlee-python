@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from bs4 import BeautifulSoup, Tag
 
 from crawlee._utils.docs import docs_group
-from crawlee.crawlers import AbstractHttpCrawler, BasicCrawlerOptions
+from crawlee.crawlers import AbstractHttpCrawler, HttpCrawlerOptions
 
 from ._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
 from ._beautifulsoup_parser import BeautifulSoupParser, BeautifulSoupParserType
@@ -58,7 +58,7 @@ class BeautifulSoupCrawler(AbstractHttpCrawler[BeautifulSoupCrawlingContext, Bea
         self,
         *,
         parser: BeautifulSoupParserType = 'lxml',
-        **kwargs: Unpack[BasicCrawlerOptions[BeautifulSoupCrawlingContext]],
+        **kwargs: Unpack[HttpCrawlerOptions[BeautifulSoupCrawlingContext]],
     ) -> None:
         """Initialize a new instance.
 

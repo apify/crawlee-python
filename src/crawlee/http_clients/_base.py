@@ -104,6 +104,7 @@ class HttpClient(ABC):
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
         statistics: Statistics | None = None,
+        timeout: timedelta | None = None,
     ) -> HttpCrawlingResult:
         """Perform the crawling for a given request.
 
@@ -114,6 +115,7 @@ class HttpClient(ABC):
             session: The session associated with the request.
             proxy_info: The information about the proxy to be used.
             statistics: The statistics object to register status codes.
+            timeout: Request timeout
 
         Raises:
             ProxyError: Raised if a proxy-related error occurs.
@@ -132,6 +134,7 @@ class HttpClient(ABC):
         payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
+        timeout: timedelta | None = None,
     ) -> HttpResponse:
         """Send an HTTP request via the client.
 
@@ -144,6 +147,7 @@ class HttpClient(ABC):
             payload: The data to be sent as the request body.
             session: The session associated with the request.
             proxy_info: The information about the proxy to be used.
+            timeout: Request timeout
 
         Raises:
             ProxyError: Raised if a proxy-related error occurs.

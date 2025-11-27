@@ -6,7 +6,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Any, TypedDict
 
 from cachetools import LRUCache
-from impit import AsyncClient, Browser, HTTPError, Response, TransportError
+from impit import AsyncClient, Browser, HTTPError, Response, TimeoutException, TransportError
 from impit import ProxyError as ImpitProxyError
 from typing_extensions import override
 
@@ -125,6 +125,7 @@ class ImpitHttpClient(HttpClient):
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
         statistics: Statistics | None = None,
+        timeout: timedelta | None = None,
     ) -> HttpCrawlingResult:
         client = self._get_client(proxy_info.url if proxy_info else None, session.cookies.jar if session else None)
 
@@ -134,7 +135,10 @@ class ImpitHttpClient(HttpClient):
                 method=request.method,
                 content=request.payload,
                 headers=dict(request.headers) if request.headers else None,
+                timeout=timeout.total_seconds() if timeout else None,
             )
+        except TimeoutException as exc:
+            raise TimeoutError from exc
         except (TransportError, HTTPError) as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
@@ -157,6 +161,7 @@ class ImpitHttpClient(HttpClient):
         payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
+        timeout: timedelta | None = None,
     ) -> HttpResponse:
         if isinstance(headers, dict) or headers is None:
             headers = HttpHeaders(headers or {})
@@ -165,8 +170,14 @@ class ImpitHttpClient(HttpClient):
 
         try:
             response = await client.request(
-                method=method, url=url, content=payload, headers=dict(headers) if headers else None
+                method=method,
+                url=url,
+                content=payload,
+                headers=dict(headers) if headers else None,
+                timeout=timeout.total_seconds() if timeout else None,
             )
+        except TimeoutException as exc:
+            raise TimeoutError from exc
         except (TransportError, HTTPError) as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
@@ -189,14 +200,18 @@ class ImpitHttpClient(HttpClient):
     ) -> AsyncGenerator[HttpResponse]:
         client = self._get_client(proxy_info.url if proxy_info else None, session.cookies.jar if session else None)
 
-        response = await client.request(
-            method=method,
-            url=url,
-            content=payload,
-            headers=dict(headers) if headers else None,
-            timeout=timeout.total_seconds() if timeout else None,
-            stream=True,
-        )
+        try:
+            response = await client.request(
+                method=method,
+                url=url,
+                content=payload,
+                headers=dict(headers) if headers else None,
+                timeout=timeout.total_seconds() if timeout else None,
+                stream=True,
+            )
+        except TimeoutException as exc:
+            raise TimeoutError from exc
+
         try:
             yield _ImpitResponse(response)
         finally:

@@ -147,6 +147,7 @@ class CurlImpersonateHttpClient(HttpClient):
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
         statistics: Statistics | None = None,
+        timeout: timedelta | None = None,
     ) -> HttpCrawlingResult:
         client = self._get_client(proxy_info.url if proxy_info else None)
 
@@ -157,6 +158,7 @@ class CurlImpersonateHttpClient(HttpClient):
                 headers=request.headers,
                 data=request.payload,
                 cookies=session.cookies.jar if session else None,
+                timeout=timeout.total_seconds() if timeout else None,
             )
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
@@ -186,6 +188,7 @@ class CurlImpersonateHttpClient(HttpClient):
         payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
+        timeout: timedelta | None = None,
     ) -> HttpResponse:
         if isinstance(headers, dict) or headers is None:
             headers = HttpHeaders(headers or {})
@@ -200,6 +203,7 @@ class CurlImpersonateHttpClient(HttpClient):
                 headers=dict(headers) if headers else None,
                 data=payload,
                 cookies=session.cookies.jar if session else None,
+                timeout=timeout.total_seconds() if timeout else None,
             )
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
