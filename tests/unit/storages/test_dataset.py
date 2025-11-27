@@ -1,6 +1,3 @@
-# TODO: Update crawlee_storage_dir args once the Pydantic bug is fixed
-# https://github.com/apify/crawlee-python/issues/146
-
 from __future__ import annotations
 
 import json
@@ -492,7 +489,7 @@ async def test_export_with_multiple_kwargs(dataset: Dataset, tmp_path: Path) -> 
     custom_dir_name = 'some_dir'
     custom_dir = tmp_path / custom_dir_name
     custom_dir.mkdir()
-    target_configuration = Configuration(crawlee_storage_dir=str(custom_dir))  # type: ignore[call-arg]
+    target_configuration = Configuration(storage_dir=str(custom_dir))
 
     # Set expected values
     expected_exported_data = f'{json.dumps([{"some key": "some data"}])}'
@@ -875,7 +872,7 @@ async def test_purge_on_start_enabled(storage_client: StorageClient) -> None:
     """Test purge behavior when purge_on_start=True: named storages retain data, unnamed storages are purged."""
 
     # Skip this test for memory storage since it doesn't persist data between client instances.
-    if storage_client.__class__ == MemoryStorageClient:
+    if isinstance(storage_client, MemoryStorageClient):
         pytest.skip('Memory storage does not persist data between client instances.')
 
     configuration = Configuration(purge_on_start=True)
@@ -961,7 +958,7 @@ async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
     """Test purge behavior when purge_on_start=False: all storages retain data regardless of type."""
 
     # Skip this test for memory storage since it doesn't persist data between client instances.
-    if storage_client.__class__ == MemoryStorageClient:
+    if isinstance(storage_client, MemoryStorageClient):
         pytest.skip('Memory storage does not persist data between client instances.')
 
     configuration = Configuration(purge_on_start=False)
@@ -1085,3 +1082,20 @@ async def test_validate_name(storage_client: StorageClient, name: str, *, is_val
     else:
         with pytest.raises(ValueError, match=rf'Invalid storage name "{name}".*'):
             await Dataset.open(name=name, storage_client=storage_client)
+
+
+async def test_record_with_noascii_chars(dataset: Dataset) -> None:
+    """Test handling record with non-ASCII characters."""
+    init_value = {
+        'record_1': 'Supermaxi El Jardín',
+        'record_2': 'záznam dva',
+        'record_3': '記録三',
+    }
+
+    # Save the record to the dataset
+    await dataset.push_data(init_value)
+
+    # Get the record and verify
+    value = await dataset.get_data()
+    assert value is not None
+    assert value.items[0] == init_value

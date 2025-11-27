@@ -5,6 +5,7 @@ import logging
 from datetime import timedelta
 from functools import update_wrapper
 from typing import TYPE_CHECKING, Any
+from unittest import mock
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -207,3 +208,14 @@ async def test_methods_raise_error_when_not_active(event_system_info_data: Event
         await event_manager.wait_for_all_listeners_to_complete()
 
         assert event_manager.active is True
+
+
+async def test_event_manager_in_context_persistence() -> None:
+    """Test that entering the `EventManager` context emits persist state event at least once."""
+    event_manager = EventManager()
+
+    with mock.patch.object(event_manager, '_emit_persist_state_event', AsyncMock()) as mocked_emit_persist_state_event:
+        async with event_manager:
+            pass
+
+    assert mocked_emit_persist_state_event.call_count >= 1

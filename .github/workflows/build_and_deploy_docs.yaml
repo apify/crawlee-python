@@ -10,7 +10,7 @@ on:
 
 env:
   NODE_VERSION: 20
-  PYTHON_VERSION: 3.13
+  PYTHON_VERSION: 3.14
 
 jobs:
   build_and_deploy_docs:
@@ -24,13 +24,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.ref }}
 
       - name: Set up Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
 

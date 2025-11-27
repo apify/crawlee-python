@@ -281,11 +281,14 @@ class KeyValueStore(Storage):
             if key in cache:
                 return cache[key].current_value.root
 
+            async def kvs_factory() -> KeyValueStore:
+                return self
+
             cache[key] = recoverable_state = RecoverableState(
                 default_state=AutosavedValue(default_value),
-                persistence_enabled=True,
-                persist_state_kvs_id=self.id,
                 persist_state_key=key,
+                persistence_enabled=True,
+                persist_state_kvs_factory=kvs_factory,
                 logger=logger,
             )
 

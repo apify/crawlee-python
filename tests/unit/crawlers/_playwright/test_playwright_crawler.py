@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from crawlee._request import RequestOptions
     from crawlee._types import HttpMethod, HttpPayload
     from crawlee.browsers._types import BrowserType
-    from crawlee.crawlers import PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
+    from crawlee.crawlers import BasicCrawlingContext, PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
 
 
 @pytest.mark.parametrize(
@@ -668,6 +668,39 @@ async def test_respect_robots_txt(server_url: URL) -> None:
     assert visited == {
         str(server_url / 'start_enqueue'),
         str(server_url / 'sub_index'),
+    }
+
+
+async def test_respect_robots_txt_with_problematic_links(server_url: URL) -> None:
+    """Test checks the crawler behavior with links that may cause problems when attempting to retrieve robots.txt."""
+    visit = mock.Mock()
+    fail = mock.Mock()
+    crawler = PlaywrightCrawler(
+        respect_robots_txt_file=True,
+        max_request_retries=0,
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links(strategy='all')
+
+    @crawler.failed_request_handler
+    async def error_handler(context: BasicCrawlingContext, _error: Exception) -> None:
+        fail(context.request.url)
+
+    await crawler.run([str(server_url / 'problematic_links')])
+
+    visited = {call[0][0] for call in visit.call_args_list}
+    failed = {call[0][0] for call in fail.call_args_list}
+
+    # Email must be skipped
+    # https://avatars.githubusercontent.com/apify does not get robots.txt, but is correct for the crawler.
+    assert visited == {str(server_url / 'problematic_links'), 'https://avatars.githubusercontent.com/apify'}
+
+    # The budplaceholder.com does not exist.
+    assert failed == {
+        'https://budplaceholder.com/',
     }
 
 

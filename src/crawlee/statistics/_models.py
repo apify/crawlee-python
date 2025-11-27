@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
@@ -76,7 +77,6 @@ class StatisticsState(BaseModel):
     crawler_started_at: Annotated[datetime | None, Field(alias='crawlerStartedAt')] = None
     crawler_last_started_at: Annotated[datetime | None, Field(alias='crawlerLastStartTimestamp')] = None
     crawler_finished_at: Annotated[datetime | None, Field(alias='crawlerFinishedAt')] = None
-    crawler_runtime: Annotated[timedelta_ms, Field(alias='crawlerRuntimeMillis')] = timedelta()
     errors: dict[str, Any] = Field(default_factory=dict)
     retry_errors: dict[str, Any] = Field(alias='retryErrors', default_factory=dict)
     requests_with_status_code: dict[str, int] = Field(alias='requestsWithStatusCode', default_factory=dict)
@@ -92,6 +92,37 @@ class StatisticsState(BaseModel):
             return_type=list[int],
         ),
     ] = {}
+
+    # Used to track the crawler runtime, that had already been persisted. This is the runtime from previous runs.
+    _runtime_offset: Annotated[timedelta, Field(exclude=True)] = timedelta()
+
+    def model_post_init(self, /, __context: Any) -> None:
+        self._runtime_offset = self.crawler_runtime or self._runtime_offset
+
+    @property
+    def crawler_runtime(self) -> timedelta:
+        if self.crawler_last_started_at:
+            finished_at = self.crawler_finished_at or datetime.now(timezone.utc)
+            return self._runtime_offset + finished_at - self.crawler_last_started_at
+        return self._runtime_offset
+
+    @crawler_runtime.setter
+    def crawler_runtime(self, value: timedelta) -> None:
+        # Setter for backwards compatibility only, the crawler_runtime is now computed_field, and cant be set manually.
+        # To be removed in v2 release https://github.com/apify/crawlee-python/issues/1567
+        warnings.warn(
+            f"Setting 'crawler_runtime' is deprecated and will be removed in a future version."
+            f' Value {value} will not be used.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    @computed_field(alias='crawlerRuntimeMillis')
+    def crawler_runtime_for_serialization(self) -> timedelta:
+        if self.crawler_last_started_at:
+            finished_at = self.crawler_finished_at or datetime.now(timezone.utc)
+            return self._runtime_offset + finished_at - self.crawler_last_started_at
+        return self._runtime_offset
 
     @computed_field(alias='requestTotalDurationMillis', return_type=timedelta_ms)  # type: ignore[prop-decorator]
     @property

@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee.configuration import Configuration
+    from crawlee.storages import KeyValueStore
 
 logger = getLogger(__name__)
 
@@ -92,6 +93,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         metadata: RequestQueueMetadata,
         path_to_rq: Path,
         lock: asyncio.Lock,
+        recoverable_state: RecoverableState[RequestQueueState],
     ) -> None:
         """Initialize a new instance.
 
@@ -114,12 +116,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self._is_empty_cache: bool | None = None
         """Cache for is_empty result: None means unknown, True/False is cached state."""
 
-        self._state = RecoverableState[RequestQueueState](
-            default_state=RequestQueueState(),
-            persist_state_key=f'__RQ_STATE_{self._metadata.id}',
-            persistence_enabled=True,
-            logger=logger,
-        )
+        self._state = recoverable_state
         """Recoverable state to maintain request ordering, in-progress status, and handled status."""
 
     @override
@@ -135,6 +132,22 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     def path_to_metadata(self) -> Path:
         """The full path to the request queue metadata file."""
         return self.path_to_rq / METADATA_FILENAME
+
+    @classmethod
+    async def _create_recoverable_state(cls, id: str, configuration: Configuration) -> RecoverableState:
+        async def kvs_factory() -> KeyValueStore:
+            from crawlee.storage_clients import FileSystemStorageClient  # noqa: PLC0415 avoid circular import
+            from crawlee.storages import KeyValueStore  # noqa: PLC0415 avoid circular import
+
+            return await KeyValueStore.open(storage_client=FileSystemStorageClient(), configuration=configuration)
+
+        return RecoverableState[RequestQueueState](
+            default_state=RequestQueueState(),
+            persist_state_key=f'__RQ_STATE_{id}',
+            persist_state_kvs_factory=kvs_factory,
+            persistence_enabled=True,
+            logger=logger,
+        )
 
     @classmethod
     async def open(
@@ -184,7 +197,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     continue
 
                 try:
-                    file = await asyncio.to_thread(path_to_metadata.open)
+                    file = await asyncio.to_thread(path_to_metadata.open, 'r', encoding='utf-8')
                     try:
                         file_content = json.load(file)
                         metadata = RequestQueueMetadata(**file_content)
@@ -194,6 +207,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                                 metadata=metadata,
                                 path_to_rq=rq_base_path / rq_dir,
                                 lock=asyncio.Lock(),
+                                recoverable_state=await cls._create_recoverable_state(
+                                    id=id, configuration=configuration
+                                ),
                             )
                             await client._state.initialize()
                             await client._discover_existing_requests()
@@ -216,7 +232,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             # If the RQ directory exists, reconstruct the client from the metadata file.
             if path_to_rq.exists() and path_to_metadata.exists():
-                file = await asyncio.to_thread(open, path_to_metadata)
+                file = await asyncio.to_thread(open, path_to_metadata, 'r', encoding='utf-8')
                 try:
                     file_content = json.load(file)
                 finally:
@@ -230,6 +246,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     metadata=metadata,
                     path_to_rq=path_to_rq,
                     lock=asyncio.Lock(),
+                    recoverable_state=await cls._create_recoverable_state(id=metadata.id, configuration=configuration),
                 )
 
                 await client._state.initialize()
@@ -254,6 +271,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     metadata=metadata,
                     path_to_rq=path_to_rq,
                     lock=asyncio.Lock(),
+                    recoverable_state=await cls._create_recoverable_state(id=metadata.id, configuration=configuration),
                 )
                 await client._state.initialize()
                 await client._update_metadata()
@@ -757,7 +775,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         """
         # Open the request file.
         try:
-            file = await asyncio.to_thread(open, file_path)
+            file = await asyncio.to_thread(open, file_path, 'r', encoding='utf-8')
         except FileNotFoundError:
             logger.warning(f'Request file "{file_path}" not found.')
             return None

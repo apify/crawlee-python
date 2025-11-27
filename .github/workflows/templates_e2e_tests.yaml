@@ -7,7 +7,7 @@ on:
 
 env:
   NODE_VERSION: 22
-  PYTHON_VERSION: 3.13
+  PYTHON_VERSION: 3.14
 
 jobs:
   end_to_end_tests:
@@ -24,10 +24,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
 

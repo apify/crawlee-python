@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import warnings
 from datetime import timedelta
 from pathlib import Path
@@ -149,7 +150,7 @@ class SqlStorageClient(StorageClient):
                     # Raise an error if the new version creates breaking changes in the database schema.
                     if db_version and db_version != __version__:
                         warnings.warn(
-                            f'Database version {db_version.version} does not match library version {__version__}. '
+                            f'Database version {db_version} does not match library version {__version__}. '
                             'This may lead to unexpected behavior. Drop the db if you want to make sure that '
                             'everything will work fine.',
                             category=UserWarning,
@@ -266,6 +267,14 @@ class SqlStorageClient(StorageClient):
         if 'sqlite' not in connection_string and 'postgresql' not in connection_string:
             raise ValueError(
                 'Unsupported database. Supported: sqlite, postgresql. Consider using a different database.'
+            )
+
+        # TODO: https://github.com/apify/crawlee-python/issues/1555
+        if 'postgresql' in connection_string and sys.version_info >= (3, 14):
+            raise ValueError(
+                'SqlStorageClient cannot use PostgreSQL with Python 3.14 '
+                'due to asyncpg compatibility limitations. '
+                'Please use Python 3.13 or earlier, or switch to SQLite.'
             )
 
         self._engine = create_async_engine(

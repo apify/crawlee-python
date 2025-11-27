@@ -1,15 +1,13 @@
-# TODO: Update crawlee_storage_dir args once the Pydantic bug is fixed
-# https://github.com/apify/crawlee-python/issues/146
-
 from __future__ import annotations
 
 import logging
 import os
 import warnings
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from curl_cffi import CurlHttpVersion
+from fakeredis import FakeAsyncRedis
 from proxy import Proxy
 from uvicorn.config import Config
 
@@ -17,6 +15,7 @@ from crawlee import service_locator
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_network
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient, ImpitHttpClient
 from crawlee.proxy_configuration import ProxyInfo
+from crawlee.statistics import Statistics
 from crawlee.storages import KeyValueStore
 from tests.unit.server import TestServer, app, serve_in_thread
 
@@ -71,6 +70,10 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
 
         # Verify that the test environment was set up correctly.
         assert os.environ.get('CRAWLEE_STORAGE_DIR') == str(tmp_path)
+
+        # Reset global class variables to ensure test isolation.
+        KeyValueStore._autosaved_values = {}
+        Statistics._Statistics__next_id = 0  # type:ignore[attr-defined] # Mangled attribute
 
     return _prepare_test_env
 
@@ -195,14 +198,26 @@ def redirect_server_url(redirect_http_server: TestServer) -> URL:
 
 @pytest.fixture(
     params=[
-        pytest.param('curl', id='curl'),
         pytest.param('httpx', id='httpx'),
         pytest.param('impit', id='impit'),
+        pytest.param('curl', id='curl'),
     ]
 )
-async def http_client(request: pytest.FixtureRequest) -> HttpClient:
+async def http_client(request: pytest.FixtureRequest) -> AsyncGenerator[HttpClient, None]:
+    class_client: type[HttpClient]
     if request.param == 'curl':
-        return CurlImpersonateHttpClient(http_version=CurlHttpVersion.V1_1)
-    if request.param == 'impit':
-        return ImpitHttpClient(http3=False)
-    return HttpxHttpClient(http2=False)
+        class_client = CurlImpersonateHttpClient
+        kwargs: dict[str, Any] = {'http_version': CurlHttpVersion.V1_1}
+    elif request.param == 'impit':
+        class_client = ImpitHttpClient
+        kwargs = {'http3': False}
+    else:
+        class_client = HttpxHttpClient
+        kwargs = {'http2': True}
+    async with class_client(**kwargs) as client:
+        yield client
+
+
+@pytest.fixture
+def redis_client() -> FakeAsyncRedis:
+    return FakeAsyncRedis()

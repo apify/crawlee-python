@@ -99,7 +99,7 @@ apify run
 For running Crawlee code as an Actor on [Apify platform](https://apify.com/actors) you need to wrap the body of the main function of your crawler with `async with Actor`.
 
 :::info NOTE
-Adding `async with Actor` is the only important thing needed to run it on Apify platform as an Actor. It is needed to initialize your Actor (e.g. to set the correct storage implementation) and to correctly handle exitting the process.
+Adding `async with Actor` is the only important thing needed to run it on Apify platform as an Actor. It is needed to initialize your Actor (e.g. to set the correct storage implementation) and to correctly handle exiting the process.
 :::
 
 Let's look at the `BeautifulSoupCrawler` example from the [Quick start](../quick-start) guide:
