@@ -106,24 +106,24 @@ module.exports = {
         ],
     ]),
     plugins: [
-        [
-            '@apify/docusaurus-plugin-typedoc-api',
-            {
-                projectRoot: '.',
-                changelogs: false,
-                readmes: false,
-                packages: [{ path: '.' }],
-                typedocOptions: {
-                    excludeExternals: false,
-                },
-                sortSidebar: groupSort,
-                routeBasePath: 'api',
-                pythonOptions: {
-                    pythonModulePath: path.join(__dirname, '../src/crawlee'),
-                    moduleShortcutsPath: path.join(__dirname, 'module_shortcuts.json'),
-                },
-            },
-        ],
+        // [
+        //     '@apify/docusaurus-plugin-typedoc-api',
+        //     {
+        //         projectRoot: '.',
+        //         changelogs: false,
+        //         readmes: false,
+        //         packages: [{ path: '.' }],
+        //         typedocOptions: {
+        //             excludeExternals: false,
+        //         },
+        //         sortSidebar: groupSort,
+        //         routeBasePath: 'api',
+        //         pythonOptions: {
+        //             pythonModulePath: path.join(__dirname, '../src/crawlee'),
+        //             moduleShortcutsPath: path.join(__dirname, 'module_shortcuts.json'),
+        //         },
+        //     },
+        // ],
         // [
         //     '@docusaurus/plugin-client-redirects',
         //     {
