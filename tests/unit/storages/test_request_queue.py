@@ -1348,3 +1348,22 @@ async def test_reclaim_request_with_change_state(rq: RequestQueue) -> None:
     assert reclaimed_request is not None
     assert reclaimed_request.url == 'https://example.com/original'
     assert reclaimed_request.user_data['state'] == 'modified'
+
+
+async def test_request_with_noascii_chars(rq: RequestQueue) -> None:
+    """Test handling requests with non-ASCII characters in user data."""
+    data_with_special_chars = {
+        'record_1': 'Supermaxi El Jardín',
+        'record_2': 'záznam dva',
+        'record_3': '記録三',
+    }
+    init_request = Request.from_url('https://crawlee.dev', user_data=data_with_special_chars)
+
+    # Add a request with special user data
+    await rq.add_request(init_request)
+
+    # Get the request and verify
+    request = await rq.fetch_next_request()
+    assert request is not None
+    assert request.url == 'https://crawlee.dev'
+    assert request.user_data == init_request.user_data
