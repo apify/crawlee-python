@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from datetime import timedelta
 from typing import TYPE_CHECKING
 from unittest import mock
 
@@ -341,3 +343,42 @@ async def test_enqueue_links_error_with_multi_params(
             await context.enqueue_links(rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
 
     await crawler.run([str(server_url / 'start_enqueue')])
+
+
+async def test_navigation_timeout_on_slow_request(server_url: URL, http_client: HttpClient) -> None:
+    """Test that navigation_timeout causes TimeoutError on slow HTTP requests."""
+    crawler = BeautifulSoupCrawler(
+        http_client=http_client,
+        navigation_timeout=timedelta(seconds=1),
+        max_request_retries=0,
+    )
+
+    failed_request_handler = mock.AsyncMock()
+    crawler.failed_request_handler(failed_request_handler)
+
+    request_handler = mock.AsyncMock()
+    crawler.router.default_handler(request_handler)
+
+    # Request endpoint that delays 5 seconds - should timeout at 1 second
+    await crawler.run([str(server_url.with_path('/slow').with_query(delay=5))])
+
+    assert failed_request_handler.call_count == 1
+    assert isinstance(failed_request_handler.call_args[0][1], asyncio.TimeoutError)
+
+
+async def test_slow_navigation_does_not_count_toward_handler_timeout(server_url: URL, http_client: HttpClient) -> None:
+    crawler = BeautifulSoupCrawler(
+        http_client=http_client,
+        request_handler_timeout=timedelta(seconds=0.5),
+        max_request_retries=0,
+    )
+
+    request_handler = mock.AsyncMock()
+    crawler.router.default_handler(request_handler)
+
+    # Navigation takes 1 second (exceeds handler timeout), but should still succeed
+    result = await crawler.run([str(server_url.with_path('/slow').with_query(delay=1))])
+
+    assert result.requests_failed == 0
+    assert result.requests_finished == 1
+    assert request_handler.call_count == 1
