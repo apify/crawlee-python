@@ -69,3 +69,62 @@ crawl-delay: 2
 
 sitemap: http://not-exists.com/sitemap_1.xml
 sitemap: http://not-exists.com/sitemap_2.xml"""
+
+
+INFINITE_SCROLL = b"""\
+<!DOCTYPE html>
+<html>
+<body>
+    <div id="content"></div>
+
+    <script>
+        let page = 0;
+        let loading = false;
+
+        for (let i = 0; i < 10; i++) {
+            const div = document.createElement('div');
+            div.className = 'item';
+            div.style.height = '200px';
+            div.textContent = 'Item ' + (i + 1);
+            document.getElementById('content').appendChild(div);
+        }
+
+        async function loadMore() {
+            if (loading || page >= 3) return;
+            loading = true;
+            page++;
+
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            for (let i = 0; i < 10; i++) {
+                const div = document.createElement('div');
+                div.className = 'item';
+                div.style.height = '200px';
+                div.textContent = 'Item ' + (page * 10 + i + 1);
+                document.getElementById('content').appendChild(div);
+            }
+
+            loading = false;
+        }
+
+        window.addEventListener('scroll', () => {
+            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
+                loadMore();
+            }
+        });
+    </script>
+</body>
+</html>
+"""
+
+RESOURCE_LOADING_PAGE = b"""\
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="/server_static/test.js"></script>
+  </head>
+  <body>
+    <img src="/server_static/test.png" />
+  </body>
+</html>
+"""
