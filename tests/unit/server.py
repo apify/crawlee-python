@@ -18,7 +18,9 @@ from tests.unit.server_endpoints import (
     GENERIC_RESPONSE,
     HELLO_WORLD,
     INCAPSULA,
+    INFINITE_SCROLL,
     PROBLEMATIC_LINKS,
+    RESOURCE_LOADING_PAGE,
     ROBOTS_TXT,
     SECONDARY_INDEX,
     START_ENQUEUE,
@@ -121,6 +123,8 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         'xml': hello_world_xml,
         'robots.txt': robots_txt,
         'get_compressed': get_compressed,
+        'infinite_scroll': infinite_scroll_endpoint,
+        'resource_loading_page': resource_loading_endpoint,
     }
     path = URL(scope['path']).parts[1]
     # Route requests to appropriate handlers
@@ -409,6 +413,22 @@ async def get_compressed(_scope: dict[str, Any], _receive: Receive, send: Send) 
         }
     )
     await send({'type': 'http.response.body', 'body': gzip.compress(HELLO_WORLD * 1000)})
+
+
+async def infinite_scroll_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Handle requests for the infinite scroll page."""
+    await send_html_response(
+        send,
+        INFINITE_SCROLL,
+    )
+
+
+async def resource_loading_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Handle requests for the resource loading page."""
+    await send_html_response(
+        send,
+        RESOURCE_LOADING_PAGE,
+    )
 
 
 class TestServer(Server):
