@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import pytest
@@ -35,16 +34,13 @@ def configuration(tmp_path: Path) -> Configuration:
 @pytest.fixture
 async def rq_client(
     configuration: Configuration,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncGenerator[SqlRequestQueueClient, None]:
     """A fixture for a SQL request queue client."""
     async with SqlStorageClient() as storage_client:
-        monkeypatch.setattr(storage_client, '_accessed_modified_update_interval', timedelta(seconds=0))
         client = await storage_client.create_rq_client(
             name='test-request-queue',
             configuration=configuration,
         )
-        monkeypatch.setattr(client, '_accessed_modified_update_interval', timedelta(seconds=0))
         yield client
         await client.drop()
 

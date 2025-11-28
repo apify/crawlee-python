@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import pytest
@@ -38,11 +37,9 @@ def get_tables(sync_conn: Connection) -> list[str]:
 @pytest.fixture
 async def dataset_client(
     configuration: Configuration,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncGenerator[SqlDatasetClient, None]:
     """A fixture for a SQL dataset client."""
     async with SqlStorageClient() as storage_client:
-        monkeypatch.setattr(storage_client, '_accessed_modified_update_interval', timedelta(seconds=0))
         client = await storage_client.create_dataset_client(
             name='test-dataset',
             configuration=configuration,
