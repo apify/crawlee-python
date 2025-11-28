@@ -138,7 +138,7 @@ class ImpitHttpClient(HttpClient):
                 timeout=timeout.total_seconds() if timeout else None,
             )
         except TimeoutException as exc:
-            raise TimeoutError from exc
+            raise asyncio.TimeoutError from exc
         except (TransportError, HTTPError) as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
@@ -177,7 +177,7 @@ class ImpitHttpClient(HttpClient):
                 timeout=timeout.total_seconds() if timeout else None,
             )
         except TimeoutException as exc:
-            raise TimeoutError from exc
+            raise asyncio.TimeoutError from exc
         except (TransportError, HTTPError) as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
@@ -210,7 +210,7 @@ class ImpitHttpClient(HttpClient):
                 stream=True,
             )
         except TimeoutException as exc:
-            raise TimeoutError from exc
+            raise asyncio.TimeoutError from exc
 
         try:
             yield _ImpitResponse(response)

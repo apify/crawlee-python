@@ -7,6 +7,7 @@ from datetime import timedelta
 from functools import partial
 from typing import TYPE_CHECKING, Any, Generic, Literal
 
+import playwright.async_api
 from more_itertools import partition
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
@@ -272,6 +273,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         Raises:
             ValueError: If the browser pool is not initialized.
             SessionError: If the URL cannot be loaded by the browser.
+            TimeoutError: If navigation does not succeed within the navigation timeout.
 
         Yields:
             The enhanced crawling context with the Playwright-specific features (page, response, enqueue_links,
@@ -303,9 +305,12 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 # Set route_handler only for current request
                 await context.page.route(context.request.url, route_handler)
 
-            response = await asyncio.wait_for(
-                context.page.goto(context.request.url), timeout=self._navigation_timeout.total_seconds()
-            )
+            try:
+                response = await context.page.goto(
+                    context.request.url, timeout=self._navigation_timeout.total_seconds() * 1000
+                )
+            except playwright.async_api.TimeoutError as exc:
+                raise asyncio.TimeoutError from exc
 
             if response is None:
                 raise SessionError(f'Failed to load the URL: {context.request.url}')

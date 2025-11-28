@@ -4,11 +4,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Literal
 from unittest import mock
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -925,3 +927,43 @@ async def test_enqueue_links_error_with_multi_params(
             await context.enqueue_links(rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
 
     await crawler.run([str(server_url / 'start_enqueue')])
+
+
+async def test_navigation_timeout_on_slow_page_load(server_url: URL) -> None:
+    crawler = PlaywrightCrawler(
+        navigation_timeout=timedelta(seconds=1),
+        max_request_retries=0,
+    )
+
+    request_handler = AsyncMock()
+    crawler.router.default_handler(request_handler)
+
+    failed_request_handler = AsyncMock()
+    crawler.failed_request_handler(failed_request_handler)
+
+    result = await crawler.run([str((server_url / 'slow').with_query(delay=2))])
+
+    assert result.requests_failed == 1
+    assert result.requests_finished == 0
+
+    assert request_handler.call_count == 0
+
+    assert failed_request_handler.call_count == 1
+    assert isinstance(failed_request_handler.call_args[0][1], asyncio.TimeoutError)
+
+
+async def test_slow_navigation_does_not_count_toward_handler_timeout(server_url: URL) -> None:
+    crawler = PlaywrightCrawler(
+        request_handler_timeout=timedelta(seconds=0.5),
+        max_request_retries=0,
+    )
+
+    request_handler = AsyncMock()
+    crawler.router.default_handler(request_handler)
+
+    # Navigation takes 1 second (exceeds handler timeout), but should still succeed
+    result = await crawler.run([str((server_url / 'slow').with_query(delay=1))])
+
+    assert result.requests_failed == 0
+    assert result.requests_finished == 1
+    assert request_handler.call_count == 1

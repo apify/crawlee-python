@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
@@ -163,6 +164,8 @@ class HttpxHttpClient(HttpClient):
 
         try:
             response = await client.send(http_request)
+        except httpx.TimeoutException as exc:
+            raise asyncio.TimeoutError from exc
         except httpx.TransportError as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
@@ -203,6 +206,8 @@ class HttpxHttpClient(HttpClient):
 
         try:
             response = await client.send(http_request)
+        except httpx.TimeoutException as exc:
+            raise asyncio.TimeoutError from exc
         except httpx.TransportError as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
@@ -235,7 +240,10 @@ class HttpxHttpClient(HttpClient):
             timeout=httpx.Timeout(None, connect=timeout.total_seconds()) if timeout else None,
         )
 
-        response = await client.send(http_request, stream=True)
+        try:
+            response = await client.send(http_request, stream=True)
+        except httpx.TimeoutException as exc:
+            raise asyncio.TimeoutError from exc
 
         try:
             yield _HttpxResponse(response)
