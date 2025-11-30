@@ -1312,7 +1312,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         return await request_manager.add_requests(context_aware_requests)
 
-    async def _commit_request_handler_result(self, context: BasicCrawlingContext) -> None:
+    async def _commit_request_handler_result(
+        self,
+        context: BasicCrawlingContext,
+        original_request: Request,
+        original_session: Session | None = None,
+    ) -> None:
         """Commit request handler result for the input `context`. Result is taken from `_context_result_map`."""
         result = self._context_result_map[context]
 
@@ -1323,6 +1328,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             await self._push_data(**push_data_call)
 
         await self._commit_key_value_store_changes(result, get_kvs=self.get_key_value_store)
+
+        result.sync_session(sync_session=original_session)
+        result.sync_request(sync_request=original_request)
 
     @staticmethod
     async def _commit_key_value_store_changes(
@@ -1389,11 +1397,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         else:
             session = await self._get_session()
         proxy_info = await self._get_proxy_info(request, session)
-        result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
+        result = RequestHandlerRunResult(
+            key_value_store_getter=self.get_key_value_store, request=request, session=session
+        )
 
         context = BasicCrawlingContext(
-            request=request,
-            session=session,
+            request=result.request,
+            session=result.session,
             proxy_info=proxy_info,
             send_request=self._prepare_send_request_function(session, proxy_info),
             add_requests=result.add_requests,
@@ -1416,9 +1426,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             except asyncio.TimeoutError as e:
                 raise RequestHandlerError(e, context) from e
 
-            await self._commit_request_handler_result(context)
+            await self._commit_request_handler_result(context, original_request=request, original_session=session)
             await wait_for(
-                lambda: request_manager.mark_request_as_handled(context.request),
+                lambda: request_manager.mark_request_as_handled(request),
                 timeout=self._internal_timeout,
                 timeout_message='Marking request as handled timed out after '
                 f'{self._internal_timeout.total_seconds()} seconds',

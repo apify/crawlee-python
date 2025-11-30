@@ -802,6 +802,8 @@ async def test_change_context_state_after_handling(test_input: TestInput, server
 
         assert session is not None
         assert check_request is not None
+
+        print('Test Session', check_request)
         assert session.user_data.get('session_state') is True
         # Check that request user data was updated in the handler and only onse.
         assert check_request.user_data.get('request_state') == ['initial', 'handler']
