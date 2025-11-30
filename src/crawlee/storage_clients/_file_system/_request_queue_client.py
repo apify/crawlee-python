@@ -197,7 +197,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     continue
 
                 try:
-                    file = await asyncio.to_thread(path_to_metadata.open)
+                    file = await asyncio.to_thread(path_to_metadata.open, 'r', encoding='utf-8')
                     try:
                         file_content = json.load(file)
                         metadata = RequestQueueMetadata(**file_content)
@@ -232,7 +232,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             # If the RQ directory exists, reconstruct the client from the metadata file.
             if path_to_rq.exists() and path_to_metadata.exists():
-                file = await asyncio.to_thread(open, path_to_metadata)
+                file = await asyncio.to_thread(open, path_to_metadata, 'r', encoding='utf-8')
                 try:
                     file_content = json.load(file)
                 finally:
@@ -775,7 +775,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         """
         # Open the request file.
         try:
-            file = await asyncio.to_thread(open, file_path)
+            file = await asyncio.to_thread(open, file_path, 'r', encoding='utf-8')
         except FileNotFoundError:
             logger.warning(f'Request file "{file_path}" not found.')
             return None
