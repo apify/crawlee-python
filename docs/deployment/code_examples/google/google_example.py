@@ -6,10 +6,7 @@ from datetime import timedelta
 import functions_framework
 from flask import Request, Response
 
-from crawlee.crawlers import (
-    BeautifulSoupCrawler,
-    BeautifulSoupCrawlingContext,
-)
+from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from crawlee.storage_clients import MemoryStorageClient
 
 
@@ -51,7 +48,7 @@ async def main() -> str:
     # highlight-end
 
 
-@functions_framework.http
+@functions_framework.http  # type: ignore[untyped-decorator]
 def crawlee_run(request: Request) -> Response:
     # You can pass data to your crawler using `request`
     function_id = request.headers['Function-Execution-Id']
