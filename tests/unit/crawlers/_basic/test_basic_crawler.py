@@ -305,7 +305,7 @@ async def test_handlers_use_context_helpers(tmp_path: Path, handler: str) -> Non
         raise RuntimeError('Arbitrary crash for testing purposes')
 
     # Apply one of the handlers
-    @getattr(crawler, handler)  # type:ignore[misc] # Untyped decorator is ok to make the test concise
+    @getattr(crawler, handler)  # type: ignore[untyped-decorator]
     async def handler_implementation(context: BasicCrawlingContext, error: Exception) -> None:
         await context.push_data(test_data)
         await context.add_requests(requests=[test_request], rq_alias=rq_alias)

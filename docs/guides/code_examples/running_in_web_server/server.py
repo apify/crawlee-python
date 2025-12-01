@@ -14,7 +14,7 @@ from .crawler import lifespan
 app = FastAPI(lifespan=lifespan, title='Crawler app')
 
 
-@app.get('/', response_class=HTMLResponse)
+@app.get('/', response_class=HTMLResponse)  # type: ignore[untyped-decorator]
 def index() -> str:
     return """
 <!DOCTYPE html>
@@ -32,7 +32,7 @@ def index() -> str:
 """
 
 
-@app.get('/scrape')
+@app.get('/scrape')  # type: ignore[untyped-decorator]
 async def scrape_url(request: Request, url: str | None = None) -> dict:
     if not url:
         return {'url': 'missing', 'scrape result': 'no results'}
