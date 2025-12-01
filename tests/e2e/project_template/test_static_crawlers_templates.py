@@ -73,7 +73,6 @@ async def test_static_crawler_actor_at_apify(
 
     # Print apify version for debugging purposes in rare cases of CLI failures
     subprocess.run(['apify', '--version'], check=True)  # noqa: ASYNC221, S607
-    raise RuntimeError('Just to see if the cli version is printed')
 
     # Build actor using sequence of cli commands as the user would
     subprocess.run(  # noqa: ASYNC221, S603
