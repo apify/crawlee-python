@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.1.1 - **not yet released**
+## [1.1.1](https://github.com/apify/crawlee-python/releases/tag/v1.1.1) (2025-12-02)
 
 ### 🐛 Bug Fixes
 
@@ -14,7 +13,6 @@ All notable changes to this project will be documented in this file.
 - Respect `&lt;base&gt;` when enqueuing ([#1590](https://github.com/apify/crawlee-python/pull/1590)) ([de517a1](https://github.com/apify/crawlee-python/commit/de517a1629cc29b20568143eb64018f216d4ba33)) by [@Mantisus](https://github.com/Mantisus), closes [#1589](https://github.com/apify/crawlee-python/issues/1589)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.1.0](https://github.com/apify/crawlee-python/releases/tag/v1.1.0) (2025-11-18)
 
 ### 🚀 Features
