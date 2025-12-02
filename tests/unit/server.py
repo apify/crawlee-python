@@ -15,6 +15,7 @@ from uvicorn.server import Server
 from yarl import URL
 
 from tests.unit.server_endpoints import (
+    BASE_INDEX,
     GENERIC_RESPONSE,
     HELLO_WORLD,
     INCAPSULA,
@@ -105,6 +106,7 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         'page_1': generic_response_endpoint,
         'page_2': generic_response_endpoint,
         'page_3': generic_response_endpoint,
+        'base_page': base_index_endpoint,
         'problematic_links': problematic_links_endpoint,
         'set_cookies': set_cookies,
         'set_complex_cookies': set_complex_cookies,
@@ -428,6 +430,16 @@ async def resource_loading_endpoint(_scope: dict[str, Any], _receive: Receive, s
     await send_html_response(
         send,
         RESOURCE_LOADING_PAGE,
+    )
+
+
+async def base_index_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Handle requests for the base index page."""
+    host = f'http://{get_headers_dict(_scope).get("host", "localhost")}'
+    content = BASE_INDEX.format(host=host).encode()
+    await send_html_response(
+        send,
+        content,
     )
 
 
