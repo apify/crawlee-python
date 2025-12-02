@@ -99,6 +99,9 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL) -> None:
         str(server_url / 'page_1'),
         str(server_url / 'page_2'),
         str(server_url / 'page_3'),
+        str(server_url / 'page_4'),
+        str(server_url / 'base_page'),
+        str(server_url / 'base_subpath/page_5'),
     }
 
 
@@ -668,6 +671,8 @@ async def test_respect_robots_txt(server_url: URL) -> None:
     assert visited == {
         str(server_url / 'start_enqueue'),
         str(server_url / 'sub_index'),
+        str(server_url / 'base_page'),
+        str(server_url / 'base_subpath/page_5'),
     }
 
 
@@ -724,6 +729,7 @@ async def test_on_skipped_request(server_url: URL) -> None:
         str(server_url / 'page_1'),
         str(server_url / 'page_2'),
         str(server_url / 'page_3'),
+        str(server_url / 'page_4'),
     }
 
 

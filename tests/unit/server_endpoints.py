@@ -24,6 +24,18 @@ SECONDARY_INDEX = b"""\
 <body>
     <a href="/page_3">Link 3</a>
     <a href="/page_2">Link 4</a>
+    <a href="/base_page">Base Page</a>
+</body></html>"""
+
+BASE_INDEX = """\
+<html><head>
+    <base href="{host}/base_subpath/">
+    <base href="{host}/sub_index/">
+    <title>Hello</title>
+</head>
+<body>
+    <a href="page_5">Link 5</a>
+    <a href="/page_4">Link 6</a>
 </body></html>"""
 
 INCAPSULA = b"""\
