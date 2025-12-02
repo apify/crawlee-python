@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Fix `same-domain` strategy ignoring public suffix  ([#1572](https://github.com/apify/crawlee-python/pull/1572)) ([3d018b2](https://github.com/apify/crawlee-python/commit/3d018b21a28a4bee493829783057188d6106a69b)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1571](https://github.com/apify/crawlee-python/issues/1571)
 - Make context helpers work in `FailedRequestHandler` and `ErrorHandler` ([#1570](https://github.com/apify/crawlee-python/pull/1570)) ([b830019](https://github.com/apify/crawlee-python/commit/b830019350830ac33075316061659e2854f7f4a5)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1532](https://github.com/apify/crawlee-python/issues/1532)
 - Fix non-ASCII character corruption in `FileSystemStorageClient` on systems without UTF-8 default encoding ([#1580](https://github.com/apify/crawlee-python/pull/1580)) ([f179f86](https://github.com/apify/crawlee-python/commit/f179f8671b0b6af9264450e4fef7e49d1cecd2bd)) by [@Mantisus](https://github.com/Mantisus), closes [#1579](https://github.com/apify/crawlee-python/issues/1579)
+- Respect `&lt;base&gt;` when enqueuing ([#1590](https://github.com/apify/crawlee-python/pull/1590)) ([de517a1](https://github.com/apify/crawlee-python/commit/de517a1629cc29b20568143eb64018f216d4ba33)) by [@Mantisus](https://github.com/Mantisus), closes [#1589](https://github.com/apify/crawlee-python/issues/1589)
 
 
 <!-- git-cliff-unreleased-end -->
