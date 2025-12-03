@@ -3,11 +3,14 @@ from __future__ import annotations
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import TYPE_CHECKING
+
+from async_timeout import Timeout, timeout
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from datetime import timedelta
+    from types import TracebackType
 
 _SECONDS_PER_MINUTE = 60
 _SECONDS_PER_HOUR = 3600
@@ -33,6 +36,40 @@ def measure_time() -> Iterator[TimerResult]:
         after_cpu = time.thread_time()
         result.wall = after_wall - before_wall
         result.cpu = after_cpu - before_cpu
+
+
+class SharedTimeout:
+    """Keeps track of a time budget shared by multiple independent async operations."""
+
+    def __init__(self, timeout: timedelta) -> None:
+        self._remaining_timeout = timeout
+        self._active_timeout: Timeout | None = None
+        self._activation_timestamp: float | None = None
+
+    async def __aenter__(self) -> timedelta:
+        if self._active_timeout is not None or self._activation_timestamp is not None:
+            raise RuntimeError('A shared timeout context cannot be entered twice at the same time')
+
+        self._activation_timestamp = time.monotonic()
+        self._active_timeout = new_timeout = timeout(self._remaining_timeout.total_seconds())
+        await new_timeout.__aenter__()
+        return self._remaining_timeout
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
+        if self._active_timeout is None or self._activation_timestamp is None:
+            raise RuntimeError('Logic error')
+
+        await self._active_timeout.__aexit__(exc_type, exc_value, exc_traceback)
+        elapsed = time.monotonic() - self._activation_timestamp
+        self._remaining_timeout = self._remaining_timeout - timedelta(seconds=elapsed)
+
+        self._active_timeout = None
+        self._activation_timestamp = None
 
 
 def format_duration(duration: timedelta | None) -> str:

@@ -5,13 +5,16 @@ import logging
 from abc import ABC
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Generic
+from weakref import WeakKeyDictionary
 
 from more_itertools import partition
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypeVar
 
 from crawlee._request import Request, RequestOptions
+from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
+from crawlee._utils.time import SharedTimeout
 from crawlee._utils.urls import to_absolute_url_iterator
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
@@ -25,7 +28,7 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from crawlee import RequestTransformAction
-    from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, ExtractLinksFunction
+    from crawlee._types import EnqueueLinksKwargs, ExtractLinksFunction
 
     from ._abstract_http_parser import AbstractHttpParser
 
@@ -76,6 +79,7 @@ class AbstractHttpCrawler(
         self._parser = parser
         self._navigation_timeout = navigation_timeout or timedelta(minutes=1)
         self._pre_navigation_hooks: list[Callable[[BasicCrawlingContext], Awaitable[None]]] = []
+        self._shared_navigation_timeouts = WeakKeyDictionary[BasicCrawlingContext, SharedTimeout]()
 
         if '_context_pipeline' not in kwargs:
             raise ValueError(
@@ -128,8 +132,12 @@ class AbstractHttpCrawler(
     async def _execute_pre_navigation_hooks(
         self, context: BasicCrawlingContext
     ) -> AsyncGenerator[BasicCrawlingContext, None]:
+        self._shared_navigation_timeouts[context] = SharedTimeout(self._navigation_timeout)
+
         for hook in self._pre_navigation_hooks:
-            await hook(context)
+            async with self._shared_navigation_timeouts[context]:
+                await hook(context)
+
         yield context
 
     async def _parse_http_response(
@@ -232,13 +240,14 @@ class AbstractHttpCrawler(
         Yields:
             The original crawling context enhanced by HTTP response.
         """
-        result = await self._http_client.crawl(
-            request=context.request,
-            session=context.session,
-            proxy_info=context.proxy_info,
-            statistics=self._statistics,
-            timeout=self._navigation_timeout,
-        )
+        async with self._shared_navigation_timeouts[context] as remaining_timeout:
+            result = await self._http_client.crawl(
+                request=context.request,
+                session=context.session,
+                proxy_info=context.proxy_info,
+                statistics=self._statistics,
+                timeout=remaining_timeout,
+            )
 
         yield HttpCrawlingContext.from_basic_crawling_context(context=context, http_response=result.http_response)
 

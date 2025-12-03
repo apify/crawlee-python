@@ -6,6 +6,7 @@ import warnings
 from datetime import timedelta
 from functools import partial
 from typing import TYPE_CHECKING, Any, Generic, Literal
+from weakref import WeakKeyDictionary
 
 import playwright.async_api
 from more_itertools import partition
@@ -14,10 +15,14 @@ from typing_extensions import NotRequired, TypedDict, TypeVar
 
 from crawlee import service_locator
 from crawlee._request import Request, RequestOptions
-from crawlee._types import ConcurrencySettings
+from crawlee._types import (
+    BasicCrawlingContext,
+    ConcurrencySettings,
+)
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
 from crawlee._utils.robots import RobotsTxtFile
+from crawlee._utils.time import SharedTimeout
 from crawlee._utils.urls import to_absolute_url_iterator
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
@@ -46,7 +51,6 @@ if TYPE_CHECKING:
 
     from crawlee import RequestTransformAction
     from crawlee._types import (
-        BasicCrawlingContext,
         EnqueueLinksKwargs,
         ExtractLinksFunction,
         HttpHeaders,
@@ -145,6 +149,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         if configuration is not None:
             service_locator.set_configuration(configuration)
 
+        self._shared_navigation_timeouts = WeakKeyDictionary[BasicCrawlingContext, SharedTimeout]()
+
         if browser_pool:
             # Raise an exception if browser_pool is provided together with other browser-related arguments.
             if any(
@@ -235,9 +241,13 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             block_requests=partial(block_requests, page=crawlee_page.page),
         )
 
+        self._shared_navigation_timeouts[pre_navigation_context] = SharedTimeout(self._navigation_timeout)
+
         async with browser_page_context(crawlee_page.page):
             for hook in self._pre_navigation_hooks:
-                await hook(pre_navigation_context)
+                async with self._shared_navigation_timeouts[context]:
+                    await hook(pre_navigation_context)
+
         yield pre_navigation_context
 
     def _prepare_request_interceptor(
@@ -306,9 +316,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 await context.page.route(context.request.url, route_handler)
 
             try:
-                response = await context.page.goto(
-                    context.request.url, timeout=self._navigation_timeout.total_seconds() * 1000
-                )
+                async with self._shared_navigation_timeouts[context] as remaining_timeout:
+                    response = await context.page.goto(
+                        context.request.url, timeout=remaining_timeout.total_seconds() * 1000
+                    )
             except playwright.async_api.TimeoutError as exc:
                 raise asyncio.TimeoutError from exc
 

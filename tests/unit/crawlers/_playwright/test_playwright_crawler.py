@@ -952,6 +952,24 @@ async def test_navigation_timeout_on_slow_page_load(server_url: URL) -> None:
     assert isinstance(failed_request_handler.call_args[0][1], asyncio.TimeoutError)
 
 
+async def test_navigation_timeout_applies_to_hooks(server_url: URL) -> None:
+    crawler = PlaywrightCrawler(
+        navigation_timeout=timedelta(seconds=0.5),
+        max_request_retries=0,
+    )
+
+    request_handler = AsyncMock()
+    crawler.router.default_handler(request_handler)
+    crawler.pre_navigation_hook(lambda _: asyncio.sleep(1))
+
+    # Pre-navigation hook takes 1 second (exceeds navigation timeout), so the URL will not be handled
+    result = await crawler.run([str(server_url)])
+
+    assert result.requests_failed == 1
+    assert result.requests_finished == 0
+    assert request_handler.call_count == 0
+
+
 async def test_slow_navigation_does_not_count_toward_handler_timeout(server_url: URL) -> None:
     crawler = PlaywrightCrawler(
         request_handler_timeout=timedelta(seconds=0.5),
