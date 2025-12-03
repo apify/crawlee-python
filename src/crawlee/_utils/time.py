@@ -39,7 +39,10 @@ def measure_time() -> Iterator[TimerResult]:
 
 
 class SharedTimeout:
-    """Keeps track of a time budget shared by multiple independent async operations."""
+    """Keeps track of a time budget shared by multiple independent async operations.
+
+    Provides a reusable, non-reentrant context manager interface.
+    """
 
     def __init__(self, timeout: timedelta) -> None:
         self._remaining_timeout = timeout
