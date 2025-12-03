@@ -4,7 +4,7 @@ import dataclasses
 from collections.abc import Callable, Iterator, Mapping
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, Protocol, TypedDict, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, TypedDict, TypeVar, cast, overload
 
 from pydantic import ConfigDict, Field, PlainValidator, RootModel
 
@@ -261,11 +261,6 @@ class KeyValueStoreChangeRecords:
 class RequestHandlerRunResult:
     """Record of calls to storage-related context helpers."""
 
-    _REQUEST_SYNC_FIELDS: ClassVar[frozenset[str]] = frozenset({'headers', 'user_data'})
-    _SESSION_SYNC_FIELDS: ClassVar[frozenset[str]] = frozenset(
-        {'_user_data', '_usage_count', '_error_score', '_cookies'}
-    )
-
     def __init__(
         self,
         *,
@@ -279,8 +274,16 @@ class RequestHandlerRunResult:
         self.key_value_store_changes = dict[tuple[str | None, str | None, str | None], KeyValueStoreChangeRecords]()
 
         # Isolated copies for handler execution
-        self.request = deepcopy(request)
-        self.session = deepcopy(session) if session else None
+        self._request = deepcopy(request)
+        self._session = deepcopy(session) if session else None
+
+    @property
+    def request(self) -> Request:
+        return self._request
+
+    @property
+    def session(self) -> Session | None:
+        return self._session
 
     async def add_requests(
         self,
@@ -331,22 +334,29 @@ class RequestHandlerRunResult:
 
         return self.key_value_store_changes[id, name, alias]
 
-    def sync_request(self, sync_request: Request) -> None:
-        """Sync request state from copies back to originals."""
-        for field in self._REQUEST_SYNC_FIELDS:
-            value = getattr(self.request, field)
-            original_value = getattr(sync_request, field)
-            if value != original_value:
-                object.__setattr__(sync_request, field, value)
+    def apply_request_changes(self, target: Request) -> None:
+        """Apply tracked changes from handler copy to original request."""
+        if self.request.user_data != target.user_data:
+            target.user_data.update(self.request.user_data)
 
-    def sync_session(self, sync_session: Session | None = None) -> None:
-        """Sync session state from copies back to originals."""
-        if self.session and sync_session:
-            for field in self._SESSION_SYNC_FIELDS:
+        if self.request.headers != target.headers:
+            target.headers = target.headers | self.request.headers
+
+    def apply_session_changes(self, target: Session | None = None) -> None:
+        """Apply tracked changes from handler copy to original session."""
+        simple_fields: set[str] = {'_usage_count', '_error_score'}
+
+        if self.session and target:
+            if self.session.user_data != target.user_data:
+                target.user_data.update(self.session.user_data)
+
+            if self.session.cookies != target.cookies:
+                target.cookies.set_cookies(self.session.cookies.get_cookies_as_dicts())
+            for field in simple_fields:
                 value = getattr(self.session, field)
-                original_value = getattr(sync_session, field)
+                original_value = getattr(target, field)
                 if value != original_value:
-                    object.__setattr__(sync_session, field, value)
+                    object.__setattr__(target, field, value)
 
 
 @docs_group('Functions')
