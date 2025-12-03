@@ -31,7 +31,8 @@ class AdaptiveContextError(RuntimeError):
 @dataclass(frozen=True)
 @docs_group('Crawling contexts')
 class AdaptivePlaywrightCrawlingContext(
-    Generic[TStaticParseResult, TStaticSelectResult], ParsedHttpCrawlingContext[TStaticParseResult]
+    ParsedHttpCrawlingContext[TStaticParseResult],
+    Generic[TStaticParseResult, TStaticSelectResult],
 ):
     _static_parser: AbstractHttpParser[TStaticParseResult, TStaticSelectResult]
     """The crawling context used by `AdaptivePlaywrightCrawler`.

@@ -1,15 +1,15 @@
-# TODO: Update crawlee_storage_dir args once the Pydantic bug is fixed
-# https://github.com/apify/crawlee-python/issues/146
-
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 import pytest
 
+from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore
+from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -19,33 +19,13 @@ if TYPE_CHECKING:
     from crawlee.storage_clients import StorageClient
 
 
-@pytest.fixture(params=['memory', 'file_system'])
-def storage_client(request: pytest.FixtureRequest) -> StorageClient:
-    """Parameterized fixture to test with different storage clients."""
-    if request.param == 'memory':
-        return MemoryStorageClient()
-
-    return FileSystemStorageClient()
-
-
-@pytest.fixture
-def configuration(tmp_path: Path) -> Configuration:
-    """Provide a configuration with a temporary storage directory."""
-    return Configuration(
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
-        purge_on_start=True,
-    )
-
-
 @pytest.fixture
 async def dataset(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> AsyncGenerator[Dataset, None]:
     """Fixture that provides a dataset instance for each test."""
     dataset = await Dataset.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     yield dataset
@@ -54,18 +34,16 @@ async def dataset(
 
 async def test_open_creates_new_dataset(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that open() creates a new dataset with proper metadata."""
     dataset = await Dataset.open(
-        name='new_dataset',
+        name='new-dataset',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify dataset properties
     assert dataset.id is not None
-    assert dataset.name == 'new_dataset'
+    assert dataset.name == 'new-dataset'
 
     metadata = await dataset.get_metadata()
     assert metadata.item_count == 0
@@ -75,13 +53,11 @@ async def test_open_creates_new_dataset(
 
 async def test_reopen_default(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test reopening a dataset with default parameters."""
     # Create a first dataset instance with default parameters
     dataset_1 = await Dataset.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify default properties
@@ -97,7 +73,6 @@ async def test_reopen_default(
     # Reopen the same dataset
     dataset_2 = await Dataset.open(
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify both instances reference the same dataset
@@ -116,14 +91,12 @@ async def test_reopen_default(
 
 async def test_open_by_id(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test opening a dataset by its ID."""
     # First create a dataset by name
     dataset1 = await Dataset.open(
-        name='dataset_by_id_test',
+        name='dataset-by-id-test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some data to identify it
@@ -134,12 +107,11 @@ async def test_open_by_id(
     dataset2 = await Dataset.open(
         id=dataset1.id,
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Verify it's the same dataset
     assert dataset2.id == dataset1.id
-    assert dataset2.name == 'dataset_by_id_test'
+    assert dataset2.name == 'dataset-by-id-test'
 
     # Verify the data is still there
     data = await dataset2.get_data()
@@ -153,13 +125,11 @@ async def test_open_by_id(
 
 async def test_open_existing_dataset(
     dataset: Dataset,
-    storage_client: StorageClient,
 ) -> None:
     """Test that open() loads an existing dataset correctly."""
     # Open the same dataset again
     reopened_dataset = await Dataset.open(
         name=dataset.name,
-        storage_client=storage_client,
     )
 
     # Verify dataset properties
@@ -175,15 +145,17 @@ async def test_open_existing_dataset(
 
 async def test_open_with_id_and_name(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test that open() raises an error when both id and name are provided."""
-    with pytest.raises(ValueError, match='Only one of "id" or "name" can be specified'):
+    with pytest.raises(
+        ValueError,
+        match=r'Only one of "id", "name", "alias" can be specified, but following arguments '
+        r'were specified: "id", "name".',
+    ):
         await Dataset.open(
             id='some-id',
             name='some-name',
             storage_client=storage_client,
-            configuration=configuration,
         )
 
 
@@ -395,13 +367,11 @@ async def test_list_items_with_options(dataset: Dataset) -> None:
 
 async def test_drop(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test dropping a dataset removes it from cache and clears its data."""
     dataset = await Dataset.open(
-        name='drop_test',
+        name='drop-test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some data
@@ -412,9 +382,8 @@ async def test_drop(
 
     # Verify dataset is empty (by creating a new one with the same name)
     new_dataset = await Dataset.open(
-        name='drop_test',
+        name='drop-test',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     result = await new_dataset.get_data()
@@ -429,8 +398,7 @@ async def test_export_to_json(
     """Test exporting dataset to JSON format."""
     # Create a key-value store for export
     kvs = await KeyValueStore.open(
-        name='export_kvs',
-        storage_client=storage_client,
+        name='export-kvs',
     )
 
     # Add some items to the dataset
@@ -445,7 +413,7 @@ async def test_export_to_json(
     await dataset.export_to(
         key='dataset_export.json',
         content_type='json',
-        to_kvs_name='export_kvs',
+        to_kvs_name='export-kvs',
         to_kvs_storage_client=storage_client,
     )
 
@@ -468,7 +436,7 @@ async def test_export_to_csv(
     """Test exporting dataset to CSV format."""
     # Create a key-value store for export
     kvs = await KeyValueStore.open(
-        name='export_kvs',
+        name='export-kvs',
         storage_client=storage_client,
     )
 
@@ -484,7 +452,7 @@ async def test_export_to_csv(
     await dataset.export_to(
         key='dataset_export.csv',
         content_type='csv',
-        to_kvs_name='export_kvs',
+        to_kvs_name='export-kvs',
         to_kvs_storage_client=storage_client,
     )
 
@@ -503,11 +471,48 @@ async def test_export_to_csv(
 
 async def test_export_to_invalid_content_type(dataset: Dataset) -> None:
     """Test exporting dataset with invalid content type raises error."""
-    with pytest.raises(ValueError, match='Unsupported content type'):
+    with pytest.raises(ValueError, match=r'Unsupported content type'):
         await dataset.export_to(
             key='invalid_export',
             content_type='invalid',  # type: ignore[call-overload]  # Intentionally invalid content type
         )
+
+
+async def test_export_with_multiple_kwargs(dataset: Dataset, tmp_path: Path) -> None:
+    """Test exporting dataset using many optional arguments together."""
+    target_kvs_name = 'some-kvs'
+    target_storage_client = FileSystemStorageClient()
+    export_key = 'exported_dataset'
+    data = {'some key': 'some data'}
+
+    # Prepare custom directory and configuration
+    custom_dir_name = 'some_dir'
+    custom_dir = tmp_path / custom_dir_name
+    custom_dir.mkdir()
+    target_configuration = Configuration(storage_dir=str(custom_dir))
+
+    # Set expected values
+    expected_exported_data = f'{json.dumps([{"some key": "some data"}])}'
+    expected_kvs_dir = custom_dir / 'key_value_stores' / target_kvs_name
+
+    # Populate dataset and export
+    await dataset.push_data(data)
+    await dataset.export_to(
+        key=export_key,
+        content_type='json',
+        to_kvs_name=target_kvs_name,
+        to_kvs_storage_client=target_storage_client,
+        to_kvs_configuration=target_configuration,
+    )
+
+    # Verify the directory was created
+    assert expected_kvs_dir.is_dir()
+    # Verify that kvs contains the exported data
+    kvs = await KeyValueStore.open(
+        name=target_kvs_name, storage_client=target_storage_client, configuration=target_configuration
+    )
+
+    assert await kvs.get_value(key=export_key) == expected_exported_data
 
 
 async def test_large_dataset(dataset: Dataset) -> None:
@@ -530,14 +535,12 @@ async def test_large_dataset(dataset: Dataset) -> None:
 
 async def test_purge(
     storage_client: StorageClient,
-    configuration: Configuration,
 ) -> None:
     """Test purging a dataset removes all data but keeps the dataset itself."""
     # First create a dataset
     dataset = await Dataset.open(
-        name='purge_test_dataset',
+        name='purge-test-dataset',
         storage_client=storage_client,
-        configuration=configuration,
     )
 
     # Add some data
@@ -563,7 +566,7 @@ async def test_purge(
 
     # Verify the dataset still exists but is empty
     assert dataset.id == dataset_id  # Same ID preserved
-    assert dataset.name == 'purge_test_dataset'  # Same name preserved
+    assert dataset.name == 'purge-test-dataset'  # Same name preserved
 
     # Dataset should be empty now
     data = await dataset.get_data()
@@ -582,3 +585,517 @@ async def test_purge(
 
     # Clean up
     await dataset.drop()
+
+
+async def test_open_with_alias(
+    storage_client: StorageClient,
+) -> None:
+    """Test opening datasets with alias parameter for NDU functionality."""
+    # Create datasets with different aliases
+    dataset_1 = await Dataset.open(
+        alias='test_alias_1',
+        storage_client=storage_client,
+    )
+    dataset_2 = await Dataset.open(
+        alias='test_alias_2',
+        storage_client=storage_client,
+    )
+
+    # Verify they have different IDs but no names (unnamed)
+    assert dataset_1.id != dataset_2.id
+    assert dataset_1.name is None
+    assert dataset_2.name is None
+
+    # Add different data to each
+    await dataset_1.push_data({'source': 'alias_1', 'value': 1})
+    await dataset_2.push_data({'source': 'alias_2', 'value': 2})
+
+    # Verify data isolation
+    data_1 = await dataset_1.get_data()
+    data_2 = await dataset_2.get_data()
+
+    assert data_1.count == 1
+    assert data_2.count == 1
+    assert data_1.items[0]['source'] == 'alias_1'
+    assert data_2.items[0]['source'] == 'alias_2'
+
+    # Clean up
+    await dataset_1.drop()
+    await dataset_2.drop()
+
+
+async def test_alias_caching(
+    storage_client: StorageClient,
+) -> None:
+    """Test that datasets with same alias return same instance (cached)."""
+    # Open dataset with alias
+    dataset_1 = await Dataset.open(
+        alias='cache_test',
+        storage_client=storage_client,
+    )
+
+    # Open again with same alias
+    dataset_2 = await Dataset.open(
+        alias='cache_test',
+        storage_client=storage_client,
+    )
+
+    # Should be same instance
+    assert dataset_1 is dataset_2
+    assert dataset_1.id == dataset_2.id
+
+    # Clean up
+    await dataset_1.drop()
+
+
+async def test_alias_with_id_error(
+    storage_client: StorageClient,
+) -> None:
+    """Test that providing both alias and id raises error."""
+    with pytest.raises(
+        ValueError,
+        match=r'Only one of "id", "name", "alias" can be specified, but following arguments '
+        r'were specified: "id", "alias".',
+    ):
+        await Dataset.open(
+            id='some-id',
+            alias='some-alias',
+            storage_client=storage_client,
+        )
+
+
+async def test_alias_with_name_error(
+    storage_client: StorageClient,
+) -> None:
+    """Test that providing both alias and name raises error."""
+    with pytest.raises(
+        ValueError,
+        match=r'Only one of "id", "name", "alias" can be specified, but following arguments '
+        r'were specified: "name", "alias".',
+    ):
+        await Dataset.open(
+            name='some-name',
+            alias='some-alias',
+            storage_client=storage_client,
+        )
+
+
+async def test_alias_with_all_parameters_error(
+    storage_client: StorageClient,
+) -> None:
+    """Test that providing id, name, and alias raises error."""
+    with pytest.raises(
+        ValueError,
+        match=r'Only one of "id", "name", "alias" can be specified, but following arguments '
+        r'were specified: "id", "name", "alias".',
+    ):
+        await Dataset.open(
+            id='some-id',
+            name='some-name',
+            alias='some-alias',
+            storage_client=storage_client,
+        )
+
+
+async def test_alias_with_special_characters(
+    storage_client: StorageClient,
+) -> None:
+    """Test alias functionality with special characters."""
+    special_aliases = [
+        'alias-with-dashes',
+        'alias_with_underscores',
+        'alias.with.dots',
+        'alias123with456numbers',
+        'CamelCaseAlias',
+    ]
+
+    datasets = []
+    for alias in special_aliases:
+        dataset = await Dataset.open(
+            alias=alias,
+            storage_client=storage_client,
+        )
+        datasets.append(dataset)
+
+        # Add data with the alias as identifier
+        await dataset.push_data({'alias_used': alias, 'test': 'special_chars'})
+
+    # Verify all work correctly
+    for i, dataset in enumerate(datasets):
+        data = await dataset.get_data()
+        assert data.count == 1
+        assert data.items[0]['alias_used'] == special_aliases[i]
+
+    # Clean up
+    for dataset in datasets:
+        await dataset.drop()
+
+
+async def test_named_vs_alias_conflict_detection(
+    storage_client: StorageClient,
+) -> None:
+    """Test that conflicts between named and alias storages are detected."""
+    # Test 1: Create named storage first, then try alias with same name
+    named_dataset = await Dataset.open(name='conflict-test', storage_client=storage_client)
+    assert named_dataset.name == 'conflict-test'
+
+    # Try to create alias with same name - should raise error
+    with pytest.raises(ValueError, match=r'Cannot create alias storage "conflict-test".*already exists'):
+        await Dataset.open(alias='conflict-test', storage_client=storage_client)
+
+    # Clean up
+    await named_dataset.drop()
+
+    # Test 2: Create alias first, then try named with same name
+    alias_dataset = await Dataset.open(alias='conflict-test2', storage_client=storage_client)
+    assert alias_dataset.name is None  # Alias storages have no name
+
+    # Try to create named with same name - should raise error
+    with pytest.raises(ValueError, match=r'Cannot create named storage "conflict-test2".*already exists'):
+        await Dataset.open(name='conflict-test2', storage_client=storage_client)
+
+    # Clean up
+    await alias_dataset.drop()
+
+
+async def test_alias_parameter(
+    storage_client: StorageClient,
+) -> None:
+    """Test dataset creation and operations with alias parameter."""
+    # Create dataset with alias
+    alias_dataset = await Dataset.open(
+        alias='test_alias',
+        storage_client=storage_client,
+    )
+
+    # Verify alias dataset properties
+    assert alias_dataset.id is not None
+    assert alias_dataset.name is None  # Alias storages should be unnamed
+
+    # Test data operations
+    await alias_dataset.push_data({'type': 'alias', 'value': 1})
+    data = await alias_dataset.get_data()
+    assert data.count == 1
+    assert data.items[0]['type'] == 'alias'
+
+    await alias_dataset.drop()
+
+
+async def test_alias_vs_named_isolation(
+    storage_client: StorageClient,
+) -> None:
+    """Test that alias and named datasets with same identifier are isolated."""
+    # Create named dataset
+    named_dataset = await Dataset.open(
+        name='test-identifier',
+        storage_client=storage_client,
+    )
+
+    # Verify named dataset
+    assert named_dataset.name == 'test-identifier'
+    await named_dataset.push_data({'type': 'named'})
+
+    # Clean up named dataset first
+    await named_dataset.drop()
+
+    # Now create alias dataset with same identifier (should work after cleanup)
+    alias_dataset = await Dataset.open(
+        alias='test_identifier',
+        storage_client=storage_client,
+    )
+
+    # Should be different instance
+    assert alias_dataset.name is None
+    await alias_dataset.push_data({'type': 'alias'})
+
+    # Verify alias data
+    alias_data = await alias_dataset.get_data()
+    assert alias_data.items[0]['type'] == 'alias'
+
+    await alias_dataset.drop()
+
+
+async def test_default_vs_alias_default_equivalence(
+    storage_client: StorageClient,
+) -> None:
+    """Test that default dataset and alias='default' are equivalent."""
+    # Open default dataset
+    default_dataset = await Dataset.open(
+        storage_client=storage_client,
+    )
+
+    alias_default_dataset = await Dataset.open(
+        alias=StorageInstanceManager._DEFAULT_STORAGE_ALIAS,
+        storage_client=storage_client,
+    )
+
+    # Should be the same
+    assert default_dataset.id == alias_default_dataset.id
+    assert default_dataset.name is None
+    assert alias_default_dataset.name is None
+
+    # Data should be shared
+    await default_dataset.push_data({'source': 'default'})
+    data = await alias_default_dataset.get_data()
+    assert data.items[0]['source'] == 'default'
+
+    await default_dataset.drop()
+
+
+async def test_multiple_alias_isolation(
+    storage_client: StorageClient,
+) -> None:
+    """Test that different aliases create separate datasets."""
+    datasets = []
+
+    for i in range(3):
+        dataset = await Dataset.open(
+            alias=f'alias_{i}',
+            storage_client=storage_client,
+        )
+        await dataset.push_data({'alias': f'alias_{i}', 'index': i})
+        datasets.append(dataset)
+
+    # All should be different
+    for i in range(3):
+        for j in range(i + 1, 3):
+            assert datasets[i].id != datasets[j].id
+
+    # Verify data isolation
+    for i, dataset in enumerate(datasets):
+        data = await dataset.get_data()
+        assert data.items[0]['alias'] == f'alias_{i}'
+        await dataset.drop()
+
+
+async def test_purge_on_start_enabled(storage_client: StorageClient) -> None:
+    """Test purge behavior when purge_on_start=True: named storages retain data, unnamed storages are purged."""
+
+    # Skip this test for memory storage since it doesn't persist data between client instances.
+    if isinstance(storage_client, MemoryStorageClient):
+        pytest.skip('Memory storage does not persist data between client instances.')
+
+    configuration = Configuration(purge_on_start=True)
+
+    # First, create all storage types with purge enabled and add data.
+    default_dataset = await Dataset.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    alias_dataset = await Dataset.open(
+        alias='purge-test-alias',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    named_dataset = await Dataset.open(
+        name='purge-test-named',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    await default_dataset.push_data({'type': 'default', 'data': 'should_be_purged'})
+    await alias_dataset.push_data({'type': 'alias', 'data': 'should_be_purged'})
+    await named_dataset.push_data({'type': 'named', 'data': 'should_persist'})
+
+    # Verify data was added
+    default_data = await default_dataset.get_data()
+    alias_data = await alias_dataset.get_data()
+    named_data = await named_dataset.get_data()
+
+    assert len(default_data.items) == 1
+    assert len(alias_data.items) == 1
+    assert len(named_data.items) == 1
+
+    # Verify that default and alias storages are unnamed
+    default_metadata = await default_dataset.get_metadata()
+    alias_metadata = await alias_dataset.get_metadata()
+    named_metadata = await named_dataset.get_metadata()
+
+    assert default_metadata.name is None
+    assert alias_metadata.name is None
+    assert named_metadata.name == 'purge-test-named'
+
+    # Clear storage cache to simulate "reopening" storages
+    service_locator.storage_instance_manager.clear_cache()
+
+    # Now "reopen" all storages
+    default_dataset_2 = await Dataset.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+    alias_dataset_2 = await Dataset.open(
+        alias='purge-test-alias',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+    named_dataset_2 = await Dataset.open(
+        name='purge-test-named',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Check the data after purge
+    default_data_after = await default_dataset_2.get_data()
+    alias_data_after = await alias_dataset_2.get_data()
+    named_data_after = await named_dataset_2.get_data()
+
+    # Unnamed storages (alias and default) should be purged (data removed)
+    assert len(default_data_after.items) == 0
+    assert len(alias_data_after.items) == 0
+
+    # Named storage should retain data (not purged)
+    assert len(named_data_after.items) == 1
+
+    # Clean up
+    await named_dataset_2.drop()
+    await alias_dataset_2.drop()
+    await default_dataset_2.drop()
+
+
+async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
+    """Test purge behavior when purge_on_start=False: all storages retain data regardless of type."""
+
+    # Skip this test for memory storage since it doesn't persist data between client instances.
+    if isinstance(storage_client, MemoryStorageClient):
+        pytest.skip('Memory storage does not persist data between client instances.')
+
+    configuration = Configuration(purge_on_start=False)
+
+    # First, create all storage types with purge disabled and add data.
+    default_dataset = await Dataset.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    alias_dataset = await Dataset.open(
+        alias='purge-test-alias',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    named_dataset = await Dataset.open(
+        name='purge-test-named',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    await default_dataset.push_data({'type': 'default', 'data': 'should_persist'})
+    await alias_dataset.push_data({'type': 'alias', 'data': 'should_persist'})
+    await named_dataset.push_data({'type': 'named', 'data': 'should_persist'})
+
+    # Verify data was added
+    default_data = await default_dataset.get_data()
+    alias_data = await alias_dataset.get_data()
+    named_data = await named_dataset.get_data()
+
+    assert len(default_data.items) == 1
+    assert len(alias_data.items) == 1
+    assert len(named_data.items) == 1
+
+    # Verify that default and alias storages are unnamed
+    default_metadata = await default_dataset.get_metadata()
+    alias_metadata = await alias_dataset.get_metadata()
+    named_metadata = await named_dataset.get_metadata()
+
+    assert default_metadata.name is None
+    assert alias_metadata.name is None
+    assert named_metadata.name == 'purge-test-named'
+
+    # Clear storage cache to simulate "reopening" storages
+    service_locator.storage_instance_manager.clear_cache()
+
+    # Now "reopen" all storages
+    default_dataset_2 = await Dataset.open(
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+    alias_dataset_2 = await Dataset.open(
+        alias='purge-test-alias',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+    named_dataset_2 = await Dataset.open(
+        name='purge-test-named',
+        storage_client=storage_client,
+        configuration=configuration,
+    )
+
+    # Check the data after purge
+    default_data_after = await default_dataset_2.get_data()
+    alias_data_after = await alias_dataset_2.get_data()
+    named_data_after = await named_dataset_2.get_data()
+
+    # All storages should retain data (not purged)
+    assert len(default_data_after.items) == 1
+    assert len(alias_data_after.items) == 1
+    assert len(named_data_after.items) == 1
+
+    assert default_data_after.items[0]['data'] == 'should_persist'
+    assert alias_data_after.items[0]['data'] == 'should_persist'
+    assert named_data_after.items[0]['data'] == 'should_persist'
+
+    # Clean up
+    await default_dataset_2.drop()
+    await alias_dataset_2.drop()
+    await named_dataset_2.drop()
+
+
+async def test_name_default_not_allowed(storage_client: StorageClient) -> None:
+    """Test that storage can't have default alias as name, to prevent collisions with unnamed storage alias."""
+    with pytest.raises(
+        ValueError,
+        match=f'Storage name cannot be "{StorageInstanceManager._DEFAULT_STORAGE_ALIAS}" as '
+        f'it is reserved for default alias.',
+    ):
+        await Dataset.open(name=StorageInstanceManager._DEFAULT_STORAGE_ALIAS, storage_client=storage_client)
+
+
+@pytest.mark.parametrize(
+    ('name', 'is_valid'),
+    [
+        pytest.param('F', True, id='single-char'),
+        pytest.param('7', True, id='single-digit'),
+        pytest.param('FtghdfseySds', True, id='mixed-case'),
+        pytest.param('125673450', True, id='all-digits'),
+        pytest.param('Ft2134Sfe0O1hf', True, id='mixed-alphanumeric'),
+        pytest.param('name-with-dashes', True, id='dashes'),
+        pytest.param('1-value', True, id='number start'),
+        pytest.param('value-1', True, id='number end'),
+        pytest.param('test-1-value', True, id='number middle'),
+        pytest.param('test-------value', True, id='multiple-dashes'),
+        pytest.param('test-VALUES-test', True, id='multiple-cases'),
+        pytest.param('name_with_underscores', False, id='underscores'),
+        pytest.param('name with spaces', False, id='spaces'),
+        pytest.param('-test', False, id='dashes start'),
+        pytest.param('test-', False, id='dashes end'),
+    ],
+)
+async def test_validate_name(storage_client: StorageClient, name: str, *, is_valid: bool) -> None:
+    """Test name validation logic."""
+    if is_valid:
+        # Should not raise
+        dataset = await Dataset.open(name=name, storage_client=storage_client)
+        assert dataset.name == name
+        await dataset.drop()
+    else:
+        with pytest.raises(ValueError, match=rf'Invalid storage name "{name}".*'):
+            await Dataset.open(name=name, storage_client=storage_client)
+
+
+async def test_record_with_noascii_chars(dataset: Dataset) -> None:
+    """Test handling record with non-ASCII characters."""
+    init_value = {
+        'record_1': 'Supermaxi El Jardín',
+        'record_2': 'záznam dva',
+        'record_3': '記録三',
+    }
+
+    # Save the record to the dataset
+    await dataset.push_data(init_value)
+
+    # Get the record and verify
+    value = await dataset.get_data()
+    assert value is not None
+    assert value.items[0] == init_value

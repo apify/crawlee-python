@@ -12,6 +12,7 @@ from crawlee._utils.file import export_csv_to_stream, export_json_to_stream
 
 from ._base import Storage
 from ._key_value_store import KeyValueStore
+from ._utils import validate_storage_name
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -75,6 +76,8 @@ class Dataset(Storage):
             id: The unique identifier of the storage.
             name: The name of the storage, if available.
         """
+        validate_storage_name(name)
+
         self._client = client
         self._id = id
         self._name = name
@@ -100,18 +103,25 @@ class Dataset(Storage):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
         storage_client: StorageClient | None = None,
     ) -> Dataset:
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
 
+        client_opener_coro = storage_client.create_dataset_client(
+            id=id, name=name, alias=alias, configuration=configuration
+        )
+        storage_client_cache_key = storage_client.get_storage_client_cache_key(configuration=configuration)
+
         return await service_locator.storage_instance_manager.open_storage_instance(
             cls,
             id=id,
             name=name,
-            configuration=configuration,
-            client_opener=storage_client.create_dataset_client,
+            alias=alias,
+            client_opener_coro=client_opener_coro,
+            storage_client_cache_key=storage_client_cache_key,
         )
 
     @override
@@ -146,7 +156,7 @@ class Dataset(Storage):
         desc: bool = False,
         fields: list[str] | None = None,
         omit: list[str] | None = None,
-        unwind: str | None = None,
+        unwind: list[str] | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
         flatten: list[str] | None = None,
@@ -197,7 +207,7 @@ class Dataset(Storage):
         desc: bool = False,
         fields: list[str] | None = None,
         omit: list[str] | None = None,
-        unwind: str | None = None,
+        unwind: list[str] | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
     ) -> AsyncIterator[dict[str, Any]]:
@@ -245,7 +255,7 @@ class Dataset(Storage):
         desc: bool = False,
         fields: list[str] | None = None,
         omit: list[str] | None = None,
-        unwind: str | None = None,
+        unwind: list[str] | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
     ) -> list[dict[str, Any]]:

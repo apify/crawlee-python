@@ -10,4 +10,7 @@ apify
 # % if cookiecutter.http_client == 'curl-impersonate'
 # % do extras.append('curl-impersonate')
 # % endif
+# % if cookiecutter.http_client == 'httpx'
+# % do extras.append('httpx')
+# % endif
 crawlee[{{ extras | join(',') }}]

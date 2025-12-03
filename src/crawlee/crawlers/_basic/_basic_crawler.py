@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import signal
 import sys
@@ -14,7 +15,7 @@ from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, Literal, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, cast
 from urllib.parse import ParseResult, urlparse
 from weakref import WeakKeyDictionary
 
@@ -27,6 +28,7 @@ from crawlee import EnqueueStrategy, Glob, RequestTransformAction, service_locat
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
 from crawlee._log_config import configure_logger, get_configured_log_level, string_to_log_level
 from crawlee._request import Request, RequestOptions, RequestState
+from crawlee._service_locator import ServiceLocator
 from crawlee._types import (
     BasicCrawlingContext,
     EnqueueLinksKwargs,
@@ -95,6 +97,9 @@ if TYPE_CHECKING:
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 TRequestIterator = TypeVar('TRequestIterator', str, Request)
+TParams = ParamSpec('TParams')
+T = TypeVar('T')
+
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Request | None]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 SkippedRequestCallback = Callable[[str, SkippedReason], Awaitable[None]]
@@ -204,7 +209,7 @@ class _BasicCrawlerOptions(TypedDict):
     Returning `None` suppresses the status message."""
 
 
-class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], TypedDict):
+class _BasicCrawlerOptionsGeneric(TypedDict, Generic[TCrawlingContext, TStatisticsState]):
     """Generic options the `BasicCrawler` constructor."""
 
     request_handler: NotRequired[Callable[[TCrawlingContext], Awaitable[None]]]
@@ -219,9 +224,9 @@ class _BasicCrawlerOptionsGeneric(Generic[TCrawlingContext, TStatisticsState], T
 
 
 class BasicCrawlerOptions(
-    Generic[TCrawlingContext, TStatisticsState],
     _BasicCrawlerOptions,
     _BasicCrawlerOptionsGeneric[TCrawlingContext, TStatisticsState],
+    Generic[TCrawlingContext, TStatisticsState],
 ):
     """Arguments for the `BasicCrawler` constructor.
 
@@ -346,14 +351,23 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             _logger: A logger instance, typically provided by a subclass, for consistent logging labels.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
-        if configuration:
-            service_locator.set_configuration(configuration)
-        if storage_client:
-            service_locator.set_storage_client(storage_client)
-        if event_manager:
-            service_locator.set_event_manager(event_manager)
+        implicit_event_manager_with_explicit_config = False
+        if not configuration:
+            configuration = service_locator.get_configuration()
+        elif not event_manager:
+            implicit_event_manager_with_explicit_config = True
 
-        config = service_locator.get_configuration()
+        if not storage_client:
+            storage_client = service_locator.get_storage_client()
+
+        if not event_manager:
+            event_manager = service_locator.get_event_manager()
+
+        self._service_locator = ServiceLocator(
+            configuration=configuration, storage_client=storage_client, event_manager=event_manager
+        )
+
+        config = self._service_locator.get_configuration()
 
         # Core components
         self._request_manager = request_manager
@@ -419,17 +433,31 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             httpx_logger = logging.getLogger('httpx')  # Silence HTTPX logger
             httpx_logger.setLevel(logging.DEBUG if get_configured_log_level() <= logging.DEBUG else logging.WARNING)
         self._logger = _logger or logging.getLogger(__name__)
+        if implicit_event_manager_with_explicit_config:
+            self._logger.warning(
+                'No event manager set, implicitly using event manager from global service_locator.'
+                'It is advised to explicitly set the event manager if explicit configuration is used as well.'
+            )
         self._statistics_log_format = statistics_log_format
 
         # Statistics
-        self._statistics = statistics or cast(
-            'Statistics[TStatisticsState]',
-            Statistics.with_default_state(
-                periodic_message_logger=self._logger,
-                statistics_log_format=self._statistics_log_format,
-                log_message='Current request statistics:',
-            ),
-        )
+        if statistics:
+            self._statistics = statistics
+        else:
+
+            async def persist_state_factory() -> KeyValueStore:
+                return await self.get_key_value_store()
+
+            self._statistics = cast(
+                'Statistics[TStatisticsState]',
+                Statistics.with_default_state(
+                    persistence_enabled=True,
+                    periodic_message_logger=self._logger,
+                    statistics_log_format=self._statistics_log_format,
+                    log_message='Current request statistics:',
+                    persist_state_kvs_factory=persist_state_factory,
+                ),
+            )
 
         # Additional context managers to enter and exit
         self._additional_context_managers = _additional_context_managers or []
@@ -496,6 +524,24 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._logger.info(f'Crawler.stop() was called with following reason: {reason}.')
         self._unexpected_stop = True
 
+    def _wrap_handler_with_error_context(
+        self, handler: Callable[[TCrawlingContext | BasicCrawlingContext, Exception], Awaitable[T]]
+    ) -> Callable[[TCrawlingContext | BasicCrawlingContext, Exception], Awaitable[T]]:
+        """Decorate error handlers to make their context helpers usable."""
+
+        @functools.wraps(handler)
+        async def wrapped_handler(context: TCrawlingContext | BasicCrawlingContext, exception: Exception) -> T:
+            # Original context helpers that are from `RequestHandlerRunResult` will not be commited as the request
+            # failed. Modified context provides context helpers with direct access to the storages.
+            error_context = context.create_modified_copy(
+                push_data=self._push_data,
+                get_key_value_store=self.get_key_value_store,
+                add_requests=functools.partial(self._add_requests, context),
+            )
+            return await handler(error_context, exception)
+
+        return wrapped_handler
+
     def _stop_if_max_requests_count_exceeded(self) -> None:
         """Call `stop` when the maximum number of requests to crawl has been reached."""
         if self._max_requests_per_crawl is None:
@@ -548,7 +594,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def get_request_manager(self) -> RequestManager:
         """Return the configured request manager. If none is configured, open and return the default request queue."""
         if not self._request_manager:
-            self._request_manager = await RequestQueue.open()
+            self._request_manager = await RequestQueue.open(
+                storage_client=self._service_locator.get_storage_client(),
+                configuration=self._service_locator.get_configuration(),
+            )
 
         return self._request_manager
 
@@ -557,18 +606,32 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
     ) -> Dataset:
         """Return the `Dataset` with the given ID or name. If none is provided, return the default one."""
-        return await Dataset.open(id=id, name=name)
+        return await Dataset.open(
+            id=id,
+            name=name,
+            alias=alias,
+            storage_client=self._service_locator.get_storage_client(),
+            configuration=self._service_locator.get_configuration(),
+        )
 
     async def get_key_value_store(
         self,
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
     ) -> KeyValueStore:
         """Return the `KeyValueStore` with the given ID or name. If none is provided, return the default KVS."""
-        return await KeyValueStore.open(id=id, name=name)
+        return await KeyValueStore.open(
+            id=id,
+            name=name,
+            alias=alias,
+            storage_client=self._service_locator.get_storage_client(),
+            configuration=self._service_locator.get_configuration(),
+        )
 
     def error_handler(
         self, handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext]
@@ -577,7 +640,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         The error handler is invoked after a request handler error occurs and before a retry attempt.
         """
-        self._error_handler = handler
+        self._error_handler = self._wrap_handler_with_error_context(handler)
         return handler
 
     def failed_request_handler(
@@ -587,7 +650,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         The failed request handler is invoked when a request has failed all retry attempts.
         """
-        self._failed_request_handler = handler
+        self._failed_request_handler = self._wrap_handler_with_error_context(handler)
         return handler
 
     def on_skipped_request(self, callback: SkippedRequestCallback) -> SkippedRequestCallback:
@@ -627,7 +690,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request_manager = await self.get_request_manager()
             if purge_request_queue and isinstance(request_manager, RequestQueue):
                 await request_manager.drop()
-                self._request_manager = await RequestQueue.open()
+                self._request_manager = await RequestQueue.open(
+                    storage_client=self._service_locator.get_storage_client(),
+                    configuration=self._service_locator.get_configuration(),
+                )
 
         if requests is not None:
             await self.add_requests(requests)
@@ -654,7 +720,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         except CancelledError:
             pass
         finally:
-            await self._crawler_state_rec_task.stop()
             if threading.current_thread() is threading.main_thread():
                 with suppress(NotImplementedError):
                     asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
@@ -684,9 +749,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         return final_statistics
 
     async def _run_crawler(self) -> None:
-        event_manager = service_locator.get_event_manager()
-
-        self._crawler_state_rec_task.start()
+        event_manager = self._service_locator.get_event_manager()
 
         # Collect the context managers to be entered. Context managers that are already active are excluded,
         # as they were likely entered by the caller, who will also be responsible for exiting them.
@@ -698,6 +761,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 self._statistics,
                 self._session_pool if self._use_session_pool else None,
                 self._http_client,
+                self._crawler_state_rec_task,
                 *self._additional_context_managers,
             )
             if cm and getattr(cm, 'active', False) is False
@@ -772,6 +836,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
+        dataset_alias: str | None = None,
         **kwargs: Unpack[GetDataKwargs],
     ) -> DatasetItemsListPage:
         """Retrieve data from a `Dataset`.
@@ -781,13 +846,20 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Args:
             dataset_id: The ID of the `Dataset`.
-            dataset_name: The name of the `Dataset`.
+            dataset_name: The name of the `Dataset` (global scope, named storage).
+            dataset_alias: The alias of the `Dataset` (run scope, unnamed storage).
             kwargs: Keyword arguments to be passed to the `Dataset.get_data()` method.
 
         Returns:
             The retrieved data.
         """
-        dataset = await Dataset.open(id=dataset_id, name=dataset_name)
+        dataset = await Dataset.open(
+            id=dataset_id,
+            name=dataset_name,
+            alias=dataset_alias,
+            storage_client=self._service_locator.get_storage_client(),
+            configuration=self._service_locator.get_configuration(),
+        )
         return await dataset.get_data(**kwargs)
 
     async def export_data(
@@ -795,6 +867,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         path: str | Path,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
+        dataset_alias: str | None = None,
     ) -> None:
         """Export all items from a Dataset to a JSON or CSV file.
 
@@ -804,10 +877,17 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Args:
             path: The destination file path. Must end with '.json' or '.csv'.
-            dataset_id: The ID of the Dataset to export from. If None, uses `name` parameter instead.
-            dataset_name: The name of the Dataset to export from. If None, uses `id` parameter instead.
+            dataset_id: The ID of the Dataset to export from.
+            dataset_name: The name of the Dataset to export from (global scope, named storage).
+            dataset_alias: The alias of the Dataset to export from (run scope, unnamed storage).
         """
-        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
+        dataset = await Dataset.open(
+            id=dataset_id,
+            name=dataset_name,
+            alias=dataset_alias,
+            storage_client=self._service_locator.get_storage_client(),
+            configuration=self._service_locator.get_configuration(),
+        )
 
         path = path if isinstance(path, Path) else Path(path)
         dst = path.open('w', newline='')
@@ -824,6 +904,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         data: list[dict[str, Any]] | dict[str, Any],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
+        dataset_alias: str | None = None,
         **kwargs: Unpack[PushDataKwargs],
     ) -> None:
         """Push data to a `Dataset`.
@@ -834,10 +915,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Args:
             data: The data to push to the `Dataset`.
             dataset_id: The ID of the `Dataset`.
-            dataset_name: The name of the `Dataset`.
+            dataset_name: The name of the `Dataset` (global scope, named storage).
+            dataset_alias: The alias of the `Dataset` (run scope, unnamed storage).
             kwargs: Keyword arguments to be passed to the `Dataset.push_data()` method.
         """
-        dataset = await self.get_dataset(id=dataset_id, name=dataset_name)
+        dataset = await self.get_dataset(id=dataset_id, name=dataset_name, alias=dataset_alias)
         await dataset.push_data(data, **kwargs)
 
     def _should_retry_request(self, context: BasicCrawlingContext, error: Exception) -> bool:
@@ -894,6 +976,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             requests: Sequence[str | Request] | None = None,
+            rq_id: str | None = None,
+            rq_name: str | None = None,
+            rq_alias: str | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> None:
             kwargs.setdefault('strategy', 'same-hostname')
@@ -905,7 +990,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                         '`transform_request_function` arguments when `requests` is provided.'
                     )
                 # Add directly passed requests.
-                await context.add_requests(requests or list[str | Request](), **kwargs)
+                await context.add_requests(
+                    requests or list[str | Request](), rq_id=rq_id, rq_name=rq_name, rq_alias=rq_alias, **kwargs
+                )
             else:
                 # Add requests from extracted links.
                 await context.add_requests(
@@ -914,7 +1001,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                         label=label,
                         user_data=user_data,
                         transform_request_function=transform_request_function,
+                        **kwargs,
                     ),
+                    rq_id=rq_id,
+                    rq_name=rq_name,
+                    rq_alias=rq_alias,
                     **kwargs,
                 )
 
@@ -974,8 +1065,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return target_url.hostname == origin_url.hostname
 
         if strategy == 'same-domain':
-            origin_domain = self._tld_extractor.extract_str(origin_url.hostname).domain
-            target_domain = self._tld_extractor.extract_str(target_url.hostname).domain
+            origin_domain = self._tld_extractor.extract_str(origin_url.hostname).top_domain_under_public_suffix
+            target_domain = self._tld_extractor.extract_str(target_url.hostname).top_domain_under_public_suffix
             return origin_domain == target_domain
 
         if strategy == 'same-origin':
@@ -1031,8 +1122,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if self._should_retry_request(context, error):
             request.retry_count += 1
+            reduced_error = str(error).split('\n')[0]
             self.log.warning(
-                f'Retrying request to {context.request.url} due to: {error} \n'
+                f'Retrying request to {context.request.url} due to: {reduced_error}'
                 f'{get_one_line_error_summary_if_possible(error)}'
             )
             await self._statistics.error_tracker.add(error=error, context=context)
@@ -1057,7 +1149,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 max_retries=3,
             )
             await self._handle_failed_request(context, error)
-            self._statistics.record_request_processing_failure(request.id or request.unique_key)
+            self._statistics.record_request_processing_failure(request.unique_key)
 
     async def _handle_request_error(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
         try:
@@ -1186,34 +1278,46 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             else:
                 yield Request.from_url(url)
 
+    async def _add_requests(
+        self,
+        context: BasicCrawlingContext,
+        requests: Sequence[str | Request],
+        rq_id: str | None = None,
+        rq_name: str | None = None,
+        rq_alias: str | None = None,
+        **kwargs: Unpack[EnqueueLinksKwargs],
+    ) -> None:
+        """Add requests method aware of the crawling context."""
+        if rq_id or rq_name or rq_alias:
+            request_manager: RequestManager = await RequestQueue.open(
+                id=rq_id,
+                name=rq_name,
+                alias=rq_alias,
+                storage_client=self._service_locator.get_storage_client(),
+                configuration=self._service_locator.get_configuration(),
+            )
+        else:
+            request_manager = await self.get_request_manager()
+
+        context_aware_requests = list[Request]()
+        base_url = kwargs.get('base_url') or context.request.loaded_url or context.request.url
+        requests_iterator = self._convert_url_to_request_iterator(requests, base_url)
+        filter_requests_iterator = self._enqueue_links_filter_iterator(requests_iterator, context.request.url, **kwargs)
+        for dst_request in filter_requests_iterator:
+            # Update the crawl depth of the request.
+            dst_request.crawl_depth = context.request.crawl_depth + 1
+
+            if self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth:
+                context_aware_requests.append(dst_request)
+
+        return await request_manager.add_requests(context_aware_requests)
+
     async def _commit_request_handler_result(self, context: BasicCrawlingContext) -> None:
         """Commit request handler result for the input `context`. Result is taken from `_context_result_map`."""
         result = self._context_result_map[context]
 
-        request_manager = await self.get_request_manager()
-        origin = context.request.loaded_url or context.request.url
-
         for add_requests_call in result.add_requests_calls:
-            requests = list[Request]()
-
-            base_url = url if (url := add_requests_call.get('base_url')) else origin
-
-            requests_iterator = self._convert_url_to_request_iterator(add_requests_call['requests'], base_url)
-
-            enqueue_links_kwargs: EnqueueLinksKwargs = {k: v for k, v in add_requests_call.items() if k != 'requests'}  # type: ignore[assignment]
-
-            filter_requests_iterator = self._enqueue_links_filter_iterator(
-                requests_iterator, context.request.url, **enqueue_links_kwargs
-            )
-
-            for dst_request in filter_requests_iterator:
-                # Update the crawl depth of the request.
-                dst_request.crawl_depth = context.request.crawl_depth + 1
-
-                if self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth:
-                    requests.append(dst_request)
-
-            await request_manager.add_requests(requests)
+            await self._add_requests(context, **add_requests_call)
 
         for push_data_call in result.push_data_calls:
             await self._push_data(**push_data_call)
@@ -1225,8 +1329,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         result: RequestHandlerRunResult, get_kvs: GetKeyValueStoreFromRequestHandlerFunction
     ) -> None:
         """Store key value store changes recorded in result."""
-        for (id, name), changes in result.key_value_store_changes.items():
-            store = await get_kvs(id=id, name=name)
+        for (id, name, alias), changes in result.key_value_store_changes.items():
+            store = await get_kvs(id=id, name=name, alias=alias)
             for key, value in changes.updates.items():
                 await store.set_value(key, value.content, value.content_type)
 
@@ -1274,7 +1378,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if not (await self._is_allowed_based_on_robots_txt_file(request.url)):
             self._logger.warning(
-                f'Skipping request {request.url} ({request.id}) because it is disallowed based on robots.txt'
+                f'Skipping request {request.url} ({request.unique_key}) because it is disallowed based on robots.txt'
             )
 
             await self._handle_skipped_request(request, 'robots_txt', need_mark=True)
@@ -1300,8 +1404,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
         self._context_result_map[context] = result
 
-        statistics_id = request.id or request.unique_key
-        self._statistics.record_request_processing_start(statistics_id)
+        self._statistics.record_request_processing_start(request.unique_key)
 
         try:
             request.state = RequestState.REQUEST_HANDLER
@@ -1328,7 +1431,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             if context.session and context.session.is_usable:
                 context.session.mark_good()
 
-            self._statistics.record_request_processing_finish(statistics_id)
+            self._statistics.record_request_processing_finish(request.unique_key)
 
         except RequestCollisionError as request_error:
             context.request.no_retry = True
@@ -1353,7 +1456,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 await self._error_handler(context, session_error)
 
             if self._should_retry_request(context, session_error):
-                self._logger.warning('Encountered a session error, rotating session and retrying')
+                exc_only = ''.join(traceback.format_exception_only(session_error)).strip()
+                self._logger.warning('Encountered "%s", rotating session and retrying...', exc_only)
 
                 context.session.retire()
 
@@ -1373,7 +1477,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 )
 
                 await self._handle_failed_request(context, session_error)
-                self._statistics.record_request_processing_failure(statistics_id)
+                self._statistics.record_request_processing_failure(request.unique_key)
 
         except ContextPipelineInterruptedError as interrupted_error:
             self._logger.debug('The context pipeline was interrupted', exc_info=interrupted_error)
@@ -1519,7 +1623,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def _crawler_state_task(self) -> None:
         """Emit a persist state event with the given migration status."""
-        event_manager = service_locator.get_event_manager()
+        event_manager = self._service_locator.get_event_manager()
 
         current_state = self.statistics.state
 

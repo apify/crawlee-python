@@ -7,6 +7,7 @@ from yarl import URL
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from logging import Logger
 
 
 def is_url_absolute(url: str) -> bool:
@@ -22,13 +23,19 @@ def convert_to_absolute_url(base_url: str, relative_url: str) -> str:
     return str(URL(base_url).join(URL(relative_url)))
 
 
-def to_absolute_url_iterator(base_url: str, urls: Iterator[str]) -> Iterator[str]:
+def to_absolute_url_iterator(base_url: str, urls: Iterator[str], logger: Logger | None = None) -> Iterator[str]:
     """Convert an iterator of relative URLs to absolute URLs using a base URL."""
     for url in urls:
         if is_url_absolute(url):
             yield url
         else:
-            yield convert_to_absolute_url(base_url, url)
+            converted_url = convert_to_absolute_url(base_url, url)
+            # Skip the URL if conversion fails, probably due to an incorrect format, such as 'mailto:'.
+            if not is_url_absolute(converted_url):
+                if logger:
+                    logger.debug(f'Could not convert URL "{url}" to absolute using base URL "{base_url}". Skipping it.')
+                continue
+            yield converted_url
 
 
 _http_url_adapter = TypeAdapter(AnyHttpUrl)

@@ -50,7 +50,7 @@ apify login
 
 Now that you have your account set up, you will need to adjust the code a tiny bit. We will use the [Apify SDK](https://docs.apify.com/sdk/python/), which will help us to wire the Crawlee storages (like the [`RequestQueue`](https://docs.apify.com/sdk/python/reference/class/RequestQueue)) to their Apify platform counterparts - otherwise Crawlee would keep things only in memory.
 
-Open your `src/main.py` file, and wrap everyting in your `main` function with the [`Actor`](https://docs.apify.com/sdk/python/reference/class/Actor) context manager. Your code should look like this:
+Open your `src/main.py` file, and wrap everything in your `main` function with the [`Actor`](https://docs.apify.com/sdk/python/reference/class/Actor) context manager. Your code should look like this:
 
 <CodeBlock className="language-python" title="src/main.py">
     {MainExample}

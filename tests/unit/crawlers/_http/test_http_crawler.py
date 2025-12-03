@@ -126,9 +126,9 @@ async def test_handles_client_errors(
         pytest.param([], True, 4, 1, id='default_behavior'),
         # error without retry for all 4xx statuses
         pytest.param([], False, 0, 1, id='default_behavior_without_session_pool'),
-        # take as successful status codes from the `ignore_http_error_status_codes` list with Sessoion Pool
+        # take as successful status codes from the `ignore_http_error_status_codes` list with Session Pool
         pytest.param([403], True, 0, 0, id='ignore_error_status_codes'),
-        # take as successful status codes from the `ignore_http_error_status_codes` list without Sessoion Pool
+        # take as successful status codes from the `ignore_http_error_status_codes` list without Session Pool
         pytest.param([403], False, 0, 0, id='ignore_error_status_codes_without_session_pool'),
     ],
 )
@@ -381,7 +381,7 @@ async def test_isolation_cookies(http_client: HttpClient, server_url: URL) -> No
         ),
         http_client=http_client,
         max_request_retries=10,
-        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
     )
 
     @crawler.router.default_handler
@@ -565,11 +565,15 @@ async def test_error_snapshot_through_statistics(server_url: URL) -> None:
     kvs = await crawler.get_key_value_store()
     kvs_content = {}
     async for key_info in kvs.iterate_keys():
+        # Skip any non-error snapshot keys, e.g. __RQ_STATE_.
+        if 'ERROR_SNAPSHOT' not in key_info.key:
+            continue
         kvs_content[key_info.key] = await kvs.get_value(key_info.key)
 
     # One error, three time retried.
+    content_key = next(iter(kvs_content))
     assert crawler.statistics.error_tracker.total == 4
     assert crawler.statistics.error_tracker.unique_error_count == 1
     assert len(kvs_content) == 1
-    assert key_info.key.endswith('.html')
-    assert kvs_content[key_info.key] == HELLO_WORLD.decode('utf8')
+    assert content_key.endswith('.html')
+    assert kvs_content[content_key] == HELLO_WORLD.decode('utf8')

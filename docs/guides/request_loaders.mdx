@@ -10,11 +10,13 @@ import TabItem from '@theme/TabItem';
 import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
 import RlBasicExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/rl_basic_example.py';
-import SitemapExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/sitemap_example.py';
+import SitemapExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/sitemap_basic_example.py';
 import RlTandemExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/rl_tandem_example.py';
 import RlExplicitTandemExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/rl_tandem_example_explicit.py';
 import SitemapTandemExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/sitemap_tandem_example.py';
 import SitemapExplicitTandemExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/sitemap_tandem_example_explicit.py';
+import RlBasicPersistExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/rl_basic_example_with_persist.py';
+import SitemapPersistExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/sitemap_example_with_persist.py';
 
 The [`request_loaders`](https://github.com/apify/crawlee-python/tree/master/src/crawlee/request_loaders) sub-package extends the functionality of the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, providing additional tools for managing URLs and requests. If you are new to Crawlee and unfamiliar with the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, consider starting with the [Storages](https://crawlee.dev/python/docs/guides/storages) guide first. Request loaders define how requests are fetched and stored, enabling various use cases such as reading URLs from files, external APIs, or combining multiple sources together.
 
@@ -29,7 +31,7 @@ The [`request_loaders`](https://github.com/apify/crawlee-python/tree/master/src/
 And specific request loader implementations:
 
 - <ApiLink to="class/RequestList">`RequestList`</ApiLink>: A lightweight implementation for managing a static list of URLs.
-- <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink>: A specialized loader that reads URLs from XML sitemaps with filtering capabilities.
+- <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink>: A specialized loader that reads URLs from XML and plain-text sitemaps following the [Sitemaps protocol](https://www.sitemaps.org/protocol.html) with filtering capabilities.
 
 Below is a class diagram that illustrates the relationships between these components and the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>:
 
@@ -102,6 +104,10 @@ RequestManager --|> RequestManagerTandem
 
 The <ApiLink to="class/RequestLoader">`RequestLoader`</ApiLink> interface defines the foundation for fetching requests during a crawl. It provides abstract methods for basic operations like retrieving, marking, and checking the status of requests. Concrete implementations, such as <ApiLink to="class/RequestList">`RequestList`</ApiLink>, build on this interface to handle specific scenarios. You can create your own custom loader that reads from an external file, web endpoint, database, or any other specific data source. For more details, refer to the <ApiLink to="class/RequestLoader">`RequestLoader`</ApiLink> API reference.
 
+:::info NOTE
+To learn how to use request loaders in your crawlers, see the [Request manager tandem](#request-manager-tandem) section below.
+:::
+
 ### Request list
 
 The <ApiLink to="class/RequestList">`RequestList`</ApiLink> can accept an asynchronous generator as input, allowing requests to be streamed rather than loading them all into memory at once. This can significantly reduce memory usage, especially when working with large sets of URLs.
@@ -112,13 +118,39 @@ Here is a basic example of working with the <ApiLink to="class/RequestList">`Req
     {RlBasicExample}
 </RunnableCodeBlock>
 
+### Request list with persistence
+
+The <ApiLink to="class/RequestList">`RequestList`</ApiLink> supports state persistence, allowing it to resume from where it left off after interruption. This is particularly useful for long-running crawls or when you need to pause and resume crawling later.
+
+To enable persistence, provide `persist_state_key` and optionally `persist_requests_key` parameters, and disable automatic cleanup by setting `purge_on_start = False` in the configuration. The `persist_state_key` saves the loader's progress, while `persist_requests_key` ensures that the request data doesn't change between runs. For more details on resuming interrupted crawls, see the [Resuming a paused crawl](../examples/resuming-paused-crawl) example.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {RlBasicPersistExample}
+</RunnableCodeBlock>
+
 ### Sitemap request loader
 
-The <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> is a specialized request loader that reads URLs from XML sitemaps. It's particularly useful when you want to crawl a website systematically by following its sitemap structure. The loader supports filtering URLs using glob patterns and regular expressions, allowing you to include or exclude specific types of URLs. The <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> provides streaming processing of sitemaps, ensuring efficient memory usage without loading the entire sitemap into memory.
+The <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> is a specialized request loader that reads URLs from sitemaps following the [Sitemaps protocol](https://www.sitemaps.org/protocol.html). It supports both XML and plain text sitemap formats. It's particularly useful when you want to crawl a website systematically by following its sitemap structure.
+
+:::note
+The `SitemapRequestLoader` is designed specifically for sitemaps that follow the standard Sitemaps protocol. HTML pages containing links are not supported by this loader - those should be handled by regular crawlers using the `enqueue_links` functionality.
+:::
+
+The loader supports filtering URLs using glob patterns and regular expressions, allowing you to include or exclude specific types of URLs. The <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> provides streaming processing of sitemaps, ensuring efficient memory usage without loading the entire sitemap into memory.
 
 <RunnableCodeBlock className="language-python" language="python">
     {SitemapExample}
 </RunnableCodeBlock>
+
+### Sitemap request loader with persistence
+
+Similarly, the <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> supports state persistence to resume processing from where it left off. This is especially valuable when processing large sitemaps that may take considerable time to complete.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {SitemapPersistExample}
+</RunnableCodeBlock>
+
+When using persistence with `SitemapRequestLoader`, make sure to use the context manager (`async with`) to properly save the state when the work is completed.
 
 ## Request managers
 

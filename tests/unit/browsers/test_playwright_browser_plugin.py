@@ -60,12 +60,22 @@ async def test_methods_raise_error_when_not_active() -> None:
 
     assert plugin.active is False
 
-    with pytest.raises(RuntimeError, match='Plugin is not active'):
+    with pytest.raises(RuntimeError, match=r'Plugin is not active'):
         await plugin.new_browser()
 
-    with pytest.raises(RuntimeError, match='Plugin is already active.'):
+    with pytest.raises(RuntimeError, match=r'Plugin is already active.'):
         async with plugin, plugin:
             pass
 
     async with plugin:
         assert plugin.active is True
+
+
+async def raise_error_if_chrome_and_executable_path() -> None:
+    with pytest.raises(
+        ValueError, match=r'Cannot use `use_chrome` with `Configuration.default_browser_path` or `executable_path` set.'
+    ):
+        PlaywrightBrowserPlugin(
+            browser_type='chrome',
+            browser_launch_options={'executable_path': '/path/to/chrome'},
+        )

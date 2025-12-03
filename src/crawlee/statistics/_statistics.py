@@ -1,6 +1,7 @@
 # Inspiration: https://github.com/apify/crawlee/blob/v3.9.2/packages/core/src/crawlers/statistics.ts
 from __future__ import annotations
 
+import asyncio
 import math
 import time
 from datetime import datetime, timedelta, timezone
@@ -17,7 +18,10 @@ from crawlee.statistics import FinalStatistics, StatisticsState
 from crawlee.statistics._error_tracker import ErrorTracker
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
     from types import TracebackType
+
+    from crawlee.storages import KeyValueStore
 
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 TNewStatisticsState = TypeVar('TNewStatisticsState', bound=StatisticsState, default=StatisticsState)
@@ -70,6 +74,7 @@ class Statistics(Generic[TStatisticsState]):
         persistence_enabled: bool | Literal['explicit_only'] = False,
         persist_state_kvs_name: str | None = None,
         persist_state_key: str | None = None,
+        persist_state_kvs_factory: Callable[[], Coroutine[None, None, KeyValueStore]] | None = None,
         log_message: str = 'Statistics',
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
@@ -79,8 +84,6 @@ class Statistics(Generic[TStatisticsState]):
     ) -> None:
         self._id = Statistics.__next_id
         Statistics.__next_id += 1
-
-        self._instance_start: datetime | None = None
 
         self.error_tracker = ErrorTracker(
             save_error_snapshots=save_error_snapshots,
@@ -92,9 +95,10 @@ class Statistics(Generic[TStatisticsState]):
 
         self._state = RecoverableState(
             default_state=state_model(stats_id=self._id),
-            persist_state_key=persist_state_key or f'SDK_CRAWLER_STATISTICS_{self._id}',
+            persist_state_key=persist_state_key or f'__CRAWLER_STATISTICS_{self._id}',
             persistence_enabled=persistence_enabled,
             persist_state_kvs_name=persist_state_kvs_name,
+            persist_state_kvs_factory=persist_state_kvs_factory,
             logger=logger,
         )
 
@@ -110,8 +114,8 @@ class Statistics(Generic[TStatisticsState]):
         """Create near copy of the `Statistics` with replaced `state_model`."""
         new_statistics: Statistics[TNewStatisticsState] = Statistics(
             persistence_enabled=self._state._persistence_enabled,  # noqa: SLF001
-            persist_state_kvs_name=self._state._persist_state_kvs_name,  # noqa: SLF001
             persist_state_key=self._state._persist_state_key,  # noqa: SLF001
+            persist_state_kvs_factory=self._state._persist_state_kvs_factory,  # noqa: SLF001
             log_message=self._log_message,
             periodic_message_logger=self._periodic_message_logger,
             state_model=state_model,
@@ -125,6 +129,7 @@ class Statistics(Generic[TStatisticsState]):
         persistence_enabled: bool = False,
         persist_state_kvs_name: str | None = None,
         persist_state_key: str | None = None,
+        persist_state_kvs_factory: Callable[[], Coroutine[None, None, KeyValueStore]] | None = None,
         log_message: str = 'Statistics',
         periodic_message_logger: Logger | None = None,
         log_interval: timedelta = timedelta(minutes=1),
@@ -136,6 +141,7 @@ class Statistics(Generic[TStatisticsState]):
             persistence_enabled=persistence_enabled,
             persist_state_kvs_name=persist_state_kvs_name,
             persist_state_key=persist_state_key,
+            persist_state_kvs_factory=persist_state_kvs_factory,
             log_message=log_message,
             periodic_message_logger=periodic_message_logger,
             log_interval=log_interval,
@@ -158,14 +164,17 @@ class Statistics(Generic[TStatisticsState]):
         if self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is already active.')
 
-        self._active = True
-        self._instance_start = datetime.now(timezone.utc)
-
         await self._state.initialize()
-        self._after_initialize()
+        # Reset `crawler_finished_at` to indicate a new run in progress.
+        self.state.crawler_finished_at = None
 
+        # Start periodic logging and let it print initial state before activation.
         self._periodic_logger.start()
+        await asyncio.sleep(0.01)
+        self._active = True
 
+        self.state.crawler_last_started_at = datetime.now(timezone.utc)
+        self.state.crawler_started_at = self.state.crawler_started_at or self.state.crawler_last_started_at
         return self
 
     async def __aexit__(
@@ -182,13 +191,14 @@ class Statistics(Generic[TStatisticsState]):
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        self._state.current_value.crawler_finished_at = datetime.now(timezone.utc)
+        if not self.state.crawler_last_started_at:
+            raise RuntimeError('Statistics.state.crawler_last_started_at not set.')
 
-        await self._state.teardown()
-
+        # Stop logging and deactivate the statistics to prevent further changes to crawler_runtime
         await self._periodic_logger.stop()
-
+        self.state.crawler_finished_at = datetime.now(timezone.utc)
         self._active = False
+        await self._state.teardown()
 
     @property
     def state(self) -> TStatisticsState:
@@ -247,11 +257,7 @@ class Statistics(Generic[TStatisticsState]):
 
     def calculate(self) -> FinalStatistics:
         """Calculate the current statistics."""
-        if self._instance_start is None:
-            raise RuntimeError('The Statistics object is not initialized')
-
-        crawler_runtime = datetime.now(timezone.utc) - self._instance_start
-        total_minutes = crawler_runtime.total_seconds() / 60
+        total_minutes = self.state.crawler_runtime.total_seconds() / 60
         state = self._state.current_value
         serialized_state = state.model_dump(by_alias=False)
 
@@ -262,7 +268,7 @@ class Statistics(Generic[TStatisticsState]):
             requests_failed_per_minute=math.floor(state.requests_failed / total_minutes) if total_minutes else 0,
             request_total_duration=state.request_total_finished_duration + state.request_total_failed_duration,
             requests_total=state.requests_failed + state.requests_finished,
-            crawler_runtime=crawler_runtime,
+            crawler_runtime=state.crawler_runtime,
             requests_finished=state.requests_finished,
             requests_failed=state.requests_failed,
             retry_histogram=serialized_state['request_retry_histogram'],
@@ -281,21 +287,6 @@ class Statistics(Generic[TStatisticsState]):
             self._periodic_message_logger.info(f'{self._log_message}\n{stats.to_table()}')
         else:
             self._periodic_message_logger.info(self._log_message, extra=stats.to_dict())
-
-    def _after_initialize(self) -> None:
-        state = self._state.current_value
-
-        if state.crawler_started_at is None:
-            state.crawler_started_at = datetime.now(timezone.utc)
-
-        if state.stats_persisted_at is not None and state.crawler_last_started_at:
-            self._instance_start = datetime.now(timezone.utc) - (
-                state.stats_persisted_at - state.crawler_last_started_at
-            )
-        elif state.crawler_last_started_at:
-            self._instance_start = state.crawler_last_started_at
-
-        state.crawler_last_started_at = self._instance_start
 
     def _save_retry_count_for_request(self, record: RequestProcessingRecord) -> None:
         retry_count = record.retry_count

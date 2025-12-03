@@ -5,7 +5,7 @@ from crawlee.crawlers import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawli
 
 
 async def main() -> None:
-    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser()
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser()
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent
 import json
 import logging
 import os
@@ -10,6 +11,7 @@ import time
 from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
+from itertools import product
 from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, Mock, call, patch
 
@@ -27,7 +29,7 @@ from crawlee.events._local_event_manager import LocalEventManager
 from crawlee.request_loaders import RequestList, RequestManagerTandem
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics
-from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 if TYPE_CHECKING:
@@ -226,7 +228,7 @@ async def test_calls_error_handler() -> None:
         assert isinstance(error_call.error, RuntimeError)
 
 
-async def test_calls_error_handler_for_sesion_errors() -> None:
+async def test_calls_error_handler_for_session_errors() -> None:
     crawler = BasicCrawler(
         max_session_rotations=1,
     )
@@ -280,6 +282,46 @@ async def test_calls_failed_request_handler() -> None:
     assert len(calls) == 1
     assert calls[0][0].request.url == 'https://b.placeholder.com'
     assert isinstance(calls[0][1], RuntimeError)
+
+
+@pytest.mark.parametrize('handler', ['failed_request_handler', 'error_handler'])
+async def test_handlers_use_context_helpers(tmp_path: Path, handler: str) -> None:
+    """Test that context helpers used in `failed_request_handler` and in `error_handler` have effect."""
+    # Prepare crawler
+    storage_client = FileSystemStorageClient()
+    crawler = BasicCrawler(
+        max_request_retries=1, storage_client=storage_client, configuration=Configuration(storage_dir=str(tmp_path))
+    )
+    # Test data
+    rq_alias = 'other'
+    test_data = {'some': 'data'}
+    test_key = 'key'
+    test_value = 'value'
+    test_request = Request.from_url('https://d.placeholder.com')
+
+    # Request handler with injected error
+    @crawler.router.default_handler
+    async def request_handler(context: BasicCrawlingContext) -> None:
+        raise RuntimeError('Arbitrary crash for testing purposes')
+
+    # Apply one of the handlers
+    @getattr(crawler, handler)  # type:ignore[misc] # Untyped decorator is ok to make the test concise
+    async def handler_implementation(context: BasicCrawlingContext, error: Exception) -> None:
+        await context.push_data(test_data)
+        await context.add_requests(requests=[test_request], rq_alias=rq_alias)
+        kvs = await context.get_key_value_store()
+        await kvs.set_value(test_key, test_value)
+
+    await crawler.run(['https://b.placeholder.com'])
+
+    # Verify that the context helpers used in handlers had effect on used storages
+    dataset = await Dataset.open(storage_client=storage_client)
+    kvs = await KeyValueStore.open(storage_client=storage_client)
+    rq = await RequestQueue.open(alias=rq_alias, storage_client=storage_client)
+
+    assert test_value == await kvs.get_value(test_key)
+    assert [test_data] == (await dataset.get_data()).items
+    assert test_request == await rq.fetch_next_request()
 
 
 async def test_handles_error_in_failed_request_handler() -> None:
@@ -345,6 +387,7 @@ STRATEGY_TEST_URLS = (
     'https://blog.someplace.com/index.html',
     'https://redirect.someplace.com',
     'https://other.place.com/index.html',
+    'https://someplace.jp/',
 )
 
 INCLUDE_TEST_URLS = (
@@ -399,7 +442,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 loaded_url=STRATEGY_TEST_URLS[0],
-                requests=STRATEGY_TEST_URLS[:4],
+                requests=STRATEGY_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(strategy='same-domain'),
                 expected_urls=STRATEGY_TEST_URLS[1:4],
             ),
@@ -409,7 +452,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 loaded_url=STRATEGY_TEST_URLS[0],
-                requests=STRATEGY_TEST_URLS[:4],
+                requests=STRATEGY_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(strategy='same-hostname'),
                 expected_urls=[STRATEGY_TEST_URLS[1]],
             ),
@@ -419,7 +462,7 @@ INCLUDE_TEST_URLS = (
             AddRequestsTestInput(
                 start_url=STRATEGY_TEST_URLS[0],
                 loaded_url=STRATEGY_TEST_URLS[0],
-                requests=STRATEGY_TEST_URLS[:4],
+                requests=STRATEGY_TEST_URLS,
                 kwargs=EnqueueLinksKwargs(strategy='same-origin'),
                 expected_urls=[],
             ),
@@ -798,7 +841,7 @@ async def test_max_requests_per_crawl() -> None:
 
     # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
     crawler = BasicCrawler(
-        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
         max_requests_per_crawl=3,
     )
 
@@ -819,7 +862,7 @@ async def test_max_crawl_depth() -> None:
 
     # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
     crawler = BasicCrawler(
-        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
         max_crawl_depth=2,
     )
 
@@ -858,7 +901,10 @@ async def test_abort_on_error(
 ) -> None:
     starts_urls = []
 
-    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=1), abort_on_error=True)
+    crawler = BasicCrawler(
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+        abort_on_error=True,
+    )
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -951,18 +997,18 @@ async def test_logs_final_statistics(
     if statistics_log_format == 'table':
         assert final_statistics.msg.splitlines() == [
             'Final request statistics:',
-            '┌───────────────────────────────┬───────────┐',
-            '│ requests_finished             │ 4         │',
-            '│ requests_failed               │ 33        │',
-            '│ retry_histogram               │ [1, 4, 8] │',
-            '│ request_avg_failed_duration   │ 99.0      │',
-            '│ request_avg_finished_duration │ 0.483     │',
-            '│ requests_finished_per_minute  │ 0.33      │',
-            '│ requests_failed_per_minute    │ 0.1       │',
-            '│ request_total_duration        │ 720.0     │',
-            '│ requests_total                │ 37        │',
-            '│ crawler_runtime               │ 300.0     │',
-            '└───────────────────────────────┴───────────┘',
+            '┌───────────────────────────────┬────────────┐',
+            '│ requests_finished             │ 4          │',
+            '│ requests_failed               │ 33         │',
+            '│ retry_histogram               │ [1, 4, 8]  │',
+            '│ request_avg_failed_duration   │ 1min 39.0s │',
+            '│ request_avg_finished_duration │ 483.0ms    │',
+            '│ requests_finished_per_minute  │ 0.33       │',
+            '│ requests_failed_per_minute    │ 0.1        │',
+            '│ request_total_duration        │ 12min      │',
+            '│ requests_total                │ 37         │',
+            '│ crawler_runtime               │ 5min       │',
+            '└───────────────────────────────┴────────────┘',
         ]
     else:
         assert final_statistics.msg == 'Final request statistics:'
@@ -990,7 +1036,7 @@ async def test_crawler_manual_stop() -> None:
     processed_urls = []
 
     # Set max_concurrency to 1 to ensure testing urls are visited one by one in order.
-    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=1))
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1))
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -1017,8 +1063,8 @@ async def test_crawler_multiple_stops_in_parallel() -> None:
     ]
     processed_urls = []
 
-    # Set max_concurrency to 2 to ensure two urls are being visited in parallel.
-    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(max_concurrency=2))
+    # Set concurrency to 2 to ensure two urls are being visited in parallel.
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=2, max_concurrency=2))
 
     both_handlers_started = asyncio.Barrier(2)  # type:ignore[attr-defined]  # Test is skipped in older Python versions.
     only_one_handler_at_a_time = asyncio.Semaphore(1)
@@ -1040,7 +1086,7 @@ async def test_crawler_multiple_stops_in_parallel() -> None:
     assert stats.requests_finished == 2
 
 
-async def test_sets_services() -> None:
+async def test_services_no_side_effect_on_crawler_init() -> None:
     custom_configuration = Configuration()
     custom_event_manager = LocalEventManager.from_config(custom_configuration)
     custom_storage_client = MemoryStorageClient()
@@ -1051,9 +1097,125 @@ async def test_sets_services() -> None:
         storage_client=custom_storage_client,
     )
 
-    assert service_locator.get_configuration() is custom_configuration
-    assert service_locator.get_event_manager() is custom_event_manager
-    assert service_locator.get_storage_client() is custom_storage_client
+    assert service_locator.get_configuration() is not custom_configuration
+    assert service_locator.get_event_manager() is not custom_event_manager
+    assert service_locator.get_storage_client() is not custom_storage_client
+
+
+async def test_crawler_uses_default_services() -> None:
+    custom_configuration = Configuration()
+    service_locator.set_configuration(custom_configuration)
+
+    custom_event_manager = LocalEventManager.from_config(custom_configuration)
+    service_locator.set_event_manager(custom_event_manager)
+
+    custom_storage_client = MemoryStorageClient()
+    service_locator.set_storage_client(custom_storage_client)
+
+    basic_crawler = BasicCrawler()
+
+    assert basic_crawler._service_locator.get_configuration() is custom_configuration
+    assert basic_crawler._service_locator.get_event_manager() is custom_event_manager
+    assert basic_crawler._service_locator.get_storage_client() is custom_storage_client
+
+
+async def test_services_crawlers_can_use_different_services() -> None:
+    custom_configuration_1 = Configuration()
+    custom_event_manager_1 = LocalEventManager.from_config(custom_configuration_1)
+    custom_storage_client_1 = MemoryStorageClient()
+
+    custom_configuration_2 = Configuration()
+    custom_event_manager_2 = LocalEventManager.from_config(custom_configuration_2)
+    custom_storage_client_2 = MemoryStorageClient()
+
+    _ = BasicCrawler(
+        configuration=custom_configuration_1,
+        event_manager=custom_event_manager_1,
+        storage_client=custom_storage_client_1,
+    )
+
+    _ = BasicCrawler(
+        configuration=custom_configuration_2,
+        event_manager=custom_event_manager_2,
+        storage_client=custom_storage_client_2,
+    )
+
+
+async def test_crawler_uses_default_storages(tmp_path: Path) -> None:
+    configuration = Configuration(
+        storage_dir=str(tmp_path),
+        purge_on_start=True,
+    )
+    service_locator.set_configuration(configuration)
+
+    dataset = await Dataset.open()
+    kvs = await KeyValueStore.open()
+    rq = await RequestQueue.open()
+
+    crawler = BasicCrawler()
+
+    assert dataset is await crawler.get_dataset()
+    assert kvs is await crawler.get_key_value_store()
+    assert rq is await crawler.get_request_manager()
+
+
+async def test_crawler_can_use_other_storages(tmp_path: Path) -> None:
+    configuration = Configuration(
+        storage_dir=str(tmp_path),
+        purge_on_start=True,
+    )
+    service_locator.set_configuration(configuration)
+
+    dataset = await Dataset.open()
+    kvs = await KeyValueStore.open()
+    rq = await RequestQueue.open()
+
+    crawler = BasicCrawler(storage_client=MemoryStorageClient())
+
+    assert dataset is not await crawler.get_dataset()
+    assert kvs is not await crawler.get_key_value_store()
+    assert rq is not await crawler.get_request_manager()
+
+
+async def test_crawler_can_use_other_storages_of_same_type(tmp_path: Path) -> None:
+    """Test that crawler can use non-global storage of the same type as global storage without conflicts"""
+    a_path = tmp_path / 'a'
+    b_path = tmp_path / 'b'
+    a_path.mkdir()
+    b_path.mkdir()
+    expected_paths = {
+        path / storage
+        for path, storage in product({a_path, b_path}, {'datasets', 'key_value_stores', 'request_queues'})
+    }
+
+    configuration_a = Configuration(
+        storage_dir=str(a_path),
+        purge_on_start=True,
+    )
+    configuration_b = Configuration(
+        storage_dir=str(b_path),
+        purge_on_start=True,
+    )
+
+    # Set global configuration
+    service_locator.set_configuration(configuration_a)
+    service_locator.set_storage_client(FileSystemStorageClient())
+    # Create storages based on the global services
+    dataset = await Dataset.open()
+    kvs = await KeyValueStore.open()
+    rq = await RequestQueue.open()
+
+    # Set the crawler to use different storage client
+    crawler = BasicCrawler(storage_client=FileSystemStorageClient(), configuration=configuration_b)
+
+    # Assert that the storages are different
+    assert dataset is not await crawler.get_dataset()
+    assert kvs is not await crawler.get_key_value_store()
+    assert rq is not await crawler.get_request_manager()
+
+    # Assert that all storages exists on the filesystem
+    for path in expected_paths:
+        assert path.is_dir()
 
 
 async def test_allows_storage_client_overwrite_before_run(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1181,7 +1343,7 @@ async def test_keep_alive(
         keep_alive=keep_alive,
         max_requests_per_crawl=max_requests_per_crawl,
         # If more request can run in parallel, then max_requests_per_crawl is not deterministic.
-        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
     )
     mocked_handler = Mock()
 
@@ -1368,7 +1530,7 @@ async def test_reduced_logs_from_timed_out_request_handler(caplog: pytest.LogCap
     for record in caplog.records:
         if record.message and 'timed out after 1.0 seconds' in record.message:
             full_message = (record.message or '') + (record.exc_text or '')
-            assert Counter(full_message)['\n'] < 10
+            assert '\n' not in full_message
             assert '# INJECTED DELAY' in full_message
             found_timeout_message = True
             break
@@ -1384,7 +1546,7 @@ async def test_status_message_callback() -> None:
     async def status_callback(
         state: StatisticsState, previous_state: StatisticsState | None, message: str
     ) -> str | None:
-        status_message_callback(message)
+        await status_message_callback(message)
         states.append({'state': state, 'previous_state': previous_state})
         return message
 
@@ -1432,3 +1594,177 @@ async def test_status_message_emit() -> None:
     event_manager.off(event=Event.CRAWLER_STATUS, listener=listener)
 
     assert status_message_listener.called
+
+
+@pytest.mark.parametrize(
+    ('queue_name', 'queue_alias', 'by_id'),
+    [
+        pytest.param('named-queue', None, False, id='with rq_name'),
+        pytest.param(None, 'alias-queue', False, id='with rq_alias'),
+        pytest.param('id-queue', None, True, id='with rq_id'),
+    ],
+)
+async def test_add_requests_with_rq_param(queue_name: str | None, queue_alias: str | None, *, by_id: bool) -> None:
+    crawler = BasicCrawler()
+    rq = await RequestQueue.open(name=queue_name, alias=queue_alias)
+    if by_id:
+        queue_id = rq.id
+        queue_name = None
+    else:
+        queue_id = None
+    visit_urls = set()
+
+    check_requests = [
+        Request.from_url('https://a.placeholder.com'),
+        Request.from_url('https://b.placeholder.com'),
+        Request.from_url('https://c.placeholder.com'),
+    ]
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visit_urls.add(context.request.url)
+        await context.add_requests(check_requests, rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
+
+    await crawler.run(['https://start.placeholder.com'])
+
+    requests_from_queue = []
+    while request := await rq.fetch_next_request():
+        requests_from_queue.append(request)
+
+    assert requests_from_queue == check_requests
+    assert visit_urls == {'https://start.placeholder.com'}
+
+    await rq.drop()
+
+
+@pytest.mark.parametrize(
+    ('queue_name', 'queue_alias', 'queue_id'),
+    [
+        pytest.param('named-queue', 'alias-queue', None, id='rq_name and rq_alias'),
+        pytest.param('named-queue', None, 'id-queue', id='rq_name and rq_id'),
+        pytest.param(None, 'alias-queue', 'id-queue', id='rq_alias and rq_id'),
+        pytest.param('named-queue', 'alias-queue', 'id-queue', id='rq_name and rq_alias and rq_id'),
+    ],
+)
+async def test_add_requests_error_with_multi_params(
+    queue_id: str | None, queue_name: str | None, queue_alias: str | None
+) -> None:
+    crawler = BasicCrawler()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        with pytest.raises(ValueError, match='Only one of `rq_id`, `rq_name` or `rq_alias` can be set'):
+            await context.add_requests(
+                [Request.from_url('https://a.placeholder.com')],
+                rq_id=queue_id,
+                rq_name=queue_name,
+                rq_alias=queue_alias,
+            )
+
+    await crawler.run(['https://start.placeholder.com'])
+
+
+async def test_crawler_purge_request_queue_uses_same_storage_client() -> None:
+    """Make sure that purge on start does not replace the storage client in the underlying storage manager"""
+
+    # Set some different storage_client globally and different for Crawlee.
+    service_locator.set_storage_client(FileSystemStorageClient())
+    unrelated_rq = await RequestQueue.open()
+    unrelated_request = Request.from_url('https://x.placeholder.com')
+    await unrelated_rq.add_request(unrelated_request)
+
+    crawler = BasicCrawler(storage_client=MemoryStorageClient())
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        context.log.info(context.request.url)
+
+    for _ in (1, 2):
+        await crawler.run(requests=[Request.from_url('https://a.placeholder.com')], purge_request_queue=True)
+        assert crawler.statistics.state.requests_finished == 1
+
+    # Crawler should not fall back to the default storage after the purge
+    assert await unrelated_rq.fetch_next_request() == unrelated_request
+
+
+async def _run_crawler(requests: list[str], storage_dir: str) -> StatisticsState:
+    """Run crawler and return its statistics state.
+
+    Must be defined like this to be pickable for ProcessPoolExecutor."""
+    service_locator.set_configuration(
+        Configuration(
+            storage_dir=storage_dir,
+            purge_on_start=False,
+        )
+    )
+
+    async def request_handler(context: BasicCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url} ...')
+
+    crawler = BasicCrawler(
+        request_handler=request_handler,
+        concurrency_settings=ConcurrencySettings(max_concurrency=1, desired_concurrency=1),
+    )
+
+    await crawler.run(requests)
+    return crawler.statistics.state
+
+
+def _process_run_crawler(requests: list[str], storage_dir: str) -> StatisticsState:
+    return asyncio.run(_run_crawler(requests=requests, storage_dir=storage_dir))
+
+
+async def test_crawler_statistics_persistence(tmp_path: Path) -> None:
+    """Test that crawler statistics persist and are loaded correctly.
+
+    This test simulates starting the crawler process twice, and checks that the statistics include first run."""
+
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        # Crawl 2 requests in the first run and automatically persist the state.
+        first_run_state = executor.submit(
+            _process_run_crawler,
+            requests=['https://a.placeholder.com', 'https://b.placeholder.com'],
+            storage_dir=str(tmp_path),
+        ).result()
+        assert first_run_state.requests_finished == 2
+
+    # Do not reuse the executor to simulate a fresh process to avoid modified class attributes.
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        # Crawl 1 additional requests in the second run, but use previously automatically persisted state.
+        second_run_state = executor.submit(
+            _process_run_crawler, requests=['https://c.placeholder.com'], storage_dir=str(tmp_path)
+        ).result()
+        assert second_run_state.requests_finished == 3
+
+    assert first_run_state.crawler_started_at == second_run_state.crawler_started_at
+    assert first_run_state.crawler_finished_at
+    assert second_run_state.crawler_finished_at
+
+    assert first_run_state.crawler_finished_at < second_run_state.crawler_finished_at
+    assert first_run_state.crawler_runtime < second_run_state.crawler_runtime
+
+
+async def test_crawler_intermediate_statistics() -> None:
+    """Test that crawler statistics are correctly updating total runtime on every calculate call."""
+    crawler = BasicCrawler()
+    check_time = timedelta(seconds=0.1)
+
+    async def wait_for_statistics_initialization() -> None:
+        while not crawler.statistics.active:  # noqa: ASYNC110 # It is ok for tests.
+            await asyncio.sleep(0.1)
+
+    @crawler.router.default_handler
+    async def handler(_: BasicCrawlingContext) -> None:
+        await asyncio.sleep(check_time.total_seconds() * 5)
+
+    # Start crawler and wait until statistics are initialized.
+    crawler_task = asyncio.create_task(crawler.run(['https://a.placeholder.com']))
+    await wait_for_statistics_initialization()
+
+    # Wait some time and check that runtime is updated.
+    await asyncio.sleep(check_time.total_seconds())
+    crawler.statistics.calculate()
+    assert crawler.statistics.state.crawler_runtime >= check_time
+
+    # Wait for crawler to finish
+    await crawler_task

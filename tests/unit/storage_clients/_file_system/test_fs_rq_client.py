@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee import Request
+from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import FileSystemStorageClient
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -20,27 +20,23 @@ if TYPE_CHECKING:
 @pytest.fixture
 def configuration(tmp_path: Path) -> Configuration:
     return Configuration(
-        crawlee_storage_dir=str(tmp_path),  # type: ignore[call-arg]
+        storage_dir=str(tmp_path),
     )
 
 
 @pytest.fixture
-async def rq_client(configuration: Configuration) -> AsyncGenerator[FileSystemRequestQueueClient, None]:
+async def rq_client() -> AsyncGenerator[FileSystemRequestQueueClient, None]:
     """A fixture for a file system request queue client."""
     client = await FileSystemStorageClient().create_rq_client(
-        name='test_request_queue',
-        configuration=configuration,
+        name='test-request-queue',
     )
     yield client
     await client.drop()
 
 
-async def test_file_and_directory_creation(configuration: Configuration) -> None:
+async def test_file_and_directory_creation() -> None:
     """Test that file system RQ creates proper files and directories."""
-    client = await FileSystemStorageClient().create_rq_client(
-        name='new_request_queue',
-        configuration=configuration,
-    )
+    client = await FileSystemStorageClient().create_rq_client(name='new-request-queue')
 
     # Verify files were created
     assert client.path_to_rq.exists()
@@ -50,7 +46,7 @@ async def test_file_and_directory_creation(configuration: Configuration) -> None
     with client.path_to_metadata.open() as f:
         metadata = json.load(f)
         assert metadata['id'] == (await client.get_metadata()).id
-        assert metadata['name'] == 'new_request_queue'
+        assert metadata['name'] == 'new-request-queue'
 
     await client.drop()
 
@@ -80,6 +76,14 @@ async def test_request_file_persistence(rq_client: FileSystemRequestQueueClient)
             request_data = json.load(f)
             assert 'url' in request_data
             assert request_data['url'].startswith('https://example.com/')
+
+
+async def test_opening_rq_does_not_have_side_effect_on_service_locator(configuration: Configuration) -> None:
+    """Opening request queue client should cause setting storage client in the global service locator."""
+    await FileSystemStorageClient().create_rq_client(name='test_request_queue', configuration=configuration)
+
+    # Set some specific storage client in the service locator. There should be no `ServiceConflictError`.
+    service_locator.set_storage_client(MemoryStorageClient())
 
 
 async def test_drop_removes_directory(rq_client: FileSystemRequestQueueClient) -> None:
@@ -135,14 +139,13 @@ async def test_metadata_file_updates(rq_client: FileSystemRequestQueueClient) ->
         assert metadata_json['total_request_count'] == 1
 
 
-async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
+async def test_data_persistence_across_reopens() -> None:
     """Test that requests persist correctly when reopening the same RQ."""
     storage_client = FileSystemStorageClient()
 
     # Create RQ and add requests
     original_client = await storage_client.create_rq_client(
         name='persistence-test',
-        configuration=configuration,
     )
 
     test_requests = [
@@ -156,7 +159,6 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
     # Reopen by ID and verify requests persist
     reopened_client = await storage_client.create_rq_client(
         id=rq_id,
-        configuration=configuration,
     )
 
     metadata = await reopened_client.get_metadata()

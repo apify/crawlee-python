@@ -58,7 +58,7 @@ class DatasetClient(ABC):
         desc: bool = False,
         fields: list[str] | None = None,
         omit: list[str] | None = None,
-        unwind: str | None = None,
+        unwind: list[str] | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
         flatten: list[str] | None = None,
@@ -79,7 +79,7 @@ class DatasetClient(ABC):
         desc: bool = False,
         fields: list[str] | None = None,
         omit: list[str] | None = None,
-        unwind: str | None = None,
+        unwind: list[str] | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
     ) -> AsyncIterator[dict[str, Any]]:

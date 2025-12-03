@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
@@ -11,6 +12,9 @@ from typing_extensions import override
 from crawlee._utils.console import make_table
 from crawlee._utils.docs import docs_group
 from crawlee._utils.models import timedelta_ms
+from crawlee._utils.time import format_duration
+
+_STATISTICS_TABLE_WIDTH = 100
 
 
 @dataclass(frozen=True)
@@ -31,9 +35,14 @@ class FinalStatistics:
 
     def to_table(self) -> str:
         """Print out the Final Statistics data as a table."""
-        str_dict = {k: v.total_seconds() if isinstance(v, timedelta) else v for k, v in asdict(self).items()}
+        formatted_dict = {}
+        for k, v in asdict(self).items():
+            if isinstance(v, timedelta):
+                formatted_dict[k] = format_duration(v)
+            else:
+                formatted_dict[k] = v
 
-        return make_table([(str(k), str(v)) for k, v in str_dict.items()], width=60)
+        return make_table([(str(k), str(v)) for k, v in formatted_dict.items()], width=_STATISTICS_TABLE_WIDTH)
 
     def to_dict(self) -> dict[str, float | int | list[int]]:
         return {k: v.total_seconds() if isinstance(v, timedelta) else v for k, v in asdict(self).items()}
@@ -49,7 +58,7 @@ class FinalStatistics:
 class StatisticsState(BaseModel):
     """Statistic data about a crawler run."""
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_inf_nan='constants')
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, ser_json_inf_nan='constants')
     stats_id: Annotated[int | None, Field(alias='statsId')] = None
 
     requests_finished: Annotated[int, Field(alias='requestsFinished')] = 0
@@ -68,7 +77,6 @@ class StatisticsState(BaseModel):
     crawler_started_at: Annotated[datetime | None, Field(alias='crawlerStartedAt')] = None
     crawler_last_started_at: Annotated[datetime | None, Field(alias='crawlerLastStartTimestamp')] = None
     crawler_finished_at: Annotated[datetime | None, Field(alias='crawlerFinishedAt')] = None
-    crawler_runtime: Annotated[timedelta_ms, Field(alias='crawlerRuntimeMillis')] = timedelta()
     errors: dict[str, Any] = Field(default_factory=dict)
     retry_errors: dict[str, Any] = Field(alias='retryErrors', default_factory=dict)
     requests_with_status_code: dict[str, int] = Field(alias='requestsWithStatusCode', default_factory=dict)
@@ -84,6 +92,37 @@ class StatisticsState(BaseModel):
             return_type=list[int],
         ),
     ] = {}
+
+    # Used to track the crawler runtime, that had already been persisted. This is the runtime from previous runs.
+    _runtime_offset: Annotated[timedelta, Field(exclude=True)] = timedelta()
+
+    def model_post_init(self, /, __context: Any) -> None:
+        self._runtime_offset = self.crawler_runtime or self._runtime_offset
+
+    @property
+    def crawler_runtime(self) -> timedelta:
+        if self.crawler_last_started_at:
+            finished_at = self.crawler_finished_at or datetime.now(timezone.utc)
+            return self._runtime_offset + finished_at - self.crawler_last_started_at
+        return self._runtime_offset
+
+    @crawler_runtime.setter
+    def crawler_runtime(self, value: timedelta) -> None:
+        # Setter for backwards compatibility only, the crawler_runtime is now computed_field, and cant be set manually.
+        # To be removed in v2 release https://github.com/apify/crawlee-python/issues/1567
+        warnings.warn(
+            f"Setting 'crawler_runtime' is deprecated and will be removed in a future version."
+            f' Value {value} will not be used.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    @computed_field(alias='crawlerRuntimeMillis')
+    def crawler_runtime_for_serialization(self) -> timedelta:
+        if self.crawler_last_started_at:
+            finished_at = self.crawler_finished_at or datetime.now(timezone.utc)
+            return self._runtime_offset + finished_at - self.crawler_last_started_at
+        return self._runtime_offset
 
     @computed_field(alias='requestTotalDurationMillis', return_type=timedelta_ms)  # type: ignore[prop-decorator]
     @property

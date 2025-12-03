@@ -9,6 +9,8 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
+import OpeningExample from '!!raw-loader!roa-loader!./code_examples/storages/opening.py';
+
 import RqBasicExample from '!!raw-loader!roa-loader!./code_examples/storages/rq_basic_example.py';
 import RqWithCrawlerExample from '!!raw-loader!roa-loader!./code_examples/storages/rq_with_crawler_example.py';
 import RqWithCrawlerExplicitExample from '!!raw-loader!roa-loader!./code_examples/storages/rq_with_crawler_explicit_example.py';
@@ -26,7 +28,9 @@ import KvsWithCrawlerExplicitExample from '!!raw-loader!roa-loader!./code_exampl
 import CleaningDoNotPurgeExample from '!!raw-loader!roa-loader!./code_examples/storages/cleaning_do_not_purge_example.py';
 import CleaningPurgeExplicitlyExample from '!!raw-loader!roa-loader!./code_examples/storages/cleaning_purge_explicitly_example.py';
 
-Crawlee offers several storage types for managing and persisting your crawling data. Request-oriented storages, such as the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, help you store and deduplicate URLs, while result-oriented storages, like <ApiLink to="class/Dataset">`Dataset`</ApiLink> and <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, focus on storing and retrieving scraping results. This guide helps you choose the storage type that suits your needs.
+Crawlee offers several storage types for managing and persisting your crawling data. Request-oriented storages, such as the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, help you store and deduplicate URLs, while result-oriented storages, like <ApiLink to="class/Dataset">`Dataset`</ApiLink> and <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, focus on storing and retrieving scraping results. This guide explains when to use each type, how to interact with them, and how to control their lifecycle.
+
+## Overview
 
 Crawlee's storage system consists of two main layers:
 - **Storages** (<ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>): High-level interfaces for interacting with different storage types.
@@ -69,6 +73,21 @@ Storage --|> Dataset
 Storage --|> KeyValueStore
 Storage --|> RequestQueue
 ```
+
+### Named and unnamed storages
+
+Crawlee supports two types of storages:
+
+- **Named storages**: Persistent storages with a specific name that persist across runs. These are useful when you want to share data between different crawler runs or access the same storage from multiple places.
+- **Unnamed storages**: Temporary storages identified by an alias that are scoped to a single run. These are automatically purged at the start of each run (when `purge_on_start` is enabled, which is the default).
+
+### Default storage
+
+Each storage type (<ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>) has a default instance that can be accessed without specifying `id`, `name` or `alias`. Default unnamed storage is accessed by calling storage's `open` method without parameters. This is the most common way to use storages in simple crawlers. The special alias `"default"` is equivalent to calling `open` without parameters
+
+<RunnableCodeBlock className="language-python" language="python">
+    {OpeningExample}
+</RunnableCodeBlock>
 
 ## Request queue
 
@@ -186,13 +205,7 @@ Crawlee provides the following helper function to simplify interactions with the
 
 ## Cleaning up the storages
 
-By default, Crawlee automatically cleans up **default storages** before each crawler run to ensure a clean state. This behavior is controlled by the <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink> setting (default: `True`).
-
-### What gets purged
-
-- **Default storages** are completely removed and recreated at the start of each run, ensuring that you start with a clean slate.
-- **Named storages** are never automatically purged and persist across runs.
-- The behavior depends on the storage client implementation.
+By default, Crawlee cleans up all unnamed storages (including the default one) at the start of each run, so every crawl begins with a clean state. This behavior is controlled by <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink> (default: True). In contrast, named storages are never purged automatically and persist across runs. The exact behavior may vary depending on the storage client implementation.
 
 ### When purging happens
 
@@ -221,6 +234,6 @@ Note that purging behavior may vary between storage client implementations. For 
 
 ## Conclusion
 
-This guide introduced you to the different storage types available in Crawlee and how to interact with them. You learned how to manage requests using the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> and store and retrieve scraping results using the <ApiLink to="class/Dataset">`Dataset`</ApiLink> and <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>. You also discovered how to use helper functions to simplify interactions with these storages. Finally, you learned how to clean up storages before starting a crawler run.
+This guide introduced you to the different storage types available in Crawlee and how to interact with them. You learned about the distinction between named storages (persistent across runs) and unnamed storages with aliases (temporary and purged on start). You discovered how to manage requests using the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> and store and retrieve scraping results using the <ApiLink to="class/Dataset">`Dataset`</ApiLink> and <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>. You also learned how to use helper functions to simplify interactions with these storages and how to control storage cleanup behavior.
 
 If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!

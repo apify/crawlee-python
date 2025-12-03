@@ -20,7 +20,7 @@ from ._session import Session
 class SessionModel(BaseModel):
     """Model for a Session object."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     id: Annotated[str, Field(alias='id')]
     max_age: Annotated[timedelta, Field(alias='maxAge')]
@@ -38,7 +38,7 @@ class SessionModel(BaseModel):
 class SessionPoolModel(BaseModel):
     """Model for a SessionPool object."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     max_pool_size: Annotated[int, Field(alias='maxPoolSize')]
 

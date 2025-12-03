@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee.configuration import Configuration
 from crawlee.storage_clients import MemoryStorageClient
 
 if TYPE_CHECKING:
@@ -17,19 +16,16 @@ if TYPE_CHECKING:
 @pytest.fixture
 async def dataset_client() -> AsyncGenerator[MemoryDatasetClient, None]:
     """Fixture that provides a fresh memory dataset client for each test."""
-    client = await MemoryStorageClient().create_dataset_client(name='test_dataset')
+    client = await MemoryStorageClient().create_dataset_client(name='test-dataset')
     yield client
     await client.drop()
 
 
 async def test_memory_specific_purge_behavior() -> None:
     """Test memory-specific purge behavior and in-memory storage characteristics."""
-    configuration = Configuration(purge_on_start=True)
-
     # Create dataset and add data
     dataset_client1 = await MemoryStorageClient().create_dataset_client(
-        name='test_purge_dataset',
-        configuration=configuration,
+        name='test-purge-dataset',
     )
     await dataset_client1.push_data({'item': 'initial data'})
 
@@ -39,8 +35,7 @@ async def test_memory_specific_purge_behavior() -> None:
 
     # Reopen with same storage client instance
     dataset_client2 = await MemoryStorageClient().create_dataset_client(
-        name='test_purge_dataset',
-        configuration=configuration,
+        name='test-purge-dataset',
     )
 
     # Verify data was purged (memory storage specific behavior)

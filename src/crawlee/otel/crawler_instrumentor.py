@@ -69,7 +69,7 @@ class CrawlerInstrumentor(BaseInstrumentor):
 
         if request_handling_instrumentation:
 
-            async def middlware_wrapper(wrapped: Any, instance: _Middleware, args: Any, kwargs: Any) -> Any:
+            async def middleware_wrapper(wrapped: Any, instance: _Middleware, args: Any, kwargs: Any) -> Any:
                 with self._tracer.start_as_current_span(
                     name=f'{instance.generator.__name__}, {wrapped.__name__}',  # type:ignore[attr-defined]  # valid in our context
                     attributes={
@@ -111,8 +111,8 @@ class CrawlerInstrumentor(BaseInstrumentor):
             # Handpicked interesting methods to instrument
             self._instrumented.extend(
                 [
-                    (_Middleware, 'action', middlware_wrapper),
-                    (_Middleware, 'cleanup', middlware_wrapper),
+                    (_Middleware, 'action', middleware_wrapper),
+                    (_Middleware, 'cleanup', middleware_wrapper),
                     (ContextPipeline, '__call__', context_pipeline_wrapper),
                     (BasicCrawler, '_BasicCrawler__run_task_function', self._simple_async_wrapper),
                     (BasicCrawler, '_commit_request_handler_result', _commit_request_handler_result_wrapper),

@@ -23,8 +23,19 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def handler(context: ParselCrawlingContext) -> None:
+        context.log.info(f'Processing {context.request.url}')
+
         # New links will be enqueued directly to the queue.
         await context.enqueue_links()
+
+        # Extract data using Parsel's XPath and CSS selectors.
+        data = {
+            'url': context.request.url,
+            'title': context.selector.xpath('//title/text()').get(),
+        }
+
+        # Push extracted data to the dataset.
+        await context.push_data(data)
 
     await crawler.run()
 

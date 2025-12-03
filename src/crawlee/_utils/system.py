@@ -36,7 +36,7 @@ else:
 class CpuInfo(BaseModel):
     """Information about the CPU usage."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     used_ratio: Annotated[float, Field(alias='usedRatio')]
     """The ratio of CPU currently in use, represented as a float between 0 and 1."""
@@ -51,7 +51,7 @@ class CpuInfo(BaseModel):
 class MemoryUsageInfo(BaseModel):
     """Information about the memory usage."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     current_size: Annotated[
         ByteSize,
@@ -71,7 +71,7 @@ class MemoryUsageInfo(BaseModel):
 class MemoryInfo(MemoryUsageInfo):
     """Information about system memory."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     total_size: Annotated[
         ByteSize, PlainValidator(ByteSize.validate), PlainSerializer(lambda size: size.bytes), Field(alias='totalSize')

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 
-from crawlee._utils.measure_time import measure_time
+from crawlee._utils.time import measure_time
 
 
 def test_measure_time_wall_sync() -> None:

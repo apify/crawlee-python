@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
@@ -9,6 +11,9 @@ from crawlee.storage_clients._base import StorageClient
 from ._dataset_client import FileSystemDatasetClient
 from ._key_value_store_client import FileSystemKeyValueStoreClient
 from ._request_queue_client import FileSystemRequestQueueClient
+
+if TYPE_CHECKING:
+    from collections.abc import Hashable
 
 
 @docs_group('Storage clients')
@@ -30,15 +35,21 @@ class FileSystemStorageClient(StorageClient):
     """
 
     @override
+    def get_storage_client_cache_key(self, configuration: Configuration) -> Hashable:
+        # Even different client instances should return same storage if the storage_dir is the same.
+        return super().get_storage_client_cache_key(configuration), configuration.storage_dir
+
+    @override
     async def create_dataset_client(
         self,
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> FileSystemDatasetClient:
         configuration = configuration or Configuration.get_global_configuration()
-        client = await FileSystemDatasetClient.open(id=id, name=name, configuration=configuration)
+        client = await FileSystemDatasetClient.open(id=id, name=name, alias=alias, configuration=configuration)
         await self._purge_if_needed(client, configuration)
         return client
 
@@ -48,10 +59,11 @@ class FileSystemStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> FileSystemKeyValueStoreClient:
         configuration = configuration or Configuration.get_global_configuration()
-        client = await FileSystemKeyValueStoreClient.open(id=id, name=name, configuration=configuration)
+        client = await FileSystemKeyValueStoreClient.open(id=id, name=name, alias=alias, configuration=configuration)
         await self._purge_if_needed(client, configuration)
         return client
 
@@ -61,9 +73,10 @@ class FileSystemStorageClient(StorageClient):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> FileSystemRequestQueueClient:
         configuration = configuration or Configuration.get_global_configuration()
-        client = await FileSystemRequestQueueClient.open(id=id, name=name, configuration=configuration)
+        client = await FileSystemRequestQueueClient.open(id=id, name=name, alias=alias, configuration=configuration)
         await self._purge_if_needed(client, configuration)
         return client

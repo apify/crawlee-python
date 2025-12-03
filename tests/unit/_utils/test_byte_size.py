@@ -12,7 +12,7 @@ def test_initializations() -> None:
     assert ByteSize.from_gb(1).bytes == 1024**3
     assert ByteSize.from_tb(1).bytes == 1024**4
 
-    with pytest.raises(ValueError, match='ByteSize cannot be negative'):
+    with pytest.raises(ValueError, match=r'ByteSize cannot be negative'):
         ByteSize(-1)
 
 
@@ -66,7 +66,7 @@ def test_subtractions() -> None:
     assert (size1 - size2).bytes == 1024
 
     # Subtraction resulting in a negative value raises ValueError
-    with pytest.raises(ValueError, match='Resulting ByteSize cannot be negative'):
+    with pytest.raises(ValueError, match=r'Resulting ByteSize cannot be negative'):
         _ = size2 - size1
 
     # Subtraction of ByteSize instance and an int

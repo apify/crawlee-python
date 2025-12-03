@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 MAX_POOL_SIZE = 3
-KVS_NAME = 'test_session_pool'
+KVS_NAME = 'test-session-pool'
 PERSIST_STATE_KEY = 'crawlee_session_pool_state'
 
 
@@ -176,21 +176,21 @@ async def test_methods_raise_error_when_not_active() -> None:
 
     assert session_pool.active is False
 
-    with pytest.raises(RuntimeError, match='SessionPool is not active.'):
+    with pytest.raises(RuntimeError, match=r'SessionPool is not active.'):
         session_pool.get_state(as_dict=True)
 
-    with pytest.raises(RuntimeError, match='SessionPool is not active.'):
+    with pytest.raises(RuntimeError, match=r'SessionPool is not active.'):
         session_pool.add_session(session)
 
-    with pytest.raises(RuntimeError, match='SessionPool is not active.'):
+    with pytest.raises(RuntimeError, match=r'SessionPool is not active.'):
         await session_pool.get_session()
 
-    with pytest.raises(RuntimeError, match='SessionPool is not active.'):
+    with pytest.raises(RuntimeError, match=r'SessionPool is not active.'):
         await session_pool.get_session_by_id(session.id)
 
     await session_pool.reset_store()
 
-    with pytest.raises(RuntimeError, match='SessionPool is already active.'):
+    with pytest.raises(RuntimeError, match=r'SessionPool is already active.'):
         async with session_pool, session_pool:
             pass
 

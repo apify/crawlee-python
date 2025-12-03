@@ -14,7 +14,7 @@ import pytest
 from crawlee._autoscaling import AutoscaledPool, SystemStatus
 from crawlee._autoscaling._types import LoadRatioInfo, SystemInfo
 from crawlee._types import ConcurrencySettings
-from crawlee._utils.measure_time import measure_time
+from crawlee._utils.time import measure_time
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
@@ -111,7 +111,7 @@ async def test_propagates_exceptions(system_status: SystemStatus | Mock) -> None
         ),
     )
 
-    with pytest.raises(RuntimeError, match='Scheduled crash'):
+    with pytest.raises(RuntimeError, match=r'Scheduled crash'):
         await pool.run()
 
     assert done_count < 20
@@ -135,11 +135,12 @@ async def test_propagates_exceptions_after_finished(system_status: SystemStatus 
         is_finished_function=lambda: future(started_count > 0),
         concurrency_settings=ConcurrencySettings(
             min_concurrency=1,
+            desired_concurrency=1,
             max_concurrency=1,
         ),
     )
 
-    with pytest.raises(RuntimeError, match='Scheduled crash'):
+    with pytest.raises(RuntimeError, match=r'Scheduled crash'):
         await pool.run()
 
 
@@ -309,17 +310,18 @@ async def test_allows_multiple_run_calls(system_status: SystemStatus | Mock) -> 
     done_count = 0
 
     async def run() -> None:
-        await asyncio.sleep(0.1)
         nonlocal done_count
         done_count += 1
+        await asyncio.sleep(0.1)
 
     pool = AutoscaledPool(
         system_status=system_status,
         run_task_function=run,
-        is_task_ready_function=lambda: future(True),
+        is_task_ready_function=lambda: future(done_count < 4),
         is_finished_function=lambda: future(done_count >= 4),
         concurrency_settings=ConcurrencySettings(
             min_concurrency=4,
+            desired_concurrency=4,
             max_concurrency=4,
         ),
     )
@@ -328,8 +330,6 @@ async def test_allows_multiple_run_calls(system_status: SystemStatus | Mock) -> 
     assert done_count == 4
 
     done_count = 0
-    await asyncio.sleep(0.2)  # Allow any lingering callbacks to complete
-    done_count = 0  # Reset again to ensure clean state
 
     await pool.run()
     assert done_count == 4

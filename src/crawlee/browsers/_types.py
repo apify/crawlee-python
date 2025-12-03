@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from playwright.async_api import Page
 
-BrowserType = Literal['chromium', 'firefox', 'webkit']
+BrowserType = Literal['chromium', 'firefox', 'webkit', 'chrome']
 
 
 @dataclass

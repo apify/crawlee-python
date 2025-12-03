@@ -130,11 +130,13 @@ class EventManager:
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
+        # Stop persist state event periodic emission and manually emit last one to ensure latest state is saved.
+        await self._emit_persist_state_event_rec_task.stop()
+        await self._emit_persist_state_event()
         await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
         self._event_emitter.remove_all_listeners()
         self._listener_tasks.clear()
         self._listeners_to_wrappers.clear()
-        await self._emit_persist_state_event_rec_task.stop()
         self._active = False
 
     @overload

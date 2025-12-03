@@ -12,6 +12,7 @@ from typing_extensions import NotRequired, TypedDict, TypeVar
 
 from crawlee import service_locator
 from crawlee._request import Request, RequestOptions
+from crawlee._types import ConcurrencySettings
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
 from crawlee._utils.robots import RobotsTxtFile
@@ -113,7 +114,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.
             user_data_dir: Path to a user data directory, which stores browser session data like cookies
                 and local storage.
-            browser_type: The type of browser to launch ('chromium', 'firefox', or 'webkit').
+            browser_type: The type of browser to launch:
+                - 'chromium', 'firefox', 'webkit': Use Playwright-managed browsers
+                - 'chrome': Use your locally installed Google Chrome browser. Requires Google Chrome to be installed on
+                    the system.
                 This option should not be used if `browser_pool` is provided.
             browser_launch_options: Keyword arguments to pass to the browser launch method. These options are provided
                 directly to Playwright's `browser_type.launch` method. For more details, refer to the
@@ -152,7 +156,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             ):
                 raise ValueError(
                     'You cannot provide `headless`, `browser_type`, `browser_launch_options`, '
-                    '`browser_new_context_options`, `use_incognito_pages`, `user_data_dir`  or'
+                    '`browser_new_context_options`, `use_incognito_pages`, `user_data_dir` or '
                     '`fingerprint_generator` arguments when `browser_pool` is provided.'
                 )
 
@@ -193,6 +197,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         self._pre_navigation_hooks: list[Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]] = []
 
         kwargs['http_client'] = PlaywrightHttpClient() if not kwargs.get('http_client') else kwargs['http_client']
+
+        # Set default concurrency settings for browser crawlers if not provided
+        if 'concurrency_settings' not in kwargs or kwargs['concurrency_settings'] is None:
+            kwargs['concurrency_settings'] = ConcurrencySettings(desired_concurrency=1)
 
         super().__init__(**kwargs)
 
@@ -361,7 +369,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             links_iterator: Iterator[str] = iter(
                 [url for element in elements if (url := await element.get_attribute('href')) is not None]
             )
-            links_iterator = to_absolute_url_iterator(context.request.loaded_url or context.request.url, links_iterator)
+            links_iterator = to_absolute_url_iterator(
+                context.request.loaded_url or context.request.url, links_iterator, logger=context.log
+            )
 
             if robots_txt_file:
                 skipped, links_iterator = partition(lambda url: robots_txt_file.is_allowed(url), links_iterator)
@@ -489,7 +499,9 @@ class _PlaywrightCrawlerAdditionalOptions(TypedDict):
     """A `BrowserPool` instance to be used for launching the browsers and getting pages."""
 
     browser_type: NotRequired[BrowserType]
-    """The type of browser to launch ('chromium', 'firefox', or 'webkit').
+    """The type of browser to launch:
+    - 'chromium', 'firefox', 'webkit': Use Playwright-managed browsers
+    - 'chrome': Use your locally installed Google Chrome browser. Requires Google Chrome to be installed on the system.
     This option should not be used if `browser_pool` is provided."""
 
     browser_launch_options: NotRequired[Mapping[str, Any]]
@@ -509,9 +521,9 @@ class _PlaywrightCrawlerAdditionalOptions(TypedDict):
 
 
 class PlaywrightCrawlerOptions(
-    Generic[TCrawlingContext, TStatisticsState],
     _PlaywrightCrawlerAdditionalOptions,
     BasicCrawlerOptions[TCrawlingContext, StatisticsState],
+    Generic[TCrawlingContext, TStatisticsState],
 ):
     """Arguments for the `AbstractHttpCrawler` constructor.
 

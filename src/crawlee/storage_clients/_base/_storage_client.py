@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
+    from collections.abc import Hashable
+
     from crawlee.configuration import Configuration
 
     from ._dataset_client import DatasetClient
@@ -28,12 +30,21 @@ class StorageClient(ABC):
     (where applicable), and consistent access patterns across all storage types it supports.
     """
 
+    def get_storage_client_cache_key(self, configuration: Configuration) -> Hashable:  # noqa: ARG002
+        """Return a cache key that can differentiate between different storages of this and other clients.
+
+        Can be based on configuration or on the client itself. By default, returns a module and name of the client
+        class.
+        """
+        return f'{self.__class__.__module__}.{self.__class__.__name__}'
+
     @abstractmethod
     async def create_dataset_client(
         self,
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> DatasetClient:
         """Create a dataset client."""
@@ -44,6 +55,7 @@ class StorageClient(ABC):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> KeyValueStoreClient:
         """Create a key-value store client."""
@@ -54,6 +66,7 @@ class StorageClient(ABC):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
     ) -> RequestQueueClient:
         """Create a request queue client."""

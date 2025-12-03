@@ -28,6 +28,8 @@ class Configuration(BaseSettings):
     Settings can also be configured via environment variables, prefixed with `CRAWLEE_`.
     """
 
+    # TODO: https://github.com/pydantic/pydantic-settings/issues/706
+    # Use `SettingsConfigDict(validate_by_name=True, validate_by_alias=True)` when issue is resolved.
     model_config = SettingsConfigDict(populate_by_name=True)
 
     internal_timeout: Annotated[timedelta | None, Field(alias='crawlee_internal_timeout')] = None

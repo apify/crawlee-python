@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "crawlee"
-version = "0.6.12"
+version = "1.1.1"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = { file = "LICENSE" }
@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries",
 ]
 keywords = [
@@ -35,22 +36,20 @@ keywords = [
 dependencies = [
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
-    "impit>=0.4.2",
+    "impit>=0.8.0",
     "more-itertools>=10.2.0",
     "protego>=0.5.0",
     "psutil>=6.0.0",
-    "pydantic-settings>=2.2.0,!=2.7.0,!=2.7.1,!=2.8.0",
-    "pydantic>=2.8.0,!=2.10.0,!=2.10.1,!=2.10.2",
+    "pydantic-settings>=2.12.0",
+    "pydantic>=2.11.0",
     "pyee>=9.0.0",
-    "sortedcollections>=2.1.0",
-    "sortedcontainers>=2.4.0",
     "tldextract>=5.1.0",
     "typing-extensions>=4.1.0",
     "yarl>=1.18.0",
 ]
 
 [project.optional-dependencies]
-all = ["crawlee[adaptive-crawler,beautifulsoup,cli,curl-impersonate,httpx,parsel,playwright,otel]"]
+all = ["crawlee[adaptive-crawler,beautifulsoup,cli,curl-impersonate,httpx,parsel,playwright,otel,sql_sqlite,sql_postgres,redis]"]
 adaptive-crawler = [
     "jaro-winkler>=2.0.3",
     "playwright>=1.27.0",
@@ -73,6 +72,15 @@ otel = [
     "opentelemetry-semantic-conventions>=0.54",
     "wrapt>=1.17.0",
 ]
+sql_postgres = [
+    "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
+    "asyncpg>=0.24.0; python_version < '3.14'" # TODO: https://github.com/apify/crawlee-python/issues/1555
+]
+sql_sqlite = [
+    "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
+    "aiosqlite>=0.21.0",
+]
+redis = ["redis[hiredis] >= 7.0.0"]
 
 [project.scripts]
 crawlee = "crawlee._cli:cli"
@@ -90,26 +98,26 @@ crawlee = "crawlee._cli:cli"
 [dependency-groups]
 dev = [
     "apify_client", # For e2e tests.
-    "build~=1.2.2", # For e2e tests.
-    "dycw-pytest-only~=2.1.0",
-    "mypy~=1.17.0",
-    "pre-commit~=4.2.0",
-    "proxy-py~=2.4.0",
-    "pydoc-markdown~=4.8.0",
-    "pytest-asyncio~=1.1.0",
-    "pytest-cov~=6.2.0",
-    "pytest-timeout~=2.4.0",
-    "pytest-xdist~=3.8.0",
-    "pytest~=8.4.0",
-    "ruff~=0.12.0",
+    "build<2.0.0", # For e2e tests.
+    "dycw-pytest-only<3.0.0",
+    "fakeredis[probabilistic,json,lua]<3.0.0",
+    "mypy~=1.18.0",
+    "pre-commit<5.0.0",
+    "proxy-py<3.0.0",
+    "pydoc-markdown<5.0.0",
+    "pytest-asyncio<2.0.0",
+    "pytest-cov<8.0.0",
+    "pytest-timeout<3.0.0",
+    "pytest-xdist<4.0.0",
+    "pytest<9.0.0",
+    "ruff~=0.14.0",
     "setuptools", # setuptools are used by pytest, but not explicitly required
-    "sortedcontainers-stubs~=2.4.0",
-    "types-beautifulsoup4~=4.12.0.20240229",
-    "types-cachetools~=6.1.0.20250717",
-    "types-colorama~=0.4.15.20240106",
-    "types-psutil~=7.0.0.20250218",
-    "types-python-dateutil~=2.9.0.20240316",
-    "uvicorn[standard]~=0.35.0",
+    "types-beautifulsoup4<5.0.0",
+    "types-cachetools<7.0.0",
+    "types-colorama<1.0.0",
+    "types-psutil<8.0.0",
+    "types-python-dateutil<3.0.0",
+    "uvicorn[standard]<1.0.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -177,6 +185,7 @@ indent-style = "space"
     "INP001", # File {filename} is part of an implicit namespace package, add an __init__.py
     "F841",   # Local variable {variable} is assigned to but never used
     "N999",   # Invalid module name
+    "T201",   # `print` found
 ]
 "**/docs/examples/code_examples/*crawler_with_error_snapshotter.py" = [
     "PLR2004", # Magic value used in comparison. Ignored for simplicity and readability of example code.
@@ -247,7 +256,6 @@ module = [
     "litestar",                     # Example code shows deploy on Google Cloud Run.
     "loguru",                       # Example code shows integration of loguru and crawlee for JSON logging.
     "sklearn.linear_model",         # Untyped and stubs not available
-    "sortedcollections",            # Untyped and stubs not available
     "cookiecutter.*",               # Untyped and stubs not available
     "inquirer.*",                   # Untyped and stubs not available
     "warcio.*",                     # Example code shows WARC files creation.

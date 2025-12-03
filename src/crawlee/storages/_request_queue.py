@@ -13,6 +13,7 @@ from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.request_loaders import RequestManager
 
 from ._base import Storage
+from ._utils import validate_storage_name
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -80,6 +81,8 @@ class RequestQueue(Storage, RequestManager):
             id: The unique identifier of the storage.
             name: The name of the storage, if available.
         """
+        validate_storage_name(name)
+
         self._client = client
         self._id = id
         self._name = name
@@ -118,18 +121,23 @@ class RequestQueue(Storage, RequestManager):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
         storage_client: StorageClient | None = None,
     ) -> RequestQueue:
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
 
+        client_opener_coro = storage_client.create_rq_client(id=id, name=name, alias=alias, configuration=configuration)
+        additional_cache_key = storage_client.get_storage_client_cache_key(configuration=configuration)
+
         return await service_locator.storage_instance_manager.open_storage_instance(
             cls,
             id=id,
             name=name,
-            configuration=configuration,
-            client_opener=storage_client.create_rq_client,
+            alias=alias,
+            client_opener_coro=client_opener_coro,
+            storage_client_cache_key=additional_cache_key,
         )
 
     @override
@@ -223,16 +231,16 @@ class RequestQueue(Storage, RequestManager):
         """
         return await self._client.fetch_next_request()
 
-    async def get_request(self, request_id: str) -> Request | None:
+    async def get_request(self, unique_key: str) -> Request | None:
         """Retrieve a specific request from the queue by its ID.
 
         Args:
-            request_id: The ID of the request to retrieve.
+            unique_key: Unique key of the request to retrieve.
 
         Returns:
             The request with the specified ID, or `None` if no such request exists.
         """
-        return await self._client.get_request(request_id)
+        return await self._client.get_request(unique_key)
 
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         """Mark a request as handled after successful processing.

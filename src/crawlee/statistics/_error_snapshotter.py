@@ -32,7 +32,7 @@ class ErrorSnapshotter:
         """Capture error snapshot and save it to key value store.
 
         It saves the error snapshot directly to a key value store. It can't use `context.get_key_value_store` because
-        it returns `KeyValueStoreChangeRecords` which is commited to the key value store only if the `RequestHandler`
+        it returns `KeyValueStoreChangeRecords` which is committed to the key value store only if the `RequestHandler`
         returned without an exception. ErrorSnapshotter is on the contrary active only when `RequestHandler` fails with
         an exception.
 

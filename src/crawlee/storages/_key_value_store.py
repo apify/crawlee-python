@@ -15,6 +15,7 @@ from crawlee._utils.recoverable_state import RecoverableState
 from crawlee.storage_clients.models import KeyValueStoreMetadata
 
 from ._base import Storage
+from ._utils import validate_storage_name
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -84,6 +85,8 @@ class KeyValueStore(Storage):
             id: The unique identifier of the storage.
             name: The name of the storage, if available.
         """
+        validate_storage_name(name)
+
         self._client = client
         self._id = id
         self._name = name
@@ -112,18 +115,25 @@ class KeyValueStore(Storage):
         *,
         id: str | None = None,
         name: str | None = None,
+        alias: str | None = None,
         configuration: Configuration | None = None,
         storage_client: StorageClient | None = None,
     ) -> KeyValueStore:
         configuration = service_locator.get_configuration() if configuration is None else configuration
         storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
 
+        client_opener_coro = storage_client.create_kvs_client(
+            id=id, name=name, alias=alias, configuration=configuration
+        )
+        additional_cache_key = storage_client.get_storage_client_cache_key(configuration=configuration)
+
         return await service_locator.storage_instance_manager.open_storage_instance(
             cls,
             id=id,
             name=name,
-            configuration=configuration,
-            client_opener=storage_client.create_kvs_client,
+            alias=alias,
+            client_opener_coro=client_opener_coro,
+            storage_client_cache_key=additional_cache_key,
         )
 
     @override
@@ -271,11 +281,14 @@ class KeyValueStore(Storage):
             if key in cache:
                 return cache[key].current_value.root
 
+            async def kvs_factory() -> KeyValueStore:
+                return self
+
             cache[key] = recoverable_state = RecoverableState(
                 default_state=AutosavedValue(default_value),
-                persistence_enabled=True,
-                persist_state_kvs_id=self.id,
                 persist_state_key=key,
+                persistence_enabled=True,
+                persist_state_kvs_factory=kvs_factory,
                 logger=logger,
             )
 

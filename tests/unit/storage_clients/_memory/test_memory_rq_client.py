@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee import Request
-from crawlee.configuration import Configuration
 from crawlee.storage_clients import MemoryStorageClient
 
 if TYPE_CHECKING:
@@ -18,19 +17,16 @@ if TYPE_CHECKING:
 @pytest.fixture
 async def rq_client() -> AsyncGenerator[MemoryRequestQueueClient, None]:
     """Fixture that provides a fresh memory request queue client for each test."""
-    client = await MemoryStorageClient().create_rq_client(name='test_rq')
+    client = await MemoryStorageClient().create_rq_client(name='test-rq')
     yield client
     await client.drop()
 
 
 async def test_memory_specific_purge_behavior() -> None:
     """Test memory-specific purge behavior and in-memory storage characteristics."""
-    configuration = Configuration(purge_on_start=True)
-
     # Create RQ and add data
     rq_client1 = await MemoryStorageClient().create_rq_client(
-        name='test_purge_rq',
-        configuration=configuration,
+        name='test-purge-rq',
     )
     request = Request.from_url(url='https://example.com/initial')
     await rq_client1.add_batch_of_requests([request])
@@ -40,8 +36,7 @@ async def test_memory_specific_purge_behavior() -> None:
 
     # Reopen with same storage client instance
     rq_client2 = await MemoryStorageClient().create_rq_client(
-        name='test_purge_rq',
-        configuration=configuration,
+        name='test-purge-rq',
     )
 
     # Verify queue was purged (memory storage specific behavior)

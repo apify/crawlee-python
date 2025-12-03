@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 @docs_group('HTTP parsers')
-class AbstractHttpParser(Generic[TParseResult, TSelectResult], ABC):
+class AbstractHttpParser(ABC, Generic[TParseResult, TSelectResult]):
     """Parser used for parsing HTTP response and inspecting parsed result to find links or detect blocking."""
 
     @abstractmethod

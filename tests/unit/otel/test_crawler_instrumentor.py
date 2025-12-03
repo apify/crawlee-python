@@ -9,6 +9,7 @@ from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProces
 from opentelemetry.trace import set_tracer_provider
 from yarl import URL
 
+from crawlee import ConcurrencySettings
 from crawlee.crawlers import ParselCrawler
 from crawlee.otel.crawler_instrumentor import CrawlerInstrumentor
 from crawlee.storages import Dataset
@@ -34,15 +35,20 @@ async def test_crawler_instrumentor_capability(server_url: URL) -> None:
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     set_tracer_provider(provider)
     # Instrument the crawler with OpenTelemetry
-    CrawlerInstrumentor(instrument_classes=[Dataset]).instrument()
+    instrumentor = CrawlerInstrumentor(instrument_classes=[Dataset])
+    instrumentor.instrument()
 
     # Generate first telemetry data from `Dataset` public methods.
     # `Dataset` is in `instrument_classes` argument, and thus it's public methods are instrumented.
-    dataset = await Dataset.open(name='test_dataset')
+    dataset = await Dataset.open(name='test-dataset')
     await dataset.drop()
 
     # Other traces will be from crawler run.
-    crawler = ParselCrawler(max_requests_per_crawl=1, request_handler=mock.AsyncMock())
+    crawler = ParselCrawler(
+        max_requests_per_crawl=1,
+        request_handler=mock.AsyncMock(),
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+    )
 
     # Run crawler and generate more telemetry data.
     await crawler.run([str(server_url)])

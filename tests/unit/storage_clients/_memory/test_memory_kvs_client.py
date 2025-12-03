@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee.configuration import Configuration
 from crawlee.storage_clients import MemoryStorageClient
 
 if TYPE_CHECKING:
@@ -17,19 +16,17 @@ if TYPE_CHECKING:
 @pytest.fixture
 async def kvs_client() -> AsyncGenerator[MemoryKeyValueStoreClient, None]:
     """Fixture that provides a fresh memory key-value store client for each test."""
-    client = await MemoryStorageClient().create_kvs_client(name='test_kvs')
+    client = await MemoryStorageClient().create_kvs_client(name='test-kvs')
     yield client
     await client.drop()
 
 
 async def test_memory_specific_purge_behavior() -> None:
     """Test memory-specific purge behavior and in-memory storage characteristics."""
-    configuration = Configuration(purge_on_start=True)
 
     # Create KVS and add data
     kvs_client1 = await MemoryStorageClient().create_kvs_client(
-        name='test_purge_kvs',
-        configuration=configuration,
+        name='test-purge-kvs',
     )
     await kvs_client1.set_value(key='test-key', value='initial value')
 
@@ -40,8 +37,7 @@ async def test_memory_specific_purge_behavior() -> None:
 
     # Reopen with same storage client instance
     kvs_client2 = await MemoryStorageClient().create_kvs_client(
-        name='test_purge_kvs',
-        configuration=configuration,
+        name='test-purge-kvs',
     )
 
     # Verify value was purged (memory storage specific behavior)

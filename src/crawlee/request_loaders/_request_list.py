@@ -17,7 +17,7 @@ logger = getLogger(__name__)
 
 
 class RequestListState(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     next_index: Annotated[int, Field(alias='nextIndex')] = 0
     next_unique_key: Annotated[str | None, Field(alias='nextUniqueKey')] = None
@@ -166,7 +166,7 @@ class RequestList(RequestLoader):
             return None
 
         state = await self._get_state()
-        state.in_progress.add(self._next[0].id)
+        state.in_progress.add(self._next[0].unique_key)
         self._assumed_total_count += 1
 
         next_request = self._next[0]
@@ -183,7 +183,7 @@ class RequestList(RequestLoader):
     async def mark_request_as_handled(self, request: Request) -> None:
         self._handled_count += 1
         state = await self._get_state()
-        state.in_progress.remove(request.id)
+        state.in_progress.remove(request.unique_key)
 
     async def _ensure_next_request(self) -> None:
         await self._get_state()

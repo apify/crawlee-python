@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING, Any, Literal
 from unittest import mock
 from unittest.mock import Mock
@@ -36,6 +37,7 @@ from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import Statistics
 from crawlee.statistics._error_snapshotter import ErrorSnapshotter
+from crawlee.storages import RequestQueue
 from tests.unit.server_endpoints import GENERIC_RESPONSE, HELLO_WORLD
 
 if TYPE_CHECKING:
@@ -46,7 +48,7 @@ if TYPE_CHECKING:
     from crawlee._request import RequestOptions
     from crawlee._types import HttpMethod, HttpPayload
     from crawlee.browsers._types import BrowserType
-    from crawlee.crawlers import PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
+    from crawlee.crawlers import BasicCrawlingContext, PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
 
 
 @pytest.mark.parametrize(
@@ -333,7 +335,7 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
     crawler = PlaywrightCrawler(
         session_pool=SessionPool(max_pool_size=1),
         use_incognito_pages=use_incognito_pages,
-        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
     )
 
     @crawler.router.default_handler
@@ -427,6 +429,32 @@ async def test_save_cookies_after_handler_processing(server_url: URL) -> None:
         session_cookies = {cookie['name']: cookie['value'] for cookie in check_session.cookies.get_cookies_as_dicts()}
 
         assert session_cookies == {'check': 'test'}
+
+
+async def test_read_write_cookies(server_url: URL) -> None:
+    """Test that cookies are reloaded correctly."""
+    async with SessionPool(max_pool_size=1) as session_pool:
+        crawler = PlaywrightCrawler(session_pool=session_pool)
+
+        playwright_cookies = []
+        session_cookies = []
+
+        # Check that no errors occur when reading and writing cookies.
+        @crawler.router.default_handler
+        async def request_handler(context: PlaywrightCrawlingContext) -> None:
+            cookies = await context.page.context.cookies()
+            playwright_cookies.extend(cookies)
+
+            if context.session:
+                context.session.cookies.set_cookies_from_playwright_format(cookies)
+                session_cookies.extend(context.session.cookies.get_cookies_as_dicts())
+
+        await crawler.run([str(server_url / 'set_complex_cookies')])
+
+        # Check that the cookie was received with `partitionKey`
+        assert any('partitionKey' in cookie for cookie in playwright_cookies)
+
+        assert len(playwright_cookies) == len(session_cookies)
 
 
 async def test_custom_fingerprint_uses_generator_options(server_url: URL) -> None:
@@ -604,6 +632,9 @@ async def test_error_snapshot_through_statistics(server_url: URL) -> None:
     kvs_content = {}
 
     async for key_info in kvs.iterate_keys():
+        # Skip any non-error snapshot keys, e.g. __RQ_STATE_.
+        if 'ERROR_SNAPSHOT' not in key_info.key:
+            continue
         kvs_content[key_info.key] = await kvs.get_value(key_info.key)
 
         assert set(key_info.key).issubset(ErrorSnapshotter.ALLOWED_CHARACTERS)
@@ -637,6 +668,39 @@ async def test_respect_robots_txt(server_url: URL) -> None:
     assert visited == {
         str(server_url / 'start_enqueue'),
         str(server_url / 'sub_index'),
+    }
+
+
+async def test_respect_robots_txt_with_problematic_links(server_url: URL) -> None:
+    """Test checks the crawler behavior with links that may cause problems when attempting to retrieve robots.txt."""
+    visit = mock.Mock()
+    fail = mock.Mock()
+    crawler = PlaywrightCrawler(
+        respect_robots_txt_file=True,
+        max_request_retries=0,
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links(strategy='all')
+
+    @crawler.failed_request_handler
+    async def error_handler(context: BasicCrawlingContext, _error: Exception) -> None:
+        fail(context.request.url)
+
+    await crawler.run([str(server_url / 'problematic_links')])
+
+    visited = {call[0][0] for call in visit.call_args_list}
+    failed = {call[0][0] for call in fail.call_args_list}
+
+    # Email must be skipped
+    # https://avatars.githubusercontent.com/apify does not get robots.txt, but is correct for the crawler.
+    assert visited == {str(server_url / 'problematic_links'), 'https://avatars.githubusercontent.com/apify'}
+
+    # The budplaceholder.com does not exist.
+    assert failed == {
+        'https://budplaceholder.com/',
     }
 
 
@@ -732,3 +796,132 @@ async def test_extract_links(server_url: URL) -> None:
 
     assert len(extracted_links) == 1
     assert extracted_links[0] == str(server_url / 'page_1')
+
+
+async def test_reduced_logs_from_playwright_navigation_timeout(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO)
+    crawler = PlaywrightCrawler(configure_logging=False)
+    non_existent_page = 'https://totally-non-existing-site.com/blablablba'
+
+    # Capture all logs from the 'crawlee' logger at INFO level or higher
+    with caplog.at_level(logging.INFO, logger='crawlee'):
+        await crawler.run([Request.from_url(non_existent_page)])
+
+    expected_summarized_log = (
+        f'Retrying request to {non_existent_page} due to: Page.goto: net::ERR_NAME_NOT_RESOLVED at {non_existent_page}'
+    )
+
+    # Find the Playwright specific error message in the logs
+    found_playwright_message = False
+    for record in caplog.records:
+        if record.message and expected_summarized_log in record.message:
+            full_message = (record.message or '') + (record.exc_text or '')
+            assert '\n' not in full_message
+            found_playwright_message = True
+            break
+
+    assert found_playwright_message, 'Expected log message about request handler error was not found.'
+
+
+@pytest.mark.parametrize(
+    ('queue_name', 'queue_alias', 'by_id'),
+    [
+        pytest.param('named-queue', None, False, id='with rq_name'),
+        pytest.param(None, 'alias-queue', False, id='with rq_alias'),
+        pytest.param('id-queue', None, True, id='with rq_id'),
+    ],
+)
+async def test_enqueue_links_with_rq_param(
+    server_url: URL, queue_name: str | None, queue_alias: str | None, *, by_id: bool
+) -> None:
+    crawler = PlaywrightCrawler()
+    rq = await RequestQueue.open(name=queue_name, alias=queue_alias)
+    if by_id:
+        queue_name = None
+        queue_id = rq.id
+    else:
+        queue_id = None
+    visit_urls: set[str] = set()
+
+    @crawler.router.default_handler
+    async def handler(context: PlaywrightCrawlingContext) -> None:
+        visit_urls.add(context.request.url)
+        await context.enqueue_links(rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    requests_from_queue: list[str] = []
+    while request := await rq.fetch_next_request():
+        requests_from_queue.append(request.url)
+
+    assert set(requests_from_queue) == {str(server_url / 'page_1'), str(server_url / 'sub_index')}
+    assert visit_urls == {str(server_url / 'start_enqueue')}
+
+    await rq.drop()
+
+
+@pytest.mark.parametrize(
+    ('queue_name', 'queue_alias', 'by_id'),
+    [
+        pytest.param('named-queue', None, False, id='with rq_name'),
+        pytest.param(None, 'alias-queue', False, id='with rq_alias'),
+        pytest.param('id-queue', None, True, id='with rq_id'),
+    ],
+)
+async def test_enqueue_links_requests_with_rq_param(
+    server_url: URL, queue_name: str | None, queue_alias: str | None, *, by_id: bool
+) -> None:
+    crawler = PlaywrightCrawler()
+    rq = await RequestQueue.open(name=queue_name, alias=queue_alias)
+    if by_id:
+        queue_name = None
+        queue_id = rq.id
+    else:
+        queue_id = None
+    visit_urls: set[str] = set()
+
+    check_requests: list[str] = [
+        'https://a.placeholder.com',
+        'https://b.placeholder.com',
+        'https://c.placeholder.com',
+    ]
+
+    @crawler.router.default_handler
+    async def handler(context: PlaywrightCrawlingContext) -> None:
+        visit_urls.add(context.request.url)
+        await context.enqueue_links(
+            requests=check_requests, rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias, strategy='all'
+        )
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    requests_from_queue: list[str] = []
+    while request := await rq.fetch_next_request():
+        requests_from_queue.append(request.url)
+
+    assert set(requests_from_queue) == set(check_requests)
+    assert visit_urls == {str(server_url / 'start_enqueue')}
+
+    await rq.drop()
+
+
+@pytest.mark.parametrize(
+    ('queue_id', 'queue_name', 'queue_alias'),
+    [
+        pytest.param('named-queue', 'alias-queue', None, id='rq_name and rq_alias'),
+        pytest.param('named-queue', None, 'id-queue', id='rq_name and rq_id'),
+        pytest.param(None, 'alias-queue', 'id-queue', id='rq_alias and rq_id'),
+        pytest.param('named-queue', 'alias-queue', 'id-queue', id='rq_name and rq_alias and rq_id'),
+    ],
+)
+async def test_enqueue_links_error_with_multi_params(
+    server_url: URL, queue_id: str | None, queue_name: str | None, queue_alias: str | None
+) -> None:
+    crawler = PlaywrightCrawler()
+
+    @crawler.router.default_handler
+    async def handler(context: PlaywrightCrawlingContext) -> None:
+        with pytest.raises(ValueError, match='Cannot use both `rq_name` and `rq_alias`'):
+            await context.enqueue_links(rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
