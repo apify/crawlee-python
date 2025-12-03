@@ -115,7 +115,7 @@ class HttpClient(ABC):
             session: The session associated with the request.
             proxy_info: The information about the proxy to be used.
             statistics: The statistics object to register status codes.
-            timeout: Request timeout
+            timeout: Maximum time allowed to process the request.
 
         Raises:
             ProxyError: Raised if a proxy-related error occurs.
@@ -147,7 +147,7 @@ class HttpClient(ABC):
             payload: The data to be sent as the request body.
             session: The session associated with the request.
             proxy_info: The information about the proxy to be used.
-            timeout: Request timeout
+            timeout: Maximum time allowed to process the request.
 
         Raises:
             ProxyError: Raised if a proxy-related error occurs.
