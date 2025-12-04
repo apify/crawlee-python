@@ -1135,8 +1135,17 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 except Exception as e:
                     raise UserDefinedErrorHandlerError('Exception thrown in user-defined request error handler') from e
                 else:
-                    if new_request is not None:
-                        request = new_request
+                    if new_request is not None and new_request != request:
+                        await request_manager.add_request(new_request)
+                        await wait_for(
+                            lambda: request_manager.mark_request_as_handled(request),
+                            timeout=self._internal_timeout,
+                            timeout_message='Marking request as handled timed out after '
+                            f'{self._internal_timeout.total_seconds()} seconds',
+                            logger=self._logger,
+                            max_retries=3,
+                        )
+                        return
 
             await request_manager.reclaim_request(request)
         else:
