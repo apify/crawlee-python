@@ -546,12 +546,14 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             # Update sequence number and state to ensure proper ordering.
             if forefront:
+                logger.info('Reclaiming forefront request')
                 # Remove from regular requests if it was there
                 state.regular_requests.pop(request.unique_key, None)
                 sequence_number = state.forefront_sequence_counter
                 state.forefront_sequence_counter += 1
                 state.forefront_requests[request.unique_key] = sequence_number
             else:
+                logger.info('Reclaiming regular request')
                 # Remove from forefront requests if it was there
                 state.forefront_requests.pop(request.unique_key, None)
                 sequence_number = state.sequence_counter
@@ -559,23 +561,30 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 state.regular_requests[request.unique_key] = sequence_number
 
             # Save the clean request without extra fields
+
             request_data = await json_dumps(request.model_dump())
+            logger.info('Atomic write')
             await atomic_write(request_path, request_data)
 
             # Remove from in-progress.
+            logger.info('Remove from in-progress')
             state.in_progress_requests.discard(request.unique_key)
 
+            logger.info('Update RQ metadata.')
             # Update RQ metadata.
             await self._update_metadata(
                 update_modified_at=True,
                 update_accessed_at=True,
             )
+            logger.info('Updated RQ metadata.')
 
             # Add the request back to the cache.
             if forefront:
                 self._request_cache.appendleft(request)
+                logger.info(f'Add the request back to the cache: forefront. {self._request_cache}')
             else:
                 self._request_cache.append(request)
+                logger.info(f'Add the request back to the cache: normal. . {self._request_cache}')
 
             return ProcessedRequest(
                 unique_key=request.unique_key,
@@ -595,6 +604,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             # If there are in-progress requests, return False immediately.
             if len(state.in_progress_requests) > 0:
                 self._is_empty_cache = False
+                logger.info(f'{state.in_progress_requests=}')
                 return False
 
             # If we have a cached requests, check them first (fast path).
@@ -602,8 +612,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 for req in self._request_cache:
                     if req.unique_key not in state.handled_requests:
                         self._is_empty_cache = False
+                        logger.info(f'{(req.unique_key not in state.handled_requests)=}')
                         return False
                 self._is_empty_cache = True
+                logger.info(f'{(len(state.in_progress_requests) == 0)=}')
                 return len(state.in_progress_requests) == 0
 
             # Fallback: check state for unhandled requests.
@@ -615,9 +627,11 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             if unhandled_requests:
                 self._is_empty_cache = False
+                logger.info(f'{unhandled_requests=}')
                 return False
 
             self._is_empty_cache = True
+            logger.info('Last resort is empty')
             return True
 
     def _get_request_path(self, unique_key: str) -> Path:

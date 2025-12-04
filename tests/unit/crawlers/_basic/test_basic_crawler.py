@@ -1300,6 +1300,7 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
         max_request_retries=max_request_retries,
     )
     crawler.log.setLevel(logging.DEBUG)
+    logging.getLogger('crawlee.storage_clients._file_system._request_queue_client').setLevel(logging.DEBUG)
 
     mocked_handler_before_sleep = Mock()
     mocked_handler_after_sleep = Mock()
