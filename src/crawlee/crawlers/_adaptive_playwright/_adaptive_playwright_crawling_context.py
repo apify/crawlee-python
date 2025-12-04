@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from playwright.async_api import Page, Response
     from typing_extensions import Self
 
-    from crawlee.crawlers._playwright._types import BlockRequestsFunction
+    from crawlee.crawlers._playwright._types import BlockRequestsFunction, GotoOptions
 
 
 TStaticParseResult = TypeVar('TStaticParseResult')
@@ -190,8 +190,9 @@ class AdaptivePlaywrightCrawlingContext(
         http_response = await PlaywrightHttpResponse.from_playwright_response(
             response=context.response, protocol=protocol_guess or ''
         )
-        # block_requests is useful only on pre-navigation contexts. It is useless here.
+        # block_requests and goto_options are useful only on pre-navigation contexts. It is useless here.
         context_kwargs.pop('block_requests')
+        context_kwargs.pop('goto_options')
         return cls(
             parsed_content=await parser.parse(http_response),
             http_response=http_response,
@@ -211,6 +212,9 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
     _page: Page | None = None
     block_requests: BlockRequestsFunction | None = None
     """Blocks network requests matching specified URL patterns."""
+
+    goto_options: GotoOptions | None = None
+    """Additional options to pass to Playwright's `Page.goto()` method. Don't support `timeout`."""
 
     @property
     def page(self) -> Page:

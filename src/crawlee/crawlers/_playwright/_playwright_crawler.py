@@ -35,6 +35,7 @@ from crawlee.statistics import StatisticsState
 from ._playwright_crawling_context import PlaywrightCrawlingContext
 from ._playwright_http_client import PlaywrightHttpClient, browser_page_context
 from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
+from ._types import GotoOptions
 from ._utils import block_requests, infinite_scroll
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=PlaywrightCrawlingContext)
@@ -108,6 +109,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         user_data_dir: str | Path | None = None,
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
+        goto_options: GotoOptions | None = None,
         fingerprint_generator: FingerprintGenerator | None | Literal['default'] = 'default',
         headless: bool | None = None,
         use_incognito_pages: bool | None = None,
@@ -142,6 +144,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 This option should not be used if `browser_pool` is provided.
             navigation_timeout: Timeout for navigation (the process between opening a Playwright page and calling
                 the request handler)
+            goto_options: Additional options to pass to Playwright's `Page.goto()` method. Don't support `timeout`,
+                use `navigation_timeout` instead.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         configuration = kwargs.pop('configuration', None)
@@ -213,6 +217,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             kwargs['concurrency_settings'] = ConcurrencySettings(desired_concurrency=1)
 
         self._navigation_timeout = navigation_timeout or timedelta(minutes=1)
+        self._goto_options = goto_options or GotoOptions()
 
         super().__init__(**kwargs)
 
@@ -238,6 +243,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             log=context.log,
             page=crawlee_page.page,
             block_requests=partial(block_requests, page=crawlee_page.page),
+            goto_options=GotoOptions(**self._goto_options),
         )
 
         context_id = id(pre_navigation_context)
@@ -321,7 +327,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             try:
                 async with self._shared_navigation_timeouts[id(context)] as remaining_timeout:
                     response = await context.page.goto(
-                        context.request.url, timeout=remaining_timeout.total_seconds() * 1000
+                        context.request.url, timeout=remaining_timeout.total_seconds() * 1000, **context.goto_options
                     )
             except playwright.async_api.TimeoutError as exc:
                 raise asyncio.TimeoutError from exc
@@ -351,6 +357,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                     extract_links=extract_links,
                     enqueue_links=self._create_enqueue_links_function(context, extract_links),
                     block_requests=partial(block_requests, page=context.page),
+                    goto_options=context.goto_options,
                 )
 
             if context.session:

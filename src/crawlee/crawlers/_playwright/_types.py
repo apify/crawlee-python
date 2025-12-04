@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol, TypedDict
 
 from crawlee import HttpHeaders
 from crawlee._utils.docs import docs_group
@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from playwright.async_api import APIResponse, Response
-    from typing_extensions import Self
+    from typing_extensions import NotRequired, Self
 
 
 @docs_group('Functions')
@@ -58,3 +58,13 @@ class PlaywrightHttpResponse:
         _content = await response.body()
 
         return cls(http_version=http_version, status_code=status_code, headers=headers, _content=_content)
+
+
+class GotoOptions(TypedDict):
+    """Keyword arguments for Playwright's `Page.goto()` method."""
+
+    wait_until: NotRequired[Literal['domcontentloaded', 'load', 'networkidle', 'commit']]
+    """When to consider operation succeeded, defaults to 'load' event."""
+
+    referer: NotRequired[str]
+    """Referer header value."""
