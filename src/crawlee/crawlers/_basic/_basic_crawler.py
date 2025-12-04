@@ -14,6 +14,7 @@ from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Seque
 from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
+from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, cast
 from urllib.parse import ParseResult, urlparse
@@ -32,6 +33,8 @@ from crawlee._service_locator import ServiceLocator
 from crawlee._types import (
     BasicCrawlingContext,
     EnqueueLinksKwargs,
+    ExportDataCsvKwargs,
+    ExportDataJsonKwargs,
     GetKeyValueStoreFromRequestHandlerFunction,
     HttpHeaders,
     HttpPayload,
@@ -41,7 +44,7 @@ from crawlee._types import (
     SkippedReason,
 )
 from crawlee._utils.docs import docs_group
-from crawlee._utils.file import export_csv_to_stream, export_json_to_stream
+from crawlee._utils.file import atomic_write, export_csv_to_stream, export_json_to_stream
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
@@ -868,6 +871,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
+        **additional_kwargs: Unpack[ExportDataJsonKwargs | ExportDataCsvKwargs],  # type: ignore[misc]
     ) -> None:
         """Export all items from a Dataset to a JSON or CSV file.
 
@@ -880,6 +884,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             dataset_id: The ID of the Dataset to export from.
             dataset_name: The name of the Dataset to export from (global scope, named storage).
             dataset_alias: The alias of the Dataset to export from (run scope, unnamed storage).
+            additional_kwargs: Extra keyword arguments forwarded to the JSON/CSV exporter depending on the file format.
         """
         dataset = await Dataset.open(
             id=dataset_id,
@@ -889,13 +894,18 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             configuration=self._service_locator.get_configuration(),
         )
 
-        path = path if isinstance(path, Path) else Path(path)
-        dst = path.open('w', newline='')
+        path = Path(path)
 
         if path.suffix == '.csv':
-            await export_csv_to_stream(dataset.iterate_items(), dst)
+            dst = StringIO()
+            csv_kwargs = cast('ExportDataCsvKwargs', additional_kwargs)
+            await export_csv_to_stream(dataset.iterate_items(), dst, **csv_kwargs)
+            await atomic_write(path, dst.getvalue())
         elif path.suffix == '.json':
-            await export_json_to_stream(dataset.iterate_items(), dst)
+            dst = StringIO()
+            json_kwargs = cast('ExportDataJsonKwargs', additional_kwargs)
+            await export_json_to_stream(dataset.iterate_items(), dst, **json_kwargs)
+            await atomic_write(path, dst.getvalue())
         else:
             raise ValueError(f'Unsupported file extension: {path.suffix}')
 

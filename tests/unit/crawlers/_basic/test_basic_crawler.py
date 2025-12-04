@@ -735,6 +735,22 @@ async def test_crawler_push_and_export_data(tmp_path: Path) -> None:
     assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
 
 
+async def test_crawler_export_data_additional_kwargs(tmp_path: Path) -> None:
+    crawler = BasicCrawler()
+    dataset = await Dataset.open()
+
+    await dataset.push_data({'z': 1, 'a': 2})
+
+    json_path = tmp_path / 'dataset.json'
+    csv_path = tmp_path / 'dataset.csv'
+
+    await crawler.export_data(path=json_path, sort_keys=True, separators=(',', ':'))
+    await crawler.export_data(path=csv_path, delimiter=';', lineterminator='\n')
+
+    assert json_path.read_text() == '[{"a":2,"z":1}]'
+    assert csv_path.read_text() == 'z;a\n1;2\n'
+
+
 async def test_context_push_and_export_data(tmp_path: Path) -> None:
     crawler = BasicCrawler()
 

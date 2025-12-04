@@ -30,7 +30,8 @@ async def main() -> None:
     await crawler.run(['https://crawlee.dev'])
 
     # Export the entire dataset to a JSON file.
-    await crawler.export_data(path='results.json')
+    # Set ensure_ascii=False to allow Unicode characters in the output.
+    await crawler.export_data(path='results.json', ensure_ascii=False)
 
 
 if __name__ == '__main__':
