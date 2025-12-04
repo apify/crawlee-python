@@ -1301,6 +1301,8 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     )
     crawler.log.setLevel(logging.DEBUG)
     logging.getLogger('crawlee.storage_clients._file_system._request_queue_client').setLevel(logging.DEBUG)
+    logging.getLogger('crawlee._autoscaling.autoscaled_pool').setLevel(logging.INFO)
+
 
     mocked_handler_before_sleep = Mock()
     mocked_handler_after_sleep = Mock()

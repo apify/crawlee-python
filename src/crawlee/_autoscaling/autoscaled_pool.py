@@ -124,7 +124,9 @@ class AutoscaledPool:
 
         try:
             await run.result
+            logger.info('Finished naturally')
         except AbortError:
+            logger.info('AbortError')
             orchestrator.cancel()
             for task in run.worker_tasks:
                 if not task.done():
@@ -245,16 +247,16 @@ class AutoscaledPool:
                     await asyncio.wait_for(run.worker_tasks_updated.wait(), timeout=0.5)
         finally:
             if finished:
-                logger.debug('`is_finished_function` reports that we are finished')
+                logger.info('`is_finished_function` reports that we are finished')
             elif run.result.done() and run.result.exception() is not None:
-                logger.debug('Unhandled exception in `run_task_function`')
+                logger.info('Unhandled exception in `run_task_function`')
 
             if run.worker_tasks:
-                logger.debug('Terminating - waiting for tasks to complete')
+                logger.info('Terminating - waiting for tasks to complete')
                 await asyncio.wait(run.worker_tasks, return_when=asyncio.ALL_COMPLETED)
-                logger.debug('Worker tasks finished')
+                logger.info('Worker tasks finished')
             else:
-                logger.debug('Terminating - no running tasks to wait for')
+                logger.info('Terminating - no running tasks to wait for')
 
             if not run.result.done():
                 run.result.set_result(object())

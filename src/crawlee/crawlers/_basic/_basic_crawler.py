@@ -1347,6 +1347,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if self._abort_on_error and self._failed:
             self._failed = False
+            self.log.info('_abort_on_error')
             return True
 
         if self._keep_alive:
