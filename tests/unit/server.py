@@ -125,6 +125,7 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         'xml': hello_world_xml,
         'robots.txt': robots_txt,
         'get_compressed': get_compressed,
+        'slow': slow_response,
         'infinite_scroll': infinite_scroll_endpoint,
         'resource_loading_page': resource_loading_endpoint,
     }
@@ -415,6 +416,15 @@ async def get_compressed(_scope: dict[str, Any], _receive: Receive, send: Send) 
         }
     )
     await send({'type': 'http.response.body', 'body': gzip.compress(HELLO_WORLD * 1000)})
+
+
+async def slow_response(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Handle requests with a configurable delay to test timeouts."""
+    query_params = get_query_params(scope.get('query_string', b''))
+    delay = float(query_params.get('delay', '5'))  # Default 5 second delay
+
+    await asyncio.sleep(delay)
+    await send_html_response(send, HELLO_WORLD)
 
 
 async def infinite_scroll_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:

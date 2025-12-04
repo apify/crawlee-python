@@ -34,6 +34,7 @@ keywords = [
     "scraping",
 ]
 dependencies = [
+    "async-timeout>=5.0.1",
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
     "impit>=0.8.0",

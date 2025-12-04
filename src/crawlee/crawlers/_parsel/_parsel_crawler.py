@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from parsel import Selector
 
 from crawlee._utils.docs import docs_group
-from crawlee.crawlers import AbstractHttpCrawler, BasicCrawlerOptions
+from crawlee.crawlers import AbstractHttpCrawler, HttpCrawlerOptions
 
 from ._parsel_crawling_context import ParselCrawlingContext
 from ._parsel_parser import ParselParser
@@ -56,7 +56,7 @@ class ParselCrawler(AbstractHttpCrawler[ParselCrawlingContext, Selector, Selecto
 
     def __init__(
         self,
-        **kwargs: Unpack[BasicCrawlerOptions[ParselCrawlingContext]],
+        **kwargs: Unpack[HttpCrawlerOptions[ParselCrawlingContext]],
     ) -> None:
         """Initialize a new instance.
 
