@@ -1295,7 +1295,11 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     double_handler_timeout_s = handler_timeout.total_seconds() * 2
     handler_sleep = iter([double_handler_timeout_s, double_handler_timeout_s, 0])
 
-    crawler = BasicCrawler(request_handler_timeout=handler_timeout, max_request_retries=max_request_retries)
+    crawler = BasicCrawler(
+        request_handler_timeout=handler_timeout,
+        max_request_retries=max_request_retries,
+    )
+    crawler.log.setLevel(logging.DEBUG)
 
     mocked_handler_before_sleep = Mock()
     mocked_handler_after_sleep = Mock()
@@ -1311,6 +1315,7 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
 
         # This will not execute if timeout happens.
         mocked_handler_after_sleep()
+        context.log.info('Handling request')
 
     # Timeout in pytest, because previous implementation would run crawler until following:
     # "The request queue seems to be stuck for 300.0s, resetting internal state."
