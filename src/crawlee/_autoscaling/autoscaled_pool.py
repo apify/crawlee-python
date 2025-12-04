@@ -123,6 +123,7 @@ class AutoscaledPool:
         )
 
         try:
+            logger.info(f'Await result')
             await run.result
             logger.info(f'Finished naturally, {run.worker_tasks=}, {run.result.result()=}')
         except AbortError:
@@ -133,6 +134,9 @@ class AutoscaledPool:
                     task.cancel()
         except Exception as exc:
             logger.error('Something sinister happened', exc_info=exc)
+            raise
+        except BaseException as exc:
+            logger.error('BaseException happened', exc_info=exc)
             raise
 
         finally:
