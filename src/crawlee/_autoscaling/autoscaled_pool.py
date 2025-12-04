@@ -46,7 +46,7 @@ class AutoscaledPool:
     _AUTOSCALE_INTERVAL = timedelta(seconds=10)
     """Interval at which the autoscaled pool adjusts the desired concurrency based on the latest system status."""
 
-    _LOGGING_INTERVAL = timedelta(minutes=1)
+    _LOGGING_INTERVAL = timedelta(seconds=0.5)
     """Interval at which the autoscaled pool logs its current state."""
 
     _DESIRED_CONCURRENCY_RATIO = 0.9
