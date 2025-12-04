@@ -1369,7 +1369,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return False
 
         request_manager = await self.get_request_manager()
-        return not await request_manager.is_empty()
+        is_ready = not await request_manager.is_empty()
+        if is_ready:
+            self.log.info('There is a request to process')
+        return is_ready
 
     async def __run_task_function(self) -> None:
         request_manager = await self.get_request_manager()

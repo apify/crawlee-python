@@ -237,20 +237,21 @@ class AutoscaledPool:
 
                 current_status = self._system_status.get_current_system_info()
                 if not current_status.is_system_idle:
-                    logger.debug('Not scheduling new tasks - system is overloaded')
+                    logger.info('Not scheduling new tasks - system is overloaded')
                 elif self._is_paused:
-                    logger.debug('Not scheduling new tasks - the autoscaled pool is paused')
+                    logger.info('Not scheduling new tasks - the autoscaled pool is paused')
                 elif self.current_concurrency >= self.desired_concurrency:
-                    logger.debug('Not scheduling new tasks - already running at desired concurrency')
+                    logger.info('Not scheduling new tasks - already running at desired concurrency')
                 elif not await self._is_task_ready_function():
                     logger.debug('Not scheduling new task - no task is ready')
                 else:
-                    logger.debug('Scheduling a new task')
+                    logger.info('Scheduling a new task')
                     worker_task = asyncio.create_task(self._worker_task(), name='autoscaled pool worker task')
                     worker_task.add_done_callback(lambda task: self._reap_worker_task(task, run))
                     run.worker_tasks.append(worker_task)
 
                     if math.isfinite(self._max_tasks_per_minute):
+                        logger.info('Deadlock sleep????')
                         await asyncio.sleep(60 / self._max_tasks_per_minute)
 
                     continue
