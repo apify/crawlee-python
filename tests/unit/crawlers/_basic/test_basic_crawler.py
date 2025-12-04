@@ -1294,6 +1294,7 @@ async def test_timeout_in_handler(sleep_type: str, _) -> None:
     max_request_retries = 3
     double_handler_timeout_s = handler_timeout.total_seconds() * 2
     handler_sleep = iter([double_handler_timeout_s, double_handler_timeout_s, 0])
+    CI_test_tolerance = 5  # MacOS CI has been slow in exceptional cases
 
     crawler = BasicCrawler(
         request_handler_timeout=handler_timeout,
@@ -1322,7 +1323,7 @@ async def test_timeout_in_handler(sleep_type: str, _) -> None:
 
     # Timeout in pytest, because previous implementation would run crawler until following:
     # "The request queue seems to be stuck for 300.0s, resetting internal state."
-    async with timeout(max_request_retries * double_handler_timeout_s):
+    async with timeout(max_request_retries * double_handler_timeout_s + CI_test_tolerance):
         await crawler.run(['https://a.placeholder.com'])
 
     assert crawler.statistics.state.requests_finished == 1
