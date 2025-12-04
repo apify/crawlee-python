@@ -1271,7 +1271,7 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
     await store.persist_autosaved_values()
     assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY))['counter'] == 2
 
-
+@pytest.mark.parametrize("_", range(10))
 @pytest.mark.run_alone
 @pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.timeout was introduced in Python 3.11.')
 @pytest.mark.parametrize(
@@ -1281,7 +1281,7 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
         pytest.param('sync_sleep', marks=pytest.mark.skip(reason='https://github.com/apify/crawlee-python/issues/908')),
     ],
 )
-async def test_timeout_in_handler(sleep_type: str) -> None:
+async def test_timeout_in_handler(sleep_type: str, _) -> None:
     """Test that timeout from request handler is treated the same way as exception thrown in request handler.
 
     Handler should be able to time out even if the code causing the timeout is blocking sync code.
