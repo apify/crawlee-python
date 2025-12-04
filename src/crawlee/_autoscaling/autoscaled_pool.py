@@ -124,7 +124,7 @@ class AutoscaledPool:
 
         try:
             await run.result
-            logger.info('Finished naturally')
+            logger.info(f'Finished naturally, {run.worker_tasks=}, {run.result.result()=}')
         except AbortError:
             logger.info('AbortError')
             orchestrator.cancel()
@@ -249,6 +249,13 @@ class AutoscaledPool:
 
                 with suppress(asyncio.TimeoutError):
                     await asyncio.wait_for(run.worker_tasks_updated.wait(), timeout=0.5)
+
+            logger.info("Just finishing")
+
+        except Exception as e:
+            logger.error('What is hiding here?', exc_info=e)
+            raise
+
         finally:
             logger.info(f'Finally pool. {finished=}, {(run.result.done())=}')
             if finished:
@@ -264,7 +271,7 @@ class AutoscaledPool:
                 logger.info('Terminating - no running tasks to wait for')
 
             if not run.result.done():
-                run.result.set_result(object())
+                run.result.set_result("Hello")
 
     def _reap_worker_task(self, task: asyncio.Task, run: _AutoscaledPoolRun) -> None:
         """Handle cleanup and tracking of a completed worker task.
