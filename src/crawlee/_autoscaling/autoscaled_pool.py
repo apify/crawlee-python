@@ -131,6 +131,10 @@ class AutoscaledPool:
             for task in run.worker_tasks:
                 if not task.done():
                     task.cancel()
+        except Exception as exc:
+            logger.error('Something sinister happened', exc_info=exc)
+            raise
+
         finally:
             with suppress(asyncio.CancelledError):
                 await self._autoscale_task.stop()
@@ -218,7 +222,7 @@ class AutoscaledPool:
         Exits when `is_finished_function` returns True.
         """
         finished = False
-
+        logger.info('_worker_task_orchestrator')
         try:
             while not (finished := await self._is_finished_function()) and not run.result.done():
                 run.worker_tasks_updated.clear()
@@ -246,6 +250,7 @@ class AutoscaledPool:
                 with suppress(asyncio.TimeoutError):
                     await asyncio.wait_for(run.worker_tasks_updated.wait(), timeout=0.5)
         finally:
+            logger.info('Finally pool')
             if finished:
                 logger.info('`is_finished_function` reports that we are finished')
             elif run.result.done() and run.result.exception() is not None:
