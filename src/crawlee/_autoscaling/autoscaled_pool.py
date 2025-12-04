@@ -250,7 +250,7 @@ class AutoscaledPool:
                 with suppress(asyncio.TimeoutError):
                     await asyncio.wait_for(run.worker_tasks_updated.wait(), timeout=0.5)
         finally:
-            logger.info('Finally pool')
+            logger.info(f'Finally pool. {finished=}, {(run.result.done())=}')
             if finished:
                 logger.info('`is_finished_function` reports that we are finished')
             elif run.result.done() and run.result.exception() is not None:
