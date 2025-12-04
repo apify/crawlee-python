@@ -136,12 +136,16 @@ class AutoscaledPool:
             raise
 
         finally:
+            logger.error('finally')
             with suppress(asyncio.CancelledError):
+                logger.error('self._autoscale_task.stop()')
                 await self._autoscale_task.stop()
             with suppress(asyncio.CancelledError):
+                logger.error('await self._log_system_status_task.stop()')
                 await self._log_system_status_task.stop()
 
             if not orchestrator.done():
+                logger.error('not orchestrator.done()')
                 orchestrator.cancel()
             elif not orchestrator.cancelled() and orchestrator.exception() is not None:
                 logger.error('Exception in worker task orchestrator', exc_info=orchestrator.exception())
@@ -257,7 +261,7 @@ class AutoscaledPool:
             raise
 
         finally:
-            logger.info(f'Finally pool. {finished=}, {(run.result.done())=}')
+            logger.info(f'Finally pool. {finished=}, {(run.result.done())=}, {(run.result.result() if run.result.done() else None)=}')
             if finished:
                 logger.info('`is_finished_function` reports that we are finished')
             elif run.result.done() and run.result.exception() is not None:
