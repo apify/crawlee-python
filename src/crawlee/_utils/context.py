@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+import inspect
 from collections.abc import Callable
 from functools import wraps
 from typing import Any, TypeVar
@@ -44,4 +44,4 @@ def ensure_context(method: T) -> T:
 
         return await method(self, *args, **kwargs)
 
-    return async_wrapper if asyncio.iscoroutinefunction(method) else sync_wrapper  # type: ignore[return-value]
+    return async_wrapper if inspect.iscoroutinefunction(method) else sync_wrapper  # type: ignore[return-value]

@@ -221,6 +221,10 @@ timeout = 300
 markers = [
     "run_alone: marks tests that must run in isolation",
 ]
+filterwarnings = [
+    "ignore:websockets.legacy is deprecated:DeprecationWarning",
+    "ignore:websockets.server.WebSocketServerProtocol is deprecated:DeprecationWarning",
+]
 
 [tool.mypy]
 python_version = "3.10"

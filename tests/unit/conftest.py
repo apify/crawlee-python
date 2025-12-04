@@ -185,6 +185,7 @@ def redirect_http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator
         timeout_graceful_shutdown=10,
         log_level='error',
         access_log=False,
+        ws='websockets-sansio',
     )
     server = TestServer(config=config)
     yield from serve_in_thread(server)

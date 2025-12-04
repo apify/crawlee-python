@@ -26,6 +26,9 @@ def test_get_cpu_info_returns_valid_values() -> None:
     assert 0 <= cpu_info.used_ratio <= 1
 
 
+# Suppress the warning because there were no problems with using `fork' in our test environment.
+# However, there are serialization issues in other cases.
+@pytest.mark.filterwarnings('ignore:This process .* is multi-threaded, use of fork:DeprecationWarning')
 @pytest.mark.skipif(sys.platform != 'linux', reason='Improved estimation available only on Linux')
 def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
     """Test that memory usage estimation is not overestimating memory usage by counting shared memory multiple times.
