@@ -1353,7 +1353,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return False
 
         request_manager = await self.get_request_manager()
-        return await request_manager.is_finished()
+        is_finished = await request_manager.is_finished()
+        if is_finished:
+            self.log.info('I am sure this is a lie!!!')
+            self.log.info(self._request_manager._client._state._state)
+        return is_finished
 
     async def __is_task_ready_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()

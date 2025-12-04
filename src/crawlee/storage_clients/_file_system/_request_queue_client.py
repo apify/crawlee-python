@@ -57,7 +57,6 @@ class RequestQueueState(BaseModel):
     handled_requests: set[str] = set()
     """Set of request unique keys that have been handled."""
 
-
 class FileSystemRequestQueueClient(RequestQueueClient):
     """A file system implementation of the request queue client.
 
