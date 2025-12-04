@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 1.1.2 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- Only apply requestHandlerTimeout to request handler ([#1474](https://github.com/apify/crawlee-python/pull/1474)) ([0dfb6c2](https://github.com/apify/crawlee-python/commit/0dfb6c2a13b6650736245fa39b3fbff397644df7)) by [@janbuchar](https://github.com/janbuchar)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [1.1.1](https://github.com/apify/crawlee-python/releases/tag/v1.1.1) (2025-12-02)
