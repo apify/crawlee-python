@@ -1768,3 +1768,35 @@ async def test_crawler_intermediate_statistics() -> None:
 
     # Wait for crawler to finish
     await crawler_task
+
+
+async def test_protect_request_and_session_in_run_handlers() -> None:
+    """Test that session and request in crawling context are protected in run handlers."""
+    request_queue = await RequestQueue.open(name='state-test')
+
+    async with SessionPool(max_pool_size=1) as session_pool:
+        session = await session_pool.get_session()
+        session.user_data['session_state'] = ['initial']
+
+        request = Request.from_url('https://test.url/', user_data={'request_state': ['initial']}, session_id=session.id)
+
+        crawler = BasicCrawler(session_pool=session_pool, request_manager=request_queue, max_request_retries=0)
+
+        @crawler.router.default_handler
+        async def handler(context: BasicCrawlingContext) -> None:
+            if context.session:
+                context.session.user_data['session_state'].append('modified')
+            if isinstance(context.request.user_data['request_state'], list):
+                context.request.user_data['request_state'].append('modified')
+            raise ValueError('Simulated error after modifying request and session')
+
+        await crawler.run([request])
+
+        check_request = await request_queue.get_request(request.unique_key)
+        assert check_request is not None
+        assert check_request.user_data['request_state'] == ['initial']
+
+        check_session = await session_pool.get_session()
+        assert check_session.user_data['session_state'] == ['initial']
+
+    await request_queue.drop()
