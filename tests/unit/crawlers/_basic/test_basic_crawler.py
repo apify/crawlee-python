@@ -1794,11 +1794,13 @@ async def test_new_request_error_handler() -> None:
 
     await crawler.run([request])
 
-    check_original_request = await queue.get_request(request.unique_key)
-    check_error_request = await queue.get_request(f'{request.unique_key}|test')
+    original_request = await queue.get_request(request.unique_key)
+    error_request = await queue.get_request(f'{request.unique_key}|test')
 
-    assert check_original_request is not None
-    assert check_original_request.state == RequestState.ERROR_HANDLER
+    assert original_request is not None
+    assert original_request.state == RequestState.ERROR_HANDLER
+    assert original_request.was_already_handled
 
-    assert check_error_request is not None
-    assert check_error_request.state == RequestState.REQUEST_HANDLER
+    assert error_request is not None
+    assert error_request.state == RequestState.REQUEST_HANDLER
+    assert error_request.was_already_handled
