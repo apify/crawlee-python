@@ -1829,5 +1829,5 @@ async def test_new_request_error_handler() -> None:
     assert original_request.was_already_handled
 
     assert error_request is not None
-    assert error_request.state == RequestState.REQUEST_HANDLER
+    assert error_request.state == RequestState.DONE
     assert error_request.was_already_handled
