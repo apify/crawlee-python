@@ -30,13 +30,38 @@ jobs:
       python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
 
   unit_tests:
-    name: Unit tests
-    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
-    secrets:
-      httpbin_url: ${{ secrets.APIFY_HTTPBIN_TOKEN && format('https://httpbin.apify.actor?token={0}', secrets.APIFY_HTTPBIN_TOKEN) || 'https://httpbin.org'}}
-    with:
-      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
-      os: '["ubuntu-latest", "windows-latest", "macos-latest"]'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    runs-on: ${{ matrix.os }}
+    env:
+      HTTPBIN_URL: 'asd'
+
+    steps:
+      - name: Disable Spotlight indexing
+        if: runner.os == 'macOS'
+        run: sudo mdutil -i off /
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv package manager
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Python dependencies
+        run: make install-dev
+
+      - name: Run unit tests
+        run: make unit-tests
 
   docs_check:
     name: Docs check
