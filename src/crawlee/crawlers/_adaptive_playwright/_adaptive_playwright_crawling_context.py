@@ -214,7 +214,7 @@ class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
     """Blocks network requests matching specified URL patterns."""
 
     goto_options: GotoOptions | None = None
-    """Additional options to pass to Playwright's `Page.goto()` method. Don't support `timeout`."""
+    """Additional options to pass to Playwright's `Page.goto()` method. The `timeout` option is not supported."""
 
     @property
     def page(self) -> Page:
