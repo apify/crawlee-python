@@ -732,7 +732,13 @@ async def test_crawler_push_and_export_data(tmp_path: Path) -> None:
         {'id': 1, 'test': 'test'},
         {'id': 2, 'test': 'test'},
     ]
-    assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
+
+    # On Windows, text mode file writes convert \n to \r\n, resulting in \r\n line endings.
+    # On Unix/Linux, \n remains as \n.
+    if sys.platform == 'win32':
+        assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
+    else:
+        assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\n0,test\n1,test\n2,test\n'
 
 
 async def test_crawler_export_data_additional_kwargs(tmp_path: Path) -> None:
@@ -770,7 +776,12 @@ async def test_context_push_and_export_data(tmp_path: Path) -> None:
         {'id': 2, 'test': 'test'},
     ]
 
-    assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
+    # On Windows, text mode file writes convert \n to \r\n, resulting in \r\n line endings.
+    # On Unix/Linux, \n remains as \n.
+    if sys.platform == 'win32':
+        assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\r\n0,test\r\n1,test\r\n2,test\r\n'
+    else:
+        assert (tmp_path / 'dataset.csv').read_bytes() == b'id,test\n0,test\n1,test\n2,test\n'
 
 
 async def test_context_update_kv_store() -> None:
