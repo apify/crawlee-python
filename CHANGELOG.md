@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Only apply requestHandlerTimeout to request handler ([#1474](https://github.com/apify/crawlee-python/pull/1474)) ([0dfb6c2](https://github.com/apify/crawlee-python/commit/0dfb6c2a13b6650736245fa39b3fbff397644df7)) by [@janbuchar](https://github.com/janbuchar)
+- Handle the case when `error_handler` returns `Request` ([#1595](https://github.com/apify/crawlee-python/pull/1595)) ([8a961a2](https://github.com/apify/crawlee-python/commit/8a961a2b07d0d33a7302dbb13c17f3d90999d390)) by [@Mantisus](https://github.com/Mantisus)
 
 
 <!-- git-cliff-unreleased-end -->
