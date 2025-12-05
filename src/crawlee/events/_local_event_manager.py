@@ -93,8 +93,8 @@ class LocalEventManager(EventManager):
 
     async def _emit_system_info_event(self) -> None:
         """Emit a system info event with the current CPU and memory usage."""
-        cpu_info = get_cpu_info()
-        memory_info = get_memory_info()
+        cpu_info = await asyncio.to_thread(get_cpu_info)
+        memory_info = await asyncio.to_thread(get_memory_info)
 
         event_data = EventSystemInfoData(cpu_info=cpu_info, memory_info=memory_info)
         self.emit(event=Event.SYSTEM_INFO, event_data=event_data)

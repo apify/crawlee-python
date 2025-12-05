@@ -1130,7 +1130,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             await self._statistics.error_tracker.add(error=error, context=context)
 
             if self._error_handler:
-                self.log.warning('Error handler')
                 try:
                     new_request = await self._error_handler(context, error)
                 except Exception as e:
@@ -1146,12 +1145,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             await self._mark_request_as_handled(request)
             await self._handle_failed_request(context, error)
             self._statistics.record_request_processing_failure(request.unique_key)
-        self.log.warning('_handle_request_retries DONE')
 
     async def _handle_request_error(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
         try:
             context.request.state = RequestState.ERROR_HANDLER
-            self.log.warning('Before _handle_request_error')
+
             await wait_for(
                 partial(self._handle_request_retries, context, error),
                 timeout=self._internal_timeout,
@@ -1159,7 +1157,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 f'{self._internal_timeout.total_seconds()} seconds',
                 logger=self._logger,
             )
-            self.log.warning('After _handle_request_error')
 
             context.request.state = RequestState.DONE
         except UserDefinedErrorHandlerError:
@@ -1331,17 +1328,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if self._abort_on_error and self._failed:
             self._failed = False
-            self.log.info('_abort_on_error')
             return True
 
         if self._keep_alive:
             return False
 
         request_manager = await self.get_request_manager()
-        is_finished = await request_manager.is_finished()
-        if is_finished:
-            self.log.info('I am sure this is a lie!!!')
-        return is_finished
+        return await request_manager.is_finished()
 
     async def __is_task_ready_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
@@ -1353,10 +1346,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return False
 
         request_manager = await self.get_request_manager()
-        is_ready = not await request_manager.is_empty()
-        if is_ready:
-            self.log.info('There is a request to process')
-        return is_ready
+        return not await request_manager.is_empty()
 
     async def __run_task_function(self) -> None:
         request_manager = await self.get_request_manager()
@@ -1370,11 +1360,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
         if request is None:
-            # No request to process, request manager is neither finished nor empty.
-            # All requests are locked or in progress.
-            self._logger.warning("Backoff: No available requests to process.")
-            await asyncio.sleep(0.2) # Small backoff time to avoid overloading the system through busy-waiting.
-            self._logger.warning("Backoff finished.")
             return
 
         if not (await self._is_allowed_based_on_robots_txt_file(request.url)):
@@ -1415,10 +1400,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             try:
                 await self._run_request_handler(context=context)
             except asyncio.TimeoutError as e:
-                context.log.info('RH error')
                 raise RequestHandlerError(e, context) from e
 
-            context.log.info('Commit resutls')
             await self._commit_request_handler_result(context)
 
             await self._mark_request_as_handled(request)
@@ -1428,7 +1411,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             if context.session and context.session.is_usable:
                 context.session.mark_good()
 
-            context.log.info('Finished processing request')
             self._statistics.record_request_processing_finish(request.unique_key)
 
         except RequestCollisionError as request_error:

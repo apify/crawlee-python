@@ -40,17 +40,12 @@ jobs:
       HTTPBIN_URL: 'asd'
 
     steps:
-      - name: Os cleanup
+      - name: macOS cleanup
         if: runner.os == 'macOS'
+        # Disable Spotlight indexing and try to kill all useless processes that could drain CPU during tests
         run: |
           sudo mdutil -i off /
-          sudo killall ecosystemanalyticsd
-          sudo killall Finder || true
-          sudo killall mds || true
-          sudo killall mds_stores || true
-          sudo killall mds_worker || true
-          sudo killall mdworker || true
-          sudo killall mdworker_shared || true
+          sudo killall Finder spindump ecosystemanalyticsd SystemUIServer NotificationCenter mds mds_stores mds_worker mdworker mdworker_shared || true
 
       - name: Checkout repository
         uses: actions/checkout@v4

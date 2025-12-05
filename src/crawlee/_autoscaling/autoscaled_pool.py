@@ -46,7 +46,7 @@ class AutoscaledPool:
     _AUTOSCALE_INTERVAL = timedelta(seconds=10)
     """Interval at which the autoscaled pool adjusts the desired concurrency based on the latest system status."""
 
-    _LOGGING_INTERVAL = timedelta(seconds=0.5)
+    _LOGGING_INTERVAL = timedelta(minutes=1)
     """Interval at which the autoscaled pool logs its current state."""
 
     _DESIRED_CONCURRENCY_RATIO = 0.9
@@ -60,9 +60,6 @@ class AutoscaledPool:
 
     _TASK_TIMEOUT: timedelta | None = None
     """Timeout within which the `run_task_function` must complete."""
-
-    _OVERLOADED_BACKOFF_TIME: timedelta = timedelta(seconds=1)
-    """When overloaded, Autoscaled pool waits this long before rechecking system status."""
 
     def __init__(
         self,
@@ -126,33 +123,19 @@ class AutoscaledPool:
         )
 
         try:
-            logger.info(f'Await result')
             await run.result
-            logger.info(f'Finished naturally, {run.worker_tasks=}, {run.result.result()=}')
         except AbortError:
-            logger.info('AbortError')
             orchestrator.cancel()
             for task in run.worker_tasks:
                 if not task.done():
                     task.cancel()
-        except Exception as exc:
-            logger.error('Something sinister happened', exc_info=exc)
-            raise
-        except BaseException as exc:
-            logger.error('BaseException happened', exc_info=exc)
-            raise
-
         finally:
-            logger.error('finally')
             with suppress(asyncio.CancelledError):
-                logger.error('self._autoscale_task.stop()')
                 await self._autoscale_task.stop()
             with suppress(asyncio.CancelledError):
-                logger.error('await self._log_system_status_task.stop()')
                 await self._log_system_status_task.stop()
 
             if not orchestrator.done():
-                logger.error('not orchestrator.done()')
                 orchestrator.cancel()
             elif not orchestrator.cancelled() and orchestrator.exception() is not None:
                 logger.error('Exception in worker task orchestrator', exc_info=orchestrator.exception())
@@ -233,59 +216,48 @@ class AutoscaledPool:
         Exits when `is_finished_function` returns True.
         """
         finished = False
-        logger.info('_worker_task_orchestrator')
+
         try:
             while not (finished := await self._is_finished_function()) and not run.result.done():
                 run.worker_tasks_updated.clear()
 
                 current_status = self._system_status.get_current_system_info()
                 if not current_status.is_system_idle:
-                    logger.info(f'Not scheduling new tasks - system is overloaded: {current_status}')
-                    await asyncio.sleep(self._OVERLOADED_BACKOFF_TIME.total_seconds())
-                    logger.info('Release the overloaded backoff')
+                    logger.debug('Not scheduling new tasks - system is overloaded')
                 elif self._is_paused:
-                    logger.info('Not scheduling new tasks - the autoscaled pool is paused')
+                    logger.debug('Not scheduling new tasks - the autoscaled pool is paused')
                 elif self.current_concurrency >= self.desired_concurrency:
-                    logger.info('Not scheduling new tasks - already running at desired concurrency')
+                    logger.debug('Not scheduling new tasks - already running at desired concurrency')
                 elif not await self._is_task_ready_function():
                     logger.debug('Not scheduling new task - no task is ready')
                 else:
-                    logger.info('Scheduling a new task')
+                    logger.debug('Scheduling a new task')
                     worker_task = asyncio.create_task(self._worker_task(), name='autoscaled pool worker task')
                     worker_task.add_done_callback(lambda task: self._reap_worker_task(task, run))
                     run.worker_tasks.append(worker_task)
 
                     if math.isfinite(self._max_tasks_per_minute):
-                        logger.info('Deadlock sleep????')
                         await asyncio.sleep(60 / self._max_tasks_per_minute)
 
                     continue
 
                 with suppress(asyncio.TimeoutError):
                     await asyncio.wait_for(run.worker_tasks_updated.wait(), timeout=0.5)
-
-            logger.info("Just finishing")
-
-        except BaseException as e:
-            logger.error('What is hiding here?', exc_info=e)
-            raise
-
         finally:
-            logger.info(f'Finally pool. {finished=}, {(run.result.done())=}, {(run.result.result() if run.result.done() else None)=}')
             if finished:
-                logger.info('`is_finished_function` reports that we are finished')
+                logger.debug('`is_finished_function` reports that we are finished')
             elif run.result.done() and run.result.exception() is not None:
-                logger.info('Unhandled exception in `run_task_function`')
+                logger.debug('Unhandled exception in `run_task_function`')
 
             if run.worker_tasks:
-                logger.info('Terminating - waiting for tasks to complete')
+                logger.debug('Terminating - waiting for tasks to complete')
                 await asyncio.wait(run.worker_tasks, return_when=asyncio.ALL_COMPLETED)
-                logger.info('Worker tasks finished')
+                logger.debug('Worker tasks finished')
             else:
-                logger.info('Terminating - no running tasks to wait for')
+                logger.debug('Terminating - no running tasks to wait for')
 
             if not run.result.done():
-                run.result.set_result("Hello")
+                run.result.set_result(object())
 
     def _reap_worker_task(self, task: asyncio.Task, run: _AutoscaledPoolRun) -> None:
         """Handle cleanup and tracking of a completed worker task.

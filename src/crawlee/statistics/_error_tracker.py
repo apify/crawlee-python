@@ -58,7 +58,6 @@ class ErrorTracker:
             early: Flag indicating that the error is added earlier than usual to have access to resources that will be
              closed before normal error collection. This prevents double reporting during normal error collection.
         """
-        logger.warning('Adding error')
         if id(error) in self._early_reported_errors:
             # Error had to be collected earlier before relevant resources are closed.
             self._early_reported_errors.remove(id(error))
@@ -99,15 +98,12 @@ class ErrorTracker:
             == 1
             and context is not None
         ):
-            logger.warning('awaiting snapshot')
             # Save snapshot only on the first occurrence of the error and only if context and kvs was passed as well.
             await self._capture_error_snapshot(
                 error_message=new_error_group_message or error_group_message,
                 file_and_line=error_group_file_and_line,
                 context=context,
             )
-            logger.warning('Snapshot added')
-        logger.warning('Finished')
 
     async def _capture_error_snapshot(
         self, error_message: str, file_and_line: str, context: BasicCrawlingContext

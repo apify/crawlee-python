@@ -12,18 +12,15 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
 from itertools import product
-from subprocess import run
 from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, Mock, call, patch
 
-import psutil
 import pytest
 
 from crawlee import ConcurrencySettings, Glob, service_locator
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpMethod
 from crawlee._utils.robots import RobotsTxtFile
-from crawlee._utils.system import print_ps
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
@@ -1274,7 +1271,7 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
     await store.persist_autosaved_values()
     assert (await store.get_value(BasicCrawler._CRAWLEE_STATE_KEY))['counter'] == 2
 
-@pytest.mark.parametrize("_", range(10))
+
 @pytest.mark.run_alone
 @pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.timeout was introduced in Python 3.11.')
 @pytest.mark.parametrize(
@@ -1284,7 +1281,7 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
         pytest.param('sync_sleep', marks=pytest.mark.skip(reason='https://github.com/apify/crawlee-python/issues/908')),
     ],
 )
-async def test_timeout_in_handler(sleep_type: str, _) -> None:
+async def test_timeout_in_handler(sleep_type: str) -> None:
     """Test that timeout from request handler is treated the same way as exception thrown in request handler.
 
     Handler should be able to time out even if the code causing the timeout is blocking sync code.
@@ -1293,25 +1290,12 @@ async def test_timeout_in_handler(sleep_type: str, _) -> None:
     # Test is skipped in older Python versions.
     from asyncio import timeout  # type:ignore[attr-defined] # noqa: PLC0415
 
-    # Debug CPu usage before starting the test
-    print_ps()
-
     handler_timeout = timedelta(seconds=1)
     max_request_retries = 3
     double_handler_timeout_s = handler_timeout.total_seconds() * 2
     handler_sleep = iter([double_handler_timeout_s, double_handler_timeout_s, 0])
-    CI_test_tolerance = 5  # MacOS CI has been slow in exceptional cases
 
-    crawler = BasicCrawler(
-        request_handler_timeout=handler_timeout,
-        max_request_retries=max_request_retries,
-    )
-    crawler.log.setLevel(logging.DEBUG)
-
-    crawler.log.info(f'Calling get_cpu_info()...: {psutil.cpu_percent(percpu=True)}')
-    logging.getLogger('crawlee.storage_clients._file_system._request_queue_client').setLevel(logging.DEBUG)
-    logging.getLogger('crawlee._autoscaling.autoscaled_pool').setLevel(logging.INFO)
-
+    crawler = BasicCrawler(request_handler_timeout=handler_timeout, max_request_retries=max_request_retries)
 
     mocked_handler_before_sleep = Mock()
     mocked_handler_after_sleep = Mock()
@@ -1327,11 +1311,10 @@ async def test_timeout_in_handler(sleep_type: str, _) -> None:
 
         # This will not execute if timeout happens.
         mocked_handler_after_sleep()
-        context.log.info('Handling request')
 
     # Timeout in pytest, because previous implementation would run crawler until following:
     # "The request queue seems to be stuck for 300.0s, resetting internal state."
-    async with timeout(max_request_retries * double_handler_timeout_s + CI_test_tolerance):
+    async with timeout(max_request_retries * double_handler_timeout_s):
         await crawler.run(['https://a.placeholder.com'])
 
     assert crawler.statistics.state.requests_finished == 1

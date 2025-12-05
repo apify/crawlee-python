@@ -4,7 +4,6 @@ import json
 import logging
 import sys
 import textwrap
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from colorama import Fore, Style, just_fix_windows_console
@@ -163,6 +162,6 @@ class CrawleeLogFormatter(logging.Formatter):
 
         if self.include_logger_name:
             # Include logger name at the beginning of the log line
-            return f'{datetime.utcnow().strftime("%M-%S-%f")}{logger_name_string}{level_string}{log_string}{extra_string}{exception_string}'
+            return f'{logger_name_string}{level_string}{log_string}{extra_string}{exception_string}'
 
         return f'{level_string}{log_string}{extra_string}{exception_string}'
