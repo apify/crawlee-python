@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 1.1.2 - **not yet released**
 
+### 🚀 Features
+
+- Add additional kwargs to Crawler&#x27;s export_data ([#1597](https://github.com/apify/crawlee-python/pull/1597)) ([5977f37](https://github.com/apify/crawlee-python/commit/5977f376b93a7c0d4dd53f0d331a4b04fedba2c6)) by [@vdusek](https://github.com/vdusek), closes [#526](https://github.com/apify/crawlee-python/issues/526)
+
 ### 🐛 Bug Fixes
 
 - Only apply requestHandlerTimeout to request handler ([#1474](https://github.com/apify/crawlee-python/pull/1474)) ([0dfb6c2](https://github.com/apify/crawlee-python/commit/0dfb6c2a13b6650736245fa39b3fbff397644df7)) by [@janbuchar](https://github.com/janbuchar)
