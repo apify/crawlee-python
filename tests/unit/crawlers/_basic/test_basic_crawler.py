@@ -12,9 +12,11 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
 from itertools import product
+from subprocess import run
 from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, Mock, call, patch
 
+import psutil
 import pytest
 
 from crawlee import ConcurrencySettings, Glob, service_locator
@@ -1290,6 +1292,13 @@ async def test_timeout_in_handler(sleep_type: str, _) -> None:
     # Test is skipped in older Python versions.
     from asyncio import timeout  # type:ignore[attr-defined] # noqa: PLC0415
 
+    # Debug CPu usage before starting the test
+    run("ps -ewfaxo comm,user,pid,%cpu,cmd", shell=True)
+
+    run("ps -awxo pid,%cpu,comm", shell=True)
+
+
+
     handler_timeout = timedelta(seconds=1)
     max_request_retries = 3
     double_handler_timeout_s = handler_timeout.total_seconds() * 2
@@ -1301,6 +1310,8 @@ async def test_timeout_in_handler(sleep_type: str, _) -> None:
         max_request_retries=max_request_retries,
     )
     crawler.log.setLevel(logging.DEBUG)
+
+    crawler.log.info(f'Calling get_cpu_info()...: {psutil.cpu_percent(percpu=True)}')
     logging.getLogger('crawlee.storage_clients._file_system._request_queue_client').setLevel(logging.DEBUG)
     logging.getLogger('crawlee._autoscaling.autoscaled_pool').setLevel(logging.INFO)
 

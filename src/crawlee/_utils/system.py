@@ -93,9 +93,10 @@ def get_cpu_info() -> CpuInfo:
     It utilizes the `psutil` library. Function `psutil.cpu_percent()` returns a float representing the current
     system-wide CPU utilization as a percentage.
     """
-    logger.debug('Calling get_cpu_info()...')
-    cpu_percent = psutil.cpu_percent(interval=0.1)
-    return CpuInfo(used_ratio=cpu_percent / 100)
+
+    cpu_percent = psutil.cpu_percent(percpu=True)
+    logger.info(f'Calling get_cpu_info()...: {cpu_percent}')
+    return CpuInfo(used_ratio=sum(cpu_percent)/len(cpu_percent) / 100)
 
 
 def get_memory_info() -> MemoryInfo:
