@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, Mock, call, patch
 import pytest
 
 from crawlee import ConcurrencySettings, Glob, service_locator
-from crawlee._request import Request
+from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpMethod
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee.configuration import Configuration
@@ -1768,3 +1768,39 @@ async def test_crawler_intermediate_statistics() -> None:
 
     # Wait for crawler to finish
     await crawler_task
+
+
+async def test_new_request_error_handler() -> None:
+    """Test that error in new_request_handler is handled properly."""
+    queue = await RequestQueue.open()
+    crawler = BasicCrawler(
+        request_manager=queue,
+    )
+
+    request = Request.from_url('https://a.placeholder.com')
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        if '|test' in context.request.unique_key:
+            return
+        raise ValueError('This error should not be handled by error handler')
+
+    @crawler.error_handler
+    async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request | None:
+        return Request.from_url(
+            context.request.url,
+            unique_key=f'{context.request.unique_key}|test',
+        )
+
+    await crawler.run([request])
+
+    original_request = await queue.get_request(request.unique_key)
+    error_request = await queue.get_request(f'{request.unique_key}|test')
+
+    assert original_request is not None
+    assert original_request.state == RequestState.ERROR_HANDLER
+    assert original_request.was_already_handled
+
+    assert error_request is not None
+    assert error_request.state == RequestState.REQUEST_HANDLER
+    assert error_request.was_already_handled
