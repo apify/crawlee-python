@@ -241,7 +241,8 @@ class AutoscaledPool:
                 current_status = self._system_status.get_current_system_info()
                 if not current_status.is_system_idle:
                     logger.info('Not scheduling new tasks - system is overloaded')
-                    await asyncio.sleep(self._OVERLOADED_BACKOFF_TIME)
+                    await asyncio.sleep(self._OVERLOADED_BACKOFF_TIME.total_seconds())
+                    logger.info('Release the overloaded backoff')
                 elif self._is_paused:
                     logger.info('Not scheduling new tasks - the autoscaled pool is paused')
                 elif self.current_concurrency >= self.desired_concurrency:

@@ -54,6 +54,7 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
 
         def extra_memory_child(ready: synchronize.Barrier, measured: synchronize.Barrier) -> None:
             memory = SharedMemory(size=extra_memory_size, create=True)
+            assert memory.buf is not None
             memory.buf[:] = bytearray([255 for _ in range(extra_memory_size)])
             print(f'Using the memory... {memory.buf[-1]}')
             ready.wait()
@@ -64,6 +65,7 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
         def shared_extra_memory_child(
             ready: synchronize.Barrier, measured: synchronize.Barrier, memory: SharedMemory
         ) -> None:
+            assert memory.buf is not None
             print(f'Using the memory... {memory.buf[-1]}')
             ready.wait()
             measured.wait()
@@ -79,6 +81,7 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
 
             if use_shared_memory:
                 shared_memory = SharedMemory(size=extra_memory_size, create=True)
+                assert shared_memory.buf is not None
                 shared_memory.buf[:] = bytearray([255 for _ in range(extra_memory_size)])
                 extra_args = [shared_memory]
             else:

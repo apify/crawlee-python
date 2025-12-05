@@ -1136,21 +1136,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 except Exception as e:
                     raise UserDefinedErrorHandlerError('Exception thrown in user-defined request error handler') from e
                 else:
-                    if new_request is not None:
-                        request = new_request
-            self.log.warning('reclaim_request')
+                    if new_request is not None and new_request != request:
+                        await request_manager.add_request(new_request)
+                        await self._mark_request_as_handled(request)
+                        return
+
             await request_manager.reclaim_request(request)
         else:
-            self.log.warning('mark_request_as_handled')
-            await wait_for(
-                lambda: request_manager.mark_request_as_handled(context.request),
-                timeout=self._internal_timeout,
-                timeout_message='Marking request as handled timed out after '
-                f'{self._internal_timeout.total_seconds()} seconds',
-                logger=self._logger,
-                max_retries=3,
-            )
-            self.log.warning('_handle_failed_request')
+            await self._mark_request_as_handled(request)
             await self._handle_failed_request(context, error)
             self._statistics.record_request_processing_failure(request.unique_key)
         self.log.warning('_handle_request_retries DONE')
@@ -1201,16 +1194,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self, request: Request | str, reason: SkippedReason, *, need_mark: bool = False
     ) -> None:
         if need_mark and isinstance(request, Request):
-            request_manager = await self.get_request_manager()
-
-            await wait_for(
-                lambda: request_manager.mark_request_as_handled(request),
-                timeout=self._internal_timeout,
-                timeout_message='Marking request as handled timed out after '
-                f'{self._internal_timeout.total_seconds()} seconds',
-                logger=self._logger,
-                max_retries=3,
-            )
+            await self._mark_request_as_handled(request)
             request.state = RequestState.SKIPPED
 
         url = request.url if isinstance(request, Request) else request
@@ -1388,7 +1372,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if request is None:
             # No request to process, request manager is neither finished nor empty.
             # All requests are locked or in progress.
+            self._logger.warning("Backoff: No available requests to process.")
             await asyncio.sleep(0.2) # Small backoff time to avoid overloading the system through busy-waiting.
+            self._logger.warning("Backoff finished.")
             return
 
         if not (await self._is_allowed_based_on_robots_txt_file(request.url)):
@@ -1434,15 +1420,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             context.log.info('Commit resutls')
             await self._commit_request_handler_result(context)
-            context.log.info('Marking as handled request')
-            await wait_for(
-                lambda: request_manager.mark_request_as_handled(context.request),
-                timeout=self._internal_timeout,
-                timeout_message='Marking request as handled timed out after '
-                f'{self._internal_timeout.total_seconds()} seconds',
-                logger=self._logger,
-                max_retries=3,
-            )
+
+            await self._mark_request_as_handled(request)
 
             request.state = RequestState.DONE
 
@@ -1486,14 +1465,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 await request_manager.reclaim_request(request)
                 await self._statistics.error_tracker_retry.add(error=session_error, context=context)
             else:
-                await wait_for(
-                    lambda: request_manager.mark_request_as_handled(context.request),
-                    timeout=self._internal_timeout,
-                    timeout_message='Marking request as handled timed out after '
-                    f'{self._internal_timeout.total_seconds()} seconds',
-                    logger=self._logger,
-                    max_retries=3,
-                )
+                await self._mark_request_as_handled(request)
 
                 await self._handle_failed_request(context, session_error)
                 self._statistics.record_request_processing_failure(request.unique_key)
@@ -1501,14 +1473,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         except ContextPipelineInterruptedError as interrupted_error:
             self._logger.debug('The context pipeline was interrupted', exc_info=interrupted_error)
 
-            await wait_for(
-                lambda: request_manager.mark_request_as_handled(context.request),
-                timeout=self._internal_timeout,
-                timeout_message='Marking request as handled timed out after '
-                f'{self._internal_timeout.total_seconds()} seconds',
-                logger=self._logger,
-                max_retries=3,
-            )
+            await self._mark_request_as_handled(request)
 
         except ContextPipelineInitializationError as initialization_error:
             self._logger.debug(
@@ -1526,12 +1491,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             raise
 
     async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
-        await wait_for(
-            lambda: self._context_pipeline(context, self.router),
-            timeout=self._request_handler_timeout,
-            timeout_message=f'{self._request_handler_timeout_text}'
-            f' {self._request_handler_timeout.total_seconds()} seconds',
-            logger=self._logger,
+        await self._context_pipeline(
+            context,
+            lambda final_context: wait_for(
+                lambda: self.router(final_context),
+                timeout=self._request_handler_timeout,
+                timeout_message=f'{self._request_handler_timeout_text}'
+                f' {self._request_handler_timeout.total_seconds()} seconds',
+                logger=self._logger,
+            ),
         )
 
     def _raise_for_error_status_code(self, status_code: int) -> None:
@@ -1679,3 +1647,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
         self._previous_crawler_state = current_state
+
+    async def _mark_request_as_handled(self, request: Request) -> None:
+        request_manager = await self.get_request_manager()
+        await wait_for(
+            lambda: request_manager.mark_request_as_handled(request),
+            timeout=self._internal_timeout,
+            timeout_message='Marking request as handled timed out after '
+            f'{self._internal_timeout.total_seconds()} seconds',
+            logger=self._logger,
+            max_retries=3,
+        )

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "crawlee"
-version = "1.1.1"
+version = "1.1.2"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = { file = "LICENSE" }
@@ -34,6 +34,7 @@ keywords = [
     "scraping",
 ]
 dependencies = [
+    "async-timeout>=5.0.1",
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
     "impit>=0.8.0",
@@ -74,7 +75,7 @@ otel = [
 ]
 sql_postgres = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
-    "asyncpg>=0.24.0; python_version < '3.14'" # TODO: https://github.com/apify/crawlee-python/issues/1555
+    "asyncpg>=0.24.0"
 ]
 sql_sqlite = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
@@ -101,7 +102,7 @@ dev = [
     "build<2.0.0", # For e2e tests.
     "dycw-pytest-only<3.0.0",
     "fakeredis[probabilistic,json,lua]<3.0.0",
-    "mypy~=1.18.0",
+    "mypy~=1.19.0",
     "pre-commit<5.0.0",
     "proxy-py<3.0.0",
     "pydoc-markdown<5.0.0",
