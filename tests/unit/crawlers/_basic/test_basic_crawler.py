@@ -23,6 +23,7 @@ from crawlee import ConcurrencySettings, Glob, service_locator
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpMethod
 from crawlee._utils.robots import RobotsTxtFile
+from crawlee._utils.system import print_ps
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
@@ -1293,11 +1294,7 @@ async def test_timeout_in_handler(sleep_type: str, _) -> None:
     from asyncio import timeout  # type:ignore[attr-defined] # noqa: PLC0415
 
     # Debug CPu usage before starting the test
-    run("ps -ewfaxo comm,user,pid,%cpu,cmd", shell=True)
-
-    run("ps -awxo pid,%cpu,comm", shell=True)
-
-
+    print_ps()
 
     handler_timeout = timedelta(seconds=1)
     max_request_retries = 3

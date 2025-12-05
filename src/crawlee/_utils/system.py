@@ -5,6 +5,7 @@ import sys
 from contextlib import suppress
 from datetime import datetime, timezone
 from logging import getLogger
+from subprocess import run
 from typing import Annotated
 
 import psutil
@@ -96,7 +97,10 @@ def get_cpu_info() -> CpuInfo:
 
     cpu_percent = psutil.cpu_percent(percpu=True)
     logger.info(f'Calling get_cpu_info()...: {cpu_percent}')
-    return CpuInfo(used_ratio=sum(cpu_percent)/len(cpu_percent) / 100)
+    ratio = sum(cpu_percent)/len(cpu_percent) / 100
+    if ratio>0.95:
+        print_ps()
+    return CpuInfo(used_ratio=ratio)
 
 
 def get_memory_info() -> MemoryInfo:
@@ -124,3 +128,7 @@ def get_memory_info() -> MemoryInfo:
         current_size=ByteSize(current_size_bytes),
         system_wide_used_size=ByteSize(vm.total - vm.available),
     )
+
+
+def print_ps():
+    run("ps -awxo pid,%cpu,comm", shell=True)

@@ -40,9 +40,17 @@ jobs:
       HTTPBIN_URL: 'asd'
 
     steps:
-      - name: Disable Spotlight indexing
+      - name: Os cleanup
         if: runner.os == 'macOS'
-        run: sudo mdutil -i off /
+        run: |
+          sudo mdutil -i off /
+          sudo killall ecosystemanalyticsd
+          sudo killall Finder || true
+          sudo killall mds || true
+          sudo killall mds_stores || true
+          sudo killall mds_worker || true
+          sudo killall mdworker || true
+          sudo killall mdworker_shared || true
 
       - name: Checkout repository
         uses: actions/checkout@v4
