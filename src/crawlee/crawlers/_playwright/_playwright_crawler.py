@@ -144,8 +144,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 This option should not be used if `browser_pool` is provided.
             navigation_timeout: Timeout for navigation (the process between opening a Playwright page and calling
                 the request handler)
-            goto_options: Additional options to pass to Playwright's `Page.goto()` method. Don't support `timeout`,
-                use `navigation_timeout` instead.
+            goto_options: Additional options to pass to Playwright's `Page.goto()` method. The `timeout` option is
+                not supported, use `navigation_timeout` instead.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         configuration = kwargs.pop('configuration', None)
