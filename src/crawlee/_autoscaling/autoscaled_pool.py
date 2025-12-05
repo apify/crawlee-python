@@ -61,6 +61,9 @@ class AutoscaledPool:
     _TASK_TIMEOUT: timedelta | None = None
     """Timeout within which the `run_task_function` must complete."""
 
+    _OVERLOADED_BACKOFF_TIME: timedelta = timedelta(seconds=0.5)
+    """When overloaded, Autoscaled pool waits this long before rechecking system status."""
+
     def __init__(
         self,
         *,
@@ -238,6 +241,7 @@ class AutoscaledPool:
                 current_status = self._system_status.get_current_system_info()
                 if not current_status.is_system_idle:
                     logger.info('Not scheduling new tasks - system is overloaded')
+                    await asyncio.sleep(self._OVERLOADED_BACKOFF_TIME)
                 elif self._is_paused:
                     logger.info('Not scheduling new tasks - the autoscaled pool is paused')
                 elif self.current_concurrency >= self.desired_concurrency:
@@ -261,7 +265,7 @@ class AutoscaledPool:
 
             logger.info("Just finishing")
 
-        except Exception as e:
+        except BaseException as e:
             logger.error('What is hiding here?', exc_info=e)
             raise
 

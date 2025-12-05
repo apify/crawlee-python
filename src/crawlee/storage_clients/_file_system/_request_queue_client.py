@@ -596,6 +596,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         async with self._lock:
             # If we have a cached value, return it immediately.
             if self._is_empty_cache is not None:
+                logger.info(f'From cache {self._is_empty_cache=}')
                 return self._is_empty_cache
 
             state = self._state.current_value

@@ -1386,6 +1386,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
         if request is None:
+            # No request to process, request manager is neither finished nor empty.
+            # All requests are locked or in progress.
+            await asyncio.sleep(0.2) # Small backoff time to avoid overloading the system through busy-waiting.
             return
 
         if not (await self._is_allowed_based_on_robots_txt_file(request.url)):
