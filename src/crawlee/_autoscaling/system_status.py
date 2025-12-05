@@ -123,6 +123,7 @@ class SystemStatus:
             CPU load ratio information.
         """
         sample = self._snapshotter.get_cpu_sample(sample_duration)
+        logger.info(sample)
         return self._is_sample_overloaded(sample, self._cpu_overload_threshold)
 
     def _is_memory_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
