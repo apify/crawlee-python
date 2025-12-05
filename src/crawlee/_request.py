@@ -41,7 +41,7 @@ class CrawleeRequestData(BaseModel):
     enqueue_strategy: Annotated[EnqueueStrategy | None, Field(alias='enqueueStrategy')] = None
     """The strategy that was used for enqueuing the request."""
 
-    state: RequestState | None = None
+    state: RequestState = RequestState.UNPROCESSED
     """Describes the request's current lifecycle state."""
 
     session_rotation_count: Annotated[int | None, Field(alias='sessionRotationCount')] = None
@@ -352,7 +352,7 @@ class Request(BaseModel):
         self.crawlee_data.crawl_depth = new_value
 
     @property
-    def state(self) -> RequestState | None:
+    def state(self) -> RequestState:
         """Crawlee-specific request handling state."""
         return self.crawlee_data.state
 

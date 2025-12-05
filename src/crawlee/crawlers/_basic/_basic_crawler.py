@@ -1152,6 +1152,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             await request_manager.reclaim_request(request)
         else:
+            request.state = RequestState.ERROR
             await self._mark_request_as_handled(request)
             await self._handle_failed_request(context, error)
             self._statistics.record_request_processing_failure(request.unique_key)
@@ -1167,8 +1168,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 f'{self._internal_timeout.total_seconds()} seconds',
                 logger=self._logger,
             )
-
-            context.request.state = RequestState.DONE
         except UserDefinedErrorHandlerError:
             context.request.state = RequestState.ERROR
             raise
@@ -1201,8 +1200,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self, request: Request | str, reason: SkippedReason, *, need_mark: bool = False
     ) -> None:
         if need_mark and isinstance(request, Request):
-            await self._mark_request_as_handled(request)
             request.state = RequestState.SKIPPED
+            await self._mark_request_as_handled(request)
 
         url = request.url if isinstance(request, Request) else request
 
@@ -1403,8 +1402,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._statistics.record_request_processing_start(request.unique_key)
 
         try:
-            request.state = RequestState.REQUEST_HANDLER
-
             self._check_request_collision(context.request, context.session)
 
             try:
@@ -1414,9 +1411,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             await self._commit_request_handler_result(context)
 
-            await self._mark_request_as_handled(request)
-
             request.state = RequestState.DONE
+
+            await self._mark_request_as_handled(request)
 
             if context.session and context.session.is_usable:
                 context.session.mark_good()
@@ -1483,6 +1480,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             raise
 
     async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
+        context.request.state = RequestState.BEFORE_NAV
         await self._context_pipeline(
             context,
             lambda final_context: wait_for(

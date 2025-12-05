@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
 
 from crawlee import service_locator
-from crawlee._request import Request, RequestOptions
+from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._types import (
     BasicCrawlingContext,
     ConcurrencySettings,
@@ -329,6 +329,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                     response = await context.page.goto(
                         context.request.url, timeout=remaining_timeout.total_seconds() * 1000, **context.goto_options
                     )
+                context.request.state = RequestState.AFTER_NAV
             except playwright.async_api.TimeoutError as exc:
                 raise asyncio.TimeoutError from exc
 

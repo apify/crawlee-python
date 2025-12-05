@@ -10,7 +10,7 @@ from more_itertools import partition
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypeVar
 
-from crawlee._request import Request, RequestOptions
+from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._utils.docs import docs_group
 from crawlee._utils.time import SharedTimeout
 from crawlee._utils.urls import to_absolute_url_iterator
@@ -257,6 +257,7 @@ class AbstractHttpCrawler(
                 timeout=remaining_timeout,
             )
 
+        context.request.state = RequestState.AFTER_NAV
         yield HttpCrawlingContext.from_basic_crawling_context(context=context, http_response=result.http_response)
 
     async def _handle_status_code_response(

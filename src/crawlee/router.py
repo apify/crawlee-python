@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Generic, TypeVar
 
+from crawlee._request import RequestState
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
 
@@ -89,6 +90,7 @@ class Router(Generic[TCrawlingContext]):
 
     async def __call__(self, context: TCrawlingContext) -> None:
         """Invoke a request handler that matches the request label (or the default)."""
+        context.request.state = RequestState.REQUEST_HANDLER
         if context.request.label is None or context.request.label not in self._handlers_by_label:
             if self._default_handler is None:
                 raise RuntimeError(
