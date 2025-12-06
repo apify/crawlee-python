@@ -166,7 +166,7 @@ class Request(BaseModel):
 
     model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
-    unique_key: Annotated[str, Field(alias='uniqueKey')]
+    unique_key: Annotated[str, Field(alias='uniqueKey', frozen=True)]
     """A unique key identifying the request. Two requests with the same `unique_key` are considered as pointing
     to the same URL.
 
@@ -178,17 +178,18 @@ class Request(BaseModel):
     and specify which URLs shall be considered equal.
     """
 
-    url: Annotated[str, BeforeValidator(validate_http_url), Field()]
+    url: Annotated[str, BeforeValidator(validate_http_url), Field(frozen=True)]
     """The URL of the web page to crawl. Must be a valid HTTP or HTTPS URL, and may include query parameters
     and fragments."""
 
-    method: HttpMethod = 'GET'
+    method: Annotated[HttpMethod, Field(frozen=True)] = 'GET'
     """HTTP request method."""
 
     payload: Annotated[
         HttpPayload | None,
         BeforeValidator(lambda v: v.encode() if isinstance(v, str) else v),
         PlainSerializer(lambda v: v.decode() if isinstance(v, bytes) else v),
+        Field(frozen=True),
     ] = None
     """HTTP request payload."""
 
