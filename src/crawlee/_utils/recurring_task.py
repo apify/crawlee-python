@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from logging import getLogger
 from typing import TYPE_CHECKING
 
@@ -49,7 +50,7 @@ class RecurringTask:
         """
         sleep_time_secs = self.delay.total_seconds()
         while True:
-            await self.func() if asyncio.iscoroutinefunction(self.func) else self.func()
+            await self.func() if inspect.iscoroutinefunction(self.func) else self.func()
             await asyncio.sleep(sleep_time_secs)
 
     def start(self) -> None:

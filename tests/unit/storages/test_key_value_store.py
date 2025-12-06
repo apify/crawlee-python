@@ -1095,25 +1095,28 @@ async def test_validate_name(storage_client: StorageClient, name: str, *, is_val
 
 
 @pytest.mark.parametrize(
-    'tested_storage_client',
+    'tested_storage_client_class',
     [
-        pytest.param(MemoryStorageClient(), id='tested=MemoryStorageClient'),
-        pytest.param(FileSystemStorageClient(), id='tested=FileSystemStorageClient'),
-        pytest.param(SqlStorageClient(), id='tested=SqlStorageClient'),
+        pytest.param(MemoryStorageClient, id='tested=MemoryStorageClient'),
+        pytest.param(FileSystemStorageClient, id='tested=FileSystemStorageClient'),
+        pytest.param(SqlStorageClient, id='tested=SqlStorageClient'),
     ],
 )
 @pytest.mark.parametrize(
-    'global_storage_client',
+    'global_storage_client_class',
     [
-        pytest.param(MemoryStorageClient(), id='global=MemoryStorageClient'),
-        pytest.param(FileSystemStorageClient(), id='global=FileSystemStorageClient'),
-        pytest.param(SqlStorageClient(), id='global=SqlStorageClient'),
+        pytest.param(MemoryStorageClient, id='global=MemoryStorageClient'),
+        pytest.param(FileSystemStorageClient, id='global=FileSystemStorageClient'),
+        pytest.param(SqlStorageClient, id='global=SqlStorageClient'),
     ],
 )
 async def test_get_auto_saved_value_various_global_clients(
-    tmp_path: Path, tested_storage_client: StorageClient, global_storage_client: StorageClient
+    tmp_path: Path, tested_storage_client_class: type[StorageClient], global_storage_client_class: type[StorageClient]
 ) -> None:
     """Ensure that persistence is working for all clients regardless of what is set in service locator."""
+    tested_storage_client = tested_storage_client_class()
+    global_storage_client = global_storage_client_class()
+
     service_locator.set_configuration(
         Configuration(
             storage_dir=str(tmp_path),

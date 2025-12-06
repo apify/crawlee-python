@@ -71,6 +71,9 @@ async def test_static_crawler_actor_at_apify(
         project_path=tmp_path / actor_name, wheel_path=crawlee_wheel_path, package_manager=package_manager
     )
 
+    # Print apify version for debugging purposes in rare cases of CLI failures
+    subprocess.run(['apify', '--version'], check=True)  # noqa: ASYNC221, S607
+
     # Build actor using sequence of cli commands as the user would
     subprocess.run(  # noqa: ASYNC221, S603
         ['apify', 'login', '-t', os.environ['APIFY_TEST_USER_API_TOKEN']],  # noqa: S607

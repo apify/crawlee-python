@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock
 
 import pytest
-from playwright.async_api import Browser, Playwright, async_playwright
+from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
 
 from crawlee.browsers import PlaywrightBrowserController, PlaywrightPersistentBrowser
 
@@ -115,6 +115,10 @@ async def test_memory_leak_on_concurrent_context_creation() -> None:
     # Prepare mocked browser with relevant methods and attributes
     mocked_browser = AsyncMock()
     mocked_context_launcher = AsyncMock()
+    mocked_context = AsyncMock(spec=BrowserContext)
+
+    mocked_context_launcher.return_value = mocked_context
+    mocked_context.new_page.return_value = AsyncMock(spec=Page)
 
     async def delayed_launch_persistent_context(*args: Any, **kwargs: Any) -> Any:
         """Ensure that both calls to create context overlap in time."""

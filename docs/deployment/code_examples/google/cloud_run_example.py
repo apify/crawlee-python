@@ -9,7 +9,7 @@ from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 from crawlee.storage_clients import MemoryStorageClient
 
 
-@get('/')
+@get('/')  # type: ignore[untyped-decorator]
 async def main() -> str:
     """The crawler entry point that will be called when the HTTP endpoint is accessed."""
     # highlight-start

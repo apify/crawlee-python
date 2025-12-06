@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
@@ -10,6 +11,7 @@ from curl_cffi.requests.cookies import Cookies as CurlCookies
 from curl_cffi.requests.cookies import CurlMorsel
 from curl_cffi.requests.exceptions import ProxyError as CurlProxyError
 from curl_cffi.requests.exceptions import RequestException as CurlRequestError
+from curl_cffi.requests.exceptions import Timeout
 from curl_cffi.requests.impersonate import DEFAULT_CHROME as CURL_DEFAULT_CHROME
 from typing_extensions import override
 
@@ -147,6 +149,7 @@ class CurlImpersonateHttpClient(HttpClient):
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
         statistics: Statistics | None = None,
+        timeout: timedelta | None = None,
     ) -> HttpCrawlingResult:
         client = self._get_client(proxy_info.url if proxy_info else None)
 
@@ -157,7 +160,10 @@ class CurlImpersonateHttpClient(HttpClient):
                 headers=request.headers,
                 data=request.payload,
                 cookies=session.cookies.jar if session else None,
+                timeout=timeout.total_seconds() if timeout else None,
             )
+        except Timeout as exc:
+            raise asyncio.TimeoutError from exc
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
@@ -186,6 +192,7 @@ class CurlImpersonateHttpClient(HttpClient):
         payload: HttpPayload | None = None,
         session: Session | None = None,
         proxy_info: ProxyInfo | None = None,
+        timeout: timedelta | None = None,
     ) -> HttpResponse:
         if isinstance(headers, dict) or headers is None:
             headers = HttpHeaders(headers or {})
@@ -200,7 +207,10 @@ class CurlImpersonateHttpClient(HttpClient):
                 headers=dict(headers) if headers else None,
                 data=payload,
                 cookies=session.cookies.jar if session else None,
+                timeout=timeout.total_seconds() if timeout else None,
             )
+        except Timeout as exc:
+            raise asyncio.TimeoutError from exc
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
@@ -241,6 +251,8 @@ class CurlImpersonateHttpClient(HttpClient):
                 stream=True,
                 timeout=timeout.total_seconds() if timeout else None,
             )
+        except Timeout as exc:
+            raise asyncio.TimeoutError from exc
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc

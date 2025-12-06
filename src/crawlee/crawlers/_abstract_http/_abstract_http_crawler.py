@@ -3,14 +3,16 @@ from __future__ import annotations
 import asyncio
 import logging
 from abc import ABC
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Generic
 
 from more_itertools import partition
 from pydantic import ValidationError
-from typing_extensions import TypeVar
+from typing_extensions import NotRequired, TypeVar
 
 from crawlee._request import Request, RequestOptions
 from crawlee._utils.docs import docs_group
+from crawlee._utils.time import SharedTimeout
 from crawlee._utils.urls import to_absolute_url_iterator
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
@@ -30,6 +32,19 @@ if TYPE_CHECKING:
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
+
+
+class HttpCrawlerOptions(
+    BasicCrawlerOptions[TCrawlingContext, TStatisticsState],
+    Generic[TCrawlingContext, TStatisticsState],
+):
+    """Arguments for the `AbstractHttpCrawler` constructor.
+
+    It is intended for typing forwarded `__init__` arguments in the subclasses.
+    """
+
+    navigation_timeout: NotRequired[timedelta | None]
+    """Timeout for the HTTP request."""
 
 
 @docs_group('Crawlers')
@@ -56,10 +71,13 @@ class AbstractHttpCrawler(
         self,
         *,
         parser: AbstractHttpParser[TParseResult, TSelectResult],
+        navigation_timeout: timedelta | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext, StatisticsState]],
     ) -> None:
         self._parser = parser
+        self._navigation_timeout = navigation_timeout or timedelta(minutes=1)
         self._pre_navigation_hooks: list[Callable[[BasicCrawlingContext], Awaitable[None]]] = []
+        self._shared_navigation_timeouts: dict[int, SharedTimeout] = {}
 
         if '_context_pipeline' not in kwargs:
             raise ValueError(
@@ -112,9 +130,17 @@ class AbstractHttpCrawler(
     async def _execute_pre_navigation_hooks(
         self, context: BasicCrawlingContext
     ) -> AsyncGenerator[BasicCrawlingContext, None]:
-        for hook in self._pre_navigation_hooks:
-            await hook(context)
-        yield context
+        context_id = id(context)
+        self._shared_navigation_timeouts[context_id] = SharedTimeout(self._navigation_timeout)
+
+        try:
+            for hook in self._pre_navigation_hooks:
+                async with self._shared_navigation_timeouts[context_id]:
+                    await hook(context)
+
+            yield context
+        finally:
+            self._shared_navigation_timeouts.pop(context_id, None)
 
     async def _parse_http_response(
         self, context: HttpCrawlingContext
@@ -167,9 +193,15 @@ class AbstractHttpCrawler(
             kwargs.setdefault('strategy', 'same-hostname')
 
             links_iterator: Iterator[str] = iter(self._parser.find_links(parsed_content, selector=selector))
-            links_iterator = to_absolute_url_iterator(
-                context.request.loaded_url or context.request.url, links_iterator, logger=context.log
+
+            # Get base URL from <base> tag if present
+            extracted_base_urls = list(self._parser.find_links(parsed_content, 'base[href]'))
+            base_url: str = (
+                str(extracted_base_urls[0])
+                if extracted_base_urls
+                else context.request.loaded_url or context.request.url
             )
+            links_iterator = to_absolute_url_iterator(base_url, links_iterator, logger=context.log)
 
             if robots_txt_file:
                 skipped, links_iterator = partition(lambda url: robots_txt_file.is_allowed(url), links_iterator)
@@ -216,12 +248,14 @@ class AbstractHttpCrawler(
         Yields:
             The original crawling context enhanced by HTTP response.
         """
-        result = await self._http_client.crawl(
-            request=context.request,
-            session=context.session,
-            proxy_info=context.proxy_info,
-            statistics=self._statistics,
-        )
+        async with self._shared_navigation_timeouts[id(context)] as remaining_timeout:
+            result = await self._http_client.crawl(
+                request=context.request,
+                session=context.session,
+                proxy_info=context.proxy_info,
+                statistics=self._statistics,
+                timeout=remaining_timeout,
+            )
 
         yield HttpCrawlingContext.from_basic_crawling_context(context=context, http_response=result.http_response)
 

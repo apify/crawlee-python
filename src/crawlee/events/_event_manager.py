@@ -174,11 +174,9 @@ class EventManager:
             # to avoid blocking the event loop
             coro = (
                 listener(*bound_args.args, **bound_args.kwargs)
-                if asyncio.iscoroutinefunction(listener)
+                if inspect.iscoroutinefunction(listener)
                 else asyncio.to_thread(cast('Callable[..., None]', listener), *bound_args.args, **bound_args.kwargs)
             )
-            # Note: use `asyncio.iscoroutinefunction` rather then `inspect.iscoroutinefunction` since it works with
-            # unittests.mock.AsyncMock. See https://github.com/python/cpython/issues/84753.
 
             listener_task = asyncio.create_task(coro, name=f'Task-{event.value}-{listener.__name__}')
             self._listener_tasks.add(listener_task)

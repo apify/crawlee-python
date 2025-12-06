@@ -3,7 +3,21 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 1.1.1 - **not yet released**
+## 1.1.2 - **not yet released**
+
+### 🚀 Features
+
+- Add additional kwargs to Crawler&#x27;s export_data ([#1597](https://github.com/apify/crawlee-python/pull/1597)) ([5977f37](https://github.com/apify/crawlee-python/commit/5977f376b93a7c0d4dd53f0d331a4b04fedba2c6)) by [@vdusek](https://github.com/vdusek), closes [#526](https://github.com/apify/crawlee-python/issues/526)
+- Add `goto_options` for `PlaywrightCrawler` ([#1599](https://github.com/apify/crawlee-python/pull/1599)) ([0b82f3b](https://github.com/apify/crawlee-python/commit/0b82f3b6fb175223ea2aa5b348afcd5fdb767972)) by [@Mantisus](https://github.com/Mantisus), closes [#1576](https://github.com/apify/crawlee-python/issues/1576)
+
+### 🐛 Bug Fixes
+
+- Only apply requestHandlerTimeout to request handler ([#1474](https://github.com/apify/crawlee-python/pull/1474)) ([0dfb6c2](https://github.com/apify/crawlee-python/commit/0dfb6c2a13b6650736245fa39b3fbff397644df7)) by [@janbuchar](https://github.com/janbuchar)
+- Handle the case when `error_handler` returns `Request` ([#1595](https://github.com/apify/crawlee-python/pull/1595)) ([8a961a2](https://github.com/apify/crawlee-python/commit/8a961a2b07d0d33a7302dbb13c17f3d90999d390)) by [@Mantisus](https://github.com/Mantisus)
+
+
+<!-- git-cliff-unreleased-end -->
+## [1.1.1](https://github.com/apify/crawlee-python/releases/tag/v1.1.1) (2025-12-02)
 
 ### 🐛 Bug Fixes
 
@@ -11,9 +25,9 @@ All notable changes to this project will be documented in this file.
 - Fix `same-domain` strategy ignoring public suffix  ([#1572](https://github.com/apify/crawlee-python/pull/1572)) ([3d018b2](https://github.com/apify/crawlee-python/commit/3d018b21a28a4bee493829783057188d6106a69b)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1571](https://github.com/apify/crawlee-python/issues/1571)
 - Make context helpers work in `FailedRequestHandler` and `ErrorHandler` ([#1570](https://github.com/apify/crawlee-python/pull/1570)) ([b830019](https://github.com/apify/crawlee-python/commit/b830019350830ac33075316061659e2854f7f4a5)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1532](https://github.com/apify/crawlee-python/issues/1532)
 - Fix non-ASCII character corruption in `FileSystemStorageClient` on systems without UTF-8 default encoding ([#1580](https://github.com/apify/crawlee-python/pull/1580)) ([f179f86](https://github.com/apify/crawlee-python/commit/f179f8671b0b6af9264450e4fef7e49d1cecd2bd)) by [@Mantisus](https://github.com/Mantisus), closes [#1579](https://github.com/apify/crawlee-python/issues/1579)
+- Respect `&lt;base&gt;` when enqueuing ([#1590](https://github.com/apify/crawlee-python/pull/1590)) ([de517a1](https://github.com/apify/crawlee-python/commit/de517a1629cc29b20568143eb64018f216d4ba33)) by [@Mantisus](https://github.com/Mantisus), closes [#1589](https://github.com/apify/crawlee-python/issues/1589)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.1.0](https://github.com/apify/crawlee-python/releases/tag/v1.1.0) (2025-11-18)
 
 ### 🚀 Features

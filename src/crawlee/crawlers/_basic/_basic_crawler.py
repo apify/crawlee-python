@@ -14,6 +14,7 @@ from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Seque
 from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
+from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, cast
 from urllib.parse import ParseResult, urlparse
@@ -32,6 +33,8 @@ from crawlee._service_locator import ServiceLocator
 from crawlee._types import (
     BasicCrawlingContext,
     EnqueueLinksKwargs,
+    ExportDataCsvKwargs,
+    ExportDataJsonKwargs,
     GetKeyValueStoreFromRequestHandlerFunction,
     HttpHeaders,
     HttpPayload,
@@ -41,7 +44,7 @@ from crawlee._types import (
     SkippedReason,
 )
 from crawlee._utils.docs import docs_group
-from crawlee._utils.file import export_csv_to_stream, export_json_to_stream
+from crawlee._utils.file import atomic_write, export_csv_to_stream, export_json_to_stream
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
@@ -869,6 +872,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
+        **additional_kwargs: Unpack[ExportDataJsonKwargs | ExportDataCsvKwargs],  # type: ignore[misc]
     ) -> None:
         """Export all items from a Dataset to a JSON or CSV file.
 
@@ -881,6 +885,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             dataset_id: The ID of the Dataset to export from.
             dataset_name: The name of the Dataset to export from (global scope, named storage).
             dataset_alias: The alias of the Dataset to export from (run scope, unnamed storage).
+            additional_kwargs: Extra keyword arguments forwarded to the JSON/CSV exporter depending on the file format.
         """
         dataset = await Dataset.open(
             id=dataset_id,
@@ -890,13 +895,18 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             configuration=self._service_locator.get_configuration(),
         )
 
-        path = path if isinstance(path, Path) else Path(path)
-        dst = path.open('w', newline='')
+        path = Path(path)
 
         if path.suffix == '.csv':
-            await export_csv_to_stream(dataset.iterate_items(), dst)
+            dst = StringIO()
+            csv_kwargs = cast('ExportDataCsvKwargs', additional_kwargs)
+            await export_csv_to_stream(dataset.iterate_items(), dst, **csv_kwargs)
+            await atomic_write(path, dst.getvalue())
         elif path.suffix == '.json':
-            await export_json_to_stream(dataset.iterate_items(), dst)
+            dst = StringIO()
+            json_kwargs = cast('ExportDataJsonKwargs', additional_kwargs)
+            await export_json_to_stream(dataset.iterate_items(), dst, **json_kwargs)
+            await atomic_write(path, dst.getvalue())
         else:
             raise ValueError(f'Unsupported file extension: {path.suffix}')
 
@@ -1136,19 +1146,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 except Exception as e:
                     raise UserDefinedErrorHandlerError('Exception thrown in user-defined request error handler') from e
                 else:
-                    if new_request is not None:
-                        request = new_request
+                    if new_request is not None and new_request != request:
+                        await request_manager.add_request(new_request)
+                        await self._mark_request_as_handled(request)
+                        return
 
             await request_manager.reclaim_request(request)
         else:
-            await wait_for(
-                lambda: request_manager.mark_request_as_handled(context.request),
-                timeout=self._internal_timeout,
-                timeout_message='Marking request as handled timed out after '
-                f'{self._internal_timeout.total_seconds()} seconds',
-                logger=self._logger,
-                max_retries=3,
-            )
+            await self._mark_request_as_handled(request)
             await self._handle_failed_request(context, error)
             self._statistics.record_request_processing_failure(request.unique_key)
 
@@ -1197,16 +1202,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self, request: Request | str, reason: SkippedReason, *, need_mark: bool = False
     ) -> None:
         if need_mark and isinstance(request, Request):
-            request_manager = await self.get_request_manager()
-
-            await wait_for(
-                lambda: request_manager.mark_request_as_handled(request),
-                timeout=self._internal_timeout,
-                timeout_message='Marking request as handled timed out after '
-                f'{self._internal_timeout.total_seconds()} seconds',
-                logger=self._logger,
-                max_retries=3,
-            )
+            await self._mark_request_as_handled(request)
             request.state = RequestState.SKIPPED
 
         url = request.url if isinstance(request, Request) else request
@@ -1426,14 +1422,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 raise RequestHandlerError(e, context) from e
 
             await self._commit_request_handler_result(context)
-            await wait_for(
-                lambda: request_manager.mark_request_as_handled(request),
-                timeout=self._internal_timeout,
-                timeout_message='Marking request as handled timed out after '
-                f'{self._internal_timeout.total_seconds()} seconds',
-                logger=self._logger,
-                max_retries=3,
-            )
+
+            await self._mark_request_as_handled(request)
 
             request.state = RequestState.DONE
 
@@ -1477,14 +1467,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 await request_manager.reclaim_request(request)
                 await self._statistics.error_tracker_retry.add(error=session_error, context=context)
             else:
-                await wait_for(
-                    lambda: request_manager.mark_request_as_handled(request),
-                    timeout=self._internal_timeout,
-                    timeout_message='Marking request as handled timed out after '
-                    f'{self._internal_timeout.total_seconds()} seconds',
-                    logger=self._logger,
-                    max_retries=3,
-                )
+                await self._mark_request_as_handled(request)
 
                 await self._handle_failed_request(context, session_error)
                 self._statistics.record_request_processing_failure(request.unique_key)
@@ -1492,14 +1475,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         except ContextPipelineInterruptedError as interrupted_error:
             self._logger.debug('The context pipeline was interrupted', exc_info=interrupted_error)
 
-            await wait_for(
-                lambda: request_manager.mark_request_as_handled(request),
-                timeout=self._internal_timeout,
-                timeout_message='Marking request as handled timed out after '
-                f'{self._internal_timeout.total_seconds()} seconds',
-                logger=self._logger,
-                max_retries=3,
-            )
+            await self._mark_request_as_handled(request)
 
         except ContextPipelineInitializationError as initialization_error:
             self._logger.debug(
@@ -1517,12 +1493,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             raise
 
     async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
-        await wait_for(
-            lambda: self._context_pipeline(context, self.router),
-            timeout=self._request_handler_timeout,
-            timeout_message=f'{self._request_handler_timeout_text}'
-            f' {self._request_handler_timeout.total_seconds()} seconds',
-            logger=self._logger,
+        await self._context_pipeline(
+            context,
+            lambda final_context: wait_for(
+                lambda: self.router(final_context),
+                timeout=self._request_handler_timeout,
+                timeout_message=f'{self._request_handler_timeout_text}'
+                f' {self._request_handler_timeout.total_seconds()} seconds',
+                logger=self._logger,
+            ),
         )
 
     def _raise_for_error_status_code(self, status_code: int) -> None:
@@ -1670,3 +1649,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
         self._previous_crawler_state = current_state
+
+    async def _mark_request_as_handled(self, request: Request) -> None:
+        request_manager = await self.get_request_manager()
+        await wait_for(
+            lambda: request_manager.mark_request_as_handled(request),
+            timeout=self._internal_timeout,
+            timeout_message='Marking request as handled timed out after '
+            f'{self._internal_timeout.total_seconds()} seconds',
+            logger=self._logger,
+            max_retries=3,
+        )
