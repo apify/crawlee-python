@@ -3,7 +3,6 @@ import re
 import traceback
 
 import crawlee.errors
-import crawlee.router
 
 
 def _get_only_innermost_exception(error: BaseException) -> BaseException:
