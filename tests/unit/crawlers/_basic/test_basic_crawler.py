@@ -6,8 +6,10 @@ import concurrent
 import json
 import logging
 import os
+import re
 import sys
 import time
+from asyncio import Future
 from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
@@ -1540,6 +1542,7 @@ async def test_reduced_logs_from_timed_out_request_handler(caplog: pytest.LogCap
     caplog.set_level(logging.INFO)
     crawler = BasicCrawler(
         configure_logging=False,
+        max_request_retries=1,
         request_handler_timeout=timedelta(seconds=1),
     )
 
@@ -1559,6 +1562,31 @@ async def test_reduced_logs_from_timed_out_request_handler(caplog: pytest.LogCap
             full_message = (record.message or '') + (record.exc_text or '')
             assert '\n' not in full_message
             assert '# INJECTED DELAY' in full_message
+            found_timeout_message = True
+            break
+
+    assert found_timeout_message, 'Expected log message about request handler error was not found.'
+
+
+async def test_reduced_logs_from_time_out_in_request_handler(caplog: pytest.LogCaptureFixture) -> None:
+    crawler = BasicCrawler(configure_logging=False, max_request_retries=1)
+
+    @crawler.router.default_handler
+    async def default_handler(_: BasicCrawlingContext) -> None:
+        await asyncio.wait_for(Future(), timeout=1)
+
+    # Capture all logs from the 'crawlee' logger at INFO level or higher
+    with caplog.at_level(logging.INFO, logger='crawlee'):
+        await crawler.run([Request.from_url('https://a.placeholder.com')])
+
+    # Check for 1 line summary message
+    found_timeout_message = False
+    for record in caplog.records:
+        if re.match(
+            r'Retrying request to .* due to: Timeout raised by user defined handler\. File .*, line .*,'
+            r' in default_handler,     await asyncio.wait_for\(Future\(\), timeout=1\)',
+            record.message,
+        ):
             found_timeout_message = True
             break
 

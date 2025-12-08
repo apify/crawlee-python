@@ -59,6 +59,7 @@ from crawlee.errors import (
     RequestHandlerError,
     SessionError,
     UserDefinedErrorHandlerError,
+    UserHandlerTimeoutError,
 )
 from crawlee.events._types import Event, EventCrawlerStatusData
 from crawlee.http_clients import ImpitHttpClient
@@ -1134,7 +1135,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request.retry_count += 1
             reduced_error = str(error).split('\n')[0]
             self.log.warning(
-                f'Retrying request to {context.request.url} due to: {reduced_error}'
+                f'Retrying request to {context.request.url} due to: {reduced_error}. '
                 f'{get_one_line_error_summary_if_possible(error)}'
             )
             await self._statistics.error_tracker.add(error=error, context=context)
@@ -1221,10 +1222,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if (
             isinstance(error, asyncio.exceptions.TimeoutError)
+            and traceback_parts
             and self._request_handler_timeout_text in traceback_parts[-1]
-        ):
+        ) or isinstance(error, UserHandlerTimeoutError):
             used_traceback_parts = reduce_asyncio_timeout_error_to_relevant_traceback_parts(error)
-            used_traceback_parts.append(traceback_parts[-1])
+            used_traceback_parts.extend(traceback_parts[-1:])
 
         return ''.join(used_traceback_parts).strip('\n')
 

@@ -29,6 +29,10 @@ class UserDefinedErrorHandlerError(Exception):
     """Wraps an exception thrown from an user-defined error handler."""
 
 
+class UserHandlerTimeoutError(UserDefinedErrorHandlerError):
+    """Raised when a router fails due to user raised timeout. This is different from user-defined handler timing out."""
+
+
 @docs_group('Errors')
 class SessionError(Exception):
     """Errors of `SessionError` type will trigger a session rotation.
