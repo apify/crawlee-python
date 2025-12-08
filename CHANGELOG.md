@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.1.2 - **not yet released**
+## [1.2.0](https://github.com/apify/crawlee-python/releases/tag/v1.2.0) (2025-12-08)
 
 ### 🚀 Features
 
@@ -17,7 +16,6 @@ All notable changes to this project will be documented in this file.
 - Align `Request.state` transitions with `Request` lifecycle ([#1601](https://github.com/apify/crawlee-python/pull/1601)) ([383225f](https://github.com/apify/crawlee-python/commit/383225f9f055d95ffb1302b8cf96f42ec264f1fc)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.1.1](https://github.com/apify/crawlee-python/releases/tag/v1.1.1) (2025-12-02)
 
 ### 🐛 Bug Fixes
