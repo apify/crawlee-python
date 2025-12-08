@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 1.2.1 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- Fix short error summary ([#1605](https://github.com/apify/crawlee-python/pull/1605)) ([b751208](https://github.com/apify/crawlee-python/commit/b751208d9a56e9d923e4559baeba35e2eede0450)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1602](https://github.com/apify/crawlee-python/issues/1602)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [1.2.0](https://github.com/apify/crawlee-python/releases/tag/v1.2.0) (2025-12-08)
