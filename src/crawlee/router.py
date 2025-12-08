@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from typing import Generic, TypeVar
 
@@ -95,7 +96,16 @@ class Router(Generic[TCrawlingContext]):
                     f'No handler matches label `{context.request.label}` and no default handler is configured'
                 )
 
-            return await self._default_handler(context)
+            user_defined_handler = self._default_handler
+        else:
+            user_defined_handler = self._handlers_by_label[context.request.label]
 
-        handler = self._handlers_by_label[context.request.label]
-        return await handler(context)
+        try:
+            return await user_defined_handler(context)
+        except asyncio.TimeoutError as e:
+            # Timeout in handler, but not timeout of handler.
+            raise UserHandlerTimeoutError('Timeout raised by user defined handler') from e
+
+
+class UserHandlerTimeoutError(Exception):
+    """Raised when a router fails due to user timeout."""
