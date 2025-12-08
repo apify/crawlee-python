@@ -9,6 +9,8 @@ from crawlee._utils.docs import docs_group
 
 __all__ = ['Router']
 
+from crawlee.errors import UserHandlerTimeoutError
+
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext)
 RequestHandler = Callable[[TCrawlingContext], Awaitable[None]]
 
@@ -105,7 +107,3 @@ class Router(Generic[TCrawlingContext]):
         except asyncio.TimeoutError as e:
             # Timeout in handler, but not timeout of handler.
             raise UserHandlerTimeoutError('Timeout raised by user defined handler') from e
-
-
-class UserHandlerTimeoutError(Exception):
-    """Raised when a router fails due to user timeout."""

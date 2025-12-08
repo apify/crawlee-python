@@ -2,6 +2,7 @@ import asyncio
 import re
 import traceback
 
+import crawlee.errors
 import crawlee.router
 
 
@@ -10,7 +11,7 @@ def _get_only_innermost_exception(error: BaseException) -> BaseException:
 
     If the innermost exception is UserHandlerTimeoutError, return whatever caused that if possible.
     """
-    if type(error) is crawlee.router.UserHandlerTimeoutError:
+    if type(error) is crawlee.errors.UserHandlerTimeoutError:
         if error.__cause__:
             return error.__cause__
         if error.__context__:
@@ -46,7 +47,7 @@ def _strip_pep657_highlighting(traceback_part: str) -> str:
 
 
 def reduce_asyncio_timeout_error_to_relevant_traceback_parts(
-    timeout_error: asyncio.exceptions.TimeoutError,
+    timeout_error: asyncio.exceptions.TimeoutError | crawlee.errors.UserHandlerTimeoutError,
 ) -> list[str]:
     innermost_error_traceback_parts = _get_traceback_parts_for_innermost_exception(timeout_error)
     return _get_filtered_traceback_parts_for_asyncio_timeout_error(innermost_error_traceback_parts)
@@ -63,7 +64,7 @@ def get_one_line_error_summary_if_possible(error: Exception) -> str:
     if isinstance(error, asyncio.exceptions.TimeoutError):
         relevant_part = reduce_asyncio_timeout_error_to_relevant_traceback_parts(error)
         most_relevant_part = (',' + relevant_part[-1]) if len(relevant_part) else ''
-    elif isinstance(error, crawlee.router.UserHandlerTimeoutError):
+    elif isinstance(error, crawlee.errors.UserHandlerTimeoutError):
         # Error is user defined handler. First two lines should be location of the `UserHandlerTimeoutError` in crawlee
         # code and third line the topmost user error
         traceback_parts = _get_traceback_parts_for_innermost_exception(error)

@@ -1542,6 +1542,7 @@ async def test_reduced_logs_from_timed_out_request_handler(caplog: pytest.LogCap
     caplog.set_level(logging.INFO)
     crawler = BasicCrawler(
         configure_logging=False,
+        max_request_retries=1,
         request_handler_timeout=timedelta(seconds=1),
     )
 
@@ -1568,7 +1569,7 @@ async def test_reduced_logs_from_timed_out_request_handler(caplog: pytest.LogCap
 
 
 async def test_reduced_logs_from_time_out_in_request_handler(caplog: pytest.LogCaptureFixture) -> None:
-    crawler = BasicCrawler(configure_logging=False)
+    crawler = BasicCrawler(configure_logging=False, max_request_retries=1)
 
     @crawler.router.default_handler
     async def default_handler(_: BasicCrawlingContext) -> None:

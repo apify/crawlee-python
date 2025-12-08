@@ -59,6 +59,7 @@ from crawlee.errors import (
     RequestHandlerError,
     SessionError,
     UserDefinedErrorHandlerError,
+    UserHandlerTimeoutError,
 )
 from crawlee.events._types import Event, EventCrawlerStatusData
 from crawlee.http_clients import ImpitHttpClient
@@ -1222,10 +1223,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if (
             isinstance(error, asyncio.exceptions.TimeoutError)
+            and traceback_parts
             and self._request_handler_timeout_text in traceback_parts[-1]
-        ):
+        ) or isinstance(error, UserHandlerTimeoutError):
             used_traceback_parts = reduce_asyncio_timeout_error_to_relevant_traceback_parts(error)
-            used_traceback_parts.append(traceback_parts[-1])
+            used_traceback_parts.extend(traceback_parts[-1:])
 
         return ''.join(used_traceback_parts).strip('\n')
 
