@@ -191,6 +191,7 @@ class AbstractHttpCrawler(
             robots_txt_file = await self._get_robots_txt_file_for_url(context.request.url)
 
             kwargs.setdefault('strategy', 'same-hostname')
+            strategy = kwargs.get('strategy', 'same-hostname')
 
             links_iterator: Iterator[str] = iter(self._parser.find_links(parsed_content, selector=selector))
 
@@ -209,7 +210,9 @@ class AbstractHttpCrawler(
                 skipped = iter([])
 
             for url in self._enqueue_links_filter_iterator(links_iterator, context.request.url, **kwargs):
-                request_options = RequestOptions(url=url, user_data={**base_user_data}, label=label)
+                request_options = RequestOptions(
+                    url=url, user_data={**base_user_data}, label=label, enqueue_strategy=strategy
+                )
 
                 if transform_request_function:
                     transform_request_options = transform_request_function(request_options)
