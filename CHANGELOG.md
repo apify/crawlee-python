@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Fix short error summary ([#1605](https://github.com/apify/crawlee-python/pull/1605)) ([b751208](https://github.com/apify/crawlee-python/commit/b751208d9a56e9d923e4559baeba35e2eede0450)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1602](https://github.com/apify/crawlee-python/issues/1602)
+- Freeze core `Request` fields ([#1603](https://github.com/apify/crawlee-python/pull/1603)) ([ae6d86b](https://github.com/apify/crawlee-python/commit/ae6d86b8c82900116032596201d94cd7875aaadc)) by [@Mantisus](https://github.com/Mantisus)
 
 
 <!-- git-cliff-unreleased-end -->
