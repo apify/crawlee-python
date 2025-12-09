@@ -34,14 +34,14 @@ class RequestState(IntEnum):
 class CrawleeRequestData(BaseModel):
     """Crawlee-specific configuration stored in the `user_data`."""
 
-    max_retries: Annotated[int | None, Field(alias='maxRetries')] = None
+    max_retries: Annotated[int | None, Field(alias='maxRetries', frozen=True)] = None
     """Maximum number of retries for this request. Allows to override the global `max_request_retries` option of
     `BasicCrawler`."""
 
     enqueue_strategy: Annotated[EnqueueStrategy | None, Field(alias='enqueueStrategy')] = None
     """The strategy that was used for enqueuing the request."""
 
-    state: RequestState | None = None
+    state: RequestState = RequestState.UNPROCESSED
     """Describes the request's current lifecycle state."""
 
     session_rotation_count: Annotated[int | None, Field(alias='sessionRotationCount')] = None
@@ -137,6 +137,8 @@ class RequestOptions(TypedDict):
     always_enqueue: NotRequired[bool]
     user_data: NotRequired[dict[str, JsonSerializable]]
     no_retry: NotRequired[bool]
+    enqueue_strategy: NotRequired[EnqueueStrategy]
+    max_retries: NotRequired[int | None]
 
 
 @docs_group('Storage data')
@@ -166,7 +168,7 @@ class Request(BaseModel):
 
     model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
-    unique_key: Annotated[str, Field(alias='uniqueKey')]
+    unique_key: Annotated[str, Field(alias='uniqueKey', frozen=True)]
     """A unique key identifying the request. Two requests with the same `unique_key` are considered as pointing
     to the same URL.
 
@@ -178,17 +180,18 @@ class Request(BaseModel):
     and specify which URLs shall be considered equal.
     """
 
-    url: Annotated[str, BeforeValidator(validate_http_url), Field()]
+    url: Annotated[str, BeforeValidator(validate_http_url), Field(frozen=True)]
     """The URL of the web page to crawl. Must be a valid HTTP or HTTPS URL, and may include query parameters
     and fragments."""
 
-    method: HttpMethod = 'GET'
+    method: Annotated[HttpMethod, Field(frozen=True)] = 'GET'
     """HTTP request method."""
 
     payload: Annotated[
         HttpPayload | None,
         BeforeValidator(lambda v: v.encode() if isinstance(v, str) else v),
         PlainSerializer(lambda v: v.decode() if isinstance(v, bytes) else v),
+        Field(frozen=True),
     ] = None
     """HTTP request payload."""
 
@@ -250,6 +253,8 @@ class Request(BaseModel):
         keep_url_fragment: bool = False,
         use_extended_unique_key: bool = False,
         always_enqueue: bool = False,
+        enqueue_strategy: EnqueueStrategy | None = None,
+        max_retries: int | None = None,
         **kwargs: Any,
     ) -> Self:
         """Create a new `Request` instance from a URL.
@@ -277,6 +282,9 @@ class Request(BaseModel):
                 `unique_key` computation. This is only relevant when `unique_key` is not provided.
             always_enqueue: If set to `True`, the request will be enqueued even if it is already present in the queue.
                 Using this is not allowed when a custom `unique_key` is also provided and will result in a `ValueError`.
+            enqueue_strategy: The strategy that will be used for enqueuing the request.
+            max_retries: Maximum number of retries for this request. Allows to override the global `max_request_retries`
+                option of `BasicCrawler`.
             **kwargs: Additional request properties.
         """
         if unique_key is not None and always_enqueue:
@@ -301,12 +309,27 @@ class Request(BaseModel):
         if always_enqueue:
             unique_key = f'{crypto_random_object_id()}|{unique_key}'
 
+        user_data_dict = kwargs.pop('user_data', {}) or {}
+        crawlee_data_dict = user_data_dict.get('__crawlee', {})
+
+        if max_retries is not None:
+            crawlee_data_dict['maxRetries'] = max_retries
+
+        if enqueue_strategy is not None:
+            crawlee_data_dict['enqueueStrategy'] = enqueue_strategy
+
+        crawlee_data = CrawleeRequestData(**crawlee_data_dict)
+
+        if crawlee_data:
+            user_data_dict['__crawlee'] = crawlee_data
+
         request = cls(
             url=url,
             unique_key=unique_key,
             method=method,
             headers=headers,
             payload=payload,
+            user_data=user_data_dict,
             **kwargs,
         )
 
@@ -352,7 +375,7 @@ class Request(BaseModel):
         self.crawlee_data.crawl_depth = new_value
 
     @property
-    def state(self) -> RequestState | None:
+    def state(self) -> RequestState:
         """Crawlee-specific request handling state."""
         return self.crawlee_data.state
 
@@ -364,10 +387,6 @@ class Request(BaseModel):
     def max_retries(self) -> int | None:
         """Crawlee-specific limit on the number of retries of the request."""
         return self.crawlee_data.max_retries
-
-    @max_retries.setter
-    def max_retries(self, new_max_retries: int) -> None:
-        self.crawlee_data.max_retries = new_max_retries
 
     @property
     def session_rotation_count(self) -> int | None:

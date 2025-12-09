@@ -59,6 +59,7 @@ from crawlee.errors import (
     RequestHandlerError,
     SessionError,
     UserDefinedErrorHandlerError,
+    UserHandlerTimeoutError,
 )
 from crawlee.events._types import Event, EventCrawlerStatusData
 from crawlee.http_clients import ImpitHttpClient
@@ -1135,7 +1136,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request.retry_count += 1
             reduced_error = str(error).split('\n')[0]
             self.log.warning(
-                f'Retrying request to {context.request.url} due to: {reduced_error}'
+                f'Retrying request to {context.request.url} due to: {reduced_error}. '
                 f'{get_one_line_error_summary_if_possible(error)}'
             )
             await self._statistics.error_tracker.add(error=error, context=context)
@@ -1153,6 +1154,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             await request_manager.reclaim_request(request)
         else:
+            request.state = RequestState.ERROR
             await self._mark_request_as_handled(request)
             await self._handle_failed_request(context, error)
             self._statistics.record_request_processing_failure(request.unique_key)
@@ -1168,8 +1170,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 f'{self._internal_timeout.total_seconds()} seconds',
                 logger=self._logger,
             )
-
-            context.request.state = RequestState.DONE
         except UserDefinedErrorHandlerError:
             context.request.state = RequestState.ERROR
             raise
@@ -1202,8 +1202,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self, request: Request | str, reason: SkippedReason, *, need_mark: bool = False
     ) -> None:
         if need_mark and isinstance(request, Request):
-            await self._mark_request_as_handled(request)
             request.state = RequestState.SKIPPED
+            await self._mark_request_as_handled(request)
 
         url = request.url if isinstance(request, Request) else request
 
@@ -1223,10 +1223,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if (
             isinstance(error, asyncio.exceptions.TimeoutError)
+            and traceback_parts
             and self._request_handler_timeout_text in traceback_parts[-1]
-        ):
+        ) or isinstance(error, UserHandlerTimeoutError):
             used_traceback_parts = reduce_asyncio_timeout_error_to_relevant_traceback_parts(error)
-            used_traceback_parts.append(traceback_parts[-1])
+            used_traceback_parts.extend(traceback_parts[-1:])
 
         return ''.join(used_traceback_parts).strip('\n')
 
@@ -1324,7 +1325,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         await self._commit_key_value_store_changes(result, get_kvs=self.get_key_value_store)
 
-        result.apply_session_changes(target=context.session)
         result.apply_request_changes(target=context.request)
 
     @staticmethod
@@ -1392,13 +1392,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         else:
             session = await self._get_session()
         proxy_info = await self._get_proxy_info(request, session)
-        result = RequestHandlerRunResult(
-            key_value_store_getter=self.get_key_value_store, request=request, session=session
-        )
+        result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store, request=request)
 
         context = BasicCrawlingContext(
             request=result.request,
-            session=result.session,
+            session=session,
             proxy_info=proxy_info,
             send_request=self._prepare_send_request_function(session, proxy_info),
             add_requests=result.add_requests,
@@ -1415,7 +1413,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request.state = RequestState.REQUEST_HANDLER
 
             try:
-                with swaped_context(context, request, session):
+                with swaped_context(context, request):
                     self._check_request_collision(request, session)
                     await self._run_request_handler(context=context)
             except asyncio.TimeoutError as e:
@@ -1423,9 +1421,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             await self._commit_request_handler_result(context)
 
-            await self._mark_request_as_handled(request)
-
             request.state = RequestState.DONE
+
+            await self._mark_request_as_handled(request)
 
             if session and session.is_usable:
                 session.mark_good()
@@ -1493,6 +1491,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             raise
 
     async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
+        context.request.state = RequestState.BEFORE_NAV
         await self._context_pipeline(
             context,
             lambda final_context: wait_for(

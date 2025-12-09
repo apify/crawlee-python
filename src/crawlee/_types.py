@@ -266,7 +266,6 @@ class RequestHandlerRunResult:
         *,
         key_value_store_getter: GetKeyValueStoreFunction,
         request: Request,
-        session: Session | None = None,
     ) -> None:
         self._key_value_store_getter = key_value_store_getter
         self.add_requests_calls = list[AddRequestsKwargs]()
@@ -275,15 +274,10 @@ class RequestHandlerRunResult:
 
         # Isolated copies for handler execution
         self._request = deepcopy(request)
-        self._session = deepcopy(session) if session else None
 
     @property
     def request(self) -> Request:
         return self._request
-
-    @property
-    def session(self) -> Session | None:
-        return self._session
 
     async def add_requests(
         self,
@@ -337,26 +331,10 @@ class RequestHandlerRunResult:
     def apply_request_changes(self, target: Request) -> None:
         """Apply tracked changes from handler copy to original request."""
         if self.request.user_data != target.user_data:
-            target.user_data.update(self.request.user_data)
+            target.user_data = self.request.user_data
 
         if self.request.headers != target.headers:
             target.headers = target.headers | self.request.headers
-
-    def apply_session_changes(self, target: Session | None = None) -> None:
-        """Apply tracked changes from handler copy to original session."""
-        simple_fields: set[str] = {'_usage_count', '_error_score'}
-
-        if self.session and target:
-            if self.session.user_data != target.user_data:
-                target.user_data.update(self.session.user_data)
-
-            if self.session.cookies != target.cookies:
-                target.cookies.set_cookies(self.session.cookies.get_cookies_as_dicts())
-            for field in simple_fields:
-                value = getattr(self.session, field)
-                original_value = getattr(target, field)
-                if value != original_value:
-                    object.__setattr__(target, field, value)
 
 
 @docs_group('Functions')

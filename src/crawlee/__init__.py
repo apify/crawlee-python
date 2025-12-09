@@ -1,6 +1,6 @@
 from importlib import metadata
 
-from ._request import Request, RequestOptions
+from ._request import Request, RequestOptions, RequestState
 from ._service_locator import service_locator
 from ._types import ConcurrencySettings, EnqueueStrategy, HttpHeaders, RequestTransformAction, SkippedReason
 from ._utils.globs import Glob
@@ -14,6 +14,7 @@ __all__ = [
     'HttpHeaders',
     'Request',
     'RequestOptions',
+    'RequestState',
     'RequestTransformAction',
     'SkippedReason',
     'service_locator',

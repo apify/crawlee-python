@@ -291,12 +291,13 @@ class AdaptivePlaywrightCrawler(
 
         # New result is created and injected to newly created context. This is done to ensure isolation of sub crawlers.
         result = RequestHandlerRunResult(
-            key_value_store_getter=self.get_key_value_store, request=context.request, session=context.session
+            key_value_store_getter=self.get_key_value_store,
+            request=context.request,
         )
         context_linked_to_result = BasicCrawlingContext(
             request=result.request,
-            session=result.session,
-            proxy_info=deepcopy(context.proxy_info),
+            session=context.session,
+            proxy_info=context.proxy_info,
             send_request=context.send_request,
             add_requests=result.add_requests,
             push_data=result.push_data,

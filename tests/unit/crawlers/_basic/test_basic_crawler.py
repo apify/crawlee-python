@@ -6,8 +6,10 @@ import concurrent
 import json
 import logging
 import os
+import re
 import sys
 import time
+from asyncio import Future
 from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
@@ -1540,6 +1542,7 @@ async def test_reduced_logs_from_timed_out_request_handler(caplog: pytest.LogCap
     caplog.set_level(logging.INFO)
     crawler = BasicCrawler(
         configure_logging=False,
+        max_request_retries=1,
         request_handler_timeout=timedelta(seconds=1),
     )
 
@@ -1559,6 +1562,31 @@ async def test_reduced_logs_from_timed_out_request_handler(caplog: pytest.LogCap
             full_message = (record.message or '') + (record.exc_text or '')
             assert '\n' not in full_message
             assert '# INJECTED DELAY' in full_message
+            found_timeout_message = True
+            break
+
+    assert found_timeout_message, 'Expected log message about request handler error was not found.'
+
+
+async def test_reduced_logs_from_time_out_in_request_handler(caplog: pytest.LogCaptureFixture) -> None:
+    crawler = BasicCrawler(configure_logging=False, max_request_retries=1)
+
+    @crawler.router.default_handler
+    async def default_handler(_: BasicCrawlingContext) -> None:
+        await asyncio.wait_for(Future(), timeout=1)
+
+    # Capture all logs from the 'crawlee' logger at INFO level or higher
+    with caplog.at_level(logging.INFO, logger='crawlee'):
+        await crawler.run([Request.from_url('https://a.placeholder.com')])
+
+    # Check for 1 line summary message
+    found_timeout_message = False
+    for record in caplog.records:
+        if re.match(
+            r'Retrying request to .* due to: Timeout raised by user defined handler\. File .*, line .*,'
+            r' in default_handler,     await asyncio.wait_for\(Future\(\), timeout=1\)',
+            record.message,
+        ):
             found_timeout_message = True
             break
 
@@ -1797,22 +1825,17 @@ async def test_crawler_intermediate_statistics() -> None:
     await crawler_task
 
 
-async def test_protect_request_and_session_in_run_handlers() -> None:
+async def test_protect_request_in_run_handlers() -> None:
     """Test that session and request in crawling context are protected in run handlers."""
     request_queue = await RequestQueue.open(name='state-test')
 
     async with SessionPool(max_pool_size=1) as session_pool:
-        session = await session_pool.get_session()
-        session.user_data['session_state'] = ['initial']
-
-        request = Request.from_url('https://test.url/', user_data={'request_state': ['initial']}, session_id=session.id)
+        request = Request.from_url('https://test.url/', user_data={'request_state': ['initial']})
 
         crawler = BasicCrawler(session_pool=session_pool, request_manager=request_queue, max_request_retries=0)
 
         @crawler.router.default_handler
         async def handler(context: BasicCrawlingContext) -> None:
-            if context.session:
-                context.session.user_data['session_state'].append('modified')
             if isinstance(context.request.user_data['request_state'], list):
                 context.request.user_data['request_state'].append('modified')
             raise ValueError('Simulated error after modifying request and session')
@@ -1822,9 +1845,6 @@ async def test_protect_request_and_session_in_run_handlers() -> None:
         check_request = await request_queue.get_request(request.unique_key)
         assert check_request is not None
         assert check_request.user_data['request_state'] == ['initial']
-
-        check_session = await session_pool.get_session()
-        assert check_session.user_data['session_state'] == ['initial']
 
     await request_queue.drop()
 
@@ -1861,5 +1881,5 @@ async def test_new_request_error_handler() -> None:
     assert original_request.was_already_handled
 
     assert error_request is not None
-    assert error_request.state == RequestState.REQUEST_HANDLER
+    assert error_request.state == RequestState.DONE
     assert error_request.was_already_handled

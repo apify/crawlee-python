@@ -19,6 +19,7 @@ from crawlee import (
     Glob,
     HttpHeaders,
     Request,
+    RequestState,
     RequestTransformAction,
     SkippedReason,
     service_locator,
@@ -991,3 +992,57 @@ async def test_slow_navigation_does_not_count_toward_handler_timeout(server_url:
     assert result.requests_failed == 0
     assert result.requests_finished == 1
     assert request_handler.call_count == 1
+
+
+async def test_request_state(server_url: URL) -> None:
+    queue = await RequestQueue.open(alias='playwright_request_state')
+    crawler = PlaywrightCrawler(request_manager=queue)
+
+    success_request = Request.from_url(str(server_url))
+    assert success_request.state == RequestState.UNPROCESSED
+
+    error_request = Request.from_url(str(server_url / 'error'), user_data={'cause_error': True})
+
+    requests_states: dict[str, dict[str, RequestState]] = {success_request.unique_key: {}, error_request.unique_key: {}}
+
+    @crawler.pre_navigation_hook
+    async def pre_navigation_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        requests_states[context.request.unique_key]['pre_navigation'] = context.request.state
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        if context.request.user_data.get('cause_error'):
+            raise ValueError('Caused error as requested')
+        requests_states[context.request.unique_key]['request_handler'] = context.request.state
+
+    @crawler.error_handler
+    async def error_handler(context: BasicCrawlingContext, _error: Exception) -> None:
+        requests_states[context.request.unique_key]['error_handler'] = context.request.state
+
+    @crawler.failed_request_handler
+    async def failed_request_handler(context: BasicCrawlingContext, _error: Exception) -> None:
+        requests_states[context.request.unique_key]['failed_request_handler'] = context.request.state
+
+    await crawler.run([success_request, error_request])
+
+    handled_success_request = await queue.get_request(success_request.unique_key)
+
+    assert handled_success_request is not None
+    assert handled_success_request.state == RequestState.DONE
+
+    assert requests_states[success_request.unique_key] == {
+        'pre_navigation': RequestState.BEFORE_NAV,
+        'request_handler': RequestState.REQUEST_HANDLER,
+    }
+
+    handled_error_request = await queue.get_request(error_request.unique_key)
+    assert handled_error_request is not None
+    assert handled_error_request.state == RequestState.ERROR
+
+    assert requests_states[error_request.unique_key] == {
+        'pre_navigation': RequestState.BEFORE_NAV,
+        'error_handler': RequestState.ERROR_HANDLER,
+        'failed_request_handler': RequestState.ERROR,
+    }
+
+    await queue.drop()
