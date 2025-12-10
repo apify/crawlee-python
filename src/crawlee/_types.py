@@ -334,7 +334,7 @@ class RequestHandlerRunResult:
             target.user_data = self.request.user_data
 
         if self.request.headers != target.headers:
-            target.headers = target.headers | self.request.headers
+            target.headers = self.request.headers
 
 
 @docs_group('Functions')
