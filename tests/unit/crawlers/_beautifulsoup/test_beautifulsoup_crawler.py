@@ -414,7 +414,7 @@ async def test_slow_navigation_does_not_count_toward_handler_timeout(server_url:
 async def test_enqueue_strategy_after_redirect(server_url: URL, redirect_server_url: URL) -> None:
     crawler = BeautifulSoupCrawler()
 
-    hendler_calls = mock.AsyncMock()
+    handles_calls = mock.AsyncMock()
 
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
