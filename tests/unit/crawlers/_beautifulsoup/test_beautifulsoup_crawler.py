@@ -426,5 +426,5 @@ async def test_enqueue_strategy_after_redirect(server_url: URL, redirect_server_
 
     await crawler.run([str(server_url)])
 
-    assert hendler_calls.called
-    assert hendler_calls.call_count == 1
+    assert handler_calls.called
+    assert handler_calls.call_count == 1
