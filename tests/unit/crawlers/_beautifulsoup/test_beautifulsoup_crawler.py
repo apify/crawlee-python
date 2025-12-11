@@ -418,7 +418,7 @@ async def test_enqueue_strategy_after_redirect(server_url: URL, redirect_server_
 
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
-        await hendler_calls(context.request.url)
+        await handler_calls(context.request.url)
 
         target_url = str(server_url.with_path('redirect').with_query(url=str(redirect_server_url)))
 
