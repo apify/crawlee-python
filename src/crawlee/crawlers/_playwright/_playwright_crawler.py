@@ -399,6 +399,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             robots_txt_file = await self._get_robots_txt_file_for_url(context.request.url)
 
             kwargs.setdefault('strategy', 'same-hostname')
+            strategy = kwargs.get('strategy', 'same-hostname')
 
             elements = await context.page.query_selector_all(selector)
             links_iterator: Iterator[str] = iter(
@@ -417,17 +418,19 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 skipped = iter([])
 
             for url in self._enqueue_links_filter_iterator(links_iterator, context.request.url, **kwargs):
-                request_option = RequestOptions({'url': url, 'user_data': {**base_user_data}, 'label': label})
+                request_options = RequestOptions(
+                    url=url, user_data={**base_user_data}, label=label, enqueue_strategy=strategy
+                )
 
                 if transform_request_function:
-                    transform_request_option = transform_request_function(request_option)
-                    if transform_request_option == 'skip':
+                    transform_request_options = transform_request_function(request_options)
+                    if transform_request_options == 'skip':
                         continue
-                    if transform_request_option != 'unchanged':
-                        request_option = transform_request_option
+                    if transform_request_options != 'unchanged':
+                        request_options = transform_request_options
 
                 try:
-                    request = Request.from_url(**request_option)
+                    request = Request.from_url(**request_options)
                 except ValidationError as exc:
                     context.log.debug(
                         f'Skipping URL "{url}" due to invalid format: {exc}. '

@@ -1038,7 +1038,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         warning_flag = True
 
         for request in request_iterator:
-            target_url = request.url if isinstance(request, Request) else request
+            if isinstance(request, Request):
+                if request.enqueue_strategy != strategy:
+                    request.enqueue_strategy = strategy
+                target_url = request.url
+            else:
+                target_url = request
             parsed_target_url = urlparse(target_url)
 
             if warning_flag and strategy != 'all' and not parsed_target_url.hostname:
