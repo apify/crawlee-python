@@ -56,3 +56,24 @@ website/package-lock.json
 
 # Default directory for memory storage
 storage/
+
+# ============================================================================
+# Tax RAG Project Specific
+# ============================================================================
+
+# Environment files
+tax_rag_project/.env
+tax_rag_project/.env.local
+tax_rag_project/.env.production
+
+# Project storage and data
+tax_rag_project/storage/
+tax_rag_project/qdrant_storage/
+
+# Logs
+tax_rag_project/*.log
+tax_rag_project/logs/
+
+# Temporary files
+tax_rag_project/tmp/
+tax_rag_project/.tmp/

@@ -1,3 +1,11 @@
+# Crawlee-Python Fork - Canadian Tax RAG Project
+
+> **Note**: This is a fork of [apify/crawlee-python](https://github.com/apify/crawlee-python) used as the foundation for a Canadian tax documentation scraping project. The original Crawlee framework code is preserved in `src/crawlee/`. The tax scraper project is located in [`tax_rag_project/`](tax_rag_project/).
+
+**Project**: [Canadian Tax Documentation RAG Pipeline](tax_rag_project/README.md)
+
+---
+
 <h1 align="center">
     <a href="https://crawlee.dev">
         <picture>

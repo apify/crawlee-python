@@ -1,0 +1,10 @@
+# Tax RAG Scraper Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core dependencies
+crawlee[beautifulsoup]>=1.2.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Additional utilities (optional)
+# python-dotenv>=1.0.0  # If using .env files directly
