@@ -27,6 +27,8 @@ build/
 # Coverage reports
 .coverage*
 htmlcov
+coverage-unit.xml
+coverage-integration.xml
 
 # IDE, editors
 .vscode

@@ -20,6 +20,9 @@
     <a href="https://pypi.org/project/crawlee/" rel="nofollow">
         <img src="https://img.shields.io/pypi/dm/crawlee" alt="PyPI - Downloads" style="max-width: 100%;">
     </a>
+    <a href="https://codecov.io/gh/apify/crawlee-python" >
+        <img src="https://codecov.io/gh/apify/crawlee-python/graph/badge.svg?token=TODO" alt="Code cov report" style="max-width: 100%;"/>
+    </a>
     <a href="https://pypi.org/project/crawlee/" rel="nofollow">
         <img src="https://img.shields.io/pypi/pyversions/crawlee" alt="PyPI - Python Version" style="max-width: 100%;">
     </a>
