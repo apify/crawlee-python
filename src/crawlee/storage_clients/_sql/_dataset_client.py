@@ -1,21 +1,24 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Select, insert, select
+from sqlalchemy import func as sql_func
 from typing_extensions import Self, override
 
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 from ._client_mixin import MetadataUpdateParams, SqlClientMixin
-from ._db_models import DatasetItemDb, DatasetMetadataDb
+from ._db_models import DatasetItemDb, DatasetMetadataBufferDb, DatasetMetadataDb
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from sqlalchemy import Select
+    from sqlalchemy.ext.asyncio import AsyncSession
     from typing_extensions import NotRequired
 
     from ._storage_client import SqlStorageClient
@@ -40,6 +43,7 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
     The dataset data is stored in SQL database tables following the pattern:
     - `datasets` table: Contains dataset metadata (id, name, timestamps, item_count)
     - `dataset_records` table: Contains individual items with JSON data and auto-increment ordering
+    - `dataset_metadata_buffer` table: Buffers metadata updates for performance optimization
 
     Items are stored as a JSON object in SQLite and as JSONB in PostgreSQL. These objects must be JSON-serializable.
     The `item_id` auto-increment primary key ensures insertion order is preserved.
@@ -57,6 +61,9 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
 
     _CLIENT_TYPE = 'Dataset'
     """Human-readable client type for error messages."""
+
+    _BUFFER_TABLE = DatasetMetadataBufferDb
+    """SQLAlchemy model for metadata buffer."""
 
     def __init__(
         self,
@@ -121,12 +128,12 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
 
         Resets item_count to 0 and deletes all records from dataset_records table.
         """
+        now = datetime.now(timezone.utc)
         await self._purge(
             metadata_kwargs=_DatasetMetadataUpdateParams(
                 new_item_count=0,
-                update_accessed_at=True,
-                update_modified_at=True,
-                force=True,
+                accessed_at=now,
+                modified_at=now,
             )
         )
 
@@ -135,23 +142,13 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
         if not isinstance(data, list):
             data = [data]
 
-        db_items: list[dict[str, Any]] = []
         db_items = [{'dataset_id': self._id, 'data': item} for item in data]
         stmt = insert(self._ITEM_TABLE).values(db_items)
 
         async with self.get_session(with_simple_commit=True) as session:
             await session.execute(stmt)
 
-            await self._update_metadata(
-                session,
-                **_DatasetMetadataUpdateParams(
-                    update_accessed_at=True,
-                    update_modified_at=True,
-                    delta_item_count=len(data),
-                    new_item_count=len(data),
-                    force=True,
-                ),
-            )
+            await self._add_buffer_record(session, update_modified_at=True, delta_item_count=len(data))
 
     @override
     async def get_data(
@@ -183,15 +180,11 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
             view=view,
         )
 
-        async with self.get_session() as session:
+        async with self.get_session(with_simple_commit=True) as session:
             result = await session.execute(stmt)
             db_items = result.scalars().all()
 
-            updated = await self._update_metadata(session, **_DatasetMetadataUpdateParams(update_accessed_at=True))
-
-            # Commit updates to the metadata
-            if updated:
-                await session.commit()
+            await self._add_buffer_record(session)
 
         items = [db_item.data for db_item in db_items]
         metadata = await self.get_metadata()
@@ -230,17 +223,13 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
             skip_hidden=skip_hidden,
         )
 
-        async with self.get_session() as session:
+        async with self.get_session(with_simple_commit=True) as session:
             db_items = await session.stream_scalars(stmt)
 
             async for db_item in db_items:
                 yield db_item.data
 
-            updated = await self._update_metadata(session, **_DatasetMetadataUpdateParams(update_accessed_at=True))
-
-            # Commit updates to the metadata
-            if updated:
-                await session.commit()
+            await self._add_buffer_record(session)
 
     def _prepare_get_stmt(
         self,
@@ -286,13 +275,14 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
 
         return stmt.offset(offset).limit(limit)
 
+    @override
     def _specific_update_metadata(
         self,
         new_item_count: int | None = None,
         delta_item_count: int | None = None,
         **_kwargs: dict[str, Any],
     ) -> dict[str, Any]:
-        """Update the dataset metadata in the database.
+        """Directly update the dataset metadata in the database.
 
         Args:
             session: The SQLAlchemy AsyncSession to use for the update.
@@ -308,3 +298,39 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
             values_to_set['item_count'] = self._METADATA_TABLE.item_count + delta_item_count
 
         return values_to_set
+
+    @override
+    def _prepare_buffer_data(self, delta_item_count: int | None = None, **_kwargs: Any) -> dict[str, Any]:
+        """Prepare dataset specific buffer data.
+
+        Args:
+            delta_item_count: If provided, add this value to the current item count.
+        """
+        buffer_data = {}
+        if delta_item_count is not None:
+            buffer_data['delta_item_count'] = delta_item_count
+
+        return buffer_data
+
+    @override
+    async def _apply_buffer_updates(self, session: AsyncSession, max_buffer_id: int) -> None:
+        aggregation_stmt = select(
+            sql_func.max(self._BUFFER_TABLE.accessed_at).label('max_accessed_at'),
+            sql_func.max(self._BUFFER_TABLE.modified_at).label('max_modified_at'),
+            sql_func.sum(self._BUFFER_TABLE.delta_item_count).label('delta_item_count'),
+        ).where(self._BUFFER_TABLE.storage_id == self._id, self._BUFFER_TABLE.id <= max_buffer_id)
+
+        result = await session.execute(aggregation_stmt)
+        row = result.first()
+
+        if not row:
+            return
+
+        await self._update_metadata(
+            session,
+            **_DatasetMetadataUpdateParams(
+                accessed_at=row.max_accessed_at,
+                modified_at=row.max_modified_at,
+                delta_item_count=row.delta_item_count,
+            ),
+        )
