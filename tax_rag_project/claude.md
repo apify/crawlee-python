@@ -227,15 +227,61 @@ curl http://localhost:6333/health
 
 ## Current Status
 
-**Last Updated**: 2025-12-12
+**Last Updated**: 2025-12-13
 
-**Current Stage**: Stage 1 - Basic Crawler (Setup Phase)
+**Current Stage**: Stage 2 Complete - Production Error Handling & Statistics
+
+**Completed**:
+- ✅ Stage 1: Basic crawler infrastructure with BeautifulSoup
+- ✅ Stage 2: Error handling, automatic retries (3x), statistics tracking
 
 **Next Steps**:
-1. Implement basic CRA crawler
-2. Test crawling 5-10 pages
-3. Verify storage and logging
-4. Move to Stage 2 (processing)
+1. Install dependencies and test error handling implementation
+2. Begin Stage 3: PDF parsing and enhanced metadata extraction
+3. Move toward vector database integration
+
+## Troubleshooting
+
+### Python Environment Issues (Windows)
+
+**Problem**: Running tests fails with "Python was not found" or import errors.
+
+**Root Causes**:
+1. **Windows Python Stub**: `/c/Users/.../WindowsApps/python` is a Microsoft Store redirect, not real Python
+2. **Missing Dependencies**: Requires `pip install -e .` (Crawlee) and `pip install -r requirements.txt` (scraper deps)
+3. **PYTHONPATH Not Set**: Import `tax_rag_scraper` fails because `src/` isn't in Python's module search path
+
+**Solutions**:
+
+```bash
+# 1. Disable Windows Python stub (optional)
+# Settings → Apps → App execution aliases → Turn off "App Installer" for python.exe
+
+# 2. Install dependencies (from project root)
+pip install -e .                          # Install Crawlee framework
+cd src/tax_rag_scraper
+pip install -r requirements.txt           # Install scraper dependencies
+
+# 3. Set PYTHONPATH and run tests
+cd ../../  # Back to project root
+export PYTHONPATH="${PWD}/src"            # Linux/Mac
+set PYTHONPATH=%CD%\src                   # Windows CMD
+$env:PYTHONPATH="$PWD\src"                # Windows PowerShell
+
+python src/tax_rag_scraper/test_error_handling.py
+```
+
+**Quick Verification**:
+```bash
+# Check Python installation
+python --version
+
+# Check Crawlee installation
+python -c "import crawlee; print(crawlee.__version__)"
+
+# Check module path
+python -c "import sys; print('\n'.join(sys.path))"
+```
 
 ## Resources
 

@@ -14,6 +14,14 @@ class Settings(BaseSettings):
     # Storage
     STORAGE_DIR: str = "storage"
 
+    # Rate limiting
+    MAX_REQUESTS_PER_MINUTE: int = 60
+    MIN_DELAY_BETWEEN_REQUESTS_MS: int = 100
+    MAX_DELAY_BETWEEN_REQUESTS_MS: int = 500
+
+    # Respect robots.txt
+    RESPECT_ROBOTS_TXT: bool = True
+
     class Config:
         env_file = ".env"
         case_sensitive = True
