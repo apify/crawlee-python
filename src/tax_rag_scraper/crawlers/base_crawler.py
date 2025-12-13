@@ -1,8 +1,9 @@
 """Base crawler implementation for tax documentation."""
 
+from datetime import timedelta
+
 from crawlee.crawlers import BeautifulSoupCrawler
 from crawlee._autoscaling.autoscaled_pool import ConcurrencySettings
-from crawlee.configuration import Configuration
 from crawlee.http_clients import HttpxHttpClient
 
 from tax_rag_scraper.config.settings import Settings
@@ -27,12 +28,6 @@ class TaxDataCrawler:
         # Initialize robots.txt checker
         self.robots_checker = RobotsChecker() if self.settings.RESPECT_ROBOTS_TXT else None
 
-        # Configure retries and timeouts
-        config = Configuration(
-            max_request_retries=3,
-            request_handler_timeout_secs=60,
-        )
-
         # Create HTTP client with custom headers and user-agent rotation
         http_client = HttpxHttpClient(
             headers={
@@ -55,11 +50,14 @@ class TaxDataCrawler:
             concurrency_settings=ConcurrencySettings(
                 max_concurrency=self.settings.MAX_CONCURRENCY,
                 desired_concurrency=self.settings.MAX_CONCURRENCY,
+                # Rate limiting: max tasks per minute
+                max_tasks_per_minute=self.settings.MAX_REQUESTS_PER_MINUTE,
             ),
-            configuration=config,
             http_client=http_client,
-            # Rate limiting
-            max_requests_per_minute=self.settings.MAX_REQUESTS_PER_MINUTE,
+            # Retry configuration (passed directly to crawler, not Configuration)
+            max_request_retries=3,
+            # Timeout configuration (uses timedelta)
+            request_handler_timeout=timedelta(seconds=60),
         )
         self._setup_handlers()
 

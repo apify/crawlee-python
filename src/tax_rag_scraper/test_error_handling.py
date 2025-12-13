@@ -20,7 +20,7 @@ async def main():
     crawler = TaxDataCrawler()
     await crawler.run(test_urls)
 
-    print("\n✓ Error handling test complete.")
+    print("\n[SUCCESS] Error handling test complete.")
     print("Check logs above to verify:")
     print("  - Valid URL processed successfully")
     print("  - 404 URL logged warning (no crash)")

@@ -46,9 +46,9 @@ async def main():
     # Verify rate limiting worked
     expected_min_duration = (len(test_urls) - 1) * (60 / settings.MAX_REQUESTS_PER_MINUTE)
     if duration >= expected_min_duration:
-        print(f"\n✓ Rate limiting working correctly (expected minimum: {expected_min_duration:.2f}s)")
+        print(f"\n[SUCCESS] Rate limiting working correctly (expected minimum: {expected_min_duration:.2f}s)")
     else:
-        print(f"\n⚠ Rate limiting may not be working (duration too short)")
+        print(f"\n[WARNING] Rate limiting may not be working (duration too short)")
 
 
 if __name__ == '__main__':
