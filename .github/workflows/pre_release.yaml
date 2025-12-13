@@ -35,14 +35,10 @@ jobs:
   # Otherwise, these checks will be launched from the `run_code_checks` workflow.
   wait_for_checks:
     name: Wait for code checks to pass
-    runs-on: ubuntu-latest
-    steps:
-      - uses: lewagon/wait-on-check-action@v1.4.1
-        with:
-          ref: ${{ github.ref }}
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          check-regexp: "( check| tests)$"
-          wait-interval: 5
+    uses: apify/workflows/.github/workflows/wait_for_checks.yaml@wait-for-checks-action
+    with:
+      ref: ${{ github.ref }}
+      check-regexp: "( check| tests)$"
 
   update_changelog:
     name: Update changelog
