@@ -17,6 +17,7 @@ concurrency:
 
 jobs:
   release_metadata:
+    if: "!startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'ci') && startsWith(github.repository, 'apify/')"
     name: Prepare release metadata
     runs-on: ubuntu-latest
     outputs:
@@ -31,18 +32,13 @@ jobs:
           release_type: prerelease
           existing_changelog_path: CHANGELOG.md
 
-  # If github.ref points to a [ci skip] commit, this workflow won't run.
-  # Otherwise, these checks will be launched from the `run_code_checks` workflow.
-  wait_for_checks:
-    name: Wait for code checks to pass
-    uses: apify/workflows/.github/workflows/wait_for_checks.yaml@wait-for-checks-action
-    with:
-      ref: ${{ github.ref }}
-      check-regexp: "( check| tests)$"
+  run_code_checks:
+    name: Run code checks
+    uses: ./.github/workflows/run_code_checks.yaml
 
   update_changelog:
     name: Update changelog
-    needs: [release_metadata, wait_for_checks]
+    needs: [release_metadata, run_code_checks]
     uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
     with:
       version_number: ${{ needs.release_metadata.outputs.version_number }}
@@ -60,7 +56,7 @@ jobs:
   publish_to_pypi:
     if: "!startsWith(github.event.head_commit.message, 'ci') && !startsWith(github.event.head_commit.message, 'docs')"
     name: Publish to PyPI
-    needs: [release_metadata, update_changelog]
+    needs: [release_metadata, run_code_checks, update_changelog]
     runs-on: ubuntu-latest
     permissions:
       contents: write
