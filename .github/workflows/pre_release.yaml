@@ -34,7 +34,7 @@ jobs:
 
   run_code_checks:
     name: Run code checks
-    uses: ./.github/workflows/run_code_checks.yaml
+    uses: ./.github/workflows/code_checks.yaml
 
   update_changelog:
     name: Update changelog

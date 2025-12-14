@@ -1,0 +1,21 @@
+name: Run doc checks
+
+on:
+  # Trigger code checks on opening a new pull request.
+  # Secrets are only made available to the integration tests job, with a manual approval
+  # step required for PRs from forks. This prevents their potential exposure.
+  pull_request:
+
+  # Trigger for pushing to the master branch is handled by the build-and-deploy-docs workflow.
+
+  # It should also be possible to trigger checks manually
+  workflow_dispatch:
+
+  # Allow this workflow to be invoked as a reusable workflow from other workflows
+  workflow_call:
+
+jobs:
+  doc_checks:
+    name: Run doc checks
+    uses: apify/workflows/.github/workflows/python_docs_check.yaml@main
+    secrets: inherit

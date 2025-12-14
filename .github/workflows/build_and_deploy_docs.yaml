@@ -13,7 +13,13 @@ env:
   PYTHON_VERSION: 3.14
 
 jobs:
+  doc_checks:
+    name: Doc checks
+    uses: ./.github/workflows/doc_checks.yaml
+    secrets: inherit
+
   build_and_deploy_docs:
+    needs: [doc_checks]
     environment:
       name: github-pages
     permissions:

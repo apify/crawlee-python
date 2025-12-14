@@ -47,8 +47,3 @@ jobs:
       operating-systems: '["ubuntu-latest", "windows-latest", "macos-latest"]'
       python-version-for-codecov: "3.14"
       operating-system-for-codecov: ubuntu-latest
-
-  docs_check:
-    name: Docs check
-    uses: apify/workflows/.github/workflows/python_docs_check.yaml@main
-    secrets: inherit
