@@ -5,7 +5,7 @@
 E2E_TESTS_CONCURRENCY = 1
 
 clean:
-	rm -rf .mypy_cache .pytest_cache .ruff_cache build dist htmlcov .coverage
+	rm -rf .mypy_cache .pytest_cache .ruff_cache .uv-cache build dist htmlcov .coverage
 
 install-sync:
 	uv sync --all-extras

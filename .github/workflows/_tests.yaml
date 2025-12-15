@@ -1,0 +1,21 @@
+name: Tests
+
+on:
+  # Runs when manually triggered from the GitHub UI.
+  workflow_dispatch:
+
+  # Runs when invoked by another workflow.
+  workflow_call:
+
+jobs:
+  unit_tests:
+    name: Unit tests
+    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
+    secrets:
+      httpbin_url: ${{ secrets.APIFY_HTTPBIN_TOKEN && format('https://httpbin.apify.actor?token={0}', secrets.APIFY_HTTPBIN_TOKEN) || 'https://httpbin.org' }}
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    with:
+      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+      operating-systems: '["ubuntu-latest", "windows-latest", "macos-latest"]'
+      python-version-for-codecov: "3.14"
+      operating-system-for-codecov: ubuntu-latest

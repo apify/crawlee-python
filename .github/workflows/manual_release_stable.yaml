@@ -1,7 +1,7 @@
-name: Create a release
+name: Stable release
 
 on:
-  # Trigger a stable version release via GitHub's UI, with the ability to specify the type of release.
+  # Runs when manually triggered from the GitHub UI, with options to specify the type of release.
   workflow_dispatch:
     inputs:
       release_type:
@@ -26,8 +26,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  code_checks:
+    name: Code checks
+    uses: ./.github/workflows/_check_code.yaml
+
   release_metadata:
     name: Prepare release metadata
+    needs: [code_checks]
     runs-on: ubuntu-latest
     outputs:
       version_number: ${{ steps.release_metadata.outputs.version_number }}
@@ -43,21 +48,9 @@ jobs:
           custom_version: ${{ inputs.custom_version }}
           existing_changelog_path: CHANGELOG.md
 
-  lint_check:
-    name: Lint check
-    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
-    with:
-      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
-
-  type_check:
-    name: Type check
-    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
-    with:
-      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
-
   update_changelog:
     name: Update changelog
-    needs: [release_metadata, lint_check, type_check]
+    needs: [release_metadata]
     uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
     with:
       version_number: ${{ needs.release_metadata.outputs.version_number }}
@@ -65,15 +58,8 @@ jobs:
     secrets:
       APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
-  build_and_deploy_docs:
-    needs: [update_changelog]
-    uses: ./.github/workflows/build_and_deploy_docs.yaml
-    with:
-      ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
-    secrets: inherit
-
   create_github_release:
-    name: Create github release
+    name: Create GitHub release
     needs: [release_metadata, update_changelog]
     runs-on: ubuntu-latest
     env:

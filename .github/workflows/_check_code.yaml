@@ -1,0 +1,30 @@
+name: Code checks
+
+on:
+  # Runs when manually triggered from the GitHub UI.
+  workflow_dispatch:
+
+  # Runs when invoked by another workflow.
+  workflow_call:
+
+jobs:
+  actions_lint_check:
+    name: Actions lint check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Run actionlint
+        uses: rhysd/actionlint@v1.7.9
+
+  lint_check:
+    name: Lint check
+    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
+    with:
+      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+
+  type_check:
+    name: Type check
+    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
+    with:
+      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'

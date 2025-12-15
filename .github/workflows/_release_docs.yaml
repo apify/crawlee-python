@@ -1,7 +1,10 @@
-name: Build and deploy docs
+name: Doc release
 
 on:
+  # Runs when manually triggered from the GitHub UI.
   workflow_dispatch:
+
+  # Runs when invoked by another workflow.
   workflow_call:
     inputs:
       ref:
@@ -9,11 +12,12 @@ on:
         type: string
 
 env:
-  NODE_VERSION: 20
+  NODE_VERSION: 22
   PYTHON_VERSION: 3.14
 
 jobs:
-  build_and_deploy_docs:
+  release_docs:
+    name: Doc release
     environment:
       name: github-pages
     permissions:

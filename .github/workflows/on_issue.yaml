@@ -1,13 +1,14 @@
-name: Update new issue
+name: CI (issue)
 
 on:
+  # Runs when a new issue is opened.
   issues:
     types:
       - opened
 
 jobs:
   label_issues:
-    name: Label issues
+    name: Add labels
     runs-on: ubuntu-latest
     permissions:
       issues: write

@@ -1,15 +1,15 @@
-name: Create a pre-release
+name: Pre-release
 
 on:
-  # Trigger a beta version release (pre-release) on push to the master branch.
-  push:
-    branches:
-      - master
-    tags-ignore:
-      - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
-
-  # Or it can be triggered manually.
+  # Runs when manually triggered from the GitHub UI.
   workflow_dispatch:
+
+  # Runs when invoked by another workflow.
+  workflow_call:
+    outputs:
+      changelog_commitish:
+        description: The commit SHA after updating the changelog
+        value: ${{ jobs.update_changelog.outputs.changelog_commitish }}
 
 concurrency:
   group: release
@@ -17,6 +17,7 @@ concurrency:
 
 jobs:
   release_metadata:
+    if: "!startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'ci') && startsWith(github.repository, 'apify/')"
     name: Prepare release metadata
     runs-on: ubuntu-latest
     outputs:
@@ -31,35 +32,15 @@ jobs:
           release_type: prerelease
           existing_changelog_path: CHANGELOG.md
 
-  # If github.ref points to a [ci skip] commit, this workflow won't run.
-  # Otherwise, these checks will be launched from the `run_code_checks` workflow.
-  wait_for_checks:
-    name: Wait for code checks to pass
-    runs-on: ubuntu-latest
-    steps:
-      - uses: lewagon/wait-on-check-action@v1.4.1
-        with:
-          ref: ${{ github.ref }}
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          check-regexp: "( check| tests)$"
-          wait-interval: 5
-
   update_changelog:
     name: Update changelog
-    needs: [release_metadata, wait_for_checks]
+    needs: [release_metadata]
     uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
     with:
       version_number: ${{ needs.release_metadata.outputs.version_number }}
       changelog: ${{ needs.release_metadata.outputs.changelog }}
     secrets:
       APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
-
-  build_and_deploy_docs:
-    needs: [update_changelog]
-    uses: ./.github/workflows/build_and_deploy_docs.yaml
-    with:
-      ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
-    secrets: inherit
 
   publish_to_pypi:
     if: "!startsWith(github.event.head_commit.message, 'ci') && !startsWith(github.event.head_commit.message, 'docs')"
@@ -80,6 +61,7 @@ jobs:
           is_prerelease: "yes"
           version_number: ${{ needs.release_metadata.outputs.version_number }}
           ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
+
       # Publishes the package to PyPI using PyPA official GitHub action with OIDC authentication.
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

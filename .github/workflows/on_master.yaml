@@ -1,0 +1,38 @@
+name: CI (master)
+
+on:
+  # Runs on every push to the master branch.
+  push:
+    branches:
+      - master
+    tags-ignore:
+      - "**"  # Ignore all tags to avoid duplicate executions triggered by tag pushes.
+
+jobs:
+  doc_checks:
+    name: Doc checks
+    uses: ./.github/workflows/_check_docs.yaml
+    secrets: inherit
+
+  code_checks:
+    name: Code checks
+    uses: ./.github/workflows/_check_code.yaml
+
+  tests:
+    name: Tests
+    uses: ./.github/workflows/_tests.yaml
+    secrets: inherit
+
+  pre_release:
+    name: Pre-release
+    needs: [code_checks, tests]
+    uses: ./.github/workflows/_release_pre.yaml
+    secrets: inherit
+
+  release_docs:
+    name: Doc release
+    needs: [doc_checks, pre_release]
+    uses: ./.github/workflows/_release_docs.yaml
+    with:
+      ref: ${{ needs.pre_release.outputs.changelog_commitish }}
+    secrets: inherit
