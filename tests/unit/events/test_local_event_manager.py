@@ -13,7 +13,7 @@ async def test_emit_system_info_event() -> None:
     mocked_listener = AsyncMock()
 
     async def async_listener(payload: Any) -> None:
-        mocked_listener(payload)
+        await mocked_listener(payload)
 
     system_info_interval = timedelta(milliseconds=50)
     test_tolerance_coefficient = 10
