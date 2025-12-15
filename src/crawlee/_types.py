@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Callable, Iterator, Mapping
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, TypedDict, TypeVar, cast, overload
 
@@ -260,11 +261,23 @@ class KeyValueStoreChangeRecords:
 class RequestHandlerRunResult:
     """Record of calls to storage-related context helpers."""
 
-    def __init__(self, *, key_value_store_getter: GetKeyValueStoreFunction) -> None:
+    def __init__(
+        self,
+        *,
+        key_value_store_getter: GetKeyValueStoreFunction,
+        request: Request,
+    ) -> None:
         self._key_value_store_getter = key_value_store_getter
         self.add_requests_calls = list[AddRequestsKwargs]()
         self.push_data_calls = list[PushDataFunctionCall]()
         self.key_value_store_changes = dict[tuple[str | None, str | None, str | None], KeyValueStoreChangeRecords]()
+
+        # Isolated copies for handler execution
+        self._request = deepcopy(request)
+
+    @property
+    def request(self) -> Request:
+        return self._request
 
     async def add_requests(
         self,
@@ -314,6 +327,14 @@ class RequestHandlerRunResult:
             )
 
         return self.key_value_store_changes[id, name, alias]
+
+    def apply_request_changes(self, target: Request) -> None:
+        """Apply tracked changes from handler copy to original request."""
+        if self.request.user_data != target.user_data:
+            target.user_data = self.request.user_data
+
+        if self.request.headers != target.headers:
+            target.headers = self.request.headers
 
 
 @docs_group('Functions')

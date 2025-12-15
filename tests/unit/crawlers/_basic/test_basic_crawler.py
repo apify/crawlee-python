@@ -1825,6 +1825,29 @@ async def test_crawler_intermediate_statistics() -> None:
     await crawler_task
 
 
+async def test_protect_request_in_run_handlers() -> None:
+    """Test that request in crawling context are protected in run handlers."""
+    request_queue = await RequestQueue.open(name='state-test')
+
+    request = Request.from_url('https://test.url/', user_data={'request_state': ['initial']})
+
+    crawler = BasicCrawler(request_manager=request_queue, max_request_retries=0)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        if isinstance(context.request.user_data['request_state'], list):
+            context.request.user_data['request_state'].append('modified')
+        raise ValueError('Simulated error after modifying request')
+
+    await crawler.run([request])
+
+    check_request = await request_queue.get_request(request.unique_key)
+    assert check_request is not None
+    assert check_request.user_data['request_state'] == ['initial']
+
+    await request_queue.drop()
+
+
 async def test_new_request_error_handler() -> None:
     """Test that error in new_request_handler is handled properly."""
     queue = await RequestQueue.open()

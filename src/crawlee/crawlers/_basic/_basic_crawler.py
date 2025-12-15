@@ -69,6 +69,7 @@ from crawlee.statistics import Statistics, StatisticsState
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 from ._context_pipeline import ContextPipeline
+from ._context_utils import swaped_context
 from ._logging_utils import (
     get_one_line_error_summary_if_possible,
     reduce_asyncio_timeout_error_to_relevant_traceback_parts,
@@ -1326,6 +1327,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         await self._commit_key_value_store_changes(result, get_kvs=self.get_key_value_store)
 
+        result.apply_request_changes(target=context.request)
+
     @staticmethod
     async def _commit_key_value_store_changes(
         result: RequestHandlerRunResult, get_kvs: GetKeyValueStoreFromRequestHandlerFunction
@@ -1391,10 +1394,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         else:
             session = await self._get_session()
         proxy_info = await self._get_proxy_info(request, session)
-        result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
+        result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store, request=request)
 
         context = BasicCrawlingContext(
-            request=request,
+            request=result.request,
             session=session,
             proxy_info=proxy_info,
             send_request=self._prepare_send_request_function(session, proxy_info),
@@ -1409,10 +1412,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._statistics.record_request_processing_start(request.unique_key)
 
         try:
-            self._check_request_collision(context.request, context.session)
+            request.state = RequestState.REQUEST_HANDLER
 
             try:
-                await self._run_request_handler(context=context)
+                with swaped_context(context, request):
+                    self._check_request_collision(request, session)
+                    await self._run_request_handler(context=context)
             except asyncio.TimeoutError as e:
                 raise RequestHandlerError(e, context) from e
 
@@ -1422,13 +1427,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             await self._mark_request_as_handled(request)
 
-            if context.session and context.session.is_usable:
-                context.session.mark_good()
+            if session and session.is_usable:
+                session.mark_good()
 
             self._statistics.record_request_processing_finish(request.unique_key)
 
         except RequestCollisionError as request_error:
-            context.request.no_retry = True
+            request.no_retry = True
             await self._handle_request_error(context, request_error)
 
         except RequestHandlerError as primary_error:
@@ -1443,7 +1448,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             await self._handle_request_error(primary_error.crawling_context, primary_error.wrapped_exception)
 
         except SessionError as session_error:
-            if not context.session:
+            if not session:
                 raise RuntimeError('SessionError raised in a crawling context without a session') from session_error
 
             if self._error_handler:
@@ -1453,10 +1458,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 exc_only = ''.join(traceback.format_exception_only(session_error)).strip()
                 self._logger.warning('Encountered "%s", rotating session and retrying...', exc_only)
 
-                context.session.retire()
+                if session:
+                    session.retire()
 
                 # Increment session rotation count.
-                context.request.session_rotation_count = (context.request.session_rotation_count or 0) + 1
+                request.session_rotation_count = (request.session_rotation_count or 0) + 1
 
                 await request_manager.reclaim_request(request)
                 await self._statistics.error_tracker_retry.add(error=session_error, context=context)
