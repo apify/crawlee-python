@@ -26,17 +26,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  lint_check:
-    name: Lint check
-    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
-    with:
-      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
-
-  type_check:
-    name: Type check
-    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
-    with:
-      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+  code_checks:
+    name: Code checks
+    uses: ./.github/workflows/_check_code.yaml
 
   release_metadata:
     name: Prepare release metadata
