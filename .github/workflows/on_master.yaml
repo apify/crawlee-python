@@ -26,7 +26,7 @@ jobs:
   build_and_deploy_docs:
     name: Build and deploy docs
     needs: [doc_checks]
-    uses: ./.github/workflows/build_and_deploy_docs.yaml
+    uses: ./.github/workflows/docs.yaml
     secrets: inherit
 
   pre_release:
