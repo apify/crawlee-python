@@ -1310,10 +1310,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         return await request_manager.add_requests(context_aware_requests)
 
-    async def _commit_request_handler_result(
-        self,
-        context: BasicCrawlingContext,
-    ) -> None:
+    async def _commit_request_handler_result(self, context: BasicCrawlingContext) -> None:
         """Commit request handler result for the input `context`. Result is taken from `_context_result_map`."""
         result = self._context_result_map[context]
 
