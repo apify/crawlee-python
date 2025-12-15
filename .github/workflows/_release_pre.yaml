@@ -1,4 +1,4 @@
-name: Create a pre-release
+name: Pre-release
 
 on:
   # Runs when manually triggered from the GitHub UI.

@@ -1,4 +1,4 @@
-name: Run code checks
+name: Code checks
 
 on:
   # Runs when manually triggered from the GitHub UI.

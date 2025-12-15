@@ -1,4 +1,4 @@
-name: Templates end-to-end tests
+name: Scheduled tests
 
 on:
   # Runs when manually triggered from the GitHub UI.

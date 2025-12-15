@@ -15,14 +15,14 @@ jobs:
 
   doc_checks:
     name: Doc checks
-    uses: ./.github/workflows/doc_checks.yaml
+    uses: ./.github/workflows/_check_docs.yaml
     secrets: inherit
 
   code_checks:
     name: Code checks
-    uses: ./.github/workflows/code_checks.yaml
+    uses: ./.github/workflows/_check_code.yaml
 
   tests:
     name: Tests
-    uses: ./.github/workflows/tests.yaml
+    uses: ./.github/workflows/_tests.yaml
     secrets: inherit

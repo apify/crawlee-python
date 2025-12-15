@@ -1,4 +1,4 @@
-name: Docs
+name: Doc release
 
 on:
   # Runs when manually triggered from the GitHub UI.
@@ -16,8 +16,8 @@ env:
   PYTHON_VERSION: 3.14
 
 jobs:
-  build_and_deploy_docs:
-    name: Build and deploy docs
+  release_docs:
+    name: Doc release
     environment:
       name: github-pages
     permissions:
