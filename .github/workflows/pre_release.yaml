@@ -6,6 +6,10 @@ on:
 
   # Runs when invoked by another workflow.
   workflow_call:
+    outputs:
+      changelog_commitish:
+        description: The commit SHA after updating the changelog
+        value: ${{ jobs.update_changelog.outputs.changelog_commitish }}
 
 concurrency:
   group: release
