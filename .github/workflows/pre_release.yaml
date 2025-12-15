@@ -28,13 +28,9 @@ jobs:
           release_type: prerelease
           existing_changelog_path: CHANGELOG.md
 
-  run_code_checks:
-    name: Run code checks
-    uses: ./.github/workflows/code_checks.yaml
-
   update_changelog:
     name: Update changelog
-    needs: [release_metadata, run_code_checks]
+    needs: [release_metadata]
     uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
     with:
       version_number: ${{ needs.release_metadata.outputs.version_number }}
@@ -42,17 +38,10 @@ jobs:
     secrets:
       APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
-  build_and_deploy_docs:
-    needs: [update_changelog]
-    uses: ./.github/workflows/docs.yaml
-    with:
-      ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
-    secrets: inherit
-
   publish_to_pypi:
     if: "!startsWith(github.event.head_commit.message, 'ci') && !startsWith(github.event.head_commit.message, 'docs')"
     name: Publish to PyPI
-    needs: [release_metadata, run_code_checks, update_changelog]
+    needs: [update_changelog]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -68,6 +57,7 @@ jobs:
           is_prerelease: "yes"
           version_number: ${{ needs.release_metadata.outputs.version_number }}
           ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
+
       # Publishes the package to PyPI using PyPA official GitHub action with OIDC authentication.
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

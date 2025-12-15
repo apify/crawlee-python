@@ -65,16 +65,9 @@ jobs:
     secrets:
       APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
-  build_and_deploy_docs:
-    needs: [update_changelog]
-    uses: ./.github/workflows/docs.yaml
-    with:
-      ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
-    secrets: inherit
-
   create_github_release:
-    name: Create github release
-    needs: [release_metadata, update_changelog]
+    name: Create GitHub release
+    needs: [update_changelog]
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -89,7 +82,7 @@ jobs:
 
   publish_to_pypi:
     name: Publish to PyPI
-    needs: [release_metadata, update_changelog]
+    needs: [update_changelog]
     runs-on: ubuntu-latest
     permissions:
       contents: write

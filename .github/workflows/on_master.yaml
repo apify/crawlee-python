@@ -27,6 +27,8 @@ jobs:
     name: Build and deploy docs
     needs: [doc_checks]
     uses: ./.github/workflows/docs.yaml
+    with:
+      ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
     secrets: inherit
 
   pre_release:
