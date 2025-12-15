@@ -7,7 +7,7 @@ from unittest import mock
 
 import pytest
 
-from crawlee import ConcurrencySettings, Glob, HttpHeaders, RequestTransformAction, SkippedReason
+from crawlee import ConcurrencySettings, Glob, HttpHeaders, Request, RequestTransformAction, SkippedReason
 from crawlee.crawlers import BasicCrawlingContext, BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from crawlee.storages import RequestQueue
 
@@ -409,3 +409,22 @@ async def test_slow_navigation_does_not_count_toward_handler_timeout(server_url:
     assert result.requests_failed == 0
     assert result.requests_finished == 1
     assert request_handler.call_count == 1
+
+
+async def test_enqueue_strategy_after_redirect(server_url: URL, redirect_server_url: URL) -> None:
+    crawler = BeautifulSoupCrawler()
+
+    handler_calls = mock.AsyncMock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        await handler_calls(context.request.url)
+
+        target_url = str(server_url.with_path('redirect').with_query(url=str(redirect_server_url)))
+
+        await context.enqueue_links(requests=[Request.from_url(target_url)], strategy='same-origin')
+
+    await crawler.run([str(server_url)])
+
+    assert handler_calls.called
+    assert handler_calls.call_count == 1
