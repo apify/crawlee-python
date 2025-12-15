@@ -32,7 +32,7 @@ jobs:
 
   release_metadata:
     name: Prepare release metadata
-    needs: [lint_check, type_check]
+    needs: [code_checks]
     runs-on: ubuntu-latest
     outputs:
       version_number: ${{ steps.release_metadata.outputs.version_number }}
