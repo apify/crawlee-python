@@ -41,7 +41,7 @@ jobs:
   publish_to_pypi:
     if: "!startsWith(github.event.head_commit.message, 'ci') && !startsWith(github.event.head_commit.message, 'docs')"
     name: Publish to PyPI
-    needs: [update_changelog]
+    needs: [release_metadata, update_changelog]
     runs-on: ubuntu-latest
     permissions:
       contents: write

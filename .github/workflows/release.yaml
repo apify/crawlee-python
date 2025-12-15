@@ -26,8 +26,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  lint_check:
+    name: Lint check
+    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
+    with:
+      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+
+  type_check:
+    name: Type check
+    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
+    with:
+      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+
   release_metadata:
     name: Prepare release metadata
+    needs: [lint_check, type_check]
     runs-on: ubuntu-latest
     outputs:
       version_number: ${{ steps.release_metadata.outputs.version_number }}
@@ -43,21 +56,9 @@ jobs:
           custom_version: ${{ inputs.custom_version }}
           existing_changelog_path: CHANGELOG.md
 
-  lint_check:
-    name: Lint check
-    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
-    with:
-      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
-
-  type_check:
-    name: Type check
-    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
-    with:
-      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
-
   update_changelog:
     name: Update changelog
-    needs: [release_metadata, lint_check, type_check]
+    needs: [release_metadata]
     uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
     with:
       version_number: ${{ needs.release_metadata.outputs.version_number }}
@@ -67,7 +68,7 @@ jobs:
 
   create_github_release:
     name: Create GitHub release
-    needs: [update_changelog]
+    needs: [release_metadata, update_changelog]
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -82,7 +83,7 @@ jobs:
 
   publish_to_pypi:
     name: Publish to PyPI
-    needs: [update_changelog]
+    needs: [release_metadata, update_changelog]
     runs-on: ubuntu-latest
     permissions:
       contents: write

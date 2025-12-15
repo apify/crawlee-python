@@ -23,16 +23,16 @@ jobs:
     uses: ./.github/workflows/tests.yaml
     secrets: inherit
 
-  build_and_deploy_docs:
-    name: Build and deploy docs
-    needs: [doc_checks]
-    uses: ./.github/workflows/docs.yaml
-    with:
-      ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
-    secrets: inherit
-
   pre_release:
     name: Pre-release
     needs: [code_checks, tests]
     uses: ./.github/workflows/pre_release.yaml
+    secrets: inherit
+
+  build_and_deploy_docs:
+    name: Build and deploy docs
+    needs: [doc_checks, pre_release]
+    uses: ./.github/workflows/docs.yaml
+    with:
+      ref: ${{ needs.pre_release.outputs.changelog_commitish }}
     secrets: inherit
