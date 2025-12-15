@@ -1,7 +1,7 @@
 name: Create a release
 
 on:
-  # Trigger a stable version release via GitHub's UI, with the ability to specify the type of release.
+  # Runs when manually triggered from the GitHub UI, with options to specify the type of release.
   workflow_dispatch:
     inputs:
       release_type:

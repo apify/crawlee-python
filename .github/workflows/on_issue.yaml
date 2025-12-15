@@ -1,6 +1,7 @@
 name: Update new issue
 
 on:
+  # Runs when a new issue is opened.
   issues:
     types:
       - opened

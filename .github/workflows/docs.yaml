@@ -1,7 +1,10 @@
-name: Build and deploy docs
+name: Docs
 
 on:
+  # Runs when manually triggered from the GitHub UI.
   workflow_dispatch:
+
+  # Runs when invoked by another workflow.
   workflow_call:
     inputs:
       ref:
@@ -13,13 +16,8 @@ env:
   PYTHON_VERSION: 3.14
 
 jobs:
-  doc_checks:
-    name: Doc checks
-    uses: ./.github/workflows/doc_checks.yaml
-    secrets: inherit
-
   build_and_deploy_docs:
-    needs: [doc_checks]
+    name: Build and deploy docs
     environment:
       name: github-pages
     permissions:

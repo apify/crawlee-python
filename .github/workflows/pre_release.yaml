@@ -1,15 +1,11 @@
 name: Create a pre-release
 
 on:
-  # Trigger a beta version release (pre-release) on push to the master branch.
-  push:
-    branches:
-      - master
-    tags-ignore:
-      - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
-
-  # Or it can be triggered manually.
+  # Runs when manually triggered from the GitHub UI.
   workflow_dispatch:
+
+  # Runs when invoked by another workflow.
+  workflow_call:
 
 concurrency:
   group: release
