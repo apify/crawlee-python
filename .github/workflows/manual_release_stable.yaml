@@ -40,7 +40,7 @@ jobs:
       changelog: ${{ steps.release_metadata.outputs.changelog }}
       release_notes: ${{ steps.release_metadata.outputs.release_notes }}
     steps:
-      - uses: apify/workflows/git-cliff-release@main
+      - uses: apify/workflows/git-cliff-release@fix-git-cliff
         name: Prepare release metadata
         id: release_metadata
         with:

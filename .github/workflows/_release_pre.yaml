@@ -25,7 +25,7 @@ jobs:
       tag_name: ${{ steps.release_metadata.outputs.tag_name }}
       changelog: ${{ steps.release_metadata.outputs.changelog }}
     steps:
-      - uses: apify/workflows/git-cliff-release@main
+      - uses: apify/workflows/git-cliff-release@fix-git-cliff
         id: release_metadata
         name: Prepare release metadata
         with:
