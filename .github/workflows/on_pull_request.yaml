@@ -16,8 +16,6 @@ jobs:
   doc_checks:
     name: Doc checks
     uses: ./.github/workflows/_check_docs.yaml
-    secrets:
-      APIFY_SIGNING_TOKEN: ${{ secrets.APIFY_SIGNING_TOKEN }}
 
   code_checks:
     name: Code checks
@@ -26,6 +24,4 @@ jobs:
   tests:
     name: Tests
     uses: ./.github/workflows/_tests.yaml
-    secrets:
-      APIFY_HTTPBIN_TOKEN: ${{ secrets.APIFY_HTTPBIN_TOKEN }}
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    secrets: inherit

@@ -10,13 +10,6 @@ on:
       ref:
         required: true
         type: string
-    secrets:
-      APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN:
-        required: true
-      APIFY_SIGNING_TOKEN:
-        required: true
-      SEGMENT_TOKEN:
-        required: false
 
 env:
   NODE_VERSION: 22

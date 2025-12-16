@@ -15,8 +15,6 @@ jobs:
   doc_checks:
     name: Doc checks
     uses: ./.github/workflows/_check_docs.yaml
-    secrets:
-      APIFY_SIGNING_TOKEN: ${{ secrets.APIFY_SIGNING_TOKEN }}
 
   doc_release:
     # Skip this for non-docs commits and forks.
@@ -27,10 +25,7 @@ jobs:
     with:
       # Use the same ref as the one that triggered the workflow.
       ref: ${{ github.ref }}
-    secrets:
-      APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
-      APIFY_SIGNING_TOKEN: ${{ secrets.APIFY_SIGNING_TOKEN }}
-      SEGMENT_TOKEN: ${{ secrets.SEGMENT_TOKEN }}
+    secrets: inherit
 
   code_checks:
     name: Code checks
@@ -41,9 +36,7 @@ jobs:
     if: "!startsWith(github.event.head_commit.message, 'ci') && !startsWith(github.event.head_commit.message, 'docs')"
     name: Tests
     uses: ./.github/workflows/_tests.yaml
-    secrets:
-      APIFY_HTTPBIN_TOKEN: ${{ secrets.APIFY_HTTPBIN_TOKEN }}
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    secrets: inherit
 
   release_prepare:
     # Skip this for "ci", "docs" and "test" commits and for forks.
@@ -70,8 +63,7 @@ jobs:
     with:
       version_number: ${{ needs.release_prepare.outputs.version_number }}
       changelog: ${{ needs.release_prepare.outputs.changelog }}
-    secrets:
-      APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+    secrets: inherit
 
   pypi_publish:
     name: PyPI publish
@@ -102,7 +94,4 @@ jobs:
     with:
       # Use the ref from the changelog update to include the updated changelog.
       ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
-    secrets:
-      APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
-      APIFY_SIGNING_TOKEN: ${{ secrets.APIFY_SIGNING_TOKEN }}
-      SEGMENT_TOKEN: ${{ secrets.SEGMENT_TOKEN }}
+    secrets: inherit
