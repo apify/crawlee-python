@@ -257,7 +257,7 @@ module = [
     "camoufox",                     # Example code shows integration of camoufox and crawlee.
     "fastapi",                      # Example code shows running in webserver.
     "saxonche",                     # Example code shows HttpCrawler with custom parser.
-    "scrapling",                    # Example code shows HttpCrawler with custom parser.
+    "scrapling.*",                    # Example code shows HttpCrawler with custom parser.
     "selectolax.*",                 # Example code shows HttpCrawler with custom parser.
     "stagehand.*",                  # Example code shows integration of Stagehand and crawlee.
     "starlette.*",                  # Example code shows running in webserver.
