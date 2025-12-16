@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.2.1](https://github.com/apify/crawlee-python/releases/tag/v1.2.1) (2025-12-16)
+<!-- git-cliff-unreleased-start -->
+
+## 1.2.1 - **not yet released**
 
 ### 🐛 Bug Fixes
 
@@ -11,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Respect `enqueue_strategy` after redirects in `enqueue_links` ([#1607](https://github.com/apify/crawlee-python/pull/1607)) ([700df91](https://github.com/apify/crawlee-python/commit/700df91bc9be1299388030a3e48e4dbc6f5b85a0)) by [@Mantisus](https://github.com/Mantisus), closes [#1606](https://github.com/apify/crawlee-python/issues/1606)
 - Protect `Request` from partial mutations on request handler failure ([#1585](https://github.com/apify/crawlee-python/pull/1585)) ([a69caf8](https://github.com/apify/crawlee-python/commit/a69caf87edecc755287c53c8cc0ca4725af5d411)) by [@Mantisus](https://github.com/Mantisus), closes [#1514](https://github.com/apify/crawlee-python/issues/1514)
 
+<!-- git-cliff-unreleased-end -->
 
 ## [1.2.0](https://github.com/apify/crawlee-python/releases/tag/v1.2.0) (2025-12-08)
 
