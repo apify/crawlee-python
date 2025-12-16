@@ -1,0 +1,67 @@
+---
+id: httpcrawler-with-custom-parser
+title: HttpCrawler with custom parser
+description: Learn how to use HttpCrawler with third-party parsing libraries instead of BeautifulSoup and Parsel.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import LxmlParser from '!!raw-loader!roa-loader!./code_examples/httpcrawler_custom_parser/lxml_parser.py';
+import LxmlSaxoncheParser from '!!raw-loader!roa-loader!./code_examples/httpcrawler_custom_parser/lxml_saxonche_parser.py';
+import SelectolaxParser from '!!raw-loader!roa-loader!./code_examples/httpcrawler_custom_parser/selectolax_parser.py';
+import PyqueryParser from '!!raw-loader!roa-loader!./code_examples/httpcrawler_custom_parser/pyquery_parser.py';
+import ScraplingParser from '!!raw-loader!roa-loader!./code_examples/httpcrawler_custom_parser/scrapling_parser.py';
+
+Crawlee provides <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> and <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> as built-in solutions for HTML parsing. However, you may want to use a different parsing library that better fits your specific needs. The <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> gives you direct access to raw HTTP responses, allowing you to integrate any parsing library of your choice.
+
+When using <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> with a custom parser, helpers like <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> and <ApiLink to="class/ExtractLinksFunction">`extract_links`</ApiLink> are not available. For deeper integration, use the <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> implementation as inspiration.
+
+The following sections demonstrate how to use various parsing libraries with <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> to extract data from a page and enqueue discovered links for further crawling.
+
+## lxml
+
+[lxml](https://lxml.de/) is a high-performance XML and HTML parser that provides Python bindings to the C libraries libxml2 and libxslt. It supports XPath 1.0, XSLT 1.0, and EXSLT extensions for element selection. The `make_links_absolute` method is particularly useful for converting relative URLs to absolute ones before link extraction.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {LxmlParser}
+</RunnableCodeBlock>
+
+## lxml with SaxonC-HE
+
+Using [SaxonC-HE](https://pypi.org/project/saxonche/) together with lxml enables XPath 3.1 support, which provides advanced features like `distinct-values()` function and more powerful string manipulation. In this setup, lxml converts HTML to well-formed XML that SaxonC-HE can process.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {LxmlSaxoncheParser}
+</RunnableCodeBlock>
+
+## selectolax
+
+[selectolax](https://github.com/rushter/selectolax) is a fast HTML parser that offers two backends: the default `Modest` engine and `Lexbor`. It provides a simple API with CSS selector support. The example below uses the `Lexbor` backend for optimal performance.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {SelectolaxParser}
+</RunnableCodeBlock>
+
+## PyQuery
+
+[PyQuery](https://pyquery.readthedocs.io/) brings jQuery-like syntax to Python for HTML manipulation. Built on top of `lxml`, it combines familiar jQuery CSS selectors with Python's ease of use. This is a good choice if you're comfortable with jQuery syntax and want a straightforward API for DOM traversal and manipulation.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {PyqueryParser}
+</RunnableCodeBlock>
+
+## Scrapling
+
+[Scrapling](https://github.com/D4Vinci/Scrapling) is scraping library that provides both CSS selectors and XPath 1.0. It offers automatic text extraction and a Scrapy/BeautifulSoup-like API with pseudo-elements support similar to Parsel.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {ScraplingParser}
+</RunnableCodeBlock>
+
+## Conclusion
+
+<ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> provides a solid foundation for integrating any parsing library from the Python ecosystem. By giving you direct access to HTTP responses, it allows you to leverage the parser you're most comfortable with or the one that best fits your specific requirements. Whether you need XPath support, CSS selectors, or specialized parsing features, <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> makes it straightforward to incorporate your preferred tool into your scraping workflow.
