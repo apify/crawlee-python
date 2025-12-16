@@ -6,6 +6,11 @@ on:
 
   # Runs when invoked by another workflow.
   workflow_call:
+    secrets:
+      APIFY_HTTPBIN_TOKEN:
+        required: false
+      CODECOV_TOKEN:
+        required: false
 
 jobs:
   unit_tests:

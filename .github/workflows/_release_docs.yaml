@@ -10,10 +10,18 @@ on:
       ref:
         required: true
         type: string
+    secrets:
+      APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN:
+        required: true
+      APIFY_SIGNING_TOKEN:
+        required: true
+      SEGMENT_TOKEN:
+        required: false
 
 env:
   NODE_VERSION: 22
   PYTHON_VERSION: 3.14
+  CHECKOUT_REF: ${{ github.event_name == 'workflow_call' && inputs.ref || github.ref }}
 
 jobs:
   release_docs:
@@ -31,7 +39,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.ref }}
+          ref: ${{ env.CHECKOUT_REF }}
 
       - name: Set up Node
         uses: actions/setup-node@v6

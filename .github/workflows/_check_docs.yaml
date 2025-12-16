@@ -6,9 +6,13 @@ on:
 
   # Runs when invoked by another workflow.
   workflow_call:
+    secrets:
+      APIFY_SIGNING_TOKEN:
+        required: false
 
 jobs:
   doc_checks:
     name: Doc checks
     uses: apify/workflows/.github/workflows/python_docs_check.yaml@main
-    secrets: inherit
+    secrets:
+      APIFY_SIGNING_TOKEN: ${{ secrets.APIFY_SIGNING_TOKEN }}

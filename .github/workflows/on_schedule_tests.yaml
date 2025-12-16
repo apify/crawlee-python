@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: '0 6 * * *'
 
+concurrency:
+  group: scheduled-tests
+  cancel-in-progress: false
+
 env:
   NODE_VERSION: 22
   PYTHON_VERSION: 3.14
