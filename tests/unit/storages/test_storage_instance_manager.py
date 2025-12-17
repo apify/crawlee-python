@@ -1,5 +1,8 @@
+import asyncio
+import sys
 from pathlib import Path
 from typing import cast
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -128,3 +131,61 @@ async def test_preexisting_unnamed_storage_open_by_id(storage_type: type[Storage
     storage_1_again = await storage_type.open(id=storage_1.id, storage_client=storage_client)
 
     assert storage_1.id == storage_1_again.id
+
+
+@pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.Barrier was introduced in Python 3.11.')
+async def test_concurrent_open_datasets() -> None:
+    """Test that concurrent open datasets with the same name return the same instance."""
+    from asyncio import Barrier  # type:ignore[attr-defined] # noqa: PLC0415
+
+    barrier = Barrier(2)
+
+    async def push_data(data: dict) -> None:
+        await barrier.wait()
+        dataset = await Dataset.open(name='concurrent-storage')
+        await dataset.push_data(data)
+
+    await asyncio.gather(
+        push_data({'test_1': '1'}),
+        push_data({'test_2': '2'}),
+    )
+
+    dataset = await Dataset.open(name='concurrent-storage')
+
+    items = await dataset.get_data()
+    assert len(items.items) == 2
+
+    await dataset.drop()
+
+
+@pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.Barrier was introduced in Python 3.11.')
+async def test_concurrent_open_datasets_with_same_name_and_alias() -> None:
+    """Test that concurrent open requests for the same storage return the same instance."""
+    from asyncio import Barrier  # type:ignore[attr-defined] # noqa: PLC0415
+
+    valid_kwargs: dict[str, str | None] = {}
+
+    exception_calls = AsyncMock()
+
+    barrier = Barrier(2)
+
+    async def open_dataset(name: str | None, alias: str | None) -> None:
+        await barrier.wait()
+        try:
+            await Dataset.open(name=name, alias=alias)
+            valid_kwargs['name'] = name
+            valid_kwargs['alias'] = alias
+        except ValueError:
+            exception_calls()
+
+    await asyncio.gather(
+        open_dataset(name=None, alias='concurrent-storage'),
+        open_dataset(name='concurrent-storage', alias=None),
+    )
+
+    # Ensure that a ValueError was raised due to name/alias conflict
+    exception_calls.assert_called_once()
+
+    dataset = await Dataset.open(name=valid_kwargs.get('name'), alias=valid_kwargs.get('alias'))
+
+    await dataset.drop()
