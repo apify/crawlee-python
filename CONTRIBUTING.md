@@ -46,7 +46,7 @@ make format
 
 ### Type checking
 
-Type checking is handled by [mypy](https://mypy.readthedocs.io/), verifying code against type annotations. Configuration settings can be found in `pyproject.toml`.
+Type checking is handled by [ty](https://docs.astral.sh/ty/), verifying code against type annotations. Configuration settings can be found in `pyproject.toml`.
 
 To run type checking:
 

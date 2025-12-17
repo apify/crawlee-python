@@ -1,4 +1,3 @@
-# mypy: disable-error-code="misc"
 import json
 import os
 
@@ -9,7 +8,7 @@ from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 from crawlee.storage_clients import MemoryStorageClient
 
 
-@get('/')  # type: ignore[untyped-decorator]
+@get('/')
 async def main() -> str:
     """The crawler entry point that will be called when the HTTP endpoint is accessed."""
     # highlight-start

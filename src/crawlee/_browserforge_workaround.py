@@ -20,7 +20,7 @@ def patch_browserforge() -> None:
     def DownloadIfNotExists(**flags: bool) -> None:
         pass
 
-    download.DownloadIfNotExists = DownloadIfNotExists
+    download.DownloadIfNotExists = DownloadIfNotExists  # ty: ignore[invalid-assignment]
 
     import browserforge.bayesian_network
 

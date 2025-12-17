@@ -3,9 +3,7 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING, Any
 
-from opentelemetry.instrumentation.instrumentor import (  # type:ignore[attr-defined]  # Mypy has troubles with OTEL
-    BaseInstrumentor,
-)
+from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
 from opentelemetry.instrumentation.utils import unwrap
 from opentelemetry.semconv.attributes.code_attributes import CODE_FUNCTION_NAME
 from opentelemetry.semconv.attributes.http_attributes import HTTP_REQUEST_METHOD

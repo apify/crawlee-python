@@ -25,7 +25,7 @@ class RecurringTask:
     """
 
     def __init__(self, func: Callable, delay: timedelta) -> None:
-        logger.debug(f'Calling RecurringTask.__init__(func={func.__name__}, delay={delay})...')
+        logger.debug(f'Calling RecurringTask.__init__(func={func.__name__}, delay={delay})...')  # ty: ignore[unresolved-attribute]
         self.func = func
         self.delay = delay
         self.task: asyncio.Task | None = None
@@ -55,7 +55,7 @@ class RecurringTask:
 
     def start(self) -> None:
         """Start the recurring task execution."""
-        self.task = asyncio.create_task(self._wrapper(), name=f'Task-recurring-{self.func.__name__}')
+        self.task = asyncio.create_task(self._wrapper(), name=f'Task-recurring-{self.func.__name__}')  # ty: ignore[possibly-missing-attribute]
 
     async def stop(self) -> None:
         """Stop the recurring task execution."""

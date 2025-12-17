@@ -19,5 +19,5 @@ async def await_redis_response(response: Awaitable[T] | T) -> T:
 def read_lua_script(script_name: str) -> str:
     """Read a Lua script from a file."""
     file_path = Path(__file__).parent / 'lua_scripts' / script_name
-    with file_path.open('r', encoding='utf-8') as file:
+    with file_path.open(mode='r', encoding='utf-8') as file:
         return file.read()

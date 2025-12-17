@@ -1,4 +1,3 @@
-# mypy: disable-error-code="misc"
 import asyncio
 import json
 from datetime import timedelta
@@ -48,7 +47,7 @@ async def main() -> str:
     # highlight-end
 
 
-@functions_framework.http  # type: ignore[untyped-decorator]
+@functions_framework.http
 def crawlee_run(request: Request) -> Response:
     # You can pass data to your crawler using `request`
     function_id = request.headers['Function-Execution-Id']

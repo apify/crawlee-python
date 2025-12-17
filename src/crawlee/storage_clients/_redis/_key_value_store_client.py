@@ -144,7 +144,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
 
         async with self._get_pipeline() as pipe:
             # redis-py typing issue
-            await await_redis_response(pipe.hset(self._items_key, key, value_bytes))  # type: ignore[arg-type]
+            await await_redis_response(pipe.hset(self._items_key, key, value_bytes))  # ty: ignore[invalid-argument-type]
 
             await await_redis_response(
                 pipe.hset(
@@ -174,9 +174,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
 
         # Query the record by key
         # redis-py typing issue
-        value_bytes: bytes | None = await await_redis_response(
-            self._redis.hget(self._items_key, key)  # type: ignore[arg-type]
-        )
+        value_bytes: bytes | None = await await_redis_response(self._redis.hget(self._items_key, key))  # ty: ignore[invalid-assignment]
 
         if value_bytes is None:
             logger.warning(f'Value for key "{key}" is missing.')
@@ -225,7 +223,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             raise TypeError('The items data was received in an incorrect format.')
 
         # Get all keys, sorted alphabetically
-        keys = sorted(items_data.keys())
+        keys = sorted(items_data.keys())  # ty: ignore[invalid-argument-type]
 
         # Apply exclusive_start_key filter if provided
         if exclusive_start_key is not None:

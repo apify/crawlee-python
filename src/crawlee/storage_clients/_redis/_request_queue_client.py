@@ -247,7 +247,6 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         *,
         forefront: bool = False,
     ) -> AddRequestsResponse:
-        # Mypy workaround
         if self._add_requests_script is None:
             raise RuntimeError('Scripts not loaded. Call _ensure_scripts_loaded() before using the client.')
 
@@ -264,8 +263,8 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 await await_redis_response(pipe.smismember(self._pending_set_key, unique_keys))
                 await await_redis_response(pipe.smismember(self._handled_set_key, unique_keys))
             elif self._dedup_strategy == 'bloom':
-                await await_redis_response(pipe.bf().mexists(self._added_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
-                await await_redis_response(pipe.bf().mexists(self._handled_filter_key, *unique_keys))  # type: ignore[no-untyped-call]
+                await await_redis_response(pipe.bf().mexists(self._added_filter_key, *unique_keys))
+                await await_redis_response(pipe.bf().mexists(self._handled_filter_key, *unique_keys))
 
             pipe_results = await pipe.execute()
 
@@ -353,7 +352,6 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         if self._pending_fetch_cache:
             return self._pending_fetch_cache.popleft()
 
-        # Mypy workaround
         if self._fetch_script is None:
             raise RuntimeError('Scripts not loaded. Call _ensure_scripts_loaded() before using the client.')
 
@@ -399,7 +397,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 await await_redis_response(pipe.sadd(self._handled_set_key, request.unique_key))
                 await await_redis_response(pipe.srem(self._pending_set_key, request.unique_key))
             elif self._dedup_strategy == 'bloom':
-                await await_redis_response(pipe.bf().add(self._handled_filter_key, request.unique_key))  # type: ignore[no-untyped-call]
+                await await_redis_response(pipe.bf().add(self._handled_filter_key, request.unique_key))
 
             await await_redis_response(pipe.hdel(self._in_progress_key, request.unique_key))
             await await_redis_response(pipe.hdel(self._data_key, request.unique_key))
@@ -499,17 +497,16 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
             await await_redis_response(
                 pipeline.bf().create(
                     self._added_filter_key, errorRate=self._bloom_error_rate, capacity=100000, expansion=10
-                )  # type: ignore[no-untyped-call]
+                )
             )
             await await_redis_response(
                 pipeline.bf().create(
                     self._handled_filter_key, errorRate=self._bloom_error_rate, capacity=100000, expansion=10
-                )  # type: ignore[no-untyped-call]
+                )
             )
 
     async def _reclaim_stale_requests(self) -> None:
         """Reclaim requests that have been in progress for too long."""
-        # Mypy workaround
         if self._reclaim_stale_script is None:
             raise RuntimeError('Scripts not loaded. Call _ensure_scripts_loaded() before using the client.')
 

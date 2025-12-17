@@ -160,7 +160,7 @@ class StorageInstanceManager:
 
             metadata = await client.get_metadata()
 
-            instance = cls(client, metadata.id, metadata.name)  # type: ignore[call-arg]
+            instance = cls(client, metadata.id, metadata.name)  # ty: ignore[too-many-positional-arguments]
             instance_name = getattr(instance, 'name', None)
 
             # Cache the instance.

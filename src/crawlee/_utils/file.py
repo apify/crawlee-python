@@ -170,7 +170,7 @@ async def export_csv_to_stream(
     if 'lineterminator' not in kwargs:
         kwargs['lineterminator'] = '\n'
 
-    writer = csv.writer(dst, **kwargs)  # type: ignore[arg-type]
+    writer = csv.writer(dst, **kwargs)
     write_header = True
 
     # Iterate over the dataset and write to CSV.
