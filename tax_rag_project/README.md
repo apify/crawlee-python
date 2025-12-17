@@ -10,7 +10,7 @@ This project crawls, processes, and stores Canadian tax documentation in a vecto
 
 - **Web Scraping**: [Crawlee for Python](https://crawlee.dev/python/) - Robust, production-grade crawler
 - **Vector Database**: [Qdrant](https://qdrant.tech/) - High-performance vector search
-- **Embeddings**: [sentence-transformers](https://www.sbert.net/) - State-of-the-art semantic embeddings
+- **Embeddings**: [OpenAI Embeddings API](https://platform.openai.com/docs/guides/embeddings) - High-quality semantic embeddings
 - **Containerization**: Docker & Docker Compose - Consistent deployment environment
 - **Storage**: File-based persistence with structured metadata
 
@@ -101,6 +101,29 @@ tax_rag_project/
    ```bash
    cd scripts
    ..\.venv\Scripts\python.exe run_all_tests.py
+   ```
+
+6. **Test Qdrant integration** (See [TEST_QDRANT.md](TEST_QDRANT.md) for details)
+
+   **Set OpenAI API key first:**
+   ```bash
+   # Copy .env.example to .env and add your OPENAI_API_KEY
+   cp .env.example .env
+   # Edit .env and add: OPENAI_API_KEY=sk-proj-your-key-here
+   ```
+
+   **Setup and test (Windows):**
+   ```bash
+   scripts\setup_qdrant.bat              # Start Qdrant
+   scripts\test_qdrant_connection.bat    # Test connection (~$0.0001)
+   scripts\test_qdrant_integration.bat   # Test full crawler (~$0.001-0.01)
+   ```
+
+   **Setup and test (Linux/Mac/Git Bash):**
+   ```bash
+   ./scripts/setup_qdrant.sh              # Start Qdrant
+   ./scripts/test_qdrant_connection.sh    # Test connection (~$0.0001)
+   ./scripts/test_qdrant_integration.sh   # Test full crawler (~$0.001-0.01)
    ```
 
 ### Super Simple Setup (Windows)

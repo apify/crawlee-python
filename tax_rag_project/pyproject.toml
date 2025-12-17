@@ -13,6 +13,8 @@ dependencies = [
     "pydantic>=2.11.0",
     "pydantic-settings>=2.12.0",
     "httpx>=0.27.0",
+    "qdrant-client>=1.7.0",
+    "openai>=1.0.0",
 ]
 
 [project.optional-dependencies]

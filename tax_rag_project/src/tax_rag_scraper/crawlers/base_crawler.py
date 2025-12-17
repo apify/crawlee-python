@@ -14,26 +14,66 @@ from tax_rag_scraper.utils.user_agents import get_random_user_agent
 from tax_rag_scraper.utils.robots import RobotsChecker
 from tax_rag_scraper.crawlers.site_router import SiteRouter
 from tax_rag_scraper.utils.link_extractor import LinkExtractor
+from tax_rag_scraper.storage.qdrant_client import TaxDataQdrantClient
+from tax_rag_scraper.utils.embeddings import EmbeddingService
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class TaxDataCrawler:
     """Base crawler for scraping Canadian tax documentation."""
 
-    def __init__(self, settings: Settings = None, max_depth: int = 2):
+    def __init__(
+        self,
+        settings: Settings = None,
+        max_depth: int = 2,
+        use_qdrant: bool = False,
+        qdrant_host: str = "localhost",
+        qdrant_port: int = 6333,
+    ):
         """Initialize the crawler with settings.
 
         Args:
             settings: Application settings. If None, uses default settings.
             max_depth: Maximum crawl depth for link discovery. Default is 2.
+            use_qdrant: Enable Qdrant vector database integration.
+            qdrant_host: Qdrant server hostname.
+            qdrant_port: Qdrant server port.
         """
         self.settings = settings or Settings()
 
         # Initialize robots.txt checker
         self.robots_checker = RobotsChecker() if self.settings.RESPECT_ROBOTS_TXT else None
 
-        # Initialize site router and link extractor (NEW)
+        # Initialize site router and link extractor
         self.site_router = SiteRouter()
         self.link_extractor = LinkExtractor(max_depth=max_depth)
+
+        # Initialize Qdrant integration (NEW)
+        self.use_qdrant = use_qdrant
+
+        if use_qdrant:
+            logger.info("Initializing Qdrant integration...")
+            self.qdrant_client = TaxDataQdrantClient(
+                host=qdrant_host,
+                port=qdrant_port,
+                collection_name=self.settings.QDRANT_COLLECTION,
+                vector_size=1536,
+            )
+            self.embedding_service = EmbeddingService(
+                model_name=self.settings.EMBEDDING_MODEL,
+                api_key=self.settings.OPENAI_API_KEY
+            )
+            logger.info("✓ Qdrant integration ready")
+        else:
+            self.qdrant_client = None
+            self.embedding_service = None
+
+        # Batch storage for efficiency (NEW)
+        self.document_batch = []
+        self.batch_size = self.settings.EMBEDDING_BATCH_SIZE if use_qdrant else 0
 
         # Create HTTP client with custom headers and user-agent rotation
         http_client = HttpxHttpClient(
@@ -87,6 +127,12 @@ class TaxDataCrawler:
                 result = await handler.handle(context)
                 if result:
                     self.stats.record_success()
+
+                    # Add to Qdrant batch if enabled (NEW)
+                    if self.use_qdrant:
+                        # Convert TaxDocument to dict for batching
+                        doc_dict = result.model_dump() if hasattr(result, 'model_dump') else result
+                        await self._store_document(doc_dict)
                 else:
                     self.stats.record_failure()
             except Exception:
@@ -113,6 +159,51 @@ class TaxDataCrawler:
                     user_data={'depth': current_depth + 1}
                 )
 
+    async def _store_document(self, doc_data: dict):
+        """
+        Store document (batch for Qdrant, immediate for filesystem)
+
+        Args:
+            doc_data: Document dictionary to store
+        """
+        if not self.use_qdrant:
+            return
+
+        self.document_batch.append(doc_data)
+
+        # Flush batch when it reaches batch_size
+        if len(self.document_batch) >= self.batch_size:
+            await self._flush_batch()
+
+    async def _flush_batch(self):
+        """Flush document batch to Qdrant"""
+        if not self.document_batch:
+            return
+
+        try:
+            logger.info(f"Flushing batch of {len(self.document_batch)} documents to Qdrant")
+
+            # Generate embeddings for all documents in batch
+            embeddings = await self.embedding_service.embed_documents(
+                self.document_batch
+            )
+
+            # Store in Qdrant
+            await self.qdrant_client.store_documents(
+                self.document_batch,
+                embeddings
+            )
+
+            logger.info(f"✓ Batch flushed successfully")
+
+            # Clear batch
+            self.document_batch = []
+
+        except Exception as e:
+            logger.error(f"Error flushing batch: {e}")
+            # Don't re-raise - we don't want to stop the crawler
+            # Documents are still saved to filesystem
+
     async def run(self, start_urls: list[str]):
         """Run the crawler with the given start URLs.
 
@@ -120,6 +211,11 @@ class TaxDataCrawler:
             start_urls: List of URLs to start crawling from.
         """
         await self.crawler.run(start_urls)
+
+        # Flush any remaining documents in batch (NEW)
+        if self.use_qdrant and self.document_batch:
+            logger.info(f"Flushing final batch of {len(self.document_batch)} documents")
+            await self._flush_batch()
 
         # Print statistics after crawl completes
         summary = self.stats.summary()
@@ -133,4 +229,10 @@ class TaxDataCrawler:
                 print(f"{key}: {value:.2f}s")
             else:
                 print(f"{key}: {value}")
+
+        # Print Qdrant statistics if enabled (NEW)
+        if self.use_qdrant and self.qdrant_client:
+            doc_count = self.qdrant_client.count_documents()
+            print(f"\nQdrant Documents: {doc_count}")
+
         print("="*50 + "\n")

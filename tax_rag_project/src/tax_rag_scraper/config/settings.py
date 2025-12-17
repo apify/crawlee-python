@@ -22,9 +22,20 @@ class Settings(BaseSettings):
     # Respect robots.txt
     RESPECT_ROBOTS_TXT: bool = True
 
-    # Deep crawling (NEW)
+    # Deep crawling
     MAX_CRAWL_DEPTH: int = 2
     FOLLOW_LINKS: bool = True
+
+    # Qdrant configuration
+    QDRANT_HOST: str = "localhost"
+    QDRANT_PORT: int = 6333
+    QDRANT_COLLECTION: str = "tax_documents"
+    USE_QDRANT: bool = False
+
+    # Embeddings configuration
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_BATCH_SIZE: int = 10
+    OPENAI_API_KEY: str = ""
 
     class Config:
         env_file = ".env"
