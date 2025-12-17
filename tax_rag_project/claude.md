@@ -14,22 +14,38 @@ CRA Website → Crawlee Crawler → Document Processor → Embedding Generator �
 
 ### Core Components
 
-1. **Crawler** (`crawlers/cra_crawler.py`)
-   - BeautifulSoupCrawler for HTML pages
-   - PlaywrightCrawler for JavaScript-heavy content (if needed)
-   - Target: CRA tax guides, forms, bulletins
+1. **Crawler** ✓
+   - `base_crawler.py` - BeautifulSoupCrawler with deep crawling support
+     - Built-in rate limiting and retry logic
+     - Robots.txt respect
+     - User-agent rotation for polite crawling
+     - Statistics tracking
+     - Target: CRA tax guides, forms, bulletins
+   - `site_router.py` - Site-specific routing logic for different domains
 
-2. **Processor** (`processors/document_processor.py`)
+2. **Handlers** ✓
+   - `base_handler.py` - Request handler base class with error management
+   - `cra_handler.py` - CRA-specific handler with custom extraction logic
+   - Data extraction from HTML
+   - Extensible for different page types
+
+3. **Utilities** ✓
+   - `link_extractor.py` - Smart link extraction and filtering
+   - `robots.py` - Robots.txt checker
+   - `stats_tracker.py` - Statistics tracking
+   - `user_agents.py` - User-agent rotation
+
+4. **Processor** (`processors/document_processor.py`) - Planned
    - Text extraction from HTML and PDF
    - Chunking strategy (semantic chunking preferred)
    - Metadata enrichment (document type, date, source URL)
 
-3. **Embeddings** (`processors/embedding_generator.py`)
+5. **Embeddings** (`processors/embedding_generator.py`) - Planned
    - Model: sentence-transformers (all-MiniLM-L6-v2 or similar)
    - Batch processing for efficiency
    - Dimension: 384 or 768 depending on model
 
-4. **Storage** (Qdrant)
+6. **Storage** (Qdrant) - Planned
    - Collection: `cra_tax_documents`
    - Payload: text chunks + metadata
    - Vector dimension: matches embedding model
@@ -67,54 +83,24 @@ CRA Website → Crawlee Crawler → Document Processor → Embedding Generator �
 
 ## Staged Implementation
 
-### Stage 1: Basic Crawler ✓ (Current)
+### Stage 1: Basic Crawler ✓ (COMPLETED)
 
 **Goal**: Get data flowing end-to-end
 
 - [x] Project structure
-- [ ] Simple BeautifulSoupCrawler
-- [ ] Crawl 5-10 CRA pages
-- [ ] Extract text and save to JSON
-- [ ] Basic logging
+- [x] BeautifulSoupCrawler implementation (base_crawler.py)
+- [x] Request handler with error handling
+- [x] Rate limiting and security features
+- [x] Robots.txt respect
+- [x] User-agent rotation
+- [x] Statistics tracking
+- [x] Test suite (error handling, rate limiting)
+- [x] Documentation and runner scripts
 
-**Success Criteria**: Can crawl CRA pages and save raw content
+**Success Criteria**: ✓ Can crawl CRA pages with proper error handling and rate limiting.
 
-### Stage 2: Enhanced Processing
-
-**Goal**: Clean, structured data
-
-- [ ] PDF parsing (PyPDF2 or pdfplumber)
-- [ ] HTML text extraction (clean formatting)
-- [ ] Metadata extraction (title, date, document type)
-- [ ] Chunking implementation
-- [ ] Data validation
-
-**Success Criteria**: Structured, chunked documents with metadata
-
-### Stage 3: Vector Database
-
-**Goal**: Searchable embeddings
-
-- [ ] Qdrant Docker setup
-- [ ] Collection schema design
-- [ ] Embedding generation
-- [ ] Batch upload to Qdrant
-- [ ] Search API testing
-
-**Success Criteria**: Can query Qdrant and retrieve relevant chunks
-
-### Stage 4: Production Hardening
-
-**Goal**: Reliable, maintainable system
-
-- [ ] Comprehensive error handling
-- [ ] Rate limiting (respect CRA servers)
-- [ ] Retry logic with exponential backoff
-- [ ] Monitoring and alerts
-- [ ] Docker Compose production config
-- [ ] Deployment documentation
-
-**Success Criteria**: Runs reliably on DigitalOcean VPS
+### Continued Development
+Implementation stages will be provided and completed periodically with Claude Code. The user will control the development process and control Claude Code in development. We will not speculate on continued development but keep the overall project objectives in mind when assisting in development.
 
 ## Development Workflow
 
@@ -136,48 +122,129 @@ CRA Website → Crawlee Crawler → Document Processor → Embedding Generator �
 
 ```
 tax_rag_project/
-├── crawlers/
+├── src/
+│   ├── tax_rag_scraper/            # Main scraper package
+│   │   ├── crawlers/
+│   │   │   ├── __init__.py
+│   │   │   ├── base_crawler.py     # ✓ Base crawler with deep crawling
+│   │   │   └── site_router.py      # ✓ Site-specific routing logic
+│   │   ├── handlers/
+│   │   │   ├── __init__.py
+│   │   │   ├── base_handler.py     # ✓ Request handler base class
+│   │   │   └── cra_handler.py      # ✓ CRA-specific handler
+│   │   ├── models/
+│   │   │   ├── __init__.py
+│   │   │   └── tax_document.py     # ✓ Data models
+│   │   ├── config/
+│   │   │   ├── __init__.py
+│   │   │   └── settings.py         # ✓ Centralized settings
+│   │   ├── utils/
+│   │   │   ├── __init__.py
+│   │   │   ├── link_extractor.py   # ✓ Link extraction utilities
+│   │   │   ├── stats_tracker.py    # ✓ Statistics tracking
+│   │   │   ├── user_agents.py      # ✓ User-agent rotation
+│   │   │   └── robots.py           # ✓ Robots.txt checker
+│   │   ├── storage/
+│   │   │   └── __init__.py
+│   │   ├── main.py                 # ✓ Main entry point
+│   │   ├── test_deep_crawling.py   # ✓ Deep crawling tests
+│   │   ├── README.md               # ✓ Scraper documentation
+│   │   ├── pyproject.toml          # ✓ Scraper config
+│   │   └── requirements.txt        # ✓ Scraper dependencies
+│   └── tax_scraper/                # Alternative scraper (WIP)
+│       ├── crawlers/               # Empty placeholder
+│       ├── handlers/               # Empty placeholder
+│       └── utils/                  # Empty placeholder
+├── tests/                          # ✓ Test suite
 │   ├── __init__.py
-│   ├── cra_crawler.py      # Main crawler implementation
-│   └── config.py           # Crawler-specific config
-├── processors/
-│   ├── __init__.py
-│   ├── document_processor.py   # Text extraction and cleaning
-│   ├── chunking.py            # Chunking logic
-│   └── embedding_generator.py  # Embedding creation
-├── config/
-│   ├── __init__.py
-│   ├── settings.py         # Centralized settings (from .env)
-│   └── qdrant_schema.py    # Qdrant collection config
-├── storage/                # Runtime storage (not committed)
-└── tests/                  # Test suite (TODO)
+│   ├── test_error_handling.py      # ✓ Error handling tests
+│   └── test_rate_limiting.py       # ✓ Rate limiting tests
+├── scripts/                        # ✓ Runner and setup scripts
+│   ├── run_crawler.py              # ✓ Run base crawler
+│   ├── run_all_tests.py            # ✓ Run all tests
+│   ├── setup.bat                   # ✓ Windows setup automation
+│   ├── setup.sh                    # ✓ Linux/Mac setup automation
+│   ├── test.bat                    # ✓ Windows test runner
+│   ├── test.sh                     # ✓ Linux/Mac test runner
+│   ├── activate.bat                # ✓ Quick venv activation
+│   ├── run_tests.bat               # ✓ Windows batch file
+│   ├── run_tests.sh                # ✓ Linux/Mac shell script
+├── docs/                           # Documentation directory
+├── processors/                     # (Planned) Document processing
+├── config/                         # (Planned) Additional configs
+├── crawlers/                       # (Planned) Crawler configs
+├── storage/                        # Runtime storage (not committed)
+├── venv/                           # ✓ Virtual environment (local)
+├── .env.example                    # ✓ Environment template
+├── .env.local                      # ✓ Local settings
+├── .gitignore                      # ✓ Git ignore rules
+├── requirements.txt                # ✓ Dependencies
+├── pyproject.toml                  # ✓ Project configuration
+├── CHANGELOG.md                    # ✓ Version history
+├── claude.md                       # ✓ This file
+└── README.md                       # ✓ Main readme
 ```
 
 ## Commands Reference
 
 ### Crawlee Framework
 
-Install Crawlee from fork:
+Install Crawlee from fork (from repository root):
 ```bash
 pip install -e .
 ```
 
+### Quick Setup Scripts
+
+**Windows - Automated Setup:**
+```bash
+cd tax_rag_project/scripts
+./setup.bat        # Complete environment setup
+./test.bat         # Run tests with venv activation
+./activate.bat     # Quick venv activation
+```
+
+**Linux/Mac - Automated Setup:**
+```bash
+cd tax_rag_project/scripts
+./setup.sh         # Complete environment setup
+./test.sh          # Run tests with venv activation
+```
+
 ### Project Commands
 
-Run crawler (TODO):
+Run base crawler:
 ```bash
-cd tax_rag_project
-python crawlers/cra_crawler.py
+cd tax_rag_project/scripts
+../../.venv/Scripts/python.exe run_crawler.py     # Windows
+../../.venv/bin/python run_crawler.py             # Linux/Mac
+```
+
+Run all tests:
+```bash
+cd tax_rag_project/scripts
+../../.venv/Scripts/python.exe run_all_tests.py   # Windows
+./run_tests.bat                                   # Windows (batch)
+./test.bat                                        # Windows (with venv)
+```
+
+Run individual tests:
+```bash
+cd tax_rag_project/scripts
+../../.venv/Scripts/python.exe ../tests/test_error_handling.py
+../../.venv/Scripts/python.exe ../tests/test_rate_limiting.py
+```
+
+Run deep crawling tests:
+```bash
+cd tax_rag_project/src/tax_rag_scraper
+../../.venv/Scripts/python.exe test_deep_crawling.py    # Windows
+../../.venv/bin/python test_deep_crawling.py            # Linux/Mac
 ```
 
 Start Qdrant (TODO):
 ```bash
 docker-compose up -d
-```
-
-Run tests (TODO):
-```bash
-pytest tests/
 ```
 
 ### Useful Development Commands
@@ -201,7 +268,7 @@ curl http://localhost:6333/health
 
 ### Respectful Crawling
 
-- **ALWAYS** check CRA's robots.txt: `https://www.canada.ca/robots.txt`
+- **ALWAYS** check robots.txt (example `https://www.canada.ca/robots.txt`)
 - Use conservative rate limits (1-2 req/sec max)
 - Set proper User-Agent identifying the bot
 - Implement politeness delays between requests
@@ -227,60 +294,66 @@ curl http://localhost:6333/health
 
 ## Current Status
 
-**Last Updated**: 2025-12-13
+**Last Updated**: 2025-12-17
 
-**Current Stage**: Stage 2 Complete - Production Error Handling & Statistics
-
-**Completed**:
-- ✅ Stage 1: Basic crawler infrastructure with BeautifulSoup
-- ✅ Stage 2: Error handling, automatic retries (3x), statistics tracking
-
-**Next Steps**:
-1. Install dependencies and test error handling implementation
-2. Begin Stage 3: PDF parsing and enhanced metadata extraction
-3. Move toward vector database integration
+**Completed Stages**:
+- ✓ Stage 1: Basic Crawler
+- ✓ Stage 2: Error Handling & Retry Logic
+- ✓ Stage 3: Rate Limiting & Security
 
 ## Troubleshooting
 
-### Python Environment Issues (Windows)
+### Project Organization
 
-**Problem**: Running tests fails with "Python was not found" or import errors.
+**Current Structure**: All tax scraper code is now in `tax_rag_project/` directory:
+- Source code: `tax_rag_project/src/tax_rag_scraper/`
+- Tests: `tax_rag_project/tests/`
+- Scripts: `tax_rag_project/scripts/`
+- Docs: `tax_rag_project/docs/`
 
-**Root Causes**:
-1. **Windows Python Stub**: `/c/Users/.../WindowsApps/python` is a Microsoft Store redirect, not real Python
-2. **Missing Dependencies**: Requires `pip install -e .` (Crawlee) and `pip install -r requirements.txt` (scraper deps)
-3. **PYTHONPATH Not Set**: Import `tax_rag_scraper` fails because `src/` isn't in Python's module search path
+The main repository `src/` folder only contains the crawlee library source.
 
-**Solutions**:
+### Running Tests and Scripts
+
+**Always use the virtual environment Python**:
 
 ```bash
-# 1. Disable Windows Python stub (optional)
-# Settings → Apps → App execution aliases → Turn off "App Installer" for python.exe
+# From tax_rag_project/scripts/
+../../.venv/Scripts/python.exe run_crawler.py      # Windows
+../../.venv/bin/python run_crawler.py              # Linux/Mac
 
-# 2. Install dependencies (from project root)
-pip install -e .                          # Install Crawlee framework
-cd src/tax_rag_scraper
-pip install -r requirements.txt           # Install scraper dependencies
-
-# 3. Set PYTHONPATH and run tests
-cd ../../  # Back to project root
-export PYTHONPATH="${PWD}/src"            # Linux/Mac
-set PYTHONPATH=%CD%\src                   # Windows CMD
-$env:PYTHONPATH="$PWD\src"                # Windows PowerShell
-
-python src/tax_rag_scraper/test_error_handling.py
+# Or use batch files
+./run_tests.bat                                    # Windows
+./run_tests.sh                                     # Linux/Mac
 ```
 
-**Quick Verification**:
+**Don't use**:
+- Global `python` command (may not have dependencies)
+- `pytest` directly (may not be in PATH)
+
+### Python Path Issues
+
+The runner scripts in `tax_rag_project/scripts/` automatically handle Python path setup. If you need to import manually:
+
+```python
+import sys
+from pathlib import Path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root / "src"))
+```
+
+### Quick Verification
+
 ```bash
 # Check Python installation
-python --version
+.venv/Scripts/python.exe --version
 
-# Check Crawlee installation
-python -c "import crawlee; print(crawlee.__version__)"
+# Check Crawlee installation (from repo root)
+.venv/Scripts/python.exe -c "import crawlee; print(crawlee.__version__)"
 
-# Check module path
-python -c "import sys; print('\n'.join(sys.path))"
+# Test the scraper works
+cd tax_rag_project/scripts
+../../.venv/Scripts/python.exe run_crawler.py
 ```
 
 ## Resources

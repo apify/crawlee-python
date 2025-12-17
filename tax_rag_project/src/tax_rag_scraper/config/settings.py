@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     # Respect robots.txt
     RESPECT_ROBOTS_TXT: bool = True
 
+    # Deep crawling (NEW)
+    MAX_CRAWL_DEPTH: int = 2
+    FOLLOW_LINKS: bool = True
+
     class Config:
         env_file = ".env"
         case_sensitive = True

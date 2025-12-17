@@ -12,21 +12,28 @@ from tax_rag_scraper.handlers.base_handler import BaseHandler
 from tax_rag_scraper.utils.stats_tracker import CrawlStats
 from tax_rag_scraper.utils.user_agents import get_random_user_agent
 from tax_rag_scraper.utils.robots import RobotsChecker
+from tax_rag_scraper.crawlers.site_router import SiteRouter
+from tax_rag_scraper.utils.link_extractor import LinkExtractor
 
 
 class TaxDataCrawler:
     """Base crawler for scraping Canadian tax documentation."""
 
-    def __init__(self, settings: Settings = None):
+    def __init__(self, settings: Settings = None, max_depth: int = 2):
         """Initialize the crawler with settings.
 
         Args:
             settings: Application settings. If None, uses default settings.
+            max_depth: Maximum crawl depth for link discovery. Default is 2.
         """
         self.settings = settings or Settings()
 
         # Initialize robots.txt checker
         self.robots_checker = RobotsChecker() if self.settings.RESPECT_ROBOTS_TXT else None
+
+        # Initialize site router and link extractor (NEW)
+        self.site_router = SiteRouter()
+        self.link_extractor = LinkExtractor(max_depth=max_depth)
 
         # Create HTTP client with custom headers and user-agent rotation
         http_client = HttpxHttpClient(
@@ -64,34 +71,18 @@ class TaxDataCrawler:
     def _setup_handlers(self):
         """Set up request handlers for the crawler."""
 
-        # Create a concrete implementation of BaseHandler
-        class DefaultHandler(BaseHandler):
-            def __init__(self, stats: CrawlStats, robots_checker: RobotsChecker = None):
-                self.stats = stats
-                self.robots_checker = robots_checker
-
-            async def handle(self, context):
-                # Check robots.txt before processing
-                if self.robots_checker and not self.robots_checker.can_fetch(context.request.url):
-                    context.log.warning(f'Blocked by robots.txt: {context.request.url}')
-                    return None
-
-                # Call parent handle method (from BaseHandler)
-                return await super().handle(context)
-
-            async def _extract_data(self, context):
-                # Same extraction logic as Stage 1
-                doc = TaxDocument(
-                    url=str(context.request.url),
-                    title=context.soup.title.string if context.soup.title else "",
-                    content=context.soup.get_text()[:1000],
-                )
-                return doc
-
-        handler = DefaultHandler(self.stats, self.robots_checker)
-
         @self.crawler.router.default_handler
         async def default_handler(context):
+            # Check robots.txt if enabled (from Stage 3)
+            if self.robots_checker and not self.robots_checker.can_fetch(context.request.url):
+                context.log.warning(f'Blocked by robots.txt: {context.request.url}')
+                self.stats.record_failure()
+                return
+
+            # Get appropriate handler for this URL domain (NEW)
+            handler = self.site_router.get_handler(context.request.url)
+
+            # Process the page
             try:
                 result = await handler.handle(context)
                 if result:
@@ -100,7 +91,27 @@ class TaxDataCrawler:
                     self.stats.record_failure()
             except Exception:
                 self.stats.record_failure()
-                raise  # Re-raise to let Crawlee handle retries
+                raise
+
+            # Extract and enqueue links for deep crawling (NEW)
+            current_depth = context.request.user_data.get('depth', 0)
+
+            if current_depth < self.link_extractor.max_depth:
+                context.log.info(f'Extracting links from depth {current_depth}')
+
+                links = self.link_extractor.extract_links(
+                    context.soup,
+                    context.request.url,
+                    current_depth
+                )
+
+                context.log.info(f'Found {len(links)} valid links at depth {current_depth}')
+
+                # Enqueue discovered links
+                await context.add_requests(
+                    [link for link in links],
+                    user_data={'depth': current_depth + 1}
+                )
 
     async def run(self, start_urls: list[str]):
         """Run the crawler with the given start URLs.

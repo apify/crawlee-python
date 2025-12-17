@@ -18,17 +18,44 @@ This project crawls, processes, and stores Canadian tax documentation in a vecto
 
 ```
 tax_rag_project/
-├── crawlers/           # Web scraper implementations (TODO)
-├── processors/         # Document processing pipeline (TODO)
-├── config/            # Configuration files (TODO)
-├── storage/           # Local data storage (created at runtime)
-├── .env.example       # Environment variable template
-├── .env.local         # Local development overrides (not committed)
-├── CHANGELOG.md       # Project version history
-└── README.md          # This file
+├── src/
+│   ├── tax_rag_scraper/        # Main scraper package
+│   │   ├── crawlers/           # Crawler implementations
+│   │   │   ├── base_crawler.py     # Base crawler with deep crawling
+│   │   │   └── site_router.py      # Site-specific routing logic
+│   │   ├── handlers/           # Request handlers
+│   │   │   ├── base_handler.py     # Base request handler
+│   │   │   └── cra_handler.py      # CRA-specific handler
+│   │   ├── models/             # Data models
+│   │   ├── config/             # Configuration
+│   │   ├── utils/              # Utility modules
+│   │   ├── storage/            # Storage utilities
+│   │   ├── main.py             # Main entry point
+│   │   └── test_deep_crawling.py   # Deep crawling tests
+│   └── tax_scraper/            # Alternative scraper (WIP)
+├── tests/                      # Test suite
+│   ├── test_error_handling.py
+│   └── test_rate_limiting.py
+├── scripts/                    # Runner and setup scripts
+├── docs/                       # Documentation (planned)
+├── storage/                    # Local data storage (runtime)
+├── processors/                 # Document processing (planned)
+├── config/                     # Additional config (planned)
+├── crawlers/                   # Crawler configs (planned)
+├── venv/                       # Virtual environment (local)
+├── .env.example                # Environment template
+├── .env.local                  # Local overrides
+├── .gitignore                  # Git ignore rules
+├── requirements.txt            # Dependencies
+├── pyproject.toml              # Project configuration
+├── CHANGELOG.md                # Version history
+├── claude.md                   # Development notes
+└── README.md                   # This file
 ```
 
 ## Quick Start
+
+### Manual Setup (All Platforms)
 
 ### Prerequisites
 
@@ -49,27 +76,46 @@ tax_rag_project/
    pip install -e .
    ```
 
-3. **Install project dependencies**
+3. **Configure environment variables**
    ```bash
    cd tax_rag_project
-   pip install -r requirements.txt  # TODO: Create requirements.txt
-   ```
-
-4. **Configure environment variables**
-   ```bash
    cp .env.example .env.local
    # Edit .env.local with your configuration
    ```
 
-5. **Start Qdrant vector database**
+4. **Run the crawler**
    ```bash
-   docker-compose up -d  # TODO: Create docker-compose.yml
+   # Windows
+   cd scripts
+   ..\.venv\Scripts\python.exe run_crawler.py
+
+   # Or use batch file
+   run_tests.bat
+
+   # Linux/Mac
+   cd scripts
+   ../​.venv/bin/python run_crawler.py
    ```
 
-6. **Run the crawler** (TODO)
+5. **Run all tests**
    ```bash
-   python crawlers/cra_crawler.py
+   cd scripts
+   ..\.venv\Scripts\python.exe run_all_tests.py
    ```
+
+### Super Simple Setup (Windows)
+
+**First time only:**
+```bash
+# Double-click or run:
+setup_dev_env.bat
+```
+
+**Every time you want to run tests:**
+```bash
+# Double-click or run:
+run_test.bat
+```
 
 ## Development Setup
 
@@ -83,44 +129,9 @@ See [.env.example](.env.example) for all configuration options including:
 
 ### Project Configuration
 
-Configuration follows a staged implementation approach:
-
-**Stage 1: Basic Crawler** (Current)
-- Simple CRA website crawler
-- File-based storage
-- Basic document extraction
-
-**Stage 2: Enhanced Processing** (Planned)
-- PDF parsing and text extraction
-- Metadata enrichment
-- Chunking strategy implementation
-
-**Stage 3: Vector Database** (Planned)
-- Qdrant integration
-- Embedding generation
-- Vector indexing
-
-**Stage 4: Production Hardening** (Planned)
-- Error handling and retry logic
-- Rate limiting and politeness delays
-- Monitoring and logging
-- Docker deployment configuration
+Configuration follows a staged implementation approach. This will not be specified in the README.md file here.
 
 See [claude.md](claude.md) for detailed development notes and architecture decisions.
-
-## Deployment
-
-### DigitalOcean VPS Deployment
-
-This project is designed for self-hosted deployment on a DigitalOcean VPS:
-
-1. **Provision VPS** with Ubuntu 22.04+
-2. **Install dependencies**: Docker, Python 3.10+
-3. **Clone repository** to VPS
-4. **Configure production environment** (`.env.production`)
-5. **Run via Docker Compose** for production reliability
-
-Detailed deployment guide: TODO
 
 ## Contributing
 
