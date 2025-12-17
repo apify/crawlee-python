@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.2.2 - **not yet released**
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.2.1](https://github.com/apify/crawlee-python/releases/tag/v1.2.1) (2025-12-16)
 
 ### 🐛 Bug Fixes
