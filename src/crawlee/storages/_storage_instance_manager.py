@@ -151,7 +151,7 @@ class StorageInstanceManager:
                 self._opener_locks[opener_lock_key] = lock
 
             async with lock:
-                # Re-check cache inside the lock
+                # Another task could have created the storage while we were waiting for the lock - check if that happened
                 if cached_instance := self._get_from_cache(
                     cls,
                     id=id,
