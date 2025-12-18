@@ -4,6 +4,7 @@
 [default]
 extend-ignore-re = [
     "https?://[^\\s]+", # Ignore URLs
+    "'gASV[^']+",       # Ignore base64-encoded pickle data
 ]
 
 [files]
