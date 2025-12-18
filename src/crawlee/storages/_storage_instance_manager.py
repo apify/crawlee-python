@@ -122,7 +122,7 @@ class StorageInstanceManager:
             if not any([name, alias, id]):
                 alias = self._DEFAULT_STORAGE_ALIAS
 
-            # Check cache
+            # Check cache without lock first for performance.
             if cached_instance := self._get_from_cache(
                 cls,
                 id=id,
@@ -131,14 +131,6 @@ class StorageInstanceManager:
                 storage_client_cache_key=storage_client_cache_key,
             ):
                 return cached_instance
-
-            # Check for conflicts between named and alias storages
-            self._check_name_alias_conflict(
-                cls,
-                name=name,
-                alias=alias,
-                storage_client_cache_key=storage_client_cache_key,
-            )
 
             # Validate storage name
             if name is not None:
@@ -151,7 +143,8 @@ class StorageInstanceManager:
                 self._opener_locks[opener_lock_key] = lock
 
             async with lock:
-                # Another task could have created the storage while we were waiting for the lock - check if that happened
+                # Another task could have created the storage while we were waiting for the lock - check if that
+                # happened
                 if cached_instance := self._get_from_cache(
                     cls,
                     id=id,
@@ -161,7 +154,7 @@ class StorageInstanceManager:
                 ):
                     return cached_instance
 
-                # Re-check for conflicts between named and alias storages
+                # Check for conflicts between named and alias storages
                 self._check_name_alias_conflict(
                     cls,
                     name=name,
@@ -179,6 +172,9 @@ class StorageInstanceManager:
                 instance_name = getattr(instance, 'name', None)
 
                 # Cache the instance.
+                # Note: No awaits in this section. All cache entries must be written
+                # atomically to ensure pre-checks outside the lock see consistent state.
+
                 # Always cache by id.
                 self._cache.by_id[cls][instance.id][storage_client_cache_key] = instance
 
