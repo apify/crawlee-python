@@ -57,16 +57,19 @@ class RedisStorageClient(StorageClient):
             queue_bloom_error_rate: Desired false positive rate for Bloom filter deduplication. Only relevant if
                 `queue_dedup_strategy` is set to 'bloom'.
         """
-        match (redis, connection_string):
-            case (None, None):
-                raise ValueError('Either redis or connection_string must be provided.')
-            case (Redis(), None):
-                self._redis = redis
-            case (None, str()):
-                self._redis = Redis.from_url(connection_string)
-            case (Redis(), str()):
-                raise ValueError('Either redis or connection_string must be provided, not both.')
+        if redis is None and connection_string is None:
+            raise ValueError('Either redis or connection_string must be provided.')
 
+        if redis is not None and connection_string is not None:
+            raise ValueError('Either redis or connection_string must be provided, not both.')
+
+        if isinstance(redis, Redis) and connection_string is None:
+            self._redis = redis
+
+        if isinstance(connection_string, str) and redis is None:
+            self._redis = Redis.from_url(connection_string)
+
+        self._redis: Redis  # to help type checker
         self._queue_dedup_strategy = queue_dedup_strategy
         self._queue_bloom_error_rate = queue_bloom_error_rate
 

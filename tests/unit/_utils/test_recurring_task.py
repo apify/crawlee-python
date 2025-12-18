@@ -48,7 +48,7 @@ async def test_execution(function: AsyncMock, delay: timedelta) -> None:
     await asyncio.sleep(0.1)  # Wait enough for the task to execute a few times
     await task.stop()
 
-    assert isinstance(task.func, AsyncMock)  # To let MyPy know that the function is a mocked
+    assert isinstance(task.func, AsyncMock)  # To let type checker know that the function is a mock
     assert task.func.call_count >= 3
 
     await task.stop()

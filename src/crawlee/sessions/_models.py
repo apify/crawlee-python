@@ -63,19 +63,19 @@ class SessionPoolModel(BaseModel):
         ),
     ]
 
-    @computed_field(alias='sessionCount')  # type: ignore[prop-decorator]
+    @computed_field(alias='sessionCount')
     @property
     def session_count(self) -> int:
         """Get the total number of sessions currently maintained in the pool."""
         return len(self.sessions)
 
-    @computed_field(alias='usableSessionCount')  # type: ignore[prop-decorator]
+    @computed_field(alias='usableSessionCount')
     @property
     def usable_session_count(self) -> int:
         """Get the number of sessions that are currently usable."""
         return len([session for _, session in self.sessions.items() if session.is_usable])
 
-    @computed_field(alias='retiredSessionCount')  # type: ignore[prop-decorator]
+    @computed_field(alias='retiredSessionCount')
     @property
     def retired_session_count(self) -> int:
         """Get the number of sessions that are no longer usable."""

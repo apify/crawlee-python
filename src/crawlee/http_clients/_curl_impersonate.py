@@ -93,12 +93,12 @@ class _CurlImpersonateResponse:
         return self._response.content
 
     async def read_stream(self) -> AsyncGenerator[bytes, None]:
-        if not self._response.astream_task or self._response.astream_task.done():  # type: ignore[attr-defined]
+        if not self._response.astream_task or self._response.astream_task.done():  # ty: ignore[possibly-missing-attribute]
             raise RuntimeError(
                 'Cannot read stream: either already consumed or Response not obtained from `stream` method'
             )
 
-        async for chunk in self._response.aiter_content():  # type: ignore[no-untyped-call]
+        async for chunk in self._response.aiter_content():
             yield chunk
 
 
@@ -156,7 +156,7 @@ class CurlImpersonateHttpClient(HttpClient):
         try:
             response = await client.request(
                 url=request.url,
-                method=request.method.upper(),  # type: ignore[arg-type] # curl-cffi requires uppercase method
+                method=request.method.upper(),  # ty: ignore[invalid-argument-type]
                 headers=request.headers,
                 data=request.payload,
                 cookies=session.cookies.jar if session else None,
@@ -203,7 +203,7 @@ class CurlImpersonateHttpClient(HttpClient):
         try:
             response = await client.request(
                 url=url,
-                method=method.upper(),  # type: ignore[arg-type] # curl-cffi requires uppercase method
+                method=method.upper(),  # ty: ignore[invalid-argument-type]
                 headers=dict(headers) if headers else None,
                 data=payload,
                 cookies=session.cookies.jar if session else None,
@@ -244,7 +244,7 @@ class CurlImpersonateHttpClient(HttpClient):
         try:
             response = await client.request(
                 url=url,
-                method=method.upper(),  # type: ignore[arg-type] # curl-cffi requires uppercase method
+                method=method.upper(),  # ty: ignore[invalid-argument-type]
                 headers=dict(headers) if headers else None,
                 data=payload,
                 cookies=session.cookies.jar if session else None,
@@ -309,8 +309,8 @@ class CurlImpersonateHttpClient(HttpClient):
     @staticmethod
     def _get_cookies(curl: Curl) -> list[Cookie]:
         cookies: list[Cookie] = []
-        for curl_cookie in curl.getinfo(CurlInfo.COOKIELIST):  # type: ignore[union-attr]
-            curl_morsel = CurlMorsel.from_curl_format(curl_cookie)  # type: ignore[arg-type]
+        for curl_cookie in curl.getinfo(CurlInfo.COOKIELIST):  # ty: ignore[not-iterable]
+            curl_morsel = CurlMorsel.from_curl_format(curl_cookie)  # ty: ignore[invalid-argument-type]
             cookie = curl_morsel.to_cookiejar_cookie()
             cookies.append(cookie)
         return cookies

@@ -93,7 +93,7 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
     def __delitem__(self, key: str) -> None:
         del self.__pydantic_extra__[key]
 
-    def __iter__(self) -> Iterator[str]:  # type: ignore[override]
+    def __iter__(self) -> Iterator[str]:  # ty: ignore[invalid-method-override]
         yield from self.__pydantic_extra__
 
     def __len__(self) -> int:
@@ -195,7 +195,7 @@ class Request(BaseModel):
     ] = None
     """HTTP request payload."""
 
-    # Workaround for pydantic 2.12 and mypy type checking issue for Annotated with default_factory
+    # Workaround for Pydantic and type checkers when using Annotated with default_factory
     if TYPE_CHECKING:
         headers: HttpHeaders = HttpHeaders()
         """HTTP request headers."""

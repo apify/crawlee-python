@@ -183,7 +183,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         rq_base_path = Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
 
         if not rq_base_path.exists():
-            await asyncio.to_thread(rq_base_path.mkdir, parents=True, exist_ok=True)
+            await asyncio.to_thread(lambda: rq_base_path.mkdir(parents=True, exist_ok=True))
 
         # Open an existing RQ by its ID, raise an error if not found.
         if id:
@@ -197,7 +197,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     continue
 
                 try:
-                    file = await asyncio.to_thread(path_to_metadata.open, 'r', encoding='utf-8')
+                    file = await asyncio.to_thread(lambda p=path_to_metadata: p.open(mode='r', encoding='utf-8'))
                     try:
                         file_content = json.load(file)
                         metadata = RequestQueueMetadata(**file_content)
@@ -232,7 +232,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             # If the RQ directory exists, reconstruct the client from the metadata file.
             if path_to_rq.exists() and path_to_metadata.exists():
-                file = await asyncio.to_thread(open, path_to_metadata, 'r', encoding='utf-8')
+                file = await asyncio.to_thread(lambda: path_to_metadata.open(encoding='utf-8'))
                 try:
                     file_content = json.load(file)
                 finally:
@@ -300,7 +300,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             request_files = await self._get_request_files(self.path_to_rq)
 
             for file_path in request_files:
-                await asyncio.to_thread(file_path.unlink, missing_ok=True)
+                await asyncio.to_thread(lambda f=file_path: f.unlink(missing_ok=True))
 
             # Clear recoverable state
             await self._state.reset()
@@ -675,7 +675,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             self._metadata.had_multiple_clients = True
 
         # Ensure the parent directory for the metadata file exists.
-        await asyncio.to_thread(self.path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(lambda: self.path_to_metadata.parent.mkdir(parents=True, exist_ok=True))
 
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump())
@@ -753,10 +753,10 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             A list of paths to all request files.
         """
         # Create the requests directory if it doesn't exist.
-        await asyncio.to_thread(path_to_rq.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(lambda: path_to_rq.mkdir(parents=True, exist_ok=True))
 
         # List all the json files.
-        files = await asyncio.to_thread(list, path_to_rq.glob('*.json'))
+        files = await asyncio.to_thread(lambda: list(path_to_rq.glob('*.json')))
 
         # Filter out metadata file and non-file entries.
         filtered = filter(lambda request_file: request_file.is_file() and request_file.name != METADATA_FILENAME, files)
@@ -775,7 +775,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         """
         # Open the request file.
         try:
-            file = await asyncio.to_thread(open, file_path, 'r', encoding='utf-8')
+            file = await asyncio.to_thread(lambda f=file_path: f.open(mode='r', encoding='utf-8'))
         except FileNotFoundError:
             logger.warning(f'Request file "{file_path}" not found.')
             return None
