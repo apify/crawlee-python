@@ -16,20 +16,34 @@ else:
 
 
 async def main():
-    """Test full crawler with Qdrant + OpenAI integration"""
+    """Test full crawler with Qdrant Cloud + OpenAI integration"""
 
     print("="*50)
-    print("QDRANT INTEGRATION TEST")
+    print("QDRANT CLOUD INTEGRATION TEST")
     print("="*50)
 
-    # Check API key
+    # Check OpenAI API key
     api_key = os.getenv('OPENAI_API_KEY')
     if not api_key:
         print("\n[ERROR] OPENAI_API_KEY not set")
         print("Add to .env file: OPENAI_API_KEY=sk-proj-...")
         return
 
-    print(f"[OK] API key found: {api_key[:20]}...")
+    print(f"[OK] OpenAI API key found: {api_key[:20]}...")
+
+    # Check Qdrant Cloud credentials
+    qdrant_url = os.getenv('QDRANT_URL')
+    qdrant_api_key = os.getenv('QDRANT_API_KEY')
+
+    if not qdrant_url or not qdrant_api_key:
+        print("\n[ERROR] Qdrant Cloud credentials not set")
+        print("Get credentials at https://cloud.qdrant.io")
+        print("Add to .env file:")
+        print("  QDRANT_URL=https://your-cluster.cloud.qdrant.io")
+        print("  QDRANT_API_KEY=your-api-key")
+        return
+
+    print(f"[OK] Qdrant Cloud URL found: {qdrant_url}")
 
     # Configure crawler
     settings = Settings(
@@ -38,8 +52,8 @@ async def main():
         MAX_REQUESTS_PER_MINUTE=30,
         RESPECT_ROBOTS_TXT=True,
         USE_QDRANT=True,
-        QDRANT_HOST="localhost",
-        QDRANT_PORT=6333,
+        QDRANT_URL=qdrant_url,
+        QDRANT_API_KEY=qdrant_api_key,
         QDRANT_COLLECTION="tax_documents",
         EMBEDDING_MODEL="text-embedding-3-small",
         EMBEDDING_BATCH_SIZE=3,
@@ -65,8 +79,8 @@ async def main():
             settings=settings,
             max_depth=1,  # Shallow crawl for testing
             use_qdrant=True,
-            qdrant_host=settings.QDRANT_HOST,
-            qdrant_port=settings.QDRANT_PORT,
+            qdrant_url=settings.QDRANT_URL,
+            qdrant_api_key=settings.QDRANT_API_KEY,
         )
 
         await crawler.run(test_urls)
@@ -82,20 +96,19 @@ async def main():
         return
 
     print("\nVerification Steps:")
-    print("  1. Check Qdrant dashboard: http://localhost:6333/dashboard")
+    print("  1. Check Qdrant Cloud dashboard: https://cloud.qdrant.io")
     print("     - Look for 'tax_documents' collection")
     print("     - Verify vector dimension is 1536")
     print("     - Check document count matches crawled pages")
-    print("\n  2. Check Docker logs:")
-    print("     docker-compose logs qdrant | grep -i 'upsert'")
-    print("\n  3. Expected behavior:")
+    print("\n  2. Expected behavior:")
     print("     - Documents scraped and saved to filesystem")
     print("     - Embeddings generated in batches of 3")
-    print("     - Documents stored in Qdrant with 1536-dim vectors")
+    print("     - Documents stored in Qdrant Cloud with 1536-dim vectors")
     print("     - Final statistics show Qdrant document count")
-    print("\n  4. Cost estimate:")
+    print("\n  3. Cost estimate:")
     print("     - ~$0.001-0.01 depending on pages crawled")
     print("     - OpenAI text-embedding-3-small: $0.00002/1K tokens")
+    print("     - Qdrant Cloud free tier: 1GB storage included")
 
 
 if __name__ == '__main__':

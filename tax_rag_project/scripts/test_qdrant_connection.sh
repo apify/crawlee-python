@@ -1,13 +1,13 @@
 #!/bin/bash
 # ============================================================================
-# Test Qdrant connection with OpenAI embeddings
+# Test Qdrant Cloud connection with OpenAI embeddings
 # Usage: ./scripts/test_qdrant_connection.sh
 # ============================================================================
 
 cd "$(dirname "$0")/.."
 
 echo "============================================================"
-echo "QDRANT CONNECTION TEST"
+echo "QDRANT CLOUD CONNECTION TEST"
 echo "============================================================"
 echo
 
@@ -23,35 +23,20 @@ fi
 
 # Check if .env file exists
 if [ ! -f ".env" ] && [ ! -f ".env.local" ]; then
-    echo "WARNING: No .env or .env.local file found!"
+    echo "WARNING: No .env file found!"
     echo
-    echo "You need to set OPENAI_API_KEY for this test to work."
+    echo "You need to set the following environment variables:"
+    echo "  - QDRANT_URL (from https://cloud.qdrant.io)"
+    echo "  - QDRANT_API_KEY (from https://cloud.qdrant.io)"
+    echo "  - OPENAI_API_KEY (from https://platform.openai.com/api-keys)"
     echo
-    echo "Options:"
-    echo "  1. Copy .env.example to .env and add your API key"
-    echo "  2. Set environment variable: export OPENAI_API_KEY=sk-proj-..."
-    echo
-    echo "Get your API key from: https://platform.openai.com/api-keys"
+    echo "Copy .env.example to .env and add your credentials"
     echo
     read -p "Press Enter to continue..."
     exit 1
 fi
 
-# Check if Qdrant is running
-echo "Checking if Qdrant is running..."
-if ! curl -s http://localhost:6333/health > /dev/null 2>&1; then
-    echo
-    echo "WARNING: Qdrant doesn't appear to be running!"
-    echo
-    echo "Please start Qdrant first:"
-    echo "  docker-compose up -d"
-    echo
-    echo "Then wait 10-15 seconds for initialization."
-    echo
-    read -p "Press Enter to continue..."
-    exit 1
-fi
-echo "Qdrant is running!"
+echo "Using Qdrant Cloud (no Docker required)"
 echo
 
 # Activate virtual environment

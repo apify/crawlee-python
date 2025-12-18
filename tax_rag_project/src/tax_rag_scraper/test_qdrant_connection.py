@@ -16,13 +16,13 @@ else:
 
 
 async def main():
-    """Test Qdrant connection and OpenAI embeddings"""
+    """Test Qdrant Cloud connection and OpenAI embeddings"""
 
     print("="*50)
-    print("QDRANT + OPENAI CONNECTION TEST")
+    print("QDRANT CLOUD + OPENAI CONNECTION TEST")
     print("="*50)
 
-    # Check API key
+    # Check OpenAI API key
     api_key = os.getenv('OPENAI_API_KEY')
     if not api_key:
         print("\n[ERROR] OPENAI_API_KEY not set")
@@ -30,37 +30,45 @@ async def main():
         print("  export OPENAI_API_KEY=sk-proj-...")
         return
 
-    print(f"[OK] API key found: {api_key[:20]}...")
+    print(f"[OK] OpenAI API key found: {api_key[:20]}...")
 
-    # Load Qdrant configuration from environment
-    qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
-    qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
-    qdrant_api_key = os.getenv('QDRANT_API_KEY', '')
-    qdrant_use_https = os.getenv('QDRANT_USE_HTTPS', 'false').lower() == 'true'
+    # Load Qdrant Cloud configuration from environment
+    qdrant_url = os.getenv('QDRANT_URL')
+    qdrant_api_key = os.getenv('QDRANT_API_KEY')
 
-    # Test 1: Qdrant connection
-    print(f"\n1. Testing Qdrant connection to {qdrant_host}...")
+    # Validate Qdrant credentials
+    if not qdrant_url:
+        print("\n[ERROR] QDRANT_URL not set")
+        print("Get credentials at https://cloud.qdrant.io")
+        print("Set in .env file:")
+        print("  QDRANT_URL=https://your-cluster.cloud.qdrant.io")
+        print("  QDRANT_API_KEY=your-api-key")
+        return
+
+    if not qdrant_api_key:
+        print("\n[ERROR] QDRANT_API_KEY not set")
+        print("Get credentials at https://cloud.qdrant.io")
+        print("Set in .env file:")
+        print("  QDRANT_API_KEY=your-api-key")
+        return
+
+    # Test 1: Qdrant Cloud connection
+    print(f"\n1. Testing Qdrant Cloud connection to {qdrant_url}...")
     try:
         client = TaxDataQdrantClient(
-            host=qdrant_host,
-            port=qdrant_port,
-            api_key=qdrant_api_key if qdrant_api_key else None,
-            use_https=qdrant_use_https,
+            url=qdrant_url,
+            api_key=qdrant_api_key,
             collection_name="test_collection",
             vector_size=1536,
         )
-        connection_type = "Qdrant Cloud" if qdrant_api_key else "Local Qdrant"
-        print(f"[OK] Connected to {connection_type} successfully")
+        print(f"[OK] Connected to Qdrant Cloud successfully")
         print(f"[OK] Collection 'test_collection' ready (1536 dimensions)")
     except Exception as e:
         print(f"[ERROR] Failed to connect: {e}")
-        if qdrant_api_key:
-            print("\nCheck your Qdrant Cloud credentials in .env.local:")
-            print("  QDRANT_HOST=your-cluster.cloud.qdrant.io")
-            print("  QDRANT_API_KEY=your-api-key")
-        else:
-            print("\nMake sure Qdrant is running:")
-            print("  docker-compose up -d")
+        print("\nCheck your Qdrant Cloud credentials in .env:")
+        print("  QDRANT_URL=https://your-cluster.cloud.qdrant.io")
+        print("  QDRANT_API_KEY=your-api-key")
+        print("\nGet credentials at https://cloud.qdrant.io")
         return
 
     # Test 2: Embedding service
@@ -149,11 +157,11 @@ async def main():
     print("\n" + "="*50)
     print("ALL TESTS PASSED")
     print("="*50)
-    print("\nQdrant is ready for use!")
+    print("\nQdrant Cloud is ready for use!")
     print("Next steps:")
     print("  - Run integration test: python src/tax_rag_scraper/test_qdrant_integration.py")
-    print("  - Check dashboard: http://localhost:6333/dashboard")
-    print("  - Check Docker logs: docker-compose logs qdrant")
+    print("  - Check Qdrant Cloud dashboard at https://cloud.qdrant.io")
+    print("  - View your collections and monitor usage")
 
 
 if __name__ == '__main__':

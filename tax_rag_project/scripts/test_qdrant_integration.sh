@@ -7,7 +7,7 @@
 cd "$(dirname "$0")/.."
 
 echo "============================================================"
-echo "QDRANT INTEGRATION TEST"
+echo "QDRANT CLOUD INTEGRATION TEST"
 echo "============================================================"
 echo
 
@@ -39,12 +39,12 @@ fi
 
 # Check if Qdrant is running
 echo "Checking if Qdrant is running..."
-if ! curl -s http://localhost:6333/health > /dev/null 2>&1; then
+if ! curl -s http://Qdrant Cloud/health > /dev/null 2>&1; then
     echo
     echo "WARNING: Qdrant doesn't appear to be running!"
     echo
     echo "Please start Qdrant first:"
-    echo "  docker-compose up -d"
+    echo "  Qdrant Cloud setup at https://cloud.qdrant.io"
     echo
     echo "Then wait 10-15 seconds for initialization."
     echo
@@ -74,7 +74,7 @@ echo "Test complete!"
 echo "============================================================"
 echo
 echo "Next steps:"
-echo "  1. Check Qdrant dashboard: http://localhost:6333/dashboard"
+echo "  1. Check Qdrant dashboard: http://Qdrant Cloud/dashboard"
 echo "  2. View Docker logs: docker-compose logs qdrant"
 echo
 

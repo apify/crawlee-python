@@ -1,13 +1,13 @@
 @echo off
 REM ============================================================================
-REM Test Qdrant connection with OpenAI embeddings
+REM Test Qdrant Cloud connection with OpenAI embeddings
 REM Usage: scripts\test_qdrant_connection.bat
 REM ============================================================================
 
 cd /d "%~dp0\.."
 
 echo ============================================================
-echo QDRANT CONNECTION TEST
+echo QDRANT CLOUD CONNECTION TEST
 echo ============================================================
 echo.
 
@@ -24,37 +24,21 @@ if not exist "venv\Scripts\activate.bat" (
 REM Check if .env file exists
 if not exist ".env" (
     if not exist ".env.local" (
-        echo WARNING: No .env or .env.local file found!
+        echo WARNING: No .env file found!
         echo.
-        echo You need to set OPENAI_API_KEY for this test to work.
+        echo You need to set the following environment variables:
+        echo   - QDRANT_URL (from https://cloud.qdrant.io)
+        echo   - QDRANT_API_KEY (from https://cloud.qdrant.io)
+        echo   - OPENAI_API_KEY (from https://platform.openai.com/api-keys)
         echo.
-        echo Options:
-        echo   1. Copy .env.example to .env and add your API key
-        echo   2. Set environment variable: set OPENAI_API_KEY=sk-proj-...
-        echo.
-        echo Get your API key from: https://platform.openai.com/api-keys
+        echo Copy .env.example to .env and add your credentials
         echo.
         pause
         exit /b 1
     )
 )
 
-REM Check if Qdrant is running
-echo Checking if Qdrant is running...
-curl -s http://localhost:6333/health >nul 2>&1
-if errorlevel 1 (
-    echo.
-    echo WARNING: Qdrant doesn't appear to be running!
-    echo.
-    echo Please start Qdrant first:
-    echo   docker-compose up -d
-    echo.
-    echo Then wait 10-15 seconds for initialization.
-    echo.
-    pause
-    exit /b 1
-)
-echo Qdrant is running!
+echo Using Qdrant Cloud (no Docker required)
 echo.
 
 REM Activate virtual environment

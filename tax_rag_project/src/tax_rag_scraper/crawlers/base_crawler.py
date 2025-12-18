@@ -30,21 +30,17 @@ class TaxDataCrawler:
         settings: Settings = None,
         max_depth: int = 2,
         use_qdrant: bool = False,
-        qdrant_host: str = "localhost",
-        qdrant_port: int = 6333,
+        qdrant_url: str = None,
         qdrant_api_key: str = None,
-        qdrant_use_https: bool = False,
     ):
         """Initialize the crawler with settings.
 
         Args:
             settings: Application settings. If None, uses default settings.
             max_depth: Maximum crawl depth for link discovery. Default is 2.
-            use_qdrant: Enable Qdrant vector database integration.
-            qdrant_host: Qdrant server hostname.
-            qdrant_port: Qdrant server port.
-            qdrant_api_key: API key for Qdrant Cloud (optional).
-            qdrant_use_https: Use HTTPS for Qdrant connection (for cloud).
+            use_qdrant: Enable Qdrant Cloud vector database integration.
+            qdrant_url: Qdrant Cloud URL (e.g., 'https://xyz.cloud.qdrant.io').
+            qdrant_api_key: API key for Qdrant Cloud authentication.
         """
         self.settings = settings or Settings()
 
@@ -55,17 +51,21 @@ class TaxDataCrawler:
         self.site_router = SiteRouter()
         self.link_extractor = LinkExtractor(max_depth=max_depth)
 
-        # Initialize Qdrant integration (NEW)
+        # Initialize Qdrant Cloud integration
         self.use_qdrant = use_qdrant
 
         if use_qdrant:
-            connection_type = "Qdrant Cloud" if qdrant_api_key else "Local Qdrant"
-            logger.info(f"Initializing {connection_type} integration...")
+            if not qdrant_url or not qdrant_api_key:
+                raise ValueError(
+                    "Qdrant Cloud credentials required. "
+                    "Set QDRANT_URL and QDRANT_API_KEY environment variables. "
+                    "Get credentials at https://cloud.qdrant.io"
+                )
+
+            logger.info(f"Initializing Qdrant Cloud integration...")
             self.qdrant_client = TaxDataQdrantClient(
-                host=qdrant_host,
-                port=qdrant_port,
+                url=qdrant_url,
                 api_key=qdrant_api_key,
-                use_https=qdrant_use_https,
                 collection_name=self.settings.QDRANT_COLLECTION,
                 vector_size=1536,
             )
@@ -73,7 +73,7 @@ class TaxDataCrawler:
                 model_name=self.settings.EMBEDDING_MODEL,
                 api_key=self.settings.OPENAI_API_KEY
             )
-            logger.info(f"✓ {connection_type} integration ready")
+            logger.info(f"✓ Qdrant Cloud integration ready")
         else:
             self.qdrant_client = None
             self.embedding_service = None

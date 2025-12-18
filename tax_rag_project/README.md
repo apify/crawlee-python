@@ -9,9 +9,8 @@ This project crawls, processes, and stores Canadian tax documentation in a vecto
 ## Tech Stack
 
 - **Web Scraping**: [Crawlee for Python](https://crawlee.dev/python/) - Robust, production-grade crawler
-- **Vector Database**: [Qdrant](https://qdrant.tech/) - High-performance vector search
+- **Vector Database**: [Qdrant Cloud](https://cloud.qdrant.io) - Cloud-hosted vector search (1GB free tier)
 - **Embeddings**: [OpenAI Embeddings API](https://platform.openai.com/docs/guides/embeddings) - High-quality semantic embeddings
-- **Containerization**: Docker & Docker Compose - Consistent deployment environment
 - **Storage**: File-based persistence with structured metadata
 
 ## Project Structure
@@ -60,8 +59,9 @@ tax_rag_project/
 ### Prerequisites
 
 - Python 3.10+
-- Docker & Docker Compose (for Qdrant)
 - Git
+- Qdrant Cloud account (free tier: https://cloud.qdrant.io)
+- OpenAI API key (https://platform.openai.com/api-keys)
 
 ### Installation
 
@@ -76,79 +76,75 @@ tax_rag_project/
    pip install -e .
    ```
 
-3. **Configure environment variables**
+3. **Set up Qdrant Cloud**
+   - Visit https://cloud.qdrant.io
+   - Create a free account (1GB storage included)
+   - Create a new cluster
+   - Copy your cluster URL and API key
+
+4. **Configure environment variables**
    ```bash
    cd tax_rag_project
-   cp .env.example .env.local
-   # Edit .env.local with your configuration
-   ```
-
-4. **Run the crawler**
-   ```bash
-   # Windows
-   cd scripts
-   ..\.venv\Scripts\python.exe run_crawler.py
-
-   # Or use batch file
-   run_tests.bat
-
-   # Linux/Mac
-   cd scripts
-   ../​.venv/bin/python run_crawler.py
-   ```
-
-5. **Run all tests**
-   ```bash
-   cd scripts
-   ..\.venv\Scripts\python.exe run_all_tests.py
-   ```
-
-6. **Test Qdrant integration** (See [TEST_QDRANT.md](TEST_QDRANT.md) for details)
-
-   **Set OpenAI API key first:**
-   ```bash
-   # Copy .env.example to .env and add your OPENAI_API_KEY
    cp .env.example .env
-   # Edit .env and add: OPENAI_API_KEY=sk-proj-your-key-here
+   # Edit .env with your Qdrant Cloud credentials:
+   # QDRANT_URL=https://your-cluster.cloud.qdrant.io
+   # QDRANT_API_KEY=your-api-key
+   # OPENAI_API_KEY=sk-proj-...
    ```
 
-   **Setup and test (Windows):**
+5. **Test Qdrant Cloud connection**
    ```bash
-   scripts\setup_qdrant.bat              # Start Qdrant
-   scripts\test_qdrant_connection.bat    # Test connection (~$0.0001)
-   scripts\test_qdrant_integration.bat   # Test full crawler (~$0.001-0.01)
+   # Test connection to Qdrant Cloud
+   python src/tax_rag_scraper/test_qdrant_connection.py
    ```
 
-   **Setup and test (Linux/Mac/Git Bash):**
+6. **Run the crawler**
    ```bash
-   ./scripts/setup_qdrant.sh              # Start Qdrant
-   ./scripts/test_qdrant_connection.sh    # Test connection (~$0.0001)
-   ./scripts/test_qdrant_integration.sh   # Test full crawler (~$0.001-0.01)
+   # Run main crawler with Qdrant Cloud integration
+   python src/tax_rag_scraper/main.py
+
+   # Or run integration test
+   python src/tax_rag_scraper/test_qdrant_integration.py
    ```
 
-### Super Simple Setup (Windows)
-
-**First time only:**
-```bash
-# Double-click or run:
-setup_dev_env.bat
-```
-
-**Every time you want to run tests:**
-```bash
-# Double-click or run:
-run_test.bat
-```
+7. **Verify in Qdrant Cloud**
+   - Visit https://cloud.qdrant.io
+   - Check your cluster dashboard
+   - View the `tax_documents` collection
+   - Monitor vector count and storage usage
 
 ## Development Setup
 
 ### Environment Variables
 
 See [.env.example](.env.example) for all configuration options including:
-- Crawler settings (max requests, concurrency, rate limits)
-- Qdrant connection details
-- Storage paths
-- Retry and timeout configurations
+- **Qdrant Cloud**: URL and API key (required)
+- **OpenAI API**: API key for embeddings (required)
+- **Crawler settings**: max requests, concurrency, rate limits
+- **Storage paths**: local file storage configuration
+- **Retry and timeout configurations**: error handling settings
+
+### Qdrant Cloud Setup
+
+1. **Create Account**
+   - Visit https://cloud.qdrant.io
+   - Sign up for free (1GB storage included)
+
+2. **Create Cluster**
+   - Click "Create Cluster"
+   - Choose free tier
+   - Select region closest to you
+   - Wait for cluster provisioning (~1-2 minutes)
+
+3. **Get Credentials**
+   - Copy your cluster URL: `https://xyz-example.cloud.qdrant.io`
+   - Copy your API key from the dashboard
+   - Add both to your `.env` file
+
+4. **Collection Creation**
+   - Collections are created automatically when you run the crawler
+   - The `tax_documents` collection will be created on first run
+   - Vector dimension: 1536 (OpenAI text-embedding-3-small)
 
 ### Project Configuration
 
@@ -166,8 +162,23 @@ See [CHANGELOG.md](CHANGELOG.md) for project-specific changes.
 This project uses the Crawlee framework (Apache License 2.0).
 Project-specific code: TODO - Define license
 
+## Architecture
+
+This project uses a **cloud-first architecture** with:
+- **Qdrant Cloud** for vector storage (no local Docker required)
+- **OpenAI API** for generating embeddings
+- **GitHub Actions** for automated deployment (Stage 6)
+
+**Benefits:**
+- No Docker setup or maintenance required
+- Automatic scaling and high availability
+- Free tier suitable for development and testing
+- Production-ready from day one
+
 ## Links
 
 - [Crawlee Documentation](https://crawlee.dev/python/)
+- [Qdrant Cloud](https://cloud.qdrant.io)
 - [Qdrant Documentation](https://qdrant.tech/documentation/)
+- [OpenAI Embeddings](https://platform.openai.com/docs/guides/embeddings)
 - [Project Changelog](CHANGELOG.md)

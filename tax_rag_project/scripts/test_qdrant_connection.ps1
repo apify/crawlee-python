@@ -1,5 +1,5 @@
 # ============================================================================
-# Test Qdrant connection with OpenAI embeddings (PowerShell)
+# Test Qdrant Cloud connection with OpenAI embeddings (PowerShell)
 # Usage: .\scripts\test_qdrant_connection.ps1
 # ============================================================================
 
@@ -7,7 +7,7 @@
 Set-Location $PSScriptRoot\..
 
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host "QDRANT CONNECTION TEST" -ForegroundColor Cyan
+Write-Host "QDRANT CLOUD CONNECTION TEST" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -23,39 +23,20 @@ if (-not (Test-Path "venv\Scripts\Activate.ps1")) {
 
 # Check if .env file exists
 if (-not (Test-Path ".env") -and -not (Test-Path ".env.local")) {
-    Write-Host "WARNING: No .env or .env.local file found!" -ForegroundColor Yellow
+    Write-Host "WARNING: No .env file found!" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "You need to set OPENAI_API_KEY for this test to work."
+    Write-Host "You need to set the following environment variables:" -ForegroundColor Cyan
+    Write-Host "  - QDRANT_URL (from https://cloud.qdrant.io)"
+    Write-Host "  - QDRANT_API_KEY (from https://cloud.qdrant.io)"
+    Write-Host "  - OPENAI_API_KEY (from https://platform.openai.com/api-keys)"
     Write-Host ""
-    Write-Host "Options:" -ForegroundColor Cyan
-    Write-Host "  1. Copy .env.example to .env and add your API key"
-    Write-Host "  2. Set environment variable: `$env:OPENAI_API_KEY='sk-proj-...'"
-    Write-Host ""
-    Write-Host "Get your API key from: https://platform.openai.com/api-keys"
-    Write-Host ""
-    Read-Host "Press Enter to exit"
-    exit 1
-}
-
-# Check if Qdrant is running
-Write-Host "Checking if Qdrant is running..." -ForegroundColor Cyan
-try {
-    $response = Invoke-WebRequest -Uri "http://localhost:6333/health" -UseBasicParsing -ErrorAction Stop
-    Write-Host "Qdrant is running!" -ForegroundColor Green
-} catch {
-    Write-Host ""
-    Write-Host "WARNING: Qdrant doesn't appear to be running!" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "Please start Qdrant first:" -ForegroundColor Cyan
-    Write-Host "  .\scripts\setup_qdrant.ps1"
-    Write-Host "  OR: docker compose up -d"
-    Write-Host ""
-    Write-Host "Then wait 10-15 seconds for initialization."
+    Write-Host "Copy .env.example to .env and add your credentials"
     Write-Host ""
     Read-Host "Press Enter to exit"
     exit 1
 }
 
+Write-Host "Using Qdrant Cloud (no Docker required)" -ForegroundColor Green
 Write-Host ""
 
 # Activate virtual environment and run test

@@ -236,25 +236,24 @@ Use different .env files:
 
 ## Deployment
 
-### DigitalOcean VPS
+### Cloud-First Architecture
 
-This project is designed for self-hosted deployment:
+This project uses cloud-based services for production deployment:
 
-1. **Provision Ubuntu 22.04+ droplet**
-2. **Install Python 3.10+, Docker**
-3. **Clone repository:**
-   ```bash
-   git clone <your-fork> /opt/tax-rag-scraper
-   cd /opt/tax-rag-scraper
-   ```
-4. **Install dependencies:**
-   ```bash
-   pip install -e .
-   cd src/tax_rag_scraper
-   pip install -r requirements.txt
-   ```
-5. **Configure production settings** in `.env.production`
-6. **Run crawler** (manually or via cron/systemd)
+1. **Set up Qdrant Cloud**
+   - Visit https://cloud.qdrant.io
+   - Create a cluster (free tier: 1GB storage)
+   - Copy cluster URL and API key
+
+2. **Configure credentials**
+   - Set `QDRANT_URL` environment variable
+   - Set `QDRANT_API_KEY` environment variable
+   - Set `OPENAI_API_KEY` environment variable
+
+3. **Deploy via GitHub Actions** (Stage 6)
+   - Automated deployment pipeline
+   - Scheduled crawling
+   - No server maintenance required
 
 See `tax_rag_project/` directory for detailed deployment guides.
 
@@ -271,18 +270,34 @@ See `tax_rag_project/` directory for detailed deployment guides.
 - Text cleaning and normalization
 - Semantic chunking
 
-### 📋 Stage 3: Vector Database
-- Qdrant Docker setup
-- Embedding generation (sentence-transformers)
-- Batch upload pipeline
-- Search API integration
-
-### 📋 Stage 4: Production Hardening
+### ✅ Stage 3: Production Hardening
 - Comprehensive error handling
 - Rate limiting and politeness
 - Monitoring and alerting
-- Docker Compose deployment
-- CI/CD pipeline
+- Security best practices
+
+### ✅ Stage 4: Multi-Site Support
+- Deep crawling with link extraction
+- Site-specific handlers
+- Advanced routing logic
+
+### ✅ Stage 5: Qdrant Cloud Integration
+- Qdrant Cloud setup (cloud-hosted vector database)
+- OpenAI embedding generation
+- Batch upload pipeline
+- Vector search capabilities
+
+### 🔄 Stage 5.5: Cloud Architecture (Current)
+- Remove Docker dependencies
+- Cloud-only configuration
+- URL-based Qdrant connection
+- Production-ready setup
+
+### 📋 Stage 6: GitHub Actions Deployment
+- Automated CI/CD pipeline
+- Scheduled crawling
+- Environment management
+- Monitoring and alerts
 
 ## Troubleshooting
 

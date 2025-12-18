@@ -7,7 +7,7 @@
 Set-Location $PSScriptRoot\..
 
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host "QDRANT INTEGRATION TEST" -ForegroundColor Cyan
+Write-Host "QDRANT CLOUD INTEGRATION TEST" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -40,7 +40,7 @@ if (-not (Test-Path ".env") -and -not (Test-Path ".env.local")) {
 # Check if Qdrant is running
 Write-Host "Checking if Qdrant is running..." -ForegroundColor Cyan
 try {
-    $response = Invoke-WebRequest -Uri "http://localhost:6333/health" -UseBasicParsing -ErrorAction Stop
+    $response = Invoke-WebRequest -Uri "http://Qdrant Cloud/health" -UseBasicParsing -ErrorAction Stop
     Write-Host "Qdrant is running!" -ForegroundColor Green
 } catch {
     Write-Host ""
@@ -75,7 +75,7 @@ Write-Host "Test complete!" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Yellow
-Write-Host "  1. Check Qdrant dashboard: http://localhost:6333/dashboard"
+Write-Host "  1. Check Qdrant dashboard: http://Qdrant Cloud/dashboard"
 Write-Host "  2. View Docker logs: docker compose logs qdrant"
 Write-Host ""
 

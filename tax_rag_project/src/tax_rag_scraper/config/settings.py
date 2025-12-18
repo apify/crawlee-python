@@ -33,20 +33,16 @@ class Settings(BaseSettings):
     MAX_CRAWL_DEPTH: int = 2
     FOLLOW_LINKS: bool = True
 
-    # Qdrant configuration
-    QDRANT_HOST: str = "localhost"
-    QDRANT_PORT: int = 6333
-    QDRANT_API_KEY: str = ""
-    QDRANT_USE_HTTPS: bool = False
+    # Qdrant Cloud configuration
+    # Get credentials at https://cloud.qdrant.io
+    QDRANT_URL: str  # Required: https://your-cluster.cloud.qdrant.io
+    QDRANT_API_KEY: str  # Required: Your Qdrant Cloud API key
     QDRANT_COLLECTION: str = "tax_documents"
-    USE_QDRANT: bool = False
-    QDRANT_CONTAINER_NAME: str = "qdrant-taxrag"
-    QDRANT_GRPC_PORT: int = 6334
-    QDRANT_VOLUME_PATH: str = "./qdrant_storage"
+    USE_QDRANT: bool = True
 
     # Embeddings configuration
     EMBEDDING_MODEL: str = "text-embedding-3-small"
-    EMBEDDING_BATCH_SIZE: int = 10
+    EMBEDDING_BATCH_SIZE: int = 5  # Reduced from 10 to avoid rate limits
     OPENAI_API_KEY: str = ""
 
     # Document processing
