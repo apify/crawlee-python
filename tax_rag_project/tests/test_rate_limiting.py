@@ -33,7 +33,7 @@ async def main():
 
     start_time = datetime.now()
 
-    crawler = TaxDataCrawler(settings=settings)
+    crawler = TaxDataCrawler(settings=settings, max_depth=0)
     await crawler.run(test_urls)
 
     end_time = datetime.now()

@@ -26,7 +26,7 @@ async def main():
     crawler = TaxDataCrawler(settings=settings, max_depth=2)
     await crawler.run(test_urls)
 
-    print("\n✓ Deep crawling test complete.")
+    print("\n[SUCCESS] Deep crawling test complete.")
     print("\nExpected behavior:")
     print("  - Depth 0: Processed seed URL (forms page)")
     print("  - Depth 1: Discovered and processed links from seed page")

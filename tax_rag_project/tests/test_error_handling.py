@@ -17,7 +17,7 @@ async def main():
 
     print("Testing error handling with valid and invalid URLs...\n")
 
-    crawler = TaxDataCrawler()
+    crawler = TaxDataCrawler(max_depth=0)
     await crawler.run(test_urls)
 
     print("\n[SUCCESS] Error handling test complete.")

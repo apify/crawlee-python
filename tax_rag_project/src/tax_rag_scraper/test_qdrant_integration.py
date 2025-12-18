@@ -1,8 +1,18 @@
 """Test full crawler integration with Qdrant and OpenAI embeddings"""
 import asyncio
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 from tax_rag_scraper.crawlers.base_crawler import TaxDataCrawler
 from tax_rag_scraper.config.settings import Settings
+
+# Load environment variables from .env
+env_path = Path(__file__).parent.parent.parent / '.env'
+if env_path.exists():
+    load_dotenv(env_path)
+    print(f"[OK] Loaded environment from .env")
+else:
+    print("[WARNING] Warning: .env file not found")
 
 
 async def main():
@@ -15,11 +25,11 @@ async def main():
     # Check API key
     api_key = os.getenv('OPENAI_API_KEY')
     if not api_key:
-        print("\n✗ OPENAI_API_KEY not set")
+        print("\n[ERROR] OPENAI_API_KEY not set")
         print("Add to .env file: OPENAI_API_KEY=sk-proj-...")
         return
 
-    print(f"✓ API key found: {api_key[:20]}...")
+    print(f"[OK] API key found: {api_key[:20]}...")
 
     # Configure crawler
     settings = Settings(
@@ -62,11 +72,11 @@ async def main():
         await crawler.run(test_urls)
 
         print("\n" + "="*50)
-        print("✓ Integration test complete")
+        print("[OK] Integration test complete")
         print("="*50)
 
     except Exception as e:
-        print(f"\n✗ Integration test failed: {e}")
+        print(f"\n[ERROR] Integration test failed: {e}")
         import traceback
         traceback.print_exc()
         return

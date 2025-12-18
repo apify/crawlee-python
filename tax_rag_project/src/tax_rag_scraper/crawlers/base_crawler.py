@@ -32,6 +32,8 @@ class TaxDataCrawler:
         use_qdrant: bool = False,
         qdrant_host: str = "localhost",
         qdrant_port: int = 6333,
+        qdrant_api_key: str = None,
+        qdrant_use_https: bool = False,
     ):
         """Initialize the crawler with settings.
 
@@ -41,6 +43,8 @@ class TaxDataCrawler:
             use_qdrant: Enable Qdrant vector database integration.
             qdrant_host: Qdrant server hostname.
             qdrant_port: Qdrant server port.
+            qdrant_api_key: API key for Qdrant Cloud (optional).
+            qdrant_use_https: Use HTTPS for Qdrant connection (for cloud).
         """
         self.settings = settings or Settings()
 
@@ -55,10 +59,13 @@ class TaxDataCrawler:
         self.use_qdrant = use_qdrant
 
         if use_qdrant:
-            logger.info("Initializing Qdrant integration...")
+            connection_type = "Qdrant Cloud" if qdrant_api_key else "Local Qdrant"
+            logger.info(f"Initializing {connection_type} integration...")
             self.qdrant_client = TaxDataQdrantClient(
                 host=qdrant_host,
                 port=qdrant_port,
+                api_key=qdrant_api_key,
+                use_https=qdrant_use_https,
                 collection_name=self.settings.QDRANT_COLLECTION,
                 vector_size=1536,
             )
@@ -66,7 +73,7 @@ class TaxDataCrawler:
                 model_name=self.settings.EMBEDDING_MODEL,
                 api_key=self.settings.OPENAI_API_KEY
             )
-            logger.info("✓ Qdrant integration ready")
+            logger.info(f"✓ {connection_type} integration ready")
         else:
             self.qdrant_client = None
             self.embedding_service = None
