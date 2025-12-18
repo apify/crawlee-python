@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 @contextmanager
-def swaped_context(
+def swapped_context(
     context: BasicCrawlingContext,
     request: Request,
 ) -> Iterator[None]:

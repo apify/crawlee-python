@@ -28,3 +28,12 @@ jobs:
     uses: apify/workflows/.github/workflows/python_type_check.yaml@main
     with:
       python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+
+  spell_check:
+    name: Spell check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Check spelling with typos
+        uses: crate-ci/typos@v1.40.0

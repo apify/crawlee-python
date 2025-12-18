@@ -69,7 +69,7 @@ from crawlee.statistics import Statistics, StatisticsState
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 from ._context_pipeline import ContextPipeline
-from ._context_utils import swaped_context
+from ._context_utils import swapped_context
 from ._logging_utils import (
     get_one_line_error_summary_if_possible,
     reduce_asyncio_timeout_error_to_relevant_traceback_parts,
@@ -536,7 +536,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         @functools.wraps(handler)
         async def wrapped_handler(context: TCrawlingContext | BasicCrawlingContext, exception: Exception) -> T:
-            # Original context helpers that are from `RequestHandlerRunResult` will not be commited as the request
+            # Original context helpers that are from `RequestHandlerRunResult` will not be committed as the request
             # failed. Modified context provides context helpers with direct access to the storages.
             error_context = context.create_modified_copy(
                 push_data=self._push_data,
@@ -1415,7 +1415,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request.state = RequestState.REQUEST_HANDLER
 
             try:
-                with swaped_context(context, request):
+                with swapped_context(context, request):
                     self._check_request_collision(request, session)
                     await self._run_request_handler(context=context)
             except asyncio.TimeoutError as e:
