@@ -11,7 +11,7 @@ from .selectolax_parser import SelectolaxLexborParser
 
 
 async def main() -> None:
-    crawler: AdaptivePlaywrightCrawler = AdaptivePlaywrightCrawler(
+    crawler = AdaptivePlaywrightCrawler(
         max_requests_per_crawl=10,
         # Use custom Selectolax parser for static content parsing.
         static_parser=SelectolaxLexborParser(),
