@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 1.2.2 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- Prevent race condition in concurrent storage creation ([#1626](https://github.com/apify/crawlee-python/pull/1626)) ([7f17a43](https://github.com/apify/crawlee-python/commit/7f17a4347d5884962767e757a92ec173688fed7b)) by [@Mantisus](https://github.com/Mantisus), closes [#1621](https://github.com/apify/crawlee-python/issues/1621)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [1.2.1](https://github.com/apify/crawlee-python/releases/tag/v1.2.1) (2025-12-16)
