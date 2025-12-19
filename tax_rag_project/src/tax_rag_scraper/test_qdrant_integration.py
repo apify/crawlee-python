@@ -1,16 +1,19 @@
 """Test full crawler integration with Qdrant and OpenAI embeddings"""
+
 import asyncio
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
-from tax_rag_scraper.crawlers.base_crawler import TaxDataCrawler
+
 from tax_rag_scraper.config.settings import Settings
+from tax_rag_scraper.crawlers.base_crawler import TaxDataCrawler
 
 # Load environment variables from .env
-env_path = Path(__file__).parent.parent.parent / '.env'
+env_path = Path(__file__).parent.parent.parent / ".env"
 if env_path.exists():
     load_dotenv(env_path)
-    print(f"[OK] Loaded environment from .env")
+    print("[OK] Loaded environment from .env")
 else:
     print("[WARNING] Warning: .env file not found")
 
@@ -18,12 +21,12 @@ else:
 async def main():
     """Test full crawler with Qdrant Cloud + OpenAI integration"""
 
-    print("="*50)
+    print("=" * 50)
     print("QDRANT CLOUD INTEGRATION TEST")
-    print("="*50)
+    print("=" * 50)
 
     # Check OpenAI API key
-    api_key = os.getenv('OPENAI_API_KEY')
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         print("\n[ERROR] OPENAI_API_KEY not set")
         print("Add to .env file: OPENAI_API_KEY=sk-proj-...")
@@ -32,8 +35,8 @@ async def main():
     print(f"[OK] OpenAI API key found: {api_key[:20]}...")
 
     # Check Qdrant Cloud credentials
-    qdrant_url = os.getenv('QDRANT_URL')
-    qdrant_api_key = os.getenv('QDRANT_API_KEY')
+    qdrant_url = os.getenv("QDRANT_URL")
+    qdrant_api_key = os.getenv("QDRANT_API_KEY")
 
     if not qdrant_url or not qdrant_api_key:
         print("\n[ERROR] Qdrant Cloud credentials not set")
@@ -61,17 +64,17 @@ async def main():
     )
 
     test_urls = [
-        'https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/about-your-tax-return.html',
+        "https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/about-your-tax-return.html",
     ]
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Max requests: {settings.MAX_REQUESTS_PER_CRAWL}")
     print(f"  Embedding model: {settings.EMBEDDING_MODEL}")
     print(f"  Collection: {settings.QDRANT_COLLECTION}")
     print(f"  Batch size: {settings.EMBEDDING_BATCH_SIZE}")
-    print(f"  Vector dimensions: 1536 (text-embedding-3-small)")
+    print("  Vector dimensions: 1536 (text-embedding-3-small)")
     print(f"\nTest URL: {test_urls[0]}")
-    print(f"\nStarting crawl with Qdrant integration...\n")
+    print("\nStarting crawl with Qdrant integration...\n")
 
     # Create and run crawler
     try:
@@ -85,13 +88,14 @@ async def main():
 
         await crawler.run(test_urls)
 
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("[OK] Integration test complete")
-        print("="*50)
+        print("=" * 50)
 
     except Exception as e:
         print(f"\n[ERROR] Integration test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return
 
@@ -111,5 +115,5 @@ async def main():
     print("     - Qdrant Cloud free tier: 1GB storage included")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

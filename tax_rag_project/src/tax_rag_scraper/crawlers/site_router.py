@@ -1,7 +1,9 @@
-from urllib.parse import urlparse
-from tax_rag_scraper.handlers.cra_handler import CRAHandler
-from tax_rag_scraper.handlers.base_handler import BaseHandler
 from typing import Dict
+from urllib.parse import urlparse
+
+from tax_rag_scraper.handlers.base_handler import BaseHandler
+from tax_rag_scraper.handlers.cra_handler import CRAHandler
+
 
 class SiteRouter:
     """Routes URLs to appropriate handlers based on domain"""
@@ -9,7 +11,7 @@ class SiteRouter:
     def __init__(self):
         # Map domains to their specialized handlers
         self.handlers: Dict[str, BaseHandler] = {
-            'canada.ca': CRAHandler(),
+            "canada.ca": CRAHandler(),
             # Future: Add more site handlers here
             # 'irs.gov': IRSHandler(),
             # 'gov.uk': HMRCHandler(),
@@ -22,6 +24,7 @@ class SiteRouter:
 
     def _create_default_handler(self) -> BaseHandler:
         """Create a concrete default handler for unknown sites"""
+
         class DefaultExtractor(BaseHandler):
             async def _extract_data(self, context):
                 from tax_rag_scraper.models.tax_document import TaxDocument
@@ -37,8 +40,8 @@ class SiteRouter:
                     url=str(context.request.url),
                     title=title,
                     content=content,
-                    document_type='Unknown',
-                    metadata={'source': 'Unknown'},
+                    document_type="Unknown",
+                    metadata={"source": "Unknown"},
                 )
 
         return DefaultExtractor()

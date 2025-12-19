@@ -5,16 +5,17 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
 
-from tax_rag_scraper.crawlers.base_crawler import TaxDataCrawler
 from tax_rag_scraper.config.settings import Settings
+from tax_rag_scraper.crawlers.base_crawler import TaxDataCrawler
 
 
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description='Canadian Tax Documentation Crawler with Qdrant Cloud integration',
+        description="Canadian Tax Documentation Crawler with Qdrant Cloud integration",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -35,20 +36,17 @@ Environment Variables Required:
 Get credentials:
   Qdrant Cloud: https://cloud.qdrant.io
   OpenAI API:   https://platform.openai.com/api-keys
-        """
+        """,
     )
 
     parser.add_argument(
-        '--deep',
-        action='store_true',
-        help='Enable deep crawl mode (increases max depth to 3, may override --max-depth)'
+        "--deep",
+        action="store_true",
+        help="Enable deep crawl mode (increases max depth to 3, may override --max-depth)",
     )
 
     parser.add_argument(
-        '--max-depth',
-        type=int,
-        default=None,
-        help='Maximum crawl depth (default: 2, or 3 if --deep is used)'
+        "--max-depth", type=int, default=None, help="Maximum crawl depth (default: 2, or 3 if --deep is used)"
     )
 
     return parser.parse_args()
@@ -61,16 +59,16 @@ async def main():
     args = parse_arguments()
 
     # Load environment variables
-    env_path = Path(__file__).parent.parent.parent / '.env'
+    env_path = Path(__file__).parent.parent.parent / ".env"
     if env_path.exists():
         load_dotenv(env_path)
-        print(f"[OK] Loaded environment from .env")
+        print("[OK] Loaded environment from .env")
     else:
         print("[WARNING] .env file not found, using environment variables")
 
     # Validate required Qdrant Cloud credentials
-    qdrant_url = os.getenv('QDRANT_URL')
-    qdrant_api_key = os.getenv('QDRANT_API_KEY')
+    qdrant_url = os.getenv("QDRANT_URL")
+    qdrant_api_key = os.getenv("QDRANT_API_KEY")
 
     if not qdrant_url:
         print("\n[ERROR] QDRANT_URL environment variable not set")
@@ -91,7 +89,7 @@ async def main():
         sys.exit(1)
 
     # Validate required OpenAI API key
-    openai_api_key = os.getenv('OPENAI_API_KEY')
+    openai_api_key = os.getenv("OPENAI_API_KEY")
     if not openai_api_key:
         print("\n[ERROR] OPENAI_API_KEY environment variable not set")
         print("\nGet your API key from https://platform.openai.com/api-keys")
@@ -99,7 +97,7 @@ async def main():
         sys.exit(1)
 
     print(f"[OK] Qdrant Cloud URL: {qdrant_url}")
-    print(f"[OK] OpenAI API key configured")
+    print("[OK] OpenAI API key configured")
 
     # Configure settings
     settings = Settings()
@@ -122,11 +120,9 @@ async def main():
     settings.MAX_CRAWL_DEPTH = crawl_depth
 
     # Test with CRA website (Canadian Revenue Agency - public info pages)
-    test_urls = [
-        'https://www.canada.ca/en/revenue-agency/services/forms-publications.html'
-    ]
+    test_urls = ["https://www.canada.ca/en/revenue-agency/services/forms-publications.html"]
 
-    print(f"\n[INFO] Starting crawler with Qdrant Cloud integration")
+    print("\n[INFO] Starting crawler with Qdrant Cloud integration")
     print(f"[INFO] Mode: {'Deep Crawl' if args.deep else 'Standard Crawl'}")
     print(f"[INFO] Collection: {settings.QDRANT_COLLECTION}")
     print(f"[INFO] Max requests: {settings.MAX_REQUESTS_PER_CRAWL}")
@@ -148,5 +144,5 @@ async def main():
     print("[OK] View your data in Qdrant Cloud: https://cloud.qdrant.io")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

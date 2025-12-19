@@ -1,6 +1,8 @@
 from typing import Set
 from urllib.parse import urljoin, urlparse
+
 from bs4 import BeautifulSoup
+
 
 class LinkExtractor:
     """Extract and filter links from HTML pages for deep crawling"""
@@ -14,12 +16,7 @@ class LinkExtractor:
         self.allowed_domains = allowed_domains or set()
         self.max_depth = max_depth
 
-    def extract_links(
-        self,
-        soup: BeautifulSoup,
-        base_url: str,
-        current_depth: int = 0
-    ) -> Set[str]:
+    def extract_links(self, soup: BeautifulSoup, base_url: str, current_depth: int = 0) -> Set[str]:
         """
         Extract valid links from page
 
@@ -39,11 +36,11 @@ class LinkExtractor:
         base_domain = urlparse(base_url).netloc
 
         # Find all <a> tags with href attribute
-        for link in soup.find_all('a', href=True):
-            href = link['href']
+        for link in soup.find_all("a", href=True):
+            href = link["href"]
 
             # Skip empty hrefs
-            if not href or href.strip() == '':
+            if not href or href.strip() == "":
                 continue
 
             # Convert relative URLs to absolute
@@ -72,7 +69,7 @@ class LinkExtractor:
         - Anchor-only links
         """
         # Must be HTTP or HTTPS
-        if parsed.scheme not in ('http', 'https'):
+        if parsed.scheme not in ("http", "https"):
             return False
 
         # Check domain restrictions
@@ -87,7 +84,7 @@ class LinkExtractor:
 
         # Skip file downloads
         path_lower = parsed.path.lower()
-        if any(path_lower.endswith(ext) for ext in ['.pdf', '.zip', '.doc', '.docx', '.xls', '.xlsx']):
+        if any(path_lower.endswith(ext) for ext in [".pdf", ".zip", ".doc", ".docx", ".xls", ".xlsx"]):
             return False
 
         # Skip anchor-only links (fragments)

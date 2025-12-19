@@ -1,9 +1,11 @@
 """Base handler for processing crawled pages with error handling."""
 
-from crawlee.crawlers import BeautifulSoupCrawlingContext
-from tax_rag_scraper.models.tax_document import TaxDocument
-from typing import Optional
 import traceback
+from typing import Optional
+
+from crawlee.crawlers import BeautifulSoupCrawlingContext
+
+from tax_rag_scraper.models.tax_document import TaxDocument
 
 
 class BaseHandler:
@@ -22,13 +24,11 @@ class BaseHandler:
             Exception: Re-raises exceptions to trigger Crawlee's retry mechanism
         """
         try:
-            context.log.info(f'Processing {context.request.url}')
+            context.log.info(f"Processing {context.request.url}")
 
             # Validate response
             if context.http_response.status_code != 200:
-                context.log.warning(
-                    f'Non-200 status: {context.http_response.status_code}'
-                )
+                context.log.warning(f"Non-200 status: {context.http_response.status_code}")
                 return None
 
             # Extract data with error handling
@@ -36,15 +36,12 @@ class BaseHandler:
 
             if doc:
                 await context.push_data(doc.model_dump())
-                context.log.info(f'✓ Successfully processed {context.request.url}')
+                context.log.info(f"✓ Successfully processed {context.request.url}")
 
             return doc
 
         except Exception as e:
-            context.log.error(
-                f'Error processing {context.request.url}: {str(e)}\n'
-                f'{traceback.format_exc()}'
-            )
+            context.log.error(f"Error processing {context.request.url}: {str(e)}\n{traceback.format_exc()}")
             # Re-raise to trigger Crawlee's retry mechanism
             raise
 

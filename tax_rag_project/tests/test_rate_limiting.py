@@ -3,8 +3,8 @@
 import asyncio
 from datetime import datetime
 
-from tax_rag_scraper.crawlers.base_crawler import TaxDataCrawler
 from tax_rag_scraper.config.settings import Settings
+from tax_rag_scraper.crawlers.base_crawler import TaxDataCrawler
 
 
 async def main():
@@ -18,11 +18,11 @@ async def main():
     )
 
     test_urls = [
-        'https://www.canada.ca/en/revenue-agency.html',
-        'https://www.canada.ca/en/revenue-agency/services/tax.html',
-        'https://www.canada.ca/en/revenue-agency/services/forms-publications.html',
-        'https://www.canada.ca/en/revenue-agency/corporate/about-canada-revenue-agency-cra.html',
-        'https://www.canada.ca/en/revenue-agency/services/e-services.html',
+        "https://www.canada.ca/en/revenue-agency.html",
+        "https://www.canada.ca/en/revenue-agency/services/tax.html",
+        "https://www.canada.ca/en/revenue-agency/services/forms-publications.html",
+        "https://www.canada.ca/en/revenue-agency/corporate/about-canada-revenue-agency-cra.html",
+        "https://www.canada.ca/en/revenue-agency/services/e-services.html",
     ]
 
     print("Testing rate limiting and security features...")
@@ -48,8 +48,8 @@ async def main():
     if duration >= expected_min_duration:
         print(f"\n[SUCCESS] Rate limiting working correctly (expected minimum: {expected_min_duration:.2f}s)")
     else:
-        print(f"\n[WARNING] Rate limiting may not be working (duration too short)")
+        print("\n[WARNING] Rate limiting may not be working (duration too short)")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

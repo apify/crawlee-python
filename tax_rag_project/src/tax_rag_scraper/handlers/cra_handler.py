@@ -1,8 +1,11 @@
+import re
+from typing import Optional
+
 from crawlee.crawlers import BeautifulSoupCrawlingContext
+
 from tax_rag_scraper.handlers.base_handler import BaseHandler
 from tax_rag_scraper.models.tax_document import TaxDocument
-from typing import Optional
-import re
+
 
 class CRAHandler(BaseHandler):
     """Handler for Canada Revenue Agency (canada.ca) website"""
@@ -11,18 +14,18 @@ class CRAHandler(BaseHandler):
         soup = context.soup
 
         # Extract CRA-specific data using their HTML structure
-        title = soup.find('h1')
+        title = soup.find("h1")
         title_text = title.get_text(strip=True) if title else "No title"
 
         # Find main content area (CRA uses <main> tag)
-        main_content = soup.find('main') or soup.find('div', class_='content')
+        main_content = soup.find("main") or soup.find("div", class_="content")
         content = main_content.get_text(strip=True) if main_content else ""
 
         # Extract metadata specific to CRA
         metadata = {
-            'source': 'CRA',
-            'language': soup.find('html').get('lang', 'en') if soup.find('html') else 'en',
-            'domain': 'canada.ca',
+            "source": "CRA",
+            "language": soup.find("html").get("lang", "en") if soup.find("html") else "en",
+            "domain": "canada.ca",
         }
 
         # Look for tax year indicators in the content
@@ -45,7 +48,7 @@ class CRAHandler(BaseHandler):
         Extract tax year from content
         Looks for patterns like: 2024, 2023-2024
         """
-        match = re.search(r'20\d{2}(?:\s*-\s*20\d{2})?', text)
+        match = re.search(r"20\d{2}(?:\s*-\s*20\d{2})?", text)
         return match.group(0) if match else None
 
     def _determine_document_type(self, url: str) -> str:
@@ -54,13 +57,13 @@ class CRAHandler(BaseHandler):
         """
         url_lower = url.lower()
 
-        if 'form' in url_lower:
-            return 'CRA_Form'
-        elif 'guide' in url_lower:
-            return 'CRA_Guide'
-        elif 'publication' in url_lower:
-            return 'CRA_Publication'
-        elif 'notice' in url_lower or 'bulletin' in url_lower:
-            return 'CRA_Bulletin'
+        if "form" in url_lower:
+            return "CRA_Form"
+        elif "guide" in url_lower:
+            return "CRA_Guide"
+        elif "publication" in url_lower:
+            return "CRA_Publication"
+        elif "notice" in url_lower or "bulletin" in url_lower:
+            return "CRA_Bulletin"
         else:
-            return 'CRA_General'
+            return "CRA_General"

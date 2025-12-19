@@ -1,16 +1,19 @@
 """Test Qdrant connection with OpenAI embeddings"""
+
 import asyncio
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
+
 from tax_rag_scraper.storage.qdrant_client import TaxDataQdrantClient
 from tax_rag_scraper.utils.embeddings import EmbeddingService
 
 # Load environment variables from .env
-env_path = Path(__file__).parent.parent.parent / '.env'
+env_path = Path(__file__).parent.parent.parent / ".env"
 if env_path.exists():
     load_dotenv(env_path)
-    print(f"[OK] Loaded environment from .env")
+    print("[OK] Loaded environment from .env")
 else:
     print("[WARNING] .env file not found")
 
@@ -18,12 +21,12 @@ else:
 async def main():
     """Test Qdrant Cloud connection and OpenAI embeddings"""
 
-    print("="*50)
+    print("=" * 50)
     print("QDRANT CLOUD + OPENAI CONNECTION TEST")
-    print("="*50)
+    print("=" * 50)
 
     # Check OpenAI API key
-    api_key = os.getenv('OPENAI_API_KEY')
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         print("\n[ERROR] OPENAI_API_KEY not set")
         print("Set it in .env file or environment:")
@@ -33,8 +36,8 @@ async def main():
     print(f"[OK] OpenAI API key found: {api_key[:20]}...")
 
     # Load Qdrant Cloud configuration from environment
-    qdrant_url = os.getenv('QDRANT_URL')
-    qdrant_api_key = os.getenv('QDRANT_API_KEY')
+    qdrant_url = os.getenv("QDRANT_URL")
+    qdrant_api_key = os.getenv("QDRANT_API_KEY")
 
     # Validate Qdrant credentials
     if not qdrant_url:
@@ -61,8 +64,8 @@ async def main():
             collection_name="test_collection",
             vector_size=1536,
         )
-        print(f"[OK] Connected to Qdrant Cloud successfully")
-        print(f"[OK] Collection 'test_collection' ready (1536 dimensions)")
+        print("[OK] Connected to Qdrant Cloud successfully")
+        print("[OK] Collection 'test_collection' ready (1536 dimensions)")
     except Exception as e:
         print(f"[ERROR] Failed to connect: {e}")
         print("\nCheck your Qdrant Cloud credentials in .env:")
@@ -74,11 +77,8 @@ async def main():
     # Test 2: Embedding service
     print("\n2. Testing OpenAI embedding service...")
     try:
-        embedding_service = EmbeddingService(
-            model_name='text-embedding-3-small',
-            api_key=api_key
-        )
-        print(f"[OK] OpenAI embedding service initialized")
+        embedding_service = EmbeddingService(model_name="text-embedding-3-small", api_key=api_key)
+        print("[OK] OpenAI embedding service initialized")
         print(f"  Model: {embedding_service.model_name}")
         print(f"  Vector size: {embedding_service.vector_size}")
     except Exception as e:
@@ -92,13 +92,13 @@ async def main():
             {
                 "title": "Income Tax Act",
                 "content": "The Income Tax Act governs taxation in Canada.",
-                "url": "https://test.example.com/doc1"
+                "url": "https://test.example.com/doc1",
             },
             {
                 "title": "GST/HST Guide",
                 "content": "Guide to Goods and Services Tax and Harmonized Sales Tax.",
-                "url": "https://test.example.com/doc2"
-            }
+                "url": "https://test.example.com/doc2",
+            },
         ]
 
         embeddings = await embedding_service.embed_documents(test_docs)
@@ -129,10 +129,7 @@ async def main():
         query = "Canadian tax regulations"
         query_embedding = await embedding_service.embed_query(query)
 
-        results = client.search(
-            query_vector=query_embedding,
-            limit=2
-        )
+        results = client.search(query_vector=query_embedding, limit=2)
 
         print(f"[OK] Search completed for query: '{query}'")
         print(f"  Found {len(results)} results:")
@@ -154,9 +151,9 @@ async def main():
     except Exception as e:
         print(f"[WARNING] Failed to delete test collection: {e}")
 
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("ALL TESTS PASSED")
-    print("="*50)
+    print("=" * 50)
     print("\nQdrant Cloud is ready for use!")
     print("Next steps:")
     print("  - Run integration test: python src/tax_rag_scraper/test_qdrant_integration.py")
@@ -164,5 +161,5 @@ async def main():
     print("  - View your collections and monitor usage")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

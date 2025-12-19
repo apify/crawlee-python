@@ -1,6 +1,7 @@
 """Test script for error handling and retry mechanisms."""
 
 import asyncio
+
 from tax_rag_scraper.crawlers.base_crawler import TaxDataCrawler
 
 
@@ -8,11 +9,10 @@ async def main():
     """Test error handling with a mix of valid and invalid URLs."""
     test_urls = [
         # Valid URL
-        'https://www.canada.ca/en/revenue-agency/services/forms-publications.html',
-
+        "https://www.canada.ca/en/revenue-agency/services/forms-publications.html",
         # Invalid URLs to test error handling
-        'https://www.canada.ca/en/revenue-agency/this-page-does-not-exist-404.html',
-        'https://invalid-domain-that-does-not-exist-12345.com',
+        "https://www.canada.ca/en/revenue-agency/this-page-does-not-exist-404.html",
+        "https://invalid-domain-that-does-not-exist-12345.com",
     ]
 
     print("Testing error handling with valid and invalid URLs...\n")
@@ -27,5 +27,5 @@ async def main():
     print("  - Invalid domain retried 3 times then failed gracefully")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

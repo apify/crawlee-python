@@ -1,8 +1,8 @@
 """Robots.txt checker for respectful web scraping."""
 
-from urllib.robotparser import RobotFileParser
-from urllib.parse import urljoin, urlparse
 from typing import Dict
+from urllib.parse import urljoin, urlparse
+from urllib.robotparser import RobotFileParser
 
 
 class RobotsChecker:
@@ -11,7 +11,7 @@ class RobotsChecker:
     def __init__(self):
         self._parsers: Dict[str, RobotFileParser] = {}
 
-    def can_fetch(self, url: str, user_agent: str = '*') -> bool:
+    def can_fetch(self, url: str, user_agent: str = "*") -> bool:
         """
         Check if URL can be fetched according to robots.txt.
 
@@ -27,7 +27,7 @@ class RobotsChecker:
 
         # Cache parser per domain
         if base_url not in self._parsers:
-            robots_url = urljoin(base_url, '/robots.txt')
+            robots_url = urljoin(base_url, "/robots.txt")
             parser = RobotFileParser()
             parser.set_url(robots_url)
 

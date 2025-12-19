@@ -1,19 +1,17 @@
-from openai import AsyncOpenAI
-from typing import List, Optional
+import asyncio
 import logging
 import os
-import asyncio
+from typing import List, Optional
+
+from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
+
 
 class EmbeddingService:
     """Service for generating text embeddings using OpenAI's API"""
 
-    def __init__(
-        self,
-        model_name: str = 'text-embedding-3-small',
-        api_key: Optional[str] = None
-    ):
+    def __init__(self, model_name: str = "text-embedding-3-small", api_key: Optional[str] = None):
         """
         Initialize OpenAI embedding service
 
@@ -27,7 +25,7 @@ class EmbeddingService:
             ValueError: If API key is not provided or found in environment
         """
         self.model_name = model_name
-        self.api_key = api_key or os.getenv('OPENAI_API_KEY')
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
 
         if not self.api_key:
             raise ValueError("OpenAI API key required. Set OPENAI_API_KEY environment variable.")
@@ -90,11 +88,11 @@ class EmbeddingService:
             if chunk_end < len(text):
                 # Look for sentence ending within last 500 chars
                 search_start = max(current_pos, chunk_end - 500)
-                sentence_ends = ['.', '!', '?', '\n\n']
+                sentence_ends = [".", "!", "?", "\n\n"]
                 best_break = chunk_end
 
                 for i in range(chunk_end, search_start, -1):
-                    if text[i:i+1] in sentence_ends:
+                    if text[i : i + 1] in sentence_ends:
                         best_break = i + 1
                         break
 
@@ -144,17 +142,12 @@ class EmbeddingService:
                     f"This should have been caught by chunking logic."
                 )
             elif estimated_tokens > 6000:
-                logger.warning(
-                    f"Text {i} approaching limit: {estimated_tokens} estimated tokens "
-                    f"({len(text)} chars)"
-                )
+                logger.warning(f"Text {i} approaching limit: {estimated_tokens} estimated tokens ({len(text)} chars)")
 
         for attempt in range(max_retries):
             try:
                 response = await self.client.embeddings.create(
-                    model=self.model_name,
-                    input=texts,
-                    encoding_format="float"
+                    model=self.model_name, input=texts, encoding_format="float"
                 )
 
                 embeddings = [item.embedding for item in response.data]
@@ -174,12 +167,12 @@ class EmbeddingService:
 
                 # Check if it's a rate limit error
                 if "rate_limit_exceeded" in error_msg or "429" in error_msg:
-                    wait_time = 2 ** attempt * 3  # 3s, 6s, 12s
+                    wait_time = 2**attempt * 3  # 3s, 6s, 12s
                     logger.warning(f"Rate limit hit, waiting {wait_time}s (attempt {attempt + 1}/{max_retries})")
                     await asyncio.sleep(wait_time)
 
                     if attempt == max_retries - 1:
-                        logger.error(f"Max retries reached for rate limit")
+                        logger.error("Max retries reached for rate limit")
                         raise
                 else:
                     logger.error(f"Error generating embeddings: {e}")
@@ -203,8 +196,8 @@ class EmbeddingService:
         embeddings = []
 
         for doc in documents:
-            title = doc.get('title', '')
-            content = doc.get('content', '')
+            title = doc.get("title", "")
+            content = doc.get("content", "")
             full_text = f"Title: {title}\nContent: {content}"
 
             # Check if text needs chunking

@@ -1,6 +1,8 @@
 import asyncio
-from tax_rag_scraper.crawlers.base_crawler import TaxDataCrawler
+
 from tax_rag_scraper.config.settings import Settings
+from tax_rag_scraper.crawlers.base_crawler import TaxDataCrawler
+
 
 async def main():
     """Test deep crawling and multi-site support"""
@@ -15,11 +17,11 @@ async def main():
 
     # Start with CRA forms page (likely has many links)
     test_urls = [
-        'https://www.canada.ca/en/revenue-agency/services/forms-publications/forms.html',
+        "https://www.canada.ca/en/revenue-agency/services/forms-publications/forms.html",
     ]
 
     print("Testing deep crawling and site-specific handlers...")
-    print(f"Max crawl depth: 2")
+    print("Max crawl depth: 2")
     print(f"Max requests: {settings.MAX_REQUESTS_PER_CRAWL}")
     print(f"Starting from: {test_urls[0]}\n")
 
@@ -35,5 +37,6 @@ async def main():
     print("  - Statistics show multiple URLs processed")
     print("\nCheck storage/datasets/default/ for extracted documents")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     asyncio.run(main())
