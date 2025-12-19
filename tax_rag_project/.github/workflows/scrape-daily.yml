@@ -1,0 +1,84 @@
+name: Daily Tax Document Scraper
+
+on:
+  # Run daily at 9 AM UTC (4 AM EST, 1 AM PST)
+  schedule:
+    - cron: '0 9 * * *'
+
+  # Allow manual triggering from GitHub UI
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install uv package manager
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        working-directory: ./tax_rag_project
+        run: |
+          uv pip install --system -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: |
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Run daily scraper
+        working-directory: ./tax_rag_project
+        env:
+          # Qdrant Cloud credentials
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+
+          # OpenAI API credentials
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+          # Crawler configuration for daily lightweight crawl
+          MAX_REQUESTS_PER_CRAWL: 100
+          MAX_CONCURRENCY: 3
+          MAX_CRAWL_DEPTH: 2
+
+          # Collection and storage settings
+          QDRANT_COLLECTION: tax_documents
+          USE_QDRANT: true
+          STORAGE_DIR: ./storage
+
+          # Rate limiting (be respectful)
+          MAX_REQUESTS_PER_MINUTE: 60
+          MIN_REQUEST_DELAY: 1.0
+          MAX_REQUEST_DELAY: 3.0
+        run: |
+          python src/tax_rag_scraper/main.py
+
+      - name: Upload metrics artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-scrape-metrics-${{ github.run_number }}
+          path: tax_rag_project/storage/datasets/*/metrics.jsonl
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload crawl results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-scrape-results-${{ github.run_number }}
+          path: tax_rag_project/storage/datasets/
+          retention-days: 30
+          if-no-files-found: warn

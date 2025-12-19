@@ -1,0 +1,93 @@
+name: Weekly Deep Tax Document Scraper
+
+on:
+  # Run every Sunday at 3 AM UTC (10 PM Saturday EST, 7 PM Saturday PST)
+  schedule:
+    - cron: '0 3 * * 0'
+
+  # Allow manual triggering from GitHub UI
+  workflow_dispatch:
+
+jobs:
+  scrape-deep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install uv package manager
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        working-directory: ./tax_rag_project
+        run: |
+          uv pip install --system -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: |
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Run weekly deep scraper
+        working-directory: ./tax_rag_project
+        env:
+          # Qdrant Cloud credentials
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+
+          # OpenAI API credentials
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+          # Crawler configuration for weekly deep crawl
+          MAX_REQUESTS_PER_CRAWL: 500
+          MAX_CONCURRENCY: 2
+          MAX_CRAWL_DEPTH: 3
+
+          # Collection and storage settings
+          QDRANT_COLLECTION: tax_documents
+          USE_QDRANT: true
+          STORAGE_DIR: ./storage
+
+          # Rate limiting (be respectful even for deep crawls)
+          MAX_REQUESTS_PER_MINUTE: 60
+          MIN_REQUEST_DELAY: 1.5
+          MAX_REQUEST_DELAY: 3.5
+        run: |
+          python src/tax_rag_scraper/main.py --deep
+
+      - name: Upload metrics artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-deep-metrics-${{ github.run_number }}
+          path: tax_rag_project/storage/datasets/*/metrics.jsonl
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload crawl results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-deep-results-${{ github.run_number }}
+          path: tax_rag_project/storage/datasets/
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload summary statistics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-deep-summary-${{ github.run_number }}
+          path: tax_rag_project/storage/key_value_stores/
+          retention-days: 90
+          if-no-files-found: warn

@@ -1,5 +1,8 @@
 # Canadian Tax Documentation RAG Pipeline
 
+[![Daily Scraper](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/scrape-daily.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/scrape-daily.yml)
+[![Weekly Deep Scraper](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/scrape-weekly-deep.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/scrape-weekly-deep.yml)
+
 A production-ready web scraping pipeline for collecting Canadian Revenue Agency (CRA) tax documentation to power a Retrieval-Augmented Generation (RAG) chatbot.
 
 ## Purpose
@@ -103,6 +106,15 @@ tax_rag_project/
    # Run main crawler with Qdrant Cloud integration
    python src/tax_rag_scraper/main.py
 
+   # Or run deep crawl mode (depth 3, 500 requests)
+   python src/tax_rag_scraper/main.py --deep
+
+   # Or specify custom depth
+   python src/tax_rag_scraper/main.py --max-depth 4
+
+   # View help for all options
+   python src/tax_rag_scraper/main.py --help
+
    # Or run integration test
    python src/tax_rag_scraper/test_qdrant_integration.py
    ```
@@ -167,13 +179,44 @@ Project-specific code: TODO - Define license
 This project uses a **cloud-first architecture** with:
 - **Qdrant Cloud** for vector storage (no local Docker required)
 - **OpenAI API** for generating embeddings
-- **GitHub Actions** for automated deployment (Stage 6)
+- **GitHub Actions** for automated scheduling and deployment
 
 **Benefits:**
 - No Docker setup or maintenance required
 - Automatic scaling and high availability
 - Free tier suitable for development and testing
 - Production-ready from day one
+- Automated daily and weekly scraping
+
+## Automated Scheduling
+
+The project includes GitHub Actions workflows for automated scraping:
+
+### Daily Lightweight Crawl
+- **Schedule:** Every day at 9:00 AM UTC (4:00 AM EST)
+- **Configuration:** 100 requests max, depth 2, 3 concurrent workers
+- **Duration:** ~15-30 minutes
+- **Purpose:** Keep data fresh with daily updates
+
+### Weekly Deep Crawl
+- **Schedule:** Every Sunday at 3:00 AM UTC (Saturday 10:00 PM EST)
+- **Configuration:** 500 requests max, depth 3, 2 concurrent workers
+- **Duration:** ~45-90 minutes
+- **Purpose:** Comprehensive deep crawl to discover new content
+
+### Manual Triggers
+Both workflows can be triggered manually from the GitHub Actions tab.
+
+### Setup Instructions
+See [docs/GITHUB_ACTIONS_SETUP.md](docs/GITHUB_ACTIONS_SETUP.md) for detailed setup instructions including:
+- Getting Qdrant Cloud credentials
+- Configuring GitHub Secrets
+- Monitoring workflow runs
+- Downloading artifacts
+- Troubleshooting common issues
+
+### View Workflow Status
+Visit the [Actions tab](../../actions) to see workflow runs, logs, and download artifacts.
 
 ## Links
 
