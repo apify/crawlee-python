@@ -15,9 +15,12 @@ with _try_import(__name__, 'BeautifulSoupCrawler'):
     from ._rendering_type_predictor import RenderingType, RenderingTypePrediction, RenderingTypePredictor
 with _try_import(__name__, 'BeautifulSoupCrawlingContext'):
     from ._adaptive_playwright_crawler import AdaptivePlaywrightCrawler
+with _try_import(__name__, 'AdaptivePlaywrightCrawlerStatisticState'):
+    from ._adaptive_playwright_crawler import AdaptivePlaywrightCrawlerStatisticState
 
 __all__ = [
     'AdaptivePlaywrightCrawler',
+    'AdaptivePlaywrightCrawlerStatisticState',
     'AdaptivePlaywrightCrawlingContext',
     'AdaptivePlaywrightPreNavCrawlingContext',
     'RenderingType',

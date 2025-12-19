@@ -14,6 +14,8 @@ class SelectolaxLexborContext(ParsedHttpCrawlingContext[LexborHTMLParser]):
     context methods (push_data, enqueue_links, etc.) plus custom helpers.
     """
 
+    # It is only for convenience and not strictly necessary, as the
+    # parsed_content field is already available from the base class.
     @property
     def parser(self) -> LexborHTMLParser:
         """Convenient alias for accessing the parsed document."""
