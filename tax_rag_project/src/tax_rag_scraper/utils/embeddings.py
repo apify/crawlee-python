@@ -48,26 +48,29 @@ class EmbeddingService:
         """
         return len(text) // 3
 
-    def _chunk_text(self, text: str, max_words: int = 1200) -> List[str]:
+    def _chunk_text(self, text: str, max_words: int = 1200, overlap_words: int = 200) -> List[str]:
         """
-        Split text into chunks that fit within token limits.
+        Split text into chunks that fit within token limits with overlap.
         Uses word-based chunking with conservative token estimation.
 
         Strategy:
         - Max 1200 words per chunk (~8,400 chars, ~2,800 tokens)
+        - 200-word overlap between chunks (~1,400 chars) for context preservation
         - Conservative estimate: 1 token ≈ 3 characters
         - Target max: 7,000 tokens per chunk (safety margin from 8,192 limit)
 
         Args:
             text: Text to chunk
             max_words: Maximum words per chunk (default 1200)
+            overlap_words: Number of words to overlap between chunks (default 200)
 
         Returns:
-            List of text chunks, each guaranteed under token limit
+            List of text chunks with overlap, each guaranteed under token limit
         """
         # Calculate max characters based on word limit
         # Average 7 characters per word (includes spaces/punctuation)
         max_chars = max_words * 7
+        overlap_chars = overlap_words * 7
 
         if len(text) <= max_chars:
             # Validate even small texts don't exceed token limit
@@ -75,7 +78,7 @@ class EmbeddingService:
             if estimated_tokens > 7000:
                 # Recursively split if too large
                 logger.warning(f"Text too large ({estimated_tokens} tokens), splitting recursively")
-                return self._chunk_text(text, max_words=max_words // 2)
+                return self._chunk_text(text, max_words=max_words // 2, overlap_words=overlap_words // 2)
             return [text]
 
         chunks = []
@@ -105,12 +108,27 @@ class EmbeddingService:
             if estimated_tokens > 7000:
                 # Chunk still too large, split it further
                 logger.warning(f"Chunk too large ({estimated_tokens} tokens), splitting further")
-                sub_chunks = self._chunk_text(chunk, max_words=max_words // 2)
+                sub_chunks = self._chunk_text(chunk, max_words=max_words // 2, overlap_words=overlap_words // 2)
                 chunks.extend(sub_chunks)
             else:
                 chunks.append(chunk)
 
-            current_pos = chunk_end
+            # Move position forward, but step back by overlap amount for next chunk
+            # Only apply overlap if there's more text to process
+            if chunk_end < len(text):
+                # Find a good overlap point (prefer word boundary)
+                overlap_start = max(current_pos, chunk_end - overlap_chars)
+
+                # Try to start overlap at a word boundary
+                # Look backwards from chunk_end for a space
+                for i in range(chunk_end - overlap_chars, chunk_end):
+                    if text[i : i + 1] == " ":
+                        overlap_start = i + 1
+                        break
+
+                current_pos = overlap_start
+            else:
+                current_pos = chunk_end
 
         return chunks
 
