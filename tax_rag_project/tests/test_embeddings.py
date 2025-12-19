@@ -3,10 +3,10 @@ Test suite for embeddings.py
 Tests chunking with overlap, token estimation, and embedding generation
 """
 
-import asyncio
 import os
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from tax_rag_scraper.utils.embeddings import EmbeddingService
 
@@ -90,8 +90,9 @@ class TestEmbeddingService:
             chunk2_start = " ".join(chunk2_words[:300])  # First 300 words
 
             # At least some words should overlap
-            assert any(word in chunk2_start for word in overlap_sample.split()[:20]), \
-                f"No overlap found between chunk {i} and {i+1}"
+            assert any(word in chunk2_start for word in overlap_sample.split()[:20]), (
+                f"No overlap found between chunk {i} and {i + 1}"
+            )
 
     def test_chunk_text_boundary_detection(self):
         """Test that chunks break at sentence boundaries"""
@@ -105,8 +106,7 @@ class TestEmbeddingService:
 
         # All chunks except possibly the last should end with sentence punctuation
         for chunk in chunks[:-1]:
-            assert chunk.rstrip().endswith(('.', '!', '?')), \
-                "Chunk should end at sentence boundary"
+            assert chunk.rstrip().endswith((".", "!", "?")), "Chunk should end at sentence boundary"
 
     def test_chunk_text_respects_token_limits(self):
         """Test that all chunks are within token limits"""
@@ -120,8 +120,7 @@ class TestEmbeddingService:
         # All chunks should be under 7000 token limit
         for i, chunk in enumerate(chunks):
             estimated_tokens = service._estimate_tokens(chunk)
-            assert estimated_tokens <= 7000, \
-                f"Chunk {i} exceeds token limit: {estimated_tokens} tokens"
+            assert estimated_tokens <= 7000, f"Chunk {i} exceeds token limit: {estimated_tokens} tokens"
 
     def test_chunk_text_overlap_parameter(self):
         """Test that overlap parameter works correctly"""
@@ -132,13 +131,11 @@ class TestEmbeddingService:
 
         # Test with different overlap values
         chunks_200 = service._chunk_text(text, max_words=1200, overlap_words=200)
-        chunks_100 = service._chunk_text(text, max_words=1200, overlap_words=100)
         chunks_0 = service._chunk_text(text, max_words=1200, overlap_words=0)
 
         # More overlap should create more (smaller effective) chunks
         # or at least chunks with more repeated content
-        assert len(chunks_200) >= len(chunks_0), \
-            "Overlap should not reduce chunk count"
+        assert len(chunks_200) >= len(chunks_0), "Overlap should not reduce chunk count"
 
     @pytest.mark.asyncio
     async def test_embed_texts_mock(self):
@@ -272,8 +269,7 @@ class TestChunkingOverlap:
 
         # Some markers should appear in multiple chunks (due to overlap)
         multi_chunk_markers = [m for m, chunks in marker_appearances.items() if len(chunks) > 1]
-        assert len(multi_chunk_markers) > 0, \
-            "Overlap should cause some markers to appear in multiple chunks"
+        assert len(multi_chunk_markers) > 0, "Overlap should cause some markers to appear in multiple chunks"
 
     def test_no_overlap_when_overlap_zero(self):
         """Test that setting overlap_words=0 prevents overlap"""
@@ -302,10 +298,8 @@ class TestChunkingOverlap:
         for chunk in chunks:
             # Should not start or end with mid-word characters
             # (In our case, should start/end with space or full word)
-            assert chunk[0].isalnum() or chunk[0].isspace(), \
-                "Chunk should start at word boundary"
-            assert chunk[-1].isalnum() or chunk[-1].isspace(), \
-                "Chunk should end at word boundary"
+            assert chunk[0].isalnum() or chunk[0].isspace(), "Chunk should start at word boundary"
+            assert chunk[-1].isalnum() or chunk[-1].isspace(), "Chunk should end at word boundary"
 
 
 def test_integration_realistic_document():
@@ -323,12 +317,11 @@ def test_integration_realistic_document():
         applies to you, this publication will help you choose the one that will result in the
         lowest tax.
 
-        """ + ("Additional tax information. " * 1000)  # Make it large
+        """
+        + ("Additional tax information. " * 1000),  # Make it large
     }
 
-    chunks = service._chunk_text(
-        f"Title: {document['title']}\nContent: {document['content']}"
-    )
+    chunks = service._chunk_text(f"Title: {document['title']}\nContent: {document['content']}")
 
     # Verify chunking worked
     assert len(chunks) >= 1
