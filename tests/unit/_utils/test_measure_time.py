@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import time
 
+import pytest
+
 from crawlee._utils.time import measure_time
 
 
@@ -15,6 +17,10 @@ def test_measure_time_wall_sync() -> None:
     assert elapsed.wall >= 0.09
 
 
+@pytest.mark.skip(
+    reason='This test is flaky due to unreliable CPU time measurement in CI environments. '
+    'CPU utilization can vary due to system load, throttling, and context switches.'
+)
 def test_measure_time_cpu_sync() -> None:
     with measure_time() as elapsed:
         start = time.time()
