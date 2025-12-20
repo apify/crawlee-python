@@ -11,13 +11,16 @@ _install_import_hook(__name__)
 
 # The following imports are wrapped in try_import to handle optional dependencies,
 # ensuring the module can still function even if these dependencies are missing.
-with _try_import(__name__, 'BeautifulSoupCrawler'):
+with _try_import(__name__, 'RenderingType', 'RenderingTypePrediction', 'RenderingTypePredictor'):
     from ._rendering_type_predictor import RenderingType, RenderingTypePrediction, RenderingTypePredictor
-with _try_import(__name__, 'BeautifulSoupCrawlingContext'):
+with _try_import(__name__, 'AdaptivePlaywrightCrawler'):
     from ._adaptive_playwright_crawler import AdaptivePlaywrightCrawler
+with _try_import(__name__, 'AdaptivePlaywrightCrawlerStatisticState'):
+    from ._adaptive_playwright_crawler import AdaptivePlaywrightCrawlerStatisticState
 
 __all__ = [
     'AdaptivePlaywrightCrawler',
+    'AdaptivePlaywrightCrawlerStatisticState',
     'AdaptivePlaywrightCrawlingContext',
     'AdaptivePlaywrightPreNavCrawlingContext',
     'RenderingType',
