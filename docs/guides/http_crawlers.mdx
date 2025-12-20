@@ -101,7 +101,7 @@ The <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> provides direct acce
 
 Since <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> provides raw HTTP responses, you can integrate any parsing library. Note that helpers like <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> and <ApiLink to="class/ExtractLinksFunction">`extract_links`</ApiLink> are not available with this approach.
 
-The following examples demonstrate integration with various parsing libraries: [lxml](https://lxml.de/) for high-performance XPath 1.0 parsing, [lxml with SaxonC-HE](https://pypi.org/project/saxonche/) for XPath 3.1 support, [selectolax](https://github.com/rushter/selectolax) for fast CSS selector-based parsing, [PyQuery](https://pyquery.readthedocs.io/) for jQuery-like syntax, and [scrapling](https://github.com/D4Vinci/Scrapling) for CSS and XPath selectors with Scrapy/Parsel-like API and BeautifulSoup-style find methods.
+The following examples demonstrate how to integrate with several popular parsing libraries, including [lxml](https://lxml.de/) (high-performance parsing with XPath 1.0), [lxml with SaxonC-HE](https://pypi.org/project/saxonche/) (XPath 3.1 support), [selectolax](https://github.com/rushter/selectolax) (high-speed CSS selectors), [PyQuery](https://pyquery.readthedocs.io/) (jQuery-like syntax), and [scrapling](https://github.com/D4Vinci/Scrapling) (a Scrapy/Parsel-style API offering BeautifulSoup-like methods).
 
 <Tabs groupId="custom_parsers">
     <TabItem value="lxml" label="lxml">
