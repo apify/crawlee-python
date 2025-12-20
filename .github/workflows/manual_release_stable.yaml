@@ -30,52 +30,51 @@ jobs:
     name: Code checks
     uses: ./.github/workflows/_check_code.yaml
 
-  release_metadata:
-    name: Prepare release metadata
+  release_prepare:
+    name: Release prepare
     needs: [code_checks]
     runs-on: ubuntu-latest
     outputs:
-      version_number: ${{ steps.release_metadata.outputs.version_number }}
-      tag_name: ${{ steps.release_metadata.outputs.tag_name }}
-      changelog: ${{ steps.release_metadata.outputs.changelog }}
-      release_notes: ${{ steps.release_metadata.outputs.release_notes }}
+      version_number: ${{ steps.release_prepare.outputs.version_number }}
+      tag_name: ${{ steps.release_prepare.outputs.tag_name }}
+      changelog: ${{ steps.release_prepare.outputs.changelog }}
+      release_notes: ${{ steps.release_prepare.outputs.release_notes }}
     steps:
       - uses: apify/workflows/git-cliff-release@main
-        name: Prepare release metadata
-        id: release_metadata
+        name: Release prepare
+        id: release_prepare
         with:
           release_type: ${{ inputs.release_type }}
           custom_version: ${{ inputs.custom_version }}
           existing_changelog_path: CHANGELOG.md
 
-  update_changelog:
-    name: Update changelog
-    needs: [release_metadata]
+  changelog_update:
+    name: Changelog update
+    needs: [release_prepare]
     uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
     with:
-      version_number: ${{ needs.release_metadata.outputs.version_number }}
-      changelog: ${{ needs.release_metadata.outputs.changelog }}
-    secrets:
-      APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+      version_number: ${{ needs.release_prepare.outputs.version_number }}
+      changelog: ${{ needs.release_prepare.outputs.changelog }}
+    secrets: inherit
 
-  create_github_release:
-    name: Create GitHub release
-    needs: [release_metadata, update_changelog]
+  github_release:
+    name: GitHub release
+    needs: [release_prepare, changelog_update]
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Create release
+      - name: GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.release_metadata.outputs.tag_name }}
-          name: ${{ needs.release_metadata.outputs.version_number }}
-          target_commitish: ${{ needs.update_changelog.outputs.changelog_commitish }}
-          body: ${{ needs.release_metadata.outputs.release_notes }}
+          tag_name: ${{ needs.release_prepare.outputs.tag_name }}
+          name: ${{ needs.release_prepare.outputs.version_number }}
+          target_commitish: ${{ needs.changelog_update.outputs.changelog_commitish }}
+          body: ${{ needs.release_prepare.outputs.release_notes }}
 
-  publish_to_pypi:
-    name: Publish to PyPI
-    needs: [release_metadata, update_changelog]
+  pypi_publish:
+    name: PyPI publish
+    needs: [release_prepare, changelog_update]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -89,8 +88,8 @@ jobs:
         with:
           package_name: crawlee
           is_prerelease: ""
-          version_number: ${{ needs.release_metadata.outputs.version_number }}
-          ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
+          version_number: ${{ needs.release_prepare.outputs.version_number }}
+          ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
       # Publishes the package to PyPI using PyPA official GitHub action with OIDC authentication.
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

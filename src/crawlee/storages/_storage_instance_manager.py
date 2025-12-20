@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from asyncio import Lock
 from collections import defaultdict
 from collections.abc import Coroutine, Hashable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, TypeVar
+from weakref import WeakValueDictionary
 
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
@@ -76,6 +78,7 @@ class StorageInstanceManager:
 
     def __init__(self) -> None:
         self._cache: _StorageCache = _StorageCache()
+        self._opener_locks: WeakValueDictionary[tuple, Lock] = WeakValueDictionary()
 
     async def open_storage_instance(
         self,
@@ -119,63 +122,71 @@ class StorageInstanceManager:
             if not any([name, alias, id]):
                 alias = self._DEFAULT_STORAGE_ALIAS
 
-            # Check cache
-            if id is not None and (cached_instance := self._cache.by_id[cls][id].get(storage_client_cache_key)):
-                if isinstance(cached_instance, cls):
-                    return cached_instance
-                raise RuntimeError('Cached instance type mismatch.')
-
-            if name is not None and (cached_instance := self._cache.by_name[cls][name].get(storage_client_cache_key)):
-                if isinstance(cached_instance, cls):
-                    return cached_instance
-                raise RuntimeError('Cached instance type mismatch.')
-
-            if alias is not None and (
-                cached_instance := self._cache.by_alias[cls][alias].get(storage_client_cache_key)
+            # Check cache without lock first for performance.
+            if cached_instance := self._get_from_cache(
+                cls,
+                id=id,
+                name=name,
+                alias=alias,
+                storage_client_cache_key=storage_client_cache_key,
             ):
-                if isinstance(cached_instance, cls):
-                    return cached_instance
-                raise RuntimeError('Cached instance type mismatch.')
-
-            # Check for conflicts between named and alias storages
-            if alias and (self._cache.by_name[cls][alias].get(storage_client_cache_key)):
-                raise ValueError(
-                    f'Cannot create alias storage "{alias}" because a named storage with the same name already exists. '
-                    f'Use a different alias or drop the existing named storage first.'
-                )
-
-            if name and (self._cache.by_alias[cls][name].get(storage_client_cache_key)):
-                raise ValueError(
-                    f'Cannot create named storage "{name}" because an alias storage with the same name already exists. '
-                    f'Use a different name or drop the existing alias storage first.'
-                )
+                return cached_instance
 
             # Validate storage name
             if name is not None:
                 validate_storage_name(name)
 
-            # Create new instance
-            client: KeyValueStoreClient | DatasetClient | RequestQueueClient
-            client = await client_opener_coro
+            # Acquire lock for this opener
+            opener_lock_key = (cls, str(id or name or alias), storage_client_cache_key)
+            if not (lock := self._opener_locks.get(opener_lock_key)):
+                lock = Lock()
+                self._opener_locks[opener_lock_key] = lock
 
-            metadata = await client.get_metadata()
+            async with lock:
+                # Another task could have created the storage while we were waiting for the lock - check if that
+                # happened
+                if cached_instance := self._get_from_cache(
+                    cls,
+                    id=id,
+                    name=name,
+                    alias=alias,
+                    storage_client_cache_key=storage_client_cache_key,
+                ):
+                    return cached_instance
 
-            instance = cls(client, metadata.id, metadata.name)  # type: ignore[call-arg]
-            instance_name = getattr(instance, 'name', None)
+                # Check for conflicts between named and alias storages
+                self._check_name_alias_conflict(
+                    cls,
+                    name=name,
+                    alias=alias,
+                    storage_client_cache_key=storage_client_cache_key,
+                )
 
-            # Cache the instance.
-            # Always cache by id.
-            self._cache.by_id[cls][instance.id][storage_client_cache_key] = instance
+                # Create new instance
+                client: KeyValueStoreClient | DatasetClient | RequestQueueClient
+                client = await client_opener_coro
 
-            # Cache named storage.
-            if instance_name is not None:
-                self._cache.by_name[cls][instance_name][storage_client_cache_key] = instance
+                metadata = await client.get_metadata()
 
-            # Cache unnamed storage.
-            if alias is not None:
-                self._cache.by_alias[cls][alias][storage_client_cache_key] = instance
+                instance = cls(client, metadata.id, metadata.name)  # type: ignore[call-arg]
+                instance_name = getattr(instance, 'name', None)
 
-            return instance
+                # Cache the instance.
+                # Note: No awaits in this section. All cache entries must be written
+                # atomically to ensure pre-checks outside the lock see consistent state.
+
+                # Always cache by id.
+                self._cache.by_id[cls][instance.id][storage_client_cache_key] = instance
+
+                # Cache named storage.
+                if instance_name is not None:
+                    self._cache.by_name[cls][instance_name][storage_client_cache_key] = instance
+
+                # Cache unnamed storage.
+                if alias is not None:
+                    self._cache.by_alias[cls][alias][storage_client_cache_key] = instance
+
+                return instance
 
         finally:
             # Make sure the client opener is closed.
@@ -193,3 +204,51 @@ class StorageInstanceManager:
     def clear_cache(self) -> None:
         """Clear all cached storage instances."""
         self._cache = _StorageCache()
+
+    def _get_from_cache(
+        self,
+        cls: type[T],
+        *,
+        id: str | None = None,
+        name: str | None = None,
+        alias: str | None = None,
+        storage_client_cache_key: Hashable = '',
+    ) -> T | None:
+        """Get a storage instance from the cache."""
+        if id is not None and (cached_instance := self._cache.by_id[cls][id].get(storage_client_cache_key)):
+            if isinstance(cached_instance, cls):
+                return cached_instance
+            raise RuntimeError('Cached instance type mismatch.')
+
+        if name is not None and (cached_instance := self._cache.by_name[cls][name].get(storage_client_cache_key)):
+            if isinstance(cached_instance, cls):
+                return cached_instance
+            raise RuntimeError('Cached instance type mismatch.')
+
+        if alias is not None and (cached_instance := self._cache.by_alias[cls][alias].get(storage_client_cache_key)):
+            if isinstance(cached_instance, cls):
+                return cached_instance
+            raise RuntimeError('Cached instance type mismatch.')
+
+        return None
+
+    def _check_name_alias_conflict(
+        self,
+        cls: type[T],
+        *,
+        name: str | None = None,
+        alias: str | None = None,
+        storage_client_cache_key: Hashable = '',
+    ) -> None:
+        """Check for conflicts between named and alias storages."""
+        if alias and (self._cache.by_name[cls][alias].get(storage_client_cache_key)):
+            raise ValueError(
+                f'Cannot create alias storage "{alias}" because a named storage with the same name already exists. '
+                f'Use a different alias or drop the existing named storage first.'
+            )
+
+        if name and (self._cache.by_alias[cls][name].get(storage_client_cache_key)):
+            raise ValueError(
+                f'Cannot create named storage "{name}" because an alias storage with the same name already exists. '
+                f'Use a different name or drop the existing alias storage first.'
+            )
