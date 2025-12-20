@@ -43,6 +43,7 @@ __all__ = [
     'AbstractHttpCrawler',
     'AbstractHttpParser',
     'AdaptivePlaywrightCrawler',
+    'AdaptivePlaywrightCrawlerStatisticState',
     'AdaptivePlaywrightCrawlingContext',
     'AdaptivePlaywrightPreNavCrawlingContext',
     'BasicCrawler',
