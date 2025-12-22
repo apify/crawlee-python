@@ -26,7 +26,7 @@ jobs:
       - name: Install uv package manager
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Install dependencies
         working-directory: ./tax_rag_project
