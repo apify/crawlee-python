@@ -7,7 +7,6 @@ import os
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from tax_rag_scraper.utils.embeddings import EmbeddingService
 
 
@@ -16,44 +15,44 @@ class TestEmbeddingService:
 
     def test_init_with_api_key(self):
         """Test initialization with explicit API key"""
-        service = EmbeddingService(api_key="test_key")
-        assert service.api_key == "test_key"
-        assert service.model_name == "text-embedding-3-small"
+        service = EmbeddingService(api_key='test_key')
+        assert service.api_key == 'test_key'
+        assert service.model_name == 'text-embedding-3-small'
         assert service.vector_size == 1536
 
     def test_init_without_api_key_fails(self):
         """Test initialization without API key raises ValueError"""
         # Temporarily clear OPENAI_API_KEY env var
-        original_key = os.environ.get("OPENAI_API_KEY")
-        if "OPENAI_API_KEY" in os.environ:
-            del os.environ["OPENAI_API_KEY"]
+        original_key = os.environ.get('OPENAI_API_KEY')
+        if 'OPENAI_API_KEY' in os.environ:
+            del os.environ['OPENAI_API_KEY']
 
         try:
-            with pytest.raises(ValueError, match="OpenAI API key required"):
+            with pytest.raises(ValueError, match='OpenAI API key required'):
                 EmbeddingService()
         finally:
             # Restore original key
             if original_key:
-                os.environ["OPENAI_API_KEY"] = original_key
+                os.environ['OPENAI_API_KEY'] = original_key
 
     def test_estimate_tokens(self):
         """Test token estimation (1 token ≈ 3 characters)"""
-        service = EmbeddingService(api_key="test_key")
+        service = EmbeddingService(api_key='test_key')
 
         # 300 chars = 100 tokens
-        text = "a" * 300
+        text = 'a' * 300
         assert service._estimate_tokens(text) == 100
 
         # 3000 chars = 1000 tokens
-        text = "a" * 3000
+        text = 'a' * 3000
         assert service._estimate_tokens(text) == 1000
 
     def test_chunk_text_small_text(self):
         """Test that small texts are not chunked"""
-        service = EmbeddingService(api_key="test_key")
+        service = EmbeddingService(api_key='test_key')
 
         # Small text (under 1200 words)
-        text = "This is a small text. " * 50  # ~100 words
+        text = 'This is a small text. ' * 50  # ~100 words
         chunks = service._chunk_text(text)
 
         assert len(chunks) == 1
@@ -61,12 +60,12 @@ class TestEmbeddingService:
 
     def test_chunk_text_large_text_with_overlap(self):
         """Test that large texts are chunked with proper overlap"""
-        service = EmbeddingService(api_key="test_key")
+        service = EmbeddingService(api_key='test_key')
 
         # Create a large text (>1200 words)
         # Each sentence is ~10 words
-        sentence = "This is sentence number {}. It contains exactly ten words here. "
-        text = "".join([sentence.format(i) for i in range(200)])  # ~2000 words
+        sentence = 'This is sentence number {}. It contains exactly ten words here. '
+        text = ''.join([sentence.format(i) for i in range(200)])  # ~2000 words
 
         chunks = service._chunk_text(text, max_words=1200, overlap_words=200)
 
@@ -84,50 +83,50 @@ class TestEmbeddingService:
             chunk2_words = chunk2.split()
 
             # Get last 100 words from chunk1 (should be part of overlap)
-            overlap_sample = " ".join(chunk1_words[-100:])
+            overlap_sample = ' '.join(chunk1_words[-100:])
 
             # This overlap should appear near the start of chunk2
-            chunk2_start = " ".join(chunk2_words[:300])  # First 300 words
+            chunk2_start = ' '.join(chunk2_words[:300])  # First 300 words
 
             # At least some words should overlap
             assert any(word in chunk2_start for word in overlap_sample.split()[:20]), (
-                f"No overlap found between chunk {i} and {i + 1}"
+                f'No overlap found between chunk {i} and {i + 1}'
             )
 
     def test_chunk_text_boundary_detection(self):
         """Test that chunks break at sentence boundaries"""
-        service = EmbeddingService(api_key="test_key")
+        service = EmbeddingService(api_key='test_key')
 
         # Create text with clear sentence boundaries
-        sentences = [f"Sentence {i}. " for i in range(500)]
-        text = "".join(sentences)
+        sentences = [f'Sentence {i}. ' for i in range(500)]
+        text = ''.join(sentences)
 
         chunks = service._chunk_text(text, max_words=1200)
 
         # All chunks except possibly the last should end with sentence punctuation
         for chunk in chunks[:-1]:
-            assert chunk.rstrip().endswith((".", "!", "?")), "Chunk should end at sentence boundary"
+            assert chunk.rstrip().endswith(('.', '!', '?')), 'Chunk should end at sentence boundary'
 
     def test_chunk_text_respects_token_limits(self):
         """Test that all chunks are within token limits"""
-        service = EmbeddingService(api_key="test_key")
+        service = EmbeddingService(api_key='test_key')
 
         # Create very large text
-        text = "word " * 5000  # 5000 words
+        text = 'word ' * 5000  # 5000 words
 
         chunks = service._chunk_text(text)
 
         # All chunks should be under 7000 token limit
         for i, chunk in enumerate(chunks):
             estimated_tokens = service._estimate_tokens(chunk)
-            assert estimated_tokens <= 7000, f"Chunk {i} exceeds token limit: {estimated_tokens} tokens"
+            assert estimated_tokens <= 7000, f'Chunk {i} exceeds token limit: {estimated_tokens} tokens'
 
     def test_chunk_text_overlap_parameter(self):
         """Test that overlap parameter works correctly"""
-        service = EmbeddingService(api_key="test_key")
+        service = EmbeddingService(api_key='test_key')
 
         # Create text
-        text = "word " * 3000  # 3000 words
+        text = 'word ' * 3000  # 3000 words
 
         # Test with different overlap values
         chunks_200 = service._chunk_text(text, max_words=1200, overlap_words=200)
@@ -135,12 +134,12 @@ class TestEmbeddingService:
 
         # More overlap should create more (smaller effective) chunks
         # or at least chunks with more repeated content
-        assert len(chunks_200) >= len(chunks_0), "Overlap should not reduce chunk count"
+        assert len(chunks_200) >= len(chunks_0), 'Overlap should not reduce chunk count'
 
     @pytest.mark.asyncio
     async def test_embed_texts_mock(self):
         """Test embed_texts with mocked OpenAI API"""
-        service = EmbeddingService(api_key="test_key")
+        service = EmbeddingService(api_key='test_key')
 
         # Mock the OpenAI client
         mock_response = MagicMock()
@@ -153,7 +152,7 @@ class TestEmbeddingService:
         service.client.embeddings.create = AsyncMock(return_value=mock_response)
 
         # Call embed_texts
-        texts = ["text 1", "text 2"]
+        texts = ['text 1', 'text 2']
         embeddings = await service.embed_texts(texts)
 
         # Verify results
@@ -165,18 +164,18 @@ class TestEmbeddingService:
     @pytest.mark.asyncio
     async def test_embed_texts_validates_size(self):
         """Test that embed_texts validates text size before sending"""
-        service = EmbeddingService(api_key="test_key")
+        service = EmbeddingService(api_key='test_key')
 
         # Create oversized text (>7000 tokens)
-        oversized_text = "a" * 22000  # ~7333 tokens
+        oversized_text = 'a' * 22000  # ~7333 tokens
 
-        with pytest.raises(ValueError, match="exceeds safe token limit"):
+        with pytest.raises(ValueError, match='exceeds safe token limit'):
             await service.embed_texts([oversized_text])
 
     @pytest.mark.asyncio
     async def test_embed_documents_single_chunk(self):
         """Test embed_documents with normal-sized documents"""
-        service = EmbeddingService(api_key="test_key")
+        service = EmbeddingService(api_key='test_key')
 
         # Mock the OpenAI client
         mock_response = MagicMock()
@@ -186,7 +185,7 @@ class TestEmbeddingService:
         service.client.embeddings.create = AsyncMock(return_value=mock_response)
 
         # Call embed_documents
-        documents = [{"title": "Test Doc", "content": "Test content"}]
+        documents = [{'title': 'Test Doc', 'content': 'Test content'}]
         embeddings = await service.embed_documents(documents)
 
         # Verify results
@@ -196,7 +195,7 @@ class TestEmbeddingService:
     @pytest.mark.asyncio
     async def test_embed_documents_multi_chunk(self):
         """Test embed_documents with oversized documents requiring chunking"""
-        service = EmbeddingService(api_key="test_key")
+        service = EmbeddingService(api_key='test_key')
 
         # Mock the OpenAI client to return different embeddings for each chunk
         mock_response_1 = MagicMock()
@@ -209,8 +208,8 @@ class TestEmbeddingService:
         service.client.embeddings.create = AsyncMock(return_value=mock_response_1)
 
         # Create oversized document
-        large_content = "word " * 10000  # 10000 words (will be split)
-        documents = [{"title": "Large Doc", "content": large_content}]
+        large_content = 'word ' * 10000  # 10000 words (will be split)
+        documents = [{'title': 'Large Doc', 'content': large_content}]
 
         embeddings = await service.embed_documents(documents)
 
@@ -225,7 +224,7 @@ class TestEmbeddingService:
     @pytest.mark.asyncio
     async def test_embed_query(self):
         """Test embed_query for single query"""
-        service = EmbeddingService(api_key="test_key")
+        service = EmbeddingService(api_key='test_key')
 
         # Mock the OpenAI client
         mock_response = MagicMock()
@@ -235,7 +234,7 @@ class TestEmbeddingService:
         service.client.embeddings.create = AsyncMock(return_value=mock_response)
 
         # Call embed_query
-        query = "test query"
+        query = 'test query'
         embedding = await service.embed_query(query)
 
         # Verify results
@@ -248,12 +247,12 @@ class TestChunkingOverlap:
 
     def test_overlap_preserves_context(self):
         """Test that overlap preserves context across chunks"""
-        service = EmbeddingService(api_key="test_key")
+        service = EmbeddingService(api_key='test_key')
 
         # Create text with identifiable markers
-        text = ""
+        text = ''
         for i in range(300):
-            text += f"MARKER_{i} " + "filler " * 10
+            text += f'MARKER_{i} ' + 'filler ' * 10
 
         chunks = service._chunk_text(text, max_words=1200, overlap_words=200)
 
@@ -261,7 +260,7 @@ class TestChunkingOverlap:
         marker_appearances = {}
         for chunk_idx, chunk in enumerate(chunks):
             for i in range(300):
-                marker = f"MARKER_{i}"
+                marker = f'MARKER_{i}'
                 if marker in chunk:
                     if marker not in marker_appearances:
                         marker_appearances[marker] = []
@@ -269,13 +268,13 @@ class TestChunkingOverlap:
 
         # Some markers should appear in multiple chunks (due to overlap)
         multi_chunk_markers = [m for m, chunks in marker_appearances.items() if len(chunks) > 1]
-        assert len(multi_chunk_markers) > 0, "Overlap should cause some markers to appear in multiple chunks"
+        assert len(multi_chunk_markers) > 0, 'Overlap should cause some markers to appear in multiple chunks'
 
     def test_no_overlap_when_overlap_zero(self):
         """Test that setting overlap_words=0 prevents overlap"""
-        service = EmbeddingService(api_key="test_key")
+        service = EmbeddingService(api_key='test_key')
 
-        text = "word " * 3000
+        text = 'word ' * 3000
         chunks = service._chunk_text(text, max_words=1200, overlap_words=0)
 
         # With no overlap, chunks should be completely distinct
@@ -287,10 +286,10 @@ class TestChunkingOverlap:
 
     def test_overlap_respects_word_boundaries(self):
         """Test that overlap breaks at word boundaries"""
-        service = EmbeddingService(api_key="test_key")
+        service = EmbeddingService(api_key='test_key')
 
         # Create text with long words
-        text = "supercalifragilisticexpialidocious " * 2000
+        text = 'supercalifragilisticexpialidocious ' * 2000
 
         chunks = service._chunk_text(text, max_words=1200, overlap_words=200)
 
@@ -298,18 +297,18 @@ class TestChunkingOverlap:
         for chunk in chunks:
             # Should not start or end with mid-word characters
             # (In our case, should start/end with space or full word)
-            assert chunk[0].isalnum() or chunk[0].isspace(), "Chunk should start at word boundary"
-            assert chunk[-1].isalnum() or chunk[-1].isspace(), "Chunk should end at word boundary"
+            assert chunk[0].isalnum() or chunk[0].isspace(), 'Chunk should start at word boundary'
+            assert chunk[-1].isalnum() or chunk[-1].isspace(), 'Chunk should end at word boundary'
 
 
 def test_integration_realistic_document():
     """Integration test with realistic tax document"""
-    service = EmbeddingService(api_key="test_key")
+    service = EmbeddingService(api_key='test_key')
 
     # Simulate a realistic tax document
     document = {
-        "title": "IRS Publication 501 - Dependents and Filing Status",
-        "content": """
+        'title': 'IRS Publication 501 - Dependents and Filing Status',
+        'content': """
         Introduction to Tax Filing Status
 
         Your filing status is used to determine your filing requirements, standard deduction,
@@ -318,10 +317,10 @@ def test_integration_realistic_document():
         lowest tax.
 
         """
-        + ("Additional tax information. " * 1000),  # Make it large
+        + ('Additional tax information. ' * 1000),  # Make it large
     }
 
-    chunks = service._chunk_text(f"Title: {document['title']}\nContent: {document['content']}")
+    chunks = service._chunk_text(f'Title: {document["title"]}\nContent: {document["content"]}')
 
     # Verify chunking worked
     assert len(chunks) >= 1
@@ -341,6 +340,6 @@ def test_integration_realistic_document():
         assert any(word in second_chunk_start for word in first_chunk_end.split()[:50])
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     # Run tests
-    pytest.main([__file__, "-v", "-s"])
+    pytest.main([__file__, '-v', '-s'])

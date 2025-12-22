@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-from typing import List, Optional
 
 from openai import AsyncOpenAI
 
@@ -11,9 +10,8 @@ logger = logging.getLogger(__name__)
 class EmbeddingService:
     """Service for generating text embeddings using OpenAI's API"""
 
-    def __init__(self, model_name: str = "text-embedding-3-small", api_key: Optional[str] = None):
-        """
-        Initialize OpenAI embedding service
+    def __init__(self, model_name: str = 'text-embedding-3-small', api_key: str | None = None):
+        """Initialize OpenAI embedding service
 
         Args:
             model_name: OpenAI embedding model name
@@ -25,19 +23,18 @@ class EmbeddingService:
             ValueError: If API key is not provided or found in environment
         """
         self.model_name = model_name
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.api_key = api_key or os.getenv('OPENAI_API_KEY')
 
         if not self.api_key:
-            raise ValueError("OpenAI API key required. Set OPENAI_API_KEY environment variable.")
+            raise ValueError('OpenAI API key required. Set OPENAI_API_KEY environment variable.')
 
         self.client = AsyncOpenAI(api_key=self.api_key)
         self.vector_size = 1536  # text-embedding-3-small
 
-        logger.info(f"Initialized OpenAI embeddings: {self.model_name}, {self.vector_size} dims")
+        logger.info(f'Initialized OpenAI embeddings: {self.model_name}, {self.vector_size} dims')
 
     def _estimate_tokens(self, text: str) -> int:
-        """
-        Estimate token count for a text string.
+        """Estimate token count for a text string.
         Uses conservative ratio: 1 token ≈ 3 characters.
 
         Args:
@@ -48,9 +45,8 @@ class EmbeddingService:
         """
         return len(text) // 3
 
-    def _chunk_text(self, text: str, max_words: int = 1200, overlap_words: int = 200) -> List[str]:
-        """
-        Split text into chunks that fit within token limits with overlap.
+    def _chunk_text(self, text: str, max_words: int = 1200, overlap_words: int = 200) -> list[str]:
+        """Split text into chunks that fit within token limits with overlap.
         Uses word-based chunking with conservative token estimation.
 
         Strategy:
@@ -77,7 +73,7 @@ class EmbeddingService:
             estimated_tokens = self._estimate_tokens(text)
             if estimated_tokens > 7000:
                 # Recursively split if too large
-                logger.warning(f"Text too large ({estimated_tokens} tokens), splitting recursively")
+                logger.warning(f'Text too large ({estimated_tokens} tokens), splitting recursively')
                 return self._chunk_text(text, max_words=max_words // 2, overlap_words=overlap_words // 2)
             return [text]
 
@@ -91,7 +87,7 @@ class EmbeddingService:
             if chunk_end < len(text):
                 # Look for sentence ending within last 500 chars
                 search_start = max(current_pos, chunk_end - 500)
-                sentence_ends = [".", "!", "?", "\n\n"]
+                sentence_ends = ['.', '!', '?', '\n\n']
                 best_break = chunk_end
 
                 for i in range(chunk_end, search_start, -1):
@@ -107,7 +103,7 @@ class EmbeddingService:
             estimated_tokens = self._estimate_tokens(chunk)
             if estimated_tokens > 7000:
                 # Chunk still too large, split it further
-                logger.warning(f"Chunk too large ({estimated_tokens} tokens), splitting further")
+                logger.warning(f'Chunk too large ({estimated_tokens} tokens), splitting further')
                 sub_chunks = self._chunk_text(chunk, max_words=max_words // 2, overlap_words=overlap_words // 2)
                 chunks.extend(sub_chunks)
             else:
@@ -122,7 +118,7 @@ class EmbeddingService:
                 # Try to start overlap at a word boundary
                 # Look backwards from chunk_end for a space
                 for i in range(chunk_end - overlap_chars, chunk_end):
-                    if text[i : i + 1] == " ":
+                    if text[i : i + 1] == ' ':
                         overlap_start = i + 1
                         break
 
@@ -132,9 +128,8 @@ class EmbeddingService:
 
         return chunks
 
-    async def embed_texts(self, texts: List[str], max_retries: int = 3) -> List[List[float]]:
-        """
-        Generate embeddings for a list of texts with automatic retry on rate limits.
+    async def embed_texts(self, texts: list[str], max_retries: int = 3) -> list[list[float]]:
+        """Generate embeddings for a list of texts with automatic retry on rate limits.
         Includes pre-flight validation to catch oversized chunks.
 
         Args:
@@ -152,24 +147,24 @@ class EmbeddingService:
             estimated_tokens = self._estimate_tokens(text)
             if estimated_tokens > 7000:
                 logger.error(
-                    f"Text {i} too large: {estimated_tokens} estimated tokens "
-                    f"({len(text)} chars). Max safe limit: 7000 tokens"
+                    f'Text {i} too large: {estimated_tokens} estimated tokens '
+                    f'({len(text)} chars). Max safe limit: 7000 tokens'
                 )
                 raise ValueError(
-                    f"Text chunk exceeds safe token limit: {estimated_tokens} > 7000. "
-                    f"This should have been caught by chunking logic."
+                    f'Text chunk exceeds safe token limit: {estimated_tokens} > 7000. '
+                    f'This should have been caught by chunking logic.'
                 )
-            elif estimated_tokens > 6000:
-                logger.warning(f"Text {i} approaching limit: {estimated_tokens} estimated tokens ({len(text)} chars)")
+            if estimated_tokens > 6000:
+                logger.warning(f'Text {i} approaching limit: {estimated_tokens} estimated tokens ({len(text)} chars)')
 
         for attempt in range(max_retries):
             try:
                 response = await self.client.embeddings.create(
-                    model=self.model_name, input=texts, encoding_format="float"
+                    model=self.model_name, input=texts, encoding_format='float'
                 )
 
                 embeddings = [item.embedding for item in response.data]
-                logger.info(f"Generated {len(embeddings)} embeddings, {response.usage.total_tokens} tokens")
+                logger.info(f'Generated {len(embeddings)} embeddings, {response.usage.total_tokens} tokens')
 
                 return embeddings
 
@@ -177,30 +172,29 @@ class EmbeddingService:
                 error_msg = str(e)
 
                 # Check if it's a token limit error
-                if "maximum context length" in error_msg or "requested" in error_msg and "tokens" in error_msg:
-                    logger.error(f"Token limit exceeded despite validation: {error_msg}")
-                    logger.error(f"Text lengths: {[len(t) for t in texts]}")
-                    logger.error(f"Estimated tokens: {[self._estimate_tokens(t) for t in texts]}")
+                if 'maximum context length' in error_msg or ('requested' in error_msg and 'tokens' in error_msg):
+                    logger.error(f'Token limit exceeded despite validation: {error_msg}')
+                    logger.error(f'Text lengths: {[len(t) for t in texts]}')
+                    logger.error(f'Estimated tokens: {[self._estimate_tokens(t) for t in texts]}')
                     raise
 
                 # Check if it's a rate limit error
-                if "rate_limit_exceeded" in error_msg or "429" in error_msg:
+                if 'rate_limit_exceeded' in error_msg or '429' in error_msg:
                     wait_time = 2**attempt * 3  # 3s, 6s, 12s
-                    logger.warning(f"Rate limit hit, waiting {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                    logger.warning(f'Rate limit hit, waiting {wait_time}s (attempt {attempt + 1}/{max_retries})')
                     await asyncio.sleep(wait_time)
 
                     if attempt == max_retries - 1:
-                        logger.error("Max retries reached for rate limit")
+                        logger.error('Max retries reached for rate limit')
                         raise
                 else:
-                    logger.error(f"Error generating embeddings: {e}")
+                    logger.error(f'Error generating embeddings: {e}')
                     raise
 
         return []
 
-    async def embed_documents(self, documents: List[dict]) -> List[List[float]]:
-        """
-        Generate embeddings from document dictionaries.
+    async def embed_documents(self, documents: list[dict]) -> list[list[float]]:
+        """Generate embeddings from document dictionaries.
         Handles oversized documents by chunking and averaging embeddings.
 
         Combines title and content for richer semantic representation
@@ -214,9 +208,9 @@ class EmbeddingService:
         embeddings = []
 
         for doc in documents:
-            title = doc.get("title", "")
-            content = doc.get("content", "")
-            full_text = f"Title: {title}\nContent: {content}"
+            title = doc.get('title', '')
+            content = doc.get('content', '')
+            full_text = f'Title: {title}\nContent: {content}'
 
             # Check if text needs chunking
             chunks = self._chunk_text(full_text)
@@ -227,7 +221,7 @@ class EmbeddingService:
                 embeddings.append(chunk_embeddings[0])
             else:
                 # Multiple chunks - generate embedding for each and average
-                logger.warning(f"Document too large ({len(full_text)} chars), splitting into {len(chunks)} chunks")
+                logger.warning(f'Document too large ({len(full_text)} chars), splitting into {len(chunks)} chunks')
                 chunk_embeddings = await self.embed_texts(chunks)
 
                 # Average the embeddings
@@ -239,9 +233,8 @@ class EmbeddingService:
 
         return embeddings
 
-    async def embed_query(self, query: str) -> List[float]:
-        """
-        Generate embedding for a single search query
+    async def embed_query(self, query: str) -> list[float]:
+        """Generate embedding for a single search query
 
         Args:
             query: Search query string

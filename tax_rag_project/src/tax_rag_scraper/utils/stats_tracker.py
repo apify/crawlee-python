@@ -31,11 +31,11 @@ class CrawlStats:
         """
         elapsed = (datetime.utcnow() - self.start_time).total_seconds()
         return {
-            "duration_seconds": elapsed,
-            "urls_processed": self.urls_processed,
-            "urls_failed": self.urls_failed,
-            "success_rate": (
+            'duration_seconds': elapsed,
+            'urls_processed': self.urls_processed,
+            'urls_failed': self.urls_failed,
+            'success_rate': (
                 (self.urls_processed - self.urls_failed) / self.urls_processed * 100 if self.urls_processed > 0 else 0
             ),
-            "documents_extracted": self.documents_extracted,
+            'documents_extracted': self.documents_extracted,
         }
