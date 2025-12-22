@@ -4,6 +4,41 @@
 
 **Project**: [Canadian Tax Documentation RAG Pipeline](tax_rag_project/README.md)
 
+## Quick Start for Tax RAG Project
+
+### Installation
+
+To install the complete environment including Crawlee and the Tax RAG scraper with all dependencies:
+
+```bash
+# Clone the repository
+git clone <your-fork-url>
+cd crawlee-python-taxrag
+
+# Install with tax-rag dependencies (includes beautifulsoup, qdrant, openai, etc.)
+pip install -e ".[tax-rag]"
+
+# For development (includes pytest and testing tools)
+pip install -e ".[tax-rag-dev]"
+```
+
+### Running the Tax RAG Scraper
+
+```bash
+# Set up environment variables (from tax_rag_project directory)
+cd tax_rag_project
+cp .env.example .env
+# Edit .env with your Qdrant Cloud and OpenAI credentials
+
+# Run the scraper
+python src/tax_rag_scraper/main.py
+
+# Or run tests
+pytest tax_rag_project/tests/
+```
+
+For detailed setup instructions, see the [Tax RAG Project README](tax_rag_project/README.md).
+
 ---
 
 <h1 align="center">

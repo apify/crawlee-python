@@ -48,16 +48,15 @@ tax_rag_project/
 ├── .env.example                # Environment template
 ├── .env.local                  # Local overrides
 ├── .gitignore                  # Git ignore rules
-├── requirements.txt            # Dependencies
-├── pyproject.toml              # Project configuration
 ├── CHANGELOG.md                # Version history
 ├── claude.md                   # Development notes
 └── README.md                   # This file
+
+Note: Project dependencies are managed in the root pyproject.toml file.
+Use `pip install -e ".[tax-rag]"` from the repository root to install.
 ```
 
 ## Quick Start
-
-### Manual Setup (All Platforms)
 
 ### Prerequisites
 
@@ -74,9 +73,13 @@ tax_rag_project/
    cd crawlee-python-taxrag
    ```
 
-2. **Install Crawlee from local source**
+2. **Install all dependencies (from repository root)**
    ```bash
-   pip install -e .
+   # Install Crawlee + Tax RAG scraper with all dependencies
+   pip install -e ".[tax-rag]"
+
+   # For development (includes pytest and testing tools)
+   pip install -e ".[tax-rag-dev]"
    ```
 
 3. **Set up Qdrant Cloud**
@@ -119,7 +122,16 @@ tax_rag_project/
    python src/tax_rag_scraper/test_qdrant_integration.py
    ```
 
-7. **Verify in Qdrant Cloud**
+7. **Run tests**
+   ```bash
+   # From repository root
+   pytest tax_rag_project/tests/
+
+   # Or run specific test file
+   python tax_rag_project/tests/test_error_handling.py
+   ```
+
+8. **Verify in Qdrant Cloud**
    - Visit https://cloud.qdrant.io
    - Check your cluster dashboard
    - View the `tax_documents` collection

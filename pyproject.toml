@@ -82,6 +82,22 @@ sql_sqlite = [
     "aiosqlite>=0.21.0",
 ]
 redis = ["redis[hiredis] >= 7.0.0"]
+tax-rag = [
+    "crawlee[beautifulsoup]>=1.2.0",
+    "apify-fingerprint-datapoints>=0.7.0",
+    "browserforge>=1.0.0",
+    "httpx>=0.27.0",
+    "openai>=1.0.0",
+    "pydantic>=2.11.0",
+    "pydantic-settings>=2.12.0",
+    "python-dotenv>=1.0.0",
+    "qdrant-client>=1.7.0",
+]
+tax-rag-dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+]
 
 [project.scripts]
 crawlee = "crawlee._cli:cli"
@@ -122,11 +138,11 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/crawlee"]
+packages = ["src/crawlee", "tax_rag_project/src/tax_rag_scraper"]
 
 [tool.ruff]
 line-length = 120
-include = ["src/**/*.py", "tests/**/*.py", "docs/**/*.py", "website/**/*.py"]
+include = ["src/**/*.py", "tests/**/*.py", "docs/**/*.py", "website/**/*.py", "tax_rag_project/**/*.py"]
 extend-exclude = ["src/crawlee/project_template"]
 
 [tool.ruff.lint]
@@ -219,6 +235,10 @@ addopts = "-ra"
 asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
 timeout = 300
+testpaths = ["tests", "tax_rag_project/tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
 markers = [
     "run_alone: marks tests that must run in isolation",
 ]

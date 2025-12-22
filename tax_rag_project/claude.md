@@ -8,8 +8,8 @@ This document provides context for Claude Code when working on the Canadian Tax 
 
 ```
 CRA Website → Crawlee Crawler → Document Processor → Embedding Generator → Qdrant Vector DB
-                                                                              ↓
-                                                                         RAG Chatbot
+                           ↓
+                     RAG Chatbot
 ```
 
 ### Core Components
@@ -59,12 +59,14 @@ CRA Website → Crawlee Crawler → Document Processor → Embedding Generator �
 - Persistent queue for long-running crawls
 - Already forked from apify/crawlee-python
 
-### Why Qdrant?
+### Why Qdrant Cloud?
 
-- Self-hostable (important for VPS deployment)
+- Cloud-first architecture (no Docker setup required)
+- Free tier with 1GB storage
 - Excellent performance for semantic search
-- Docker-friendly deployment
+- Production-ready from day one
 - Rich filtering capabilities (by document type, date, etc.)
+- Automatic scaling and high availability
 
 ### Why sentence-transformers?
 
@@ -107,9 +109,10 @@ Implementation stages will be provided and completed periodically with Claude Co
 ### Local Development
 
 1. Work in `tax_rag_project/` directory
-2. Install Crawlee: `pip install -e .` from repo root
-3. Use `.env.local` for local configuration
-4. Run Qdrant locally via Docker: `docker-compose up`
+2. Install from repo root: `pip install -e ".[tax-rag]"` (includes Crawlee + all tax-rag dependencies)
+3. For development: `pip install -e ".[tax-rag-dev]"` (adds pytest and testing tools)
+4. Use `.env` for configuration (copy from `.env.example`)
+5. Run Qdrant via Qdrant Cloud (cloud-first architecture, no local Docker required)
 
 ### Testing Strategy
 
@@ -147,18 +150,10 @@ tax_rag_project/
 │   │   ├── storage/
 │   │   │   └── __init__.py
 │   │   ├── main.py                 # ✓ Main entry point
-│   │   ├── test_deep_crawling.py   # ✓ Deep crawling tests
-│   │   ├── README.md               # ✓ Scraper documentation
-│   │   ├── pyproject.toml          # ✓ Scraper config
-│   │   └── requirements.txt        # ✓ Scraper dependencies
-│   └── tax_scraper/                # Alternative scraper (WIP)
-│       ├── crawlers/               # Empty placeholder
-│       ├── handlers/               # Empty placeholder
-│       └── utils/                  # Empty placeholder
-├── tests/                          # ✓ Test suite
-│   ├── __init__.py
-│   ├── test_error_handling.py      # ✓ Error handling tests
-│   └── test_rate_limiting.py       # ✓ Rate limiting tests
+│   │   └── test_deep_crawling.py   # ✓ Deep crawling 
+tests
+│   └── test_rate_limiting.py       # ✓ Rate limiting 
+tests
 ├── scripts/                        # ✓ Runner and setup scripts
 │   ├── run_crawler.py              # ✓ Run base crawler
 │   ├── run_all_tests.py            # ✓ Run all tests
@@ -174,24 +169,35 @@ tax_rag_project/
 ├── config/                         # (Planned) Additional configs
 ├── crawlers/                       # (Planned) Crawler configs
 ├── storage/                        # Runtime storage (not committed)
+├── tests/                          # ✓ Test suite
+│   ├── __init__.py
+│   ├── test_error_handling.py      # ✓ Error handling 
 ├── venv/                           # ✓ Virtual environment (local)
 ├── .env.example                    # ✓ Environment template
-├── .env.local                      # ✓ Local settings
+├── .env.local                      # ✓ Local settings (optional override)
 ├── .gitignore                      # ✓ Git ignore rules
-├── requirements.txt                # ✓ Dependencies
-├── pyproject.toml                  # ✓ Project configuration
 ├── CHANGELOG.md                    # ✓ Version history
 ├── claude.md                       # ✓ This file
 └── README.md                       # ✓ Main readme
+
+Note: Project dependencies are managed in the root pyproject.toml file (../../pyproject.toml).
+Use `pip install -e ".[tax-rag]"` from repository root to install.
 ```
 
 ## Commands Reference
 
-### Crawlee Framework
+### Installation
 
-Install Crawlee from fork (from repository root):
+Install from repository root (single source of truth):
 ```bash
-pip install -e .
+# Production installation (Crawlee + all tax-rag dependencies)
+pip install -e ".[tax-rag]"
+
+# Development installation (adds pytest and testing tools)
+pip install -e ".[tax-rag-dev]"
+
+# Or both at once
+pip install -e ".[tax-rag,tax-rag-dev]"
 ```
 
 ### Quick Setup Scripts
@@ -242,9 +248,15 @@ cd tax_rag_project/src/tax_rag_scraper
 ../../.venv/bin/python test_deep_crawling.py            # Linux/Mac
 ```
 
-Start Qdrant (TODO):
+Access Qdrant Cloud:
 ```bash
-docker-compose up -d
+# Set up credentials in .env file
+# QDRANT_URL=https://your-cluster.cloud.qdrant.io
+# QDRANT_API_KEY=your-api-key
+# OPENAI_API_KEY=sk-proj-...
+
+# Test connection
+python src/tax_rag_scraper/test_qdrant_connection.py
 ```
 
 ### Useful Development Commands
@@ -259,9 +271,12 @@ Monitor storage directory:
 ls -lah tax_rag_project/storage/
 ```
 
-Qdrant health check:
+Qdrant Cloud health check:
 ```bash
-curl http://localhost:6333/health
+# Visit your cluster dashboard at https://cloud.qdrant.io
+# Or check via API
+curl https://your-cluster.cloud.qdrant.io/collections \
+  -H "api-key: your-api-key"
 ```
 
 ## Important Notes
@@ -287,14 +302,15 @@ curl http://localhost:6333/health
 
 ### Deployment Considerations
 
-- VPS requirements: 2+ CPU cores, 4+ GB RAM
-- Qdrant memory usage scales with collection size
-- Monitor disk space for storage directory
-- Use systemd or supervisor for process management
+- GitHub Actions for automated scheduling (daily and weekly crawls)
+- Qdrant Cloud handles vector storage (no VPS management needed)
+- Monitor Qdrant Cloud storage usage (free tier: 1GB)
+- Monitor local disk space for crawler storage directory
+- GitHub Actions artifacts for crawl logs and statistics
 
 ## Current Status
 
-**Last Updated**: 2025-12-17
+**Last Updated**: 2025-12-22
 
 **Completed Stages**:
 - ✓ Stage 1: Basic Crawler
@@ -302,6 +318,21 @@ curl http://localhost:6333/health
 - ✓ Stage 3: Rate Limiting & Security
 
 ## Troubleshooting
+
+### Dependency Management
+
+**Single Source of Truth**: All dependencies are managed in the root `pyproject.toml` file:
+- Core Crawlee dependencies: `[project.dependencies]`
+- Tax RAG dependencies: `[project.optional-dependencies.tax-rag]`
+- Development dependencies: `[project.optional-dependencies.tax-rag-dev]`
+
+**Installation from root**:
+```bash
+# Always run from repository root
+cd crawlee-python-taxrag
+pip install -e ".[tax-rag]"          # Production
+pip install -e ".[tax-rag-dev]"      # Development tools
+```
 
 ### Project Organization
 
@@ -330,6 +361,11 @@ The main repository `src/` folder only contains the crawlee library source.
 **Don't use**:
 - Global `python` command (may not have dependencies)
 - `pytest` directly (may not be in PATH)
+
+**Module Import Paths**:
+- Crawlee crawlers: `from crawlee.crawlers import BeautifulSoupCrawler`
+- NOT: `from crawlee import BeautifulSoupCrawler` (will fail)
+- Tax scraper: `from tax_rag_scraper.crawlers.base_crawler import TaxDataCrawler`
 
 ### Python Path Issues
 
