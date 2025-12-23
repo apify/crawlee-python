@@ -6,7 +6,7 @@ from tax_rag_scraper.models.tax_document import TaxDocument
 
 
 class CRAHandler(BaseHandler):
-    """Handler for Canada Revenue Agency (canada.ca) website"""
+    """Handler for Canada Revenue Agency (canada.ca) website."""
 
     async def _extract_data(self, context: BeautifulSoupCrawlingContext) -> TaxDocument | None:
         soup = context.soup
@@ -42,14 +42,15 @@ class CRAHandler(BaseHandler):
         )
 
     def _extract_tax_year(self, text: str) -> str | None:
-        """Extract tax year from content
-        Looks for patterns like: 2024, 2023-2024
+        """Extract tax year from content.
+
+        Looks for patterns like: 2024, 2023-2024.
         """
         match = re.search(r'20\d{2}(?:\s*-\s*20\d{2})?', text)
         return match.group(0) if match else None
 
     def _determine_document_type(self, url: str) -> str:
-        """Determine document type based on URL patterns"""
+        """Determine document type based on URL patterns."""
         url_lower = url.lower()
 
         if 'form' in url_lower:

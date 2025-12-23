@@ -2,6 +2,7 @@
 
 import logging
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from crawlee._autoscaling.autoscaled_pool import ConcurrencySettings
 from crawlee.crawlers import BeautifulSoupCrawler
@@ -15,7 +16,12 @@ from tax_rag_scraper.utils.robots import RobotsChecker
 from tax_rag_scraper.utils.stats_tracker import CrawlStats
 from tax_rag_scraper.utils.user_agents import get_random_user_agent
 
+if TYPE_CHECKING:
+    from crawlee.beautifulsoup_crawler import BeautifulSoupCrawlingContext
+
 logger = logging.getLogger(__name__)
+
+HTTP_OK = 200
 
 
 class TaxDataCrawler:
@@ -23,12 +29,13 @@ class TaxDataCrawler:
 
     def __init__(
         self,
-        settings: Settings = None,
+        settings: Settings | None = None,
         max_depth: int = 2,
+        *,
         use_qdrant: bool = False,
-        qdrant_url: str = None,
-        qdrant_api_key: str = None,
-    ):
+        qdrant_url: str | None = None,
+        qdrant_api_key: str | None = None,
+    ) -> None:
         """Initialize the crawler with settings.
 
         Args:
@@ -110,11 +117,11 @@ class TaxDataCrawler:
         )
         self._setup_handlers()
 
-    def _setup_handlers(self):
+    def _setup_handlers(self) -> None:
         """Set up request handlers for the crawler."""
 
         @self.crawler.router.default_handler
-        async def default_handler(context):
+        async def default_handler(context: 'BeautifulSoupCrawlingContext') -> None:
             # Check robots.txt if enabled (from Stage 3)
             if self.robots_checker and not self.robots_checker.can_fetch(context.request.url):
                 context.log.warning(f'Blocked by robots.txt: {context.request.url}')
@@ -152,13 +159,13 @@ class TaxDataCrawler:
                 context.log.info(f'Found {len(links)} valid links at depth {current_depth}')
 
                 # Enqueue discovered links
-                await context.add_requests([link for link in links], user_data={'depth': current_depth + 1})
+                await context.add_requests(list(links), user_data={'depth': current_depth + 1})
 
-    async def _store_document(self, doc_data: dict):
-        """Store document (batch for Qdrant, immediate for filesystem)
+    async def _store_document(self, doc_data: dict) -> None:
+        """Store document (batch for Qdrant, immediate for filesystem).
 
         Args:
-            doc_data: Document dictionary to store
+            doc_data: Document dictionary to store.
         """
         if not self.use_qdrant:
             return
@@ -169,8 +176,8 @@ class TaxDataCrawler:
         if len(self.document_batch) >= self.batch_size:
             await self._flush_batch()
 
-    async def _flush_batch(self):
-        """Flush document batch to Qdrant"""
+    async def _flush_batch(self) -> None:
+        """Flush document batch to Qdrant."""
         if not self.document_batch:
             return
 
@@ -188,12 +195,12 @@ class TaxDataCrawler:
             # Clear batch
             self.document_batch = []
 
-        except Exception as e:
-            logger.error(f'Error flushing batch: {e}')
+        except Exception:
+            logger.exception('Error flushing batch')
             # Don't re-raise - we don't want to stop the crawler
             # Documents are still saved to filesystem
 
-    async def run(self, start_urls: list[str]):
+    async def run(self, start_urls: list[str]) -> None:
         """Run the crawler with the given start URLs.
 
         Args:
@@ -206,22 +213,22 @@ class TaxDataCrawler:
             logger.info(f'Flushing final batch of {len(self.document_batch)} documents')
             await self._flush_batch()
 
-        # Print statistics after crawl completes
+        # Log statistics after crawl completes
         summary = self.stats.summary()
-        print('\n' + '=' * 50)
-        print('CRAWL STATISTICS')
-        print('=' * 50)
+        logger.info('\n%s', '=' * 50)
+        logger.info('CRAWL STATISTICS')
+        logger.info('=' * 50)
         for key, value in summary.items():
             if key == 'success_rate':
-                print(f'{key}: {value:.2f}%')
+                logger.info('%s: %.2f%%', key, value)
             elif key == 'duration_seconds':
-                print(f'{key}: {value:.2f}s')
+                logger.info('%s: %.2fs', key, value)
             else:
-                print(f'{key}: {value}')
+                logger.info('%s: %s', key, value)
 
-        # Print Qdrant statistics if enabled (NEW)
+        # Log Qdrant statistics if enabled (NEW)
         if self.use_qdrant and self.qdrant_client:
             doc_count = self.qdrant_client.count_documents()
-            print(f'\nQdrant Documents: {doc_count}')
+            logger.info('\nQdrant Documents: %d', doc_count)
 
-        print('=' * 50 + '\n')
+        logger.info('%s\n', '=' * 50)

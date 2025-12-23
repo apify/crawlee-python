@@ -1,6 +1,7 @@
-"""Test Qdrant connection with OpenAI embeddings"""
+"""Test Qdrant connection with OpenAI embeddings."""
 
 import asyncio
+import logging
 import os
 from pathlib import Path
 
@@ -9,30 +10,35 @@ from dotenv import load_dotenv
 from tax_rag_scraper.storage.qdrant_client import TaxDataQdrantClient
 from tax_rag_scraper.utils.embeddings import EmbeddingService
 
+logger = logging.getLogger(__name__)
+
+# Expected embedding dimension for OpenAI text-embedding-3-small model
+EXPECTED_EMBEDDING_DIM = 1536
+
 # Load environment variables from .env
 env_path = Path(__file__).parent.parent.parent / '.env'
 if env_path.exists():
     load_dotenv(env_path)
-    print('[OK] Loaded environment from .env')
+    logger.info('[OK] Loaded environment from .env')
 else:
-    print('[WARNING] .env file not found')
+    logger.warning('[WARNING] .env file not found')
 
 
-async def main():
-    """Test Qdrant Cloud connection and OpenAI embeddings"""
-    print('=' * 50)
-    print('QDRANT CLOUD + OPENAI CONNECTION TEST')
-    print('=' * 50)
+async def main() -> None:
+    """Test Qdrant Cloud connection and OpenAI embeddings."""
+    logger.info('=' * 50)
+    logger.info('QDRANT CLOUD + OPENAI CONNECTION TEST')
+    logger.info('=' * 50)
 
     # Check OpenAI API key
     api_key = os.getenv('OPENAI_API_KEY')
     if not api_key:
-        print('\n[ERROR] OPENAI_API_KEY not set')
-        print('Set it in .env file or environment:')
-        print('  export OPENAI_API_KEY=sk-proj-...')
+        logger.error('\n[ERROR] OPENAI_API_KEY not set')
+        logger.error('Set it in .env file or environment:')
+        logger.error('  export OPENAI_API_KEY=sk-proj-...')
         return
 
-    print(f'[OK] OpenAI API key found: {api_key[:20]}...')
+    logger.info('[OK] OpenAI API key found: %s...', api_key[:20])
 
     # Load Qdrant Cloud configuration from environment
     qdrant_url = os.getenv('QDRANT_URL')
@@ -40,22 +46,22 @@ async def main():
 
     # Validate Qdrant credentials
     if not qdrant_url:
-        print('\n[ERROR] QDRANT_URL not set')
-        print('Get credentials at https://cloud.qdrant.io')
-        print('Set in .env file:')
-        print('  QDRANT_URL=https://your-cluster.cloud.qdrant.io')
-        print('  QDRANT_API_KEY=your-api-key')
+        logger.error('\n[ERROR] QDRANT_URL not set')
+        logger.error('Get credentials at https://cloud.qdrant.io')
+        logger.error('Set in .env file:')
+        logger.error('  QDRANT_URL=https://your-cluster.cloud.qdrant.io')
+        logger.error('  QDRANT_API_KEY=your-api-key')
         return
 
     if not qdrant_api_key:
-        print('\n[ERROR] QDRANT_API_KEY not set')
-        print('Get credentials at https://cloud.qdrant.io')
-        print('Set in .env file:')
-        print('  QDRANT_API_KEY=your-api-key')
+        logger.error('\n[ERROR] QDRANT_API_KEY not set')
+        logger.error('Get credentials at https://cloud.qdrant.io')
+        logger.error('Set in .env file:')
+        logger.error('  QDRANT_API_KEY=your-api-key')
         return
 
     # Test 1: Qdrant Cloud connection
-    print(f'\n1. Testing Qdrant Cloud connection to {qdrant_url}...')
+    logger.info('\n1. Testing Qdrant Cloud connection to %s...', qdrant_url)
     try:
         client = TaxDataQdrantClient(
             url=qdrant_url,
@@ -63,29 +69,31 @@ async def main():
             collection_name='test_collection',
             vector_size=1536,
         )
-        print('[OK] Connected to Qdrant Cloud successfully')
-        print("[OK] Collection 'test_collection' ready (1536 dimensions)")
-    except Exception as e:
-        print(f'[ERROR] Failed to connect: {e}')
-        print('\nCheck your Qdrant Cloud credentials in .env:')
-        print('  QDRANT_URL=https://your-cluster.cloud.qdrant.io')
-        print('  QDRANT_API_KEY=your-api-key')
-        print('\nGet credentials at https://cloud.qdrant.io')
+        logger.info('[OK] Connected to Qdrant Cloud successfully')
+        logger.info("[OK] Collection 'test_collection' ready (%d dimensions)", EXPECTED_EMBEDDING_DIM)
+    except Exception:
+        logger.exception(
+            '[ERROR] Failed to connect\n'
+            'Check your Qdrant Cloud credentials in .env:\n'
+            '  QDRANT_URL=https://your-cluster.cloud.qdrant.io\n'
+            '  QDRANT_API_KEY=your-api-key\n'
+            'Get credentials at https://cloud.qdrant.io'
+        )
         return
 
     # Test 2: Embedding service
-    print('\n2. Testing OpenAI embedding service...')
+    logger.info('\n2. Testing OpenAI embedding service...')
     try:
         embedding_service = EmbeddingService(model_name='text-embedding-3-small', api_key=api_key)
-        print('[OK] OpenAI embedding service initialized')
-        print(f'  Model: {embedding_service.model_name}')
-        print(f'  Vector size: {embedding_service.vector_size}')
-    except Exception as e:
-        print(f'[ERROR] Failed to initialize embedding service: {e}')
+        logger.info('[OK] OpenAI embedding service initialized')
+        logger.info('  Model: %s', embedding_service.model_name)
+        logger.info('  Vector size: %d', embedding_service.vector_size)
+    except Exception:
+        logger.exception('[ERROR] Failed to initialize embedding service')
         return
 
     # Test 3: Generate embeddings
-    print('\n3. Testing embedding generation...')
+    logger.info('\n3. Testing embedding generation...')
     try:
         test_docs = [
             {
@@ -101,63 +109,67 @@ async def main():
         ]
 
         embeddings = await embedding_service.embed_documents(test_docs)
-        print(f'[OK] Generated embeddings for {len(embeddings)} documents')
-        print(f'  Embedding dimensions: {len(embeddings[0])}')
+        logger.info('[OK] Generated embeddings for %d documents', len(embeddings))
+        logger.info('  Embedding dimensions: %d', len(embeddings[0]))
 
-        if len(embeddings[0]) != 1536:
-            print(f'[WARNING] Expected 1536 dimensions, got {len(embeddings[0])}')
-    except Exception as e:
-        print(f'[ERROR] Failed to generate embeddings: {e}')
+        if len(embeddings[0]) != EXPECTED_EMBEDDING_DIM:
+            logger.warning(
+                '[WARNING] Expected %d dimensions, got %d',
+                EXPECTED_EMBEDDING_DIM,
+                len(embeddings[0]),
+            )
+    except Exception:
+        logger.exception('[ERROR] Failed to generate embeddings')
         return
 
     # Test 4: Store in Qdrant
-    print('\n4. Testing document storage...')
+    logger.info('\n4. Testing document storage...')
     try:
         await client.store_documents(test_docs, embeddings)
-        print(f'[OK] Stored {len(test_docs)} documents in Qdrant')
+        logger.info('[OK] Stored %d documents in Qdrant', len(test_docs))
 
         doc_count = client.count_documents()
-        print(f'  Total documents in collection: {doc_count}')
-    except Exception as e:
-        print(f'[ERROR] Failed to store documents: {e}')
+        logger.info('  Total documents in collection: %d', doc_count)
+    except Exception:
+        logger.exception('[ERROR] Failed to store documents')
         return
 
     # Test 5: Similarity search
-    print('\n5. Testing similarity search...')
+    logger.info('\n5. Testing similarity search...')
     try:
         query = 'Canadian tax regulations'
         query_embedding = await embedding_service.embed_query(query)
 
         results = client.search(query_vector=query_embedding, limit=2)
 
-        print(f"[OK] Search completed for query: '{query}'")
-        print(f'  Found {len(results)} results:')
+        logger.info("[OK] Search completed for query: '%s'", query)
+        logger.info('  Found %d results:', len(results))
 
         for i, result in enumerate(results, 1):
-            print(f'\n  Result {i}:')
-            print(f'    Score: {result.score:.4f}')
-            print(f'    Title: {result.payload["title"]}')
-            print(f'    URL: {result.payload["url"]}')
-    except Exception as e:
-        print(f'[ERROR] Failed to search: {e}')
+            logger.info('\n  Result %d:', i)
+            logger.info('    Score: %.4f', result.score)
+            logger.info('    Title: %s', result.payload['title'])
+            logger.info('    URL: %s', result.payload['url'])
+    except Exception:
+        logger.exception('[ERROR] Failed to search')
         return
 
     # Test 6: Cleanup
-    print('\n6. Cleaning up test collection...')
+    logger.info('\n6. Cleaning up test collection...')
     try:
         client.delete_collection()
-        print('[OK] Test collection deleted')
-    except Exception as e:
-        print(f'[WARNING] Failed to delete test collection: {e}')
+        logger.info('[OK] Test collection deleted')
+    except Exception:
+        logger.exception('[WARNING] Failed to delete test collection')
 
-    print('\n' + '=' * 50)
-    print('ALL TESTS PASSED')
-    print('=' * 50)
-    print('\nQdrant Cloud is ready for use!')
-    print('Next steps:')
-    print('  - Run integration test: python src/tax_rag_scraper/test_qdrant_integration.py')
-    print('  - Check Qdrant Cloud dashboard at https://cloud.qdrant.io')
-    print('  - View your collections and monitor usage')
+    logger.info('\n%s', '=' * 50)
+    logger.info('ALL TESTS PASSED')
+    logger.info('=' * 50)
+    logger.info('\nQdrant Cloud is ready for use!')
+    logger.info('Next steps:')
+    logger.info('  - Run integration test: python src/tax_rag_scraper/test_qdrant_integration.py')
+    logger.info('  - Check Qdrant Cloud dashboard at https://cloud.qdrant.io')
+    logger.info('  - View your collections and monitor usage')
 
 
 if __name__ == '__main__':

@@ -5,6 +5,8 @@ import traceback
 from crawlee.crawlers import BeautifulSoupCrawlingContext
 from tax_rag_scraper.models.tax_document import TaxDocument
 
+HTTP_OK = 200
+
 
 class BaseHandler:
     """Base handler with comprehensive error handling and logging."""
@@ -25,7 +27,7 @@ class BaseHandler:
             context.log.info(f'Processing {context.request.url}')
 
             # Validate response
-            if context.http_response.status_code != 200:
+            if context.http_response.status_code != HTTP_OK:
                 context.log.warning(f'Non-200 status: {context.http_response.status_code}')
                 return None
 
@@ -35,11 +37,13 @@ class BaseHandler:
             if doc:
                 await context.push_data(doc.model_dump())
                 context.log.info(f'✓ Successfully processed {context.request.url}')
+                return doc
+            return None  # noqa: TRY300
 
-            return doc
-
-        except Exception as e:
-            context.log.error(f'Error processing {context.request.url}: {e!s}\n{traceback.format_exc()}')
+        except Exception:
+            context.log.exception(
+                f'Error processing {context.request.url}\n{traceback.format_exc()}'
+            )
             # Re-raise to trigger Crawlee's retry mechanism
             raise
 

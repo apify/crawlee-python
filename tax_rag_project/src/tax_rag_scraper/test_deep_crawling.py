@@ -1,11 +1,14 @@
 import asyncio
+import logging
 
 from tax_rag_scraper.config.settings import Settings
 from tax_rag_scraper.crawlers.base_crawler import TaxDataCrawler
 
+logger = logging.getLogger(__name__)
 
-async def main():
-    """Test deep crawling and multi-site support"""
+
+async def main() -> None:
+    """Test deep crawling and multi-site support."""
     # Configure for moderate crawling
     settings = Settings(
         MAX_REQUESTS_PER_CRAWL=50,  # Limit total requests
@@ -19,22 +22,22 @@ async def main():
         'https://www.canada.ca/en/revenue-agency/services/forms-publications/forms.html',
     ]
 
-    print('Testing deep crawling and site-specific handlers...')
-    print('Max crawl depth: 2')
-    print(f'Max requests: {settings.MAX_REQUESTS_PER_CRAWL}')
-    print(f'Starting from: {test_urls[0]}\n')
+    logger.info('Testing deep crawling and site-specific handlers...')
+    logger.info('Max crawl depth: 2')
+    logger.info('Max requests: %d', settings.MAX_REQUESTS_PER_CRAWL)
+    logger.info('Starting from: %s\n', test_urls[0])
 
     crawler = TaxDataCrawler(settings=settings, max_depth=2)
     await crawler.run(test_urls)
 
-    print('\n[SUCCESS] Deep crawling test complete.')
-    print('\nExpected behavior:')
-    print('  - Depth 0: Processed seed URL (forms page)')
-    print('  - Depth 1: Discovered and processed links from seed page')
-    print('  - Depth 2: Discovered and processed links from depth 1 pages')
-    print('  - CRA handler extracted structured data (title, tax year, document type)')
-    print('  - Statistics show multiple URLs processed')
-    print('\nCheck storage/datasets/default/ for extracted documents')
+    logger.info('\n[SUCCESS] Deep crawling test complete.')
+    logger.info('\nExpected behavior:')
+    logger.info('  - Depth 0: Processed seed URL (forms page)')
+    logger.info('  - Depth 1: Discovered and processed links from seed page')
+    logger.info('  - Depth 2: Discovered and processed links from depth 1 pages')
+    logger.info('  - CRA handler extracted structured data (title, tax year, document type)')
+    logger.info('  - Statistics show multiple URLs processed')
+    logger.info('\nCheck storage/datasets/default/ for extracted documents')
 
 
 if __name__ == '__main__':

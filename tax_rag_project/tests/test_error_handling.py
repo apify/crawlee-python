@@ -5,7 +5,7 @@ import asyncio
 from tax_rag_scraper.crawlers.base_crawler import TaxDataCrawler
 
 
-async def main():
+async def main() -> None:
     """Test error handling with a mix of valid and invalid URLs."""
     test_urls = [
         # Valid URL

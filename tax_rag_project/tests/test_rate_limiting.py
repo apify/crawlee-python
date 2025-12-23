@@ -1,13 +1,13 @@
 """Test script for rate limiting and security features."""
 
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime
 
 from tax_rag_scraper.config.settings import Settings
 from tax_rag_scraper.crawlers.base_crawler import TaxDataCrawler
 
 
-async def main():
+async def main() -> None:
     """Test rate limiting and security features."""
 
     # Configure for aggressive rate limiting (easy to observe)
@@ -28,15 +28,15 @@ async def main():
     print('Testing rate limiting and security features...')
     print(f'Rate limit: {settings.MAX_REQUESTS_PER_MINUTE} requests/minute')
     print(f'Robots.txt respect: {settings.RESPECT_ROBOTS_TXT}')
-    print(f'\nStarting crawl at {datetime.now().strftime("%H:%M:%S")}')
+    print(f'\nStarting crawl at {datetime.now(UTC).strftime("%H:%M:%S")}')
     print('Watch for delayed requests (should take ~30 seconds for 5 URLs)\n')
 
-    start_time = datetime.now()
+    start_time = datetime.now(UTC)
 
     crawler = TaxDataCrawler(settings=settings, max_depth=0)
     await crawler.run(test_urls)
 
-    end_time = datetime.now()
+    end_time = datetime.now(UTC)
     duration = (end_time - start_time).total_seconds()
 
     print(f'\nCrawl finished at {end_time.strftime("%H:%M:%S")}')

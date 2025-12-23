@@ -1,13 +1,18 @@
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from tax_rag_scraper.handlers.base_handler import BaseHandler
 from tax_rag_scraper.handlers.cra_handler import CRAHandler
+from tax_rag_scraper.models.tax_document import TaxDocument
+
+if TYPE_CHECKING:
+    from crawlee.beautifulsoup_crawler import BeautifulSoupCrawlingContext
 
 
 class SiteRouter:
-    """Routes URLs to appropriate handlers based on domain"""
+    """Routes URLs to appropriate handlers based on domain."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Map domains to their specialized handlers
         self.handlers: dict[str, BaseHandler] = {
             'canada.ca': CRAHandler(),
@@ -22,12 +27,12 @@ class SiteRouter:
         self.default_handler = self._create_default_handler()
 
     def _create_default_handler(self) -> BaseHandler:
-        """Create a concrete default handler for unknown sites"""
+        """Create a concrete default handler for unknown sites."""
 
         class DefaultExtractor(BaseHandler):
-            async def _extract_data(self, context):
-                from tax_rag_scraper.models.tax_document import TaxDocument
-
+            async def _extract_data(
+                self, context: 'BeautifulSoupCrawlingContext'
+            ) -> TaxDocument | None:
                 # Basic extraction for any site
                 soup = context.soup
                 title = soup.title.string if soup.title else 'No title'
@@ -46,10 +51,10 @@ class SiteRouter:
         return DefaultExtractor()
 
     def get_handler(self, url: str) -> BaseHandler:
-        """Get appropriate handler for URL based on domain
+        """Get appropriate handler for URL based on domain.
 
-        Supports exact matches and subdomain matches
-        Example: www.canada.ca and sub.canada.ca both match 'canada.ca'
+        Supports exact matches and subdomain matches.
+        Example: www.canada.ca and sub.canada.ca both match 'canada.ca'.
         """
         domain = urlparse(url).netloc
 

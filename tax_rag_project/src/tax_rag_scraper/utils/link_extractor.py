@@ -1,29 +1,31 @@
-from urllib.parse import urljoin, urlparse
+from urllib.parse import ParseResult, urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
 
 class LinkExtractor:
-    """Extract and filter links from HTML pages for deep crawling"""
+    """Extract and filter links from HTML pages for deep crawling."""
 
-    def __init__(self, allowed_domains: set[str] = None, max_depth: int = 3):
-        """Args:
-        allowed_domains: Set of domains to crawl (None = same domain only)
-        max_depth: Maximum crawl depth (0 = seed URLs only, 1 = seed + 1 level)
+    def __init__(self, allowed_domains: set[str] | None = None, max_depth: int = 3) -> None:
+        """Initialize link extractor.
+
+        Args:
+            allowed_domains: Set of domains to crawl (None = same domain only).
+            max_depth: Maximum crawl depth (0 = seed URLs only, 1 = seed + 1 level).
         """
         self.allowed_domains = allowed_domains or set()
         self.max_depth = max_depth
 
     def extract_links(self, soup: BeautifulSoup, base_url: str, current_depth: int = 0) -> set[str]:
-        """Extract valid links from page
+        """Extract valid links from page.
 
         Args:
-            soup: BeautifulSoup parsed HTML
-            base_url: URL of current page (for resolving relative links)
-            current_depth: Current crawl depth
+            soup: BeautifulSoup parsed HTML.
+            base_url: URL of current page (for resolving relative links).
+            current_depth: Current crawl depth.
 
         Returns:
-            Set of absolute URLs to crawl next
+            Set of absolute URLs to crawl next.
         """
         # Stop if at max depth
         if current_depth >= self.max_depth:
@@ -55,14 +57,22 @@ class LinkExtractor:
 
         return links
 
-    def _is_valid_link(self, parsed, absolute_url: str, base_domain: str) -> bool:
-        """Determine if a link should be followed
+    def _is_valid_link(self, parsed: ParseResult, absolute_url: str, base_domain: str) -> bool:  # noqa: ARG002
+        """Determine if a link should be followed.
 
         Filters out:
-        - Non-HTTP(S) schemes (mailto:, javascript:, etc.)
-        - Different domains (unless in allowed_domains)
-        - File downloads (PDF, ZIP, etc.)
-        - Anchor-only links
+            - Non-HTTP(S) schemes (mailto:, javascript:, etc.)
+            - Different domains (unless in allowed_domains)
+            - File downloads (PDF, ZIP, etc.)
+            - Anchor-only links
+
+        Args:
+            parsed: Parsed URL object.
+            absolute_url: Absolute URL string.
+            base_domain: Base domain for comparison.
+
+        Returns:
+            True if link should be followed, False otherwise.
         """
         # Must be HTTP or HTTPS
         if parsed.scheme not in ('http', 'https'):
@@ -83,7 +93,4 @@ class LinkExtractor:
             return False
 
         # Skip anchor-only links (fragments)
-        if parsed.fragment and not parsed.path:
-            return False
-
-        return True
+        return not (parsed.fragment and not parsed.path)

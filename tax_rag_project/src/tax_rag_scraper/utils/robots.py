@@ -1,5 +1,6 @@
 """Robots.txt checker for respectful web scraping."""
 
+from contextlib import suppress
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
@@ -7,7 +8,7 @@ from urllib.robotparser import RobotFileParser
 class RobotsChecker:
     """Check if URLs can be fetched according to robots.txt rules."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._parsers: dict[str, RobotFileParser] = {}
 
     def can_fetch(self, url: str, user_agent: str = '*') -> bool:
@@ -29,12 +30,9 @@ class RobotsChecker:
             parser = RobotFileParser()
             parser.set_url(robots_url)
 
-            try:
+            # If can't read robots.txt, allow by default (fail open - assume access is allowed)
+            with suppress(Exception):
                 parser.read()
-            except Exception:
-                # If can't read robots.txt, allow by default
-                # (fail open - assume access is allowed)
-                pass
 
             self._parsers[base_url] = parser
 

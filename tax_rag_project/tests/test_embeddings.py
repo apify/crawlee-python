@@ -1,6 +1,6 @@
-"""
-Test suite for embeddings.py
-Tests chunking with overlap, token estimation, and embedding generation
+"""Test suite for embeddings.py.
+
+Tests chunking with overlap, token estimation, and embedding generation.
 """
 
 import os
@@ -11,17 +11,17 @@ from tax_rag_scraper.utils.embeddings import EmbeddingService
 
 
 class TestEmbeddingService:
-    """Test cases for EmbeddingService class"""
+    """Test cases for EmbeddingService class."""
 
-    def test_init_with_api_key(self):
-        """Test initialization with explicit API key"""
+    def test_init_with_api_key(self) -> None:
+        """Test initialization with explicit API key."""
         service = EmbeddingService(api_key='test_key')
         assert service.api_key == 'test_key'
         assert service.model_name == 'text-embedding-3-small'
         assert service.vector_size == 1536
 
-    def test_init_without_api_key_fails(self):
-        """Test initialization without API key raises ValueError"""
+    def test_init_without_api_key_fails(self) -> None:
+        """Test initialization without API key raises ValueError."""
         # Temporarily clear OPENAI_API_KEY env var
         original_key = os.environ.get('OPENAI_API_KEY')
         if 'OPENAI_API_KEY' in os.environ:
@@ -35,8 +35,8 @@ class TestEmbeddingService:
             if original_key:
                 os.environ['OPENAI_API_KEY'] = original_key
 
-    def test_estimate_tokens(self):
-        """Test token estimation (1 token ≈ 3 characters)"""
+    def test_estimate_tokens(self) -> None:
+        """Test token estimation (1 token ≈ 3 characters)."""
         service = EmbeddingService(api_key='test_key')
 
         # 300 chars = 100 tokens
@@ -47,8 +47,8 @@ class TestEmbeddingService:
         text = 'a' * 3000
         assert service._estimate_tokens(text) == 1000
 
-    def test_chunk_text_small_text(self):
-        """Test that small texts are not chunked"""
+    def test_chunk_text_small_text(self) -> None:
+        """Test that small texts are not chunked."""
         service = EmbeddingService(api_key='test_key')
 
         # Small text (under 1200 words)
@@ -58,8 +58,8 @@ class TestEmbeddingService:
         assert len(chunks) == 1
         assert chunks[0] == text
 
-    def test_chunk_text_large_text_with_overlap(self):
-        """Test that large texts are chunked with proper overlap"""
+    def test_chunk_text_large_text_with_overlap(self) -> None:
+        """Test that large texts are chunked with proper overlap."""
         service = EmbeddingService(api_key='test_key')
 
         # Create a large text (>1200 words)
@@ -93,8 +93,8 @@ class TestEmbeddingService:
                 f'No overlap found between chunk {i} and {i + 1}'
             )
 
-    def test_chunk_text_boundary_detection(self):
-        """Test that chunks break at sentence boundaries"""
+    def test_chunk_text_boundary_detection(self) -> None:
+        """Test that chunks break at sentence boundaries."""
         service = EmbeddingService(api_key='test_key')
 
         # Create text with clear sentence boundaries
@@ -107,8 +107,8 @@ class TestEmbeddingService:
         for chunk in chunks[:-1]:
             assert chunk.rstrip().endswith(('.', '!', '?')), 'Chunk should end at sentence boundary'
 
-    def test_chunk_text_respects_token_limits(self):
-        """Test that all chunks are within token limits"""
+    def test_chunk_text_respects_token_limits(self) -> None:
+        """Test that all chunks are within token limits."""
         service = EmbeddingService(api_key='test_key')
 
         # Create very large text
@@ -121,8 +121,8 @@ class TestEmbeddingService:
             estimated_tokens = service._estimate_tokens(chunk)
             assert estimated_tokens <= 7000, f'Chunk {i} exceeds token limit: {estimated_tokens} tokens'
 
-    def test_chunk_text_overlap_parameter(self):
-        """Test that overlap parameter works correctly"""
+    def test_chunk_text_overlap_parameter(self) -> None:
+        """Test that overlap parameter works correctly."""
         service = EmbeddingService(api_key='test_key')
 
         # Create text
@@ -137,7 +137,7 @@ class TestEmbeddingService:
         assert len(chunks_200) >= len(chunks_0), 'Overlap should not reduce chunk count'
 
     @pytest.mark.asyncio
-    async def test_embed_texts_mock(self):
+    async def test_embed_texts_mock(self) -> None:
         """Test embed_texts with mocked OpenAI API"""
         service = EmbeddingService(api_key='test_key')
 
@@ -162,7 +162,7 @@ class TestEmbeddingService:
         assert embeddings[1] == [0.2] * 1536
 
     @pytest.mark.asyncio
-    async def test_embed_texts_validates_size(self):
+    async def test_embed_texts_validates_size(self) -> None:
         """Test that embed_texts validates text size before sending"""
         service = EmbeddingService(api_key='test_key')
 
@@ -173,7 +173,7 @@ class TestEmbeddingService:
             await service.embed_texts([oversized_text])
 
     @pytest.mark.asyncio
-    async def test_embed_documents_single_chunk(self):
+    async def test_embed_documents_single_chunk(self) -> None:
         """Test embed_documents with normal-sized documents"""
         service = EmbeddingService(api_key='test_key')
 
@@ -193,7 +193,7 @@ class TestEmbeddingService:
         assert len(embeddings[0]) == 1536
 
     @pytest.mark.asyncio
-    async def test_embed_documents_multi_chunk(self):
+    async def test_embed_documents_multi_chunk(self) -> None:
         """Test embed_documents with oversized documents requiring chunking"""
         service = EmbeddingService(api_key='test_key')
 
@@ -222,7 +222,7 @@ class TestEmbeddingService:
         assert abs(embeddings[0][0] - 0.15) < 0.01
 
     @pytest.mark.asyncio
-    async def test_embed_query(self):
+    async def test_embed_query(self) -> None:
         """Test embed_query for single query"""
         service = EmbeddingService(api_key='test_key')
 
@@ -243,10 +243,10 @@ class TestEmbeddingService:
 
 
 class TestChunkingOverlap:
-    """Specific tests for chunk overlap functionality"""
+    """Specific tests for chunk overlap functionality."""
 
-    def test_overlap_preserves_context(self):
-        """Test that overlap preserves context across chunks"""
+    def test_overlap_preserves_context(self) -> None:
+        """Test that overlap preserves context across chunks."""
         service = EmbeddingService(api_key='test_key')
 
         # Create text with identifiable markers
@@ -270,8 +270,8 @@ class TestChunkingOverlap:
         multi_chunk_markers = [m for m, chunks in marker_appearances.items() if len(chunks) > 1]
         assert len(multi_chunk_markers) > 0, 'Overlap should cause some markers to appear in multiple chunks'
 
-    def test_no_overlap_when_overlap_zero(self):
-        """Test that setting overlap_words=0 prevents overlap"""
+    def test_no_overlap_when_overlap_zero(self) -> None:
+        """Test that setting overlap_words=0 prevents overlap."""
         service = EmbeddingService(api_key='test_key')
 
         text = 'word ' * 3000
@@ -284,8 +284,8 @@ class TestChunkingOverlap:
         # Allow some variance due to spacing/boundary adjustments
         assert abs(total_chars - len(text)) < len(text) * 0.1
 
-    def test_overlap_respects_word_boundaries(self):
-        """Test that overlap breaks at word boundaries"""
+    def test_overlap_respects_word_boundaries(self) -> None:
+        """Test that overlap breaks at word boundaries."""
         service = EmbeddingService(api_key='test_key')
 
         # Create text with long words
@@ -301,8 +301,8 @@ class TestChunkingOverlap:
             assert chunk[-1].isalnum() or chunk[-1].isspace(), 'Chunk should end at word boundary'
 
 
-def test_integration_realistic_document():
-    """Integration test with realistic tax document"""
+def test_integration_realistic_document() -> None:
+    """Integration test with realistic tax document."""
     service = EmbeddingService(api_key='test_key')
 
     # Simulate a realistic tax document

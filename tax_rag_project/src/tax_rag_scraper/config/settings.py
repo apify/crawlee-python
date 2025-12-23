@@ -69,5 +69,7 @@ class Settings(BaseSettings):
     HEALTH_CHECK_PORT: int = 8080
 
     class Config:
+        """Pydantic configuration for settings."""
+
         env_file = '.env'
         case_sensitive = True
