@@ -1,12 +1,19 @@
-# Cache
-__pycache__
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
 .mypy_cache
-.pytest_cache
+.pytest_cache/
 .ruff_cache
 .uv-cache
 
-# Virtual envs
-.venv
+# Virtual environments
+.venv/
+.env/
+venv/
+env/
+ENV/
 .direnv
 .envrc
 .python-version
@@ -18,23 +25,39 @@ __pycache__
 mise.toml
 .mise.toml
 
-# Egg and build artifacts
+# Python build artifacts and distributions
 *.egg-info/
 *.egg
+.installed.cfg
 dist/
 build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+.Python
 
 # Coverage reports
 .coverage*
-htmlcov
+*.cover
+htmlcov/
 coverage-unit.xml
 coverage-integration.xml
 
-# IDE, editors
-.vscode
-.idea
+# IDE, editors, and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
 *~
 .DS_Store
+Thumbs.db
 .nvim.lua
 Session.vim
 
@@ -54,8 +77,9 @@ website/typedoc-types*
 # npm lockfile (we use yarn)
 website/package-lock.json
 
-# Default directory for memory storage
-storage/
+# Crawlee framework runtime storage (at repository root)
+/storage/
+.crawlee/
 
 # ============================================================================
 # Tax RAG Project Specific
@@ -65,8 +89,10 @@ storage/
 tax_rag_project/.env
 tax_rag_project/.env.local
 tax_rag_project/.env.production
+*.env.local
 
-# Project storage and data
+# Project runtime storage and data (NOT source code)
+# Note: tax_rag_project/src/tax_rag_scraper/storage/ is SOURCE CODE and remains tracked
 tax_rag_project/storage/
 tax_rag_project/qdrant_storage/
 
@@ -77,3 +103,5 @@ tax_rag_project/logs/
 # Temporary files
 tax_rag_project/tmp/
 tax_rag_project/.tmp/
+*.tmp
+*.bak
