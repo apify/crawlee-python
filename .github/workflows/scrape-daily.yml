@@ -29,9 +29,8 @@ jobs:
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Install dependencies
-        working-directory: ./tax_rag_project
         run: |
-          uv pip install --system -r requirements.txt
+          uv pip install --system -e ".[tax-rag]"
 
       - name: Install Playwright browsers
         run: |
