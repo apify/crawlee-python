@@ -1,5 +1,6 @@
 """Statistics tracking for crawling operations."""
 
+import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -39,3 +40,18 @@ class CrawlStats:
             ),
             'documents_extracted': self.documents_extracted,
         }
+
+    def to_jsonl(self, crawl_type: str = 'standard') -> str:
+        """Export statistics as a JSONL line for persistent storage.
+
+        Args:
+            crawl_type: Type of crawl ('daily', 'weekly-deep', 'standard')
+
+        Returns:
+            A single-line JSON string with timestamp and all statistics
+        """
+        stats = self.summary()
+        stats['timestamp'] = datetime.now(UTC).isoformat()
+        stats['start_time'] = self.start_time.isoformat()
+        stats['crawl_type'] = crawl_type
+        return json.dumps(stats)

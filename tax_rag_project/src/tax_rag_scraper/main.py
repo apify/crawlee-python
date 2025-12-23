@@ -124,6 +124,9 @@ async def main() -> None:
     # Test with CRA website (Canadian Revenue Agency - public info pages)
     test_urls = ['https://www.canada.ca/en/revenue-agency/services/forms-publications.html']
 
+    # Determine crawl type for metrics tracking
+    crawl_type = 'weekly-deep' if args.deep else 'daily'
+
     logger.info('\n[INFO] Starting crawler with Qdrant Cloud integration')
     logger.info('[INFO] Mode: %s', 'Deep Crawl' if args.deep else 'Standard Crawl')
     logger.info('[INFO] Collection: %s', settings.QDRANT_COLLECTION)
@@ -140,7 +143,7 @@ async def main() -> None:
         qdrant_api_key=qdrant_api_key,
     )
 
-    await crawler.run(test_urls)
+    await crawler.run(test_urls, crawl_type=crawl_type)
 
     logger.info('\n[OK] Crawler complete. Check storage/datasets/default/ for results.')
     logger.info('[OK] View your data in Qdrant Cloud: https://cloud.qdrant.io')

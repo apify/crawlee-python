@@ -2,6 +2,7 @@
 
 import logging
 from datetime import timedelta
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from crawlee._autoscaling.autoscaled_pool import ConcurrencySettings
@@ -200,11 +201,12 @@ class TaxDataCrawler:
             # Don't re-raise - we don't want to stop the crawler
             # Documents are still saved to filesystem
 
-    async def run(self, start_urls: list[str]) -> None:
+    async def run(self, start_urls: list[str], crawl_type: str = 'standard') -> None:
         """Run the crawler with the given start URLs.
 
         Args:
             start_urls: List of URLs to start crawling from.
+            crawl_type: Type of crawl for metrics tracking ('daily', 'weekly-deep', 'standard')
         """
         await self.crawler.run(start_urls)
 
@@ -232,3 +234,33 @@ class TaxDataCrawler:
             logger.info('\nQdrant Documents: %d', doc_count)
 
         logger.info('%s\n', '=' * 50)
+
+        # Write metrics to JSONL file for GitHub Actions artifact upload
+        self._write_metrics(crawl_type)
+
+    def _write_metrics(self, crawl_type: str) -> None:
+        """Write crawl metrics to a JSONL file for persistent tracking.
+
+        Args:
+            crawl_type: Type of crawl ('daily', 'weekly-deep', 'standard')
+        """
+        try:
+            # Determine metrics file path based on storage directory
+            storage_dir = Path(self.settings.STORAGE_DIR)
+            metrics_dir = storage_dir / 'datasets' / 'default'
+            metrics_dir.mkdir(parents=True, exist_ok=True)
+
+            metrics_file = metrics_dir / 'metrics.jsonl'
+
+            # Generate JSONL line
+            metrics_line = self.stats.to_jsonl(crawl_type)
+
+            # Append to metrics file (creates if doesn't exist)
+            with metrics_file.open('a') as f:
+                f.write(metrics_line + '\n')
+
+            logger.info('[OK] Metrics written to %s', metrics_file)
+
+        except Exception:
+            logger.exception('[ERROR] Failed to write metrics file')
+            # Don't raise - metrics writing shouldn't fail the crawl
