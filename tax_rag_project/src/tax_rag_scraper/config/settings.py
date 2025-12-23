@@ -35,9 +35,8 @@ class Settings(BaseSettings):
 
     # Qdrant Cloud configuration
     # Get credentials at https://cloud.qdrant.io
-    # These are REQUIRED - no defaults provided
-    QDRANT_URL: str  # Required: https://your-cluster.cloud.qdrant.io
-    QDRANT_API_KEY: str  # Required: Your Qdrant Cloud API key
+    QDRANT_URL: str = ''  # Required when USE_QDRANT is True: https://your-cluster.cloud.qdrant.io
+    QDRANT_API_KEY: str = ''  # Required when USE_QDRANT is True: Your Qdrant Cloud API key
     QDRANT_COLLECTION: str = 'tax_documents'
     USE_QDRANT: bool = True
 
@@ -45,7 +44,7 @@ class Settings(BaseSettings):
     # OpenAI API key is REQUIRED when USE_QDRANT is True
     EMBEDDING_MODEL: str = 'text-embedding-3-small'
     EMBEDDING_BATCH_SIZE: int = 5  # Reduced from 10 to avoid rate limits
-    OPENAI_API_KEY: str  # Required: Get from https://platform.openai.com/api-keys
+    OPENAI_API_KEY: str = ''  # Required when USE_QDRANT is True: Get from https://platform.openai.com/api-keys
 
     # Document processing
     CHUNK_SIZE: int = 800
