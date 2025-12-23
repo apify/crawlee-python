@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 1.2.2 - **not yet released**
 
+### 🚀 Features
+
+- Expose `AdaptivePlaywrightCrawlerStatisticState` for `AdaptivePlaywrightCrawler` ([#1635](https://github.com/apify/crawlee-python/pull/1635)) ([1bb4bcb](https://github.com/apify/crawlee-python/commit/1bb4bcb4ccbec347ad9c14f70e9e946d48e3c38e)) by [@Mantisus](https://github.com/Mantisus)
+
 ### 🐛 Bug Fixes
 
 - Prevent race condition in concurrent storage creation ([#1626](https://github.com/apify/crawlee-python/pull/1626)) ([7f17a43](https://github.com/apify/crawlee-python/commit/7f17a4347d5884962767e757a92ec173688fed7b)) by [@Mantisus](https://github.com/Mantisus), closes [#1621](https://github.com/apify/crawlee-python/issues/1621)
