@@ -49,8 +49,7 @@ class CRAHandler(BaseHandler):
         return match.group(0) if match else None
 
     def _determine_document_type(self, url: str) -> str:
-        """Determine document type based on URL patterns
-        """
+        """Determine document type based on URL patterns"""
         url_lower = url.lower()
 
         if 'form' in url_lower:
