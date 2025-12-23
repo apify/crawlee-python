@@ -23,12 +23,14 @@ with _try_import(
     'AdaptivePlaywrightCrawler',
     'AdaptivePlaywrightCrawlingContext',
     'AdaptivePlaywrightPreNavCrawlingContext',
+    'AdaptivePlaywrightCrawlerStatisticState',
     'RenderingType',
     'RenderingTypePrediction',
     'RenderingTypePredictor',
 ):
     from ._adaptive_playwright import (
         AdaptivePlaywrightCrawler,
+        AdaptivePlaywrightCrawlerStatisticState,
         AdaptivePlaywrightCrawlingContext,
         AdaptivePlaywrightPreNavCrawlingContext,
         RenderingType,
@@ -41,6 +43,7 @@ __all__ = [
     'AbstractHttpCrawler',
     'AbstractHttpParser',
     'AdaptivePlaywrightCrawler',
+    'AdaptivePlaywrightCrawlerStatisticState',
     'AdaptivePlaywrightCrawlingContext',
     'AdaptivePlaywrightPreNavCrawlingContext',
     'BasicCrawler',
