@@ -34,7 +34,7 @@ class SelectolaxLexborParser(AbstractHttpParser[LexborHTMLParser, LexborNode]):
         self, parsed_content: LexborHTMLParser, selector: str
     ) -> Sequence[LexborNode]:
         """Select elements matching a CSS selector."""
-        return tuple(match for match in parsed_content.css(selector))
+        return tuple(item for item in parsed_content.css(selector))
 
     @override
     def is_matching_selector(
