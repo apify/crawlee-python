@@ -157,7 +157,9 @@ class AdaptivePlaywrightCrawler(
         if 'concurrency_settings' not in kwargs or kwargs['concurrency_settings'] is None:
             kwargs['concurrency_settings'] = ConcurrencySettings(desired_concurrency=1)
 
-        super().__init__(statistics=statistics, **kwargs)
+        adaptive_statistics = statistics or Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)
+
+        super().__init__(statistics=adaptive_statistics, **kwargs)
 
         # Sub crawlers related.
         playwright_crawler_specific_kwargs = playwright_crawler_specific_kwargs or {}
