@@ -176,7 +176,7 @@ async def test_concurrent_open_datasets_with_same_name_and_alias() -> None:
             valid_kwargs['name'] = name
             valid_kwargs['alias'] = alias
         except ValueError:
-            exception_calls()
+            await exception_calls()
 
     await asyncio.gather(
         open_dataset(name=None, alias='concurrent-storage'),
