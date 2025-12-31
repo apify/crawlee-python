@@ -179,7 +179,7 @@ class RedisClientMixin:
         """Create a new Redis pipeline."""
         async with self._redis.pipeline() as pipe:
             try:
-                pipe.multi()  # type: ignore[no-untyped-call]
+                pipe.multi()
                 yield pipe
             finally:
                 if with_execute:
@@ -187,7 +187,6 @@ class RedisClientMixin:
 
     async def _create_storage(self, pipeline: Pipeline) -> None:
         """Create the actual storage structure in Redis."""
-        _ = pipeline  # To avoid unused variable mypy error
 
     async def _create_script(self, script_name: str) -> AsyncScript:
         """Load a Lua script from a file and return a Script object."""
@@ -262,8 +261,6 @@ class RedisClientMixin:
             pipeline: The Redis pipeline to use for the update.
             **kwargs: Storage-specific update parameters.
         """
-        _ = pipeline  # To avoid unused variable mypy error
-        _ = kwargs
 
     async def _update_metadata(
         self,

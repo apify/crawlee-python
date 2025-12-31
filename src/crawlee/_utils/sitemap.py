@@ -430,10 +430,10 @@ async def parse_sitemap(
     up to the specified maximum depth.
     """
     # Set default options
-    options = options or {}
-    emit_nested_sitemaps = options.get('emit_nested_sitemaps', False)
-    max_depth = options.get('max_depth', float('inf'))
-    sitemap_retries = options.get('sitemap_retries', 3)
+    options = options or {}  # ty: ignore[invalid-assignment]
+    emit_nested_sitemaps = options.get('emit_nested_sitemaps', False)  # ty: ignore[possibly-missing-attribute]
+    max_depth = options.get('max_depth', float('inf'))  # ty: ignore[possibly-missing-attribute]
+    sitemap_retries = options.get('sitemap_retries', 3)  # ty: ignore[possibly-missing-attribute]
 
     # Setup working state
     sources = list(initial_sources)
@@ -472,7 +472,7 @@ async def parse_sitemap(
                 sitemap_retries,
                 emit_nested_sitemaps=emit_nested_sitemaps,
                 proxy_info=proxy_info,
-                timeout=options.get('timeout', timedelta(seconds=30)),
+                timeout=options.get('timeout', timedelta(seconds=30)),  # ty: ignore[possibly-missing-attribute]
             ):
                 yield result
         else:

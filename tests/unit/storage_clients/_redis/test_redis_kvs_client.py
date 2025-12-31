@@ -46,7 +46,7 @@ async def test_base_keys_creation(kvs_client: RedisKeyValueStoreClient) -> None:
     metadata_data = await await_redis_response(kvs_client.redis.json().get('key_value_stores:test_kvs:metadata'))
 
     assert isinstance(metadata_data, dict)
-    assert metadata_data['id'] == metadata.id  # type: ignore[unreachable] # py-json typing is broken
+    assert metadata_data['id'] == metadata.id
 
 
 async def test_value_record_creation_and_content(kvs_client: RedisKeyValueStoreClient) -> None:

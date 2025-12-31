@@ -142,7 +142,7 @@ class BrowserPool:
         plugin_options['browser_new_context_options'] = browser_new_context_options or {}
 
         if headless is not None:
-            plugin_options['browser_launch_options']['headless'] = headless
+            plugin_options['browser_launch_options']['headless'] = headless  # ty: ignore[invalid-assignment]
 
         if use_incognito_pages is not None:
             plugin_options['use_incognito_pages'] = use_incognito_pages

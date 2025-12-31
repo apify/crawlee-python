@@ -68,7 +68,7 @@ class SessionCookies:
 
         if isinstance(cookies, dict):
             for key, value in cookies.items():
-                self.set(key, value)
+                self.set(key, value)  # ty: ignore[invalid-argument-type]
 
         elif isinstance(cookies, list):
             for item in cookies:
@@ -152,7 +152,7 @@ class SessionCookies:
             cookie_dict['expires'] = cookie.expires
 
         if (same_site := cookie.get_nonstandard_attr('SameSite')) and same_site in {'Lax', 'None', 'Strict'}:
-            cookie_dict['same_site'] = same_site  # type: ignore[typeddict-item]
+            cookie_dict['same_site'] = same_site  # ty: ignore[invalid-assignment]
 
         return cookie_dict
 

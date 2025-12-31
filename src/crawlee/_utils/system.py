@@ -5,7 +5,7 @@ import sys
 from contextlib import suppress
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import psutil
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
@@ -41,11 +41,19 @@ class CpuInfo(BaseModel):
     used_ratio: Annotated[float, Field(alias='usedRatio')]
     """The ratio of CPU currently in use, represented as a float between 0 and 1."""
 
-    created_at: datetime = Field(
-        alias='createdAt',
-        default_factory=lambda: datetime.now(timezone.utc),
-    )
-    """The time at which the measurement was taken."""
+    # Workaround for Pydantic and type checkers when using Annotated with default_factory
+    if TYPE_CHECKING:
+        created_at: datetime = datetime.now(timezone.utc)
+        """The time at which the measurement was taken."""
+    else:
+        created_at: Annotated[
+            datetime,
+            Field(
+                alias='createdAt',
+                default_factory=lambda: datetime.now(timezone.utc),
+            ),
+        ]
+        """The time at which the measurement was taken."""
 
 
 class MemoryUsageInfo(BaseModel):
@@ -61,11 +69,19 @@ class MemoryUsageInfo(BaseModel):
     ]
     """Memory usage of the current Python process and its children."""
 
-    created_at: datetime = Field(
-        alias='createdAt',
-        default_factory=lambda: datetime.now(timezone.utc),
-    )
-    """The time at which the measurement was taken."""
+    # Workaround for Pydantic and type checkers when using Annotated with default_factory
+    if TYPE_CHECKING:
+        created_at: datetime = datetime.now(timezone.utc)
+        """The time at which the measurement was taken."""
+    else:
+        created_at: Annotated[
+            datetime,
+            Field(
+                alias='createdAt',
+                default_factory=lambda: datetime.now(timezone.utc),
+            ),
+        ]
+        """The time at which the measurement was taken."""
 
 
 class MemoryInfo(MemoryUsageInfo):

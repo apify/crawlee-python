@@ -62,14 +62,14 @@ class HttpHeaders(RootModel, Mapping[str, str]):
 
     model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
-    # Workaround for pydantic 2.12 and mypy type checking issue for Annotated with default_factory
+    # Workaround for Pydantic and type checkers when using Annotated with default_factory
     if TYPE_CHECKING:
         root: dict[str, str] = {}
     else:
         root: Annotated[
             dict[str, str],
             PlainValidator(lambda value: _normalize_headers(value)),
-            Field(default_factory=dict),
+            Field(default_factory=lambda: dict[str, str]()),
         ]
 
     def __getitem__(self, key: str) -> str:
@@ -91,7 +91,7 @@ class HttpHeaders(RootModel, Mapping[str, str]):
         combined_headers = {**other, **self.root}
         return HttpHeaders(combined_headers)
 
-    def __iter__(self) -> Iterator[str]:  # type: ignore[override]
+    def __iter__(self) -> Iterator[str]:  # ty: ignore[invalid-method-override]
         yield from self.root
 
     def __len__(self) -> int:
@@ -671,17 +671,16 @@ class BasicCrawlingContext:
         get_key_value_store: GetKeyValueStoreFromRequestHandlerFunction | None = None,
     ) -> Self:
         """Create a modified copy of the crawling context with specified changes."""
-        original_fields = {field.name: getattr(self, field.name) for field in dataclasses.fields(self)}
-        modified_fields = {
-            key: value
-            for key, value in {
-                'push_data': push_data,
-                'add_requests': add_requests,
-                'get_key_value_store': get_key_value_store,
-            }.items()
-            if value
-        }
-        return self.__class__(**{**original_fields, **modified_fields})
+        modifications = dict[str, Any]()
+
+        if push_data is not None:
+            modifications['push_data'] = push_data
+        if add_requests is not None:
+            modifications['add_requests'] = add_requests
+        if get_key_value_store is not None:
+            modifications['get_key_value_store'] = get_key_value_store
+
+        return dataclasses.replace(self, **modifications)
 
 
 class GetDataKwargs(TypedDict):

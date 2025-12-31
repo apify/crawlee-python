@@ -410,7 +410,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._context_result_map = WeakKeyDictionary[BasicCrawlingContext, RequestHandlerRunResult]()
 
         # Context pipeline
-        self._context_pipeline = (_context_pipeline or ContextPipeline()).compose(self._check_url_after_redirects)
+        self._context_pipeline = (_context_pipeline or ContextPipeline()).compose(self._check_url_after_redirects)  # ty: ignore[invalid-argument-type]
 
         # Crawl settings
         self._max_request_retries = max_request_retries
@@ -774,7 +774,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         async with AsyncExitStack() as exit_stack:
             for context in contexts_to_enter:
-                await exit_stack.enter_async_context(context)  # type: ignore[arg-type]
+                await exit_stack.enter_async_context(context)  # ty: ignore[invalid-argument-type]
 
             await self._autoscaled_pool.run()
 
@@ -873,7 +873,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
-        **additional_kwargs: Unpack[ExportDataJsonKwargs | ExportDataCsvKwargs],  # type: ignore[misc]
+        **additional_kwargs: Unpack[ExportDataJsonKwargs | ExportDataCsvKwargs],
     ) -> None:
         """Export all items from a Dataset to a JSON or CSV file.
 

@@ -179,13 +179,13 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
             case (True, int(), None):
                 json_path += f'[:-{offset}]'
             case (True, int(), int()):
-                json_path += f'[-{offset + limit}:-{offset}]'
+                json_path += f'[-{offset + limit}:-{offset}]'  # ty: ignore[unsupported-operator]
             case (False, 0, int()):
                 json_path += f'[:{limit}]'
             case (False, int(), None):
                 json_path += f'[{offset}:]'
             case (False, int(), int()):
-                json_path += f'[{offset}:{offset + limit}]'
+                json_path += f'[{offset}:{offset + limit}]'  # ty: ignore[unsupported-operator]
 
         if json_path == '$':
             json_path = '$[*]'
@@ -210,7 +210,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
             limit=limit or (total - offset),
             total=total,
             desc=desc,
-            items=data,
+            items=data,  # ty: ignore[invalid-argument-type]
         )
 
     @override
