@@ -119,7 +119,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         kvs_base_path = Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
 
         if not kvs_base_path.exists():
-            await asyncio.to_thread(kvs_base_path.mkdir, parents=True, exist_ok=True)
+            await asyncio.to_thread(lambda: kvs_base_path.mkdir(parents=True, exist_ok=True))
 
         # Get a new instance by ID.
         if id:
@@ -133,7 +133,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                     continue
 
                 try:
-                    file = await asyncio.to_thread(path_to_metadata.open, 'r', encoding='utf-8')
+                    file = await asyncio.to_thread(lambda p=path_to_metadata: p.open(mode='r', encoding='utf-8'))
                     try:
                         file_content = json.load(file)
                         metadata = KeyValueStoreMetadata(**file_content)
@@ -162,7 +162,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
             # If the key-value store directory exists, reconstruct the client from the metadata file.
             if path_to_kvs.exists() and path_to_metadata.exists():
-                file = await asyncio.to_thread(open, path_to_metadata, 'r', encoding='utf-8')
+                file = await asyncio.to_thread(lambda: path_to_metadata.open(mode='r', encoding='utf-8'))
                 try:
                     file_content = json.load(file)
                 finally:
@@ -212,7 +212,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             for file_path in self.path_to_kvs.glob('*'):
                 if file_path.name == METADATA_FILENAME:
                     continue
-                await asyncio.to_thread(file_path.unlink, missing_ok=True)
+                await asyncio.to_thread(lambda f=file_path: f.unlink(missing_ok=True))
 
             await self._update_metadata(
                 update_accessed_at=True,
@@ -239,7 +239,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         # Read the metadata file
         async with self._lock:
             try:
-                file = await asyncio.to_thread(open, record_metadata_filepath, 'r', encoding='utf-8')
+                file = await asyncio.to_thread(lambda: record_metadata_filepath.open(mode='r', encoding='utf-8'))
             except FileNotFoundError:
                 logger.warning(f'Metadata file disappeared for key "{key}", aborting get_value')
                 return None
@@ -346,11 +346,11 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         async with self._lock:
             # Delete the value file and its metadata if found
             if record_path.exists():
-                await asyncio.to_thread(record_path.unlink, missing_ok=True)
+                await asyncio.to_thread(lambda: record_path.unlink(missing_ok=True))
 
                 # Delete the metadata file if it exists
                 if metadata_path.exists():
-                    await asyncio.to_thread(metadata_path.unlink, missing_ok=True)
+                    await asyncio.to_thread(lambda: metadata_path.unlink(missing_ok=True))
                 else:
                     logger.warning(f'Found value file for key "{key}" but no metadata file when trying to delete it.')
 
@@ -373,7 +373,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         # List and sort all files *inside* a brief lock, then release it immediately:
         async with self._lock:
-            files = sorted(await asyncio.to_thread(list, self.path_to_kvs.glob('*')))
+            files = sorted(await asyncio.to_thread(lambda: list(self.path_to_kvs.glob('*'))))
 
         count = 0
 
@@ -395,7 +395,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
             # Try to read and parse the metadata file
             try:
-                metadata_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
+                metadata_content = await asyncio.to_thread(lambda f=file_path: f.read_text(encoding='utf-8'))
             except FileNotFoundError:
                 logger.warning(f'Metadata file disappeared for key "{key_name}", skipping it.')
                 continue
@@ -475,7 +475,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             self._metadata.modified_at = now
 
         # Ensure the parent directory for the metadata file exists.
-        await asyncio.to_thread(self.path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(lambda: self.path_to_metadata.parent.mkdir(parents=True, exist_ok=True))
 
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump())

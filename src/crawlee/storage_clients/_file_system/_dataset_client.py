@@ -120,7 +120,7 @@ class FileSystemDatasetClient(DatasetClient):
         dataset_base_path = Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
 
         if not dataset_base_path.exists():
-            await asyncio.to_thread(dataset_base_path.mkdir, parents=True, exist_ok=True)
+            await asyncio.to_thread(lambda: dataset_base_path.mkdir(parents=True, exist_ok=True))
 
         # Get a new instance by ID.
         if id:
@@ -134,7 +134,7 @@ class FileSystemDatasetClient(DatasetClient):
                     continue
 
                 try:
-                    file = await asyncio.to_thread(path_to_metadata.open, 'r', encoding='utf-8')
+                    file = await asyncio.to_thread(lambda p=path_to_metadata: p.open(mode='r', encoding='utf-8'))
                     try:
                         file_content = json.load(file)
                         metadata = DatasetMetadata(**file_content)
@@ -163,7 +163,7 @@ class FileSystemDatasetClient(DatasetClient):
 
             # If the dataset directory exists, reconstruct the client from the metadata file.
             if path_to_dataset.exists() and path_to_metadata.exists():
-                file = await asyncio.to_thread(open, path_to_metadata, 'r', encoding='utf-8')
+                file = await asyncio.to_thread(lambda: path_to_metadata.open(mode='r', encoding='utf-8'))
                 try:
                     file_content = json.load(file)
                 finally:
@@ -211,7 +211,7 @@ class FileSystemDatasetClient(DatasetClient):
     async def purge(self) -> None:
         async with self._lock:
             for file_path in await self._get_sorted_data_files():
-                await asyncio.to_thread(file_path.unlink, missing_ok=True)
+                await asyncio.to_thread(lambda f=file_path: f.unlink(missing_ok=True))
 
             await self._update_metadata(
                 update_accessed_at=True,
@@ -435,7 +435,7 @@ class FileSystemDatasetClient(DatasetClient):
             self._metadata.item_count = new_item_count
 
         # Ensure the parent directory for the metadata file exists.
-        await asyncio.to_thread(self.path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(lambda: self.path_to_metadata.parent.mkdir(parents=True, exist_ok=True))
 
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump())
@@ -456,7 +456,7 @@ class FileSystemDatasetClient(DatasetClient):
         file_path = self.path_to_dataset / filename
 
         # Ensure the dataset directory exists.
-        await asyncio.to_thread(self.path_to_dataset.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(lambda: self.path_to_dataset.mkdir(parents=True, exist_ok=True))
 
         # Dump the serialized item to the file.
         data = await json_dumps(item)
@@ -473,9 +473,10 @@ class FileSystemDatasetClient(DatasetClient):
         """
         # Retrieve and sort all JSON files in the dataset directory numerically.
         files = await asyncio.to_thread(
-            sorted,
-            self.path_to_dataset.glob('*.json'),
-            key=lambda f: int(f.stem) if f.stem.isdigit() else 0,
+            lambda: sorted(
+                self.path_to_dataset.glob('*.json'),
+                key=lambda f: int(f.stem) if f.stem.isdigit() else 0,
+            )
         )
 
         # Remove the metadata file from the list if present.

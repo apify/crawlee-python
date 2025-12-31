@@ -160,7 +160,7 @@ class AdaptivePlaywrightCrawler(
         super().__init__(statistics=statistics, **kwargs)
 
         # Sub crawlers related.
-        playwright_crawler_specific_kwargs = playwright_crawler_specific_kwargs or {}
+        playwright_crawler_specific_kwargs = playwright_crawler_specific_kwargs or {}  # ty: ignore[invalid-assignment]
 
         # Each sub crawler will use custom logger .
         static_logger = getLogger('Subcrawler_static')
@@ -181,7 +181,7 @@ class AdaptivePlaywrightCrawler(
         )
         playwright_crawler = PlaywrightCrawler(
             statistics=_NonPersistentStatistics(),
-            **playwright_crawler_specific_kwargs,
+            **playwright_crawler_specific_kwargs,  # ty: ignore[invalid-argument-type]
             **basic_crawler_kwargs_for_pw_crawler,
         )
 
@@ -335,7 +335,7 @@ class AdaptivePlaywrightCrawler(
                 )
                 await self.router(adaptive_crawling_context)
 
-            return self._static_context_pipeline(context_linked_to_result, from_static_pipeline_to_top_router)
+            return self._static_context_pipeline(context_linked_to_result, from_static_pipeline_to_top_router)  # ty: ignore[invalid-argument-type]
 
         if rendering_type == 'client only':
 
@@ -345,7 +345,7 @@ class AdaptivePlaywrightCrawler(
                 )
                 await self.router(adaptive_crawling_context)
 
-            return self._pw_context_pipeline(context_linked_to_result, from_pw_pipeline_to_top_router)
+            return self._pw_context_pipeline(context_linked_to_result, from_pw_pipeline_to_top_router)  # ty: ignore[invalid-argument-type]
 
         raise RuntimeError(
             f'Not a valid rendering type. Must be one of the following: {", ".join(get_args(RenderingType))}'

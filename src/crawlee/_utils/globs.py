@@ -36,7 +36,7 @@ def _translate(
     if not seps:
         seps = (os.path.sep, os.path.altsep) if os.path.altsep else os.path.sep
 
-    escaped_seps = ''.join(map(re.escape, seps))
+    escaped_seps = ''.join(map(re.escape, seps))  # ty: ignore[invalid-argument-type]
     any_sep = f'[{escaped_seps}]' if len(seps) > 1 else escaped_seps
     not_sep = f'[^{escaped_seps}]'
     if include_hidden:
