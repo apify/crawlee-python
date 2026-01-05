@@ -153,7 +153,7 @@ The parser converts HTTP responses into a parsed document and provides methods f
 
 This is enough to use your parser with `AbstractHttpCrawler.create_parsed_http_crawler_class` factory method. For more control, continue with custom context and crawler classes below.
 
-### Crawling context definition
+### Crawling context definition (optional)
 
 The crawling context is passed to request handlers and provides access to the parsed content. Extend <ApiLink to="class/ParsedHttpCrawlingContext">`ParsedHttpCrawlingContext`</ApiLink> to define the interface your handlers will work with. Here you can implement additional helpers for the crawler context.
 
