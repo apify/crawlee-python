@@ -6,6 +6,8 @@ from typing_extensions import Self
 from crawlee.crawlers._abstract_http import ParsedHttpCrawlingContext
 
 
+# Custom context for Selectolax parser, you can add your own methods here
+# to facilitate working with the parsed document.
 @dataclass(frozen=True)
 class SelectolaxLexborContext(ParsedHttpCrawlingContext[LexborHTMLParser]):
     """Crawling context providing access to the parsed page.

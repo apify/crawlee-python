@@ -17,6 +17,9 @@ if TYPE_CHECKING:
     from crawlee.crawlers._abstract_http import ParsedHttpCrawlingContext
 
 
+# Custom crawler using custom context, It is optional and you can use
+# AbstractHttpCrawler directly with SelectolaxLexborParser if you don't need
+# any custom context methods.
 class SelectolaxLexborCrawler(
     AbstractHttpCrawler[SelectolaxLexborContext, LexborHTMLParser, LexborNode]
 ):
@@ -30,6 +33,8 @@ class SelectolaxLexborCrawler(
         async def final_step(
             context: ParsedHttpCrawlingContext[LexborHTMLParser],
         ) -> AsyncGenerator[SelectolaxLexborContext, None]:
+            # Yield custom context wrapping with additional functionality around the base
+            # context.
             yield SelectolaxLexborContext.from_parsed_http_crawling_context(context)
 
         # Build context pipeline: HTTP request -> parsing -> custom context.
