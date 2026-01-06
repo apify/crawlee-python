@@ -1302,6 +1302,10 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
 
 
 @pytest.mark.run_alone
+@pytest.mark.skipif(
+    sys.platform != 'linux',
+    reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1652.',
+)
 @pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.timeout was introduced in Python 3.11.')
 @pytest.mark.parametrize(
     'sleep_type',
@@ -1351,6 +1355,10 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     assert mocked_handler_after_sleep.call_count == 1
 
 
+@pytest.mark.skipif(
+    sys.platform != 'linux',
+    reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1649.',
+)
 @pytest.mark.parametrize(
     ('keep_alive', 'max_requests_per_crawl', 'expected_handled_requests_count'),
     [

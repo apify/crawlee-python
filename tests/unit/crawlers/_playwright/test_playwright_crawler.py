@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import sys
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Literal
 from unittest import mock
@@ -325,6 +326,10 @@ async def test_proxy_set() -> None:
     assert handler_data.get('proxy') == proxy_value
 
 
+@pytest.mark.skipif(
+    sys.platform != 'linux',
+    reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1651.',
+)
 @pytest.mark.parametrize(
     'use_incognito_pages',
     [

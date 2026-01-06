@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -62,6 +63,10 @@ async def test_multiple_plugins_new_page_creation(server_url: URL) -> None:
         assert browser_pool.total_pages_count == 3
 
 
+@pytest.mark.skipif(
+    sys.platform != 'linux',
+    reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1660.',
+)
 async def test_new_page_with_each_plugin(server_url: URL) -> None:
     plugin_chromium = PlaywrightBrowserPlugin(browser_type='chromium')
     plugin_firefox = PlaywrightBrowserPlugin(browser_type='firefox')
