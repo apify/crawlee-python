@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from dataclasses import dataclass
 from datetime import timedelta
 from itertools import cycle
@@ -604,6 +605,10 @@ async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[st
     mocked_h2_handler.assert_has_calls([call(expected_h2_tag)])
 
 
+@pytest.mark.skipif(
+    sys.platform != 'linux',
+    reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1650.',
+)
 async def test_adaptive_context_query_selector_parsel(test_urls: list[str]) -> None:
     """Test that `context.query_selector_one` works regardless of the crawl type for Parsel variant.
 
