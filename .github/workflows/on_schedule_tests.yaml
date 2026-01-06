@@ -8,6 +8,12 @@ on:
   schedule:
     - cron: '0 6 * * *'
 
+  # Runs when invoked by another workflow.
+  workflow_call:
+    secrets:
+      APIFY_TEST_USER_API_TOKEN:
+        required: true
+
 concurrency:
   group: scheduled-tests
   cancel-in-progress: false
