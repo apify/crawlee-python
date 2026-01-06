@@ -70,6 +70,7 @@ async def test_static_crawler_actor_at_apify(
     patch_crawlee_version_in_project(
         project_path=tmp_path / actor_name, wheel_path=crawlee_wheel_path, package_manager=package_manager
     )
+    raise Exception("injected")
 
     # Print apify version for debugging purposes in rare cases of CLI failures
     subprocess.run(['apify', '--version'], check=True)  # noqa: ASYNC221, S607
