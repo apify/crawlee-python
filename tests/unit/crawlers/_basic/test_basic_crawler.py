@@ -1315,12 +1315,12 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
 
     Handler should be able to time out even if the code causing the timeout is blocking sync code.
     Crawler should attempt to retry it.
-    This test creates situation where the request handler times out twice, on third retry it does not time out."""
+    This test creates situation where the request handler times out twice, on third attempt it does not time out."""
     # Test is skipped in older Python versions.
     from asyncio import timeout  # type:ignore[attr-defined] # noqa: PLC0415
 
     handler_timeout = timedelta(seconds=1)
-    max_request_retries = 3
+    max_request_retries = 2  # Allows 3 total attempts: 1 initial + 2 retries
     double_handler_timeout_s = handler_timeout.total_seconds() * 2
     handler_sleep = iter([double_handler_timeout_s, double_handler_timeout_s, 0])
 
@@ -1343,11 +1343,11 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
 
     # Timeout in pytest, because previous implementation would run crawler until following:
     # "The request queue seems to be stuck for 300.0s, resetting internal state."
-    async with timeout(max_request_retries * double_handler_timeout_s):
+    async with timeout((max_request_retries + 1) * double_handler_timeout_s + 2):
         await crawler.run(['https://a.placeholder.com'])
 
     assert crawler.statistics.state.requests_finished == 1
-    assert mocked_handler_before_sleep.call_count == max_request_retries
+    assert mocked_handler_before_sleep.call_count == max_request_retries + 1  # Initial attempt + retries
     assert mocked_handler_after_sleep.call_count == 1
 
 
