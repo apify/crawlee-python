@@ -256,6 +256,9 @@ module = [
     "apify_fingerprint_datapoints", # Untyped and stubs not available
     "camoufox",                     # Example code shows integration of camoufox and crawlee.
     "fastapi",                      # Example code shows running in webserver.
+    "saxonche",                     # Example code shows HttpCrawler with custom parser.
+    "scrapling.*",                  # Example code shows HttpCrawler with custom parser.
+    "selectolax.*",                 # Example code shows HttpCrawler with custom parser.
     "stagehand.*",                  # Example code shows integration of Stagehand and crawlee.
     "starlette.*",                  # Example code shows running in webserver.
     "flask",                        # Example code shows deploy on Google Cloud.
@@ -263,9 +266,11 @@ module = [
     "jaro",                         # Untyped and stubs not available
     "litestar",                     # Example code shows deploy on Google Cloud Run.
     "loguru",                       # Example code shows integration of loguru and crawlee for JSON logging.
+    "lxml.*",                       # Example code shows HttpCrawler with custom parser.
     "sklearn.linear_model",         # Untyped and stubs not available
     "cookiecutter.*",               # Untyped and stubs not available
     "inquirer.*",                   # Untyped and stubs not available
+    "pyquery",                      # Example code shows HttpCrawler with custom parser.
     "warcio.*",                     # Example code shows WARC files creation.
     "wrapt"                         # Untyped and stubs not available
 ]
