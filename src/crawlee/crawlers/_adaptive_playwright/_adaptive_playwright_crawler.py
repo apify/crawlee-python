@@ -27,23 +27,16 @@ from crawlee.crawlers import (
 )
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
 from crawlee.crawlers._parsel._parsel_parser import ParselParser
+from crawlee.crawlers._playwright._playwright_crawler import _PlaywrightCrawlerAdditionalOptions
 from crawlee.statistics import Statistics, StatisticsState
 
-from ._adaptive_playwright_crawler_statistics import (
-    AdaptivePlaywrightCrawlerStatisticState,
-)
+from ._adaptive_playwright_crawler_statistics import AdaptivePlaywrightCrawlerStatisticState
 from ._adaptive_playwright_crawling_context import (
     AdaptivePlaywrightCrawlingContext,
     AdaptivePlaywrightPreNavCrawlingContext,
 )
-from ._rendering_type_predictor import (
-    DefaultRenderingTypePredictor,
-    RenderingType,
-    RenderingTypePredictor,
-)
-from ._result_comparator import (
-    create_default_comparator,
-)
+from ._rendering_type_predictor import DefaultRenderingTypePredictor, RenderingType, RenderingTypePredictor
+from ._result_comparator import create_default_comparator
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -51,7 +44,6 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
-    from crawlee.crawlers._playwright._playwright_crawler import _PlaywrightCrawlerAdditionalOptions
 
 
 TStaticParseResult = TypeVar('TStaticParseResult')
@@ -162,7 +154,7 @@ class AdaptivePlaywrightCrawler(
         super().__init__(statistics=adaptive_statistics, **kwargs)
 
         # Sub crawlers related.
-        playwright_crawler_specific_kwargs = playwright_crawler_specific_kwargs or {}  # ty: ignore[invalid-assignment]
+        playwright_crawler_specific_kwargs = playwright_crawler_specific_kwargs or _PlaywrightCrawlerAdditionalOptions()
 
         # Each sub crawler will use custom logger .
         static_logger = getLogger('Subcrawler_static')
@@ -183,7 +175,7 @@ class AdaptivePlaywrightCrawler(
         )
         playwright_crawler = PlaywrightCrawler(
             statistics=_NonPersistentStatistics(),
-            **playwright_crawler_specific_kwargs,  # ty: ignore[invalid-argument-type]
+            **playwright_crawler_specific_kwargs,
             **basic_crawler_kwargs_for_pw_crawler,
         )
 

@@ -116,6 +116,7 @@ class TestInput:
             TestInput(
                 expected_pw_count=0,
                 expected_static_count=2,
+                # Lack of ty support, see https://github.com/astral-sh/ty/issues/2348.
                 rendering_types=cycle(['static']),  # ty: ignore[invalid-argument-type]
                 detection_probability_recommendation=cycle([0]),
             ),
@@ -746,6 +747,7 @@ async def test_adaptive_context_query_non_existing_element(test_urls: list[str])
             TestInput(
                 expected_pw_count=0,
                 expected_static_count=2,
+                # Lack of ty support, see https://github.com/astral-sh/ty/issues/2348.
                 rendering_types=cycle(['static']),  # ty: ignore[invalid-argument-type]
                 detection_probability_recommendation=cycle([0]),
             ),

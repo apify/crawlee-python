@@ -179,12 +179,14 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
             case (True, int(), None):
                 json_path += f'[:-{offset}]'
             case (True, int(), int()):
+                # ty lacks support for advanced pattern matching, see https://github.com/astral-sh/ty/issues/887.
                 json_path += f'[-{offset + limit}:-{offset}]'  # ty: ignore[unsupported-operator]
             case (False, 0, int()):
                 json_path += f'[:{limit}]'
             case (False, int(), None):
                 json_path += f'[{offset}:]'
             case (False, int(), int()):
+                # ty lacks support for advanced pattern matching, see https://github.com/astral-sh/ty/issues/887.
                 json_path += f'[{offset}:{offset + limit}]'  # ty: ignore[unsupported-operator]
 
         if json_path == '$':

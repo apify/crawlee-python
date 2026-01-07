@@ -14,10 +14,7 @@ from typing_extensions import NotRequired, TypedDict, TypeVar
 
 from crawlee import service_locator
 from crawlee._request import Request, RequestOptions, RequestState
-from crawlee._types import (
-    BasicCrawlingContext,
-    ConcurrencySettings,
-)
+from crawlee._types import BasicCrawlingContext, ConcurrencySettings
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
 from crawlee._utils.robots import RobotsTxtFile
@@ -177,13 +174,12 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         # If browser_pool is not provided, create a new instance of BrowserPool with specified arguments.
         else:
             if fingerprint_generator == 'default':
-                if not browser_type:
-                    generator_browser_type = None
-                else:
-                    generator_browser_type = [fingerprint_browser_type_from_playwright_browser_type(browser_type)]
+                generator_browser_type: list[Literal['chrome', 'firefox', 'safari', 'edge']] | None = (
+                    [fingerprint_browser_type_from_playwright_browser_type(browser_type)] if browser_type else None
+                )
 
                 fingerprint_generator = DefaultFingerprintGenerator(
-                    header_options=HeaderGeneratorOptions(browsers=generator_browser_type)  # ty: ignore[invalid-argument-type]
+                    header_options=HeaderGeneratorOptions(browsers=generator_browser_type)
                 )
 
             browser_pool = BrowserPool.with_default_plugin(
@@ -516,6 +512,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
     async def _update_cookies(self, page: Page, cookies: list[PlaywrightCookieParam]) -> None:
         """Update the cookies in the page context."""
+        # False positive ty error, see https://github.com/astral-sh/ty/issues/1493.
         await page.context.add_cookies([{**cookie} for cookie in cookies])  # ty: ignore[invalid-argument-type]
 
     async def _find_txt_file_for_url(self, url: str) -> RobotsTxtFile:

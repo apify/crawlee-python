@@ -138,11 +138,11 @@ class BrowserPool:
             kwargs: Additional arguments for default constructor.
         """
         plugin_options: dict = defaultdict(dict)
-        plugin_options['browser_launch_options'] = browser_launch_options or {}
+        plugin_options['browser_launch_options'] = dict(browser_launch_options) if browser_launch_options else {}
         plugin_options['browser_new_context_options'] = browser_new_context_options or {}
 
         if headless is not None:
-            plugin_options['browser_launch_options']['headless'] = headless  # ty: ignore[invalid-assignment]
+            plugin_options['browser_launch_options']['headless'] = headless
 
         if use_incognito_pages is not None:
             plugin_options['use_incognito_pages'] = use_incognito_pages

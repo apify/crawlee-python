@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any
+from http.cookiejar import Cookie
+from typing import TYPE_CHECKING, Any, cast
 
 from curl_cffi import CurlInfo
 from curl_cffi.const import CurlHttpVersion
@@ -15,7 +16,7 @@ from curl_cffi.requests.exceptions import Timeout
 from curl_cffi.requests.impersonate import DEFAULT_CHROME as CURL_DEFAULT_CHROME
 from typing_extensions import override
 
-from crawlee._types import HttpHeaders, HttpPayload
+from crawlee._types import HttpHeaders, HttpMethod, HttpPayload
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee._utils.docs import docs_group
 from crawlee.errors import ProxyError
@@ -24,11 +25,11 @@ from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
     from datetime import timedelta
-    from http.cookiejar import Cookie
 
     from curl_cffi import Curl
     from curl_cffi.requests import Request as CurlRequest
     from curl_cffi.requests import Response
+    from curl_cffi.requests.session import HttpMethod as CurlHttpMethod
 
     from crawlee import Request
     from crawlee._types import HttpMethod
@@ -90,13 +91,15 @@ class _CurlImpersonateResponse:
     async def read(self) -> bytes:
         if self._response.astream_task:
             raise RuntimeError('Use `read_stream` to read the body of the Response received from the `stream` method')
+
         return self._response.content
 
     async def read_stream(self) -> AsyncGenerator[bytes, None]:
-        if not self._response.astream_task or self._response.astream_task.done():  # ty: ignore[possibly-missing-attribute]
-            raise RuntimeError(
-                'Cannot read stream: either already consumed or Response not obtained from `stream` method'
-            )
+        if not self._response.astream_task:
+            raise RuntimeError('Cannot read stream, Response not obtained from `stream` method.')
+
+        if isinstance(self._response.astream_task, asyncio.Future) and self._response.astream_task.done():
+            raise RuntimeError('Cannot read stream, it was already consumed.')
 
         async for chunk in self._response.aiter_content():
             yield chunk
@@ -156,7 +159,7 @@ class CurlImpersonateHttpClient(HttpClient):
         try:
             response = await client.request(
                 url=request.url,
-                method=request.method.upper(),  # ty: ignore[invalid-argument-type]
+                method=self._convert_method(request.method),
                 headers=request.headers,
                 data=request.payload,
                 cookies=session.cookies.jar if session else None,
@@ -203,7 +206,7 @@ class CurlImpersonateHttpClient(HttpClient):
         try:
             response = await client.request(
                 url=url,
-                method=method.upper(),  # ty: ignore[invalid-argument-type]
+                method=self._convert_method(method),
                 headers=dict(headers) if headers else None,
                 data=payload,
                 cookies=session.cookies.jar if session else None,
@@ -244,7 +247,7 @@ class CurlImpersonateHttpClient(HttpClient):
         try:
             response = await client.request(
                 url=url,
-                method=method.upper(),  # ty: ignore[invalid-argument-type]
+                method=self._convert_method(method),
                 headers=dict(headers) if headers else None,
                 data=payload,
                 cookies=session.cookies.jar if session else None,
@@ -291,6 +294,40 @@ class CurlImpersonateHttpClient(HttpClient):
 
         return self._client_by_proxy_url[proxy_url]
 
+    def _convert_method(self, method: HttpMethod) -> CurlHttpMethod:
+        """Convert from Crawlee HTTP method to curl-cffi HTTP method.
+
+        Args:
+            method: Crawlee HTTP method.
+
+        Returns:
+            Corresponding curl-cffi HTTP method.
+
+        Raises:
+            ValueError: If the provided HTTP method is not supported.
+        """
+        method_upper = method.upper()  # curl-cffi requires uppercase methods
+
+        match method_upper:
+            case 'GET':
+                return 'GET'
+            case 'POST':
+                return 'POST'
+            case 'PUT':
+                return 'PUT'
+            case 'DELETE':
+                return 'DELETE'
+            case 'OPTIONS':
+                return 'OPTIONS'
+            case 'HEAD':
+                return 'HEAD'
+            case 'TRACE':
+                return 'TRACE'
+            case 'PATCH':
+                return 'PATCH'
+            case _:
+                raise ValueError(f'HTTP method {method} is not supported in {self.__class__.__name__}.')
+
     @staticmethod
     def _is_proxy_error(error: CurlRequestError) -> bool:
         """Determine whether the given error is related to a proxy issue.
@@ -308,11 +345,16 @@ class CurlImpersonateHttpClient(HttpClient):
 
     @staticmethod
     def _get_cookies(curl: Curl) -> list[Cookie]:
-        cookies: list[Cookie] = []
-        for curl_cookie in curl.getinfo(CurlInfo.COOKIELIST):  # ty: ignore[not-iterable]
-            curl_morsel = CurlMorsel.from_curl_format(curl_cookie)  # ty: ignore[invalid-argument-type]
+        cookies = list[Cookie]()
+
+        # Implementation of getinfo always returns list[bytes] for CurlInfo.COOKIELIST.
+        cookie_list = cast('list[bytes]', curl.getinfo(CurlInfo.COOKIELIST))
+
+        for curl_cookie in cookie_list:
+            curl_morsel = CurlMorsel.from_curl_format(curl_cookie)
             cookie = curl_morsel.to_cookiejar_cookie()
             cookies.append(cookie)
+
         return cookies
 
     async def cleanup(self) -> None:

@@ -1,8 +1,8 @@
 # Cache
 __pycache__
-.uv_cache
 .pytest_cache
 .ruff_cache
+.ty_cache
 .uv-cache
 
 # Virtual envs

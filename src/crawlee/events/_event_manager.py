@@ -178,7 +178,8 @@ class EventManager:
                 else asyncio.to_thread(cast('Callable[..., None]', listener), *bound_args.args, **bound_args.kwargs)
             )
 
-            listener_task = asyncio.create_task(coro, name=f'Task-{event.value}-{listener.__name__}')  # ty: ignore[invalid-argument-type, unresolved-attribute]
+            listener_name = listener.__name__ if hasattr(listener, '__name__') else listener.__class__.__name__
+            listener_task = asyncio.create_task(coro, name=f'Task-{event.value}-{listener_name}')
             self._listener_tasks.add(listener_task)
 
             try:
@@ -189,7 +190,12 @@ class EventManager:
                 # We need to swallow the exception and just log it here, otherwise it could break the event emitter
                 logger.exception(
                     'Exception in the event listener',
-                    extra={'event_name': event.value, 'listener_name': listener.__name__},  # ty: ignore[unresolved-attribute]
+                    extra={
+                        'event_name': event.value,
+                        'listener_name': listener.__name__
+                        if hasattr(listener, '__name__')
+                        else listener.__class__.__name__,
+                    },
                 )
             finally:
                 logger.debug('EventManager.on.listener_wrapper(): Removing listener task from the set...')
