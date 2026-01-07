@@ -197,6 +197,8 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         if data is None:
             data = []
 
+        data = [item for item in data if isinstance(item, dict)]
+
         if skip_empty:
             data = [item for item in data if item]
 
@@ -212,7 +214,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
             limit=limit or (total - offset),
             total=total,
             desc=desc,
-            items=data,  # ty: ignore[invalid-argument-type]
+            items=data,
         )
 
     @override
