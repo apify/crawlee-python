@@ -60,7 +60,7 @@ async def test_base_keys_creation(rq_client: RedisRequestQueueClient) -> None:
     metadata_data = await await_redis_response(rq_client.redis.json().get('request_queues:test_request_queue:metadata'))
 
     assert isinstance(metadata_data, dict)
-    assert metadata_data['id'] == metadata.id  # type: ignore[unreachable] # py-json typing is broken
+    assert metadata_data['id'] == metadata.id
 
 
 async def test_request_records_persistence(rq_client: RedisRequestQueueClient) -> None:

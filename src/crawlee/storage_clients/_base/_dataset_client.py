@@ -87,8 +87,8 @@ class DatasetClient(ABC):
 
         The backend method for the `Dataset.iterate_items` call.
         """
-        # This syntax is to make mypy properly work with abstract AsyncIterator.
+        # This syntax is to make type checker properly work with abstract AsyncIterator.
         # https://mypy.readthedocs.io/en/stable/more_types.html#asynchronous-iterators
         raise NotImplementedError
-        if False:  # type: ignore[unreachable]
+        if False:
             yield 0

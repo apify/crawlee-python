@@ -86,7 +86,7 @@ async def test_rotates_proxies() -> None:
 
 async def test_rotates_proxies_with_sessions() -> None:
     proxy_urls: list[str | None] = ['http://proxy:1111', 'http://proxy:2222', 'http://proxy:3333']
-    request = Request(url='http://some.domain/abc', unique_key='1', id='1')
+    request = Request(url='http://some.domain/abc', unique_key='1')
     sessions = [f'session_{i}' for i in range(6)]
 
     config = ProxyConfiguration(proxy_urls=proxy_urls)

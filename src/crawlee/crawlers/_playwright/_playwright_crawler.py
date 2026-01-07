@@ -183,7 +183,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                     generator_browser_type = [fingerprint_browser_type_from_playwright_browser_type(browser_type)]
 
                 fingerprint_generator = DefaultFingerprintGenerator(
-                    header_options=HeaderGeneratorOptions(browsers=generator_browser_type)
+                    header_options=HeaderGeneratorOptions(browsers=generator_browser_type)  # ty: ignore[invalid-argument-type]
                 )
 
             browser_pool = BrowserPool.with_default_plugin(
@@ -202,9 +202,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         kwargs['_context_pipeline'] = (
             ContextPipeline()
             .compose(self._open_page)
-            .compose(self._navigate)
+            .compose(self._navigate)  # ty: ignore[invalid-argument-type]
             .compose(self._handle_status_code_response)
-            .compose(self._handle_blocked_request_by_content)
+            .compose(self._handle_blocked_request_by_content)  # ty: ignore[invalid-argument-type]
         )
         kwargs['_additional_context_managers'] = [self._browser_pool]
         kwargs.setdefault('_logger', logging.getLogger(__name__))
@@ -516,7 +516,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
     async def _update_cookies(self, page: Page, cookies: list[PlaywrightCookieParam]) -> None:
         """Update the cookies in the page context."""
-        await page.context.add_cookies([{**cookie} for cookie in cookies])
+        await page.context.add_cookies([{**cookie} for cookie in cookies])  # ty: ignore[invalid-argument-type]
 
     async def _find_txt_file_for_url(self, url: str) -> RobotsTxtFile:
         """Find the robots.txt file for a given URL.

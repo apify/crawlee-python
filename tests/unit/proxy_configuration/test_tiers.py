@@ -44,7 +44,7 @@ async def test_retrying_request_makes_tier_go_up() -> None:
     config = ProxyConfiguration(tiered_proxy_urls=tiered_proxy_urls)
 
     # Calling `new_proxy_info` with the same request most probably means it's being retried
-    request_1 = Request(url='http://some.domain/abc', unique_key='1', id='1')
+    request_1 = Request(url='http://some.domain/abc', unique_key='1')
 
     info = await config.new_proxy_info(None, request_1, None)
     assert info is not None
@@ -59,7 +59,7 @@ async def test_retrying_request_makes_tier_go_up() -> None:
     assert info.url == tiered_proxy_urls[2][0]
 
     # Subsequent requests with the same domain should use the same tier
-    request_2 = Request(url='http://some.domain/xyz', unique_key='2', id='2')
+    request_2 = Request(url='http://some.domain/xyz', unique_key='2')
 
     info = await config.new_proxy_info(None, request_2, None)
     assert info is not None
@@ -76,7 +76,7 @@ async def test_retrying_request_makes_tier_go_up_with_sessions() -> None:
 
     config = ProxyConfiguration(tiered_proxy_urls=tiered_proxy_urls)
 
-    request = Request(url='http://some.domain/abc', unique_key='1', id='1')
+    request = Request(url='http://some.domain/abc', unique_key='1')
 
     # Calling `new_proxy_info` with the same request likely means that it is being retried.
     # However, a single session should always receive the same proxy
@@ -116,7 +116,7 @@ async def test_successful_request_makes_tier_go_down() -> None:
 
     config = ProxyConfiguration(tiered_proxy_urls=tiered_proxy_urls)
 
-    request_1 = Request(url='http://some.domain/abc', unique_key='1', id='1')
+    request_1 = Request(url='http://some.domain/abc', unique_key='1')
 
     info = None
     for tier in tiered_proxy_urls:
@@ -125,7 +125,7 @@ async def test_successful_request_makes_tier_go_down() -> None:
         assert info.url == tier[0]
 
     for i in range(100):
-        new_request = Request(url=f'http://some.domain/{i}', unique_key=str(i), id=str(i))
+        new_request = Request(url=f'http://some.domain/{i}', unique_key=str(i))
         info = await config.new_proxy_info(None, new_request, None)
 
     assert info is not None
@@ -141,7 +141,7 @@ async def test_none_proxy_retrying_request_makes_tier_go_up() -> None:
     config = ProxyConfiguration(tiered_proxy_urls=tiered_proxy_urls)
 
     # Calling `new_proxy_info` with the same request most probably means it's being retried
-    request_1 = Request(url='http://some.domain/abc', unique_key='1', id='1')
+    request_1 = Request(url='http://some.domain/abc', unique_key='1')
 
     # No proxy used.
     info = await config.new_proxy_info(None, request_1, None)

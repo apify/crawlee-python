@@ -102,7 +102,7 @@ class AbstractHttpCrawler(
 
         class _ParsedHttpCrawler(
             AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult, TSelectResult]
-        ):
+        ):  # ty: ignore[invalid-generic-class]
             def __init__(
                 self,
                 parser: AbstractHttpParser[TParseResult, TSelectResult] = static_parser,
@@ -122,9 +122,9 @@ class AbstractHttpCrawler(
             ContextPipeline()
             .compose(self._execute_pre_navigation_hooks)
             .compose(self._make_http_request)
-            .compose(self._handle_status_code_response)
+            .compose(self._handle_status_code_response)  # ty: ignore[invalid-argument-type]
             .compose(self._parse_http_response)
-            .compose(self._handle_blocked_request_by_content)
+            .compose(self._handle_blocked_request_by_content)  # ty: ignore[invalid-argument-type]
         )
 
     async def _execute_pre_navigation_hooks(

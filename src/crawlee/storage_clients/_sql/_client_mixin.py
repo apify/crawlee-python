@@ -105,7 +105,7 @@ class SqlClientMixin(ABC):
         else:
             stmt = select(cls._METADATA_TABLE).where(cls._METADATA_TABLE.internal_name == internal_name)
             result = await session.execute(stmt)
-            orm_metadata = result.scalar_one_or_none()  # type: ignore[assignment]
+            orm_metadata = result.scalar_one_or_none()
 
         if orm_metadata:
             client = cls(id=orm_metadata.id, storage_client=storage_client)

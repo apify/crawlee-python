@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import concurrent
 import json
 import logging
 import os
@@ -11,6 +10,7 @@ import sys
 import time
 from asyncio import Future
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import timedelta
 from itertools import product
@@ -307,7 +307,7 @@ async def test_handlers_use_context_helpers(tmp_path: Path, handler: str) -> Non
         raise RuntimeError('Arbitrary crash for testing purposes')
 
     # Apply one of the handlers
-    @getattr(crawler, handler)  # type: ignore[untyped-decorator]
+    @getattr(crawler, handler)
     async def handler_implementation(context: BasicCrawlingContext, error: Exception) -> None:
         await context.push_data(test_data)
         await context.add_requests(requests=[test_request], rq_alias=rq_alias)
@@ -1043,16 +1043,16 @@ async def test_logs_final_statistics(
         assert final_statistics.msg == 'Final request statistics:'
 
         # ignore[attr-defined] since `extra` parameters are not defined for `LogRecord`
-        assert final_statistics.requests_finished == 4  # type: ignore[attr-defined]
-        assert final_statistics.requests_failed == 33  # type: ignore[attr-defined]
-        assert final_statistics.retry_histogram == [1, 4, 8]  # type: ignore[attr-defined]
-        assert final_statistics.request_avg_failed_duration == 99.0  # type: ignore[attr-defined]
-        assert final_statistics.request_avg_finished_duration == 0.483  # type: ignore[attr-defined]
-        assert final_statistics.requests_finished_per_minute == 0.33  # type: ignore[attr-defined]
-        assert final_statistics.requests_failed_per_minute == 0.1  # type: ignore[attr-defined]
-        assert final_statistics.request_total_duration == 720.0  # type: ignore[attr-defined]
-        assert final_statistics.requests_total == 37  # type: ignore[attr-defined]
-        assert final_statistics.crawler_runtime == 300.0  # type: ignore[attr-defined]
+        assert final_statistics.requests_finished == 4
+        assert final_statistics.requests_failed == 33
+        assert final_statistics.retry_histogram == [1, 4, 8]
+        assert final_statistics.request_avg_failed_duration == 99.0
+        assert final_statistics.request_avg_finished_duration == 0.483
+        assert final_statistics.requests_finished_per_minute == 0.33
+        assert final_statistics.requests_failed_per_minute == 0.1
+        assert final_statistics.request_total_duration == 720.0
+        assert final_statistics.requests_total == 37
+        assert final_statistics.crawler_runtime == 300.0
 
 
 async def test_crawler_manual_stop() -> None:
@@ -1782,7 +1782,7 @@ async def test_crawler_statistics_persistence(tmp_path: Path) -> None:
 
     This test simulates starting the crawler process twice, and checks that the statistics include first run."""
 
-    with concurrent.futures.ProcessPoolExecutor() as executor:
+    with ProcessPoolExecutor() as executor:
         # Crawl 2 requests in the first run and automatically persist the state.
         first_run_state = executor.submit(
             _process_run_crawler,
@@ -1792,7 +1792,7 @@ async def test_crawler_statistics_persistence(tmp_path: Path) -> None:
         assert first_run_state.requests_finished == 2
 
     # Do not reuse the executor to simulate a fresh process to avoid modified class attributes.
-    with concurrent.futures.ProcessPoolExecutor() as executor:
+    with ProcessPoolExecutor() as executor:
         # Crawl 1 additional requests in the second run, but use previously automatically persisted state.
         second_run_state = executor.submit(
             _process_run_crawler, requests=['https://c.placeholder.com'], storage_dir=str(tmp_path)

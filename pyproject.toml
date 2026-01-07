@@ -102,7 +102,6 @@ dev = [
     "build<2.0.0", # For e2e tests.
     "dycw-pytest-only<3.0.0",
     "fakeredis[probabilistic,json,lua]<3.0.0",
-    "mypy~=1.19.0",
     "pre-commit<5.0.0",
     "proxy-py<3.0.0",
     "pydoc-markdown<5.0.0",
@@ -113,6 +112,7 @@ dev = [
     "pytest<9.0.0",
     "ruff~=0.14.0",
     "setuptools", # setuptools are used by pytest, but not explicitly required
+    "ty~=0.0.0",
     "types-beautifulsoup4<5.0.0",
     "types-cachetools<7.0.0",
     "types-colorama<1.0.0",
@@ -230,62 +230,24 @@ filterwarnings = [
     "ignore:websockets.server.WebSocketServerProtocol is deprecated:DeprecationWarning",
 ]
 
-[tool.mypy]
-python_version = "3.10"
-plugins = ["pydantic.mypy"]
+[tool.ty.environment]
+python-version = "3.10"
+
+[tool.ty.src]
+include = ["src", "tests", "scripts", "docs", "website"]
 exclude = [
     "src/crawlee/project_template",
     "docs/guides/code_examples/storage_clients/custom_storage_client_example.py",
 ]
-files = ["src", "tests", "docs", "website"]
-check_untyped_defs = true
-disallow_incomplete_defs = true
-disallow_untyped_calls = true
-disallow_untyped_decorators = true
-disallow_untyped_defs = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_return_any = true
-warn_unreachable = true
-warn_unused_ignores = true
 
-[[tool.mypy.overrides]]
-# Example codes are sometimes showing integration of crawlee with external tool, which is not dependency of crawlee.
-module = [
-    "apify",                        # Example code shows integration of apify and crawlee.
-    "apify_fingerprint_datapoints", # Untyped and stubs not available
-    "camoufox",                     # Example code shows integration of camoufox and crawlee.
-    "fastapi",                      # Example code shows running in webserver.
-    "saxonche",                     # Example code shows HttpCrawler with custom parser.
-    "scrapling.*",                  # Example code shows HttpCrawler with custom parser.
-    "selectolax.*",                 # Example code shows HttpCrawler with custom parser.
-    "stagehand.*",                  # Example code shows integration of Stagehand and crawlee.
-    "starlette.*",                  # Example code shows running in webserver.
-    "flask",                        # Example code shows deploy on Google Cloud.
-    "functions_framework",          # Example code shows deploy on Google Cloud.
-    "jaro",                         # Untyped and stubs not available
-    "litestar",                     # Example code shows deploy on Google Cloud Run.
-    "loguru",                       # Example code shows integration of loguru and crawlee for JSON logging.
-    "lxml.*",                       # Example code shows HttpCrawler with custom parser.
-    "sklearn.linear_model",         # Untyped and stubs not available
-    "cookiecutter.*",               # Untyped and stubs not available
-    "inquirer.*",                   # Untyped and stubs not available
-    "pyquery",                      # Example code shows HttpCrawler with custom parser.
-    "warcio.*",                     # Example code shows WARC files creation.
-    "wrapt"                         # Untyped and stubs not available
+[[tool.ty.overrides]]
+include = [
+    "docs/**/*.py",
+    "website/**/*.py",
 ]
-ignore_missing_imports = true
 
-[[tool.mypy.overrides]]
-module = [
-    "running_in_web_server.*", # False positive when fastapi not available
-]
-disable_error_code = ["misc"]
-
-[tool.basedpyright]
-pythonVersion = "3.10"
-typeCheckingMode = "standard"
-include = ["src", "tests", "docs", "website"]
+[tool.ty.overrides.rules]
+unresolved-import = "ignore"
 
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "assert_never()"]
