@@ -22,7 +22,7 @@ class SelectolaxLexborParser(AbstractHttpParser[LexborHTMLParser, LexborNode]):
         """Parse HTTP response body into a document object."""
         response_body = await response.read()
         # Run parsing in a thread to avoid blocking the event loop.
-        return await asyncio.to_thread(lambda: LexborHTMLParser(response_body))
+        return await asyncio.to_thread(LexborHTMLParser, response_body)
 
     @override
     async def parse_text(self, text: str) -> LexborHTMLParser:
