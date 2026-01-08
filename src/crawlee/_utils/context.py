@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable
 from functools import wraps
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 T = TypeVar('T', bound=Callable[..., Any])
 
@@ -44,4 +44,4 @@ def ensure_context(method: T) -> T:
 
         return await method(self, *args, **kwargs)
 
-    return async_wrapper if inspect.iscoroutinefunction(method) else sync_wrapper  # ty: ignore[invalid-return-type]
+    return cast('T', async_wrapper if inspect.iscoroutinefunction(method) else sync_wrapper)

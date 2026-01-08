@@ -1,4 +1,8 @@
 # ruff: noqa: N802, PLC0415
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def patch_browserforge() -> None:
@@ -12,7 +16,7 @@ def patch_browserforge() -> None:
     import apify_fingerprint_datapoints
     from browserforge import download
 
-    download.DATA_DIRS: dict[str, Path] = {  # type:ignore[misc]
+    download.DATA_DIRS = {
         'headers': apify_fingerprint_datapoints.get_header_network().parent,
         'fingerprints': apify_fingerprint_datapoints.get_fingerprint_network().parent,
     }
@@ -20,7 +24,7 @@ def patch_browserforge() -> None:
     def DownloadIfNotExists(**flags: bool) -> None:
         pass
 
-    download.DownloadIfNotExists = DownloadIfNotExists  # ty: ignore[invalid-assignment]
+    download.DownloadIfNotExists: Callable[..., None] = DownloadIfNotExists
 
     import browserforge.bayesian_network
 
@@ -33,7 +37,7 @@ def patch_browserforge() -> None:
                 path = download.DATA_DIRS['fingerprints'] / download.DATA_FILES['fingerprints'][path.name]
             super().__init__(path)
 
-    browserforge.bayesian_network.BayesianNetwork = BayesianNetwork  # type:ignore[misc]
+    browserforge.bayesian_network.BayesianNetwork: BayesianNetwork = BayesianNetwork
     import browserforge.headers.generator
 
     browserforge.headers.generator.DATA_DIR = download.DATA_DIRS['headers']
