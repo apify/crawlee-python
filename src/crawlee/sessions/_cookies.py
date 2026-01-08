@@ -66,17 +66,18 @@ class SessionCookies:
 
         self._jar = CookieJar()
 
-        if isinstance(cookies, dict):
-            for key, value in cookies.items():
-                self.set(key, value)  # ty: ignore[invalid-argument-type]
-
-        elif isinstance(cookies, list):
+        if isinstance(cookies, list):
             for item in cookies:
                 self.set(**item)
 
         elif isinstance(cookies, SessionCookies):
             for cookie in cookies.jar:
-                self.jar.set_cookie(cookie)
+                self._jar.set_cookie(cookie)
+
+        elif isinstance(cookies, dict):
+            cookies_dict: dict[str, str] = cookies
+            for key, value in cookies_dict.items():
+                self.set(key, value)
 
     @property
     def jar(self) -> CookieJar:

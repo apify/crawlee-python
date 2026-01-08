@@ -100,9 +100,7 @@ class AbstractHttpCrawler(
         this method simplifies cases where `TParseResult` is used for both generic parameters.
         """
 
-        class _ParsedHttpCrawler(
-            AbstractHttpCrawler[ParsedHttpCrawlingContext[TParseResult], TParseResult, TSelectResult]
-        ):  # ty: ignore[invalid-generic-class]
+        class _ParsedHttpCrawler(AbstractHttpCrawler):
             def __init__(
                 self,
                 parser: AbstractHttpParser[TParseResult, TSelectResult] = static_parser,
