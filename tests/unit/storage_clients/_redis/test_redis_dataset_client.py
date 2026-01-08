@@ -49,7 +49,7 @@ async def test_base_keys_creation(dataset_client: RedisDatasetClient) -> None:
     metadata_data = await await_redis_response(dataset_client.redis.json().get('datasets:test_dataset:metadata'))
 
     assert isinstance(metadata_data, dict)
-    assert metadata_data['id'] == metadata.id  # type: ignore[unreachable] # py-json typing is broken
+    assert metadata_data['id'] == metadata.id
 
 
 async def test_record_and_content_verification(dataset_client: RedisDatasetClient) -> None:

@@ -33,12 +33,12 @@ def _translate(
 
     HACK: This function is copied from CPython stdlib source. It will be released in Python 3.13 as `glob.translate`
     """
-    if not seps:
-        seps = (os.path.sep, os.path.altsep) if os.path.altsep else os.path.sep
+    _seps = ((os.path.sep, os.path.altsep) if os.path.altsep else (os.path.sep,)) if seps is None else seps
 
-    escaped_seps = ''.join(map(re.escape, seps))
-    any_sep = f'[{escaped_seps}]' if len(seps) > 1 else escaped_seps
+    escaped_seps = ''.join(map(re.escape, _seps))
+    any_sep = f'[{escaped_seps}]' if len(_seps) > 1 else escaped_seps
     not_sep = f'[^{escaped_seps}]'
+
     if include_hidden:
         one_last_segment = f'{not_sep}+'
         one_segment = f'{one_last_segment}{any_sep}'

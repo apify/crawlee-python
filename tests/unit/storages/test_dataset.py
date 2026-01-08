@@ -472,10 +472,7 @@ async def test_export_to_csv(
 async def test_export_to_invalid_content_type(dataset: Dataset) -> None:
     """Test exporting dataset with invalid content type raises error."""
     with pytest.raises(ValueError, match=r'Unsupported content type'):
-        await dataset.export_to(
-            key='invalid_export',
-            content_type='invalid',  # type: ignore[call-overload]  # Intentionally invalid content type
-        )
+        await dataset.export_to(key='invalid_export', content_type='invalid')  # ty: ignore[no-matching-overload]
 
 
 async def test_export_with_multiple_kwargs(dataset: Dataset, tmp_path: Path) -> None:

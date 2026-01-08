@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
 import shutil
 from collections import deque
@@ -197,7 +198,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     continue
 
                 try:
-                    file = await asyncio.to_thread(path_to_metadata.open, 'r', encoding='utf-8')
+                    file = await asyncio.to_thread(path_to_metadata.open, mode='r', encoding='utf-8')
                     try:
                         file_content = json.load(file)
                         metadata = RequestQueueMetadata(**file_content)
@@ -232,7 +233,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             # If the RQ directory exists, reconstruct the client from the metadata file.
             if path_to_rq.exists() and path_to_metadata.exists():
-                file = await asyncio.to_thread(open, path_to_metadata, 'r', encoding='utf-8')
+                file = await asyncio.to_thread(path_to_metadata.open, encoding='utf-8')
                 try:
                     file_content = json.load(file)
                 finally:
@@ -756,7 +757,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         await asyncio.to_thread(path_to_rq.mkdir, parents=True, exist_ok=True)
 
         # List all the json files.
-        files = await asyncio.to_thread(list, path_to_rq.glob('*.json'))
+        files = await asyncio.to_thread(lambda: list(path_to_rq.glob('*.json')))
 
         # Filter out metadata file and non-file entries.
         filtered = filter(lambda request_file: request_file.is_file() and request_file.name != METADATA_FILENAME, files)
@@ -775,7 +776,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         """
         # Open the request file.
         try:
-            file = await asyncio.to_thread(open, file_path, 'r', encoding='utf-8')
+            file = await asyncio.to_thread(functools.partial(file_path.open, mode='r', encoding='utf-8'))
         except FileNotFoundError:
             logger.warning(f'Request file "{file_path}" not found.')
             return None

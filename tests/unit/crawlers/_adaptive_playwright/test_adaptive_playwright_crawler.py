@@ -116,7 +116,8 @@ class TestInput:
             TestInput(
                 expected_pw_count=0,
                 expected_static_count=2,
-                rendering_types=cycle(['static']),
+                # Lack of ty support, see https://github.com/astral-sh/ty/issues/2348.
+                rendering_types=cycle(['static']),  # ty: ignore[invalid-argument-type]
                 detection_probability_recommendation=cycle([0]),
             ),
             id='Static only',
@@ -125,7 +126,7 @@ class TestInput:
             TestInput(
                 expected_pw_count=2,
                 expected_static_count=0,
-                rendering_types=cycle(['client only']),
+                rendering_types=cycle(['client only']),  # ty: ignore[invalid-argument-type]
                 detection_probability_recommendation=cycle([0]),
             ),
             id='Client only',
@@ -134,7 +135,7 @@ class TestInput:
             TestInput(
                 expected_pw_count=1,
                 expected_static_count=1,
-                rendering_types=cycle(['static', 'client only']),
+                rendering_types=cycle(['static', 'client only']),  # ty: ignore[invalid-argument-type]
                 detection_probability_recommendation=cycle([0]),
             ),
             id='Mixed',
@@ -143,7 +144,7 @@ class TestInput:
             TestInput(
                 expected_pw_count=2,
                 expected_static_count=2,
-                rendering_types=cycle(['static', 'client only']),
+                rendering_types=cycle(['static', 'client only']),  # ty: ignore[invalid-argument-type]
                 detection_probability_recommendation=cycle([1]),
             ),
             id='Enforced rendering type detection',
@@ -207,7 +208,8 @@ async def test_adaptive_crawling(
 async def test_adaptive_crawling_parsel(test_urls: list[str]) -> None:
     """Top level test for parsel. Only one argument combination. (The rest of code is tested with bs variant.)"""
     predictor = _SimpleRenderingTypePredictor(
-        rendering_types=cycle(['static', 'client only']), detection_probability_recommendation=cycle([0])
+        rendering_types=cycle(['static', 'client only']),  # ty: ignore[invalid-argument-type]
+        detection_probability_recommendation=cycle([0]),
     )
 
     crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
@@ -692,7 +694,8 @@ async def test_adaptive_context_helpers_on_changed_selector(test_urls: list[str]
     dynamically changed text instead of the original static text.
     """
     browser_only_predictor_no_detection = _SimpleRenderingTypePredictor(
-        rendering_types=cycle(['client only']), detection_probability_recommendation=cycle([0])
+        rendering_types=cycle(['client only']),  # ty: ignore[invalid-argument-type]
+        detection_probability_recommendation=cycle([0]),
     )
     expected_h3_tag = f'<h3>{_H3_CHANGED_TEXT}</h3>'
 
@@ -717,7 +720,8 @@ async def test_adaptive_context_helpers_on_changed_selector(test_urls: list[str]
 async def test_adaptive_context_query_non_existing_element(test_urls: list[str]) -> None:
     """Test that querying non-existing selector returns `None`"""
     browser_only_predictor_no_detection = _SimpleRenderingTypePredictor(
-        rendering_types=cycle(['client only']), detection_probability_recommendation=cycle([0])
+        rendering_types=cycle(['client only']),  # ty: ignore[invalid-argument-type]
+        detection_probability_recommendation=cycle([0]),
     )
 
     crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
@@ -743,7 +747,8 @@ async def test_adaptive_context_query_non_existing_element(test_urls: list[str])
             TestInput(
                 expected_pw_count=0,
                 expected_static_count=2,
-                rendering_types=cycle(['static']),
+                # Lack of ty support, see https://github.com/astral-sh/ty/issues/2348.
+                rendering_types=cycle(['static']),  # ty: ignore[invalid-argument-type]
                 detection_probability_recommendation=cycle([0]),
             ),
             id='Static only',
@@ -752,7 +757,7 @@ async def test_adaptive_context_query_non_existing_element(test_urls: list[str])
             TestInput(
                 expected_pw_count=2,
                 expected_static_count=0,
-                rendering_types=cycle(['client only']),
+                rendering_types=cycle(['client only']),  # ty: ignore[invalid-argument-type]
                 detection_probability_recommendation=cycle([0]),
             ),
             id='Client only',
@@ -761,7 +766,7 @@ async def test_adaptive_context_query_non_existing_element(test_urls: list[str])
             TestInput(
                 expected_pw_count=2,
                 expected_static_count=2,
-                rendering_types=cycle(['static', 'client only']),
+                rendering_types=cycle(['static', 'client only']),  # ty: ignore[invalid-argument-type]
                 detection_probability_recommendation=cycle([1]),
             ),
             id='Enforced rendering type detection',

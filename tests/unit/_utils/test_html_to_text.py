@@ -191,7 +191,8 @@ def test_html_to_text(source: str, expected_text: str, html_to_text: Callable[[s
 @pytest.mark.parametrize('html_to_text', [html_to_text_parsel, html_to_text_beautifulsoup])
 def test_html_to_text_raises_on_wrong_input_type(html_to_text: Callable[[str], str]) -> None:
     with pytest.raises(TypeError):
-        html_to_text(1)  # type: ignore[arg-type]  # Intentional wrong type test.
+        # Intentional wrong type test.
+        html_to_text(1)  # ty: ignore[invalid-argument-type]
 
 
 def test_html_to_text_parsel() -> None:

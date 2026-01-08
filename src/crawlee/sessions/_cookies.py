@@ -66,17 +66,18 @@ class SessionCookies:
 
         self._jar = CookieJar()
 
-        if isinstance(cookies, dict):
-            for key, value in cookies.items():
-                self.set(key, value)
-
-        elif isinstance(cookies, list):
+        if isinstance(cookies, list):
             for item in cookies:
                 self.set(**item)
 
         elif isinstance(cookies, SessionCookies):
             for cookie in cookies.jar:
-                self.jar.set_cookie(cookie)
+                self._jar.set_cookie(cookie)
+
+        elif isinstance(cookies, dict):
+            cookies_dict: dict[str, str] = cookies
+            for key, value in cookies_dict.items():
+                self.set(key, value)
 
     @property
     def jar(self) -> CookieJar:
@@ -152,7 +153,7 @@ class SessionCookies:
             cookie_dict['expires'] = cookie.expires
 
         if (same_site := cookie.get_nonstandard_attr('SameSite')) and same_site in {'Lax', 'None', 'Strict'}:
-            cookie_dict['same_site'] = same_site  # type: ignore[typeddict-item]
+            cookie_dict['same_site'] = same_site  # ty: ignore[invalid-assignment]
 
         return cookie_dict
 

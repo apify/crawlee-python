@@ -88,7 +88,7 @@ async def test_calls_consumers_and_middlewares() -> None:
         )
         events.append('middleware_b_out')
 
-    pipeline = ContextPipeline[BasicCrawlingContext]().compose(middleware_a).compose(middleware_b)
+    pipeline = ContextPipeline[BasicCrawlingContext]().compose(middleware_a).compose(middleware_b)  # ty: ignore[invalid-argument-type]
 
     context = BasicCrawlingContext(
         request=Request.from_url(url='https://test.io/'),
@@ -142,7 +142,7 @@ async def test_handles_exceptions_in_middleware_initialization() -> None:
 
     async def step_2(context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
         raise RuntimeError('Crash during middleware initialization')
-        yield context  # type: ignore[unreachable]
+        yield context
 
     pipeline = ContextPipeline().compose(step_1).compose(step_2)
     context = BasicCrawlingContext(

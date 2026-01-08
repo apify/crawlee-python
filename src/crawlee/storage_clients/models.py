@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Any, Generic
+from typing import TYPE_CHECKING, Annotated, Any, Generic
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 from typing_extensions import TypeVar
@@ -127,8 +127,13 @@ class DatasetItemsListPage(BaseModel):
     desc: Annotated[bool, Field(default=False)]
     """Indicates if the returned list is in descending order."""
 
-    items: Annotated[list[dict], Field(default_factory=list)]
-    """The list of dataset items returned on this page."""
+    # Workaround for Pydantic and type checkers when using Annotated with default_factory
+    if TYPE_CHECKING:
+        items: list[dict] = []
+        """The list of dataset items returned on this page."""
+    else:
+        items: Annotated[list[dict], Field(default_factory=list)]
+        """The list of dataset items returned on this page."""
 
 
 @docs_group('Storage data')

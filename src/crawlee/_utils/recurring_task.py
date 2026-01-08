@@ -25,7 +25,11 @@ class RecurringTask:
     """
 
     def __init__(self, func: Callable, delay: timedelta) -> None:
-        logger.debug(f'Calling RecurringTask.__init__(func={func.__name__}, delay={delay})...')
+        logger.debug(
+            'Calling RecurringTask.__init__(func={%s}, delay={%s})...',
+            func.__name__ if hasattr(func, '__name__') else func.__class__.__name__,
+            delay,
+        )
         self.func = func
         self.delay = delay
         self.task: asyncio.Task | None = None
@@ -55,7 +59,11 @@ class RecurringTask:
 
     def start(self) -> None:
         """Start the recurring task execution."""
-        self.task = asyncio.create_task(self._wrapper(), name=f'Task-recurring-{self.func.__name__}')
+        name = self.func.__name__ if hasattr(self.func, '__name__') else self.func.__class__.__name__
+        self.task = asyncio.create_task(
+            self._wrapper(),
+            name=f'Task-recurring-{name}',
+        )
 
     async def stop(self) -> None:
         """Stop the recurring task execution."""
