@@ -1,13 +1,8 @@
-# TODO: The current PlaywrightCrawler tests rely on external websites. It means they can fail or take more time
-# due to network issues. To enhance test stability and reliability, we should mock the network requests.
-# https://github.com/apify/crawlee-python/issues/197
-
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
-import sys
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Literal
 from unittest import mock
@@ -326,10 +321,6 @@ async def test_proxy_set() -> None:
     assert handler_data.get('proxy') == proxy_value
 
 
-@pytest.mark.skipif(
-    sys.platform != 'linux',
-    reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1651.',
-)
 @pytest.mark.parametrize(
     'use_incognito_pages',
     [
@@ -357,7 +348,15 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
         sessions_ids.append(context.session.id)
         sessions[context.session.id] = context.session
 
-        if context.request.unique_key not in {'1', '2'}:
+        if context.request.unique_key == '1':
+            # With the second request, we check the cookies in the session and set retire
+            await context.add_requests(
+                [
+                    Request.from_url(
+                        str(server_url.with_path('/cookies')), unique_key='2', user_data={'retire_session': True}
+                    )
+                ]
+            )
             return
 
         response_data = json.loads(await context.response.text())
@@ -366,14 +365,14 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
         if context.request.user_data.get('retire_session'):
             context.session.retire()
 
+        if context.request.unique_key == '2':
+            # The third request is made with a new session to make sure it does not use another session's cookies
+            await context.add_requests([Request.from_url(str(server_url.with_path('/cookies')), unique_key='3')])
+
     await crawler.run(
         [
             # The first request sets the cookie in the session
-            str(server_url.with_path('set_cookies').extend_query(a=1)),
-            # With the second request, we check the cookies in the session and set retire
-            Request.from_url(str(server_url.with_path('/cookies')), unique_key='1', user_data={'retire_session': True}),
-            # The third request is made with a new session to make sure it does not use another session's cookies
-            Request.from_url(str(server_url.with_path('/cookies')), unique_key='2'),
+            Request.from_url(str(server_url.with_path('set_cookies').extend_query(a=1)), unique_key='1'),
         ]
     )
 
