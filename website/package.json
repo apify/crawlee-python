@@ -46,7 +46,7 @@
         "@giscus/react": "^3.0.0",
         "@mdx-js/react": "^3.0.1",
         "@mermaid-js/layout-elk": "^0.2.0",
-        "@rspack/core": "<1.6.0",
+        "@rspack/core": "<1.8.0",
         "@signalwire/docusaurus-plugin-llms-txt": "^1.2.1",
         "axios": "^1.5.0",
         "buffer": "^6.0.3",
@@ -65,7 +65,7 @@
         "unist-util-visit": "^5.0.0"
     },
     "resolutions": {
-        "@rspack/core": "<1.6.0"
+        "@rspack/core": "<1.8.0"
     },
     "packageManager": "yarn@4.12.0"
 }
