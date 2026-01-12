@@ -1763,6 +1763,12 @@ async def _run_crawler(requests: list[str], storage_dir: str) -> StatisticsState
 
     async def request_handler(context: BasicCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url} ...')
+        # Add visited url to crawler state and use it to verify state persistence.
+        state = await context.use_state({'urls': []})
+        state['urls'] = state.get('urls')
+        assert isinstance(state['urls'], list)
+        state['urls'].append(context.request.url)
+        context.log.info(f'State {state}')
 
     crawler = BasicCrawler(
         request_handler=request_handler,
@@ -1777,10 +1783,13 @@ def _process_run_crawler(requests: list[str], storage_dir: str) -> StatisticsSta
     return asyncio.run(_run_crawler(requests=requests, storage_dir=storage_dir))
 
 
-async def test_crawler_statistics_persistence(tmp_path: Path) -> None:
+async def test_crawler_state_persistence(tmp_path: Path) -> None:
     """Test that crawler statistics persist and are loaded correctly.
 
     This test simulates starting the crawler process twice, and checks that the statistics include first run."""
+
+    state_kvs = await KeyValueStore.open(storage_client=FileSystemStorageClient(),
+                                           configuration=Configuration(storage_dir=str(tmp_path)))
 
     with ProcessPoolExecutor() as executor:
         # Crawl 2 requests in the first run and automatically persist the state.
@@ -1789,7 +1798,10 @@ async def test_crawler_statistics_persistence(tmp_path: Path) -> None:
             requests=['https://a.placeholder.com', 'https://b.placeholder.com'],
             storage_dir=str(tmp_path),
         ).result()
+        # Expected state after first crawler run
         assert first_run_state.requests_finished == 2
+        state =  await state_kvs.get_value(BasicCrawler._CRAWLEE_STATE_KEY)
+        assert state.get('urls') == ['https://a.placeholder.com', 'https://b.placeholder.com']
 
     # Do not reuse the executor to simulate a fresh process to avoid modified class attributes.
     with ProcessPoolExecutor() as executor:
@@ -1797,7 +1809,14 @@ async def test_crawler_statistics_persistence(tmp_path: Path) -> None:
         second_run_state = executor.submit(
             _process_run_crawler, requests=['https://c.placeholder.com'], storage_dir=str(tmp_path)
         ).result()
+
+        # Expected state after second crawler run
+        # 2 requests from first run and 1 request from second run.
         assert second_run_state.requests_finished == 3
+
+        state =  await state_kvs.get_value(BasicCrawler._CRAWLEE_STATE_KEY)
+        assert state.get('urls') == ['https://a.placeholder.com', 'https://b.placeholder.com',
+                                     'https://c.placeholder.com']
 
     assert first_run_state.crawler_started_at == second_run_state.crawler_started_at
     assert first_run_state.crawler_finished_at

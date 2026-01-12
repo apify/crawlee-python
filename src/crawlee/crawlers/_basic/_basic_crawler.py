@@ -297,6 +297,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         status_message_logging_interval: timedelta = timedelta(seconds=10),
         status_message_callback: Callable[[StatisticsState, StatisticsState | None, str], Awaitable[str | None]]
         | None = None,
+        id: int | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -349,6 +350,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             status_message_logging_interval: Interval for logging the crawler status messages.
             status_message_callback: Allows overriding the default status message. The default status message is
                 provided in the parameters. Returning `None` suppresses the status message.
+            id: Id of the crawler used for state and statistics tracking. You can use same explicit id to share same
+                state and statistics between two crawlers. By default, each crawler will use own state and statistics.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
