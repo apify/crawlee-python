@@ -1302,9 +1302,8 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
 
 
 @pytest.mark.run_alone
-@pytest.mark.skipif(
-    sys.platform != 'linux',
-    reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1652.',
+@pytest.mark.flaky(
+    reruns=3, reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1652.'
 )
 @pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.timeout was introduced in Python 3.11.')
 @pytest.mark.parametrize(
@@ -1328,7 +1327,11 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     double_handler_timeout_s = handler_timeout.total_seconds() * 2
     handler_sleep = iter([double_handler_timeout_s, double_handler_timeout_s, 0])
 
-    crawler = BasicCrawler(request_handler_timeout=handler_timeout, max_request_retries=max_request_retries)
+    crawler = BasicCrawler(
+        request_handler_timeout=handler_timeout,
+        max_request_retries=max_request_retries,
+        storage_client=MemoryStorageClient(),
+    )
 
     mocked_handler_before_sleep = Mock()
     mocked_handler_after_sleep = Mock()
@@ -1355,8 +1358,8 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     assert mocked_handler_after_sleep.call_count == 1
 
 
-@pytest.mark.skipif(
-    sys.platform != 'linux',
+@pytest.mark.flaky(
+    reruns=3,
     reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1649.',
 )
 @pytest.mark.parametrize(
@@ -1381,6 +1384,7 @@ async def test_keep_alive(
         max_requests_per_crawl=max_requests_per_crawl,
         # If more request can run in parallel, then max_requests_per_crawl is not deterministic.
         concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+        storage_client=MemoryStorageClient(),
     )
     mocked_handler = Mock()
 
