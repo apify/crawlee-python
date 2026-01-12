@@ -266,6 +266,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
     _request_handler_timeout_text = 'Request handler timed out after'
+    __next_id = 0
 
     def __init__(
         self,
@@ -297,7 +298,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         status_message_logging_interval: timedelta = timedelta(seconds=10),
         status_message_callback: Callable[[StatisticsState, StatisticsState | None, str], Awaitable[str | None]]
         | None = None,
-        id: int | None = None,
+        crawler_id: int | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -350,7 +351,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             status_message_logging_interval: Interval for logging the crawler status messages.
             status_message_callback: Allows overriding the default status message. The default status message is
                 provided in the parameters. Returning `None` suppresses the status message.
-            id: Id of the crawler used for state and statistics tracking. You can use same explicit id to share same
+            crawler_id: Id of the crawler used for state and statistics tracking. You can use same explicit id to share
                 state and statistics between two crawlers. By default, each crawler will use own state and statistics.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
@@ -359,6 +360,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             _logger: A logger instance, typically provided by a subclass, for consistent logging labels.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
+        if crawler_id is None:
+            # This could look into set of already used ids, but lets not overengineer this.
+            self.id = BasicCrawler.__next_id
+            BasicCrawler.__next_id += 1
+        else:
+            self.id = crawler_id
+
         implicit_event_manager_with_explicit_config = False
         if not configuration:
             configuration = service_locator.get_configuration()
@@ -834,7 +842,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         default_value: dict[str, JsonSerializable] | None = None,
     ) -> dict[str, JsonSerializable]:
         kvs = await self.get_key_value_store()
-        return await kvs.get_auto_saved_value(self._CRAWLEE_STATE_KEY, default_value)
+        return await kvs.get_auto_saved_value(f'{self._CRAWLEE_STATE_KEY}_{self.id}', default_value)
 
     async def _save_crawler_state(self) -> None:
         store = await self.get_key_value_store()
