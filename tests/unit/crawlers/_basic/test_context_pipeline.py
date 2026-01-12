@@ -88,7 +88,7 @@ async def test_calls_consumers_and_middlewares() -> None:
         )
         events.append('middleware_b_out')
 
-    pipeline = ContextPipeline[BasicCrawlingContext]().compose(middleware_a).compose(middleware_b)  # ty: ignore[invalid-argument-type]
+    pipeline = ContextPipeline[BasicCrawlingContext]().compose(middleware_a).compose(middleware_b)
 
     context = BasicCrawlingContext(
         request=Request.from_url(url='https://test.io/'),
