@@ -198,9 +198,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         kwargs['_context_pipeline'] = (
             ContextPipeline()
             .compose(self._open_page)
-            .compose(self._navigate)  # ty: ignore[invalid-argument-type]
+            .compose(self._navigate)
             .compose(self._handle_status_code_response)
-            .compose(self._handle_blocked_request_by_content)  # ty: ignore[invalid-argument-type]
+            .compose(self._handle_blocked_request_by_content)
         )
         kwargs['_additional_context_managers'] = [self._browser_pool]
         kwargs.setdefault('_logger', logging.getLogger(__name__))

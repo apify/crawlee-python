@@ -75,7 +75,8 @@ async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: U
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
         try:
-            await context.enqueue_links(requests=[Request.from_url(str(server_url / 'start_enqueue'))], selector='a')  # type:ignore[call-overload]  # Testing runtime enforcement of the overloads.
+            # Testing runtime enforcement of the overloads.
+            await context.enqueue_links(requests=[Request.from_url(str(server_url / 'start_enqueue'))], selector='a')
         except Exception as e:
             exceptions.append(e)
 
