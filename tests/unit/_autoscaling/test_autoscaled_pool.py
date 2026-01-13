@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from itertools import chain, repeat
@@ -145,8 +144,8 @@ async def test_propagates_exceptions_after_finished(system_status: SystemStatus 
         await pool.run()
 
 
-@pytest.mark.skipif(
-    sys.platform != 'linux',
+@pytest.mark.flaky(
+    rerun=3,
     reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1655.',
 )
 async def test_autoscales(
