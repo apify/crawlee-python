@@ -810,36 +810,39 @@ async def test_context_use_state() -> None:
     await crawler.run(['https://hello.world'])
 
     kvs = await crawler.get_key_value_store()
-    value = await kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0')
+    value = await kvs.get_value('CRAWLEE_STATE_0')
 
     assert value == {'hello': 'world'}
 
 
-async def test_context_use_state_crawlers_share_state() -> None:
+async def test_context_use_state_crawlers_share_custom_state() -> None:
+    custom_state_dict = {}
+
+    async def custom_use_state(default_state: dict[str, JsonSerializable]) -> dict[str, JsonSerializable]:
+        if not custom_state_dict:
+            custom_state_dict.update(default_state)
+        return custom_state_dict
+
     async def handler(context: BasicCrawlingContext) -> None:
         state = await context.use_state({'urls': []})
         assert isinstance(state['urls'], list)
         state['urls'].append(context.request.url)
 
-    crawler_1 = BasicCrawler(crawler_id=0, request_handler=handler)
-    crawler_2 = BasicCrawler(crawler_id=0, request_handler=handler)
+    crawler_1 = BasicCrawler(use_state=custom_use_state, request_handler=handler)
+    crawler_2 = BasicCrawler(use_state=custom_use_state, request_handler=handler)
 
     await crawler_1.run(['https://a.com'])
     await crawler_2.run(['https://b.com'])
 
-    kvs = await KeyValueStore.open()
-    assert crawler_1.id == crawler_2.id == 0
-    assert await kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_{crawler_1.id}') == {
-        'urls': ['https://a.com', 'https://b.com']
-    }
+    assert custom_state_dict == {'urls': ['https://a.com', 'https://b.com']}
 
 
 async def test_crawlers_share_stats() -> None:
     async def handler(context: BasicCrawlingContext) -> None:
         await context.use_state({'urls': []})
 
-    crawler_1 = BasicCrawler(crawler_id=0, request_handler=handler)
-    crawler_2 = BasicCrawler(crawler_id=0, request_handler=handler, statistics=crawler_1.statistics)
+    crawler_1 = BasicCrawler(request_handler=handler)
+    crawler_2 = BasicCrawler(request_handler=handler, statistics=crawler_1.statistics)
 
     result1 = await crawler_1.run(['https://a.com'])
     result2 = await crawler_2.run(['https://b.com'])
@@ -862,8 +865,8 @@ async def test_context_use_state_crawlers_own_state() -> None:
     await crawler_2.run(['https://b.com'])
 
     kvs = await KeyValueStore.open()
-    assert await kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0') == {'urls': ['https://a.com']}
-    assert await kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_1') == {'urls': ['https://b.com']}
+    assert await kvs.get_value('CRAWLEE_STATE_0') == {'urls': ['https://a.com']}
+    assert await kvs.get_value('CRAWLEE_STATE_1') == {'urls': ['https://b.com']}
 
 
 async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> None:
@@ -906,7 +909,7 @@ async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> Non
     store = await crawler.get_key_value_store()
 
     # The state in the KVS must match with the last set state
-    assert (await store.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0')) == {'hello': 'last_world'}
+    assert (await store.get_value('CRAWLEE_STATE_0')) == {'hello': 'last_world'}
 
 
 async def test_max_requests_per_crawl() -> None:
@@ -1334,7 +1337,7 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
 
     crawler = BasicCrawler()
     store = await crawler.get_key_value_store()
-    await store.set_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0', {'counter': 0})
+    await store.set_value('CRAWLEE_STATE_0', {'counter': 0})
     handler_barrier = Barrier(2)
 
     @crawler.router.default_handler
@@ -1349,7 +1352,7 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
     store = await crawler.get_key_value_store()
     # Ensure that local state is pushed back to kvs.
     await store.persist_autosaved_values()
-    assert (await store.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0'))['counter'] == 2
+    assert (await store.get_value('CRAWLEE_STATE_0'))['counter'] == 2
 
 
 @pytest.mark.run_alone
@@ -1859,7 +1862,7 @@ async def test_crawler_state_persistence(tmp_path: Path) -> None:
         ).result()[0]
         # Expected state after first crawler run
         assert first_run_state.requests_finished == 2
-        state = await state_kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0')
+        state = await state_kvs.get_value('CRAWLEE_STATE_0')
         assert state.get('urls') == ['https://a.placeholder.com', 'https://b.placeholder.com']
 
     # Do not reuse the executor to simulate a fresh process to avoid modified class attributes.
@@ -1875,7 +1878,7 @@ async def test_crawler_state_persistence(tmp_path: Path) -> None:
         # 2 requests from first run and 1 request from second run.
         assert second_run_state.requests_finished == 3
 
-        state = await state_kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0')
+        state = await state_kvs.get_value('CRAWLEE_STATE_0')
         assert state.get('urls') == [
             'https://a.placeholder.com',
             'https://b.placeholder.com',
@@ -1912,9 +1915,9 @@ async def test_crawler_state_persistence_2_crawlers_with_migration(tmp_path: Pat
         # Expected state after first crawler run
         assert first_run_states[0].requests_finished == 1
         assert first_run_states[1].requests_finished == 1
-        state_0 = await state_kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0')
+        state_0 = await state_kvs.get_value('CRAWLEE_STATE_0')
         assert state_0.get('urls') == ['https://a.placeholder.com']
-        state_1 = await state_kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_1')
+        state_1 = await state_kvs.get_value('CRAWLEE_STATE_1')
         assert state_1.get('urls') == ['https://c.placeholder.com']
 
     with ProcessPoolExecutor() as executor:
@@ -1930,9 +1933,9 @@ async def test_crawler_state_persistence_2_crawlers_with_migration(tmp_path: Pat
         # Expected state after first crawler run
         assert second_run_states[0].requests_finished == 2
         assert second_run_states[1].requests_finished == 2
-        state_0 = await state_kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0')
+        state_0 = await state_kvs.get_value('CRAWLEE_STATE_0')
         assert state_0.get('urls') == ['https://a.placeholder.com', 'https://b.placeholder.com']
-        state_1 = await state_kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_1')
+        state_1 = await state_kvs.get_value('CRAWLEE_STATE_1')
         assert state_1.get('urls') == ['https://c.placeholder.com', 'https://d.placeholder.com']
 
 

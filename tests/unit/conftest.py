@@ -12,7 +12,7 @@ from proxy import Proxy
 from uvicorn.config import Config
 
 from crawlee import service_locator
-from crawlee.crawlers import BasicCrawler
+from crawlee.crawlers._basic._basic_crawler import _DefaultUseState
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_network
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient, ImpitHttpClient
 from crawlee.proxy_configuration import ProxyInfo
@@ -75,7 +75,7 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
         # Reset global class variables to ensure test isolation.
         KeyValueStore._autosaved_values = {}
         Statistics._Statistics__next_id = 0  # type:ignore[attr-defined] # Mangled attribute
-        BasicCrawler._BasicCrawler__next_id = 0  # type:ignore[attr-defined] # Mangled attribute
+        _DefaultUseState._next_state_id = 0  # type:ignore[attr-defined] # Mangled attribute
 
     return _prepare_test_env
 

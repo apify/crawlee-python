@@ -43,8 +43,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
-
+from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions, _DefaultUseState
 
 TStaticParseResult = TypeVar('TStaticParseResult')
 TStaticSelectResult = TypeVar('TStaticSelectResult')
@@ -389,7 +388,8 @@ class AdaptivePlaywrightCrawler(
             # (This static crawl is performed only to evaluate rendering type detection.)
             kvs = await context.get_key_value_store()
             default_value = dict[str, JsonSerializable]()
-            old_state: dict[str, JsonSerializable] = await kvs.get_value(self._CRAWLEE_STATE_KEY, default_value)
+            # This was fragile even before. Out of scope for draft
+            old_state: dict[str, JsonSerializable] = await kvs.get_value(_DefaultUseState._CRAWLEE_STATE_KEY, default_value)
             old_state_copy = deepcopy(old_state)
 
         pw_run = await self._crawl_one('client only', context=context)

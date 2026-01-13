@@ -10,7 +10,7 @@ import tempfile
 import threading
 import traceback
 from asyncio import CancelledError
-from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Coroutine, Iterable, Sequence
 from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
@@ -42,6 +42,7 @@ from crawlee._types import (
     RequestHandlerRunResult,
     SendRequestFunction,
     SkippedReason,
+    UseStateFunction,
 )
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import atomic_write, export_csv_to_stream, export_json_to_stream
@@ -239,6 +240,29 @@ class BasicCrawlerOptions(
     """
 
 
+class _DefaultUseState:
+    _next_state_id = 0
+    _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
+
+    def __init__(self, get_key_value_store: Awaitable[KeyValueStore]) -> None:
+        self._get_key_value_store = get_key_value_store
+        self._id = self._next_state_id
+        _DefaultUseState._next_state_id += 1
+
+    async def _use_state(
+        self,
+        default_value: dict[str, JsonSerializable] | None = None,
+    ) -> dict[str, JsonSerializable]:
+        kvs = await self._get_key_value_store()
+        return await kvs.get_auto_saved_value(f'{self._CRAWLEE_STATE_KEY}_{self._id}', default_value)
+
+    def __call__(
+        self,
+        default_value: dict[str, JsonSerializable] | None = None,
+    ) -> Coroutine[None, None, dict[str, JsonSerializable]]:
+        return self._use_state(default_value)
+
+
 @docs_group('Crawlers')
 class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     """A basic web crawler providing a framework for crawling websites.
@@ -264,7 +288,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         - and more.
     """
 
-    _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
     _request_handler_timeout_text = 'Request handler timed out after'
     __next_id = 0
 
@@ -298,7 +321,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         status_message_logging_interval: timedelta = timedelta(seconds=10),
         status_message_callback: Callable[[StatisticsState, StatisticsState | None, str], Awaitable[str | None]]
         | None = None,
-        crawler_id: int | None = None,
+        use_state: UseStateFunction | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -351,8 +374,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             status_message_logging_interval: Interval for logging the crawler status messages.
             status_message_callback: Allows overriding the default status message. The default status message is
                 provided in the parameters. Returning `None` suppresses the status message.
-            crawler_id: Id of the crawler used for state and statistics tracking. You can use same explicit id to share
-                state and statistics between two crawlers. By default, each crawler will use own state and statistics.
+            use_state: Callback used to access shared state. Use only for custom state implementation, for example when
+                you want to share state between two different crawlers.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -360,13 +383,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             _logger: A logger instance, typically provided by a subclass, for consistent logging labels.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
-        if crawler_id is None:
-            # This could look into set of already used ids, but lets not overengineer this.
-            self.id = BasicCrawler.__next_id
-            BasicCrawler.__next_id += 1
-        else:
-            self.id = crawler_id
-
         implicit_event_manager_with_explicit_config = False
         if not configuration:
             configuration = service_locator.get_configuration()
@@ -441,6 +457,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # Retry and session settings
         self._use_session_pool = use_session_pool
         self._retry_on_blocked = retry_on_blocked
+
+        # Set use state
+        if use_state:
+            self._use_state = use_state
+        else:
+            self._use_state = _DefaultUseState(get_key_value_store=self.get_key_value_store)
 
         # Logging setup
         if configure_logging:
@@ -836,13 +858,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             wait_for_all_requests_to_be_added=wait_for_all_requests_to_be_added,
             wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
         )
-
-    async def _use_state(
-        self,
-        default_value: dict[str, JsonSerializable] | None = None,
-    ) -> dict[str, JsonSerializable]:
-        kvs = await self.get_key_value_store()
-        return await kvs.get_auto_saved_value(f'{self._CRAWLEE_STATE_KEY}_{self.id}', default_value)
 
     async def _save_crawler_state(self) -> None:
         store = await self.get_key_value_store()
