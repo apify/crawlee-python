@@ -19,6 +19,7 @@ from crawlee.crawlers import (
     AdaptivePlaywrightCrawler,
     AdaptivePlaywrightCrawlingContext,
     AdaptivePlaywrightPreNavCrawlingContext,
+    BasicCrawler,
     RenderingType,
     RenderingTypePrediction,
     RenderingTypePredictor,
@@ -380,7 +381,7 @@ async def test_adaptive_crawling_result_use_state_isolation(
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         rendering_type_predictor=static_only_predictor_enforce_detection,
     )
-    await key_value_store.set_value('CRAWLEE_STATE_0', {'counter': 0})
+    await key_value_store.set_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0', {'counter': 0})
     request_handler_calls = 0
 
     @crawler.router.default_handler
@@ -397,7 +398,7 @@ async def test_adaptive_crawling_result_use_state_isolation(
     # Request handler was called twice
     assert request_handler_calls == 2
     # Increment of global state happened only once
-    assert (await key_value_store.get_value('CRAWLEE_STATE_0'))['counter'] == 1
+    assert (await key_value_store.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0'))['counter'] == 1
 
 
 async def test_adaptive_crawling_statistics(test_urls: list[str]) -> None:
