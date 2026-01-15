@@ -821,15 +821,15 @@ async def test_context_use_state_crawlers_share_state() -> None:
         assert isinstance(state['urls'], list)
         state['urls'].append(context.request.url)
 
-    crawler_1 = BasicCrawler(crawler_id=0, request_handler=handler)
-    crawler_2 = BasicCrawler(crawler_id=0, request_handler=handler)
+    crawler_1 = BasicCrawler(id=0, request_handler=handler)
+    crawler_2 = BasicCrawler(id=0, request_handler=handler)
 
     await crawler_1.run(['https://a.com'])
     await crawler_2.run(['https://b.com'])
 
     kvs = await KeyValueStore.open()
-    assert crawler_1.id == crawler_2.id == 0
-    assert await kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_{crawler_1.id}') == {
+    assert crawler_1._id == crawler_2._id == 0
+    assert await kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_{crawler_1._id}') == {
         'urls': ['https://a.com', 'https://b.com']
     }
 
@@ -838,8 +838,8 @@ async def test_crawlers_share_stats() -> None:
     async def handler(context: BasicCrawlingContext) -> None:
         await context.use_state({'urls': []})
 
-    crawler_1 = BasicCrawler(crawler_id=0, request_handler=handler)
-    crawler_2 = BasicCrawler(crawler_id=0, request_handler=handler, statistics=crawler_1.statistics)
+    crawler_1 = BasicCrawler(id=0, request_handler=handler)
+    crawler_2 = BasicCrawler(id=0, request_handler=handler, statistics=crawler_1.statistics)
 
     result1 = await crawler_1.run(['https://a.com'])
     result2 = await crawler_2.run(['https://b.com'])
@@ -1722,7 +1722,7 @@ async def test_add_requests_with_rq_param(queue_name: str | None, queue_alias: s
     crawler = BasicCrawler()
     rq = await RequestQueue.open(name=queue_name, alias=queue_alias)
     if by_id:
-        queue_id = rq.id
+        queue_id = rq._id
         queue_name = None
     else:
         queue_id = None
