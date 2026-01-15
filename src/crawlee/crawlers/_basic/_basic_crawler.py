@@ -1057,7 +1057,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 yield request
 
                 limit = limit - 1 if limit is not None else None
-                if limit and limit <= 0:
+                if limit is not None and limit <= 0:
                     break
 
     def _check_enqueue_strategy(
