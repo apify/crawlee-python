@@ -1056,9 +1056,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             ) and self._check_url_patterns(target_url, kwargs.get('include'), kwargs.get('exclude')):
                 yield request
 
-                limit = limit - 1 if limit is not None else None
-                if limit is not None and limit <= 0:
-                    break
+                if limit is not None:
+                    limit -= 1
+                    if limit <= 0:
+                        break
 
     def _check_enqueue_strategy(
         self,
