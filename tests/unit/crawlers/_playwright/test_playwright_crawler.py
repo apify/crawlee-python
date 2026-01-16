@@ -1051,3 +1051,28 @@ async def test_request_state(server_url: URL) -> None:
     }
 
     await queue.drop()
+
+
+async def test_enqueue_links_with_limit(server_url: URL) -> None:
+    start_url = str(server_url / 'sub_index')
+    requests = [start_url]
+
+    crawler = PlaywrightCrawler()
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links(limit=1)
+
+    await crawler.run(requests)
+
+    first_visited = visit.call_args_list[0][0][0]
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    assert first_visited == start_url
+    # Only one link should be enqueued from sub_index due to the limit
+    assert visited == {
+        start_url,
+        str(server_url / 'page_3'),
+    }
