@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 
 - Prevent race condition in concurrent storage creation ([#1626](https://github.com/apify/crawlee-python/pull/1626)) ([7f17a43](https://github.com/apify/crawlee-python/commit/7f17a4347d5884962767e757a92ec173688fed7b)) by [@Mantisus](https://github.com/Mantisus), closes [#1621](https://github.com/apify/crawlee-python/issues/1621)
 - Create correct statistics for `AdaptivePlaywrightCrawler` on initialization with a custom parser ([#1637](https://github.com/apify/crawlee-python/pull/1637)) ([bff7260](https://github.com/apify/crawlee-python/commit/bff726055dd0d7e07a2c546b15cbee22abd85960)) by [@Mantisus](https://github.com/Mantisus), closes [#1630](https://github.com/apify/crawlee-python/issues/1630)
+- Fix adding extra link for `EnqueueLinksFunction` with `limit` ([#1674](https://github.com/apify/crawlee-python/pull/1674)) ([71d7867](https://github.com/apify/crawlee-python/commit/71d7867b14f7f07cac06899f5da006091af4a954)) by [@Mantisus](https://github.com/Mantisus), closes [#1673](https://github.com/apify/crawlee-python/issues/1673)
 
 
 <!-- git-cliff-unreleased-end -->
