@@ -24,7 +24,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
       - name: Check spelling with typos
-        uses: crate-ci/typos@v1.42.0
+        uses: crate-ci/typos@v1.42.1
 
   lint_check:
     name: Lint check
