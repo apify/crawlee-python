@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.2.2 - **not yet released**
+## [1.3.0](https://github.com/apify/crawlee-python/releases/tag/v1.3.0) (2026-01-20)
 
 ### 🚀 Features
 
@@ -16,7 +15,6 @@ All notable changes to this project will be documented in this file.
 - Fix adding extra link for `EnqueueLinksFunction` with `limit` ([#1674](https://github.com/apify/crawlee-python/pull/1674)) ([71d7867](https://github.com/apify/crawlee-python/commit/71d7867b14f7f07cac06899f5da006091af4a954)) by [@Mantisus](https://github.com/Mantisus), closes [#1673](https://github.com/apify/crawlee-python/issues/1673)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.2.1](https://github.com/apify/crawlee-python/releases/tag/v1.2.1) (2025-12-16)
 
 ### 🐛 Bug Fixes
