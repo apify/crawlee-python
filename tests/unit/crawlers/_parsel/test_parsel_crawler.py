@@ -445,3 +445,28 @@ async def test_enqueue_links_error_with_multi_params(
             await context.enqueue_links(rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
 
     await crawler.run([str(server_url / 'start_enqueue')])
+
+
+async def test_enqueue_links_with_limit(server_url: URL, http_client: HttpClient) -> None:
+    start_url = str(server_url / 'sub_index')
+    requests = [start_url]
+
+    crawler = ParselCrawler(http_client=http_client)
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links(limit=1)
+
+    await crawler.run(requests)
+
+    first_visited = visit.call_args_list[0][0][0]
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    assert first_visited == start_url
+    # Only one link should be enqueued from sub_index due to the limit
+    assert visited == {
+        start_url,
+        str(server_url / 'page_3'),
+    }
