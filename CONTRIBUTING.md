@@ -15,7 +15,7 @@ All tasks are defined in `pyproject.toml` under `[tool.poe.tasks]` and can be ru
 
 | Task | Description |
 | ---- | ----------- |
-| `install-dev` | Install dependencies and pre-commit hooks |
+| `install-dev` | Install development dependencies |
 | `check-code` | Run lint, type-check, and unit-tests |
 | `lint` | Run linter |
 | `format` | Fix lint issues and format code |
@@ -24,9 +24,9 @@ All tasks are defined in `pyproject.toml` under `[tool.poe.tasks]` and can be ru
 | `unit-tests-cov` | Run unit tests with coverage |
 | `e2e-templates-tests` | Run end-to-end template tests |
 | `build-docs` | Build documentation website |
-| `run-docs` | Run documentation locally |
+| `run-docs` | Run documentation website locally |
 | `build` | Build package |
-| `clean` | Remove build artifacts |
+| `clean` | Remove build artifacts and clean caches |
 
 ## Dependencies
 
