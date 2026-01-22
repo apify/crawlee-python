@@ -259,7 +259,7 @@ context = 7
 
 # Run tasks with: uv run poe <task>
 [tool.poe.tasks]
-clean = "rm -rf .uv_cache .pytest_cache .ruff_cache .uv-cache build dist htmlcov .coverage"
+clean = "rm -rf .coverage .pytest_cache .ruff_cache .ty_cache .uv-cache build coverage-unit.xml dist htmlcov website/.docusaurus website/.yarn website/module_shortcuts.json website/node_modules "
 install-sync = "uv sync --all-extras"
 build = "uv build --verbose"
 publish-to-pypi = "uv publish --verbose --token ${APIFY_PYPI_TOKEN_CRAWLEE}"
