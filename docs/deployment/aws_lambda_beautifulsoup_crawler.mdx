@@ -1,0 +1,93 @@
+---
+id: aws-lambda-beautifulsoup
+title: BeautifulSoup crawler on AWS Lambda
+description: Prepare your BeautifulSoupCrawler to run in Lambda functions on Amazon Web Services.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+
+import CodeBlock from '@theme/CodeBlock';
+
+import BeautifulSoupCrawlerLambda from '!!raw-loader!./code_examples/aws/beautifulsoup_crawler_lambda.py';
+
+[AWS Lambda](https://docs.aws.amazon.com/lambda/latest/dg/welcome.html) is a serverless compute service that lets you run code without provisioning or managing servers. It is well suited for deploying simple crawlers that don't require browser rendering. For simple projects, you can deploy using a ZIP archive.
+
+## Updating the code
+
+For the project foundation, use <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> as described in this [example](../examples/beautifulsoup-crawler).
+
+When instantiating a crawler, use <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink>. By default, Crawlee uses file-based storage, but the Lambda filesystem is read-only (except for `/tmp`). Using `MemoryStorageClient` tells Crawlee to use in-memory storage instead.
+
+Wrap the crawler logic in a `lambda_handler` function. This is the entry point that AWS will execute.
+
+:::important
+
+Make sure to always instantiate a new crawler for every Lambda invocation. AWS keeps the environment running for some time after the first execution (to reduce cold-start times), so subsequent calls may access an already-used crawler instance.
+
+**TLDR: Keep your Lambda stateless.**
+
+:::
+
+Finally, return the scraped data from the Lambda when the crawler run ends.
+
+<CodeBlock language="python" title="lambda_function.py">
+    {BeautifulSoupCrawlerLambda}
+</CodeBlock>
+
+## Deploying the project
+
+### Preparing the environment
+
+Lambda requires all dependencies to be included in the deployment package. Create a virtual environment and install dependencies:
+
+```bash
+python3.14 -m venv .venv
+source .venv/bin/activate
+pip install 'crawlee[beautifulsoup]' 'boto3' 'aws-lambda-powertools'
+```
+
+### Creating the ZIP archive
+
+Create a ZIP archive from your project, including dependencies from the virtual environment:
+
+```bash
+cd .venv/lib/python3.14/site-packages
+zip -r ../../../../package.zip .
+cd ../../../../
+zip package.zip lambda_function.py
+```
+
+:::note Large dependencies?
+
+AWS has a limit of 50MB for direct upload and 250MB for unzipped deployment package size.
+
+A better way to manage dependencies is by using Lambda Layers. With Layers, you can share files between multiple Lambda functions and keep the actual code as slim as possible.
+
+To create a Lambda Layer:
+
+1. Create a `python/` folder and copy dependencies from `site-packages` into it
+2. Create a zip archive: `zip -r layer.zip python/`
+3. Create a new Lambda Layer from the archive (you may need to upload it to S3 first)
+4. Attach the Layer to your Lambda function
+
+:::
+
+### Uploading and configuring
+
+Upload `package.zip` as the code source in the AWS Lambda Console using the "Upload from" button.
+
+In Lambda Runtime Settings, set the handler. Since the file is named `lambda_function.py` and the function is `lambda_handler`, you can use the default value `lambda_function.lambda_handler`.
+
+:::tip Configuration
+
+In the Configuration tab, you can adjust:
+
+- **Memory**: Memory size can greatly affect execution speed. A minimum of 256-512 MB is recommended.
+- **Timeout**: Set according to the size of the website you are scraping (1 minute for code in example).
+- **Ephemeral storage**: Size of the `/tmp` directory.
+
+See the [official documentation](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html) to learn how performance and cost scale with memory.
+
+:::
+
+After the Lambda deploys, you can test it by clicking the "Test" button. The event contents don't matter for a basic test, but you can parameterize your crawler by analyzing the event object that AWS passes as the first argument to the handler.
