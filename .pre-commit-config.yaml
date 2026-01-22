@@ -3,12 +3,12 @@ repos:
     hooks:
       - id: lint-check
         name: Lint check
-        entry: make lint
+        entry: uv run poe lint
         language: system
         pass_filenames: false
 
       - id: type-check
         name: Type check
-        entry: make type-check
+        entry: uv run poe type-check
         language: system
         pass_filenames: false

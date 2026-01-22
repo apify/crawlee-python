@@ -8,12 +8,15 @@ For local development, it is required to have Python 3.10 (or a later version) i
 
 We use [uv](https://docs.astral.sh/uv/) for project management. Install it and set up your IDE accordingly.
 
+We use [Poe the Poet](https://poethepoet.natn.io/) as a task runner, similar to npm scripts in `package.json`.
+All tasks are defined in `pyproject.toml` under `[tool.poe.tasks]` and can be run with `uv run poe <task>`.
+
 ## Dependencies
 
 To install this package and its development dependencies, run:
 
 ```sh
-make install-dev
+uv run poe install-dev
 ```
 
 ## Code checking
@@ -21,7 +24,7 @@ make install-dev
 To execute all code checking tools together, run:
 
 ```sh
-make check-code
+uv run poe check-code
 ```
 
 ### Linting
@@ -31,7 +34,7 @@ We utilize [ruff](https://docs.astral.sh/ruff/) for linting, which analyzes code
 To run linting:
 
 ```sh
-make lint
+uv run poe lint
 ```
 
 ### Formatting
@@ -41,35 +44,33 @@ Our automated code formatting also leverages [ruff](https://docs.astral.sh/ruff/
 To run formatting:
 
 ```sh
-make format
+uv run poe format
 ```
 
 ### Type checking
 
 Type checking is handled by [ty](https://docs.astral.sh/ty/), verifying code against type annotations. Configuration settings can be found in `pyproject.toml`.
 
-To run type checking:
+To run type-check:
 
 ```sh
-make type-check
+uv run poe type-check
 ```
 
 ### Unit tests
-
-We employ pytest as our testing framework, equipped with various plugins. Check pyproject.toml for configuration details and installed plugins.
 
 We use [pytest](https://docs.pytest.org/) as a testing framework with many plugins. Check `pyproject.toml` for configuration details and installed plugins.
 
 To run unit tests:
 
 ```sh
-make unit-tests
+uv run poe unit-tests
 ```
 
-To run unit tests with HTML coverage report:
+To run unit tests with coverage report:
 
 ```sh
-make unit-tests-cov
+uv run poe unit-tests-cov
 ```
 
 ## End-to-end tests
@@ -79,11 +80,10 @@ Pre-requisites for running end-to-end tests:
  - `apify-cli` available in `PATH` environment variable
  - Your [apify token](https://docs.apify.com/platform/integrations/api#api-token) is available in `APIFY_TEST_USER_API_TOKEN` environment variable
 
-
 To run end-to-end tests:
 
 ```sh
-make e2e-templates-tests
+uv run poe e2e-templates-tests
 ```
 
 ## Documentation
@@ -95,7 +95,7 @@ Our API documentation is generated from these docstrings using [pydoc-markdown](
 To run the documentation locally, ensure you have `Node.js` 20+ installed, then run:
 
 ```sh
-make run-docs
+uv run poe run-docs
 ```
 
 ## Release process
