@@ -50,13 +50,10 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install Python dependencies
-        run: make install-dev
-
-      - name: Build generated API reference
-        run: make build-api-reference
+        run: uv run poe install-dev
 
       - name: Build Docusaurus docs
-        run: make build-docs
+        run: uv run poe build-docs
         env:
           APIFY_SIGNING_TOKEN: ${{ secrets.APIFY_SIGNING_TOKEN }}
           SEGMENT_TOKEN: ${{ secrets.SEGMENT_TOKEN }}

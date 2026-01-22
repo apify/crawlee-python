@@ -8,12 +8,32 @@ For local development, it is required to have Python 3.10 (or a later version) i
 
 We use [uv](https://docs.astral.sh/uv/) for project management. Install it and set up your IDE accordingly.
 
+We use [Poe the Poet](https://poethepoet.natn.io/) as a task runner, similar to npm scripts in `package.json`.
+All tasks are defined in `pyproject.toml` under `[tool.poe.tasks]` and can be run with `uv run poe <task>`.
+
+### Available tasks
+
+| Task | Description |
+| ---- | ----------- |
+| `install-dev` | Install development dependencies |
+| `check-code` | Run lint, type-check, and unit-tests |
+| `lint` | Run linter |
+| `format` | Fix lint issues and format code |
+| `type-check` | Run type checker |
+| `unit-tests` | Run unit tests |
+| `unit-tests-cov` | Run unit tests with coverage |
+| `e2e-templates-tests` | Run end-to-end template tests |
+| `build-docs` | Build documentation website |
+| `run-docs` | Run documentation website locally |
+| `build` | Build package |
+| `clean` | Remove build artifacts and clean caches |
+
 ## Dependencies
 
 To install this package and its development dependencies, run:
 
 ```sh
-make install-dev
+uv run poe install-dev
 ```
 
 ## Code checking
@@ -21,7 +41,7 @@ make install-dev
 To execute all code checking tools together, run:
 
 ```sh
-make check-code
+uv run poe check-code
 ```
 
 ### Linting
@@ -31,7 +51,7 @@ We utilize [ruff](https://docs.astral.sh/ruff/) for linting, which analyzes code
 To run linting:
 
 ```sh
-make lint
+uv run poe lint
 ```
 
 ### Formatting
@@ -41,7 +61,7 @@ Our automated code formatting also leverages [ruff](https://docs.astral.sh/ruff/
 To run formatting:
 
 ```sh
-make format
+uv run poe format
 ```
 
 ### Type checking
@@ -51,51 +71,48 @@ Type checking is handled by [ty](https://docs.astral.sh/ty/), verifying code aga
 To run type checking:
 
 ```sh
-make type-check
+uv run poe type-check
 ```
 
 ### Unit tests
-
-We employ pytest as our testing framework, equipped with various plugins. Check pyproject.toml for configuration details and installed plugins.
 
 We use [pytest](https://docs.pytest.org/) as a testing framework with many plugins. Check `pyproject.toml` for configuration details and installed plugins.
 
 To run unit tests:
 
 ```sh
-make unit-tests
+uv run poe unit-tests
 ```
 
-To run unit tests with HTML coverage report:
+To run unit tests with coverage report:
 
 ```sh
-make unit-tests-cov
+uv run poe unit-tests-cov
 ```
 
 ## End-to-end tests
 
-Pre-requisites for running end-to-end tests:
- - [apify-cli](https://docs.apify.com/cli/docs/installation) correctly installed
- - `apify-cli` available in `PATH` environment variable
- - Your [apify token](https://docs.apify.com/platform/integrations/api#api-token) is available in `APIFY_TEST_USER_API_TOKEN` environment variable
+Prerequisites:
 
+- [apify-cli](https://docs.apify.com/cli/docs/installation) installed and available in `PATH`
+- Set `APIFY_TEST_USER_API_TOKEN` to your [Apify API token](https://docs.apify.com/platform/integrations/api#api-token)
 
 To run end-to-end tests:
 
 ```sh
-make e2e-templates-tests
+uv run poe e2e-templates-tests
 ```
 
 ## Documentation
 
 We follow the [Google docstring format](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html) for code documentation. All user-facing classes and functions must be documented. Documentation standards are enforced using [Ruff](https://docs.astral.sh/ruff/).
 
-Our API documentation is generated from these docstrings using [pydoc-markdown](https://pypi.org/project/pydoc-markdown/) with custom post-processing. Additional content is provided through markdown files in the `docs/` directory. The final documentation is rendered using [Docusaurus](https://docusaurus.io/) and published to GitHub pages.
+Our API documentation is generated from these docstrings using [pydoc-markdown](https://pypi.org/project/pydoc-markdown/) with custom post-processing. Additional content is provided through markdown files in the `docs/` directory. The final documentation is rendered using [Docusaurus](https://docusaurus.io/) and published to GitHub Pages.
 
 To run the documentation locally, ensure you have `Node.js` 20+ installed, then run:
 
 ```sh
-make run-docs
+uv run poe run-docs
 ```
 
 ## Release process
@@ -120,14 +137,14 @@ name = "crawlee"
 version = "x.z.y"
 ```
 
-4. Generate the distribution archives for the package:
+4. Build the package:
 
-```shell
-uv build
+```sh
+uv run poe build
 ```
 
-5. Set up the PyPI API token for authentication and upload the package to PyPI:
+5. Upload to PyPI:
 
-```shell
+```sh
 uv publish --token YOUR_API_TOKEN
 ```

@@ -102,6 +102,7 @@ dev = [
     "build<2.0.0", # For e2e tests.
     "dycw-pytest-only<3.0.0",
     "fakeredis[probabilistic,json,lua]<3.0.0",
+    "poethepoet<1.0.0",
     "pre-commit<5.0.0",
     "proxy-py<3.0.0",
     "pydoc-markdown<5.0.0",
@@ -255,3 +256,44 @@ exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "assert_never()"]
 
 [tool.ipdb]
 context = 7
+
+# Run tasks with: uv run poe <task>
+[tool.poe.tasks]
+clean = "rm -rf .coverage .pytest_cache .ruff_cache .ty_cache .uv-cache build coverage-unit.xml dist htmlcov website/.docusaurus website/.yarn website/module_shortcuts.json website/node_modules "
+install-sync = "uv sync --all-extras"
+build = "uv build --verbose"
+publish-to-pypi = "uv publish --verbose --token ${APIFY_PYPI_TOKEN_CRAWLEE}"
+type-check = "uv run ty check"
+check-code = ["lint", "type-check", "unit-tests"]
+
+[tool.poe.tasks.install-dev]
+shell = "uv sync --all-extras && uv run pre-commit install && uv run playwright install"
+
+[tool.poe.tasks.lint]
+shell = "uv run ruff format --check && uv run ruff check"
+
+[tool.poe.tasks.format]
+shell = "uv run ruff check --fix && uv run ruff format"
+
+[tool.poe.tasks.unit-tests]
+shell = """
+uv run pytest --numprocesses=1 --verbose -m "run_alone" tests/unit && \
+uv run pytest --numprocesses=auto --verbose -m "not run_alone" tests/unit
+"""
+
+[tool.poe.tasks.unit-tests-cov]
+shell = """
+uv run pytest --numprocesses=1 --verbose -m "run_alone" --cov=src/crawlee --cov-report=xml:coverage-unit.xml tests/unit && \
+uv run pytest --numprocesses=auto --verbose -m "not run_alone" --cov=src/crawlee --cov-report=xml:coverage-unit.xml --cov-append tests/unit
+"""
+
+[tool.poe.tasks.e2e-templates-tests]
+cmd = "uv run pytest --numprocesses=${E2E_TESTS_CONCURRENCY:-1} --verbose tests/e2e/project_template --timeout=600"
+
+[tool.poe.tasks.build-docs]
+shell = "./build_api_reference.sh && corepack enable && yarn && yarn build"
+cwd = "website"
+
+[tool.poe.tasks.run-docs]
+shell = "./build_api_reference.sh && corepack enable && yarn && yarn start"
+cwd = "website"
