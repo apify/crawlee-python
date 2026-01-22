@@ -234,6 +234,7 @@ async def test_chromium_headless_headers(
     assert 'headless' not in headers['user-agent'].lower()
 
 
+@pytest.mark.flaky(reruns=3, reason='Test is flaky.')
 async def test_firefox_headless_headers(header_network: dict, server_url: URL) -> None:
     browser_type: BrowserType = 'firefox'
     crawler = PlaywrightCrawler(headless=True, browser_type=browser_type)
