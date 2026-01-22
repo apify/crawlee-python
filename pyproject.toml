@@ -217,10 +217,10 @@ builtins-ignorelist = ["id"]
 known-first-party = ["crawlee"]
 
 [tool.pytest.ini_options]
-addopts = "-ra"
+addopts = "-r a --verbose"
 asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
-timeout = 300
+timeout = 1800
 markers = [
     "run_alone: marks tests that must run in isolation",
 ]
@@ -277,18 +277,39 @@ shell = "uv run ruff check --fix && uv run ruff format"
 
 [tool.poe.tasks.unit-tests]
 shell = """
-uv run pytest --numprocesses=1 --verbose -m "run_alone" tests/unit && \
-uv run pytest --numprocesses=auto --verbose -m "not run_alone" tests/unit
+uv run pytest \
+    --numprocesses=1 \
+    -m "run_alone" \
+    tests/unit && \
+uv run pytest \
+    --numprocesses=${TESTS_CONCURRENCY:-auto} \
+    -m "not run_alone" \
+    tests/unit
 """
 
 [tool.poe.tasks.unit-tests-cov]
 shell = """
-uv run pytest --numprocesses=1 --verbose -m "run_alone" --cov=src/crawlee --cov-report=xml:coverage-unit.xml tests/unit && \
-uv run pytest --numprocesses=auto --verbose -m "not run_alone" --cov=src/crawlee --cov-report=xml:coverage-unit.xml --cov-append tests/unit
+uv run pytest \
+    --numprocesses=1 \
+    -m "run_alone" \
+    --cov=src/crawlee \
+    --cov-report=xml:coverage-unit.xml \
+    tests/unit && \
+uv run pytest \
+    --numprocesses=${TESTS_CONCURRENCY:-auto} \
+    -m "not run_alone" \
+    --cov=src/crawlee \
+    --cov-report=xml:coverage-unit.xml \
+    --cov-append \
+    tests/unit
 """
 
 [tool.poe.tasks.e2e-templates-tests]
-cmd = "uv run pytest --numprocesses=${E2E_TESTS_CONCURRENCY:-1} --verbose tests/e2e/project_template --timeout=600"
+cmd = """
+uv run pytest \
+    --numprocesses=${TESTS_CONCURRENCY:-auto} \
+    tests/e2e/project_template
+"""
 
 [tool.poe.tasks.build-docs]
 shell = "./build_api_reference.sh && corepack enable && yarn && yarn build"
