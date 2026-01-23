@@ -10,7 +10,7 @@ on:
 jobs:
   unit_tests:
     name: Unit tests
-    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@improve-shared-python-workflows
+    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
     secrets: inherit
     with:
       python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
