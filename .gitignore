@@ -79,3 +79,6 @@ website/package-lock.json
 
 # Default directory for memory storage
 storage/
+
+# Tmp dir
+tmp/
