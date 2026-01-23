@@ -17,4 +17,4 @@ jobs:
       operating_systems: '["ubuntu-latest", "windows-latest", "macos-latest"]'
       python_version_for_codecov: "3.14"
       operating_system_for_codecov: ubuntu-latest
-      tests_concurrency: "16"
+      tests_concurrency: "2"
