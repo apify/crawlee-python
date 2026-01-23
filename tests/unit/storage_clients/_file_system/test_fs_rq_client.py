@@ -173,3 +173,17 @@ async def test_data_persistence_across_reopens() -> None:
     assert {request1.url, request2.url} == {'https://example.com/1', 'https://example.com/2'}
 
     await reopened_client.drop()
+
+
+async def test_get_request_does_not_mark_in_progress(rq_client: FileSystemRequestQueueClient) -> None:
+    """Test that get_request does not block a request from being fetched."""
+    request = Request.from_url('https://example.com/blocked')
+    await rq_client.add_batch_of_requests([request])
+
+    fetched = await rq_client.get_request(request.unique_key)
+    assert fetched is not None
+    assert fetched.unique_key == request.unique_key
+
+    next_request = await rq_client.fetch_next_request()
+    assert next_request is not None
+    assert next_request.unique_key == request.unique_key
