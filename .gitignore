@@ -1,3 +1,24 @@
+# AI assistant files
+.agent
+.agents
+.ai
+.aider
+.claude
+.codeium
+.continue
+.copilot
+.cursor
+.gemini
+.llm
+.llms
+.openai
+.serena
+.windsurf
+.zed-ai
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+
 # Cache
 __pycache__
 .pytest_cache
@@ -6,10 +27,11 @@ __pycache__
 .uv-cache
 
 # Virtual envs
-.venv
 .direnv
+.env
 .envrc
 .python-version
+.venv
 
 # Other Python tools
 .ropeproject
@@ -31,11 +53,12 @@ coverage-unit.xml
 coverage-integration.xml
 
 # IDE, editors
-.vscode
-.idea
 *~
 .DS_Store
+.idea
 .nvim.lua
+.vscode
+.zed
 Session.vim
 
 # Docs
@@ -56,3 +79,6 @@ website/package-lock.json
 
 # Default directory for memory storage
 storage/
+
+# Tmp dir
+tmp/
