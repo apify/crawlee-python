@@ -15,6 +15,7 @@ concurrency:
 env:
   NODE_VERSION: 22
   PYTHON_VERSION: 3.14
+  TESTS_CONCURRENCY: 1
 
 jobs:
   end_to_end_tests:

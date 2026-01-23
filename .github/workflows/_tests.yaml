@@ -11,11 +11,10 @@ jobs:
   unit_tests:
     name: Unit tests
     uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
-    secrets:
-      httpbin_url: ${{ secrets.APIFY_HTTPBIN_TOKEN && format('https://httpbin.apify.actor?token={0}', secrets.APIFY_HTTPBIN_TOKEN) || 'https://httpbin.org' }}
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    secrets: inherit
     with:
-      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
-      operating-systems: '["ubuntu-latest", "windows-latest", "macos-latest"]'
-      python-version-for-codecov: "3.14"
-      operating-system-for-codecov: ubuntu-latest
+      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+      operating_systems: '["ubuntu-latest", "windows-latest", "macos-latest"]'
+      python_version_for_codecov: "3.14"
+      operating_system_for_codecov: ubuntu-latest
+      tests_concurrency: "2"

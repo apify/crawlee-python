@@ -30,10 +30,10 @@ jobs:
     name: Lint check
     uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
     with:
-      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
 
   type_check:
     name: Type check
     uses: apify/workflows/.github/workflows/python_type_check.yaml@main
     with:
-      python-versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
