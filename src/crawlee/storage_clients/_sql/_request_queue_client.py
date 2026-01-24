@@ -179,6 +179,8 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 update_accessed_at=True,
                 update_modified_at=True,
                 new_pending_request_count=0,
+                new_handled_request_count=0,
+                new_total_request_count=0,
                 force=True,
             )
         )

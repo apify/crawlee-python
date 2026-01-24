@@ -629,7 +629,7 @@ async def test_purge(
 
     # Queue should be empty now
     metadata = await rq.get_metadata()
-    assert metadata.total_request_count == 3
+    assert metadata.total_request_count == 0
     assert metadata.pending_request_count == 0
     assert metadata.handled_request_count == 0
     assert await rq.is_empty() is True
@@ -1144,12 +1144,12 @@ async def test_purge_on_start_enabled(storage_client: StorageClient) -> None:
     assert alias_metadata_after.pending_request_count == 0
     assert named_metadata_after.pending_request_count == 2
 
-    assert default_metadata_after.handled_request_count == 1
-    assert alias_metadata_after.handled_request_count == 1
+    assert default_metadata_after.handled_request_count == 0
+    assert alias_metadata_after.handled_request_count == 0
     assert named_metadata_after.handled_request_count == 1
 
-    assert default_metadata_after.total_request_count == 3
-    assert alias_metadata_after.total_request_count == 3
+    assert default_metadata_after.total_request_count == 0
+    assert alias_metadata_after.total_request_count == 0
     assert named_metadata_after.total_request_count == 3
 
     # Clean up
