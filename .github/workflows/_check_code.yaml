@@ -15,7 +15,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
       - name: Run actionlint
-        uses: rhysd/actionlint@v1.7.10
+        uses: rhysd/actionlint@v1
 
   spell_check:
     name: Spell check
@@ -24,7 +24,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
       - name: Check spelling with typos
-        uses: crate-ci/typos@v1.42.1
+        uses: crate-ci/typos@v1
 
   lint_check:
     name: Lint check
