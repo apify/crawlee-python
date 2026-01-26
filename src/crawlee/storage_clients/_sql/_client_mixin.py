@@ -282,7 +282,7 @@ class SqlClientMixin(ABC):
         This operation is irreversible. Uses CASCADE deletion to remove all related items.
         """
         stmt = delete(self._METADATA_TABLE).where(self._METADATA_TABLE.id == self._id)
-        # Delete the buffer records with a separate query, since table don't link via foreign key.
+        # Delete the buffer records with a separate query, since tables don't link via foreign key.
         buffer_stmt = delete(self._BUFFER_TABLE).where(self._BUFFER_TABLE.storage_id == self._id)
 
         async with self.get_session(with_simple_commit=True) as session:
