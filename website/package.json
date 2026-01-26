@@ -13,26 +13,14 @@
         "prettify": "prettier --write --config ./tools/docs-prettier.config.js ../docs/guides/*.md",
         "swizzle": "docusaurus swizzle",
         "deploy": "rimraf .docusaurus && node --max_old_space_size=16000 node_modules/@docusaurus/core/bin/docusaurus.mjs deploy",
-        "docusaurus": "docusaurus"
-    },
-    "devDependencies": {
-        "@apify/eslint-config-ts": ">=0.4.0 <1.0.0",
-        "@apify/tsconfig": ">=0.1.0 <1.0.0",
-        "@apify/ui-icons": "^1.23.0",
-        "@docusaurus/module-type-aliases": "^3.9.2",
-        "@docusaurus/types": "^3.9.2",
-        "@types/react": "^19.0.0",
-        "@typescript-eslint/eslint-plugin": "^8.46.0",
-        "@typescript-eslint/parser": "^8.46.0",
-        "eslint": "^8.57.0",
-        "eslint-plugin-react": "^7.37.5",
-        "eslint-plugin-react-hooks": "^7.0.0",
-        "fs-extra": "^11.1.0",
-        "patch-package": "^8.0.0",
-        "path-browserify": "^1.0.1",
-        "prettier": "^3.0.0",
-        "rimraf": "^6.0.0",
-        "typescript": "^5.9.3"
+        "docusaurus": "docusaurus",
+        "clean": "rimraf .docusaurus build",
+        "lint": "yarn lint:md && yarn lint:code",
+        "lint:fix": "yarn lint:md:fix && yarn lint:code:fix",
+        "lint:md": "markdownlint --config ../.markdownlint.yaml '../docs/**/*.md' '../docs/**/*.mdx' --ignore '../docs/changelog.md'",
+        "lint:md:fix": "yarn lint:md --fix",
+        "lint:code": "eslint .",
+        "lint:code:fix": "eslint . --fix"
     },
     "dependencies": {
         "@apify/docusaurus-plugin-typedoc-api": "^5.0.0",
@@ -63,6 +51,27 @@
         "react-lite-youtube-embed": "^3.0.0",
         "stream-browserify": "^3.0.0",
         "unist-util-visit": "^5.0.0"
+    },
+    "devDependencies": {
+        "@apify/eslint-config-ts": ">=0.4.0 <1.0.0",
+        "@apify/tsconfig": ">=0.1.0 <1.0.0",
+        "@apify/ui-icons": "^1.23.0",
+        "@docusaurus/module-type-aliases": "^3.9.2",
+        "@docusaurus/types": "^3.9.2",
+        "@types/react": "^19.0.0",
+        "@typescript-eslint/eslint-plugin": "^8.46.0",
+        "@typescript-eslint/parser": "^8.46.0",
+        "eslint": "^9.0.0",
+        "eslint-plugin-react": "^7.37.5",
+        "eslint-plugin-react-hooks": "^7.0.0",
+        "fs-extra": "^11.1.0",
+        "markdownlint": ">=0.39.0 <1.0.0",
+        "markdownlint-cli": ">=0.46.0 <1.0.0",
+        "patch-package": "^8.0.0",
+        "path-browserify": "^1.0.1",
+        "prettier": "^3.0.0",
+        "rimraf": "^6.0.0",
+        "typescript": "^5.9.3"
     },
     "resolutions": {
         "@rspack/core": "<1.6.0"
