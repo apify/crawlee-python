@@ -814,6 +814,6 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 delta_handled_request_count=row.delta_handled_count,
                 delta_pending_request_count=row.delta_pending_count,
                 delta_total_request_count=row.delta_total_count,
-                recalculate=row.need_recalc,
+                recalculate=bool(row.need_recalc),
             ),
         )
