@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import JSON, BigInteger, Boolean, ForeignKey, Index, Integer, LargeBinary, String, text
+from sqlalchemy import JSON, BigInteger, Boolean, ForeignKey, Index, Integer, LargeBinary, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, synonym
 from sqlalchemy.types import DateTime, TypeDecorator
@@ -95,13 +95,6 @@ class RequestQueueMetadataDb(StorageMetadataDb, Base):
     """Metadata table for request queues."""
 
     __tablename__ = 'request_queues'
-    __table_args__ = (
-        Index(
-            'idx_buffer_lock',
-            'request_queue_id',
-            'buffer_locked_until',
-        ),
-    )
 
     request_queue_id: Mapped[str] = mapped_column(String(20), nullable=False, primary_key=True)
     """Unique identifier for the request queue."""
@@ -233,7 +226,7 @@ class RequestDb(Base):
     )
     """Foreign key to metadata request queue record."""
 
-    data: Mapped[str] = mapped_column(String(5000), nullable=False)
+    data: Mapped[str] = mapped_column(Text, nullable=False)
     """JSON-serialized Request object."""
 
     sequence_number: Mapped[int] = mapped_column(Integer, nullable=False)

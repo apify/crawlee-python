@@ -238,7 +238,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
             # Update metadata if we actually deleted something
             if result.rowcount > 0:
-                await self._add_buffer_record(session, update_accessed_at=True, update_modified_at=True)
+                await self._add_buffer_record(session, update_modified_at=True)
 
     @override
     async def iterate_keys(

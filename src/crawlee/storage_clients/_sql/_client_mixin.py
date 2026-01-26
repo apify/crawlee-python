@@ -394,7 +394,7 @@ class SqlClientMixin(ABC):
         session.add(self._BUFFER_TABLE(**values_to_set))
 
     async def _try_acquire_buffer_lock(self, session: AsyncSession) -> bool:
-        """Try to acquire buffer processing lock for 200ms.
+        """Try to acquire buffer processing lock for a short period.
 
         Args:
             session: Active database session.
