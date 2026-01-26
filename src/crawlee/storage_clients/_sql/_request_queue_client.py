@@ -368,7 +368,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 await self._add_buffer_record(
                     session,
                     update_modified_at=True,
-                    reclaculate=True,
+                    recalculate=True,
                 )
                 await session.commit()
                 transaction_processed_requests.clear()
