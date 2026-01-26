@@ -46,6 +46,8 @@ source .venv/bin/activate
 pip install 'crawlee[beautifulsoup]' 'boto3' 'aws-lambda-powertools'
 ```
 
+[`boto3`](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html) is the AWS SDK for Python. Including it in your dependencies is recommended to avoid version misalignment issues with the Lambda runtime.
+
 ### Creating the ZIP archive
 
 Create a ZIP archive from your project, including dependencies from the virtual environment:
@@ -72,9 +74,18 @@ To create a Lambda Layer:
 
 :::
 
-### Uploading and configuring
+### Create Lambda function
 
-Upload `package.zip` as the code source in the AWS Lambda Console using the "Upload from" button.
+Create the Lambda function in the AWS Lambda Console:
+
+1. Navigate to `Lambda` in [AWS Management Console](https://aws.amazon.com/console/).
+2. Click **Create function**.
+3. Select **Author from scratch**.
+4. Enter a **Function name**, for example `BeautifulSoupTest`.
+5. Choose a **Python runtime** that matches the version used in your virtual environment (for example, Python 3.14).
+6. Click **Create function** to finish.
+
+Once created, upload `package.zip` as the code source in the AWS Lambda Console using the "Upload from" button.
 
 In Lambda Runtime Settings, set the handler. Since the file is named `lambda_function.py` and the function is `lambda_handler`, you can use the default value `lambda_function.lambda_handler`.
 

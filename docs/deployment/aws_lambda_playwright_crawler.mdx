@@ -1,6 +1,6 @@
 ---
 id: aws-lambda-playwright
-title: PlaywrightCrawler on AWS Lambda
+title: Playwright crawler on AWS Lambda
 description: Prepare your PlaywrightCrawler to run in Lambda functions on Amazon Web Services.
 ---
 
@@ -63,6 +63,9 @@ Add additional dependencies:
 uv add awslambdaric aws-lambda-powertools boto3
 ```
 
+[`boto3`](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html) is the AWS SDK for Python. Use it if your function integrates with any other AWS services.
+
+
 The project is created with a Dockerfile that needs to be modified for AWS Lambda by adding `ENTRYPOINT` and updating `CMD`:
 
 <CodeBlock language="dockerfile" title="Dockerfile">
@@ -85,14 +88,15 @@ docker push {user-specific-data}/lambda/aws-playwright:latest
 
 ### Creating the Lambda function
 
-1. In the AWS Lambda Console, click "Create function"
-2. Select "Container image"
-3. Browse and select your ECR image
-4. Configure the function settings
+1. Navigate to `Lambda` in [AWS Management Console](https://aws.amazon.com/console/).
+2. Click **Create function**.
+3. Select **Container image**.
+4. Browse and select your ECR image.
+5. Click **Create function** to finish.
 
 :::tip Configuration
 
-Playwright crawlers require more resources than HTTP-based crawlers:
+In the Configuration tab, you can adjust resources. Playwright crawlers require more resources than HTTP-based crawlers:
 
 - **Memory**: Minimum 1024 MB recommended. Browser operations are memory-intensive, so 2048 MB or more may be needed for complex pages.
 - **Timeout**: Set according to crawl size. Browser startup adds overhead, so allow at least 5 minutes even for simple crawls.
