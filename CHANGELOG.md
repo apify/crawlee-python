@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 1.3.1 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- Reset all counter in metadata with `purge` for `RequestQueue` ([#1686](https://github.com/apify/crawlee-python/pull/1686)) ([ee09260](https://github.com/apify/crawlee-python/commit/ee0926084589f1b6e15840b6185ec5433be3b72f)) by [@Mantisus](https://github.com/Mantisus), closes [#1682](https://github.com/apify/crawlee-python/issues/1682)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [1.3.0](https://github.com/apify/crawlee-python/releases/tag/v1.3.0) (2026-01-20)
