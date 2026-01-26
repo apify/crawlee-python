@@ -366,7 +366,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 processed_requests.extend(transaction_processed_requests)
             except SQLAlchemyError as e:
                 await session.rollback()
-                logger.warning(f'Failed to commit session: {e}')
+                logger.debug(f'Failed add requests to DB with error: {e}')
                 await self._add_buffer_record(
                     session,
                     update_modified_at=True,
