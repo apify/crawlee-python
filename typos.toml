@@ -1,0 +1,26 @@
+# Configuration for typos spell checker
+# https://github.com/crate-ci/typos
+
+[default]
+extend-ignore-re = [
+    "https?://[^\\s]+", # Ignore URLs
+    "'gASV[^']+",       # Ignore base64-encoded pickle data
+]
+
+[files]
+# Extend the default exclude list
+extend-exclude = [
+    "*.lock",
+    "*.min.js",
+    "*.min.css",
+    "CHANGELOG.md",
+]
+
+[default.extend-identifiers]
+# Add project-specific identifiers that should not be treated as typos
+ser_json_inf_nan = "ser_json_inf_nan" # Pydantic config parameter
+asend = "asend" # Python async generator method
+
+[default.extend-words]
+# Add project-specific words that should not be treated as typos
+mke = "mke" # Sennheiser MKE product name

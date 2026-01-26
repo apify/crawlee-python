@@ -1,4 +1,3 @@
-# mypy: disable-error-code="misc"
 import asyncio
 import json
 from datetime import timedelta
@@ -6,10 +5,7 @@ from datetime import timedelta
 import functions_framework
 from flask import Request, Response
 
-from crawlee.crawlers import (
-    BeautifulSoupCrawler,
-    BeautifulSoupCrawlingContext,
-)
+from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from crawlee.storage_clients import MemoryStorageClient
 
 

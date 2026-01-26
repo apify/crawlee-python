@@ -1,0 +1,27 @@
+name: CI (PR)
+
+on:
+  # Runs whenever a pull request is opened or updated.
+  pull_request:
+
+jobs:
+  pr_title_check:
+    name: PR title check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  doc_checks:
+    name: Doc checks
+    uses: ./.github/workflows/_check_docs.yaml
+
+  code_checks:
+    name: Code checks
+    uses: ./.github/workflows/_check_code.yaml
+
+  tests:
+    name: Tests
+    uses: ./.github/workflows/_tests.yaml
+    secrets: inherit

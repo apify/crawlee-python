@@ -13,19 +13,12 @@
     <a href="https://trendshift.io/repositories/11169" target="_blank"><img src="https://trendshift.io/api/badge/repositories/11169" alt="apify%2Fcrawlee-python | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
 
-<p align=center>
-    <a href="https://badge.fury.io/py/crawlee" rel="nofollow">
-        <img src="https://badge.fury.io/py/crawlee.svg" alt="PyPI version" style="max-width: 100%;">
-    </a>
-    <a href="https://pypi.org/project/crawlee/" rel="nofollow">
-        <img src="https://img.shields.io/pypi/dm/crawlee" alt="PyPI - Downloads" style="max-width: 100%;">
-    </a>
-    <a href="https://pypi.org/project/crawlee/" rel="nofollow">
-        <img src="https://img.shields.io/pypi/pyversions/crawlee" alt="PyPI - Python Version" style="max-width: 100%;">
-    </a>
-    <a href="https://discord.gg/jyEM2PRvMU" rel="nofollow">
-        <img src="https://img.shields.io/discord/801163717915574323?label=discord" alt="Chat on discord" style="max-width: 100%;">
-    </a>
+<p align="center">
+  <a href="https://badge.fury.io/py/crawlee" rel="nofollow"><img src="https://badge.fury.io/py/crawlee.svg" alt="PyPI package version"></a>
+  <a href="https://pypi.org/project/crawlee/" rel="nofollow"><img src="https://img.shields.io/pypi/dm/crawlee" alt="PyPI package downloads"></a>
+  <a href="https://codecov.io/gh/apify/crawlee-python"><img src="https://codecov.io/gh/apify/crawlee-python/graph/badge.svg?token=cCju61iPQG" alt="Codecov report"></a>
+  <a href="https://pypi.org/project/crawlee/" rel="nofollow"><img src="https://img.shields.io/pypi/pyversions/crawlee" alt="PyPI Python version"></a>
+  <a href="https://discord.gg/jyEM2PRvMU" rel="nofollow"><img src="https://img.shields.io/discord/801163717915574323?label=discord" alt="Chat on Discord"></a>
 </p>
 
 Crawlee covers your crawling and scraping end-to-end and **helps you build reliable scrapers. Fast.**

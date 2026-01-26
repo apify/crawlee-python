@@ -472,10 +472,7 @@ async def test_export_to_csv(
 async def test_export_to_invalid_content_type(dataset: Dataset) -> None:
     """Test exporting dataset with invalid content type raises error."""
     with pytest.raises(ValueError, match=r'Unsupported content type'):
-        await dataset.export_to(
-            key='invalid_export',
-            content_type='invalid',  # type: ignore[call-overload]  # Intentionally invalid content type
-        )
+        await dataset.export_to(key='invalid_export', content_type='invalid')  # ty: ignore[no-matching-overload]
 
 
 async def test_export_with_multiple_kwargs(dataset: Dataset, tmp_path: Path) -> None:
@@ -1082,3 +1079,20 @@ async def test_validate_name(storage_client: StorageClient, name: str, *, is_val
     else:
         with pytest.raises(ValueError, match=rf'Invalid storage name "{name}".*'):
             await Dataset.open(name=name, storage_client=storage_client)
+
+
+async def test_record_with_noascii_chars(dataset: Dataset) -> None:
+    """Test handling record with non-ASCII characters."""
+    init_value = {
+        'record_1': 'Supermaxi El Jardín',
+        'record_2': 'záznam dva',
+        'record_3': '記録三',
+    }
+
+    # Save the record to the dataset
+    await dataset.push_data(init_value)
+
+    # Get the record and verify
+    value = await dataset.get_data()
+    assert value is not None
+    assert value.items[0] == init_value

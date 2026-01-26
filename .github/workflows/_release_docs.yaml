@@ -1,7 +1,10 @@
-name: Build and deploy docs
+name: Doc release
 
 on:
+  # Runs when manually triggered from the GitHub UI.
   workflow_dispatch:
+
+  # Runs when invoked by another workflow.
   workflow_call:
     inputs:
       ref:
@@ -9,11 +12,13 @@ on:
         type: string
 
 env:
-  NODE_VERSION: 20
+  NODE_VERSION: 22
   PYTHON_VERSION: 3.14
+  CHECKOUT_REF: ${{ github.event_name == 'workflow_call' && inputs.ref || github.ref }}
 
 jobs:
-  build_and_deploy_docs:
+  release_docs:
+    name: Doc release
     environment:
       name: github-pages
     permissions:
@@ -24,10 +29,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.ref }}
+          ref: ${{ env.CHECKOUT_REF }}
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -45,15 +50,13 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install Python dependencies
-        run: make install-dev
-
-      - name: Build generated API reference
-        run: make build-api-reference
+        run: uv run poe install-dev
 
       - name: Build Docusaurus docs
-        run: make build-docs
+        run: uv run poe build-docs
         env:
           APIFY_SIGNING_TOKEN: ${{ secrets.APIFY_SIGNING_TOKEN }}
+          SEGMENT_TOKEN: ${{ secrets.SEGMENT_TOKEN }}
 
       - name: Set up GitHub Pages
         uses: actions/configure-pages@v5
@@ -67,6 +70,10 @@ jobs:
         uses: actions/deploy-pages@v4
 
       - name: Invalidate CloudFront cache
-        run: gh workflow run invalidate.yaml --repo apify/apify-docs-private
+        run: |
+          gh workflow run invalidate-cloudfront.yml \
+            --repo apify/apify-docs-private \
+            --field deployment=crawlee-web
+          echo "✅ CloudFront cache invalidation workflow triggered successfully"
         env:
           GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}

@@ -30,6 +30,6 @@ class _ModelWithTimedeltaMs(BaseModel):
 def test_model_with_timedelta_ms_input_types(
     time_delta_input: float | timedelta | Any | None, expected_time_delta: timedelta, expected_model_dump_value: int
 ) -> None:
-    model = _ModelWithTimedeltaMs(time_delta=time_delta_input)
+    model = _ModelWithTimedeltaMs(time_delta=time_delta_input)  # ty: ignore[invalid-argument-type]
     assert model.time_delta == expected_time_delta
     assert model.model_dump() == {'time_delta': expected_model_dump_value}

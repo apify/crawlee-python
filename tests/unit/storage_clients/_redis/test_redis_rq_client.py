@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -26,10 +25,6 @@ async def rq_client(
     suppress_user_warning: None,  # noqa: ARG001
 ) -> AsyncGenerator[RedisRequestQueueClient, None]:
     """A fixture for a Redis RQ client."""
-    # TODO: https://github.com/apify/crawlee-python/issues/1554
-    if request.param == 'bloom' and sys.platform == 'win32' and sys.version_info >= (3, 14):
-        pytest.skip('Bloom filters not supported on Windows with Python 3.14 and fakeredis')
-
     client = await RedisStorageClient(redis=redis_client, queue_dedup_strategy=request.param).create_rq_client(
         name='test_request_queue'
     )
@@ -65,7 +60,7 @@ async def test_base_keys_creation(rq_client: RedisRequestQueueClient) -> None:
     metadata_data = await await_redis_response(rq_client.redis.json().get('request_queues:test_request_queue:metadata'))
 
     assert isinstance(metadata_data, dict)
-    assert metadata_data['id'] == metadata.id  # type: ignore[unreachable] # py-json typing is broken
+    assert metadata_data['id'] == metadata.id
 
 
 async def test_request_records_persistence(rq_client: RedisRequestQueueClient) -> None:

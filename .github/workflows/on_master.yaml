@@ -1,0 +1,97 @@
+name: CI (master)
+
+on:
+  push:
+    branches:
+      - master
+    tags-ignore:
+      - "**" # Ignore all tags to avoid duplicate executions triggered by tag pushes.
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  doc_checks:
+    name: Doc checks
+    uses: ./.github/workflows/_check_docs.yaml
+
+  doc_release:
+    # Skip this for non-docs commits and forks.
+    if: "startsWith(github.event.head_commit.message, 'docs') && startsWith(github.repository, 'apify/')"
+    name: Doc release
+    needs: [doc_checks]
+    uses: ./.github/workflows/_release_docs.yaml
+    with:
+      # Use the same ref as the one that triggered the workflow.
+      ref: ${{ github.ref }}
+    secrets: inherit
+
+  code_checks:
+    name: Code checks
+    uses: ./.github/workflows/_check_code.yaml
+
+  tests:
+    # Skip this for "ci" and "docs" commits.
+    if: "!startsWith(github.event.head_commit.message, 'ci') && !startsWith(github.event.head_commit.message, 'docs')"
+    name: Tests
+    uses: ./.github/workflows/_tests.yaml
+    secrets: inherit
+
+  release_prepare:
+    # Skip this for "ci", "docs" and "test" commits and for forks.
+    if: "!startsWith(github.event.head_commit.message, 'ci') && !startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'test') && startsWith(github.repository, 'apify/')"
+    name: Release prepare
+    needs: [code_checks, tests]
+    runs-on: ubuntu-latest
+    outputs:
+      version_number: ${{ steps.release_prepare.outputs.version_number }}
+      tag_name: ${{ steps.release_prepare.outputs.tag_name }}
+      changelog: ${{ steps.release_prepare.outputs.changelog }}
+    steps:
+      - uses: apify/workflows/git-cliff-release@main
+        id: release_prepare
+        name: Release prepare
+        with:
+          release_type: prerelease
+          existing_changelog_path: CHANGELOG.md
+
+  changelog_update:
+    name: Changelog update
+    needs: [release_prepare]
+    uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
+    with:
+      version_number: ${{ needs.release_prepare.outputs.version_number }}
+      changelog: ${{ needs.release_prepare.outputs.changelog }}
+    secrets: inherit
+
+  pypi_publish:
+    name: PyPI publish
+    needs: [release_prepare, changelog_update]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # Required for OIDC authentication.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/crawlee
+    steps:
+      - name: Prepare distribution
+        uses: apify/workflows/prepare-pypi-distribution@main
+        with:
+          package_name: crawlee
+          is_prerelease: "yes"
+          version_number: ${{ needs.release_prepare.outputs.version_number }}
+          ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
+
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  doc_release_post_publish:
+    name: Doc release post publish
+    needs: [changelog_update, pypi_publish]
+    uses: ./.github/workflows/_release_docs.yaml
+    with:
+      # Use the ref from the changelog update to include the updated changelog.
+      ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
+    secrets: inherit

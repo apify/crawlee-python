@@ -1,0 +1,13 @@
+name: Doc checks
+
+on:
+  # Runs when manually triggered from the GitHub UI.
+  workflow_dispatch:
+
+  # Runs when invoked by another workflow.
+  workflow_call:
+
+jobs:
+  doc_checks:
+    name: Doc checks
+    uses: apify/workflows/.github/workflows/python_docs_check.yaml@main

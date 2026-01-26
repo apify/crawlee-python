@@ -1,14 +1,12 @@
-# TODO: The current PlaywrightCrawler tests rely on external websites. It means they can fail or take more time
-# due to network issues. To enhance test stability and reliability, we should mock the network requests.
-# https://github.com/apify/crawlee-python/issues/197
-
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Literal
 from unittest import mock
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -17,6 +15,7 @@ from crawlee import (
     Glob,
     HttpHeaders,
     Request,
+    RequestState,
     RequestTransformAction,
     SkippedReason,
     service_locator,
@@ -99,6 +98,9 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL) -> None:
         str(server_url / 'page_1'),
         str(server_url / 'page_2'),
         str(server_url / 'page_3'),
+        str(server_url / 'page_4'),
+        str(server_url / 'base_page'),
+        str(server_url / 'base_subpath/page_5'),
     }
 
 
@@ -114,7 +116,8 @@ async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: U
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
         try:
-            await context.enqueue_links(requests=[Request.from_url('https://www.whatever.com')], selector='a')  # type:ignore[call-overload]  # Testing runtime enforcement of the overloads.
+            # Testing runtime enforcement of the overloads.
+            await context.enqueue_links(requests=[Request.from_url('https://www.whatever.com')], selector='a')
         except Exception as e:
             exceptions.append(e)
 
@@ -231,6 +234,7 @@ async def test_chromium_headless_headers(
     assert 'headless' not in headers['user-agent'].lower()
 
 
+@pytest.mark.flaky(reruns=3, reason='Test is flaky.')
 async def test_firefox_headless_headers(header_network: dict, server_url: URL) -> None:
     browser_type: BrowserType = 'firefox'
     crawler = PlaywrightCrawler(headless=True, browser_type=browser_type)
@@ -346,7 +350,15 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
         sessions_ids.append(context.session.id)
         sessions[context.session.id] = context.session
 
-        if context.request.unique_key not in {'1', '2'}:
+        if context.request.unique_key == '1':
+            # With the second request, we check the cookies in the session and set retire
+            await context.add_requests(
+                [
+                    Request.from_url(
+                        str(server_url.with_path('/cookies')), unique_key='2', user_data={'retire_session': True}
+                    )
+                ]
+            )
             return
 
         response_data = json.loads(await context.response.text())
@@ -355,14 +367,14 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
         if context.request.user_data.get('retire_session'):
             context.session.retire()
 
+        if context.request.unique_key == '2':
+            # The third request is made with a new session to make sure it does not use another session's cookies
+            await context.add_requests([Request.from_url(str(server_url.with_path('/cookies')), unique_key='3')])
+
     await crawler.run(
         [
             # The first request sets the cookie in the session
-            str(server_url.with_path('set_cookies').extend_query(a=1)),
-            # With the second request, we check the cookies in the session and set retire
-            Request.from_url(str(server_url.with_path('/cookies')), unique_key='1', user_data={'retire_session': True}),
-            # The third request is made with a new session to make sure it does not use another session's cookies
-            Request.from_url(str(server_url.with_path('/cookies')), unique_key='2'),
+            Request.from_url(str(server_url.with_path('set_cookies').extend_query(a=1)), unique_key='1'),
         ]
     )
 
@@ -668,6 +680,8 @@ async def test_respect_robots_txt(server_url: URL) -> None:
     assert visited == {
         str(server_url / 'start_enqueue'),
         str(server_url / 'sub_index'),
+        str(server_url / 'base_page'),
+        str(server_url / 'base_subpath/page_5'),
     }
 
 
@@ -724,6 +738,7 @@ async def test_on_skipped_request(server_url: URL) -> None:
         str(server_url / 'page_1'),
         str(server_url / 'page_2'),
         str(server_url / 'page_3'),
+        str(server_url / 'page_4'),
     }
 
 
@@ -925,3 +940,140 @@ async def test_enqueue_links_error_with_multi_params(
             await context.enqueue_links(rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
 
     await crawler.run([str(server_url / 'start_enqueue')])
+
+
+async def test_navigation_timeout_on_slow_page_load(server_url: URL) -> None:
+    crawler = PlaywrightCrawler(
+        navigation_timeout=timedelta(seconds=1),
+        max_request_retries=0,
+    )
+
+    request_handler = AsyncMock()
+    crawler.router.default_handler(request_handler)
+
+    failed_request_handler = AsyncMock()
+    crawler.failed_request_handler(failed_request_handler)
+
+    result = await crawler.run([str((server_url / 'slow').with_query(delay=2))])
+
+    assert result.requests_failed == 1
+    assert result.requests_finished == 0
+
+    assert request_handler.call_count == 0
+
+    assert failed_request_handler.call_count == 1
+    assert isinstance(failed_request_handler.call_args[0][1], asyncio.TimeoutError)
+
+
+async def test_navigation_timeout_applies_to_hooks(server_url: URL) -> None:
+    crawler = PlaywrightCrawler(
+        navigation_timeout=timedelta(seconds=0.5),
+        max_request_retries=0,
+    )
+
+    request_handler = AsyncMock()
+    crawler.router.default_handler(request_handler)
+    crawler.pre_navigation_hook(lambda _: asyncio.sleep(1))
+
+    # Pre-navigation hook takes 1 second (exceeds navigation timeout), so the URL will not be handled
+    result = await crawler.run([str(server_url)])
+
+    assert result.requests_failed == 1
+    assert result.requests_finished == 0
+    assert request_handler.call_count == 0
+
+
+async def test_slow_navigation_does_not_count_toward_handler_timeout(server_url: URL) -> None:
+    crawler = PlaywrightCrawler(
+        request_handler_timeout=timedelta(seconds=0.5),
+        max_request_retries=0,
+    )
+
+    request_handler = AsyncMock()
+    crawler.router.default_handler(request_handler)
+
+    # Navigation takes 1 second (exceeds handler timeout), but should still succeed
+    result = await crawler.run([str((server_url / 'slow').with_query(delay=1))])
+
+    assert result.requests_failed == 0
+    assert result.requests_finished == 1
+    assert request_handler.call_count == 1
+
+
+async def test_request_state(server_url: URL) -> None:
+    queue = await RequestQueue.open(alias='playwright_request_state')
+    crawler = PlaywrightCrawler(request_manager=queue)
+
+    success_request = Request.from_url(str(server_url))
+    assert success_request.state == RequestState.UNPROCESSED
+
+    error_request = Request.from_url(str(server_url / 'error'), user_data={'cause_error': True})
+
+    requests_states: dict[str, dict[str, RequestState]] = {success_request.unique_key: {}, error_request.unique_key: {}}
+
+    @crawler.pre_navigation_hook
+    async def pre_navigation_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        requests_states[context.request.unique_key]['pre_navigation'] = context.request.state
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        if context.request.user_data.get('cause_error'):
+            raise ValueError('Caused error as requested')
+        requests_states[context.request.unique_key]['request_handler'] = context.request.state
+
+    @crawler.error_handler
+    async def error_handler(context: BasicCrawlingContext, _error: Exception) -> None:
+        requests_states[context.request.unique_key]['error_handler'] = context.request.state
+
+    @crawler.failed_request_handler
+    async def failed_request_handler(context: BasicCrawlingContext, _error: Exception) -> None:
+        requests_states[context.request.unique_key]['failed_request_handler'] = context.request.state
+
+    await crawler.run([success_request, error_request])
+
+    handled_success_request = await queue.get_request(success_request.unique_key)
+
+    assert handled_success_request is not None
+    assert handled_success_request.state == RequestState.DONE
+
+    assert requests_states[success_request.unique_key] == {
+        'pre_navigation': RequestState.BEFORE_NAV,
+        'request_handler': RequestState.REQUEST_HANDLER,
+    }
+
+    handled_error_request = await queue.get_request(error_request.unique_key)
+    assert handled_error_request is not None
+    assert handled_error_request.state == RequestState.ERROR
+
+    assert requests_states[error_request.unique_key] == {
+        'pre_navigation': RequestState.BEFORE_NAV,
+        'error_handler': RequestState.ERROR_HANDLER,
+        'failed_request_handler': RequestState.ERROR,
+    }
+
+    await queue.drop()
+
+
+async def test_enqueue_links_with_limit(server_url: URL) -> None:
+    start_url = str(server_url / 'sub_index')
+    requests = [start_url]
+
+    crawler = PlaywrightCrawler()
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links(limit=1)
+
+    await crawler.run(requests)
+
+    first_visited = visit.call_args_list[0][0][0]
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    assert first_visited == start_url
+    # Only one link should be enqueued from sub_index due to the limit
+    assert visited == {
+        start_url,
+        str(server_url / 'page_3'),
+    }

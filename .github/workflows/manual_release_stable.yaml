@@ -1,0 +1,98 @@
+name: Stable release
+
+on:
+  # Runs when manually triggered from the GitHub UI, with options to specify the type of release.
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: Release type
+        required: true
+        type: choice
+        default: auto
+        options:
+          - auto
+          - custom
+          - patch
+          - minor
+          - major
+      custom_version:
+        description: The custom version to bump to (only for "custom" type)
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  code_checks:
+    name: Code checks
+    uses: ./.github/workflows/_check_code.yaml
+
+  release_prepare:
+    name: Release prepare
+    needs: [code_checks]
+    runs-on: ubuntu-latest
+    outputs:
+      version_number: ${{ steps.release_prepare.outputs.version_number }}
+      tag_name: ${{ steps.release_prepare.outputs.tag_name }}
+      changelog: ${{ steps.release_prepare.outputs.changelog }}
+      release_notes: ${{ steps.release_prepare.outputs.release_notes }}
+    steps:
+      - uses: apify/workflows/git-cliff-release@main
+        name: Release prepare
+        id: release_prepare
+        with:
+          release_type: ${{ inputs.release_type }}
+          custom_version: ${{ inputs.custom_version }}
+          existing_changelog_path: CHANGELOG.md
+
+  changelog_update:
+    name: Changelog update
+    needs: [release_prepare]
+    uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
+    with:
+      version_number: ${{ needs.release_prepare.outputs.version_number }}
+      changelog: ${{ needs.release_prepare.outputs.changelog }}
+    secrets: inherit
+
+  github_release:
+    name: GitHub release
+    needs: [release_prepare, changelog_update]
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release_prepare.outputs.tag_name }}
+          name: ${{ needs.release_prepare.outputs.version_number }}
+          target_commitish: ${{ needs.changelog_update.outputs.changelog_commitish }}
+          body: ${{ needs.release_prepare.outputs.release_notes }}
+
+  pypi_publish:
+    name: PyPI publish
+    needs: [release_prepare, changelog_update]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # Required for OIDC authentication.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/crawlee
+    steps:
+      - name: Prepare distribution
+        uses: apify/workflows/prepare-pypi-distribution@main
+        with:
+          package_name: crawlee
+          is_prerelease: ""
+          version_number: ${{ needs.release_prepare.outputs.version_number }}
+          ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
+      # Publishes the package to PyPI using PyPA official GitHub action with OIDC authentication.
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      # TODO: add job for publish package to Conda
+      # https://github.com/apify/crawlee-python/issues/104

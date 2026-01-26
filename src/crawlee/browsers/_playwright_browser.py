@@ -78,7 +78,8 @@ class PlaywrightPersistentBrowser(Browser):
 
     async def _delete_temp_dir(self, _: BrowserContext | None) -> None:
         if self._temp_dir and self._temp_dir.exists():
-            await asyncio.to_thread(shutil.rmtree, self._temp_dir, ignore_errors=True)
+            temp_dir = self._temp_dir
+            await asyncio.to_thread(shutil.rmtree, temp_dir, ignore_errors=True)
 
     @override
     async def close(self, **kwargs: Any) -> None:

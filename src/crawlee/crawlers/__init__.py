@@ -1,7 +1,7 @@
 from crawlee._utils.try_import import install_import_hook as _install_import_hook
 from crawlee._utils.try_import import try_import as _try_import
 
-from ._abstract_http import AbstractHttpCrawler, AbstractHttpParser, ParsedHttpCrawlingContext
+from ._abstract_http import AbstractHttpCrawler, AbstractHttpParser, HttpCrawlerOptions, ParsedHttpCrawlingContext
 from ._basic import BasicCrawler, BasicCrawlerOptions, BasicCrawlingContext, ContextPipeline
 from ._http import HttpCrawler, HttpCrawlingContext, HttpCrawlingResult
 
@@ -23,12 +23,14 @@ with _try_import(
     'AdaptivePlaywrightCrawler',
     'AdaptivePlaywrightCrawlingContext',
     'AdaptivePlaywrightPreNavCrawlingContext',
+    'AdaptivePlaywrightCrawlerStatisticState',
     'RenderingType',
     'RenderingTypePrediction',
     'RenderingTypePredictor',
 ):
     from ._adaptive_playwright import (
         AdaptivePlaywrightCrawler,
+        AdaptivePlaywrightCrawlerStatisticState,
         AdaptivePlaywrightCrawlingContext,
         AdaptivePlaywrightPreNavCrawlingContext,
         RenderingType,
@@ -41,6 +43,7 @@ __all__ = [
     'AbstractHttpCrawler',
     'AbstractHttpParser',
     'AdaptivePlaywrightCrawler',
+    'AdaptivePlaywrightCrawlerStatisticState',
     'AdaptivePlaywrightCrawlingContext',
     'AdaptivePlaywrightPreNavCrawlingContext',
     'BasicCrawler',
@@ -51,6 +54,7 @@ __all__ = [
     'BeautifulSoupParserType',
     'ContextPipeline',
     'HttpCrawler',
+    'HttpCrawlerOptions',
     'HttpCrawlingContext',
     'HttpCrawlingResult',
     'ParsedHttpCrawlingContext',

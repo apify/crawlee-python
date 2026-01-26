@@ -154,7 +154,7 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
 class PatchedFingerprintGenerator(bf_FingerprintGenerator):
     """Browserforge `FingerprintGenerator` that contains patches not accepted in upstream repo."""
 
-    def __init__(  # type:ignore[no-untyped-def]  # Upstream repo types missing.
+    def __init__(
         self,
         *,
         screen: Screen | None = None,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
 import shutil
 import urllib.parse
@@ -133,7 +134,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                     continue
 
                 try:
-                    file = await asyncio.to_thread(path_to_metadata.open)
+                    file = await asyncio.to_thread(path_to_metadata.open, mode='r', encoding='utf-8')
                     try:
                         file_content = json.load(file)
                         metadata = KeyValueStoreMetadata(**file_content)
@@ -162,7 +163,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
             # If the key-value store directory exists, reconstruct the client from the metadata file.
             if path_to_kvs.exists() and path_to_metadata.exists():
-                file = await asyncio.to_thread(open, path_to_metadata)
+                file = await asyncio.to_thread(path_to_metadata.open, mode='r', encoding='utf-8')
                 try:
                     file_content = json.load(file)
                 finally:
@@ -239,7 +240,9 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         # Read the metadata file
         async with self._lock:
             try:
-                file = await asyncio.to_thread(open, record_metadata_filepath)
+                file = await asyncio.to_thread(
+                    functools.partial(record_metadata_filepath.open, mode='r', encoding='utf-8'),
+                )
             except FileNotFoundError:
                 logger.warning(f'Metadata file disappeared for key "{key}", aborting get_value')
                 return None
@@ -373,7 +376,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         # List and sort all files *inside* a brief lock, then release it immediately:
         async with self._lock:
-            files = sorted(await asyncio.to_thread(list, self.path_to_kvs.glob('*')))
+            files = sorted(await asyncio.to_thread(lambda: list(self.path_to_kvs.glob('*'))))
 
         count = 0
 

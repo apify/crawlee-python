@@ -139,7 +139,10 @@ async def test_get_cpu_sample(
 
     events_data = [
         EventSystemInfoData(
-            cpu_info=CpuInfo(used_ratio=0.5, created_at=now - timedelta(hours=delta)),
+            cpu_info=CpuInfo(
+                used_ratio=0.5,
+                created_at=now - timedelta(hours=delta),
+            ),
             memory_info=default_memory_info,
         )
         for delta in range(5, 0, -1)

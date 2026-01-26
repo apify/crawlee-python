@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Callable, Iterator, Mapping
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, TypedDict, TypeVar, cast, overload
 
@@ -15,7 +16,7 @@ if TYPE_CHECKING:
     import re
     from collections.abc import Callable, Coroutine, Sequence
 
-    from typing_extensions import NotRequired, Required, Unpack
+    from typing_extensions import NotRequired, Required, Self, Unpack
 
     from crawlee import Glob, Request
     from crawlee._request import RequestOptions
@@ -61,14 +62,14 @@ class HttpHeaders(RootModel, Mapping[str, str]):
 
     model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
-    # Workaround for pydantic 2.12 and mypy type checking issue for Annotated with default_factory
+    # Workaround for Pydantic and type checkers when using Annotated with default_factory
     if TYPE_CHECKING:
         root: dict[str, str] = {}
     else:
         root: Annotated[
             dict[str, str],
             PlainValidator(lambda value: _normalize_headers(value)),
-            Field(default_factory=dict),
+            Field(default_factory=lambda: dict[str, str]()),
         ]
 
     def __getitem__(self, key: str) -> str:
@@ -90,7 +91,7 @@ class HttpHeaders(RootModel, Mapping[str, str]):
         combined_headers = {**other, **self.root}
         return HttpHeaders(combined_headers)
 
-    def __iter__(self) -> Iterator[str]:  # type: ignore[override]
+    def __iter__(self) -> Iterator[str]:  # ty: ignore[invalid-method-override]
         yield from self.root
 
     def __len__(self) -> int:
@@ -260,11 +261,23 @@ class KeyValueStoreChangeRecords:
 class RequestHandlerRunResult:
     """Record of calls to storage-related context helpers."""
 
-    def __init__(self, *, key_value_store_getter: GetKeyValueStoreFunction) -> None:
+    def __init__(
+        self,
+        *,
+        key_value_store_getter: GetKeyValueStoreFunction,
+        request: Request,
+    ) -> None:
         self._key_value_store_getter = key_value_store_getter
         self.add_requests_calls = list[AddRequestsKwargs]()
         self.push_data_calls = list[PushDataFunctionCall]()
         self.key_value_store_changes = dict[tuple[str | None, str | None, str | None], KeyValueStoreChangeRecords]()
+
+        # Isolated copies for handler execution
+        self._request = deepcopy(request)
+
+    @property
+    def request(self) -> Request:
+        return self._request
 
     async def add_requests(
         self,
@@ -314,6 +327,14 @@ class RequestHandlerRunResult:
             )
 
         return self.key_value_store_changes[id, name, alias]
+
+    def apply_request_changes(self, target: Request) -> None:
+        """Apply tracked changes from handler copy to original request."""
+        if self.request.user_data != target.user_data:
+            target.user_data = self.request.user_data
+
+        if self.request.headers != target.headers:
+            target.headers = self.request.headers
 
 
 @docs_group('Functions')
@@ -642,6 +663,24 @@ class BasicCrawlingContext:
     def __hash__(self) -> int:
         """Return hash of the context. Each context is considered unique."""
         return id(self)
+
+    def create_modified_copy(
+        self,
+        push_data: PushDataFunction | None = None,
+        add_requests: AddRequestsFunction | None = None,
+        get_key_value_store: GetKeyValueStoreFromRequestHandlerFunction | None = None,
+    ) -> Self:
+        """Create a modified copy of the crawling context with specified changes."""
+        modifications = dict[str, Any]()
+
+        if push_data is not None:
+            modifications['push_data'] = push_data
+        if add_requests is not None:
+            modifications['add_requests'] = add_requests
+        if get_key_value_store is not None:
+            modifications['get_key_value_store'] = get_key_value_store
+
+        return dataclasses.replace(self, **modifications)
 
 
 class GetDataKwargs(TypedDict):

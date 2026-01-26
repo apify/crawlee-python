@@ -22,7 +22,7 @@ class ParselParser(AbstractHttpParser[Selector, Selector]):
     @override
     async def parse(self, response: HttpResponse) -> Selector:
         response_body = await response.read()
-        return await asyncio.to_thread(lambda: Selector(body=response_body))
+        return await asyncio.to_thread(Selector, body=response_body)
 
     @override
     async def parse_text(self, text: str) -> Selector:

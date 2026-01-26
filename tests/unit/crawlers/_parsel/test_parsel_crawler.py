@@ -61,6 +61,9 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL, http_cli
         str(server_url / 'page_1'),
         str(server_url / 'page_2'),
         str(server_url / 'page_3'),
+        str(server_url / 'page_4'),
+        str(server_url / 'base_page'),
+        str(server_url / 'base_subpath/page_5'),
     }
 
 
@@ -72,7 +75,8 @@ async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: U
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
         try:
-            await context.enqueue_links(requests=[Request.from_url(str(server_url / 'start_enqueue'))], selector='a')  # type:ignore[call-overload]  # Testing runtime enforcement of the overloads.
+            # Testing runtime enforcement of the overloads.
+            await context.enqueue_links(requests=[Request.from_url(str(server_url / 'start_enqueue'))], selector='a')
         except Exception as e:
             exceptions.append(e)
 
@@ -151,6 +155,9 @@ async def test_enqueue_links_with_transform_request_function(server_url: URL, ht
         str(server_url / 'sub_index'),
         str(server_url / 'page_1'),
         str(server_url / 'page_2'),
+        str(server_url / 'page_4'),
+        str(server_url / 'base_page'),
+        str(server_url / 'base_subpath/page_5'),
     }
 
     # # all urls added to `enqueue_links` must have a custom header
@@ -258,6 +265,8 @@ async def test_respect_robots_txt(server_url: URL, http_client: HttpClient) -> N
     assert visited == {
         str(server_url / 'start_enqueue'),
         str(server_url / 'sub_index'),
+        str(server_url / 'base_page'),
+        str(server_url / 'base_subpath/page_5'),
     }
 
 
@@ -315,6 +324,7 @@ async def test_on_skipped_request(server_url: URL, http_client: HttpClient) -> N
         str(server_url / 'page_1'),
         str(server_url / 'page_2'),
         str(server_url / 'page_3'),
+        str(server_url / 'page_4'),
     }
 
 
@@ -435,3 +445,28 @@ async def test_enqueue_links_error_with_multi_params(
             await context.enqueue_links(rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
 
     await crawler.run([str(server_url / 'start_enqueue')])
+
+
+async def test_enqueue_links_with_limit(server_url: URL, http_client: HttpClient) -> None:
+    start_url = str(server_url / 'sub_index')
+    requests = [start_url]
+
+    crawler = ParselCrawler(http_client=http_client)
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links(limit=1)
+
+    await crawler.run(requests)
+
+    first_visited = visit.call_args_list[0][0][0]
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    assert first_visited == start_url
+    # Only one link should be enqueued from sub_index due to the limit
+    assert visited == {
+        start_url,
+        str(server_url / 'page_3'),
+    }

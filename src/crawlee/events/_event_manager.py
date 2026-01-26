@@ -130,11 +130,13 @@ class EventManager:
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
+        # Stop persist state event periodic emission and manually emit last one to ensure latest state is saved.
+        await self._emit_persist_state_event_rec_task.stop()
+        await self._emit_persist_state_event()
         await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
         self._event_emitter.remove_all_listeners()
         self._listener_tasks.clear()
         self._listeners_to_wrappers.clear()
-        await self._emit_persist_state_event_rec_task.stop()
         self._active = False
 
     @overload
@@ -172,13 +174,12 @@ class EventManager:
             # to avoid blocking the event loop
             coro = (
                 listener(*bound_args.args, **bound_args.kwargs)
-                if asyncio.iscoroutinefunction(listener)
+                if inspect.iscoroutinefunction(listener)
                 else asyncio.to_thread(cast('Callable[..., None]', listener), *bound_args.args, **bound_args.kwargs)
             )
-            # Note: use `asyncio.iscoroutinefunction` rather then `inspect.iscoroutinefunction` since it works with
-            # unittests.mock.AsyncMock. See https://github.com/python/cpython/issues/84753.
 
-            listener_task = asyncio.create_task(coro, name=f'Task-{event.value}-{listener.__name__}')
+            listener_name = listener.__name__ if hasattr(listener, '__name__') else listener.__class__.__name__
+            listener_task = asyncio.create_task(coro, name=f'Task-{event.value}-{listener_name}')
             self._listener_tasks.add(listener_task)
 
             try:
@@ -189,7 +190,12 @@ class EventManager:
                 # We need to swallow the exception and just log it here, otherwise it could break the event emitter
                 logger.exception(
                     'Exception in the event listener',
-                    extra={'event_name': event.value, 'listener_name': listener.__name__},
+                    extra={
+                        'event_name': event.value,
+                        'listener_name': listener.__name__
+                        if hasattr(listener, '__name__')
+                        else listener.__class__.__name__,
+                    },
                 )
             finally:
                 logger.debug('EventManager.on.listener_wrapper(): Removing listener task from the set...')

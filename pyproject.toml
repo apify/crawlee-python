@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "crawlee"
-version = "1.0.5"
+version = "1.3.1"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = { file = "LICENSE" }
@@ -34,6 +34,7 @@ keywords = [
     "scraping",
 ]
 dependencies = [
+    "async-timeout>=5.0.1",
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
     "impit>=0.8.0",
@@ -74,7 +75,7 @@ otel = [
 ]
 sql_postgres = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
-    "asyncpg>=0.24.0; python_version < '3.14'" # TODO: https://github.com/apify/crawlee-python/issues/1555
+    "asyncpg>=0.24.0"
 ]
 sql_sqlite = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
@@ -101,23 +102,25 @@ dev = [
     "build<2.0.0", # For e2e tests.
     "dycw-pytest-only<3.0.0",
     "fakeredis[probabilistic,json,lua]<3.0.0",
-    "mypy~=1.18.0",
+    "poethepoet<1.0.0",
     "pre-commit<5.0.0",
     "proxy-py<3.0.0",
     "pydoc-markdown<5.0.0",
     "pytest-asyncio<2.0.0",
     "pytest-cov<8.0.0",
+    "pytest-rerunfailures<17.0.0",
     "pytest-timeout<3.0.0",
     "pytest-xdist<4.0.0",
     "pytest<9.0.0",
     "ruff~=0.14.0",
     "setuptools", # setuptools are used by pytest, but not explicitly required
+    "ty~=0.0.0",
     "types-beautifulsoup4<5.0.0",
     "types-cachetools<7.0.0",
     "types-colorama<1.0.0",
     "types-psutil<8.0.0",
     "types-python-dateutil<3.0.0",
-    "uvicorn[standard]~=0.35.0", # https://github.com/apify/crawlee-python/issues/1441
+    "uvicorn[standard]<1.0.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -214,68 +217,104 @@ builtins-ignorelist = ["id"]
 known-first-party = ["crawlee"]
 
 [tool.pytest.ini_options]
-addopts = "-ra"
+addopts = "-r a --verbose"
 asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
-timeout = 300
+timeout = 1800
 markers = [
     "run_alone: marks tests that must run in isolation",
 ]
+# Ignore DeprecationWarnings coming from Uvicorn's internal imports. Uvicorn relies on deprecated
+# modules from `websockets`, which triggers warnings during tests. These are safe to ignore until
+# Uvicorn updates its internals.
+filterwarnings = [
+    "ignore:websockets.legacy is deprecated:DeprecationWarning",
+    "ignore:websockets.server.WebSocketServerProtocol is deprecated:DeprecationWarning",
+]
 
-[tool.mypy]
-python_version = "3.10"
-plugins = ["pydantic.mypy"]
+[tool.ty.environment]
+python-version = "3.10"
+
+[tool.ty.src]
+include = ["src", "tests", "scripts", "docs", "website"]
 exclude = [
     "src/crawlee/project_template",
     "docs/guides/code_examples/storage_clients/custom_storage_client_example.py",
 ]
-files = ["src", "tests", "docs", "website"]
-check_untyped_defs = true
-disallow_incomplete_defs = true
-disallow_untyped_calls = true
-disallow_untyped_decorators = true
-disallow_untyped_defs = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_return_any = true
-warn_unreachable = true
-warn_unused_ignores = true
 
-[[tool.mypy.overrides]]
-# Example codes are sometimes showing integration of crawlee with external tool, which is not dependency of crawlee.
-module = [
-    "apify",                        # Example code shows integration of apify and crawlee.
-    "apify_fingerprint_datapoints", # Untyped and stubs not available
-    "camoufox",                     # Example code shows integration of camoufox and crawlee.
-    "fastapi",                      # Example code shows running in webserver.
-    "stagehand.*",                  # Example code shows integration of Stagehand and crawlee.
-    "starlette.*",                  # Example code shows running in webserver.
-    "flask",                        # Example code shows deploy on Google Cloud.
-    "functions_framework",          # Example code shows deploy on Google Cloud.
-    "jaro",                         # Untyped and stubs not available
-    "litestar",                     # Example code shows deploy on Google Cloud Run.
-    "loguru",                       # Example code shows integration of loguru and crawlee for JSON logging.
-    "sklearn.linear_model",         # Untyped and stubs not available
-    "cookiecutter.*",               # Untyped and stubs not available
-    "inquirer.*",                   # Untyped and stubs not available
-    "warcio.*",                     # Example code shows WARC files creation.
-    "wrapt"                         # Untyped and stubs not available
+[[tool.ty.overrides]]
+include = [
+    "docs/**/*.py",
+    "website/**/*.py",
 ]
-ignore_missing_imports = true
 
-[[tool.mypy.overrides]]
-module = [
-    "running_in_web_server.*", # False positive when fastapi not available
-]
-disable_error_code = ["misc"]
-
-[tool.basedpyright]
-pythonVersion = "3.10"
-typeCheckingMode = "standard"
-include = ["src", "tests", "docs", "website"]
+[tool.ty.overrides.rules]
+unresolved-import = "ignore"
 
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "assert_never()"]
 
 [tool.ipdb]
 context = 7
+
+# Run tasks with: uv run poe <task>
+[tool.poe.tasks]
+clean = "rm -rf .coverage .pytest_cache .ruff_cache .ty_cache .uv-cache build coverage-unit.xml dist htmlcov website/.docusaurus website/.yarn website/module_shortcuts.json website/node_modules "
+install-sync = "uv sync --all-extras"
+build = "uv build --verbose"
+publish-to-pypi = "uv publish --verbose --token ${APIFY_PYPI_TOKEN_CRAWLEE}"
+type-check = "uv run ty check"
+check-code = ["lint", "type-check", "unit-tests"]
+
+[tool.poe.tasks.install-dev]
+shell = "uv sync --all-extras && uv run pre-commit install && uv run playwright install"
+
+[tool.poe.tasks.lint]
+shell = "uv run ruff format --check && uv run ruff check"
+
+[tool.poe.tasks.format]
+shell = "uv run ruff check --fix && uv run ruff format"
+
+[tool.poe.tasks.unit-tests]
+shell = """
+uv run pytest \
+    --numprocesses=1 \
+    -m "run_alone" \
+    tests/unit && \
+uv run pytest \
+    --numprocesses=${TESTS_CONCURRENCY:-auto} \
+    -m "not run_alone" \
+    tests/unit
+"""
+
+[tool.poe.tasks.unit-tests-cov]
+shell = """
+uv run pytest \
+    --numprocesses=1 \
+    -m "run_alone" \
+    --cov=src/crawlee \
+    --cov-report=xml:coverage-unit.xml \
+    tests/unit && \
+uv run pytest \
+    --numprocesses=${TESTS_CONCURRENCY:-auto} \
+    -m "not run_alone" \
+    --cov=src/crawlee \
+    --cov-report=xml:coverage-unit.xml \
+    --cov-append \
+    tests/unit
+"""
+
+[tool.poe.tasks.e2e-templates-tests]
+cmd = """
+uv run pytest \
+    --numprocesses=${TESTS_CONCURRENCY:-auto} \
+    tests/e2e/project_template
+"""
+
+[tool.poe.tasks.build-docs]
+shell = "./build_api_reference.sh && corepack enable && yarn && yarn build"
+cwd = "website"
+
+[tool.poe.tasks.run-docs]
+shell = "./build_api_reference.sh && corepack enable && yarn && yarn start"
+cwd = "website"

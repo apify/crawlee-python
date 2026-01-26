@@ -15,10 +15,13 @@ from uvicorn.server import Server
 from yarl import URL
 
 from tests.unit.server_endpoints import (
+    BASE_INDEX,
     GENERIC_RESPONSE,
     HELLO_WORLD,
     INCAPSULA,
+    INFINITE_SCROLL,
     PROBLEMATIC_LINKS,
+    RESOURCE_LOADING_PAGE,
     ROBOTS_TXT,
     SECONDARY_INDEX,
     START_ENQUEUE,
@@ -103,6 +106,7 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         'page_1': generic_response_endpoint,
         'page_2': generic_response_endpoint,
         'page_3': generic_response_endpoint,
+        'base_page': base_index_endpoint,
         'problematic_links': problematic_links_endpoint,
         'set_cookies': set_cookies,
         'set_complex_cookies': set_complex_cookies,
@@ -121,6 +125,9 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         'xml': hello_world_xml,
         'robots.txt': robots_txt,
         'get_compressed': get_compressed,
+        'slow': slow_response,
+        'infinite_scroll': infinite_scroll_endpoint,
+        'resource_loading_page': resource_loading_endpoint,
     }
     path = URL(scope['path']).parts[1]
     # Route requests to appropriate handlers
@@ -411,6 +418,41 @@ async def get_compressed(_scope: dict[str, Any], _receive: Receive, send: Send) 
     await send({'type': 'http.response.body', 'body': gzip.compress(HELLO_WORLD * 1000)})
 
 
+async def slow_response(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Handle requests with a configurable delay to test timeouts."""
+    query_params = get_query_params(scope.get('query_string', b''))
+    delay = float(query_params.get('delay', '5'))  # Default 5 second delay
+
+    await asyncio.sleep(delay)
+    await send_html_response(send, HELLO_WORLD)
+
+
+async def infinite_scroll_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Handle requests for the infinite scroll page."""
+    await send_html_response(
+        send,
+        INFINITE_SCROLL,
+    )
+
+
+async def resource_loading_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Handle requests for the resource loading page."""
+    await send_html_response(
+        send,
+        RESOURCE_LOADING_PAGE,
+    )
+
+
+async def base_index_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Handle requests for the base index page."""
+    host = f'http://{get_headers_dict(_scope).get("host", "localhost")}'
+    content = BASE_INDEX.format(host=host).encode()
+    await send_html_response(
+        send,
+        content,
+    )
+
+
 class TestServer(Server):
     """A test HTTP server implementation based on Uvicorn Server."""
 
@@ -470,8 +512,9 @@ class TestServer(Server):
         # Set the event loop policy in thread with server for Windows and Python 3.12+.
         # This is necessary because there are problems with closing connections when using `ProactorEventLoop`
         if sys.version_info >= (3, 12) and sys.platform == 'win32':
-            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+            return asyncio.run(self.serve(sockets=sockets), loop_factory=asyncio.SelectorEventLoop)
         super().run(sockets=sockets)
+        return None
 
 
 def serve_in_thread(server: TestServer) -> Iterator[TestServer]:

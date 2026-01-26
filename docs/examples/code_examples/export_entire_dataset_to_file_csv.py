@@ -30,7 +30,8 @@ async def main() -> None:
     await crawler.run(['https://crawlee.dev'])
 
     # Export the entire dataset to a CSV file.
-    await crawler.export_data(path='results.csv')
+    # Use semicolon as delimiter and always quote strings.
+    await crawler.export_data(path='results.csv', delimiter=';', quoting='all')
 
 
 if __name__ == '__main__':

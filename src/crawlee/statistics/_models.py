@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+import warnings
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator, computed_field
 from typing_extensions import override
@@ -76,10 +77,20 @@ class StatisticsState(BaseModel):
     crawler_started_at: Annotated[datetime | None, Field(alias='crawlerStartedAt')] = None
     crawler_last_started_at: Annotated[datetime | None, Field(alias='crawlerLastStartTimestamp')] = None
     crawler_finished_at: Annotated[datetime | None, Field(alias='crawlerFinishedAt')] = None
-    crawler_runtime: Annotated[timedelta_ms, Field(alias='crawlerRuntimeMillis')] = timedelta()
-    errors: dict[str, Any] = Field(default_factory=dict)
-    retry_errors: dict[str, Any] = Field(alias='retryErrors', default_factory=dict)
-    requests_with_status_code: dict[str, int] = Field(alias='requestsWithStatusCode', default_factory=dict)
+
+    # Workaround for Pydantic and type checkers when using Annotated with default_factory
+    if TYPE_CHECKING:
+        errors: dict[str, Any] = {}
+        retry_errors: dict[str, Any] = {}
+        requests_with_status_code: dict[str, int] = {}
+    else:
+        errors: Annotated[dict[str, Any], Field(default_factory=dict)]
+        retry_errors: Annotated[dict[str, Any], Field(alias='retryErrors', default_factory=dict)]
+        requests_with_status_code: Annotated[
+            dict[str, int],
+            Field(alias='requestsWithStatusCode', default_factory=dict),
+        ]
+
     stats_persisted_at: Annotated[
         datetime | None, Field(alias='statsPersistedAt'), PlainSerializer(lambda _: datetime.now(timezone.utc))
     ] = None
@@ -93,22 +104,53 @@ class StatisticsState(BaseModel):
         ),
     ] = {}
 
-    @computed_field(alias='requestTotalDurationMillis', return_type=timedelta_ms)  # type: ignore[prop-decorator]
+    # Used to track the crawler runtime, that had already been persisted. This is the runtime from previous runs.
+    _runtime_offset: Annotated[timedelta, Field(exclude=True)] = timedelta()
+
+    def model_post_init(self, /, __context: Any) -> None:
+        self._runtime_offset = self.crawler_runtime or self._runtime_offset
+
+    @property
+    def crawler_runtime(self) -> timedelta:
+        if self.crawler_last_started_at:
+            finished_at = self.crawler_finished_at or datetime.now(timezone.utc)
+            return self._runtime_offset + finished_at - self.crawler_last_started_at
+        return self._runtime_offset
+
+    @crawler_runtime.setter
+    def crawler_runtime(self, value: timedelta) -> None:
+        # Setter for backwards compatibility only, the crawler_runtime is now computed_field, and cant be set manually.
+        # To be removed in v2 release https://github.com/apify/crawlee-python/issues/1567
+        warnings.warn(
+            f"Setting 'crawler_runtime' is deprecated and will be removed in a future version."
+            f' Value {value} will not be used.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    @computed_field(alias='crawlerRuntimeMillis')
+    def crawler_runtime_for_serialization(self) -> timedelta:
+        if self.crawler_last_started_at:
+            finished_at = self.crawler_finished_at or datetime.now(timezone.utc)
+            return self._runtime_offset + finished_at - self.crawler_last_started_at
+        return self._runtime_offset
+
+    @computed_field(alias='requestTotalDurationMillis', return_type=timedelta_ms)
     @property
     def request_total_duration(self) -> timedelta:
         return self.request_total_finished_duration + self.request_total_failed_duration
 
-    @computed_field(alias='requestAvgFailedDurationMillis', return_type=timedelta_ms | None)  # type: ignore[prop-decorator]
+    @computed_field(alias='requestAvgFailedDurationMillis', return_type=timedelta_ms | None)
     @property
     def request_avg_failed_duration(self) -> timedelta | None:
         return (self.request_total_failed_duration / self.requests_failed) if self.requests_failed else None
 
-    @computed_field(alias='requestAvgFinishedDurationMillis', return_type=timedelta_ms | None)  # type: ignore[prop-decorator]
+    @computed_field(alias='requestAvgFinishedDurationMillis', return_type=timedelta_ms | None)
     @property
     def request_avg_finished_duration(self) -> timedelta | None:
         return (self.request_total_finished_duration / self.requests_finished) if self.requests_finished else None
 
-    @computed_field(alias='requestsTotal')  # type: ignore[prop-decorator]
+    @computed_field(alias='requestsTotal')
     @property
     def requests_total(self) -> int:
         return self.requests_failed + self.requests_finished

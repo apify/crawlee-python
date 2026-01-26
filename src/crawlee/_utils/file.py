@@ -163,7 +163,14 @@ async def export_csv_to_stream(
     dst: TextIO,
     **kwargs: Unpack[ExportDataCsvKwargs],
 ) -> None:
-    writer = csv.writer(dst, **kwargs)  # type: ignore[arg-type]
+    # Set lineterminator to '\n' if not explicitly provided. This prevents double line endings on Windows.
+    # The csv.writer default is '\r\n', which when written to a file in text mode on Windows gets converted
+    # to '\r\r\n' due to newline translation. By using '\n', we let the platform handle the line ending
+    # conversion: '\n' stays as '\n' on Unix, and becomes '\r\n' on Windows.
+    if 'lineterminator' not in kwargs:
+        kwargs['lineterminator'] = '\n'
+
+    writer = csv.writer(dst, **kwargs)
     write_header = True
 
     # Iterate over the dataset and write to CSV.

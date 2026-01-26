@@ -1,4 +1,3 @@
-# mypy: disable-error-code="misc"
 import json
 import os
 

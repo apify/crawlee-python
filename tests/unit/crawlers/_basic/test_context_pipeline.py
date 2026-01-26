@@ -142,7 +142,7 @@ async def test_handles_exceptions_in_middleware_initialization() -> None:
 
     async def step_2(context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
         raise RuntimeError('Crash during middleware initialization')
-        yield context  # type: ignore[unreachable]
+        yield context
 
     pipeline = ContextPipeline().compose(step_1).compose(step_2)
     context = BasicCrawlingContext(

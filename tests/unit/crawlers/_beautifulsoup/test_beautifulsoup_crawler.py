@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+from datetime import timedelta
 from typing import TYPE_CHECKING
 from unittest import mock
 
 import pytest
 
-from crawlee import ConcurrencySettings, Glob, HttpHeaders, RequestTransformAction, SkippedReason
+from crawlee import ConcurrencySettings, Glob, HttpHeaders, Request, RequestTransformAction, SkippedReason
 from crawlee.crawlers import BasicCrawlingContext, BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from crawlee.storages import RequestQueue
 
@@ -58,6 +60,9 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL, http_cli
         str(server_url / 'page_1'),
         str(server_url / 'page_2'),
         str(server_url / 'page_3'),
+        str(server_url / 'page_4'),
+        str(server_url / 'base_page'),
+        str(server_url / 'base_subpath/page_5'),
     }
 
 
@@ -131,6 +136,9 @@ async def test_enqueue_links_with_transform_request_function(server_url: URL, ht
         str(server_url / 'sub_index'),
         str(server_url / 'page_1'),
         str(server_url / 'page_2'),
+        str(server_url / 'base_page'),
+        str(server_url / 'page_4'),
+        str(server_url / 'base_subpath/page_5'),
     }
 
     # # all urls added to `enqueue_links` must have a custom header
@@ -164,6 +172,8 @@ async def test_respect_robots_txt(server_url: URL, http_client: HttpClient) -> N
     assert visited == {
         str(server_url / 'start_enqueue'),
         str(server_url / 'sub_index'),
+        str(server_url / 'base_page'),
+        str(server_url / 'base_subpath/page_5'),
     }
 
 
@@ -221,6 +231,7 @@ async def test_on_skipped_request(server_url: URL, http_client: HttpClient) -> N
         str(server_url / 'page_1'),
         str(server_url / 'page_2'),
         str(server_url / 'page_3'),
+        str(server_url / 'page_4'),
     }
 
 
@@ -341,3 +352,104 @@ async def test_enqueue_links_error_with_multi_params(
             await context.enqueue_links(rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
 
     await crawler.run([str(server_url / 'start_enqueue')])
+
+
+async def test_navigation_timeout_on_slow_request(server_url: URL, http_client: HttpClient) -> None:
+    """Test that navigation_timeout causes TimeoutError on slow HTTP requests."""
+    crawler = BeautifulSoupCrawler(
+        http_client=http_client,
+        navigation_timeout=timedelta(seconds=1),
+        max_request_retries=0,
+    )
+
+    failed_request_handler = mock.AsyncMock()
+    crawler.failed_request_handler(failed_request_handler)
+
+    request_handler = mock.AsyncMock()
+    crawler.router.default_handler(request_handler)
+
+    # Request endpoint that delays 5 seconds - should timeout at 1 second
+    await crawler.run([str(server_url.with_path('/slow').with_query(delay=5))])
+
+    assert failed_request_handler.call_count == 1
+    assert isinstance(failed_request_handler.call_args[0][1], asyncio.TimeoutError)
+
+
+async def test_navigation_timeout_applies_to_hooks(server_url: URL) -> None:
+    crawler = BeautifulSoupCrawler(
+        navigation_timeout=timedelta(seconds=1),
+        max_request_retries=0,
+    )
+
+    request_handler = mock.AsyncMock()
+    crawler.router.default_handler(request_handler)
+    crawler.pre_navigation_hook(lambda _: asyncio.sleep(1))
+
+    # Pre-navigation hook takes 1 second (exceeds navigation timeout), so the URL will not be handled
+    result = await crawler.run([str(server_url)])
+
+    assert result.requests_failed == 1
+    assert result.requests_finished == 0
+    assert request_handler.call_count == 0
+
+
+async def test_slow_navigation_does_not_count_toward_handler_timeout(server_url: URL, http_client: HttpClient) -> None:
+    crawler = BeautifulSoupCrawler(
+        http_client=http_client,
+        request_handler_timeout=timedelta(seconds=0.5),
+        max_request_retries=0,
+    )
+
+    request_handler = mock.AsyncMock()
+    crawler.router.default_handler(request_handler)
+
+    # Navigation takes 1 second (exceeds handler timeout), but should still succeed
+    result = await crawler.run([str(server_url.with_path('/slow').with_query(delay=1))])
+
+    assert result.requests_failed == 0
+    assert result.requests_finished == 1
+    assert request_handler.call_count == 1
+
+
+async def test_enqueue_strategy_after_redirect(server_url: URL, redirect_server_url: URL) -> None:
+    crawler = BeautifulSoupCrawler()
+
+    handler_calls = mock.AsyncMock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        await handler_calls(context.request.url)
+
+        target_url = str(server_url.with_path('redirect').with_query(url=str(redirect_server_url)))
+
+        await context.enqueue_links(requests=[Request.from_url(target_url)], strategy='same-origin')
+
+    await crawler.run([str(server_url)])
+
+    assert handler_calls.called
+    assert handler_calls.call_count == 1
+
+
+async def test_enqueue_links_with_limit(server_url: URL, http_client: HttpClient) -> None:
+    start_url = str(server_url / 'sub_index')
+    requests = [start_url]
+
+    crawler = BeautifulSoupCrawler(http_client=http_client)
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links(limit=1)
+
+    await crawler.run(requests)
+
+    first_visited = visit.call_args_list[0][0][0]
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    assert first_visited == start_url
+    # Only one link should be enqueued from sub_index due to the limit
+    assert visited == {
+        start_url,
+        str(server_url / 'page_3'),
+    }

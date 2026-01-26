@@ -1,13 +1,21 @@
-name: Templates end-to-end tests
+name: Scheduled tests
 
 on:
+  # Runs when manually triggered from the GitHub UI.
   workflow_dispatch:
+
+  # Runs on a daily schedule at 06:00 UTC.
   schedule:
     - cron: '0 6 * * *'
+
+concurrency:
+  group: scheduled-tests
+  cancel-in-progress: false
 
 env:
   NODE_VERSION: 22
   PYTHON_VERSION: 3.14
+  TESTS_CONCURRENCY: 1
 
 jobs:
   end_to_end_tests:
@@ -24,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup node
         uses: actions/setup-node@v6
@@ -50,9 +58,9 @@ jobs:
 
       # Sync the project, but no need to install the browsers into the test runner environment.
       - name: Install Python dependencies
-        run: make install-sync
+        run: uv run poe install-sync
 
       - name: Run templates end-to-end tests
-        run: make e2e-templates-tests args="-m ${{ matrix.http-client }} and ${{ matrix.crawler-type }} and ${{ matrix.package-manager }}"
+        run: uv run poe e2e-templates-tests -- -m "${{ matrix.http-client }} and ${{ matrix.crawler-type }} and ${{ matrix.package-manager }}"
         env:
           APIFY_TEST_USER_API_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}

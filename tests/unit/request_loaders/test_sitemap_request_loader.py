@@ -4,6 +4,7 @@ import gzip
 
 from yarl import URL
 
+from crawlee import RequestOptions, RequestTransformAction
 from crawlee.http_clients._base import HttpClient
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
 from crawlee.storages import KeyValueStore
@@ -172,3 +173,37 @@ async def test_recovery_data_persistence_for_sitemap_loading(
 
     assert item is not None
     assert item.url == next_item_in_kvs
+
+
+async def test_transform_request_function(server_url: URL, http_client: HttpClient) -> None:
+    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+
+    def transform_request(request_options: RequestOptions) -> RequestOptions | RequestTransformAction:
+        request_options['user_data'] = {'transformed': True}
+        return request_options
+
+    sitemap_loader = SitemapRequestLoader(
+        [str(sitemap_url)],
+        http_client=http_client,
+        transform_request_function=transform_request,
+    )
+
+    extracted_urls = set()
+
+    while not await sitemap_loader.is_finished():
+        request = await sitemap_loader.fetch_next_request()
+        assert request is not None
+        assert request.user_data.get('transformed') is True
+
+        extracted_urls.add(request.url)
+
+        await sitemap_loader.mark_request_as_handled(request)
+
+    assert len(extracted_urls) == 5
+    assert extracted_urls == {
+        'http://not-exists.com/',
+        'http://not-exists.com/catalog?item=12&desc=vacation_hawaii',
+        'http://not-exists.com/catalog?item=73&desc=vacation_new_zealand',
+        'http://not-exists.com/catalog?item=74&desc=vacation_newfoundland',
+        'http://not-exists.com/catalog?item=83&desc=vacation_usa',
+    }

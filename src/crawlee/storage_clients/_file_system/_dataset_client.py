@@ -134,7 +134,7 @@ class FileSystemDatasetClient(DatasetClient):
                     continue
 
                 try:
-                    file = await asyncio.to_thread(path_to_metadata.open)
+                    file = await asyncio.to_thread(path_to_metadata.open, mode='r', encoding='utf-8')
                     try:
                         file_content = json.load(file)
                         metadata = DatasetMetadata(**file_content)
@@ -163,7 +163,7 @@ class FileSystemDatasetClient(DatasetClient):
 
             # If the dataset directory exists, reconstruct the client from the metadata file.
             if path_to_dataset.exists() and path_to_metadata.exists():
-                file = await asyncio.to_thread(open, path_to_metadata)
+                file = await asyncio.to_thread(path_to_metadata.open, mode='r', encoding='utf-8')
                 try:
                     file_content = json.load(file)
                 finally:
@@ -473,9 +473,10 @@ class FileSystemDatasetClient(DatasetClient):
         """
         # Retrieve and sort all JSON files in the dataset directory numerically.
         files = await asyncio.to_thread(
-            sorted,
-            self.path_to_dataset.glob('*.json'),
-            key=lambda f: int(f.stem) if f.stem.isdigit() else 0,
+            lambda: sorted(
+                self.path_to_dataset.glob('*.json'),
+                key=lambda f: int(f.stem) if f.stem.isdigit() else 0,
+            )
         )
 
         # Remove the metadata file from the list if present.
