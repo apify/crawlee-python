@@ -267,6 +267,7 @@ class SqlStorageClient(StorageClient):
             pool_size=5,
             max_overflow=10,
             pool_timeout=60,
+            pool_recycle=600,
             pool_pre_ping=True,
             echo=False,
             connect_args={'timeout': 30},

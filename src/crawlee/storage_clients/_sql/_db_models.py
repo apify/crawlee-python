@@ -283,7 +283,7 @@ class MetadataBufferDb:
     """Auto-increment primary key for ordering."""
 
     # Timestamp fields - use max value when aggregating
-    accessed_at: Mapped[datetime | None] = mapped_column(AwareDateTime, nullable=False)
+    accessed_at: Mapped[datetime] = mapped_column(AwareDateTime, nullable=False)
     """New accessed_at timestamp, if being updated."""
 
     modified_at: Mapped[datetime | None] = mapped_column(AwareDateTime, nullable=True)
