@@ -344,7 +344,7 @@ class RequestQueueMetadataBufferDb(MetadataBufferDb, Base):
     delta_total_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     """Delta for total_request_count."""
 
-    need_recalc: Mapped[bool | None] = mapped_column(Boolean, nullable=False, default=False)
+    need_recalc: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     """Flag indicating that counters need recalculation from actual data."""
 
     storage_id = synonym('request_queue_id')
