@@ -1,5 +1,6 @@
 {
     "extends": ["config:base", ":semanticCommitTypeAll(chore)"],
+    "ignorePaths": ["docs/**", "src/crawlee/project_template/**"],
     "pinVersions": false,
     "separateMajorMinor": false,
     "dependencyDashboard": false,
