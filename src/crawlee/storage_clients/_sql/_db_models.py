@@ -87,11 +87,6 @@ class DatasetMetadataDb(StorageMetadataDb, Base):
         back_populates='dataset', cascade='all, delete-orphan', lazy='noload'
     )
 
-    # Relationship to metadata buffer updates
-    buffer: Mapped[list[DatasetMetadataBufferDb]] = relationship(
-        back_populates='dataset', cascade='all, delete-orphan', lazy='noload'
-    )
-
     id = synonym('dataset_id')
     """Alias for dataset_id to match Pydantic expectations."""
 
@@ -132,11 +127,6 @@ class RequestQueueMetadataDb(StorageMetadataDb, Base):
         back_populates='queue', cascade='all, delete-orphan', lazy='noload'
     )
 
-    # Relationship to metadata buffer updates
-    buffer: Mapped[list[RequestQueueMetadataBufferDb]] = relationship(
-        back_populates='queue', cascade='all, delete-orphan', lazy='noload'
-    )
-
     id = synonym('request_queue_id')
     """Alias for request_queue_id to match Pydantic expectations."""
 
@@ -151,11 +141,6 @@ class KeyValueStoreMetadataDb(StorageMetadataDb, Base):
 
     # Relationship to store records with cascade deletion
     records: Mapped[list[KeyValueStoreRecordDb]] = relationship(
-        back_populates='kvs', cascade='all, delete-orphan', lazy='noload'
-    )
-
-    # Relationship to metadata buffer updates
-    buffer: Mapped[list[KeyValueStoreMetadataBufferDb]] = relationship(
         back_populates='kvs', cascade='all, delete-orphan', lazy='noload'
     )
 
@@ -317,13 +302,9 @@ class KeyValueStoreMetadataBufferDb(MetadataBufferDb, Base):
 
     __tablename__ = 'key_value_store_metadata_buffer'
 
-    key_value_store_id: Mapped[str] = mapped_column(
-        String(20), ForeignKey('key_value_stores.key_value_store_id', ondelete='CASCADE'), nullable=False, index=True
-    )
+    # Don't use foreign key constraint to avoid DB locks on high concurrency.
+    key_value_store_id: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     """ID of the key-value store being updated."""
-
-    # Relationship back to key-value store metadata
-    kvs: Mapped[KeyValueStoreMetadataDb] = relationship(back_populates='buffer')
 
     storage_id = synonym('key_value_store_id')
     """Alias for key_value_store_id to match SqlClientMixin expectations."""
@@ -334,17 +315,13 @@ class DatasetMetadataBufferDb(MetadataBufferDb, Base):
 
     __tablename__ = 'dataset_metadata_buffer'
 
-    dataset_id: Mapped[str] = mapped_column(
-        String(20), ForeignKey('datasets.dataset_id', ondelete='CASCADE'), nullable=False, index=True
-    )
+    # Don't use foreign key constraint to avoid DB locks on high concurrency.
+    dataset_id: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     """ID of the dataset being updated."""
 
-    # Counter deltas - use SUM when aggregating
+    # Counter deltas - use SUM when aggregating.
     delta_item_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     """Delta for dataset item_count."""
-
-    # Relationship back to dataset metadata
-    dataset: Mapped[DatasetMetadataDb] = relationship(back_populates='buffer')
 
     storage_id = synonym('dataset_id')
     """Alias for dataset_id to match SqlClientMixin expectations."""
@@ -357,15 +334,14 @@ class RequestQueueMetadataBufferDb(MetadataBufferDb, Base):
 
     __table_args__ = (Index('idx_rq_client', 'request_queue_id', 'client_id'),)
 
-    request_queue_id: Mapped[str] = mapped_column(
-        String(20), ForeignKey('request_queues.request_queue_id', ondelete='CASCADE'), nullable=False, index=True
-    )
+    # Don't use foreign key constraint to avoid DB locks on high concurrency.
+    request_queue_id: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     """ID of the request queue being updated."""
 
     client_id: Mapped[str] = mapped_column(String(32), nullable=False)
     """Identifier of the client making this update."""
 
-    # Counter deltas - use SUM when aggregating
+    # Counter deltas - use SUM when aggregating.
     delta_handled_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     """Delta for handled_request_count."""
 
@@ -377,9 +353,6 @@ class RequestQueueMetadataBufferDb(MetadataBufferDb, Base):
 
     need_recalc: Mapped[bool | None] = mapped_column(Boolean, nullable=False, default=False)
     """Flag indicating that counters need recalculation from actual data."""
-
-    # Relationship back to request queue metadata
-    queue: Mapped[RequestQueueMetadataDb] = relationship(back_populates='buffer')
 
     storage_id = synonym('request_queue_id')
     """Alias for request_queue_id to match SqlClientMixin expectations."""

@@ -444,7 +444,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
                 update_stmt = (
                     update(self._ITEM_TABLE)
-                    .where(self._ITEM_TABLE.request_id.in_(request_ids))
+                    .where(self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.request_id.in_(request_ids))
                     .values(time_blocked_until=block_until, client_key=self.client_key)
                 )
                 await session.execute(update_stmt)
