@@ -80,7 +80,7 @@ async def test_request_records_persistence(rq_client: RedisRequestQueueClient) -
     assert request_queue_response is not None
     assert isinstance(request_queue_response, list)
     request_keys = request_queue_response[1]
-
+    assert isinstance(request_keys, list)
     assert len(request_keys) == 3
 
     # Verify actual request file content
@@ -90,7 +90,7 @@ async def test_request_records_persistence(rq_client: RedisRequestQueueClient) -
     assert isinstance(requests_records_data, dict)
 
     for key in request_keys:
-        request_data = json.loads(requests_records_data[key])
+        request_data = json.loads(requests_records_data[key])  # ty: ignore[invalid-argument-type]
         assert 'url' in request_data
         assert request_data['url'].startswith('https://example.com/')
 

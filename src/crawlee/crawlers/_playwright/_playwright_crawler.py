@@ -512,8 +512,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
     async def _update_cookies(self, page: Page, cookies: list[PlaywrightCookieParam]) -> None:
         """Update the cookies in the page context."""
-        # False positive ty error, see https://github.com/astral-sh/ty/issues/1493.
-        await page.context.add_cookies([{**cookie} for cookie in cookies])  # ty: ignore[invalid-argument-type]
+        await page.context.add_cookies([{**cookie} for cookie in cookies])
 
     async def _find_txt_file_for_url(self, url: str) -> RobotsTxtFile:
         """Find the robots.txt file for a given URL.
