@@ -92,7 +92,7 @@ class ImpitHttpClient(HttpClient):
         self,
         *,
         persist_cookies_per_session: bool = True,
-        http3: bool = True,
+        http3: bool = False,
         verify: bool = True,
         browser: Browser | None = 'firefox',
         **async_client_kwargs: Any,
