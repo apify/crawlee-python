@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Reset all counter in metadata with `purge` for `RequestQueue` ([#1686](https://github.com/apify/crawlee-python/pull/1686)) ([ee09260](https://github.com/apify/crawlee-python/commit/ee0926084589f1b6e15840b6185ec5433be3b72f)) by [@Mantisus](https://github.com/Mantisus), closes [#1682](https://github.com/apify/crawlee-python/issues/1682)
+- Set default `http3=False` for `ImpitHttpClient` ([#1685](https://github.com/apify/crawlee-python/pull/1685)) ([3f390f6](https://github.com/apify/crawlee-python/commit/3f390f677540a3905038d7db6a6d1efad32fd045)) by [@Mantisus](https://github.com/Mantisus), closes [#1683](https://github.com/apify/crawlee-python/issues/1683)
+- Prevent get_request from permanently blocking requests ([#1684](https://github.com/apify/crawlee-python/pull/1684)) ([da416f9](https://github.com/apify/crawlee-python/commit/da416f98fb453904d62e7d29d8f24611ffb3ba8d)) by [@Mirza-Samad-Ahmed-Baig](https://github.com/Mirza-Samad-Ahmed-Baig)
 
 
 <!-- git-cliff-unreleased-end -->
