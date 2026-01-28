@@ -21,7 +21,7 @@ def sklearn_model_validator(v: LogisticRegression | dict[str, Any]) -> LogisticR
 def sklearn_model_serializer(model: LogisticRegression) -> dict[str, Any]:
     if hasattr(model, 'coef_'):
         return {
-            'coef': model.coef_.tolist(),
+            'coef': np.asarray(model.coef_).tolist(),
             'intercept': model.intercept_.tolist(),
             'classes': model.classes_.tolist(),
             'n_iter': model.n_iter_.tolist() if hasattr(model, 'n_iter_') else [1000],
