@@ -5,6 +5,7 @@ import logging
 import sys
 from abc import ABC
 from datetime import timedelta
+from hashlib import sha256
 from typing import TYPE_CHECKING, Any, Generic
 
 if sys.version_info >= (3, 14):
@@ -342,7 +343,7 @@ class AbstractHttpCrawler(
         if not self._response_cache:
             raise RuntimeError('Response cache is not configured.')
 
-        key = f'response_{context.request.unique_key}'
+        key = self._get_cache_key(context.request.unique_key)
         raw = await self._response_cache.get_value(key)
 
         if raw is None:
@@ -375,7 +376,13 @@ class AbstractHttpCrawler(
 
         compressed = _compressor.compress(cached.model_dump_json().encode())
 
-        key = f'response_{context.request.unique_key}'
+        key = self._get_cache_key(context.request.unique_key)
         await self._response_cache.set_value(key, compressed)
 
         yield context
+
+    @staticmethod
+    def _get_cache_key(unique_key: str) -> str:
+        """Generate a deterministic cache key for a unique_key."""
+        hashed_key = sha256(unique_key.encode('utf-8')).hexdigest()
+        return f'response_{hashed_key[:15]}'
