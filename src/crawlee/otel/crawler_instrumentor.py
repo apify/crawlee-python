@@ -33,8 +33,8 @@ class CrawlerInstrumentor(BaseInstrumentor):
         Args:
             instrument_classes: List of classes to be instrumented - all their public methods and coroutines will be
                 wrapped by generic instrumentation wrapper that will create spans for them.
-            request_handling_instrumentation: Handpicked most interesting methods to instrument in the request handling
-                pipeline.
+            request_handling_instrumentation: When `True`, the most relevant methods in the request handling pipeline
+                will be instrumented. When `False`, no request handling instrumentation will be done.
         """
         self._tracer = get_tracer(__name__)
 
