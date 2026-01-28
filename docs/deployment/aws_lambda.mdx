@@ -30,7 +30,7 @@ Wrap the crawler logic in a `lambda_handler` function. This is the entry point t
 
 Make sure to always instantiate a new crawler for every Lambda invocation. AWS keeps the environment running for some time after the first execution (to reduce cold-start times), so subsequent calls may access an already-used crawler instance.
 
-**TLDR: Keep your Lambda stateless.**
+**TL;DR: Keep your Lambda stateless.**
 
 :::
 
