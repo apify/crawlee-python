@@ -54,14 +54,11 @@ module.exports = {
                     id: 'deployment/apify-platform',
                     label: 'Deploy on Apify',
                 },
-        //         {
-        //             type: 'category',
-        //             label: 'Deploy on AWS',
-        //             items: [
-        //                 'deployment/aws-cheerio',
-        //                 'deployment/aws-browsers',
-        //             ],
-        //         },
+                {
+                    type: 'doc',
+                    id: 'deployment/aws-lambda',
+                    label: 'Deploy on AWS Lambda'
+                },
                 {
                     type: 'category',
                     label: 'Deploy to Google Cloud',
