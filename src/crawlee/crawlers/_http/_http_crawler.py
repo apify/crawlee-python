@@ -55,7 +55,7 @@ class HttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[bytes], bytes, b
         Args:
             kwargs: Additional keyword arguments to pass to the underlying `AbstractHttpCrawler`.
         """
-        kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline()
+        kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline(**kwargs)
         super().__init__(
             parser=NoParser(),
             **kwargs,

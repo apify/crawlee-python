@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, Mock
+from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock, Mock, patch
 from urllib.parse import parse_qs, urlencode
 
 import pytest
@@ -11,11 +11,11 @@ from crawlee import ConcurrencySettings, Request, RequestState
 from crawlee.crawlers import HttpCrawler
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
-from crawlee.storages import RequestQueue
+from crawlee.storages import KeyValueStore, RequestQueue
 from tests.unit.server_endpoints import HELLO_WORLD
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import AsyncGenerator, Awaitable, Callable
 
     from yarl import URL
 
@@ -632,3 +632,49 @@ async def test_request_state(server_url: URL) -> None:
     }
 
     await queue.drop()
+
+
+async def test_save_response_to_cache(http_client: HttpClient, server_url: URL) -> None:
+    cache_kvs = await KeyValueStore.open(alias='http-request-cache')
+
+    call_tracker = Mock()
+    original_method = HttpCrawler._make_http_request
+
+    response_data: dict[str, dict[str, Any]] = {}
+
+    # Wrap the original _make_http_request to track calls
+    async def tracked_make_http_request(
+        self: HttpCrawler, context: HttpCrawlingContext
+    ) -> AsyncGenerator[HttpCrawlingContext, None]:
+        call_tracker()
+        async for result in original_method(self, context):
+            yield result
+
+    with patch.object(HttpCrawler, '_make_http_request', tracked_make_http_request):
+        crawler = HttpCrawler(http_client=http_client, response_cache=cache_kvs)
+
+        @crawler.router.default_handler
+        async def handler(context: HttpCrawlingContext) -> None:
+            run_key = context.request.user_data['run']
+            if not isinstance(run_key, str):
+                raise TypeError('Invalid run key in user_data')
+
+            response_data[run_key] = {
+                'status': context.http_response.status_code,
+                'body': await context.http_response.read(),
+                'http_version': context.http_response.http_version,
+                'headers': dict(context.http_response.headers),
+                'loaded_url': context.request.loaded_url,
+            }
+
+        # First run. Make request and save in cache
+        await crawler.run([Request.from_url(str(server_url), user_data={'run': 'first-run'})])
+        assert call_tracker.call_count == 1
+
+        # Second run. Load from cache, no actual request
+        await crawler.run([Request.from_url(str(server_url), user_data={'run': 'second-run'})])
+        assert call_tracker.call_count == 1
+
+        assert response_data['first-run'] == response_data['second-run']
+
+    await cache_kvs.drop()

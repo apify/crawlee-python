@@ -38,9 +38,9 @@ class SelectolaxLexborCrawler(
             yield SelectolaxLexborContext.from_parsed_http_crawling_context(context)
 
         # Build context pipeline: HTTP request -> parsing -> custom context.
-        kwargs['_context_pipeline'] = (
-            self._create_static_content_crawler_pipeline().compose(final_step)
-        )
+        kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline(
+            **kwargs
+        ).compose(final_step)
         super().__init__(
             parser=SelectolaxLexborParser(),
             **kwargs,

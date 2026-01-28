@@ -70,7 +70,7 @@ class ParselCrawler(AbstractHttpCrawler[ParselCrawlingContext, Selector, Selecto
             """Enhance `ParsedHttpCrawlingContext[Selector]` with a `selector` property."""
             yield ParselCrawlingContext.from_parsed_http_crawling_context(context)
 
-        kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline().compose(final_step)
+        kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline(**kwargs).compose(final_step)
         super().__init__(
             parser=ParselParser(),
             **kwargs,

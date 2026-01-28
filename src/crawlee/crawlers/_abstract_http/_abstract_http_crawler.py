@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from abc import ABC
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Generic
+
+if sys.version_info >= (3, 14):
+    from compression import zstd as _compressor
+else:
+    import zlib as _compressor
 
 from more_itertools import partition
 from pydantic import ValidationError
@@ -19,6 +25,7 @@ from crawlee.errors import SessionError
 from crawlee.statistics import StatisticsState
 
 from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult, TSelectResult
+from ._types import CachedHttpResponse
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator
@@ -27,6 +34,7 @@ if TYPE_CHECKING:
 
     from crawlee import RequestTransformAction
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, ExtractLinksFunction
+    from crawlee.storages import KeyValueStore
 
     from ._abstract_http_parser import AbstractHttpParser
 
@@ -45,6 +53,9 @@ class HttpCrawlerOptions(
 
     navigation_timeout: NotRequired[timedelta | None]
     """Timeout for the HTTP request."""
+
+    response_cache: NotRequired[KeyValueStore | None]
+    """Key-value store for caching HTTP responses."""
 
 
 @docs_group('Crawlers')
@@ -72,12 +83,14 @@ class AbstractHttpCrawler(
         *,
         parser: AbstractHttpParser[TParseResult, TSelectResult],
         navigation_timeout: timedelta | None = None,
+        response_cache: KeyValueStore | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext, StatisticsState]],
     ) -> None:
         self._parser = parser
         self._navigation_timeout = navigation_timeout or timedelta(minutes=1)
         self._pre_navigation_hooks: list[Callable[[BasicCrawlingContext], Awaitable[None]]] = []
         self._shared_navigation_timeouts: dict[int, SharedTimeout] = {}
+        self._response_cache = response_cache
 
         if '_context_pipeline' not in kwargs:
             raise ValueError(
@@ -106,7 +119,7 @@ class AbstractHttpCrawler(
                 parser: AbstractHttpParser[TParseResult, TSelectResult] = static_parser,
                 **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[TParseResult]]],
             ) -> None:
-                kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline()
+                kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline(**kwargs)
                 super().__init__(
                     parser=parser,
                     **kwargs,
@@ -114,12 +127,25 @@ class AbstractHttpCrawler(
 
         return _ParsedHttpCrawler
 
-    def _create_static_content_crawler_pipeline(self) -> ContextPipeline[ParsedHttpCrawlingContext[TParseResult]]:
+    def _create_static_content_crawler_pipeline(
+        self,
+        response_cache: KeyValueStore | None = None,
+        **_kwargs: BasicCrawlerOptions[TCrawlingContext, StatisticsState],
+    ) -> ContextPipeline[ParsedHttpCrawlingContext[TParseResult]]:
         """Create static content crawler context pipeline with expected pipeline steps."""
+        pipeline = ContextPipeline().compose(self._execute_pre_navigation_hooks)
+
+        if response_cache:
+            return (
+                pipeline.compose_with_skip(self._try_load_from_cache, skip_to='parse')
+                .compose(self._make_http_request)
+                .compose(self._handle_status_code_response)
+                .compose(self._save_response_to_cache)
+                .compose(self._parse_http_response, name='parse')
+                .compose(self._handle_blocked_request_by_content)
+            )
         return (
-            ContextPipeline()
-            .compose(self._execute_pre_navigation_hooks)
-            .compose(self._make_http_request)
+            pipeline.compose(self._make_http_request)
             .compose(self._handle_status_code_response)
             .compose(self._parse_http_response)
             .compose(self._handle_blocked_request_by_content)
@@ -308,3 +334,48 @@ class AbstractHttpCrawler(
             hook: A coroutine function to be called before each navigation.
         """
         self._pre_navigation_hooks.append(hook)
+
+    async def _try_load_from_cache(
+        self, context: BasicCrawlingContext
+    ) -> AsyncGenerator[HttpCrawlingContext | None, None]:
+        """Try to load a cached HTTP response. Yields HttpCrawlingContext if found, None otherwise."""
+        if not self._response_cache:
+            raise RuntimeError('Response cache is not configured.')
+
+        key = f'response_{context.request.unique_key}'
+        raw = await self._response_cache.get_value(key)
+
+        if raw is None:
+            yield None
+            return
+
+        compressed: bytes = raw
+        data = _compressor.decompress(compressed)
+        cached = CachedHttpResponse.model_validate_json(data)
+
+        context.request.loaded_url = cached.loaded_url or context.request.url
+        context.request.state = RequestState.AFTER_NAV
+
+        yield HttpCrawlingContext.from_basic_crawling_context(context=context, http_response=cached)
+
+    async def _save_response_to_cache(self, context: HttpCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
+        """Save the HTTP response to cache after a successful request."""
+        if not self._response_cache:
+            raise RuntimeError('Response cache is not configured.')
+
+        body = await context.http_response.read()
+
+        cached = CachedHttpResponse(
+            http_version=context.http_response.http_version,
+            status_code=context.http_response.status_code,
+            headers=context.http_response.headers,
+            body=body,
+            loaded_url=context.request.loaded_url,
+        )
+
+        compressed = _compressor.compress(cached.model_dump_json().encode())
+
+        key = f'response_{context.request.unique_key}'
+        await self._response_cache.set_value(key, compressed)
+
+        yield context

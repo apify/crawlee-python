@@ -194,3 +194,151 @@ async def test_handles_exceptions_in_middleware_finalization() -> None:
 
     assert consumer.called
     assert not cleanup.called
+
+
+@pytest.mark.parametrize(
+    'condition',
+    [
+        pytest.param(True, id='skip to pipeline middleware to step 3'),
+        pytest.param(False, id='do not skip any middleware'),
+    ],
+)
+async def test_pipeline_with_skip(*, condition: bool) -> None:
+    consumer = AsyncMock()
+    mock_step_1 = AsyncMock()
+    mock_step_2 = AsyncMock()
+    mock_step_3 = AsyncMock()
+
+    async def step_1(context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
+        await mock_step_1()
+        if condition:
+            yield context
+        else:
+            yield None
+
+    async def step_2(context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
+        await mock_step_2()
+        yield context
+
+    async def step_3(context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
+        await mock_step_3()
+        yield context
+
+    pipeline = (
+        ContextPipeline[BasicCrawlingContext]()
+        .compose_with_skip(step_1, skip_to='step_3')
+        .compose(step_2, name='step_2')
+        .compose(step_3, name='step_3')
+    )
+    context = BasicCrawlingContext(
+        request=Request.from_url(url='https://test.io/'),
+        send_request=AsyncMock(),
+        add_requests=AsyncMock(),
+        session=Session(),
+        proxy_info=AsyncMock(),
+        push_data=AsyncMock(),
+        use_state=AsyncMock(),
+        get_key_value_store=AsyncMock(),
+        log=logging.getLogger(),
+    )
+    await pipeline(context, consumer)
+
+    assert mock_step_1.called
+    if condition:
+        assert not mock_step_2.called
+    else:
+        assert mock_step_2.called
+    assert mock_step_3.called
+    assert consumer.called
+
+
+async def test_pipeline_with_error_in_skip() -> None:
+    consumer = AsyncMock()
+    mock_step_1 = AsyncMock()
+    mock_step_2 = AsyncMock()
+    mock_step_3 = AsyncMock()
+
+    async def step_1(_context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
+        await mock_step_1()
+        raise RuntimeError('Crash during middleware initialization')
+        yield None
+
+    async def step_2(context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
+        await mock_step_2()
+        yield context
+
+    async def step_3(context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
+        await mock_step_3()
+        yield context
+
+    pipeline = (
+        ContextPipeline[BasicCrawlingContext]()
+        .compose_with_skip(step_1, skip_to='step_3')
+        .compose(step_2, name='step_2')
+        .compose(step_3, name='step_3')
+    )
+    context = BasicCrawlingContext(
+        request=Request.from_url(url='https://test.io/'),
+        send_request=AsyncMock(),
+        add_requests=AsyncMock(),
+        session=Session(),
+        proxy_info=AsyncMock(),
+        push_data=AsyncMock(),
+        use_state=AsyncMock(),
+        get_key_value_store=AsyncMock(),
+        log=logging.getLogger(),
+    )
+
+    with pytest.raises(ContextPipelineInitializationError):
+        await pipeline(context, consumer)
+
+    assert mock_step_1.called
+    assert not mock_step_2.called
+    assert not mock_step_3.called
+    assert not consumer.called
+
+
+async def test_pipeline_with_skip_without_target() -> None:
+    consumer = AsyncMock()
+    mock_step_1 = AsyncMock()
+    mock_step_2 = AsyncMock()
+    mock_step_3 = AsyncMock()
+
+    async def step_1(_context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
+        await mock_step_1()
+        raise RuntimeError('Crash during middleware initialization')
+        yield None
+
+    async def step_2(context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
+        await mock_step_2()
+        yield context
+
+    async def step_3(context: BasicCrawlingContext) -> AsyncGenerator[BasicCrawlingContext, None]:
+        await mock_step_3()
+        yield context
+
+    pipeline = (
+        ContextPipeline[BasicCrawlingContext]()
+        .compose_with_skip(step_1, skip_to='step_4')  # step_4 does not exist
+        .compose(step_2, name='step_2')
+        .compose(step_3, name='step_3')
+    )
+    context = BasicCrawlingContext(
+        request=Request.from_url(url='https://test.io/'),
+        send_request=AsyncMock(),
+        add_requests=AsyncMock(),
+        session=Session(),
+        proxy_info=AsyncMock(),
+        push_data=AsyncMock(),
+        use_state=AsyncMock(),
+        get_key_value_store=AsyncMock(),
+        log=logging.getLogger(),
+    )
+
+    with pytest.raises(ContextPipelineInitializationError):
+        await pipeline(context, consumer)
+
+    assert mock_step_1.called
+    assert not mock_step_2.called
+    assert not mock_step_3.called
+    assert not consumer.called

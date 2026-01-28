@@ -73,7 +73,7 @@ class BeautifulSoupCrawler(AbstractHttpCrawler[BeautifulSoupCrawlingContext, Bea
             """Enhance `ParsedHttpCrawlingContext[BeautifulSoup]` with `soup` property."""
             yield BeautifulSoupCrawlingContext.from_parsed_http_crawling_context(context)
 
-        kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline().compose(final_step)
+        kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline(**kwargs).compose(final_step)
 
         super().__init__(
             parser=BeautifulSoupParser(parser=parser),
