@@ -55,12 +55,9 @@ module.exports = {
                     label: 'Deploy on Apify',
                 },
                 {
-                    type: 'category',
-                    label: 'Deploy on AWS',
-                    items: [
-                        'deployment/aws-lambda-beautifulsoup',
-                        'deployment/aws-lambda-playwright',
-                    ],
+                    type: 'doc',
+                    id: 'deployment/aws-lambda',
+                    label: 'Deploy on AWS Lambda'
                 },
                 {
                     type: 'category',

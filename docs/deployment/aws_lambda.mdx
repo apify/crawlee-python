@@ -1,0 +1,190 @@
+---
+id: aws-lambda
+title: Deploy on AWS Lambda
+description: Prepare your crawler to run on AWS Lambda.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+
+import CodeBlock from '@theme/CodeBlock';
+
+import BeautifulSoupCrawlerLambda from '!!raw-loader!./code_examples/aws/beautifulsoup_crawler_lambda.py';
+import PlaywrightCrawlerLambda from '!!raw-loader!./code_examples/aws/playwright_crawler_lambda.py';
+import PlaywrightCrawlerDockerfile from '!!raw-loader!./code_examples/aws/playwright_dockerfile';
+
+[AWS Lambda](https://docs.aws.amazon.com/lambda/latest/dg/welcome.html) is a serverless compute service that lets you run code without provisioning or managing servers. This guide covers deploying <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> and <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.
+
+The code examples are based on the [BeautifulSoupCrawler example](../examples/beautifulsoup-crawler).
+
+## BeautifulSoupCrawler on AWS Lambda
+
+For simple crawlers that don't require browser rendering, you can deploy using a ZIP archive.
+
+### Updating the code
+
+When instantiating a crawler, use <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink>. By default, Crawlee uses file-based storage, but the Lambda filesystem is read-only (except for `/tmp`). Using `MemoryStorageClient` tells Crawlee to use in-memory storage instead.
+
+Wrap the crawler logic in a `lambda_handler` function. This is the entry point that AWS will execute.
+
+:::important
+
+Make sure to always instantiate a new crawler for every Lambda invocation. AWS keeps the environment running for some time after the first execution (to reduce cold-start times), so subsequent calls may access an already-used crawler instance.
+
+**TLDR: Keep your Lambda stateless.**
+
+:::
+
+Finally, return the scraped data from the Lambda when the crawler run ends.
+
+<CodeBlock language="python" title="lambda_function.py">
+    {BeautifulSoupCrawlerLambda}
+</CodeBlock>
+
+### Preparing the environment
+
+Lambda requires all dependencies to be included in the deployment package. Create a virtual environment and install dependencies:
+
+```bash
+python3.14 -m venv .venv
+source .venv/bin/activate
+pip install 'crawlee[beautifulsoup]' 'boto3' 'aws-lambda-powertools'
+```
+
+[`boto3`](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html) is the AWS SDK for Python. Including it in your dependencies is recommended to avoid version misalignment issues with the Lambda runtime.
+
+### Creating the ZIP archive
+
+Create a ZIP archive from your project, including dependencies from the virtual environment:
+
+```bash
+cd .venv/lib/python3.14/site-packages
+zip -r ../../../../package.zip .
+cd ../../../../
+zip package.zip lambda_function.py
+```
+
+:::note Large dependencies?
+
+AWS has a limit of 50 MB for direct upload and 250 MB for unzipped deployment package size.
+
+A better way to manage dependencies is by using Lambda Layers. With Layers, you can share files between multiple Lambda functions and keep the actual code as slim as possible.
+
+To create a Lambda Layer:
+
+1. Create a `python/` folder and copy dependencies from `site-packages` into it
+2. Create a zip archive: `zip -r layer.zip python/`
+3. Create a new Lambda Layer from the archive (you may need to upload it to S3 first)
+4. Attach the Layer to your Lambda function
+
+:::
+
+### Creating the Lambda function
+
+Create the Lambda function in the AWS Lambda Console:
+
+1. Navigate to `Lambda` in [AWS Management Console](https://aws.amazon.com/console/).
+2. Click **Create function**.
+3. Select **Author from scratch**.
+4. Enter a **Function name**, for example `BeautifulSoupTest`.
+5. Choose a **Python runtime** that matches the version used in your virtual environment (for example, Python 3.14).
+6. Click **Create function** to finish.
+
+Once created, upload `package.zip` as the code source in the AWS Lambda Console using the "Upload from" button.
+
+In Lambda Runtime Settings, set the handler. Since the file is named `lambda_function.py` and the function is `lambda_handler`, you can use the default value `lambda_function.lambda_handler`.
+
+:::tip Configuration
+
+In the Configuration tab, you can adjust:
+
+- **Memory**: Memory size can greatly affect execution speed. A minimum of 256-512 MB is recommended.
+- **Timeout**: Set according to the size of the website you are scraping (1 minute for the example code).
+- **Ephemeral storage**: Size of the `/tmp` directory.
+
+See the [official documentation](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html) to learn how performance and cost scale with memory.
+
+:::
+
+After the Lambda deploys, you can test it by clicking the "Test" button. The event contents don't matter for a basic test, but you can parameterize your crawler by parsing the event object that AWS passes as the first argument to the handler.
+
+## PlaywrightCrawler on AWS Lambda
+
+For crawlers that require browser rendering, you need to deploy using Docker container images because Playwright and browser binaries exceed Lambda's ZIP deployment size limits.
+
+### Updating the code
+
+As with <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, use <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> and wrap the logic in a `lambda_handler` function. Additionally, configure `browser_launch_options` with flags optimized for serverless environments. These flags disable sandboxing and GPU features that aren't available in Lambda's containerized runtime.
+
+<CodeBlock language="python" title="main.py">
+    {PlaywrightCrawlerLambda}
+</CodeBlock>
+
+### Installing and configuring AWS CLI
+
+Install AWS CLI following the [official documentation](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) according to your operating system.
+
+Authenticate by running:
+
+```bash
+aws login
+```
+
+### Preparing the project
+
+Initialize the project by running `uvx 'crawlee[cli]' create`.
+
+Or use a single command if you don't need interactive mode:
+
+```bash
+uvx 'crawlee[cli]' create aws_playwright --crawler-type playwright --http-client impit --package-manager uv --no-apify --start-url 'https://crawlee.dev' --install
+```
+
+Add the following dependencies:
+
+```bash
+uv add awslambdaric aws-lambda-powertools boto3
+```
+
+[`boto3`](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html) is the AWS SDK for Python. Use it if your function integrates with any other AWS services.
+
+The project is created with a Dockerfile that needs to be modified for AWS Lambda by adding `ENTRYPOINT` and updating `CMD`:
+
+<CodeBlock language="dockerfile" title="Dockerfile">
+    {PlaywrightCrawlerDockerfile}
+</CodeBlock>
+
+### Building and pushing the Docker image
+
+Create a repository `lambda/aws-playwright` in [Amazon Elastic Container Registry](https://docs.aws.amazon.com/AmazonECR/latest/userguide/what-is-ecr.html) in the same region where your Lambda functions will run. To learn more, refer to the [official documentation](https://docs.aws.amazon.com/AmazonECR/latest/userguide/getting-started-cli.html).
+
+Navigate to the created repository and click the "View push commands" button. This will open a window with console commands for uploading the Docker image to your repository. Execute them.
+
+Example:
+```bash
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin {user-specific-data}
+docker build --platform linux/amd64 --provenance=false -t lambda/aws-playwright .
+docker tag lambda/aws-playwright:latest {user-specific-data}/lambda/aws-playwright:latest
+docker push {user-specific-data}/lambda/aws-playwright:latest
+```
+
+### Creating the Lambda function
+
+1. Navigate to `Lambda` in [AWS Management Console](https://aws.amazon.com/console/).
+2. Click **Create function**.
+3. Select **Container image**.
+4. Browse and select your ECR image.
+5. Click **Create function** to finish.
+
+:::tip Configuration
+
+In the Configuration tab, you can adjust resources. Playwright crawlers require more resources than BeautifulSoup crawlers:
+
+- **Memory**: Minimum 1024 MB recommended. Browser operations are memory-intensive, so 2048 MB or more may be needed for complex pages.
+- **Timeout**: Set according to crawl size. Browser startup adds overhead, so allow at least 5 minutes even for simple crawls.
+- **Ephemeral storage**: Default 512 MB is usually sufficient unless downloading large files.
+
+See the [official documentation](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html) to learn how performance and cost scale with memory.
+
+:::
+
+After the Lambda deploys, click the "Test" button to invoke it. The event contents don't matter for a basic test, but you can parameterize your crawler by parsing the event object that AWS passes as the first argument to the handler.
