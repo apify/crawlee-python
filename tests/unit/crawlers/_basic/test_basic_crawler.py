@@ -1722,7 +1722,7 @@ async def test_add_requests_with_rq_param(queue_name: str | None, queue_alias: s
     crawler = BasicCrawler()
     rq = await RequestQueue.open(name=queue_name, alias=queue_alias)
     if by_id:
-        queue_id = rq._id
+        queue_id = rq.id
         queue_name = None
     else:
         queue_id = None
@@ -1816,6 +1816,7 @@ async def _run_crawler(crawler_id: int | None, requests: list[str], storage_dir:
         context.log.info(f'State {state}')
 
     crawler = BasicCrawler(
+        id=crawler_id,
         request_handler=request_handler,
         concurrency_settings=ConcurrencySettings(max_concurrency=1, desired_concurrency=1),
         configuration=Configuration(

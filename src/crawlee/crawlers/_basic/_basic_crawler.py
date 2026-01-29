@@ -355,8 +355,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             status_message_logging_interval: Interval for logging the crawler status messages.
             status_message_callback: Allows overriding the default status message. The default status message is
                 provided in the parameters. Returning `None` suppresses the status message.
-            id: Id of the crawler used for state tracking. You can use same explicit id to share state and between two
-                crawlers. By default, each crawler will use own state.
+            id: Identifier used for crawler state tracking. Use the same id across multiple crawlers to share state
+                between them.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
