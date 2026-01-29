@@ -214,8 +214,8 @@ class _BasicCrawlerOptions(TypedDict):
     Returning `None` suppresses the status message."""
 
     id: NotRequired[int]
-    """Id of the crawler used for state tracking. You can use same explicit id to share state between two crawlers.
-    By default, each crawler will use own state."""
+    """Identifier used for crawler state tracking. Use the same id across multiple crawlers to share state between
+    them."""
 
 
 class _BasicCrawlerOptionsGeneric(TypedDict, Generic[TCrawlingContext, TStatisticsState]):
