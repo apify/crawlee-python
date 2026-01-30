@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator, MutableMapping
 from datetime import datetime
 from enum import IntEnum
-from typing import TYPE_CHECKING, Annotated, Any, TypedDict, cast
+from typing import TYPE_CHECKING, Annotated, Any, TypedDict
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, PlainValidator, TypeAdapter
 from yarl import URL
@@ -347,9 +347,23 @@ class Request(BaseModel):
         return query_params.get(param, default)
 
     @property
+    def _typed_user_data(self) -> UserData:
+        """Return user_data as UserData with runtime type safety.
+
+        The user_data field is typed as dict[str, JsonSerializable] for API convenience,
+        but is internally always a UserData instance due to Pydantic validation. This property
+        provides safe access with an isinstance check to handle edge cases like model_construct().
+        """
+        user_data = self.user_data
+        if isinstance(user_data, UserData):
+            return user_data
+        # Handle edge case where validation was bypassed (e.g., model_construct)
+        return user_data_adapter.validate_python(user_data)
+
+    @property
     def label(self) -> str | None:
         """A string used to differentiate between arbitrary request types."""
-        return cast('UserData', self.user_data).label
+        return self._typed_user_data.label
 
     @property
     def session_id(self) -> str | None:
@@ -359,7 +373,7 @@ class Request(BaseModel):
     @property
     def crawlee_data(self) -> CrawleeRequestData:
         """Crawlee-specific configuration stored in the `user_data`."""
-        user_data = cast('UserData', self.user_data)
+        user_data = self._typed_user_data
         if user_data.crawlee_data is None:
             user_data.crawlee_data = CrawleeRequestData()
 
