@@ -234,7 +234,7 @@ class Statistics(Generic[TStatisticsState]):
         state.request_min_duration = min(
             state.request_min_duration if state.request_min_duration is not None else timedelta.max, duration
         )
-        state.request_max_duration = min(
+        state.request_max_duration = max(
             state.request_max_duration if state.request_max_duration is not None else timedelta(), duration
         )
 
