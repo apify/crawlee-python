@@ -346,14 +346,14 @@ class BrowserPool:
 
     def _identify_inactive_browsers(self) -> None:
         """Identify inactive browsers and move them to the inactive list if their idle time exceeds the threshold."""
-        for browser in self._active_browsers:
+        for browser in list(self._active_browsers):
             if browser.idle_time >= self._browser_inactive_threshold:
                 self._active_browsers.remove(browser)
                 self._inactive_browsers.append(browser)
 
     async def _close_inactive_browsers(self) -> None:
         """Close the browsers that have no active pages and have been idle for a certain period."""
-        for browser in self._inactive_browsers:
+        for browser in list(self._inactive_browsers):
             if not browser.pages:
                 await browser.close()
                 self._inactive_browsers.remove(browser)
