@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.3.1 - **not yet released**
+## [1.3.1](https://github.com/apify/crawlee-python/releases/tag/v1.3.1) (2026-01-30)
 
 ### 🐛 Bug Fixes
 
@@ -13,7 +12,6 @@ All notable changes to this project will be documented in this file.
 - Do not share state between different crawlers unless requested ([#1669](https://github.com/apify/crawlee-python/pull/1669)) ([64c246b](https://github.com/apify/crawlee-python/commit/64c246bedea14f86e607d23adc5bec644c578364)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1627](https://github.com/apify/crawlee-python/issues/1627)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.3.0](https://github.com/apify/crawlee-python/releases/tag/v1.3.0) (2026-01-20)
 
 ### 🚀 Features
