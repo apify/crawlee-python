@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.3.2 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Use `max()` instead of `min()` for `request_max_duration` statistic ([#1701](https://github.com/apify/crawlee-python/pull/1701)) ([85c4335](https://github.com/apify/crawlee-python/commit/85c43351a05ada1369b720061f6f1a7e158340b6)) by [@vdusek](https://github.com/vdusek)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.3.1](https://github.com/apify/crawlee-python/releases/tag/v1.3.1) (2026-01-30)
 
 ### 🐛 Bug Fixes
