@@ -217,7 +217,7 @@ class Request(BaseModel):
                 lambda instance: user_data_adapter.dump_python(
                     instance,
                     by_alias=True,
-                    exclude_none=True,
+                    exclude_none=False,
                     exclude_unset=True,
                     exclude_defaults=True,
                 )
