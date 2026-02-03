@@ -5,15 +5,15 @@ from collections.abc import Iterable
 from copy import deepcopy
 from functools import reduce
 from operator import or_
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+import apify_fingerprint_datapoints
 from browserforge.bayesian_network import extract_json
 from browserforge.fingerprints import Fingerprint as bf_Fingerprint
 from browserforge.fingerprints import FingerprintGenerator as bf_FingerprintGenerator
 from browserforge.fingerprints import Screen
-from browserforge.headers.generator import DATA_DIR, ListOrString
 from browserforge.headers.generator import HeaderGenerator as bf_HeaderGenerator
+from browserforge.headers.generator import ListOrString
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
@@ -252,11 +252,7 @@ class BrowserforgeHeaderGenerator:
 
 def get_available_header_network() -> dict:
     """Get header network that contains possible header values."""
-    if Path(DATA_DIR / 'header-network.zip').is_file():
-        return extract_json(DATA_DIR / 'header-network.zip')
-    if Path(DATA_DIR / 'header-network-definition.zip').is_file():
-        return extract_json(DATA_DIR / 'header-network-definition.zip')
-    raise FileNotFoundError('Missing header-network file.')
+    return extract_json(apify_fingerprint_datapoints.get_header_network())
 
 
 def get_available_header_values(header_network: dict, node_name: str | set[str]) -> set[str]:
