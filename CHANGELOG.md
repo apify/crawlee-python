@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Use `max()` instead of `min()` for `request_max_duration` statistic ([#1701](https://github.com/apify/crawlee-python/pull/1701)) ([85c4335](https://github.com/apify/crawlee-python/commit/85c43351a05ada1369b720061f6f1a7e158340b6)) by [@vdusek](https://github.com/vdusek)
+- Prevent mutation of default URL patterns list in `block_requests` ([#1702](https://github.com/apify/crawlee-python/pull/1702)) ([fcf9adb](https://github.com/apify/crawlee-python/commit/fcf9adb6a0cfeaa87ca482372d4e066584eb28d6)) by [@vdusek](https://github.com/vdusek)
+- Keep None values for `user_data` in `Request` ([#1707](https://github.com/apify/crawlee-python/pull/1707)) ([3c575bc](https://github.com/apify/crawlee-python/commit/3c575bc2b0f1c89c99d134ad3a3fa7455ccc6910)) by [@Mantisus](https://github.com/Mantisus), closes [#1706](https://github.com/apify/crawlee-python/issues/1706)
 
 
 <!-- git-cliff-unreleased-end -->
