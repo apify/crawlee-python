@@ -136,3 +136,18 @@ async def test_memory_leak_on_concurrent_context_creation() -> None:
     await asyncio.gather(controller.new_page(), controller.new_page())
 
     assert mocked_context_launcher.call_count == 1
+
+
+async def test_max_open_pages_limit_on_concurrent_creation(controller: PlaywrightBrowserController) -> None:
+    pages = await asyncio.gather(controller.new_page(), controller.new_page())
+
+    assert controller.pages_count == 2
+
+    for page in pages:
+        await page.close()
+
+
+async def test_max_open_pages_limit_error_on_concurrent_creation(controller: PlaywrightBrowserController) -> None:
+    """Test that max open pages limit is respected during concurrent page creation."""
+    with pytest.raises(ValueError, match=r'Cannot open more pages in this browser.'):
+        await asyncio.gather(controller.new_page(), controller.new_page(), controller.new_page())
