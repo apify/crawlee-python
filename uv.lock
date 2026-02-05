@@ -808,6 +808,7 @@ sql-sqlite = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "anyio" },
     { name = "apify-client" },
     { name = "build" },
     { name = "dycw-pytest-only" },
@@ -885,6 +886,7 @@ provides-extras = ["all", "adaptive-crawler", "beautifulsoup", "cli", "curl-impe
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "anyio", specifier = "<5.0.0" },
     { name = "apify-client" },
     { name = "build", specifier = "<2.0.0" },
     { name = "dycw-pytest-only", specifier = "<3.0.0" },

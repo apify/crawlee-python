@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from anyio import Path as AnyioPath
+
 from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
@@ -45,7 +47,7 @@ async def test_storage_not_persisted_when_non_persistable_storage_used(tmp_path:
     await crawler.run([str(server_url)])
 
     # Verify that no files were created in the storage directory.
-    content = list(tmp_path.iterdir())
+    content = [path async for path in AnyioPath(tmp_path).iterdir()]
     assert content == [], 'Expected the storage directory to be empty, but it is not.'
 
 
@@ -70,7 +72,7 @@ async def test_storage_persisted_with_explicit_statistics_with_persistable_stora
     await crawler.run([str(server_url)])
 
     # Verify that files were created in the storage directory.
-    content = list(tmp_path.iterdir())
+    content = [path async for path in AnyioPath(tmp_path).iterdir()]
     assert content != [], 'Expected the storage directory to contain files, but it does not.'
 
 
@@ -93,5 +95,5 @@ async def test_storage_persisted_when_enabled(tmp_path: Path, server_url: URL) -
     await crawler.run([str(server_url)])
 
     # Verify that files were created in the storage directory.
-    content = list(tmp_path.iterdir())
+    content = [path async for path in AnyioPath(tmp_path).iterdir()]
     assert content != [], 'Expected the storage directory to contain files, but it does not.'

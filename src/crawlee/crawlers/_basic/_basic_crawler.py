@@ -1386,7 +1386,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         request_manager = await self.get_request_manager()
 
         request = await wait_for(
-            lambda: request_manager.fetch_next_request(),
+            request_manager.fetch_next_request,
             timeout=self._internal_timeout,
             timeout_message=f'Fetching next request failed after {self._internal_timeout.total_seconds()} seconds',
             logger=self._logger,
