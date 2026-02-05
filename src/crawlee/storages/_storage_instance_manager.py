@@ -23,17 +23,17 @@ class _StorageCache:
     """Cache for storage instances."""
 
     by_id: defaultdict[type[Storage], defaultdict[str, defaultdict[Hashable, Storage]]] = field(
-        default_factory=lambda: defaultdict(lambda: defaultdict(lambda: defaultdict()))
+        default_factory=lambda: defaultdict(lambda: defaultdict(defaultdict))
     )
     """Cache for storage instances by ID. Example: by_id[Dataset]['some_id']['some_additional_cache_key']."""
 
     by_name: defaultdict[type[Storage], defaultdict[str, defaultdict[Hashable, Storage]]] = field(
-        default_factory=lambda: defaultdict(lambda: defaultdict(lambda: defaultdict()))
+        default_factory=lambda: defaultdict(lambda: defaultdict(defaultdict))
     )
     """Cache for storage instances by name. Example: by_name[Dataset]['some_name']['some_additional_cache_key']"""
 
     by_alias: defaultdict[type[Storage], defaultdict[str, defaultdict[Hashable, Storage]]] = field(
-        default_factory=lambda: defaultdict(lambda: defaultdict(lambda: defaultdict()))
+        default_factory=lambda: defaultdict(lambda: defaultdict(defaultdict))
     )
     """Cache for storage instances by alias. Example: by_alias[Dataset]['some_alias']['some_additional_cache_key']"""
 

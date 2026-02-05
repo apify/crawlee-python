@@ -68,8 +68,8 @@ class HttpHeaders(RootModel, Mapping[str, str]):
     else:
         root: Annotated[
             dict[str, str],
-            PlainValidator(lambda value: _normalize_headers(value)),
-            Field(default_factory=lambda: dict[str, str]()),
+            PlainValidator(_normalize_headers),
+            Field(default_factory=dict),
         ]
 
     def __getitem__(self, key: str) -> str:

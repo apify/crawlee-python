@@ -143,7 +143,7 @@ class SessionCookies:
         """
         cookie_dict = CookieParam(
             name=cookie.name,
-            value=cookie.value if cookie.value else '',
+            value=cookie.value or '',
             domain=cookie.domain,
             path=cookie.path,
             secure=cookie.secure,

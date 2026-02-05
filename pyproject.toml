@@ -112,7 +112,7 @@ dev = [
     "pytest-timeout<3.0.0",
     "pytest-xdist<4.0.0",
     "pytest<9.0.0",
-    "ruff~=0.14.0",
+    "ruff~=0.15.0",
     "setuptools", # setuptools are used by pytest, but not explicitly required
     "ty~=0.0.0",
     "types-beautifulsoup4<5.0.0",
@@ -175,6 +175,7 @@ indent-style = "space"
 ]
 "**/{tests}/*" = [
     "ASYNC230", # Async functions should not open files with blocking methods like `open`
+    "ASYNC240", # Async functions should not use pathlib.Path methods, use trio.Path or anyio.path
     "D",       # Everything from the pydocstyle
     "INP001",  # File {filename} is part of an implicit namespace package, add an __init__.py
     "PLR2004", # Magic value used in comparison, consider replacing {value} with a constant variable
