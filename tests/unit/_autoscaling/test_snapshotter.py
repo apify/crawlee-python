@@ -3,16 +3,22 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, cast
+from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
 
 from crawlee import service_locator
 from crawlee._autoscaling import Snapshotter
-from crawlee._autoscaling._types import ClientSnapshot, CpuSnapshot, MemorySnapshot
+from crawlee._autoscaling._types import (
+    SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD,
+    ClientSnapshot,
+    CpuSnapshot,
+    MemorySnapshot,
+)
 from crawlee._autoscaling.snapshotter import SortedSnapshotList
 from crawlee._utils.byte_size import ByteSize
-from crawlee._utils.system import CpuInfo, MemoryInfo
+from crawlee._utils.system import CpuInfo, MemoryInfo, get_memory_info
 from crawlee.configuration import Configuration
 from crawlee.events import LocalEventManager
 from crawlee.events._types import Event, EventSystemInfoData
@@ -354,3 +360,68 @@ def test_sorted_snapshot_list_add_maintains_order() -> None:
             prev_time = sorted_list[i - 1].created_at
             curr_time = snapshot.created_at
             assert prev_time <= curr_time, f'Items at indices {i - 1} and {i} are not in chronological order'
+
+
+async def test_dynamic_memory(default_cpu_info: CpuInfo, event_manager: LocalEventManager) -> None:
+    """Test dynamic memory scaling scenario where the system-wide memory can change.
+
+    Create one memory snapshot. In the initial setup the snapshot is overloaded due to system memory not being
+    sufficient. Then simulate a scale-up event by increasing the total system memory. The same memory snapshot should
+    no longer be considered overloaded after the scale-up. Then go back to initial memory and the same snapshot becomes
+    overloaded again
+    """
+
+    initial_memory = get_memory_info()
+    # Big memory usage ratio, that does not trigger system-wide overload
+    big_usage_ratio = 0.99 * SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD
+
+    service_locator.set_event_manager(event_manager)
+
+    async with Snapshotter.from_config(Configuration(available_memory_ratio=big_usage_ratio)) as snapshotter:
+        # Default state, memory usage exactly at the overload threshold -> overloaded, but not system-wide overloaded
+        memory_info_default = MemoryInfo(
+            total_size=initial_memory.total_size,
+            current_size=initial_memory.total_size * big_usage_ratio,
+            system_wide_used_size=initial_memory.total_size * big_usage_ratio,
+        )
+
+        event_manager.emit(
+            event=Event.SYSTEM_INFO,
+            event_data=EventSystemInfoData(
+                cpu_info=default_cpu_info,
+                memory_info=memory_info_default,
+            ),
+        )
+        await event_manager.wait_for_all_listeners_to_complete()
+
+        with (
+            mock.patch('crawlee._autoscaling.snapshotter.get_memory_info', return_value=memory_info_default),
+            mock.patch('crawlee._autoscaling._types.get_memory_info', return_value=memory_info_default),
+        ):
+            memory_samples = snapshotter.get_memory_sample()
+            assert len(memory_samples) == 1
+            assert memory_samples[0].is_overloaded
+
+        # Scaled-up state, memory usage same, but more memory, so no longer overloaded
+        scaled_up_info = MemoryInfo(
+            total_size=initial_memory.total_size * 2,  # Simulate increased total memory
+            current_size=initial_memory.total_size * big_usage_ratio,  # Simulate memory usage
+            system_wide_used_size=initial_memory.total_size * big_usage_ratio,
+        )
+
+        with (
+            mock.patch('crawlee._autoscaling.snapshotter.get_memory_info', return_value=scaled_up_info),
+            mock.patch('crawlee._autoscaling._types.get_memory_info', return_value=scaled_up_info),
+        ):
+            memory_samples = snapshotter.get_memory_sample()
+            assert len(memory_samples) == 1
+            assert not memory_samples[0].is_overloaded
+
+        # Back to default state, should be overloaded again
+        with (
+            mock.patch('crawlee._autoscaling.snapshotter.get_memory_info', return_value=memory_info_default),
+            mock.patch('crawlee._autoscaling._types.get_memory_info', return_value=memory_info_default),
+        ):
+            memory_samples = snapshotter.get_memory_sample()
+            assert len(memory_samples) == 1
+            assert memory_samples[0].is_overloaded

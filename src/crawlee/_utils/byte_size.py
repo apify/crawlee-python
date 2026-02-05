@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Annotated, Any
+
+from pydantic import BaseModel, Field
 
 _BYTES_PER_KB = 1024
 _BYTES_PER_MB = _BYTES_PER_KB**2
 _BYTES_PER_GB = _BYTES_PER_KB**3
 _BYTES_PER_TB = _BYTES_PER_KB**4
+
+
+class Ratio(BaseModel):
+    """Represents ratio of memory."""
+
+    value: Annotated[float, Field(gt=0.0, le=1.0)]
 
 
 @dataclass(frozen=True)
