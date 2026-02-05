@@ -8,6 +8,7 @@ from crawlee import RequestOptions, RequestTransformAction
 from crawlee.http_clients._base import HttpClient
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
 from crawlee.storages import KeyValueStore
+from tests.unit.utils import run_alone_on_mac
 
 BASIC_SITEMAP = """
 <?xml version="1.0" encoding="UTF-8"?>
@@ -50,6 +51,7 @@ def encode_base64(data: bytes) -> str:
     return base64.b64encode(data).decode('utf-8')
 
 
+@run_alone_on_mac
 async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client)
@@ -66,6 +68,7 @@ async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> No
     assert await sitemap_loader.get_handled_count() == 5
 
 
+@run_alone_on_mac
 async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client)

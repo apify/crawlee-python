@@ -1373,6 +1373,7 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     # Test is skipped in older Python versions.
     from asyncio import timeout  # type:ignore[attr-defined] # noqa: PLC0415
 
+    non_realtime_system_coefficient = 2
     handler_timeout = timedelta(seconds=1)
     max_request_retries = 3
     double_handler_timeout_s = handler_timeout.total_seconds() * 2
@@ -1401,7 +1402,7 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
 
     # Timeout in pytest, because previous implementation would run crawler until following:
     # "The request queue seems to be stuck for 300.0s, resetting internal state."
-    async with timeout(max_request_retries * double_handler_timeout_s):
+    async with timeout(max_request_retries * double_handler_timeout_s * non_realtime_system_coefficient):
         await crawler.run(['https://a.placeholder.com'])
 
     assert crawler.statistics.state.requests_finished == 1
