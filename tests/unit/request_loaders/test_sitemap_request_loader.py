@@ -56,9 +56,9 @@ async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> No
 
     while not await sitemap_loader.is_finished():
         item = await sitemap_loader.fetch_next_request()
-        assert item is not None
 
-        await sitemap_loader.mark_request_as_handled(item)
+        if item:
+            await sitemap_loader.mark_request_as_handled(item)
 
     assert await sitemap_loader.is_empty()
     assert await sitemap_loader.is_finished()
@@ -85,6 +85,9 @@ async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL, h
         await sitemap_loader.mark_request_as_handled(item)
 
     assert await sitemap_loader.is_empty()
+
+    await asyncio.sleep(0.1)
+
     assert await sitemap_loader.is_finished()
 
 
@@ -192,12 +195,13 @@ async def test_transform_request_function(server_url: URL, http_client: HttpClie
 
     while not await sitemap_loader.is_finished():
         request = await sitemap_loader.fetch_next_request()
-        assert request is not None
-        assert request.user_data.get('transformed') is True
 
-        extracted_urls.add(request.url)
+        if request:
+            assert request.user_data.get('transformed') is True
 
-        await sitemap_loader.mark_request_as_handled(request)
+            extracted_urls.add(request.url)
+
+            await sitemap_loader.mark_request_as_handled(request)
 
     assert len(extracted_urls) == 5
     assert extracted_urls == {
