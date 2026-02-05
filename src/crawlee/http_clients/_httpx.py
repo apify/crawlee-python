@@ -272,7 +272,7 @@ class HttpxHttpClient(HttpClient):
             headers=dict(headers) if headers else None,
             content=payload,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
-            timeout=timeout if timeout else httpx.USE_CLIENT_DEFAULT,
+            timeout=timeout or httpx.USE_CLIENT_DEFAULT,
         )
 
     def _get_client(self, proxy_url: str | None) -> httpx.AsyncClient:
@@ -329,7 +329,7 @@ class HttpxHttpClient(HttpClient):
         )
         explicit_headers = explicit_headers or HttpHeaders()
         headers = common_headers | user_agent_header | explicit_headers
-        return headers if headers else None
+        return headers or None
 
     @staticmethod
     def _is_proxy_error(error: httpx.TransportError) -> bool:

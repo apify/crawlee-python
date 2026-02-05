@@ -757,7 +757,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         await asyncio.to_thread(path_to_rq.mkdir, parents=True, exist_ok=True)
 
         # List all the json files.
-        files = await asyncio.to_thread(lambda: list(path_to_rq.glob('*.json')))
+        files = list(await asyncio.to_thread(path_to_rq.glob, '*.json'))
 
         # Filter out metadata file and non-file entries.
         filtered = filter(lambda request_file: request_file.is_file() and request_file.name != METADATA_FILENAME, files)

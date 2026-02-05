@@ -409,7 +409,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             links_iterator = to_absolute_url_iterator(base_url, links_iterator, logger=context.log)
 
             if robots_txt_file:
-                skipped, links_iterator = partition(lambda url: robots_txt_file.is_allowed(url), links_iterator)
+                skipped, links_iterator = partition(robots_txt_file.is_allowed, links_iterator)
             else:
                 skipped = iter([])
 
