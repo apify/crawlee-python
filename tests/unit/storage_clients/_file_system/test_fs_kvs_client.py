@@ -37,14 +37,14 @@ async def test_file_and_directory_creation(configuration: Configuration) -> None
     client = await FileSystemStorageClient().create_kvs_client(name='new-kvs', configuration=configuration)
 
     # Verify files were created
-    assert client.path_to_kvs.exists()
-    assert client.path_to_metadata.exists()
+    assert await client.path_to_kvs.exists()
+    assert await client.path_to_metadata.exists()
 
     # Verify metadata file structure
-    with client.path_to_metadata.open() as f:
-        metadata = json.load(f)
-        assert metadata['id'] == (await client.get_metadata()).id
-        assert metadata['name'] == 'new-kvs'
+    metadata_content = await client.path_to_metadata.read_text(encoding='utf-8')
+    metadata = json.loads(metadata_content)
+    assert metadata['id'] == (await client.get_metadata()).id
+    assert metadata['name'] == 'new-kvs'
 
     await client.drop()
 
@@ -58,19 +58,19 @@ async def test_value_file_creation_and_content(kvs_client: FileSystemKeyValueSto
     # Check if the files were created
     key_path = kvs_client.path_to_kvs / test_key
     key_metadata_path = kvs_client.path_to_kvs / f'{test_key}.{METADATA_FILENAME}'
-    assert key_path.exists()
-    assert key_metadata_path.exists()
+    assert await key_path.exists()
+    assert await key_metadata_path.exists()
 
     # Check file content
-    content = key_path.read_text(encoding='utf-8')
+    content = await key_path.read_text(encoding='utf-8')
     assert content == test_value
 
     # Check record metadata file
-    with key_metadata_path.open() as f:
-        metadata = json.load(f)
-        assert metadata['key'] == test_key
-        assert metadata['content_type'] == 'text/plain; charset=utf-8'
-        assert metadata['size'] == len(test_value.encode('utf-8'))
+    metadata_content = await key_metadata_path.read_text(encoding='utf-8')
+    metadata = json.loads(metadata_content)
+    assert metadata['key'] == test_key
+    assert metadata['content_type'] == 'text/plain; charset=utf-8'
+    assert metadata['size'] == len(test_value.encode('utf-8'))
 
 
 async def test_binary_data_persistence(kvs_client: FileSystemKeyValueStoreClient) -> None:
@@ -81,10 +81,10 @@ async def test_binary_data_persistence(kvs_client: FileSystemKeyValueStoreClient
 
     # Verify binary file exists
     key_path = kvs_client.path_to_kvs / test_key
-    assert key_path.exists()
+    assert await key_path.exists()
 
     # Verify binary content is preserved
-    content = key_path.read_bytes()
+    content = await key_path.read_bytes()
     assert content == test_value
 
     # Verify retrieval works correctly
@@ -102,9 +102,9 @@ async def test_json_serialization_to_file(kvs_client: FileSystemKeyValueStoreCli
 
     # Check if file content is valid JSON
     key_path = kvs_client.path_to_kvs / test_key
-    with key_path.open() as f:
-        file_content = json.load(f)
-        assert file_content == test_value
+    file_content_raw = await key_path.read_text(encoding='utf-8')
+    file_content = json.loads(file_content_raw)
+    assert file_content == test_value
 
 
 async def test_file_deletion_on_value_delete(kvs_client: FileSystemKeyValueStoreClient) -> None:
@@ -118,27 +118,27 @@ async def test_file_deletion_on_value_delete(kvs_client: FileSystemKeyValueStore
     # Verify files exist
     key_path = kvs_client.path_to_kvs / test_key
     metadata_path = kvs_client.path_to_kvs / f'{test_key}.{METADATA_FILENAME}'
-    assert key_path.exists()
-    assert metadata_path.exists()
+    assert await key_path.exists()
+    assert await metadata_path.exists()
 
     # Delete the value
     await kvs_client.delete_value(key=test_key)
 
     # Verify files were deleted
-    assert not key_path.exists()
-    assert not metadata_path.exists()
+    assert not await key_path.exists()
+    assert not await metadata_path.exists()
 
 
 async def test_drop_removes_directory(kvs_client: FileSystemKeyValueStoreClient) -> None:
     """Test that drop removes the entire store directory from disk."""
     await kvs_client.set_value(key='test', value='test-value')
 
-    assert kvs_client.path_to_kvs.exists()
+    assert await kvs_client.path_to_kvs.exists()
 
     # Drop the store
     await kvs_client.drop()
 
-    assert not kvs_client.path_to_kvs.exists()
+    assert not await kvs_client.path_to_kvs.exists()
 
 
 async def test_metadata_file_updates(kvs_client: FileSystemKeyValueStoreClient) -> None:

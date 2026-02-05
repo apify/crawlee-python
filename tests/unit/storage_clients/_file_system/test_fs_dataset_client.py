@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -13,6 +12,7 @@ from crawlee.storage_clients import FileSystemStorageClient
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+    from pathlib import Path
 
     from crawlee.storage_clients._file_system import FileSystemDatasetClient
 
@@ -37,16 +37,16 @@ async def test_file_and_directory_creation(configuration: Configuration) -> None
     client = await FileSystemStorageClient().create_dataset_client(name='new-dataset', configuration=configuration)
 
     # Verify files were created
-    assert client.path_to_dataset.exists()
-    assert client.path_to_metadata.exists()
+    assert await client.path_to_dataset.exists()
+    assert await client.path_to_metadata.exists()
 
     # Verify metadata file structure
-    with client.path_to_metadata.open() as f:
-        metadata = json.load(f)
-        client_metadata = await client.get_metadata()
-        assert metadata['id'] == client_metadata.id
-        assert metadata['name'] == 'new-dataset'
-        assert metadata['item_count'] == 0
+    metadata_content = await client.path_to_metadata.read_text(encoding='utf-8')
+    metadata = json.loads(metadata_content)
+    client_metadata = await client.get_metadata()
+    assert metadata['id'] == client_metadata.id
+    assert metadata['name'] == 'new-dataset'
+    assert metadata['item_count'] == 0
 
     await client.drop()
 
@@ -57,22 +57,22 @@ async def test_file_persistence_and_content_verification(dataset_client: FileSys
     await dataset_client.push_data(item)
 
     # Verify files are created on disk
-    all_files = list(dataset_client.path_to_dataset.glob('*.json'))
+    all_files = [f async for f in dataset_client.path_to_dataset.glob('*.json')]
     assert len(all_files) == 2  # 1 data file + 1 metadata file
 
     # Verify actual file content
     data_files = [item for item in all_files if item.name != METADATA_FILENAME]
     assert len(data_files) == 1
 
-    with Path(data_files[0]).open() as f:
-        saved_item = json.load(f)
-        assert saved_item == item
+    file_content = await data_files[0].read_text(encoding='utf-8')
+    saved_item = json.loads(file_content)
+    assert saved_item == item
 
     # Test multiple items file creation
     items = [{'id': 1, 'name': 'Item 1'}, {'id': 2, 'name': 'Item 2'}, {'id': 3, 'name': 'Item 3'}]
     await dataset_client.push_data(items)
 
-    all_files = list(dataset_client.path_to_dataset.glob('*.json'))
+    all_files = [f async for f in dataset_client.path_to_dataset.glob('*.json')]
     assert len(all_files) == 5  # 4 data files + 1 metadata file
 
     data_files = [f for f in all_files if f.name != METADATA_FILENAME]
@@ -83,12 +83,12 @@ async def test_drop_removes_files_from_disk(dataset_client: FileSystemDatasetCli
     """Test that dropping a dataset removes the entire dataset directory from disk."""
     await dataset_client.push_data({'test': 'data'})
 
-    assert dataset_client.path_to_dataset.exists()
+    assert await dataset_client.path_to_dataset.exists()
 
     # Drop the dataset
     await dataset_client.drop()
 
-    assert not dataset_client.path_to_dataset.exists()
+    assert not await dataset_client.path_to_dataset.exists()
 
 
 async def test_metadata_file_updates(dataset_client: FileSystemDatasetClient) -> None:
@@ -126,9 +126,9 @@ async def test_metadata_file_updates(dataset_client: FileSystemDatasetClient) ->
     assert metadata.accessed_at > accessed_after_get
 
     # Verify metadata file is updated on disk
-    with dataset_client.path_to_metadata.open() as f:
-        metadata_json = json.load(f)
-        assert metadata_json['item_count'] == 1
+    metadata_content = await dataset_client.path_to_metadata.read_text(encoding='utf-8')
+    metadata_json = json.loads(metadata_content)
+    assert metadata_json['item_count'] == 1
 
 
 async def test_data_persistence_across_reopens() -> None:

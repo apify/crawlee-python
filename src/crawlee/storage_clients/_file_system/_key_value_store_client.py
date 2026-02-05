@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import functools
 import json
 import shutil
 import urllib.parse
@@ -10,6 +8,8 @@ from logging import getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import anyio
+from anyio.to_thread import run_sync
 from pydantic import ValidationError
 from typing_extensions import Self, override
 
@@ -57,8 +57,8 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         self,
         *,
         metadata: KeyValueStoreMetadata,
-        path_to_kvs: Path,
-        lock: asyncio.Lock,
+        path_to_kvs: anyio.Path,
+        lock: anyio.Lock,
     ) -> None:
         """Initialize a new instance.
 
@@ -77,12 +77,12 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         return self._metadata
 
     @property
-    def path_to_kvs(self) -> Path:
+    def path_to_kvs(self) -> anyio.Path:
         """The full path to the key-value store directory."""
         return self._path_to_kvs
 
     @property
-    def path_to_metadata(self) -> Path:
+    def path_to_metadata(self) -> anyio.Path:
         """The full path to the key-value store metadata file."""
         return self.path_to_kvs / METADATA_FILENAME
 
@@ -117,38 +117,35 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         # Validate input parameters.
         raise_if_too_many_kwargs(id=id, name=name, alias=alias)
 
-        kvs_base_path = Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
+        kvs_base_path = anyio.Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
 
-        if not kvs_base_path.exists():
-            await asyncio.to_thread(kvs_base_path.mkdir, parents=True, exist_ok=True)
+        if not await kvs_base_path.exists():
+            await kvs_base_path.mkdir(parents=True, exist_ok=True)
 
         # Get a new instance by ID.
         if id:
             found = False
-            for kvs_dir in kvs_base_path.iterdir():
-                if not kvs_dir.is_dir():
+            async for kvs_dir in kvs_base_path.iterdir():
+                if not await kvs_dir.is_dir():
                     continue
 
                 path_to_metadata = kvs_dir / METADATA_FILENAME
-                if not path_to_metadata.exists():
+                if not await path_to_metadata.exists():
                     continue
 
                 try:
-                    file = await asyncio.to_thread(path_to_metadata.open, mode='r', encoding='utf-8')
-                    try:
-                        file_content = json.load(file)
-                        metadata = KeyValueStoreMetadata(**file_content)
-                        if metadata.id == id:
-                            client = cls(
-                                metadata=metadata,
-                                path_to_kvs=kvs_base_path / kvs_dir,
-                                lock=asyncio.Lock(),
-                            )
-                            await client._update_metadata(update_accessed_at=True)
-                            found = True
-                            break
-                    finally:
-                        await asyncio.to_thread(file.close)
+                    file_content_raw = await path_to_metadata.read_text(encoding='utf-8')
+                    file_content = json.loads(file_content_raw)
+                    metadata = KeyValueStoreMetadata(**file_content)
+                    if metadata.id == id:
+                        client = cls(
+                            metadata=metadata,
+                            path_to_kvs=kvs_base_path / kvs_dir.name,
+                            lock=anyio.Lock(),
+                        )
+                        await client._update_metadata(update_accessed_at=True)
+                        found = True
+                        break
                 except (json.JSONDecodeError, ValidationError):
                     continue
 
@@ -157,17 +154,14 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         # Get a new instance by name or alias.
         else:
-            kvs_dir = Path(name) if name else Path(alias) if alias else Path('default')
-            path_to_kvs = kvs_base_path / kvs_dir
+            kvs_dir_name = name or alias or 'default'
+            path_to_kvs = kvs_base_path / kvs_dir_name
             path_to_metadata = path_to_kvs / METADATA_FILENAME
 
             # If the key-value store directory exists, reconstruct the client from the metadata file.
-            if path_to_kvs.exists() and path_to_metadata.exists():
-                file = await asyncio.to_thread(path_to_metadata.open, mode='r', encoding='utf-8')
-                try:
-                    file_content = json.load(file)
-                finally:
-                    await asyncio.to_thread(file.close)
+            if await path_to_kvs.exists() and await path_to_metadata.exists():
+                file_content_raw = await path_to_metadata.read_text(encoding='utf-8')
+                file_content = json.loads(file_content_raw)
                 try:
                     metadata = KeyValueStoreMetadata(**file_content)
                 except ValidationError as exc:
@@ -176,7 +170,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                 client = cls(
                     metadata=metadata,
                     path_to_kvs=path_to_kvs,
-                    lock=asyncio.Lock(),
+                    lock=anyio.Lock(),
                 )
 
                 await client._update_metadata(update_accessed_at=True)
@@ -194,7 +188,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                 client = cls(
                     metadata=metadata,
                     path_to_kvs=path_to_kvs,
-                    lock=asyncio.Lock(),
+                    lock=anyio.Lock(),
                 )
                 await client._update_metadata()
 
@@ -203,17 +197,17 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
     @override
     async def drop(self) -> None:
         # If the client directory exists, remove it recursively.
-        if self.path_to_kvs.exists():
+        if await self.path_to_kvs.exists():
             async with self._lock:
-                await asyncio.to_thread(shutil.rmtree, self.path_to_kvs)
+                await run_sync(shutil.rmtree, self.path_to_kvs)
 
     @override
     async def purge(self) -> None:
         async with self._lock:
-            for file_path in self.path_to_kvs.glob('*'):
+            async for file_path in self.path_to_kvs.glob('*'):
                 if file_path.name == METADATA_FILENAME:
                     continue
-                await asyncio.to_thread(file_path.unlink, missing_ok=True)
+                await file_path.unlink(missing_ok=True)
 
             await self._update_metadata(
                 update_accessed_at=True,
@@ -228,32 +222,28 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         record_path = self.path_to_kvs / self._encode_key(key)
 
-        if not record_path.exists():
+        if not await record_path.exists():
             return None
 
         # Found a file for this key, now look for its metadata
         record_metadata_filepath = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
-        if not record_metadata_filepath.exists():
+        if not await record_metadata_filepath.exists():
             logger.warning(f'Found value file for key "{key}" but no metadata file.')
             return None
 
         # Read the metadata file
         async with self._lock:
             try:
-                file = await asyncio.to_thread(
-                    functools.partial(record_metadata_filepath.open, mode='r', encoding='utf-8'),
-                )
+                metadata_content_raw = await record_metadata_filepath.read_text(encoding='utf-8')
             except FileNotFoundError:
                 logger.warning(f'Metadata file disappeared for key "{key}", aborting get_value')
                 return None
 
             try:
-                metadata_content = json.load(file)
+                metadata_content = json.loads(metadata_content_raw)
             except json.JSONDecodeError:
                 logger.warning(f'Invalid metadata file for key "{key}"')
                 return None
-            finally:
-                await asyncio.to_thread(file.close)
 
         try:
             metadata = KeyValueStoreRecordMetadata(**metadata_content)
@@ -263,7 +253,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         # Read the actual value
         try:
-            value_bytes = await asyncio.to_thread(record_path.read_bytes)
+            value_bytes = await record_path.read_bytes()
         except FileNotFoundError:
             logger.warning(f'Value file disappeared for key "{key}"')
             return None
@@ -329,13 +319,13 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         async with self._lock:
             # Ensure the key-value store directory exists.
-            await asyncio.to_thread(self.path_to_kvs.mkdir, parents=True, exist_ok=True)
+            await self.path_to_kvs.mkdir(parents=True, exist_ok=True)
 
             # Write the value to the file.
-            await atomic_write(record_path, value_bytes)
+            await atomic_write(Path(record_path), value_bytes)
 
             # Write the record metadata to the file.
-            await atomic_write(record_metadata_filepath, record_metadata_content)
+            await atomic_write(Path(record_metadata_filepath), record_metadata_content)
 
             # Update the KVS metadata to record the access and modification.
             await self._update_metadata(update_accessed_at=True, update_modified_at=True)
@@ -348,12 +338,12 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         async with self._lock:
             # Delete the value file and its metadata if found
-            if record_path.exists():
-                await asyncio.to_thread(record_path.unlink, missing_ok=True)
+            if await record_path.exists():
+                await record_path.unlink(missing_ok=True)
 
                 # Delete the metadata file if it exists
-                if metadata_path.exists():
-                    await asyncio.to_thread(metadata_path.unlink, missing_ok=True)
+                if await metadata_path.exists():
+                    await metadata_path.unlink(missing_ok=True)
                 else:
                     logger.warning(f'Found value file for key "{key}" but no metadata file when trying to delete it.')
 
@@ -371,12 +361,13 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         limit: int | None = None,
     ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
         # Check if the KVS directory exists
-        if not self.path_to_kvs.exists():
+        if not await self.path_to_kvs.exists():
             return
 
         # List and sort all files *inside* a brief lock, then release it immediately:
         async with self._lock:
-            files = sorted(await asyncio.to_thread(lambda: list(self.path_to_kvs.glob('*'))))
+            files: list[anyio.Path] = [f async for f in self.path_to_kvs.glob('*')]
+            files.sort(key=lambda f: f.name)
 
         count = 0
 
@@ -398,7 +389,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
             # Try to read and parse the metadata file
             try:
-                metadata_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
+                metadata_content = await file_path.read_text(encoding='utf-8')
             except FileNotFoundError:
                 logger.warning(f'Metadata file disappeared for key "{key_name}", skipping it.')
                 continue
@@ -413,6 +404,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                 record_metadata = KeyValueStoreRecordMetadata(**metadata_dict)
             except ValidationError:
                 logger.warning(f'Invalid metadata schema for key "{key_name}", skipping it.')
+                continue
 
             yield record_metadata
 
@@ -435,7 +427,8 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             A file:// URL pointing to the file on the local filesystem.
         """
         record_path = self.path_to_kvs / self._encode_key(key)
-        absolute_path = record_path.absolute()
+        # Use absolute() from anyio.Path and convert to URI
+        absolute_path = await record_path.absolute()
         return absolute_path.as_uri()
 
     @override
@@ -456,7 +449,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         record_metadata_filepath = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
 
         # Both the value file and metadata file must exist for a record to be considered existing
-        return record_path.exists() and record_metadata_filepath.exists()
+        return await record_path.exists() and await record_metadata_filepath.exists()
 
     async def _update_metadata(
         self,
@@ -478,11 +471,11 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             self._metadata.modified_at = now
 
         # Ensure the parent directory for the metadata file exists.
-        await asyncio.to_thread(self.path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
+        await self.path_to_metadata.parent.mkdir(parents=True, exist_ok=True)
 
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump())
-        await atomic_write(self.path_to_metadata, data)
+        await atomic_write(Path(self.path_to_metadata), data)
 
     def _encode_key(self, key: str) -> str:
         """Encode a key to make it safe for use in a file path."""

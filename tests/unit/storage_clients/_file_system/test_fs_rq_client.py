@@ -39,14 +39,14 @@ async def test_file_and_directory_creation() -> None:
     client = await FileSystemStorageClient().create_rq_client(name='new-request-queue')
 
     # Verify files were created
-    assert client.path_to_rq.exists()
-    assert client.path_to_metadata.exists()
+    assert await client.path_to_rq.exists()
+    assert await client.path_to_metadata.exists()
 
     # Verify metadata file structure
-    with client.path_to_metadata.open() as f:
-        metadata = json.load(f)
-        assert metadata['id'] == (await client.get_metadata()).id
-        assert metadata['name'] == 'new-request-queue'
+    metadata_content = await client.path_to_metadata.read_text(encoding='utf-8')
+    metadata = json.loads(metadata_content)
+    assert metadata['id'] == (await client.get_metadata()).id
+    assert metadata['name'] == 'new-request-queue'
 
     await client.drop()
 
@@ -62,20 +62,23 @@ async def test_request_file_persistence(rq_client: FileSystemRequestQueueClient)
     await rq_client.add_batch_of_requests(requests)
 
     # Verify request files are created
-    request_files = list(rq_client.path_to_rq.glob('*.json'))
+    request_files = [f async for f in rq_client.path_to_rq.glob('*.json')]
     # Should have 3 request files + 1 metadata file
     assert len(request_files) == 4
-    assert rq_client.path_to_metadata in request_files
+
+    # Find metadata file by name
+    metadata_files = [f for f in request_files if f.name == rq_client.path_to_metadata.name]
+    assert len(metadata_files) == 1
 
     # Verify actual request file content
-    data_files = [f for f in request_files if f != rq_client.path_to_metadata]
+    data_files = [f for f in request_files if f.name != rq_client.path_to_metadata.name]
     assert len(data_files) == 3
 
     for req_file in data_files:
-        with req_file.open() as f:
-            request_data = json.load(f)
-            assert 'url' in request_data
-            assert request_data['url'].startswith('https://example.com/')
+        request_content = await req_file.read_text(encoding='utf-8')
+        request_data = json.loads(request_content)
+        assert 'url' in request_data
+        assert request_data['url'].startswith('https://example.com/')
 
 
 async def test_opening_rq_does_not_have_side_effect_on_service_locator(configuration: Configuration) -> None:
@@ -91,12 +94,12 @@ async def test_drop_removes_directory(rq_client: FileSystemRequestQueueClient) -
     await rq_client.add_batch_of_requests([Request.from_url('https://example.com')])
 
     rq_path = rq_client.path_to_rq
-    assert rq_path.exists()
+    assert await rq_path.exists()
 
     # Drop the request queue
     await rq_client.drop()
 
-    assert not rq_path.exists()
+    assert not await rq_path.exists()
 
 
 async def test_metadata_file_updates(rq_client: FileSystemRequestQueueClient) -> None:
@@ -134,9 +137,9 @@ async def test_metadata_file_updates(rq_client: FileSystemRequestQueueClient) ->
     assert metadata.accessed_at > accessed_after_read
 
     # Verify metadata file is updated on disk
-    with rq_client.path_to_metadata.open() as f:
-        metadata_json = json.load(f)
-        assert metadata_json['total_request_count'] == 1
+    metadata_content = await rq_client.path_to_metadata.read_text(encoding='utf-8')
+    metadata_json = json.loads(metadata_content)
+    assert metadata_json['total_request_count'] == 1
 
 
 async def test_data_persistence_across_reopens() -> None:

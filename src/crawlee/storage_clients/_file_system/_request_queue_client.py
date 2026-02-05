@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import functools
 import json
 import shutil
 from collections import deque
@@ -11,6 +9,8 @@ from logging import getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import anyio
+from anyio.to_thread import run_sync
 from pydantic import BaseModel, ValidationError
 from typing_extensions import Self, override
 
@@ -92,8 +92,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self,
         *,
         metadata: RequestQueueMetadata,
-        path_to_rq: Path,
-        lock: asyncio.Lock,
+        path_to_rq: anyio.Path,
+        lock: anyio.Lock,
         recoverable_state: RecoverableState[RequestQueueState],
     ) -> None:
         """Initialize a new instance.
@@ -125,12 +125,12 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         return self._metadata
 
     @property
-    def path_to_rq(self) -> Path:
+    def path_to_rq(self) -> anyio.Path:
         """The full path to the request queue directory."""
         return self._path_to_rq
 
     @property
-    def path_to_metadata(self) -> Path:
+    def path_to_metadata(self) -> anyio.Path:
         """The full path to the request queue metadata file."""
         return self.path_to_rq / METADATA_FILENAME
 
@@ -181,44 +181,39 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         # Validate input parameters.
         raise_if_too_many_kwargs(id=id, name=name, alias=alias)
 
-        rq_base_path = Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
+        rq_base_path = anyio.Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
 
-        if not rq_base_path.exists():
-            await asyncio.to_thread(rq_base_path.mkdir, parents=True, exist_ok=True)
+        if not await rq_base_path.exists():
+            await rq_base_path.mkdir(parents=True, exist_ok=True)
 
         # Open an existing RQ by its ID, raise an error if not found.
         if id:
             found = False
-            for rq_dir in rq_base_path.iterdir():
-                if not rq_dir.is_dir():
+            async for rq_dir in rq_base_path.iterdir():
+                if not await rq_dir.is_dir():
                     continue
 
                 path_to_metadata = rq_dir / METADATA_FILENAME
-                if not path_to_metadata.exists():
+                if not await path_to_metadata.exists():
                     continue
 
                 try:
-                    file = await asyncio.to_thread(path_to_metadata.open, mode='r', encoding='utf-8')
-                    try:
-                        file_content = json.load(file)
-                        metadata = RequestQueueMetadata(**file_content)
+                    file_content_raw = await path_to_metadata.read_text(encoding='utf-8')
+                    file_content = json.loads(file_content_raw)
+                    metadata = RequestQueueMetadata(**file_content)
 
-                        if metadata.id == id:
-                            client = cls(
-                                metadata=metadata,
-                                path_to_rq=rq_base_path / rq_dir,
-                                lock=asyncio.Lock(),
-                                recoverable_state=await cls._create_recoverable_state(
-                                    id=id, configuration=configuration
-                                ),
-                            )
-                            await client._state.initialize()
-                            await client._discover_existing_requests()
-                            await client._update_metadata(update_accessed_at=True)
-                            found = True
-                            break
-                    finally:
-                        await asyncio.to_thread(file.close)
+                    if metadata.id == id:
+                        client = cls(
+                            metadata=metadata,
+                            path_to_rq=rq_base_path / rq_dir.name,
+                            lock=anyio.Lock(),
+                            recoverable_state=await cls._create_recoverable_state(id=id, configuration=configuration),
+                        )
+                        await client._state.initialize()
+                        await client._discover_existing_requests()
+                        await client._update_metadata(update_accessed_at=True)
+                        found = True
+                        break
                 except (json.JSONDecodeError, ValidationError):
                     continue
 
@@ -227,17 +222,14 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         # Open an existing RQ by its name or alias, or create a new one if not found.
         else:
-            rq_dir = Path(name) if name else Path(alias) if alias else Path('default')
-            path_to_rq = rq_base_path / rq_dir
+            rq_dir_name = name or alias or 'default'
+            path_to_rq = rq_base_path / rq_dir_name
             path_to_metadata = path_to_rq / METADATA_FILENAME
 
             # If the RQ directory exists, reconstruct the client from the metadata file.
-            if path_to_rq.exists() and path_to_metadata.exists():
-                file = await asyncio.to_thread(path_to_metadata.open, encoding='utf-8')
-                try:
-                    file_content = json.load(file)
-                finally:
-                    await asyncio.to_thread(file.close)
+            if await path_to_rq.exists() and await path_to_metadata.exists():
+                file_content_raw = await path_to_metadata.read_text(encoding='utf-8')
+                file_content = json.loads(file_content_raw)
                 try:
                     metadata = RequestQueueMetadata(**file_content)
                 except ValidationError as exc:
@@ -246,7 +238,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 client = cls(
                     metadata=metadata,
                     path_to_rq=path_to_rq,
-                    lock=asyncio.Lock(),
+                    lock=anyio.Lock(),
                     recoverable_state=await cls._create_recoverable_state(id=metadata.id, configuration=configuration),
                 )
 
@@ -271,7 +263,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 client = cls(
                     metadata=metadata,
                     path_to_rq=path_to_rq,
-                    lock=asyncio.Lock(),
+                    lock=anyio.Lock(),
                     recoverable_state=await cls._create_recoverable_state(id=metadata.id, configuration=configuration),
                 )
                 await client._state.initialize()
@@ -283,8 +275,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     async def drop(self) -> None:
         async with self._lock:
             # Remove the RQ dir recursively if it exists.
-            if self.path_to_rq.exists():
-                await asyncio.to_thread(shutil.rmtree, self.path_to_rq)
+            if await self.path_to_rq.exists():
+                await run_sync(shutil.rmtree, self.path_to_rq)
 
             # Clear recoverable state
             await self._state.reset()
@@ -301,7 +293,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             request_files = await self._get_request_files(self.path_to_rq)
 
             for file_path in request_files:
-                await asyncio.to_thread(file_path.unlink, missing_ok=True)
+                await file_path.unlink(missing_ok=True)
 
             # Clear recoverable state
             await self._state.reset()
@@ -383,7 +375,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
                     # Save the clean request without extra fields
                     request_data = await json_dumps(request.model_dump())
-                    await atomic_write(request_path, request_data)
+                    await atomic_write(Path(request_path), request_data)
 
                     # Update the metadata counts.
                     new_total_request_count += 1
@@ -498,12 +490,12 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             # Dump the updated request to the file.
             request_path = self._get_request_path(request.unique_key)
 
-            if not await asyncio.to_thread(request_path.exists):
+            if not await request_path.exists():
                 logger.warning(f'Request file for {request.unique_key} does not exist, cannot mark as handled.')
                 return None
 
             request_data = await json_dumps(request.model_dump())
-            await atomic_write(request_path, request_data)
+            await atomic_write(Path(request_path), request_data)
 
             # Update state: remove from in-progress and add to handled.
             state.in_progress_requests.discard(request.unique_key)
@@ -541,7 +533,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             request_path = self._get_request_path(request.unique_key)
 
-            if not await asyncio.to_thread(request_path.exists):
+            if not await request_path.exists():
                 logger.warning(f'Request file for {request.unique_key} does not exist, cannot reclaim.')
                 return None
 
@@ -561,7 +553,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             # Save the clean request without extra fields
             request_data = await json_dumps(request.model_dump())
-            await atomic_write(request_path, request_data)
+            await atomic_write(Path(request_path), request_data)
 
             # Remove from in-progress.
             state.in_progress_requests.discard(request.unique_key)
@@ -621,7 +613,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             self._is_empty_cache = True
             return True
 
-    def _get_request_path(self, unique_key: str) -> Path:
+    def _get_request_path(self, unique_key: str) -> anyio.Path:
         """Get the path to a specific request file.
 
         Args:
@@ -676,11 +668,11 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             self._metadata.had_multiple_clients = True
 
         # Ensure the parent directory for the metadata file exists.
-        await asyncio.to_thread(self.path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
+        await self.path_to_metadata.parent.mkdir(parents=True, exist_ok=True)
 
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump())
-        await atomic_write(self.path_to_metadata, data)
+        await atomic_write(Path(self.path_to_metadata), data)
 
     async def _refresh_cache(self) -> None:
         """Refresh the request cache from filesystem.
@@ -744,7 +736,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self._request_cache_needs_refresh = False
 
     @classmethod
-    async def _get_request_files(cls, path_to_rq: Path) -> list[Path]:
+    async def _get_request_files(cls, path_to_rq: anyio.Path) -> list[anyio.Path]:
         """Get all request files from the RQ.
 
         Args:
@@ -754,18 +746,25 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             A list of paths to all request files.
         """
         # Create the requests directory if it doesn't exist.
-        await asyncio.to_thread(path_to_rq.mkdir, parents=True, exist_ok=True)
+        await path_to_rq.mkdir(parents=True, exist_ok=True)
 
         # List all the json files.
-        files = list(await asyncio.to_thread(path_to_rq.glob, '*.json'))
+        files: list[anyio.Path] = [f async for f in path_to_rq.glob('*.json')]
 
         # Filter out metadata file and non-file entries.
-        filtered = filter(lambda request_file: request_file.is_file() and request_file.name != METADATA_FILENAME, files)
+        filtered: list[anyio.Path] = [request_file for request_file in files if request_file.name != METADATA_FILENAME]
 
-        return list(filtered)
+        # We need to check is_file() asynchronously, so filter again.
+        # Cannot use list comprehension here because is_file() is async.
+        result: list[anyio.Path] = []
+        for request_file in filtered:
+            if await request_file.is_file():
+                result.append(request_file)  # noqa: PERF401
+
+        return result
 
     @classmethod
-    async def _parse_request_file(cls, file_path: Path) -> Request | None:
+    async def _parse_request_file(cls, file_path: anyio.Path) -> Request | None:
         """Parse a request file and return the `Request` object.
 
         Args:
@@ -774,21 +773,19 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         Returns:
             The parsed `Request` object or `None` if the file could not be read or parsed.
         """
-        # Open the request file.
+        # Read the file content.
         try:
-            file = await asyncio.to_thread(functools.partial(file_path.open, mode='r', encoding='utf-8'))
+            file_content_raw = await file_path.read_text(encoding='utf-8')
         except FileNotFoundError:
             logger.warning(f'Request file "{file_path}" not found.')
             return None
 
-        # Read the file content and parse it as JSON.
+        # Parse the content as JSON.
         try:
-            file_content = json.load(file)
+            file_content = json.loads(file_content_raw)
         except json.JSONDecodeError as exc:
             logger.warning(f'Failed to parse request file {file_path}: {exc!s}')
             return None
-        finally:
-            await asyncio.to_thread(file.close)
 
         # Validate the content against the Request model.
         try:

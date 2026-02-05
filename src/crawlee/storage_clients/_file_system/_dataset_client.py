@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import shutil
 from datetime import datetime, timezone
@@ -8,6 +7,8 @@ from logging import getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import anyio
+from anyio.to_thread import run_sync
 from pydantic import ValidationError
 from typing_extensions import Self, override
 
@@ -57,8 +58,8 @@ class FileSystemDatasetClient(DatasetClient):
         self,
         *,
         metadata: DatasetMetadata,
-        path_to_dataset: Path,
-        lock: asyncio.Lock,
+        path_to_dataset: anyio.Path,
+        lock: anyio.Lock,
     ) -> None:
         """Initialize a new instance.
 
@@ -77,12 +78,12 @@ class FileSystemDatasetClient(DatasetClient):
         return self._metadata
 
     @property
-    def path_to_dataset(self) -> Path:
+    def path_to_dataset(self) -> anyio.Path:
         """The full path to the dataset directory."""
         return self._path_to_dataset
 
     @property
-    def path_to_metadata(self) -> Path:
+    def path_to_metadata(self) -> anyio.Path:
         """The full path to the dataset metadata file."""
         return self.path_to_dataset / METADATA_FILENAME
 
@@ -117,38 +118,35 @@ class FileSystemDatasetClient(DatasetClient):
         # Validate input parameters.
         raise_if_too_many_kwargs(id=id, name=name, alias=alias)
 
-        dataset_base_path = Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
+        dataset_base_path = anyio.Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
 
-        if not dataset_base_path.exists():
-            await asyncio.to_thread(dataset_base_path.mkdir, parents=True, exist_ok=True)
+        if not await dataset_base_path.exists():
+            await dataset_base_path.mkdir(parents=True, exist_ok=True)
 
         # Get a new instance by ID.
         if id:
             found = False
-            for dataset_dir in dataset_base_path.iterdir():
-                if not dataset_dir.is_dir():
+            async for dataset_dir in dataset_base_path.iterdir():
+                if not await dataset_dir.is_dir():
                     continue
 
                 path_to_metadata = dataset_dir / METADATA_FILENAME
-                if not path_to_metadata.exists():
+                if not await path_to_metadata.exists():
                     continue
 
                 try:
-                    file = await asyncio.to_thread(path_to_metadata.open, mode='r', encoding='utf-8')
-                    try:
-                        file_content = json.load(file)
-                        metadata = DatasetMetadata(**file_content)
-                        if metadata.id == id:
-                            client = cls(
-                                metadata=metadata,
-                                path_to_dataset=dataset_base_path / dataset_dir,
-                                lock=asyncio.Lock(),
-                            )
-                            await client._update_metadata(update_accessed_at=True)
-                            found = True
-                            break
-                    finally:
-                        await asyncio.to_thread(file.close)
+                    file_content_raw = await path_to_metadata.read_text(encoding='utf-8')
+                    file_content = json.loads(file_content_raw)
+                    metadata = DatasetMetadata(**file_content)
+                    if metadata.id == id:
+                        client = cls(
+                            metadata=metadata,
+                            path_to_dataset=dataset_base_path / dataset_dir.name,
+                            lock=anyio.Lock(),
+                        )
+                        await client._update_metadata(update_accessed_at=True)
+                        found = True
+                        break
                 except (json.JSONDecodeError, ValidationError):
                     continue
 
@@ -157,17 +155,14 @@ class FileSystemDatasetClient(DatasetClient):
 
         # Get a new instance by name or alias.
         else:
-            dataset_dir = Path(name) if name else Path(alias) if alias else Path('default')
-            path_to_dataset = dataset_base_path / dataset_dir
+            dataset_dir_name = name or alias or 'default'
+            path_to_dataset = dataset_base_path / dataset_dir_name
             path_to_metadata = path_to_dataset / METADATA_FILENAME
 
             # If the dataset directory exists, reconstruct the client from the metadata file.
-            if path_to_dataset.exists() and path_to_metadata.exists():
-                file = await asyncio.to_thread(path_to_metadata.open, mode='r', encoding='utf-8')
-                try:
-                    file_content = json.load(file)
-                finally:
-                    await asyncio.to_thread(file.close)
+            if await path_to_dataset.exists() and await path_to_metadata.exists():
+                file_content_raw = await path_to_metadata.read_text(encoding='utf-8')
+                file_content = json.loads(file_content_raw)
                 try:
                     metadata = DatasetMetadata(**file_content)
                 except ValidationError as exc:
@@ -176,7 +171,7 @@ class FileSystemDatasetClient(DatasetClient):
                 client = cls(
                     metadata=metadata,
                     path_to_dataset=path_to_dataset,
-                    lock=asyncio.Lock(),
+                    lock=anyio.Lock(),
                 )
 
                 await client._update_metadata(update_accessed_at=True)
@@ -195,7 +190,7 @@ class FileSystemDatasetClient(DatasetClient):
                 client = cls(
                     metadata=metadata,
                     path_to_dataset=path_to_dataset,
-                    lock=asyncio.Lock(),
+                    lock=anyio.Lock(),
                 )
                 await client._update_metadata()
 
@@ -204,14 +199,14 @@ class FileSystemDatasetClient(DatasetClient):
     @override
     async def drop(self) -> None:
         async with self._lock:
-            if self.path_to_dataset.exists():
-                await asyncio.to_thread(shutil.rmtree, self.path_to_dataset)
+            if await self.path_to_dataset.exists():
+                await run_sync(shutil.rmtree, self.path_to_dataset)
 
     @override
     async def purge(self) -> None:
         async with self._lock:
             for file_path in await self._get_sorted_data_files():
-                await asyncio.to_thread(file_path.unlink, missing_ok=True)
+                await file_path.unlink(missing_ok=True)
 
             await self._update_metadata(
                 update_accessed_at=True,
@@ -273,7 +268,7 @@ class FileSystemDatasetClient(DatasetClient):
             )
 
         # If the dataset directory does not exist, log a warning and return an empty page.
-        if not self.path_to_dataset.exists():
+        if not await self.path_to_dataset.exists():
             logger.warning(f'Dataset directory not found: {self.path_to_dataset}')
             return DatasetItemsListPage(
                 count=0,
@@ -307,7 +302,7 @@ class FileSystemDatasetClient(DatasetClient):
         items = list[dict[str, Any]]()
         for file_path in selected_files:
             try:
-                file_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
+                file_content = await file_path.read_text(encoding='utf-8')
             except FileNotFoundError:
                 logger.warning(f'File disappeared during iterate_items(): {file_path}, skipping')
                 continue
@@ -368,7 +363,7 @@ class FileSystemDatasetClient(DatasetClient):
             )
 
         # If the dataset directory does not exist, log a warning and return immediately.
-        if not self.path_to_dataset.exists():
+        if not await self.path_to_dataset.exists():
             logger.warning(f'Dataset directory not found: {self.path_to_dataset}')
             return
 
@@ -391,7 +386,7 @@ class FileSystemDatasetClient(DatasetClient):
         # Iterate over each data file, reading and yielding its parsed content.
         for file_path in selected_files:
             try:
-                file_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
+                file_content = await file_path.read_text(encoding='utf-8')
             except FileNotFoundError:
                 logger.warning(f'File disappeared during iterate_items(): {file_path}, skipping')
                 continue
@@ -435,11 +430,11 @@ class FileSystemDatasetClient(DatasetClient):
             self._metadata.item_count = new_item_count
 
         # Ensure the parent directory for the metadata file exists.
-        await asyncio.to_thread(self.path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
+        await self.path_to_metadata.parent.mkdir(parents=True, exist_ok=True)
 
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump())
-        await atomic_write(self.path_to_metadata, data)
+        await atomic_write(Path(self.path_to_metadata), data)
 
     async def _push_item(self, item: dict[str, Any], item_id: int) -> None:
         """Push a single item to the dataset.
@@ -456,31 +451,26 @@ class FileSystemDatasetClient(DatasetClient):
         file_path = self.path_to_dataset / filename
 
         # Ensure the dataset directory exists.
-        await asyncio.to_thread(self.path_to_dataset.mkdir, parents=True, exist_ok=True)
+        await self.path_to_dataset.mkdir(parents=True, exist_ok=True)
 
         # Dump the serialized item to the file.
         data = await json_dumps(item)
-        await atomic_write(file_path, data)
+        await atomic_write(Path(file_path), data)
 
-    async def _get_sorted_data_files(self) -> list[Path]:
+    async def _get_sorted_data_files(self) -> list[anyio.Path]:
         """Retrieve and return a sorted list of data files in the dataset directory.
 
         The files are sorted numerically based on the filename (without extension),
         which corresponds to the order items were added to the dataset.
 
         Returns:
-            A list of `Path` objects pointing to data files, sorted by numeric filename.
+            A list of `anyio.Path` objects pointing to data files, sorted by numeric filename.
         """
         # Retrieve and sort all JSON files in the dataset directory numerically.
-        files = await asyncio.to_thread(
-            lambda: sorted(
-                self.path_to_dataset.glob('*.json'),
-                key=lambda f: int(f.stem) if f.stem.isdigit() else 0,
-            )
-        )
+        files: list[anyio.Path] = [f async for f in self.path_to_dataset.glob('*.json')]
+
+        files.sort(key=lambda f: int(f.stem) if f.stem.isdigit() else 0)
 
         # Remove the metadata file from the list if present.
-        if self.path_to_metadata in files:
-            files.remove(self.path_to_metadata)
-
-        return files
+        metadata_path = self.path_to_metadata
+        return [f for f in files if f.name != metadata_path.name]

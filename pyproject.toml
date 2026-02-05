@@ -34,6 +34,7 @@ keywords = [
     "scraping",
 ]
 dependencies = [
+    "anyio>=4.4.0",
     "async-timeout>=5.0.1",
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
@@ -98,7 +99,6 @@ crawlee = "crawlee._cli:cli"
 
 [dependency-groups]
 dev = [
-    "anyio<5.0.0",
     "apify_client", # For e2e tests.
     "build<2.0.0", # For e2e tests.
     "dycw-pytest-only<3.0.0",
