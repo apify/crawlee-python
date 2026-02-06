@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from datetime import timedelta
+from logging import getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -23,6 +23,9 @@ if TYPE_CHECKING:
     from types import TracebackType
 
     from sqlalchemy.ext.asyncio import AsyncSession
+
+
+logger = getLogger(__name__)
 
 
 @docs_group('Storage clients')
@@ -67,9 +70,6 @@ class SqlStorageClient(StorageClient):
         self._initialized = False
         self.session_maker: None | async_sessionmaker[AsyncSession] = None
 
-        # Minimum interval to reduce database load from frequent concurrent metadata updates
-        self._accessed_modified_update_interval = timedelta(seconds=1)
-
         # Flag needed to apply optimizations only for default database
         self._default_flag = self._engine is None and self._connection_string is None
         self._dialect_name: str | None = None
@@ -105,10 +105,6 @@ class SqlStorageClient(StorageClient):
         """Get the database dialect name."""
         return self._dialect_name
 
-    def get_accessed_modified_update_interval(self) -> timedelta:
-        """Get the interval for accessed and modified updates."""
-        return self._accessed_modified_update_interval
-
     async def initialize(self, configuration: Configuration) -> None:
         """Initialize the database schema.
 
@@ -139,9 +135,7 @@ class SqlStorageClient(StorageClient):
                         await conn.execute(text('PRAGMA mmap_size=268435456'))  # 256MB memory mapping
                         await conn.execute(text('PRAGMA foreign_keys=ON'))  # Enforce constraints
                         await conn.execute(text('PRAGMA busy_timeout=30000'))  # 30s busy timeout
-
                     await conn.run_sync(Base.metadata.create_all, checkfirst=True)
-
                     from crawlee import __version__  # Noqa: PLC0415
 
                     db_version = (await conn.execute(select(VersionDb))).scalar_one_or_none()
@@ -157,7 +151,6 @@ class SqlStorageClient(StorageClient):
                         )
                     elif not db_version:
                         await conn.execute(insert(VersionDb).values(version=__version__))
-
                 except (IntegrityError, OperationalError):
                     await conn.rollback()
 
@@ -273,7 +266,7 @@ class SqlStorageClient(StorageClient):
             future=True,
             pool_size=5,
             max_overflow=10,
-            pool_timeout=30,
+            pool_timeout=60,
             pool_recycle=600,
             pool_pre_ping=True,
             echo=False,
