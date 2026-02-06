@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from crawlee._utils.recurring_task import RecurringTask
+from tests.unit.utils import run_alone_on_mac
 
 
 @pytest.fixture
@@ -41,6 +42,7 @@ async def test_start_and_stop(function: AsyncMock, delay: timedelta) -> None:
     assert rt.task.done()
 
 
+@run_alone_on_mac
 async def test_execution(function: AsyncMock, delay: timedelta) -> None:
     task = RecurringTask(function, delay)
 

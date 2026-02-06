@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee.browsers import BrowserPool, PlaywrightBrowserPlugin
+from tests.unit.utils import run_alone_on_mac
 
 if TYPE_CHECKING:
     from yarl import URL
@@ -92,6 +93,7 @@ async def test_new_page_with_each_plugin(server_url: URL) -> None:
         assert browser_pool.total_pages_count == 2
 
 
+@run_alone_on_mac
 async def test_with_default_plugin_constructor(server_url: URL) -> None:
     async with BrowserPool.with_default_plugin(headless=True, browser_type='firefox') as browser_pool:
         assert len(browser_pool.plugins) == 1
