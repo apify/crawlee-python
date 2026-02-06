@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from crawlee._utils.byte_size import ByteSize
-
+from crawlee._utils.byte_size import ByteSize, Ratio
+from crawlee._utils.system import get_memory_info
 
 SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD = 0.97
 
@@ -97,8 +95,12 @@ class MemorySnapshot:
     system_wide_used_size: ByteSize | None
     """Memory usage of all processes, system-wide."""
 
-    max_memory_size: ByteSize
-    """The maximum memory that can be used by `AutoscaledPool`."""
+    max_memory_size: ByteSize | Ratio
+    """The maximum memory that can be used by `AutoscaledPool`.
+
+    When of type `ByteSize` then it is used as fixed memory size. When of type `Ratio` then it allows for dynamic memory
+    scaling based on the available system memory.
+    """
 
     system_wide_memory_size: ByteSize | None
     """Total memory available in the whole system."""
@@ -117,7 +119,15 @@ class MemorySnapshot:
             if system_wide_utilization > SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD:
                 return True
 
-        return (self.current_size / self.max_memory_size) > self.max_used_memory_ratio
+        if isinstance(self.max_memory_size, Ratio):
+            # The snapshot overload is decided not when the snapshot was taken, but when `is_overload` property is
+            # accessed. This allows for dynamic memory scaling. The same memory snapshot that used to be overloaded in
+            # the past can become non-overloaded if the available memory was increased.
+            max_memory_size = ByteSize(int(get_memory_info().total_size.bytes * self.max_memory_size.value))
+        else:
+            max_memory_size = self.max_memory_size
+
+        return (self.current_size / max_memory_size) > self.max_used_memory_ratio
 
 
 @dataclass
