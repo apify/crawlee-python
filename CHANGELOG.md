@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.3.2 - **not yet released**
+## [1.3.2](https://github.com/apify/crawlee-python/releases/tag/v1.3.2) (2026-02-09)
 
 ### 🐛 Bug Fixes
 
@@ -13,7 +12,6 @@ All notable changes to this project will be documented in this file.
 - Respect `max_open_pages_per_browser` limit for `PlaywrightBrowserController` on concurrent `new_page` calls ([#1712](https://github.com/apify/crawlee-python/pull/1712)) ([2e5534b](https://github.com/apify/crawlee-python/commit/2e5534b98913d5cbd6b721b2423d063772024417)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.3.1](https://github.com/apify/crawlee-python/releases/tag/v1.3.1) (2026-01-30)
 
 ### 🐛 Bug Fixes
