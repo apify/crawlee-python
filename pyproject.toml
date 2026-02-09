@@ -306,11 +306,7 @@ uv run pytest \
 """
 
 [tool.poe.tasks.e2e-templates-tests]
-shell = """
-uv run pytest \
-    --numprocesses=${TESTS_CONCURRENCY:-auto} \
-    tests/e2e/project_template
-"""
+cmd = "uv run pytest --numprocesses=${TESTS_CONCURRENCY:-auto} tests/e2e/project_template"
 
 [tool.poe.tasks.build-docs]
 shell = "./build_api_reference.sh && corepack enable && yarn && yarn build"
