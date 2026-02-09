@@ -61,6 +61,6 @@ jobs:
         run: uv run poe install-sync
 
       - name: Run templates end-to-end tests
-        run: uv run poe e2e-templates-tests -- -m "${{ matrix.http-client }} and ${{ matrix.crawler-type }} and ${{ matrix.package-manager }}"
+        run: uv run poe e2e-templates-tests -m "${{ matrix.http-client }} and ${{ matrix.crawler-type }} and ${{ matrix.package-manager }}"
         env:
           APIFY_TEST_USER_API_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
