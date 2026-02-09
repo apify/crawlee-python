@@ -306,7 +306,7 @@ uv run pytest \
 """
 
 [tool.poe.tasks.e2e-templates-tests]
-cmd = """
+shell = """
 uv run pytest \
     --numprocesses=${TESTS_CONCURRENCY:-auto} \
     tests/e2e/project_template
