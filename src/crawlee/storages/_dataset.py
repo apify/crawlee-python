@@ -53,7 +53,7 @@ class Dataset(Storage):
     from crawlee.storages import Dataset
 
     # Open a dataset
-    dataset = await Dataset.open(name='my_dataset')
+    dataset = await Dataset.open(name='my-dataset')
 
     # Add data
     await dataset.push_data({'title': 'Example Product', 'price': 99.99})
