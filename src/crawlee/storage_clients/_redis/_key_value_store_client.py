@@ -237,6 +237,8 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
         # Yield metadata for each key
         for key in keys:
             record = items_data[key]
+            if not isinstance(record, (str, bytes)):
+                raise TypeError(f'Expected str or bytes, got {type(record)}')
             yield KeyValueStoreRecordMetadata.model_validate_json(record)
 
         async with self._get_pipeline() as pipe:

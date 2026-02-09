@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "crawlee"
-version = "1.3.1"
+version = "1.3.2"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = { file = "LICENSE" }
@@ -55,8 +55,8 @@ adaptive-crawler = [
     "jaro-winkler>=2.0.3",
     "playwright>=1.27.0",
     "scikit-learn>=1.6.0",
-    "apify_fingerprint_datapoints>=0.0.2",
-    "browserforge>=1.2.3"
+    "apify_fingerprint_datapoints>=0.0.3",
+    "browserforge>=1.2.4"
 ]
 beautifulsoup = ["beautifulsoup4[lxml]>=4.12.0", "html5lib>=1.0"]
 cli = ["cookiecutter>=2.6.0", "inquirer>=3.3.0", "rich>=13.9.0", "typer>=0.12.0"]
@@ -98,6 +98,7 @@ crawlee = "crawlee._cli:cli"
 
 [dependency-groups]
 dev = [
+    "anyio<5.0.0",
     "apify_client", # For e2e tests.
     "build<2.0.0", # For e2e tests.
     "dycw-pytest-only<3.0.0",
@@ -111,8 +112,8 @@ dev = [
     "pytest-rerunfailures<17.0.0",
     "pytest-timeout<3.0.0",
     "pytest-xdist<4.0.0",
-    "pytest<9.0.0",
-    "ruff~=0.14.0",
+    "pytest<10.0.0",
+    "ruff~=0.15.0",
     "setuptools", # setuptools are used by pytest, but not explicitly required
     "ty~=0.0.0",
     "types-beautifulsoup4<5.0.0",

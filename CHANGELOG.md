@@ -2,15 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.3.1 - **not yet released**
+## [1.3.2](https://github.com/apify/crawlee-python/releases/tag/v1.3.2) (2026-02-09)
+
+### 🐛 Bug Fixes
+
+- Use `max()` instead of `min()` for `request_max_duration` statistic ([#1701](https://github.com/apify/crawlee-python/pull/1701)) ([85c4335](https://github.com/apify/crawlee-python/commit/85c43351a05ada1369b720061f6f1a7e158340b6)) by [@vdusek](https://github.com/vdusek)
+- Prevent mutation of default URL patterns list in `block_requests` ([#1702](https://github.com/apify/crawlee-python/pull/1702)) ([fcf9adb](https://github.com/apify/crawlee-python/commit/fcf9adb6a0cfeaa87ca482372d4e066584eb28d6)) by [@vdusek](https://github.com/vdusek)
+- Keep None values for `user_data` in `Request` ([#1707](https://github.com/apify/crawlee-python/pull/1707)) ([3c575bc](https://github.com/apify/crawlee-python/commit/3c575bc2b0f1c89c99d134ad3a3fa7455ccc6910)) by [@Mantisus](https://github.com/Mantisus), closes [#1706](https://github.com/apify/crawlee-python/issues/1706)
+- Respect `max_open_pages_per_browser` limit for `PlaywrightBrowserController` on concurrent `new_page` calls ([#1712](https://github.com/apify/crawlee-python/pull/1712)) ([2e5534b](https://github.com/apify/crawlee-python/commit/2e5534b98913d5cbd6b721b2423d063772024417)) by [@Mantisus](https://github.com/Mantisus)
+
+
+## [1.3.1](https://github.com/apify/crawlee-python/releases/tag/v1.3.1) (2026-01-30)
 
 ### 🐛 Bug Fixes
 
 - Reset all counter in metadata with `purge` for `RequestQueue` ([#1686](https://github.com/apify/crawlee-python/pull/1686)) ([ee09260](https://github.com/apify/crawlee-python/commit/ee0926084589f1b6e15840b6185ec5433be3b72f)) by [@Mantisus](https://github.com/Mantisus), closes [#1682](https://github.com/apify/crawlee-python/issues/1682)
+- Set default `http3=False` for `ImpitHttpClient` ([#1685](https://github.com/apify/crawlee-python/pull/1685)) ([3f390f6](https://github.com/apify/crawlee-python/commit/3f390f677540a3905038d7db6a6d1efad32fd045)) by [@Mantisus](https://github.com/Mantisus), closes [#1683](https://github.com/apify/crawlee-python/issues/1683)
+- Prevent get_request from permanently blocking requests ([#1684](https://github.com/apify/crawlee-python/pull/1684)) ([da416f9](https://github.com/apify/crawlee-python/commit/da416f98fb453904d62e7d29d8f24611ffb3ba8d)) by [@Mirza-Samad-Ahmed-Baig](https://github.com/Mirza-Samad-Ahmed-Baig)
+- Do not share state between different crawlers unless requested ([#1669](https://github.com/apify/crawlee-python/pull/1669)) ([64c246b](https://github.com/apify/crawlee-python/commit/64c246bedea14f86e607d23adc5bec644c578364)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1627](https://github.com/apify/crawlee-python/issues/1627)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.3.0](https://github.com/apify/crawlee-python/releases/tag/v1.3.0) (2026-01-20)
 
 ### 🚀 Features

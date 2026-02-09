@@ -88,8 +88,7 @@ async def block_requests(
         url_patterns: List of URL patterns to block. If None, uses default patterns.
         extra_url_patterns: Additional URL patterns to append to the main patterns list.
     """
-    url_patterns = url_patterns or _DEFAULT_BLOCK_REQUEST_URL_PATTERNS
-
+    url_patterns = list(url_patterns or _DEFAULT_BLOCK_REQUEST_URL_PATTERNS)
     url_patterns.extend(extra_url_patterns or [])
 
     browser_type = page.context.browser.browser_type.name if page.context.browser else 'undefined'

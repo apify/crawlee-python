@@ -213,6 +213,10 @@ class _BasicCrawlerOptions(TypedDict):
     """Allows overriding the default status message. The default status message is provided in the parameters.
     Returning `None` suppresses the status message."""
 
+    id: NotRequired[int]
+    """Identifier used for crawler state tracking. Use the same id across multiple crawlers to share state between
+    them."""
+
 
 class _BasicCrawlerOptionsGeneric(TypedDict, Generic[TCrawlingContext, TStatisticsState]):
     """Generic options the `BasicCrawler` constructor."""
@@ -266,6 +270,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
     _request_handler_timeout_text = 'Request handler timed out after'
+    __next_id = 0
 
     def __init__(
         self,
@@ -297,6 +302,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         status_message_logging_interval: timedelta = timedelta(seconds=10),
         status_message_callback: Callable[[StatisticsState, StatisticsState | None, str], Awaitable[str | None]]
         | None = None,
+        id: int | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -349,6 +355,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             status_message_logging_interval: Interval for logging the crawler status messages.
             status_message_callback: Allows overriding the default status message. The default status message is
                 provided in the parameters. Returning `None` suppresses the status message.
+            id: Identifier used for crawler state tracking. Use the same id across multiple crawlers to share state
+                between them.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -356,6 +364,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             _logger: A logger instance, typically provided by a subclass, for consistent logging labels.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
+        if id is None:
+            self._id = BasicCrawler.__next_id
+            BasicCrawler.__next_id += 1
+        else:
+            self._id = id
+
         implicit_event_manager_with_explicit_config = False
         if not configuration:
             configuration = service_locator.get_configuration()
@@ -831,7 +845,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         default_value: dict[str, JsonSerializable] | None = None,
     ) -> dict[str, JsonSerializable]:
         kvs = await self.get_key_value_store()
-        return await kvs.get_auto_saved_value(self._CRAWLEE_STATE_KEY, default_value)
+        return await kvs.get_auto_saved_value(f'{self._CRAWLEE_STATE_KEY}_{self._id}', default_value)
 
     async def _save_crawler_state(self) -> None:
         store = await self.get_key_value_store()
@@ -1372,7 +1386,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         request_manager = await self.get_request_manager()
 
         request = await wait_for(
-            lambda: request_manager.fetch_next_request(),
+            request_manager.fetch_next_request,
             timeout=self._internal_timeout,
             timeout_message=f'Fetching next request failed after {self._internal_timeout.total_seconds()} seconds',
             logger=self._logger,

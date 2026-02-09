@@ -211,13 +211,13 @@ class Request(BaseModel):
 
         user_data: Annotated[
             dict[str, JsonSerializable],  # Internally, the model contains `UserData`, this is just for convenience
-            Field(alias='userData', default_factory=lambda: UserData()),
+            Field(alias='userData', default_factory=UserData),
             PlainValidator(user_data_adapter.validate_python),
             PlainSerializer(
                 lambda instance: user_data_adapter.dump_python(
                     instance,
                     by_alias=True,
-                    exclude_none=True,
+                    exclude_none=False,
                     exclude_unset=True,
                     exclude_defaults=True,
                 )
