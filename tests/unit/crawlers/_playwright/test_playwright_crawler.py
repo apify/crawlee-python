@@ -414,7 +414,8 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
 
         # PlaywrightContext makes cookies shared by all sessions that work with it.
         # So in this case a clean session contains the same cookies
-        assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {'a': '1'}
+        assert sessions_cookies[clean_session_id] == {'a': '1'}
+        assert response_cookies[clean_session_id] == {'a': '1'}
 
 
 async def test_save_cookies_after_handler_processing(server_url: URL) -> None:
