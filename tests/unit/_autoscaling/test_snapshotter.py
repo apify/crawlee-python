@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, cast
@@ -29,8 +30,22 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 async def event_manager() -> AsyncGenerator[LocalEventManager, None]:
-    # Use a long interval to avoid interference from periodic system info events during tests
-    async with LocalEventManager(system_info_interval=timedelta(hours=9999)) as event_manager:
+    # Use a long interval to avoid interference from periodic system info events during tests and ensure the first
+    # automatic event is consumed before yielding.
+
+    event_manager = LocalEventManager(system_info_interval=timedelta(hours=9999))
+
+    initial_system_info_consumed = asyncio.Event()
+
+    async def consume_automatic_system_info(_: EventSystemInfoData) -> None:
+        initial_system_info_consumed.set()
+
+    event_manager.on(event=Event.SYSTEM_INFO, listener=consume_automatic_system_info)
+
+    async with event_manager:
+        await initial_system_info_consumed.wait()
+        event_manager.off(event=Event.SYSTEM_INFO, listener=consume_automatic_system_info)
+
         yield event_manager
 
 

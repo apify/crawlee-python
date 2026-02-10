@@ -20,7 +20,7 @@ async def main() -> None:
     # Or just provide it when opening a storage (e.g. dataset), it will be used
     # for this storage only, not globally.
     dataset = await Dataset.open(
-        name='my_dataset',
+        name='my-dataset',
         storage_client=storage_client,
     )
 

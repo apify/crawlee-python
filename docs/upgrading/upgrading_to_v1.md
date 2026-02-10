@@ -172,7 +172,7 @@ crawler = ParselCrawler(storage_client=storage_client)
 
 # Or use it for a single storage only
 dataset = await Dataset.open(
-    name='my_dataset',
+    name='my-dataset',
     storage_client=storage_client,
 )
 ```

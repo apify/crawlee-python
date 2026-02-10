@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import JSON, BigInteger, Boolean, ForeignKey, Index, Integer, LargeBinary, String, text
+from sqlalchemy import JSON, BigInteger, Boolean, ForeignKey, Index, Integer, LargeBinary, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, synonym
 from sqlalchemy.types import DateTime, TypeDecorator
@@ -52,10 +52,10 @@ class Base(DeclarativeBase):
 class StorageMetadataDb:
     """Base database model for storage metadata."""
 
-    internal_name: Mapped[str] = mapped_column(String, nullable=False, index=True, unique=True)
+    internal_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True, unique=True)
     """Internal unique name for a storage instance based on a name or alias."""
 
-    name: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
     """Human-readable name. None becomes 'default' in database to enforce uniqueness."""
 
     accessed_at: Mapped[datetime] = mapped_column(AwareDateTime, nullable=False)
@@ -66,6 +66,9 @@ class StorageMetadataDb:
 
     modified_at: Mapped[datetime] = mapped_column(AwareDateTime, nullable=False)
     """Last modification datetime."""
+
+    buffer_locked_until: Mapped[datetime | None] = mapped_column(AwareDateTime, nullable=True)
+    """Timestamp until which buffer processing is locked for this storage. NULL = unlocked."""
 
 
 class DatasetMetadataDb(StorageMetadataDb, Base):
@@ -206,7 +209,12 @@ class RequestDb(Base):
             'request_queue_id',
             'is_handled',
             'sequence_number',
-            postgresql_where=text('is_handled is false'),
+            postgresql_where=text('is_handled = false'),
+        ),
+        Index(
+            'idx_count_aggregate',
+            'request_queue_id',
+            'is_handled',
         ),
     )
 
@@ -218,7 +226,7 @@ class RequestDb(Base):
     )
     """Foreign key to metadata request queue record."""
 
-    data: Mapped[str] = mapped_column(String, nullable=False)
+    data: Mapped[str] = mapped_column(Text, nullable=False)
     """JSON-serialized Request object."""
 
     sequence_number: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -266,3 +274,78 @@ class VersionDb(Base):
     __tablename__ = 'version'
 
     version: Mapped[str] = mapped_column(String(10), nullable=False, primary_key=True)
+
+
+class MetadataBufferDb:
+    """Base model for metadata update buffer tables."""
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    """Auto-increment primary key for ordering."""
+
+    # Timestamp fields - use max value when aggregating
+    accessed_at: Mapped[datetime] = mapped_column(AwareDateTime, nullable=False)
+    """New accessed_at timestamp, if being updated."""
+
+    modified_at: Mapped[datetime | None] = mapped_column(AwareDateTime, nullable=True)
+    """New modified_at timestamp, if being updated."""
+
+
+class KeyValueStoreMetadataBufferDb(MetadataBufferDb, Base):
+    """Buffer table for deferred key-value store metadata updates to reduce concurrent access issues."""
+
+    __tablename__ = 'key_value_store_metadata_buffer'
+
+    # Don't use foreign key constraint to avoid DB locks on high concurrency.
+    key_value_store_id: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    """ID of the key-value store being updated."""
+
+    storage_id = synonym('key_value_store_id')
+    """Alias for key_value_store_id to match SqlClientMixin expectations."""
+
+
+class DatasetMetadataBufferDb(MetadataBufferDb, Base):
+    """Buffer table for deferred dataset metadata updates to reduce concurrent access issues."""
+
+    __tablename__ = 'dataset_metadata_buffer'
+
+    # Don't use foreign key constraint to avoid DB locks on high concurrency.
+    dataset_id: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    """ID of the dataset being updated."""
+
+    # Counter deltas - use SUM when aggregating.
+    delta_item_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    """Delta for dataset item_count."""
+
+    storage_id = synonym('dataset_id')
+    """Alias for dataset_id to match SqlClientMixin expectations."""
+
+
+class RequestQueueMetadataBufferDb(MetadataBufferDb, Base):
+    """Buffer table for deferred request queue metadata updates to reduce concurrent access issues."""
+
+    __tablename__ = 'request_queue_metadata_buffer'
+
+    __table_args__ = (Index('idx_rq_client', 'request_queue_id', 'client_id'),)
+
+    # Don't use foreign key constraint to avoid DB locks on high concurrency.
+    request_queue_id: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    """ID of the request queue being updated."""
+
+    client_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    """Identifier of the client making this update."""
+
+    # Counter deltas - use SUM when aggregating.
+    delta_handled_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    """Delta for handled_request_count."""
+
+    delta_pending_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    """Delta for pending_request_count."""
+
+    delta_total_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    """Delta for total_request_count."""
+
+    need_recalc: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    """Flag indicating that counters need recalculation from actual data."""
+
+    storage_id = synonym('request_queue_id')
+    """Alias for request_queue_id to match SqlClientMixin expectations."""

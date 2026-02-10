@@ -77,6 +77,7 @@ class PlaywrightBrowserController(BrowserController):
         self._last_page_opened_at = datetime.now(timezone.utc)
 
         self._total_opened_pages = 0
+        self._opening_pages_count = 0
 
         self._context_creation_lock: Lock | None = None
 
@@ -119,7 +120,7 @@ class PlaywrightBrowserController(BrowserController):
     @property
     @override
     def has_free_capacity(self) -> bool:
-        return self.pages_count < self._max_open_pages_per_browser
+        return (self.pages_count + self._opening_pages_count) < self._max_open_pages_per_browser
 
     @property
     @override
@@ -154,30 +155,35 @@ class PlaywrightBrowserController(BrowserController):
         if not self.has_free_capacity:
             raise ValueError('Cannot open more pages in this browser.')
 
-        if self._use_incognito_pages:
-            # In incognito there is exactly one context per one page. Create new context for each new page.
-            new_context = await self._create_browser_context(
-                browser_new_context_options=browser_new_context_options,
-                proxy_info=proxy_info,
-            )
-            page = await new_context.new_page()
-        else:
-            async with await self._get_context_creation_lock():
-                if not self._browser_context:
-                    self._browser_context = await self._create_browser_context(
-                        browser_new_context_options=browser_new_context_options,
-                        proxy_info=proxy_info,
-                    )
-            page = await self._browser_context.new_page()
+        self._opening_pages_count += 1
 
-        # Handle page close event
-        page.on(event='close', f=self._on_page_close)
+        try:
+            if self._use_incognito_pages:
+                # In incognito there is exactly one context per one page. Create new context for each new page.
+                new_context = await self._create_browser_context(
+                    browser_new_context_options=browser_new_context_options,
+                    proxy_info=proxy_info,
+                )
+                page = await new_context.new_page()
+            else:
+                async with await self._get_context_creation_lock():
+                    if not self._browser_context:
+                        self._browser_context = await self._create_browser_context(
+                            browser_new_context_options=browser_new_context_options,
+                            proxy_info=proxy_info,
+                        )
+                page = await self._browser_context.new_page()
 
-        # Update internal state
-        self._pages.append(page)
-        self._last_page_opened_at = datetime.now(timezone.utc)
+            # Handle page close event
+            page.on(event='close', f=self._on_page_close)
 
-        self._total_opened_pages += 1
+            # Update internal state
+            self._pages.append(page)
+            self._last_page_opened_at = datetime.now(timezone.utc)
+
+            self._total_opened_pages += 1
+        finally:
+            self._opening_pages_count -= 1
         return page
 
     @override

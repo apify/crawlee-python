@@ -54,7 +54,7 @@ class RequestQueue(Storage, RequestManager):
     from crawlee.storages import RequestQueue
 
     # Open a request queue
-    rq = await RequestQueue.open(name='my_queue')
+    rq = await RequestQueue.open(name='my-queue')
 
     # Add a request
     await rq.add_request('https://example.com')
