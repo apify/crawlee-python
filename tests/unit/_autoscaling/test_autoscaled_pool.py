@@ -34,6 +34,7 @@ def future(value: T, /) -> Awaitable[T]:
     return f
 
 
+@pytest.mark.run_alone
 async def test_runs_concurrently(system_status: SystemStatus | Mock) -> None:
     done_count = 0
 
