@@ -323,6 +323,7 @@ async def test_proxy_set() -> None:
     assert handler_data.get('proxy') == proxy_value
 
 
+@pytest.mark.run_alone
 @pytest.mark.parametrize(
     'use_incognito_pages',
     [
