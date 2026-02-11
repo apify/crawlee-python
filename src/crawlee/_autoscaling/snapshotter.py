@@ -13,7 +13,7 @@ from crawlee._utils.byte_size import ByteSize, Ratio
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
-from crawlee._utils.system import MemoryInfo, get_memory_info
+from crawlee._utils.system import MemoryInfo, MemoryUsageInfo, get_memory_info
 from crawlee.events._types import Event, EventSystemInfoData
 
 if TYPE_CHECKING:
@@ -282,27 +282,45 @@ class Snapshotter:
         Args:
             event_data: System info data from which memory usage is read.
         """
+        match event_data.memory_info, self._max_memory_size:
+            case MemoryInfo() as memory_info, Ratio() as ratio:
+                max_memory_size = memory_info.total_size * ratio.value
+                system_wide_used_size = memory_info.system_wide_used_size
+                system_wide_memory_size = memory_info.total_size
+
+            case MemoryUsageInfo(), Ratio() as ratio:
+                # This is just hypothetical case, that should not happen in practice.
+                # `LocalEvenManager` should always provide `MemoryInfo` in the event data.
+                # When running on Apify, `self._max_memory_size` is always `ByteSize`, not `Ratio`.
+                max_memory_size = get_memory_info().total_size * ratio.value
+                system_wide_used_size = None
+                system_wide_memory_size = None
+
+            case MemoryInfo() as memory_info, ByteSize() as byte_size:
+                max_memory_size = byte_size
+                system_wide_used_size = memory_info.system_wide_used_size
+                system_wide_memory_size = memory_info.total_size
+
+            case MemoryUsageInfo(), ByteSize() as byte_size:
+                max_memory_size = byte_size
+                system_wide_used_size = None
+                system_wide_memory_size = None
+
+            case _, _:
+                raise NotImplementedError('Unsupported combination of memory info and max memory size types.')
+
         snapshot = MemorySnapshot(
             current_size=event_data.memory_info.current_size,
-            max_memory_size=self._max_memory_size,
+            max_memory_size=max_memory_size,
             max_used_memory_ratio=self._max_used_memory_ratio,
             created_at=event_data.memory_info.created_at,
-            system_wide_used_size=None,
-            system_wide_memory_size=None,
+            system_wide_used_size=system_wide_used_size,
+            system_wide_memory_size=system_wide_memory_size,
         )
-
-        if isinstance(memory_info := event_data.memory_info, MemoryInfo):
-            snapshot.system_wide_used_size = memory_info.system_wide_used_size
-            snapshot.system_wide_memory_size = memory_info.total_size
 
         snapshots = cast('list[Snapshot]', self._memory_snapshots)
         self._prune_snapshots(snapshots, snapshot.created_at)
         self._memory_snapshots.add(snapshot)
-
-        if isinstance(self._max_memory_size, Ratio):
-            max_memory_size = ByteSize(int(get_memory_info().total_size.bytes * self._max_memory_size.value))
-        else:
-            max_memory_size = self._max_memory_size
 
         self._evaluate_memory_load(
             event_data.memory_info.current_size,

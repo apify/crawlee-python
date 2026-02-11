@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 
-from crawlee._utils.byte_size import ByteSize, Ratio
-from crawlee._utils.system import get_memory_info
+if TYPE_CHECKING:
+    from crawlee._utils.byte_size import ByteSize, Ratio
 
 SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD = 0.97
 
@@ -119,15 +120,7 @@ class MemorySnapshot:
             if system_wide_utilization > SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD:
                 return True
 
-        if isinstance(self.max_memory_size, Ratio):
-            # The snapshot overload is decided not when the snapshot was taken, but when `is_overload` property is
-            # accessed. This allows for dynamic memory scaling. The same memory snapshot that used to be overloaded in
-            # the past can become non-overloaded if the available memory was increased.
-            max_memory_size = ByteSize(int(get_memory_info().total_size.bytes * self.max_memory_size.value))
-        else:
-            max_memory_size = self.max_memory_size
-
-        return (self.current_size / max_memory_size) > self.max_used_memory_ratio
+        return (self.current_size / self.max_memory_size) > self.max_used_memory_ratio
 
 
 @dataclass
