@@ -47,6 +47,7 @@ async def test_initial_state(browser: Browser) -> None:
     assert controller.has_free_capacity
 
 
+@pytest.mark.run_alone
 async def test_open_and_close_page(controller: PlaywrightBrowserController, server_url: URL) -> None:
     page = await controller.new_page()
     await page.goto(str(server_url))

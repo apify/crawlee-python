@@ -146,6 +146,7 @@ def test_snapshot_client_overloaded() -> None:
     assert ClientSnapshot(error_count=7, new_error_count=3, max_error_count=2).is_overloaded
 
 
+@pytest.mark.run_alone
 async def test_get_cpu_sample(
     snapshotter: Snapshotter, event_manager: LocalEventManager, default_memory_info: MemoryInfo
 ) -> None:
@@ -212,6 +213,7 @@ async def test_methods_raise_error_when_not_active() -> None:
         assert snapshotter.active is True
 
 
+@pytest.mark.run_alone
 async def test_snapshot_pruning_removes_outdated_records(
     snapshotter: Snapshotter, event_manager: LocalEventManager, default_memory_info: MemoryInfo
 ) -> None:
