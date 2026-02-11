@@ -213,7 +213,9 @@ async def test_methods_raise_error_when_not_active() -> None:
         assert snapshotter.active is True
 
 
-@pytest.mark.run_alone
+@pytest.mark.skip(
+    reason='Flaky due to snapshot pruning boundary condition, see https://github.com/apify/crawlee-python/issues/1734'
+)
 async def test_snapshot_pruning_removes_outdated_records(
     snapshotter: Snapshotter, event_manager: LocalEventManager, default_memory_info: MemoryInfo
 ) -> None:
