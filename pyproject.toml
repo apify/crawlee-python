@@ -81,6 +81,11 @@ sql_sqlite = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
     "aiosqlite>=0.21.0",
 ]
+sql_mysql = [
+    "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
+    "aiomysql>=0.3.2",
+    "cryptography>=46.0.5",
+]
 redis = ["redis[hiredis] >= 7.0.0"]
 
 [project.scripts]

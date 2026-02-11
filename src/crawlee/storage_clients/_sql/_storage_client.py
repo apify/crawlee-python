@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from logging import getLogger
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
@@ -116,9 +116,9 @@ class SqlStorageClient(StorageClient):
             async with engine.begin() as conn:
                 self._dialect_name = engine.dialect.name
 
-                if self._dialect_name not in ('sqlite', 'postgresql'):
+                if self._dialect_name not in ('sqlite', 'postgresql', 'mysql'):
                     raise ValueError(
-                        f'Unsupported database dialect: {self._dialect_name}. Supported: sqlite, postgresql. '
+                        f'Unsupported database dialect: {self._dialect_name}. Supported: sqlite, postgresql, mysql. '
                         'Consider using a different database.',
                     )
 
@@ -256,10 +256,22 @@ class SqlStorageClient(StorageClient):
             # Create connection string with path to default database
             connection_string = f'sqlite+aiosqlite:///{db_path}'
 
-        if 'sqlite' not in connection_string and 'postgresql' not in connection_string:
+        if (
+            ('sqlite' not in connection_string)
+            and ('postgresql' not in connection_string)
+            and ('mysql' not in connection_string)
+        ):
             raise ValueError(
-                'Unsupported database. Supported: sqlite, postgresql. Consider using a different database.'
+                'Unsupported database. Supported: sqlite, postgresql, mysql. Consider using a different database.'
             )
+
+        connect_args: dict[str, Any]
+        kwargs: dict[str, Any] = {}
+        if 'mysql' in connection_string:
+            connect_args: dict[str, Any] = {'connect_timeout': 30}
+            kwargs['isolation_level'] = 'READ COMMITTED'
+        else:
+            connect_args = {'timeout': 30}
 
         self._engine = create_async_engine(
             connection_string,
@@ -270,6 +282,7 @@ class SqlStorageClient(StorageClient):
             pool_recycle=600,
             pool_pre_ping=True,
             echo=False,
-            connect_args={'timeout': 30},
+            connect_args=connect_args,
+            **kwargs,
         )
         return self._engine

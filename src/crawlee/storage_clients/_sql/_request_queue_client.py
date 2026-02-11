@@ -335,33 +335,33 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                         )
                     )
 
-            if insert_values:
-                if forefront:
-                    # If the request already exists in the database, we update the sequence_number by shifting request
-                    # to the left.
-                    upsert_stmt = self._build_upsert_stmt(
-                        self._ITEM_TABLE,
-                        insert_values,
-                        update_columns=['sequence_number'],
-                        conflict_cols=['request_id', 'request_queue_id'],
-                    )
-                    result = await session.execute(upsert_stmt)
-                else:
-                    # If the request already exists in the database, we ignore this request when inserting.
-                    insert_stmt_with_ignore = self._build_insert_stmt_with_ignore(self._ITEM_TABLE, insert_values)
-                    result = await session.execute(insert_stmt_with_ignore)
-
-                result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
-                approximate_new_request += result.rowcount
-
-            await self._add_buffer_record(
-                session,
-                update_modified_at=True,
-                delta_pending_request_count=approximate_new_request,
-                delta_total_request_count=approximate_new_request,
-            )
-
             try:
+                if insert_values:
+                    if forefront:
+                        # If the request already exists in the database, we update the sequence_number
+                        # by shifting request to the left.
+                        upsert_stmt = self._build_upsert_stmt(
+                            self._ITEM_TABLE,
+                            insert_values,
+                            update_columns=['sequence_number'],
+                            conflict_cols=['request_id', 'request_queue_id'],
+                        )
+                        result = await session.execute(upsert_stmt)
+                    else:
+                        # If the request already exists in the database, we ignore this request when inserting.
+                        insert_stmt_with_ignore = self._build_insert_stmt_with_ignore(self._ITEM_TABLE, insert_values)
+                        result = await session.execute(insert_stmt_with_ignore)
+
+                    result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
+                    approximate_new_request += result.rowcount
+
+                await self._add_buffer_record(
+                    session,
+                    update_modified_at=True,
+                    delta_pending_request_count=approximate_new_request,
+                    delta_total_request_count=approximate_new_request,
+                )
+
                 await session.commit()
                 processed_requests.extend(transaction_processed_requests)
             except SQLAlchemyError as e:
@@ -433,7 +433,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
         async with self.get_session(with_simple_commit=True) as session:
             # We use the `skip_locked` database mechanism to prevent the 'interception' of requests by another client
-            if dialect == 'postgresql':
+            if dialect in ('postgresql', 'mysql'):
                 stmt = stmt.with_for_update(skip_locked=True)
                 result = await session.execute(stmt)
                 requests_db = result.scalars().all()
