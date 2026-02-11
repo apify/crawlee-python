@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import time
+from bisect import insort
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
+from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
@@ -222,29 +225,29 @@ async def test_snapshot_pruning_removes_outdated_records(
     # Create timestamps for testing
     now = datetime.now(timezone.utc)
 
-    events_data = [
-        EventSystemInfoData(
-            cpu_info=CpuInfo(used_ratio=0.5, created_at=now - timedelta(hours=delta)),
-            memory_info=default_memory_info,
-        )
-        for delta in [
-            5,
-            3,
-            # Snapshots older than 2 hours should be pruned
-            1,
-            0,
-        ]
-    ]
+    def randomly_delayed_insort(*args: Any, **kwargs: Any) -> None:
+        """Sort with injected delay to provoke otherwise hard to reproduce race condition."""
+        time.sleep(0.05)
+        return insort(*args, **kwargs)
 
-    for event_data in events_data:
-        event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_data)
-    await event_manager.wait_for_all_listeners_to_complete()
+    with mock.patch('crawlee._autoscaling.snapshotter.insort', side_effect=randomly_delayed_insort):
+        events_data = [
+            EventSystemInfoData(
+                cpu_info=CpuInfo(used_ratio=0.5, created_at=now - timedelta(hours=delta)),
+                memory_info=default_memory_info,
+            )
+            for delta in [5, 3, 2, 0]
+        ]
+
+        for event_data in events_data:
+            event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_data)
+        await event_manager.wait_for_all_listeners_to_complete()
 
     cpu_snapshots = cast('list[CpuSnapshot]', snapshotter.get_cpu_sample())
 
     # Check that only the last two snapshots remain
     assert len(cpu_snapshots) == 2
-    assert cpu_snapshots[0].created_at == now - timedelta(hours=1)
+    assert cpu_snapshots[0].created_at == now - timedelta(hours=2)
     assert cpu_snapshots[1].created_at == now
 
 
