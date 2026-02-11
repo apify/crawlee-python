@@ -213,9 +213,6 @@ async def test_methods_raise_error_when_not_active() -> None:
         assert snapshotter.active is True
 
 
-@pytest.mark.skip(
-    reason='Flaky due to snapshot pruning boundary condition, see https://github.com/apify/crawlee-python/issues/1734'
-)
 async def test_snapshot_pruning_removes_outdated_records(
     snapshotter: Snapshotter, event_manager: LocalEventManager, default_memory_info: MemoryInfo
 ) -> None:
@@ -230,7 +227,13 @@ async def test_snapshot_pruning_removes_outdated_records(
             cpu_info=CpuInfo(used_ratio=0.5, created_at=now - timedelta(hours=delta)),
             memory_info=default_memory_info,
         )
-        for delta in [5, 3, 2, 0]
+        for delta in [
+            5,
+            3,
+            # Snapshots older than 2 hours should be pruned
+            1,
+            0,
+        ]
     ]
 
     for event_data in events_data:
@@ -241,7 +244,7 @@ async def test_snapshot_pruning_removes_outdated_records(
 
     # Check that only the last two snapshots remain
     assert len(cpu_snapshots) == 2
-    assert cpu_snapshots[0].created_at == now - timedelta(hours=2)
+    assert cpu_snapshots[0].created_at == now - timedelta(hours=1)
     assert cpu_snapshots[1].created_at == now
 
 
