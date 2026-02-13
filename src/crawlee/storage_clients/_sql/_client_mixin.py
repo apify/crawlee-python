@@ -228,7 +228,7 @@ class SqlClientMixin(ABC):
         if dialect == 'sqlite':
             return lite_insert(table_model).values(insert_values).on_conflict_do_nothing()
 
-        if dialect == 'mysql':
+        if dialect in {'mysql', 'mariadb'}:
             return mysql_insert(table_model).values(insert_values).prefix_with('IGNORE')
 
         raise NotImplementedError(f'Insert with ignore not supported for dialect: {dialect}')
@@ -264,7 +264,7 @@ class SqlClientMixin(ABC):
             set_ = {col: getattr(lite_stmt.excluded, col) for col in update_columns}
             return lite_stmt.on_conflict_do_update(index_elements=conflict_cols, set_=set_)
 
-        if dialect == 'mysql':
+        if dialect in {'mysql', 'mariadb'}:
             mysql_stmt = mysql_insert(table_model).values(insert_values)
             set_ = {col: getattr(mysql_stmt.inserted, col) for col in update_columns}
             return mysql_stmt.on_duplicate_key_update(**set_)
@@ -416,7 +416,7 @@ class SqlClientMixin(ABC):
         lock_until = now + self._BLOCK_BUFFER_TIME
         dialect = self._storage_client.get_dialect_name()
 
-        if dialect in ('postgresql', 'mysql'):
+        if dialect in {'postgresql', 'mysql', 'mariadb'}:
             select_stmt = (
                 select(self._METADATA_TABLE)
                 .where(

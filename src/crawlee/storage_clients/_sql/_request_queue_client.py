@@ -433,7 +433,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
         async with self.get_session(with_simple_commit=True) as session:
             # We use the `skip_locked` database mechanism to prevent the 'interception' of requests by another client
-            if dialect in ('postgresql', 'mysql'):
+            if dialect in {'postgresql', 'mysql', 'mariadb'}:
                 stmt = stmt.with_for_update(skip_locked=True)
                 result = await session.execute(stmt)
                 requests_db = result.scalars().all()

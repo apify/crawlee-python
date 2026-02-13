@@ -116,10 +116,10 @@ class SqlStorageClient(StorageClient):
             async with engine.begin() as conn:
                 self._dialect_name = engine.dialect.name
 
-                if self._dialect_name not in ('sqlite', 'postgresql', 'mysql'):
+                if self._dialect_name not in {'sqlite', 'postgresql', 'mysql', 'mariadb'}:
                     raise ValueError(
-                        f'Unsupported database dialect: {self._dialect_name}. Supported: sqlite, postgresql, mysql. '
-                        'Consider using a different database.',
+                        f'Unsupported database dialect: {self._dialect_name}. Supported: sqlite, postgresql, mysql, '
+                        'mariadb. Consider using a different database.',
                     )
 
                 # Create tables if they don't exist.
@@ -260,14 +260,16 @@ class SqlStorageClient(StorageClient):
             ('sqlite' not in connection_string)
             and ('postgresql' not in connection_string)
             and ('mysql' not in connection_string)
+            and ('mariadb' not in connection_string)
         ):
             raise ValueError(
-                'Unsupported database. Supported: sqlite, postgresql, mysql. Consider using a different database.'
+                'Unsupported database. Supported: sqlite, postgresql, mysql, mariadb. Consider using a different '
+                'database.'
             )
 
         connect_args: dict[str, Any]
         kwargs: dict[str, Any] = {}
-        if 'mysql' in connection_string:
+        if 'mysql' in connection_string or 'mariadb' in connection_string:
             connect_args: dict[str, Any] = {'connect_timeout': 30}
             kwargs['isolation_level'] = 'READ COMMITTED'
         else:
