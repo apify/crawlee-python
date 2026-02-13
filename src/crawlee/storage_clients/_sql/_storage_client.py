@@ -267,10 +267,11 @@ class SqlStorageClient(StorageClient):
                 'database.'
             )
 
-        connect_args: dict[str, Any]
         kwargs: dict[str, Any] = {}
         if 'mysql' in connection_string or 'mariadb' in connection_string:
             connect_args: dict[str, Any] = {'connect_timeout': 30}
+            # MySQL/MariaDB require READ COMMITTED isolation level for correct behavior in concurrent environments
+            # without deadlocks.
             kwargs['isolation_level'] = 'READ COMMITTED'
         else:
             connect_args = {'timeout': 30}
