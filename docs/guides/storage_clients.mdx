@@ -351,7 +351,7 @@ Configuration options for the <ApiLink to="class/SqlStorageClient">`SqlStorageCl
 For advanced scenarios, you can configure <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> with a custom SQLAlchemy engine and additional options via the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class. This is useful, for example, when connecting to an external PostgreSQL database or customizing connection pooling.
 
 :::warning
-If you use MySQL or MariaDB, pass the `isolation_level='READ COMMITTED'` argument to `create_async_engine`.
+If you use MySQL or MariaDB, pass the `isolation_level='READ COMMITTED'` argument to `create_async_engine`. MySQL/MariaDB default to the `REPEATABLE READ` isolation level, which can cause unnecessary locking, deadlocks, or stale reads when multiple Crawlee workers access the same tables concurrently. Using `READ COMMITTED` ensures more predictable row-level locking and visibility semantics for `SqlStorageClient`.
 :::
 
 <CodeBlock className="language-python" language="python">
