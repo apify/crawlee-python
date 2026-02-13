@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import bisect
+import functools
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, TypeVar, cast
 
 from crawlee import service_locator
-from crawlee._autoscaling._types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Snapshot
-from crawlee._utils.byte_size import ByteSize, Ratio
+from crawlee._autoscaling._types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Ratio, Snapshot
+from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
@@ -24,6 +25,12 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 T = TypeVar('T', bound=Snapshot)
+
+
+@functools.lru_cache
+def _warn_once(warning_message: str) -> None:
+    """Log a warning message only once."""
+    logger.warning(warning_message)
 
 
 class SortedSnapshotList(list[T]):
@@ -289,9 +296,13 @@ class Snapshotter:
                 system_wide_memory_size = memory_info.total_size
 
             case MemoryUsageInfo(), Ratio() as ratio:
-                # This is just hypothetical case, that should not happen in practice.
-                # `LocalEvenManager` should always provide `MemoryInfo` in the event data.
+                # This is just hypothetical case, that will most likely not happen in practice.
+                # `LocalEventManager` should always provide `MemoryInfo` in the event data.
                 # When running on Apify, `self._max_memory_size` is always `ByteSize`, not `Ratio`.
+                _warn_once(
+                    'It is recommended that a custom implementation of `LocalEventManager` emits `SYSTEM_INFO` events '
+                    'with `MemoryInfo` and not just `MemoryUsageInfo`.'
+                )
                 max_memory_size = get_memory_info().total_size * ratio.value
                 system_wide_used_size = None
                 system_wide_memory_size = None

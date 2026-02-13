@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
+
+from pydantic import Field
+from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 if TYPE_CHECKING:
-    from crawlee._utils.byte_size import ByteSize, Ratio
+    from crawlee._utils.byte_size import ByteSize
 
 SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD = 0.97
 
@@ -96,12 +99,8 @@ class MemorySnapshot:
     system_wide_used_size: ByteSize | None
     """Memory usage of all processes, system-wide."""
 
-    max_memory_size: ByteSize | Ratio
-    """The maximum memory that can be used by `AutoscaledPool`.
-
-    When of type `ByteSize` then it is used as fixed memory size. When of type `Ratio` then it allows for dynamic memory
-    scaling based on the available system memory.
-    """
+    max_memory_size: ByteSize
+    """The maximum memory that can be used by `AutoscaledPool`."""
 
     system_wide_memory_size: ByteSize | None
     """Total memory available in the whole system."""
@@ -170,3 +169,10 @@ class ClientSnapshot:
 
 
 Snapshot = MemorySnapshot | CpuSnapshot | EventLoopSnapshot | ClientSnapshot
+
+
+@pydantic_dataclass
+class Ratio:
+    """Represents ratio of memory."""
+
+    value: Annotated[float, Field(gt=0.0, le=1.0)]

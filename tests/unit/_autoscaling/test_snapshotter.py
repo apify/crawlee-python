@@ -28,9 +28,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 
-MEMORY_LOAD_JUST_BELOW_SYSTEM_WIDE_OVERLOAD = 0.99 * SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD
-
-
 @pytest.fixture
 async def event_manager() -> AsyncGenerator[LocalEventManager, None]:
     # Use a long interval to avoid interference from periodic system info events during tests and ensure the first
@@ -380,28 +377,12 @@ def test_sorted_snapshot_list_add_maintains_order() -> None:
             assert prev_time <= curr_time, f'Items at indices {i - 1} and {i} are not in chronological order'
 
 
-_initial_memory_info = get_memory_info()
-
-
-@pytest.mark.parametrize(
-    ('available_memory_ratio', 'memory_mbytes', 'overloaded_after_scale_up'),
-    [
-        pytest.param(MEMORY_LOAD_JUST_BELOW_SYSTEM_WIDE_OVERLOAD, None, False, id='Ratio-based memory limit'),
-        pytest.param(
-            MEMORY_LOAD_JUST_BELOW_SYSTEM_WIDE_OVERLOAD,
-            floor(_initial_memory_info.total_size.to_mb()),
-            True,
-            id='Fixed memory limit',
-        ),
-    ],
-)
+@pytest.mark.parametrize('dynamic_memory', [True, False])
 async def test_dynamic_memory(
     *,
     default_cpu_info: CpuInfo,
     event_manager: LocalEventManager,
-    available_memory_ratio: float,
-    memory_mbytes: int | None,
-    overloaded_after_scale_up: bool,
+    dynamic_memory: bool,
 ) -> None:
     """Test dynamic memory scaling scenario where the system-wide memory can change.
 
@@ -411,25 +392,29 @@ async def test_dynamic_memory(
 
     Based on the Snapshotter configuration, it will either take into account the increased available memory or not.
     """
+    _initial_memory_info = get_memory_info()
+    ratio_just_below_system_wide_overload = 0.99 * SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD
+
+    memory_mbytes = 0 if dynamic_memory else floor(_initial_memory_info.total_size.to_mb())
 
     service_locator.set_event_manager(event_manager)
 
     async with Snapshotter.from_config(
-        Configuration(memory_mbytes=memory_mbytes, available_memory_ratio=available_memory_ratio)
+        Configuration(memory_mbytes=memory_mbytes, available_memory_ratio=ratio_just_below_system_wide_overload)
     ) as snapshotter:
         # Default state, memory usage exactly at the overload threshold -> overloaded, but not system-wide overloaded
         memory_infos = [
             # Overloaded sample
             MemoryInfo(
                 total_size=_initial_memory_info.total_size,
-                current_size=_initial_memory_info.total_size * MEMORY_LOAD_JUST_BELOW_SYSTEM_WIDE_OVERLOAD,
-                system_wide_used_size=_initial_memory_info.total_size * MEMORY_LOAD_JUST_BELOW_SYSTEM_WIDE_OVERLOAD,
+                current_size=_initial_memory_info.total_size * ratio_just_below_system_wide_overload,
+                system_wide_used_size=_initial_memory_info.total_size * ratio_just_below_system_wide_overload,
             ),
             # Same as first sample, with twice as memory available in the system
             MemoryInfo(
                 total_size=_initial_memory_info.total_size * 2,  # Simulate increased total memory
-                current_size=_initial_memory_info.total_size * MEMORY_LOAD_JUST_BELOW_SYSTEM_WIDE_OVERLOAD,
-                system_wide_used_size=_initial_memory_info.total_size * MEMORY_LOAD_JUST_BELOW_SYSTEM_WIDE_OVERLOAD,
+                current_size=_initial_memory_info.total_size * ratio_just_below_system_wide_overload,
+                system_wide_used_size=_initial_memory_info.total_size * ratio_just_below_system_wide_overload,
             ),
         ]
 
@@ -449,4 +434,4 @@ async def test_dynamic_memory(
         # First sample will be overloaded.
         assert memory_samples[0].is_overloaded
         # Second sample can reflect the increased available memory based on the configuration used to create Snapshotter
-        assert memory_samples[1].is_overloaded == overloaded_after_scale_up
+        assert memory_samples[1].is_overloaded == (not dynamic_memory)
