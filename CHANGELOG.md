@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.3.3 - **not yet released**
+
+### 🚀 Features
+
+- Dynamic memory snapshots  ([#1715](https://github.com/apify/crawlee-python/pull/1715)) ([568a7b1](https://github.com/apify/crawlee-python/commit/568a7b186dedda19ad814ee8af3cd8e256cc4ad9)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1704](https://github.com/apify/crawlee-python/issues/1704)
+
+### 🐛 Bug Fixes
+
+- Make log levels consistent in ServiceLocator ([#1746](https://github.com/apify/crawlee-python/pull/1746)) ([4163413](https://github.com/apify/crawlee-python/commit/4163413049485b035c38efd6a4a7d41502a44cfc)) by [@janbuchar](https://github.com/janbuchar)
+
+### ⚡ Performance
+
+- Optimize metadata records processing in `SqlStorageClient` ([#1551](https://github.com/apify/crawlee-python/pull/1551)) ([df1347a](https://github.com/apify/crawlee-python/commit/df1347aacf05c05980000d15b36b65996119ea86)) by [@Mantisus](https://github.com/Mantisus), closes [#1533](https://github.com/apify/crawlee-python/issues/1533)
+
+### Build
+
+- Bump `ty` to v0.0.16 and fix type issues ([#1730](https://github.com/apify/crawlee-python/pull/1730)) ([44a0587](https://github.com/apify/crawlee-python/commit/44a05872b8b16cf8f1be88252c618ae18fc970a5)) by [@Mantisus](https://github.com/Mantisus)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.3.2](https://github.com/apify/crawlee-python/releases/tag/v1.3.2) (2026-02-09)
 
 ### 🐛 Bug Fixes

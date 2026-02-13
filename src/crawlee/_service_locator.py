@@ -65,7 +65,7 @@ class ServiceLocator:
         if self._event_manager is None:
             logger.debug('No event manager set, implicitly creating and using default LocalEventManager.')
             if self._configuration is None:
-                logger.debug(
+                logger.warning(
                     'Implicit creation of event manager will implicitly set configuration as side effect. '
                     'It is advised to explicitly first set the configuration instead.'
                 )
