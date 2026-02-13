@@ -28,7 +28,7 @@ Crawlee provides three main storage client implementations:
 
 - <ApiLink to="class/FileSystemStorageClient">`FileSystemStorageClient`</ApiLink> - Provides persistent file system storage with in-memory caching.
 - <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> - Stores data in memory with no persistence.
-- <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> - Provides persistent storage using a SQL database ([SQLite](https://sqlite.org/) or [PostgreSQL](https://www.postgresql.org/)). Requires installing the extra dependency: `crawlee[sql_sqlite]` for SQLite or `crawlee[sql_postgres]` for PostgreSQL.
+- <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> - Provides persistent storage using a SQL database ([SQLite](https://sqlite.org/), [PostgreSQL](https://www.postgresql.org/), [MySQL](https://www.mysql.com/) or [MariaDB](https://mariadb.org/)). Requires installing the extra dependency: `crawlee[sql_sqlite]` for SQLite, `crawlee[sql_postgres]` for PostgreSQL or `crawlee[sql_mysql]` for MySQL and MariaDB.
 - <ApiLink to="class/RedisStorageClient">`RedisStorageClient`</ApiLink> - Provides persistent storage using a [Redis](https://redis.io/) database v8.0+. Requires installing the extra dependency `crawlee[redis]`.
 - [`ApifyStorageClient`](https://docs.apify.com/sdk/python/reference/class/ApifyStorageClient) - Manages storage on the [Apify platform](https://apify.com), implemented in the [Apify SDK](https://github.com/apify/apify-sdk-python).
 
@@ -144,7 +144,7 @@ The `MemoryStorageClient` does not persist data between runs. All data is lost w
 The `SqlStorageClient` is experimental. Its API and behavior may change in future releases.
 :::
 
-The <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> provides persistent storage using a SQL database (SQLite by default, or PostgreSQL). It supports all Crawlee storage types and enables concurrent access from multiple independent clients or processes.
+The <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> provides persistent storage using a SQL database (SQLite by default, or PostgreSQL, MySQL, MariaDB). It supports all Crawlee storage types and enables concurrent access from multiple independent clients or processes.
 
 :::note dependencies
 The <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> is not included in the core Crawlee package.
@@ -154,10 +154,12 @@ To use it, you need to install Crawlee with the appropriate extra dependency:
   <code>pip install 'crawlee[sql_sqlite]'</code>
 - For PostgreSQL support, run:
   <code>pip install 'crawlee[sql_postgres]'</code>
+- For MySQL or MariaDB support, run:
+  <code>pip install 'crawlee[sql_mysql]'</code>
 :::
 
 By default, <ApiLink to="class/SqlStorageClient">SqlStorageClient</ApiLink> uses SQLite.
-To use PostgreSQL instead, just provide a PostgreSQL connection string via the `connection_string` parameter. No other code changes are needed—the same client works for both databases.
+To use a different database, just provide the appropriate connection string via the `connection_string` parameter. No other code changes are needed—the same client works for all supported databases.
 
 <RunnableCodeBlock className="language-python" language="python">
     {SQLStorageClientBasicExample}
@@ -214,7 +216,6 @@ class dataset_metadata_buffer {
     + id (PK)
     + accessed_at
     + modified_at
-    + dataset_id (FK)
     + delta_item_count
 }
 
@@ -247,7 +248,6 @@ class key_value_store_metadata_buffer {
     + id (PK)
     + accessed_at
     + modified_at
-    + key_value_store_id (FK)
 }
 
 %% ========================
@@ -321,7 +321,6 @@ class request_queue_metadata_buffer {
     + id (PK)
     + accessed_at
     + modified_at
-    + request_queue_id (FK)
     + client_id
     + delta_handled_count
     + delta_pending_count
@@ -346,10 +345,14 @@ Configuration options for the <ApiLink to="class/SqlStorageClient">`SqlStorageCl
 
 Configuration options for the <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> can be set via constructor arguments:
 
-- **`connection_string`** (default: SQLite in <ApiLink to="class/Configuration">`Configuration`</ApiLink> storage dir) - SQLAlchemy connection string, e.g. `sqlite+aiosqlite:///my.db` or `postgresql+asyncpg://user:pass@host/db`.
+- **`connection_string`** (default: SQLite in <ApiLink to="class/Configuration">`Configuration`</ApiLink> storage dir) - SQLAlchemy connection string, e.g. `sqlite+aiosqlite:///my.db`, `postgresql+asyncpg://user:pass@host/db`, `mysql+aiomysql://user:pass@host/db` or `mariadb+aiomysql://user:pass@host/db`.
 - **`engine`** - Pre-configured SQLAlchemy AsyncEngine (optional).
 
 For advanced scenarios, you can configure <ApiLink to="class/SqlStorageClient">`SqlStorageClient`</ApiLink> with a custom SQLAlchemy engine and additional options via the <ApiLink to="class/Configuration">`Configuration`</ApiLink> class. This is useful, for example, when connecting to an external PostgreSQL database or customizing connection pooling.
+
+:::warning
+If you use MySQL or MariaDB, pass the `isolation_level='READ COMMITTED'` argument to `create_async_engine`. MySQL/MariaDB default to the `REPEATABLE READ` isolation level, which can cause unnecessary locking, deadlocks, or stale reads when multiple Crawlee workers access the same tables concurrently. Using `READ COMMITTED` ensures more predictable row-level locking and visibility semantics for `SqlStorageClient`.
+:::
 
 <CodeBlock className="language-python" language="python">
     {SQLStorageClientConfigurationExample}
