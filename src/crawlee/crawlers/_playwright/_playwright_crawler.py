@@ -12,7 +12,6 @@ from more_itertools import partition
 from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
 
-from crawlee import service_locator
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._types import BasicCrawlingContext, ConcurrencySettings
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
@@ -145,10 +144,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 not supported, use `navigation_timeout` instead.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
-        configuration = kwargs.pop('configuration', None)
-        if configuration is not None:
-            service_locator.set_configuration(configuration)
-
         self._shared_navigation_timeouts: dict[int, SharedTimeout] = {}
 
         if browser_pool:
