@@ -223,7 +223,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             raise TypeError('The items data was received in an incorrect format.')
 
         # Get all keys, sorted alphabetically
-        keys = sorted(items_data.keys())  # ty: ignore[invalid-argument-type]
+        keys = sorted(items_data.keys())
 
         # Apply exclusive_start_key filter if provided
         if exclusive_start_key is not None:
