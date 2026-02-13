@@ -1093,17 +1093,19 @@ async def test_logs_final_statistics(
     else:
         assert final_statistics.msg == 'Final request statistics:'
 
-        # ignore[attr-defined] since `extra` parameters are not defined for `LogRecord`
-        assert final_statistics.requests_finished == 4
-        assert final_statistics.requests_failed == 33
-        assert final_statistics.retry_histogram == [1, 4, 8]
-        assert final_statistics.request_avg_failed_duration == 99.0
-        assert final_statistics.request_avg_finished_duration == 0.483
-        assert final_statistics.requests_finished_per_minute == 0.33
-        assert final_statistics.requests_failed_per_minute == 0.1
-        assert final_statistics.request_total_duration == 720.0
-        assert final_statistics.requests_total == 37
-        assert final_statistics.crawler_runtime == 300.0
+        # `extra` parameters are not defined on `LogRecord`, so we cast to `Any` to access them.
+        record = cast('Any', final_statistics)
+
+        assert record.requests_finished == 4
+        assert record.requests_failed == 33
+        assert record.retry_histogram == [1, 4, 8]
+        assert record.request_avg_failed_duration == 99.0
+        assert record.request_avg_finished_duration == 0.483
+        assert record.requests_finished_per_minute == 0.33
+        assert record.requests_failed_per_minute == 0.1
+        assert record.request_total_duration == 720.0
+        assert record.requests_total == 37
+        assert record.crawler_runtime == 300.0
 
 
 async def test_crawler_manual_stop() -> None:
