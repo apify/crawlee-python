@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 
 - Dynamic memory snapshots  ([#1715](https://github.com/apify/crawlee-python/pull/1715)) ([568a7b1](https://github.com/apify/crawlee-python/commit/568a7b186dedda19ad814ee8af3cd8e256cc4ad9)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1704](https://github.com/apify/crawlee-python/issues/1704)
 
+### 🐛 Bug Fixes
+
+- Make log levels consistent in ServiceLocator ([#1746](https://github.com/apify/crawlee-python/pull/1746)) ([4163413](https://github.com/apify/crawlee-python/commit/4163413049485b035c38efd6a4a7d41502a44cfc)) by [@janbuchar](https://github.com/janbuchar)
+
 ### ⚡ Performance
 
 - Optimize metadata records processing in `SqlStorageClient` ([#1551](https://github.com/apify/crawlee-python/pull/1551)) ([df1347a](https://github.com/apify/crawlee-python/commit/df1347aacf05c05980000d15b36b65996119ea86)) by [@Mantisus](https://github.com/Mantisus), closes [#1533](https://github.com/apify/crawlee-python/issues/1533)
