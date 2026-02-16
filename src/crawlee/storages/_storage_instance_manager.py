@@ -117,8 +117,7 @@ class StorageInstanceManager:
             # Validate input parameters.
             raise_if_too_many_kwargs(id=id, name=name, alias=alias)
 
-            # Auto-set alias='default' when no parameters are specified.
-            # Default unnamed storage is equal to alias=default unnamed storage.
+            # Auto-set alias='__default__' when no parameters are specified.
             if not any([name, alias, id]):
                 alias = self._DEFAULT_STORAGE_ALIAS
 
