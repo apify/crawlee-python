@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from logging import getLogger
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
@@ -48,6 +48,8 @@ class SqlStorageClient(StorageClient):
 
     _DEFAULT_DB_NAME = 'crawlee.db'
     """Default database name if not specified in connection string."""
+
+    _SUPPORTED_DIALECTS: ClassVar[set[str]] = {'sqlite', 'postgresql', 'mysql', 'mariadb'}
 
     def __init__(
         self,
@@ -116,10 +118,10 @@ class SqlStorageClient(StorageClient):
             async with engine.begin() as conn:
                 self._dialect_name = engine.dialect.name
 
-                if self._dialect_name not in {'sqlite', 'postgresql', 'mysql', 'mariadb'}:
+                if self._dialect_name not in self._SUPPORTED_DIALECTS:
                     raise ValueError(
-                        f'Unsupported database dialect: {self._dialect_name}. Supported: sqlite, postgresql, mysql, '
-                        'mariadb. Consider using a different database.',
+                        f'Unsupported database dialect: {self._dialect_name}. Supported: '
+                        f'{", ".join(self._SUPPORTED_DIALECTS)}. Consider using a different database.',
                     )
 
                 # Create tables if they don't exist.
@@ -256,14 +258,9 @@ class SqlStorageClient(StorageClient):
             # Create connection string with path to default database
             connection_string = f'sqlite+aiosqlite:///{db_path}'
 
-        if (
-            ('sqlite' not in connection_string)
-            and ('postgresql' not in connection_string)
-            and ('mysql' not in connection_string)
-            and ('mariadb' not in connection_string)
-        ):
+        if not any(connection_string.startswith(dialect) for dialect in self._SUPPORTED_DIALECTS):
             raise ValueError(
-                'Unsupported database. Supported: sqlite, postgresql, mysql, mariadb. Consider using a different '
+                f'Unsupported database. Supported: {", ".join(self._SUPPORTED_DIALECTS)}. Consider using a different '
                 'database.'
             )
 
