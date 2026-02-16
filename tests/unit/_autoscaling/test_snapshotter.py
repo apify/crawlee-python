@@ -242,7 +242,7 @@ async def test_snapshot_pruning_removes_outdated_records(
                 cpu_info=CpuInfo(used_ratio=0.5, created_at=now - timedelta(hours=delta)),
                 memory_info=default_memory_info,
             )
-            for delta in [3, 2, 5, 0]  # Out of order timestamps. Snapshotter can not rely on natural ordering.
+            for delta in [0, 3, 2, 5]  # Out of order timestamps. Snapshotter can not rely on natural ordering.
         ]
 
         for event_data in events_data:

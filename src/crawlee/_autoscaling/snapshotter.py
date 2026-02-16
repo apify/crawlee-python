@@ -279,8 +279,8 @@ class Snapshotter:
         )
 
         snapshots = cast('list[Snapshot]', self._cpu_snapshots)
-        self._prune_snapshots(snapshots, event_data.cpu_info.created_at)
         self._cpu_snapshots.add(snapshot)
+        self._prune_snapshots(snapshots, self._cpu_snapshots[-1].created_at)
 
     async def _snapshot_memory(self, event_data: EventSystemInfoData) -> None:
         """Capture a snapshot of the current memory usage.
@@ -334,8 +334,8 @@ class Snapshotter:
         )
 
         snapshots = cast('list[Snapshot]', self._memory_snapshots)
-        self._prune_snapshots(snapshots, snapshot.created_at)
         self._memory_snapshots.add(snapshot)
+        self._prune_snapshots(snapshots, self._memory_snapshots[-1].created_at)
 
         self._evaluate_memory_load(
             event_data.memory_info.current_size,
@@ -361,8 +361,8 @@ class Snapshotter:
             snapshot.delay = event_loop_delay
 
         snapshots = cast('list[Snapshot]', self._event_loop_snapshots)
-        self._prune_snapshots(snapshots, snapshot.created_at)
         self._event_loop_snapshots.add(snapshot)
+        self._prune_snapshots(snapshots, self._event_loop_snapshots[-1].created_at)
 
     async def _snapshot_client(self) -> None:
         """Capture a snapshot of the current API state by checking for rate limit errors (HTTP 429).
@@ -385,8 +385,8 @@ class Snapshotter:
         )
 
         snapshots = cast('list[Snapshot]', self._client_snapshots)
-        self._prune_snapshots(snapshots, snapshot.created_at)
         self._client_snapshots.add(snapshot)
+        self._prune_snapshots(snapshots, self._client_snapshots[-1].created_at)
 
     def _prune_snapshots(self, snapshots: list[Snapshot], now: datetime) -> None:
         """Remove snapshots that are older than the `self._snapshot_history`.
