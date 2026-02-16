@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 
 - Make log levels consistent in ServiceLocator ([#1746](https://github.com/apify/crawlee-python/pull/1746)) ([4163413](https://github.com/apify/crawlee-python/commit/4163413049485b035c38efd6a4a7d41502a44cfc)) by [@janbuchar](https://github.com/janbuchar)
 - Fix `PlaywrightCrawler` unintentionally setting the global configuration ([#1747](https://github.com/apify/crawlee-python/pull/1747)) ([fa58438](https://github.com/apify/crawlee-python/commit/fa58438026eb72a6002c8d494725bf4e48b4407e)) by [@Pijukatel](https://github.com/Pijukatel)
+- Fix `Snapshotter` handling of out of order samples ([#1735](https://github.com/apify/crawlee-python/pull/1735)) ([387c712](https://github.com/apify/crawlee-python/commit/387c712306055d901b1c0df4a9666967f039aefd)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1734](https://github.com/apify/crawlee-python/issues/1734)
 
 ### ⚡ Performance
 
