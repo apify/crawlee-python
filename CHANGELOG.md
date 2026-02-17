@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.3.3 - **not yet released**
+## [1.4.0](https://github.com/apify/crawlee-python/releases/tag/v1.4.0) (2026-02-17)
 
 ### 🚀 Features
 
@@ -21,7 +20,6 @@ All notable changes to this project will be documented in this file.
 - Optimize metadata records processing in `SqlStorageClient` ([#1551](https://github.com/apify/crawlee-python/pull/1551)) ([df1347a](https://github.com/apify/crawlee-python/commit/df1347aacf05c05980000d15b36b65996119ea86)) by [@Mantisus](https://github.com/Mantisus), closes [#1533](https://github.com/apify/crawlee-python/issues/1533)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.3.2](https://github.com/apify/crawlee-python/releases/tag/v1.3.2) (2026-02-09)
 
 ### 🐛 Bug Fixes
