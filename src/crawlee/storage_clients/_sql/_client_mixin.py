@@ -8,9 +8,10 @@ from typing import TYPE_CHECKING, Any, ClassVar, TypedDict, cast, overload
 
 from sqlalchemy import CursorResult, delete, select, text, update
 from sqlalchemy import func as sql_func
+from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as lite_insert
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from crawlee._utils.crypto import crypto_random_object_id
 
@@ -227,6 +228,9 @@ class SqlClientMixin(ABC):
         if dialect == 'sqlite':
             return lite_insert(table_model).values(insert_values).on_conflict_do_nothing()
 
+        if dialect in {'mysql', 'mariadb'}:
+            return mysql_insert(table_model).values(insert_values).prefix_with('IGNORE')
+
         raise NotImplementedError(f'Insert with ignore not supported for dialect: {dialect}')
 
     def _build_upsert_stmt(
@@ -259,6 +263,11 @@ class SqlClientMixin(ABC):
             lite_stmt = lite_insert(table_model).values(insert_values)
             set_ = {col: getattr(lite_stmt.excluded, col) for col in update_columns}
             return lite_stmt.on_conflict_do_update(index_elements=conflict_cols, set_=set_)
+
+        if dialect in {'mysql', 'mariadb'}:
+            mysql_stmt = mysql_insert(table_model).values(insert_values)
+            set_ = {col: getattr(mysql_stmt.inserted, col) for col in update_columns}
+            return mysql_stmt.on_duplicate_key_update(**set_)
 
         raise NotImplementedError(f'Upsert not supported for dialect: {dialect}')
 
@@ -402,11 +411,12 @@ class SqlClientMixin(ABC):
         Returns:
             True if lock was acquired, False if already locked by another process.
         """
+        capture_error_code = 1020  # MariaDB error code for "Record has changed since last read"
         now = datetime.now(timezone.utc)
         lock_until = now + self._BLOCK_BUFFER_TIME
         dialect = self._storage_client.get_dialect_name()
 
-        if dialect == 'postgresql':
+        if dialect in {'postgresql', 'mysql', 'mariadb'}:
             select_stmt = (
                 select(self._METADATA_TABLE)
                 .where(
@@ -417,7 +427,17 @@ class SqlClientMixin(ABC):
                 )
                 .with_for_update(skip_locked=True)
             )
-            result = await session.execute(select_stmt)
+
+            try:
+                result = await session.execute(select_stmt)
+            except OperationalError as e:
+                # MariaDB raises error 1020 ("Record has changed since last read") instead of
+                # silently skipping locked rows like MySQL/PostgreSQL. Treat it as lock not acquired.
+                error_code = getattr(e.orig, 'args', [None])[0]
+                if error_code == capture_error_code:
+                    return False
+                raise
+
             metadata_row = result.scalar_one_or_none()
 
             if metadata_row is None:
