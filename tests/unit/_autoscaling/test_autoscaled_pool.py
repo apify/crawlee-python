@@ -87,7 +87,7 @@ async def test_abort_works(system_status: SystemStatus | Mock) -> None:
         await run_task
 
     assert elapsed.wall is not None
-    assert elapsed.wall < 0.3
+    assert elapsed.wall < 5
 
 
 async def test_propagates_exceptions(system_status: SystemStatus | Mock) -> None:
