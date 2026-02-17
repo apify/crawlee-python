@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Dynamic memory snapshots  ([#1715](https://github.com/apify/crawlee-python/pull/1715)) ([568a7b1](https://github.com/apify/crawlee-python/commit/568a7b186dedda19ad814ee8af3cd8e256cc4ad9)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1704](https://github.com/apify/crawlee-python/issues/1704)
+- Add `MySQL` and `MariaDB` support for `SqlStorageClient` ([#1749](https://github.com/apify/crawlee-python/pull/1749)) ([202b500](https://github.com/apify/crawlee-python/commit/202b5009ea5d35ea779eb5b8db1fc575f90ca7bb)) by [@Mantisus](https://github.com/Mantisus)
 
 ### 🐛 Bug Fixes
 
