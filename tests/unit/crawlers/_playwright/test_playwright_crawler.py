@@ -20,6 +20,7 @@ from crawlee import (
     SkippedReason,
     service_locator,
 )
+from crawlee.browsers import BrowserPool, PlaywrightBrowserPlugin
 from crawlee.configuration import Configuration
 from crawlee.crawlers import PlaywrightCrawler
 from crawlee.fingerprint_suite import (
@@ -337,47 +338,47 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
     sessions_cookies: dict[str, dict[str, str]] = {}
     response_cookies: dict[str, dict[str, str]] = {}
 
-    crawler = PlaywrightCrawler(
-        session_pool=SessionPool(max_pool_size=1),
-        use_incognito_pages=use_incognito_pages,
-        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
-    )
+    async with BrowserPool(plugins=[PlaywrightBrowserPlugin(use_incognito_pages=use_incognito_pages)]) as browser_pool:
+        crawler = PlaywrightCrawler(
+            session_pool=SessionPool(max_pool_size=1),
+            concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+            browser_pool=browser_pool,
+        )
 
-    @crawler.router.default_handler
-    async def handler(context: PlaywrightCrawlingContext) -> None:
-        if not context.session:
-            return
+        @crawler.router.default_handler
+        async def handler(context: PlaywrightCrawlingContext) -> None:
+            if not context.session:
+                return
 
-        sessions_ids.append(context.session.id)
-        sessions[context.session.id] = context.session
+            sessions_ids.append(context.session.id)
+            sessions[context.session.id] = context.session
+            response_data = json.loads(await context.response.text())
+            response_cookies[context.session.id] = response_data.get('cookies')
 
-        if context.request.unique_key == '1':
-            # With the second request, we check the cookies in the session and set retire
-            await context.add_requests(
-                [
-                    Request.from_url(
-                        str(server_url.with_path('/cookies')), unique_key='2', user_data={'retire_session': True}
-                    )
-                ]
-            )
-            return
+            if context.request.unique_key == '1':
+                # With the second request, we check the cookies in the session and set retire
+                await context.add_requests(
+                    [
+                        Request.from_url(
+                            str(server_url.with_path('/cookies')), unique_key='2', user_data={'retire_session': True}
+                        )
+                    ]
+                )
+                return
 
-        response_data = json.loads(await context.response.text())
-        response_cookies[context.session.id] = response_data.get('cookies')
+            if context.request.user_data.get('retire_session'):
+                context.session.retire()
 
-        if context.request.user_data.get('retire_session'):
-            context.session.retire()
+            if context.request.unique_key == '2':
+                # The third request is made with a new session to make sure it does not use another session's cookies
+                await context.add_requests([Request.from_url(str(server_url.with_path('/cookies')), unique_key='3')])
 
-        if context.request.unique_key == '2':
-            # The third request is made with a new session to make sure it does not use another session's cookies
-            await context.add_requests([Request.from_url(str(server_url.with_path('/cookies')), unique_key='3')])
-
-    await crawler.run(
-        [
-            # The first request sets the cookie in the session
-            Request.from_url(str(server_url.with_path('set_cookies').extend_query(a=1)), unique_key='1'),
-        ]
-    )
+        await crawler.run(
+            [
+                # The first request sets the cookie in the session
+                Request.from_url(str(server_url.with_path('set_cookies').extend_query(a=1)), unique_key='1'),
+            ]
+        )
 
     assert len(response_cookies) == 2
     assert len(sessions) == 2
@@ -403,7 +404,7 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
         # The initiated cookies must match in both the response and the session store
         assert sessions_cookies[cookie_session_id] == response_cookies[cookie_session_id] == {'a': '1'}
 
-        # For a clean session, the cookie should not be in the sesstion store or in the response
+        # For a clean session, the cookie should not be in the session store or in the response
         # This way we can be sure that no cookies are being leaked through the http client
         assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {}
     # Without `use_incognito_pages` we will have access to the session cookie,
@@ -414,7 +415,8 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
 
         # PlaywrightContext makes cookies shared by all sessions that work with it.
         # So in this case a clean session contains the same cookies
-        assert sessions_cookies[clean_session_id] == response_cookies[clean_session_id] == {'a': '1'}
+        assert sessions_cookies[clean_session_id] == {'a': '1'}
+        assert response_cookies[clean_session_id] == {'a': '1'}
 
 
 async def test_save_cookies_after_handler_processing(server_url: URL) -> None:
