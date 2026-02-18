@@ -83,16 +83,16 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
             'chromium_sandbox': not config.disable_browser_sandbox,
         }
 
-        if browser_type == 'chrome' and default_launch_browser_options['executable_path']:
-            raise ValueError(
-                'Cannot use browser_type `chrome` with `Configuration.default_browser_path` or `executable_path` set.'
-            )
-
         # Map 'chrome' to 'chromium' with the 'chrome' channel.
         if browser_type == 'chrome':
             browser_type = 'chromium'
             # Chromium parameter 'channel' set to 'chrome' enables using installed Google Chrome.
             default_launch_browser_options['channel'] = 'chrome'
+            if default_launch_browser_options['executable_path']:
+                logger.debug(
+                    f'Using browser executable from {default_launch_browser_options["executable_path"]},'
+                    f" which takes precedence over 'chrome' channel."
+                )
 
         self._browser_type: BrowserType = browser_type
         self._browser_launch_options: dict[str, Any] = default_launch_browser_options | (browser_launch_options or {})
