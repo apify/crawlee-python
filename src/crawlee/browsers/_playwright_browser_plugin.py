@@ -82,20 +82,24 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
             'executable_path': config.default_browser_path,
             'chromium_sandbox': not config.disable_browser_sandbox,
         }
+        explicit_browser_launch_options = browser_launch_options or {}
 
         # Map 'chrome' to 'chromium' with the 'chrome' channel.
         if browser_type == 'chrome':
             browser_type = 'chromium'
             # Chromium parameter 'channel' set to 'chrome' enables using installed Google Chrome.
             default_launch_browser_options['channel'] = 'chrome'
-            if default_launch_browser_options['executable_path']:
+
+            if explicit_browser_launch_options.get(
+                'executable_path', default_launch_browser_options.get('executable_path')
+            ):
                 logger.debug(
                     f'Using browser executable from {default_launch_browser_options["executable_path"]},'
                     f" which takes precedence over 'chrome' channel."
                 )
 
         self._browser_type: BrowserType = browser_type
-        self._browser_launch_options: dict[str, Any] = default_launch_browser_options | (browser_launch_options or {})
+        self._browser_launch_options: dict[str, Any] = default_launch_browser_options | explicit_browser_launch_options
         self._browser_new_context_options = browser_new_context_options or {}
         self._max_open_pages_per_browser = max_open_pages_per_browser
         self._use_incognito_pages = use_incognito_pages
