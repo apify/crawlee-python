@@ -20,6 +20,9 @@ from tests.e2e.project_template.utils import patch_crawlee_version_in_project
     'crawler_type',
     [
         pytest.param('playwright-camoufox', marks=pytest.mark.playwright_camoufox),
+        pytest.param('playwright-chrome', marks=pytest.mark.playwright_chrome),
+        pytest.param('playwright-firefox', marks=pytest.mark.playwright_firefox),
+        pytest.param('playwright-webkit', marks=pytest.mark.playwright_webkit),
         pytest.param('playwright', marks=pytest.mark.playwright),
         pytest.param('parsel', marks=pytest.mark.parsel),
         pytest.param('beautifulsoup', marks=pytest.mark.beautifulsoup),
