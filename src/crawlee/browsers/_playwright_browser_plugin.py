@@ -90,12 +90,11 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
             # Chromium parameter 'channel' set to 'chrome' enables using installed Google Chrome.
             default_launch_browser_options['channel'] = 'chrome'
 
-            if explicit_browser_launch_options.get(
+            if executable_path := explicit_browser_launch_options.get(
                 'executable_path', default_launch_browser_options.get('executable_path')
             ):
                 logger.debug(
-                    f'Using browser executable from {default_launch_browser_options["executable_path"]},'
-                    f" which takes precedence over 'chrome' channel."
+                    f"Using browser executable from {executable_path}, which takes precedence over 'chrome' channel."
                 )
 
         self._browser_type: BrowserType = browser_type

@@ -10,5 +10,6 @@ crawler = PlaywrightCrawler(
     headless=True,
     max_requests_per_crawl=10,
     browser_type="chrome",
-    {{ self.http_client_instantiation() }})
+    {{ self.http_client_instantiation() }}
+)
 # % endblock
