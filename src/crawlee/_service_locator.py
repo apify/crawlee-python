@@ -35,6 +35,12 @@ class ServiceLocator:
         self._event_manager = event_manager
         self._storage_client = storage_client
 
+    def reset(self) -> None:
+        """Reset the service locator."""
+        self._configuration = None
+        self._event_manager = None
+        self._storage_client = None
+
     def get_configuration(self) -> Configuration:
         """Get the configuration."""
         if self._configuration is None:
