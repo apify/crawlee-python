@@ -12,7 +12,7 @@ import traceback
 from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Sequence
 from contextlib import AsyncExitStack, suppress
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from functools import partial
 from io import StringIO
 from pathlib import Path
@@ -46,6 +46,7 @@ from crawlee._types import (
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import atomic_write, export_csv_to_stream, export_json_to_stream
 from crawlee._utils.recurring_task import RecurringTask
+from crawlee._request_throttler import RequestThrottler
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
@@ -485,6 +486,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
         self._robots_txt_lock = asyncio.Lock()
         self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
+        self._request_throttler = RequestThrottler()
         self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
@@ -1396,6 +1398,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if request is None:
             return
 
+        # Check if this domain is currently rate-limited (429 backoff).
+        if self._request_throttler.is_throttled(request.url):
+            self._logger.debug(
+                f'Request to {request.url} delayed - domain is rate-limited '
+                f'(retry in {self._request_throttler.get_delay(request.url).total_seconds():.1f}s)'
+            )
+            await request_manager.reclaim_request(request)
+            return
+
         if not (await self._is_allowed_based_on_robots_txt_file(request.url)):
             self._logger.warning(
                 f'Skipping request {request.url} ({request.unique_key}) because it is disallowed based on robots.txt'
@@ -1441,6 +1452,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request.state = RequestState.DONE
 
             await self._mark_request_as_handled(request)
+
+            # Record successful request to reset rate limit backoff for this domain.
+            self._request_throttler.record_success(request.url)
 
             if session and session.is_usable:
                 session.mark_good()
@@ -1542,21 +1556,73 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if is_status_code_server_error(status_code) and not is_ignored_status:
             raise HttpStatusCodeError('Error status code returned', status_code)
 
-    def _raise_for_session_blocked_status_code(self, session: Session | None, status_code: int) -> None:
+    def _raise_for_session_blocked_status_code(
+        self,
+        session: Session | None,
+        status_code: int,
+        *,
+        url: str = '',
+        retry_after_header: str | None = None,
+    ) -> None:
         """Raise an exception if the given status code indicates the session is blocked.
+
+        If the status code is 429 (Too Many Requests), the domain is recorded as
+        rate-limited in the `RequestThrottler` for per-domain backoff.
 
         Args:
             session: The session used for the request. If None, no check is performed.
             status_code: The HTTP status code to check.
+            url: The request URL, used for per-domain rate limit tracking.
+            retry_after_header: The value of the Retry-After response header, if present.
 
         Raises:
             SessionError: If the status code indicates the session is blocked.
         """
+        if status_code == 429 and url:
+            retry_after = self._parse_retry_after_header(retry_after_header)
+            self._request_throttler.record_rate_limit(url, retry_after=retry_after)
+
         if session is not None and session.is_blocked_status_code(
             status_code=status_code,
             ignore_http_error_status_codes=self._ignore_http_error_status_codes,
         ):
             raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
+
+    @staticmethod
+    def _parse_retry_after_header(value: str | None) -> timedelta | None:
+        """Parse the Retry-After HTTP header value.
+
+        The header can contain either a number of seconds or an HTTP-date.
+        See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
+
+        Args:
+            value: The raw Retry-After header value.
+
+        Returns:
+            A timedelta representing the delay, or None if the header is missing or unparseable.
+        """
+        if not value:
+            return None
+
+        # Try parsing as integer seconds first.
+        try:
+            seconds = int(value)
+            return timedelta(seconds=seconds)
+        except ValueError:
+            pass
+
+        # Try parsing as HTTP-date (e.g., "Wed, 21 Oct 2015 07:28:00 GMT").
+        from email.utils import parsedate_to_datetime
+
+        try:
+            retry_date = parsedate_to_datetime(value)
+            delay = retry_date - datetime.now(retry_date.tzinfo or timezone.utc)
+            if delay.total_seconds() > 0:
+                return delay
+        except (ValueError, TypeError):
+            pass
+
+        return None
 
     def _check_request_collision(self, request: Request, session: Session | None) -> None:
         """Raise an exception if a request cannot access required resources.

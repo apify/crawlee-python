@@ -459,7 +459,13 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         """
         status_code = context.response.status
         if self._retry_on_blocked:
-            self._raise_for_session_blocked_status_code(context.session, status_code)
+            retry_after_header = context.response.headers.get('retry-after')
+            self._raise_for_session_blocked_status_code(
+                context.session,
+                status_code,
+                url=context.request.url,
+                retry_after_header=retry_after_header,
+            )
         self._raise_for_error_status_code(status_code)
         yield context
 
