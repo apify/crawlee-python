@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 
 - Use specialized Playwright docker images in templates ([#1757](https://github.com/apify/crawlee-python/pull/1757)) ([747c0cf](https://github.com/apify/crawlee-python/commit/747c0cf4a82296a2e3ea5cac5ef4c9578ea62a0c)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1756](https://github.com/apify/crawlee-python/issues/1756)
 
+### 🐛 Bug Fixes
+
+- Prevent list modification during iteration in BrowserPool ([#1703](https://github.com/apify/crawlee-python/pull/1703)) ([70309d9](https://github.com/apify/crawlee-python/commit/70309d9bf568d268a26b3ba6392be2b6ff284c65)) by [@vdusek](https://github.com/vdusek)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [1.4.0](https://github.com/apify/crawlee-python/releases/tag/v1.4.0) (2026-02-17)
