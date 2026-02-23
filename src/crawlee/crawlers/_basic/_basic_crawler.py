@@ -46,7 +46,8 @@ from crawlee._types import (
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import atomic_write, export_csv_to_stream, export_json_to_stream
 from crawlee._utils.recurring_task import RecurringTask
-from crawlee._request_throttler import RequestThrottler
+from crawlee._utils.http import parse_retry_after_header
+from crawlee.request_loaders import ThrottlingRequestManager
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
@@ -486,7 +487,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
         self._robots_txt_lock = asyncio.Lock()
         self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
-        self._request_throttler = RequestThrottler()
+        self._throttling_manager: ThrottlingRequestManager | None = None
         self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
@@ -613,12 +614,18 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
     async def get_request_manager(self) -> RequestManager:
-        """Return the configured request manager. If none is configured, open and return the default request queue."""
+        """Return the configured request manager. If none is configured, open and return the default request queue.
+
+        The returned manager is wrapped with `ThrottlingRequestManager` to enforce
+        per-domain delays from 429 responses and robots.txt crawl-delay directives.
+        """
         if not self._request_manager:
-            self._request_manager = await RequestQueue.open(
+            inner = await RequestQueue.open(
                 storage_client=self._service_locator.get_storage_client(),
                 configuration=self._service_locator.get_configuration(),
             )
+            self._throttling_manager = ThrottlingRequestManager(inner)
+            self._request_manager = self._throttling_manager
 
         return self._request_manager
 
@@ -1398,15 +1405,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if request is None:
             return
 
-        # Check if this domain is currently rate-limited (429 backoff).
-        if self._request_throttler.is_throttled(request.url):
-            self._logger.debug(
-                f'Request to {request.url} delayed - domain is rate-limited '
-                f'(retry in {self._request_throttler.get_delay(request.url).total_seconds():.1f}s)'
-            )
-            await request_manager.reclaim_request(request)
-            return
-
         if not (await self._is_allowed_based_on_robots_txt_file(request.url)):
             self._logger.warning(
                 f'Skipping request {request.url} ({request.unique_key}) because it is disallowed based on robots.txt'
@@ -1454,7 +1452,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             await self._mark_request_as_handled(request)
 
             # Record successful request to reset rate limit backoff for this domain.
-            self._request_throttler.record_success(request.url)
+            if self._throttling_manager:
+                self._throttling_manager.record_success(request.url)
 
             if session and session.is_usable:
                 session.mark_good()
@@ -1579,8 +1578,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             SessionError: If the status code indicates the session is blocked.
         """
         if status_code == 429 and url:
-            retry_after = self._parse_retry_after_header(retry_after_header)
-            self._request_throttler.record_rate_limit(url, retry_after=retry_after)
+            retry_after = parse_retry_after_header(retry_after_header)
+            if self._throttling_manager:
+                self._throttling_manager.record_domain_delay(url, retry_after=retry_after)
 
         if session is not None and session.is_blocked_status_code(
             status_code=status_code,
@@ -1588,41 +1588,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         ):
             raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
-    @staticmethod
-    def _parse_retry_after_header(value: str | None) -> timedelta | None:
-        """Parse the Retry-After HTTP header value.
-
-        The header can contain either a number of seconds or an HTTP-date.
-        See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
-
-        Args:
-            value: The raw Retry-After header value.
-
-        Returns:
-            A timedelta representing the delay, or None if the header is missing or unparseable.
-        """
-        if not value:
-            return None
-
-        # Try parsing as integer seconds first.
-        try:
-            seconds = int(value)
-            return timedelta(seconds=seconds)
-        except ValueError:
-            pass
-
-        # Try parsing as HTTP-date (e.g., "Wed, 21 Oct 2015 07:28:00 GMT").
-        from email.utils import parsedate_to_datetime
-
-        try:
-            retry_date = parsedate_to_datetime(value)
-            delay = retry_date - datetime.now(retry_date.tzinfo or timezone.utc)
-            if delay.total_seconds() > 0:
-                return delay
-        except (ValueError, TypeError):
-            pass
-
-        return None
+    # NOTE: _parse_retry_after_header has been moved to crawlee._utils.http.parse_retry_after_header
 
     def _check_request_collision(self, request: Request, session: Session | None) -> None:
         """Raise an exception if a request cannot access required resources.
@@ -1648,7 +1614,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if not self._respect_robots_txt_file:
             return True
         robots_txt_file = await self._get_robots_txt_file_for_url(url)
-        return not robots_txt_file or robots_txt_file.is_allowed(url)
+        if not robots_txt_file:
+            return True
+
+        # Wire robots.txt crawl-delay into ThrottlingRequestManager (#1396).
+        if self._throttling_manager:
+            crawl_delay = robots_txt_file.get_crawl_delay()
+            if crawl_delay is not None:
+                self._throttling_manager.set_crawl_delay(url, crawl_delay)
+
+        return robots_txt_file.is_allowed(url)
 
     async def _get_robots_txt_file_for_url(self, url: str) -> RobotsTxtFile | None:
         """Get the RobotsTxtFile for a given URL.
