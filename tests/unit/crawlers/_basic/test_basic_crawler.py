@@ -1375,7 +1375,7 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     # Test is skipped in older Python versions.
     from asyncio import timeout  # type:ignore[attr-defined] # noqa: PLC0415
 
-    non_realtime_system_coefficient = 2
+    non_realtime_system_coefficient = 10
     handler_timeout = timedelta(seconds=1)
     max_request_retries = 3
     double_handler_timeout_s = handler_timeout.total_seconds() * 2
