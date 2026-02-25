@@ -12,7 +12,7 @@ import traceback
 from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Sequence
 from contextlib import AsyncExitStack, suppress
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from functools import partial
 from io import StringIO
 from pathlib import Path
@@ -45,9 +45,8 @@ from crawlee._types import (
 )
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import atomic_write, export_csv_to_stream, export_json_to_stream
-from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.http import parse_retry_after_header
-from crawlee.request_loaders import ThrottlingRequestManager
+from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
 from crawlee._utils.wait import wait_for
@@ -65,6 +64,7 @@ from crawlee.errors import (
 )
 from crawlee.events._types import Event, EventCrawlerStatusData
 from crawlee.http_clients import ImpitHttpClient
+from crawlee.request_loaders import ThrottlingRequestManager
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics, StatisticsState
@@ -487,7 +487,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
         self._robots_txt_lock = asyncio.Lock()
         self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
-        self._throttling_manager: ThrottlingRequestManager | None = None
         self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
@@ -624,8 +623,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 storage_client=self._service_locator.get_storage_client(),
                 configuration=self._service_locator.get_configuration(),
             )
-            self._throttling_manager = ThrottlingRequestManager(inner)
-            self._request_manager = self._throttling_manager
+            self._request_manager = ThrottlingRequestManager(inner)
 
         return self._request_manager
 
@@ -716,12 +714,21 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 await self._session_pool.reset_store()
 
             request_manager = await self.get_request_manager()
-            if purge_request_queue and isinstance(request_manager, RequestQueue):
-                await request_manager.drop()
-                self._request_manager = await RequestQueue.open(
-                    storage_client=self._service_locator.get_storage_client(),
-                    configuration=self._service_locator.get_configuration(),
-                )
+            if purge_request_queue:
+                if isinstance(request_manager, RequestQueue):
+                    await request_manager.drop()
+                    self._request_manager = await RequestQueue.open(
+                        storage_client=self._service_locator.get_storage_client(),
+                        configuration=self._service_locator.get_configuration(),
+                    )
+                elif isinstance(request_manager, ThrottlingRequestManager):
+                    await request_manager.drop()
+                    inner = await RequestQueue.open(
+                        storage_client=self._service_locator.get_storage_client(),
+                        configuration=self._service_locator.get_configuration(),
+                    )
+                    self._throttling_manager = ThrottlingRequestManager(inner)
+                    self._request_manager = self._throttling_manager
 
         if requests is not None:
             await self.add_requests(requests)
@@ -1452,8 +1459,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             await self._mark_request_as_handled(request)
 
             # Record successful request to reset rate limit backoff for this domain.
-            if self._throttling_manager:
-                self._throttling_manager.record_success(request.url)
+            if isinstance(request_manager, ThrottlingRequestManager):
+                request_manager.record_success(request.url)
 
             if session and session.is_usable:
                 session.mark_good()
@@ -1560,27 +1567,30 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         session: Session | None,
         status_code: int,
         *,
-        url: str = '',
+        request_url: str = '',
         retry_after_header: str | None = None,
     ) -> None:
         """Raise an exception if the given status code indicates the session is blocked.
 
         If the status code is 429 (Too Many Requests), the domain is recorded as
-        rate-limited in the `RequestThrottler` for per-domain backoff.
+        rate-limited in the `ThrottlingRequestManager` for per-domain backoff.
 
         Args:
             session: The session used for the request. If None, no check is performed.
             status_code: The HTTP status code to check.
-            url: The request URL, used for per-domain rate limit tracking.
+            request_url: The request URL, used for per-domain rate limit tracking.
             retry_after_header: The value of the Retry-After response header, if present.
 
         Raises:
             SessionError: If the status code indicates the session is blocked.
         """
-        if status_code == 429 and url:
+        if status_code == 429 and request_url:  # noqa: PLR2004
             retry_after = parse_retry_after_header(retry_after_header)
-            if self._throttling_manager:
-                self._throttling_manager.record_domain_delay(url, retry_after=retry_after)
+
+            # _request_manager might not be initialized yet if called directly or early,
+            # but usually it's set in get_request_manager().
+            if isinstance(self._request_manager, ThrottlingRequestManager):
+                self._request_manager.record_domain_delay(request_url, retry_after=retry_after)
 
         if session is not None and session.is_blocked_status_code(
             status_code=status_code,
@@ -1589,7 +1599,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
     # NOTE: _parse_retry_after_header has been moved to crawlee._utils.http.parse_retry_after_header
-
     def _check_request_collision(self, request: Request, session: Session | None) -> None:
         """Raise an exception if a request cannot access required resources.
 
@@ -1617,11 +1626,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if not robots_txt_file:
             return True
 
-        # Wire robots.txt crawl-delay into ThrottlingRequestManager (#1396).
-        if self._throttling_manager:
+        # Wire robots.txt crawl-delay into ThrottlingRequestManager
+        if isinstance(self._request_manager, ThrottlingRequestManager):
             crawl_delay = robots_txt_file.get_crawl_delay()
             if crawl_delay is not None:
-                self._throttling_manager.set_crawl_delay(url, crawl_delay)
+                self._request_manager.set_crawl_delay(url, crawl_delay)
 
         return robots_txt_file.is_allowed(url)
 

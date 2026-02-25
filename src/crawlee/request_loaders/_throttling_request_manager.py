@@ -20,6 +20,7 @@ from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
 from crawlee.request_loaders._request_manager import RequestManager
+from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -58,8 +59,8 @@ class ThrottlingRequestManager(RequestManager):
     layer. When `fetch_next_request()` is called, it intelligently handles delays:
 
     - If the next request's domain is not throttled, it returns immediately.
-    - If the domain is throttled but other requests are available, it buffers the
-      throttled request and tries the next one.
+    - If the domain is throttled but other requests are available, it moves the
+      throttled request to a per-domain sub-queue and tries the next one.
     - If all available requests are throttled, it `asyncio.sleep()`s until the
       earliest domain cooldown expires — eliminating busy-wait and unnecessary
       queue writes.
@@ -75,9 +76,6 @@ class ThrottlingRequestManager(RequestManager):
     _MAX_DELAY = timedelta(seconds=60)
     """Maximum delay between requests to a rate-limited domain."""
 
-    _MAX_BUFFER_SIZE = 50
-    """Maximum number of requests to buffer before sleeping."""
-
     def __init__(self, inner: RequestManager) -> None:
         """Initialize the throttling manager.
 
@@ -86,7 +84,9 @@ class ThrottlingRequestManager(RequestManager):
         """
         self._inner = inner
         self._domain_states: dict[str, _DomainState] = {}
-        self._buffered_requests: list[Request] = []
+        self._sub_queues: dict[str, RequestQueue] = {}
+        self._dispatched_origins: dict[str, str] = {}
+        self._transferred_requests_count = 0
 
     @staticmethod
     def _extract_domain(url: str) -> str:
@@ -94,11 +94,11 @@ class ThrottlingRequestManager(RequestManager):
         parsed = urlparse(url)
         return parsed.hostname or ''
 
-    def _get_or_create_state(self, domain: str) -> _DomainState:
-        """Get or create a domain state entry."""
-        if domain not in self._domain_states:
-            self._domain_states[domain] = _DomainState(domain=domain)
-        return self._domain_states[domain]
+    async def _get_or_create_sub_queue(self, domain: str) -> RequestQueue:
+        """Get or create a per-domain sub-queue."""
+        if domain not in self._sub_queues:
+            self._sub_queues[domain] = await RequestQueue.open(alias=f'throttled-{domain}')
+        return self._sub_queues[domain]
 
     def _is_domain_throttled(self, domain: str) -> bool:
         """Check if a domain is currently throttled."""
@@ -113,11 +113,11 @@ class ThrottlingRequestManager(RequestManager):
             return True
 
         # Check crawl-delay: enforce minimum interval between requests.
-        if state.crawl_delay is not None and state.last_request_at is not None:
-            if now < state.last_request_at + state.crawl_delay:
-                return True
-
-        return False
+        return (
+            state.crawl_delay is not None
+            and state.last_request_at is not None
+            and now < state.last_request_at + state.crawl_delay
+        )
 
     def _get_earliest_available_time(self) -> datetime:
         """Get the earliest time any throttled domain becomes available."""
@@ -153,18 +153,16 @@ class ThrottlingRequestManager(RequestManager):
             return
 
         now = datetime.now(timezone.utc)
-        state = self._get_or_create_state(domain)
+        if domain not in self._domain_states:
+            self._domain_states[domain] = _DomainState(domain=domain)
+        state = self._domain_states[domain]
         state.consecutive_429_count += 1
 
         # Calculate delay: use Retry-After if provided, otherwise exponential backoff.
-        if retry_after is not None:
-            delay = retry_after
-        else:
-            delay = self._BASE_DELAY * (2 ** (state.consecutive_429_count - 1))
+        delay = retry_after if retry_after is not None else self._BASE_DELAY * (2 ** (state.consecutive_429_count - 1))
 
         # Cap the delay.
-        if delay > self._MAX_DELAY:
-            delay = self._MAX_DELAY
+        delay = min(delay, self._MAX_DELAY)
 
         state.throttled_until = now + delay
 
@@ -197,7 +195,9 @@ class ThrottlingRequestManager(RequestManager):
         if not domain:
             return
 
-        state = self._get_or_create_state(domain)
+        if domain not in self._domain_states:
+            self._domain_states[domain] = _DomainState(domain=domain)
+        state = self._domain_states[domain]
         state.crawl_delay = timedelta(seconds=delay_seconds)
 
         logger.debug(f'Set crawl-delay for domain "{domain}" to {delay_seconds}s')
@@ -206,7 +206,9 @@ class ThrottlingRequestManager(RequestManager):
         """Record that a request to this domain was just dispatched."""
         domain = self._extract_domain(url)
         if domain:
-            state = self._get_or_create_state(domain)
+            if domain not in self._domain_states:
+                self._domain_states[domain] = _DomainState(domain=domain)
+            state = self._domain_states[domain]
             state.last_request_at = datetime.now(timezone.utc)
 
     # ──────────────────────────────────────────────────────
@@ -215,8 +217,11 @@ class ThrottlingRequestManager(RequestManager):
 
     @override
     async def drop(self) -> None:
-        self._buffered_requests.clear()
         await self._inner.drop()
+        for sq in self._sub_queues.values():
+            await sq.drop()
+        self._sub_queues.clear()
+        self._dispatched_origins.clear()
 
     @override
     async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest:
@@ -244,71 +249,91 @@ class ThrottlingRequestManager(RequestManager):
 
     @override
     async def reclaim_request(self, request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
+        origin = self._dispatched_origins.get(request.unique_key)
+        if origin and origin != 'inner' and origin in self._sub_queues:
+            return await self._sub_queues[origin].reclaim_request(request, forefront=forefront)
         return await self._inner.reclaim_request(request, forefront=forefront)
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
+        origin = self._dispatched_origins.get(request.unique_key)
+        if origin and origin != 'inner' and origin in self._sub_queues:
+            return await self._sub_queues[origin].mark_request_as_handled(request)
         return await self._inner.mark_request_as_handled(request)
 
     @override
     async def get_handled_count(self) -> int:
-        return await self._inner.get_handled_count()
+        count = await self._inner.get_handled_count()
+        for sq in self._sub_queues.values():
+            count += await sq.get_handled_count()
+        return max(0, count - self._transferred_requests_count)
 
     @override
     async def get_total_count(self) -> int:
-        return await self._inner.get_total_count()
+        count = await self._inner.get_total_count()
+        for sq in self._sub_queues.values():
+            count += await sq.get_total_count()
+        return max(0, count - self._transferred_requests_count)
 
     @override
     async def is_empty(self) -> bool:
-        if self._buffered_requests:
+        if not await self._inner.is_empty():
             return False
-        return await self._inner.is_empty()
+        for sq in self._sub_queues.values():
+            if not await sq.is_empty():
+                return False
+        return True
 
     @override
     async def is_finished(self) -> bool:
-        if self._buffered_requests:
+        if not await self._inner.is_finished():
             return False
-        return await self._inner.is_finished()
+        for sq in self._sub_queues.values():
+            if not await sq.is_finished():
+                return False
+        return True
 
     @override
     async def fetch_next_request(self) -> Request | None:
         """Fetch the next request, respecting per-domain delays.
 
-        If the next available request belongs to a throttled domain, buffer it and
-        try the next one. If all available requests are throttled, sleep until the
-        earliest domain becomes available.
+        If the next available request belongs to a throttled domain, it is moved to
+        a per-domain sub-queue. If all unhandled requests are in throttled sub-queues,
+        it sleeps until the earliest domain becomes available.
         """
-        # First, check if any buffered requests are now unthrottled.
-        still_throttled = []
-        for req in self._buffered_requests:
-            domain = self._extract_domain(req.url)
+        # First, check if any sub-queues have unthrottled requests.
+        for domain, sq in self._sub_queues.items():
             if not self._is_domain_throttled(domain):
-                self._mark_domain_dispatched(req.url)
-                # Return remaining throttled requests to buffer.
-                self._buffered_requests = still_throttled
-                return req
-            still_throttled.append(req)
-        self._buffered_requests = still_throttled
+                req = await sq.fetch_next_request()
+                if req:
+                    self._mark_domain_dispatched(req.url)
+                    self._dispatched_origins[req.unique_key] = domain
+                    return req
 
         # Try fetching from the inner queue.
         while True:
             request = await self._inner.fetch_next_request()
 
             if request is None:
-                # No more requests in the queue.
-                if self._buffered_requests:
-                    # There are buffered requests waiting for cooldown — sleep and retry.
+                # No more requests in inner queue. Check if sub-queues have requests.
+                have_sq_requests = False
+                for sq in self._sub_queues.values():
+                    if not await sq.is_empty():
+                        have_sq_requests = True
+                        break
+
+                if have_sq_requests:
+                    # Requests exist but domains are throttled. Sleep and retry.
                     earliest = self._get_earliest_available_time()
                     sleep_duration = max(
                         (earliest - datetime.now(timezone.utc)).total_seconds(),
                         0.1,  # Minimum sleep to avoid tight loops.
                     )
                     logger.debug(
-                        f'All {len(self._buffered_requests)} buffered request(s) throttled. '
+                        f'Throttled sub-queues have requests. '
                         f'Sleeping {sleep_duration:.1f}s until earliest domain is available.'
                     )
                     await asyncio.sleep(sleep_duration)
-                    # After sleep, recursively try again.
                     return await self.fetch_next_request()
                 return None
 
@@ -317,24 +342,17 @@ class ThrottlingRequestManager(RequestManager):
             if not self._is_domain_throttled(domain):
                 # Domain is clear — dispatch immediately.
                 self._mark_domain_dispatched(request.url)
+                self._dispatched_origins[request.unique_key] = 'inner'
                 return request
 
-            # Domain is throttled — buffer this request.
+            # Domain is throttled — move this request to the sub-queue.
             logger.debug(
-                f'Request to {request.url} buffered — domain "{domain}" is throttled'
+                f'Request to {request.url} moved to sub-queue — domain "{domain}" is throttled'
             )
-            self._buffered_requests.append(request)
+            sq = await self._get_or_create_sub_queue(domain)
+            await sq.add_request(request)
 
-            if len(self._buffered_requests) >= self._MAX_BUFFER_SIZE:
-                # Too many buffered: sleep until earliest cooldown and retry.
-                earliest = self._get_earliest_available_time()
-                sleep_duration = max(
-                    (earliest - datetime.now(timezone.utc)).total_seconds(),
-                    0.1,
-                )
-                logger.debug(
-                    f'Buffer full ({self._MAX_BUFFER_SIZE} requests). '
-                    f'Sleeping {sleep_duration:.1f}s.'
-                )
-                await asyncio.sleep(sleep_duration)
-                return await self.fetch_next_request()
+            # Mark it handled in inner so it is not processed twice.
+            # We track transfer count to correct get_total_count and get_handled_count.
+            await self._inner.mark_request_as_handled(request)
+            self._transferred_requests_count += 1

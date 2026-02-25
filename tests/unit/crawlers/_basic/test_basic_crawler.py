@@ -28,7 +28,7 @@ from crawlee.crawlers import BasicCrawler
 from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
 from crawlee.events import Event, EventCrawlerStatusData
 from crawlee.events._local_event_manager import LocalEventManager
-from crawlee.request_loaders import RequestList, RequestManagerTandem
+from crawlee.request_loaders import RequestList, RequestManagerTandem, ThrottlingRequestManager
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
@@ -653,7 +653,7 @@ async def test_crawler_get_storages() -> None:
     crawler = BasicCrawler()
 
     rp = await crawler.get_request_manager()
-    assert isinstance(rp, RequestQueue)
+    assert isinstance(rp, ThrottlingRequestManager)
 
     dataset = await crawler.get_dataset()
     assert isinstance(dataset, Dataset)
@@ -1238,7 +1238,8 @@ async def test_crawler_uses_default_storages(tmp_path: Path) -> None:
 
     assert dataset is await crawler.get_dataset()
     assert kvs is await crawler.get_key_value_store()
-    assert rq is await crawler.get_request_manager()
+    manager = await crawler.get_request_manager()
+    assert (manager._inner if isinstance(manager, ThrottlingRequestManager) else manager) is rq
 
 
 async def test_crawler_can_use_other_storages(tmp_path: Path) -> None:
@@ -1256,7 +1257,8 @@ async def test_crawler_can_use_other_storages(tmp_path: Path) -> None:
 
     assert dataset is not await crawler.get_dataset()
     assert kvs is not await crawler.get_key_value_store()
-    assert rq is not await crawler.get_request_manager()
+    manager = await crawler.get_request_manager()
+    assert (manager._inner if isinstance(manager, ThrottlingRequestManager) else manager) is not rq
 
 
 async def test_crawler_can_use_other_storages_of_same_type(tmp_path: Path) -> None:
@@ -1293,7 +1295,8 @@ async def test_crawler_can_use_other_storages_of_same_type(tmp_path: Path) -> No
     # Assert that the storages are different
     assert dataset is not await crawler.get_dataset()
     assert kvs is not await crawler.get_key_value_store()
-    assert rq is not await crawler.get_request_manager()
+    manager = await crawler.get_request_manager()
+    assert (manager._inner if isinstance(manager, ThrottlingRequestManager) else manager) is not rq
 
     # Assert that all storages exists on the filesystem
     for path in expected_paths:

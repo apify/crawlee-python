@@ -15,7 +15,7 @@ def parse_retry_after_header(value: str | None) -> timedelta | None:
         value: The raw Retry-After header value.
 
     Returns:
-        A timedelta representing the delay, or None if the header is missing or unparseable.
+        A timedelta representing the delay, or None if the header is missing or unparsable.
     """
     if not value:
         return None

@@ -1,23 +1,15 @@
-"""Tests for ThrottlingRequestManager - per-domain delay scheduling.
-
-Tests cover: 429 backoff, robots.txt crawl-delay, domain independence,
-exponential backoff, buffer + sleep behavior, and full RequestManager delegation.
-"""
+"""Tests for ThrottlingRequestManager - per-domain delay scheduling."""
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from crawlee._request import Request
-from crawlee.request_loaders._throttling_request_manager import ThrottlingRequestManager, _DomainState
 from crawlee._utils.http import parse_retry_after_header
-
-
-# ── Fixtures ──────────────────────────────────────────────
+from crawlee.request_loaders._throttling_request_manager import ThrottlingRequestManager
 
 
 @pytest.fixture
@@ -43,6 +35,28 @@ def manager(mock_inner: AsyncMock) -> ThrottlingRequestManager:
     return ThrottlingRequestManager(mock_inner)
 
 
+@pytest.fixture(autouse=True)
+def mock_request_queue_open() -> AsyncMock:
+    """Mock RequestQueue.open to avoid hitting real storage during tests."""
+    target = 'crawlee.request_loaders._throttling_request_manager.RequestQueue.open'
+    with patch(target, new_callable=AsyncMock) as mocked:
+        async def mock_open(*args: any, **kwargs: any) -> AsyncMock:  # noqa: ARG001
+            sq = AsyncMock()
+            sq.fetch_next_request = AsyncMock(return_value=None)
+            sq.add_request = AsyncMock()
+            sq.reclaim_request = AsyncMock()
+            sq.mark_request_as_handled = AsyncMock()
+            sq.get_handled_count = AsyncMock(return_value=0)
+            sq.get_total_count = AsyncMock(return_value=0)
+            sq.is_empty = AsyncMock(return_value=True)
+            sq.is_finished = AsyncMock(return_value=True)
+            sq.drop = AsyncMock()
+            return sq
+
+        mocked.side_effect = mock_open
+        yield mocked
+
+
 def _make_request(url: str) -> Request:
     """Helper to create a Request object."""
     return Request.from_url(url)
@@ -51,273 +65,305 @@ def _make_request(url: str) -> Request:
 # ── Core Throttling Tests ─────────────────────────────────
 
 
-class TestDomainThrottling:
-    """Tests for per-domain rate limiting."""
+@pytest.mark.asyncio
+async def test_non_throttled_passes_through(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    """Requests for non-throttled domains should return immediately."""
+    request = _make_request('https://example.com/page1')
+    mock_inner.fetch_next_request.return_value = request
 
-    @pytest.mark.asyncio
-    async def test_non_throttled_passes_through(self, manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
-        """Requests for non-throttled domains should return immediately."""
-        request = _make_request('https://example.com/page1')
-        mock_inner.fetch_next_request.return_value = request
+    result = await manager.fetch_next_request()
 
-        result = await manager.fetch_next_request()
+    assert result is not None
+    assert result.url == 'https://example.com/page1'
 
-        assert result is not None
-        assert result.url == 'https://example.com/page1'
 
-    @pytest.mark.asyncio
-    async def test_429_triggers_domain_delay(self, manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
-        """After record_domain_delay(), the domain should be throttled."""
-        manager.record_domain_delay('https://example.com/page1')
+@pytest.mark.asyncio
+async def test_429_triggers_domain_delay(manager: ThrottlingRequestManager) -> None:
+    """After record_domain_delay(), the domain should be throttled."""
+    manager.record_domain_delay('https://example.com/page1')
 
-        assert manager._is_domain_throttled('example.com')
+    assert manager._is_domain_throttled('example.com')
 
-    @pytest.mark.asyncio
-    async def test_different_domains_independent(self, manager: ThrottlingRequestManager) -> None:
-        """Throttling example.com should NOT affect other-site.com."""
-        manager.record_domain_delay('https://example.com/page1')
 
-        assert manager._is_domain_throttled('example.com')
-        assert not manager._is_domain_throttled('other-site.com')
+@pytest.mark.asyncio
+async def test_different_domains_independent(manager: ThrottlingRequestManager) -> None:
+    """Throttling example.com should NOT affect other-site.com."""
+    manager.record_domain_delay('https://example.com/page1')
 
-    @pytest.mark.asyncio
-    async def test_exponential_backoff(self, manager: ThrottlingRequestManager) -> None:
-        """Consecutive 429s should increase delay exponentially."""
-        url = 'https://example.com/page1'
+    assert manager._is_domain_throttled('example.com')
+    assert not manager._is_domain_throttled('other-site.com')
 
-        # First 429: 2s delay.
+
+@pytest.mark.asyncio
+async def test_exponential_backoff(manager: ThrottlingRequestManager) -> None:
+    """Consecutive 429s should increase delay exponentially."""
+    url = 'https://example.com/page1'
+
+    manager.record_domain_delay(url)
+    state = manager._domain_states['example.com']
+    first_until = state.throttled_until
+
+    manager.record_domain_delay(url)
+    second_until = state.throttled_until
+
+    assert second_until > first_until
+    assert state.consecutive_429_count == 2
+
+
+@pytest.mark.asyncio
+async def test_max_delay_cap(manager: ThrottlingRequestManager) -> None:
+    """Backoff should cap at _MAX_DELAY (60s)."""
+    url = 'https://example.com/page1'
+
+    for _ in range(20):
         manager.record_domain_delay(url)
-        state = manager._domain_states['example.com']
-        first_until = state.throttled_until
 
-        # Second 429: 4s delay.
-        manager.record_domain_delay(url)
-        second_until = state.throttled_until
+    state = manager._domain_states['example.com']
+    now = datetime.now(timezone.utc)
+    actual_delay = state.throttled_until - now
 
-        # The second delay should extend further into the future.
-        assert second_until > first_until
-        assert state.consecutive_429_count == 2
+    assert actual_delay <= manager._MAX_DELAY + timedelta(seconds=1)
 
-    @pytest.mark.asyncio
-    async def test_max_delay_cap(self, manager: ThrottlingRequestManager) -> None:
-        """Backoff should cap at _MAX_DELAY (60s)."""
-        url = 'https://example.com/page1'
 
-        # Trigger many 429s to hit the cap.
-        for _ in range(20):
-            manager.record_domain_delay(url)
+@pytest.mark.asyncio
+async def test_retry_after_header_priority(manager: ThrottlingRequestManager) -> None:
+    """Explicit Retry-After should override exponential backoff."""
+    url = 'https://example.com/page1'
 
-        state = manager._domain_states['example.com']
-        now = datetime.now(timezone.utc)
-        actual_delay = state.throttled_until - now
+    manager.record_domain_delay(url, retry_after=timedelta(seconds=30))
 
-        # Should never exceed MAX_DELAY + small tolerance.
-        assert actual_delay <= manager._MAX_DELAY + timedelta(seconds=1)
+    state = manager._domain_states['example.com']
+    now = datetime.now(timezone.utc)
+    actual_delay = state.throttled_until - now
 
-    @pytest.mark.asyncio
-    async def test_retry_after_header_priority(self, manager: ThrottlingRequestManager) -> None:
-        """Explicit Retry-After should override exponential backoff."""
-        url = 'https://example.com/page1'
+    assert actual_delay > timedelta(seconds=28)
+    assert actual_delay <= timedelta(seconds=31)
 
-        # Record with explicit 30s Retry-After.
-        manager.record_domain_delay(url, retry_after=timedelta(seconds=30))
 
-        state = manager._domain_states['example.com']
-        now = datetime.now(timezone.utc)
-        actual_delay = state.throttled_until - now
+@pytest.mark.asyncio
+async def test_success_resets_backoff(manager: ThrottlingRequestManager) -> None:
+    """Successful request should reset the consecutive 429 count."""
+    url = 'https://example.com/page1'
 
-        # Should be approximately 30s (within tolerance).
-        assert actual_delay > timedelta(seconds=28)
-        assert actual_delay <= timedelta(seconds=31)
+    manager.record_domain_delay(url)
+    manager.record_domain_delay(url)
+    assert manager._domain_states['example.com'].consecutive_429_count == 2
 
-    @pytest.mark.asyncio
-    async def test_success_resets_backoff(self, manager: ThrottlingRequestManager) -> None:
-        """Successful request should reset the consecutive 429 count."""
-        url = 'https://example.com/page1'
-
-        manager.record_domain_delay(url)
-        manager.record_domain_delay(url)
-        assert manager._domain_states['example.com'].consecutive_429_count == 2
-
-        manager.record_success(url)
-        assert manager._domain_states['example.com'].consecutive_429_count == 0
+    manager.record_success(url)
+    assert manager._domain_states['example.com'].consecutive_429_count == 0
 
 
 # ── Crawl-Delay Integration Tests ─────────────────────────
 
 
-class TestCrawlDelay:
-    """Tests for robots.txt crawl-delay integration (#1396)."""
+@pytest.mark.asyncio
+async def test_crawl_delay_integration(manager: ThrottlingRequestManager) -> None:
+    """set_crawl_delay() should enforce per-domain minimum interval."""
+    url = 'https://example.com/page1'
+    manager.set_crawl_delay(url, 5)
 
-    @pytest.mark.asyncio
-    async def test_crawl_delay_integration(self, manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
-        """set_crawl_delay() should enforce per-domain minimum interval."""
-        url = 'https://example.com/page1'
-        manager.set_crawl_delay(url, 5)
+    state = manager._domain_states['example.com']
+    assert state.crawl_delay == timedelta(seconds=5)
 
-        state = manager._domain_states['example.com']
-        assert state.crawl_delay == timedelta(seconds=5)
 
-    @pytest.mark.asyncio
-    async def test_crawl_delay_throttles_after_dispatch(
-        self, manager: ThrottlingRequestManager, mock_inner: AsyncMock
-    ) -> None:
-        """After dispatching a request, crawl-delay should throttle the next one."""
-        url = 'https://example.com/page1'
-        manager.set_crawl_delay(url, 5)
+@pytest.mark.asyncio
+async def test_crawl_delay_throttles_after_dispatch(manager: ThrottlingRequestManager) -> None:
+    """After dispatching a request, crawl-delay should throttle the next one."""
+    url = 'https://example.com/page1'
+    manager.set_crawl_delay(url, 5)
 
-        # Simulate dispatching (which sets last_request_at).
-        manager._mark_domain_dispatched(url)
+    manager._mark_domain_dispatched(url)
 
-        # Domain should now be throttled.
-        assert manager._is_domain_throttled('example.com')
+    assert manager._is_domain_throttled('example.com')
 
 
 # ── Sleep-Based Scheduling Tests ────────────────────────
 
 
-class TestSchedulingBehavior:
-    """Tests for the sleep-based scheduling that eliminates busy-wait."""
+@pytest.mark.asyncio
+async def test_mixed_throttled_and_unthrottled(
+    manager: ThrottlingRequestManager,
+    mock_inner: AsyncMock,
+    mock_request_queue_open: AsyncMock,
+) -> None:
+    """Throttled domain requests should be moved to sub-queues; unthrottled ones returned."""
+    throttled_req = _make_request('https://throttled.com/page1')
+    unthrottled_req = _make_request('https://free.com/page1')
 
-    @pytest.mark.asyncio
-    async def test_mixed_throttled_and_unthrottled(
-        self, manager: ThrottlingRequestManager, mock_inner: AsyncMock
-    ) -> None:
-        """Throttled domain requests should be buffered; unthrottled ones returned."""
-        throttled_req = _make_request('https://throttled.com/page1')
-        unthrottled_req = _make_request('https://free.com/page1')
+    manager.record_domain_delay('https://throttled.com/page1')
 
-        # Throttle one domain.
-        manager.record_domain_delay('https://throttled.com/page1')
+    # inner returns throttled, then unthrottled
+    mock_inner.fetch_next_request.side_effect = [throttled_req, unthrottled_req]
 
-        # Inner queue returns throttled first, then unthrottled.
-        mock_inner.fetch_next_request.side_effect = [throttled_req, unthrottled_req]
+    result = await manager.fetch_next_request()
+
+    assert result is not None
+    assert result.url == 'https://free.com/page1'
+
+    # Verify throttled request was moved to sub-queue
+    mock_request_queue_open.assert_called_once()
+    assert 'throttled.com' in manager._sub_queues
+
+    sq = manager._sub_queues['throttled.com']
+    sq.add_request.assert_called_once_with(throttled_req)
+
+
+@pytest.mark.asyncio
+async def test_sleep_instead_of_busy_wait(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    """When all domains are throttled and queue is empty, should sleep (not spin)."""
+    throttled_req = _make_request('https://throttled.com/page1')
+
+    manager.record_domain_delay('https://throttled.com/page1', retry_after=timedelta(seconds=0.2))
+
+    # inner queue returns the request first time, then None
+    mock_inner.fetch_next_request.side_effect = [throttled_req, None]
+
+    target = 'crawlee.request_loaders._throttling_request_manager.asyncio.sleep'
+    with patch(target, new_callable=AsyncMock) as mock_sleep:
+        # Instead of actually sleeping, we simulate the time passing by unthrottling the domain
+        async def sleep_side_effect(*args: any, **kwargs: any) -> None:  # noqa: ARG001
+            # Clear throttle so recursive call succeeds
+            manager._domain_states['throttled.com'].throttled_until = datetime.now(timezone.utc)
+            # Setup the sub-queue to return the request now
+            sq = manager._sub_queues['throttled.com']
+            sq.fetch_next_request.side_effect = [throttled_req, None]
+            # Must return False then True so loop proceeds
+            sq.is_empty.side_effect = [False, True]
+
+        mock_sleep.side_effect = sleep_side_effect
+        
+        # When request is moved to sub-queue, we must ensure it isn't "empty" so it triggers sleep
+        async def mock_add_request(*args: any, **kwargs: any) -> None:
+            sq = manager._sub_queues['throttled.com']
+            sq.is_empty.return_value = False
+        manager._sub_queues = {'throttled.com': AsyncMock()}
+        manager._sub_queues['throttled.com'].add_request.side_effect = mock_add_request
+        manager._sub_queues['throttled.com'].is_empty.return_value = True
 
         result = await manager.fetch_next_request()
 
-        # Should skip the throttled one and return the unthrottled one.
+        mock_sleep.assert_called_once()
         assert result is not None
-        assert result.url == 'https://free.com/page1'
-        # Throttled request should be in the buffer.
-        assert len(manager._buffered_requests) == 1
-
-    @pytest.mark.asyncio
-    async def test_sleep_instead_of_busy_wait(
-        self, manager: ThrottlingRequestManager, mock_inner: AsyncMock
-    ) -> None:
-        """When all domains are throttled and queue is empty, should sleep (not spin)."""
-        throttled_req = _make_request('https://throttled.com/page1')
-
-        # Throttle the domain with a very short delay for test speed.
-        manager.record_domain_delay('https://throttled.com/page1', retry_after=timedelta(seconds=0.2))
-
-        # First call returns throttled request, second returns None (queue empty).
-        mock_inner.fetch_next_request.side_effect = [throttled_req, None]
-
-        with patch('crawlee.request_loaders._throttling_request_manager.asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
-            # Make sleep a no-op but track that it was called.
-            mock_sleep.return_value = None
-
-            # After sleep, the buffered request should be returned.
-            # We need the recursive call to find the now-unthrottled buffered request.
-            # Reset throttle so the recursive call succeeds.
-            async def sleep_side_effect(duration: float) -> None:
-                # After sleeping, clear the throttle so the request can be dispatched.
-                manager._domain_states['throttled.com'].throttled_until = datetime.now(timezone.utc)
-
-            mock_sleep.side_effect = sleep_side_effect
-
-            result = await manager.fetch_next_request()
-
-            # asyncio.sleep should have been called instead of busy-waiting.
-            mock_sleep.assert_called_once()
-            assert result is not None
-            assert result.url == 'https://throttled.com/page1'
+        assert result.url == 'https://throttled.com/page1'
 
 
 # ── Delegation Tests ────────────────────────────────────
 
 
-class TestRequestManagerDelegation:
-    """Verify all RequestManager methods properly delegate to inner."""
+@pytest.mark.asyncio
+async def test_add_request_delegates(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    request = _make_request('https://example.com')
+    await manager.add_request(request)
+    mock_inner.add_request.assert_called_once_with(request, forefront=False)
 
-    @pytest.mark.asyncio
-    async def test_add_request_delegates(self, manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
-        request = _make_request('https://example.com')
-        await manager.add_request(request)
-        mock_inner.add_request.assert_called_once_with(request, forefront=False)
 
-    @pytest.mark.asyncio
-    async def test_reclaim_request_delegates(self, manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
-        request = _make_request('https://example.com')
-        await manager.reclaim_request(request)
-        mock_inner.reclaim_request.assert_called_once_with(request, forefront=False)
+@pytest.mark.asyncio
+async def test_reclaim_request_delegates(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    request = _make_request('https://example.com')
+    await manager.reclaim_request(request)
+    mock_inner.reclaim_request.assert_called_once_with(request, forefront=False)
 
-    @pytest.mark.asyncio
-    async def test_mark_request_as_handled_delegates(
-        self, manager: ThrottlingRequestManager, mock_inner: AsyncMock
-    ) -> None:
-        request = _make_request('https://example.com')
-        await manager.mark_request_as_handled(request)
-        mock_inner.mark_request_as_handled.assert_called_once_with(request)
 
-    @pytest.mark.asyncio
-    async def test_get_handled_count_delegates(
-        self, manager: ThrottlingRequestManager, mock_inner: AsyncMock
-    ) -> None:
-        mock_inner.get_handled_count.return_value = 42
-        assert await manager.get_handled_count() == 42
+@pytest.mark.asyncio
+async def test_reclaim_request_delegates_to_sub_queue(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    request = _make_request('https://example.com')
+    
+    # Setup state manually assuming it was fetched from a sub-queue
+    sq = AsyncMock()
+    manager._sub_queues['example.com'] = sq
+    manager._dispatched_origins[request.unique_key] = 'example.com'
 
-    @pytest.mark.asyncio
-    async def test_get_total_count_delegates(
-        self, manager: ThrottlingRequestManager, mock_inner: AsyncMock
-    ) -> None:
-        mock_inner.get_total_count.return_value = 100
-        assert await manager.get_total_count() == 100
+    await manager.reclaim_request(request)
 
-    @pytest.mark.asyncio
-    async def test_is_empty_with_buffer(self, manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
-        """is_empty should return False if there are buffered requests."""
-        mock_inner.is_empty.return_value = True
-        assert await manager.is_empty() is True
+    sq.reclaim_request.assert_called_once_with(request, forefront=False)
+    mock_inner.reclaim_request.assert_not_called()
 
-        # Add a buffered request.
-        manager._buffered_requests.append(_make_request('https://example.com'))
-        assert await manager.is_empty() is False
 
-    @pytest.mark.asyncio
-    async def test_is_finished_with_buffer(self, manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
-        """is_finished should return False if there are buffered requests."""
-        mock_inner.is_finished.return_value = True
-        assert await manager.is_finished() is True
+@pytest.mark.asyncio
+async def test_mark_request_as_handled_delegates(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    request = _make_request('https://example.com')
+    await manager.mark_request_as_handled(request)
+    mock_inner.mark_request_as_handled.assert_called_once_with(request)
 
-        manager._buffered_requests.append(_make_request('https://example.com'))
-        assert await manager.is_finished() is False
 
-    @pytest.mark.asyncio
-    async def test_drop_clears_buffer(self, manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
-        """drop() should clear the buffer and delegate."""
-        manager._buffered_requests.append(_make_request('https://example.com'))
-        await manager.drop()
-        assert len(manager._buffered_requests) == 0
-        mock_inner.drop.assert_called_once()
+@pytest.mark.asyncio
+async def test_get_handled_count_aggregates(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    mock_inner.get_handled_count.return_value = 42
+
+    sq = AsyncMock()
+    sq.get_handled_count.return_value = 10
+    manager._sub_queues['example.com'] = sq
+    manager._transferred_requests_count = 5
+
+    assert await manager.get_handled_count() == 47
+
+
+@pytest.mark.asyncio
+async def test_get_total_count_aggregates(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    mock_inner.get_total_count.return_value = 100
+
+    sq = AsyncMock()
+    sq.get_total_count.return_value = 20
+    manager._sub_queues['example.com'] = sq
+    manager._transferred_requests_count = 10
+
+    assert await manager.get_total_count() == 110
+
+
+@pytest.mark.asyncio
+async def test_is_empty_aggregates(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    mock_inner.is_empty.return_value = True
+    assert await manager.is_empty() is True
+
+    sq = AsyncMock()
+    sq.is_empty.return_value = False
+    manager._sub_queues['example.com'] = sq
+
+    assert await manager.is_empty() is False
+
+
+@pytest.mark.asyncio
+async def test_is_finished_aggregates(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    mock_inner.is_finished.return_value = True
+    assert await manager.is_finished() is True
+
+    sq = AsyncMock()
+    sq.is_finished.return_value = False
+    manager._sub_queues['example.com'] = sq
+
+    assert await manager.is_finished() is False
+
+
+@pytest.mark.asyncio
+async def test_drop_clears_all(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    request = _make_request('https://example.com')
+    sq = AsyncMock()
+    manager._sub_queues['example.com'] = sq
+    manager._dispatched_origins[request.unique_key] = 'inner'
+
+    await manager.drop()
+
+    mock_inner.drop.assert_called_once()
+    sq.drop.assert_called_once()
+    assert len(manager._sub_queues) == 0
+    assert len(manager._dispatched_origins) == 0
 
 
 # ── Utility Tests ──────────────────────────────────────
 
 
-class TestParseRetryAfterHeader:
-    """Tests for the extracted parse_retry_after_header utility."""
+def test_parse_retry_after_none_value() -> None:
+    assert parse_retry_after_header(None) is None
 
-    def test_none_value(self) -> None:
-        assert parse_retry_after_header(None) is None
 
-    def test_empty_string(self) -> None:
-        assert parse_retry_after_header('') is None
+def test_parse_retry_after_empty_string() -> None:
+    assert parse_retry_after_header('') is None
 
-    def test_integer_seconds(self) -> None:
-        result = parse_retry_after_header('120')
-        assert result == timedelta(seconds=120)
 
-    def test_invalid_value(self) -> None:
-        assert parse_retry_after_header('not-a-date-or-number') is None
+def test_parse_retry_after_integer_seconds() -> None:
+    result = parse_retry_after_header('120')
+    assert result == timedelta(seconds=120)
+
+
+def test_parse_retry_after_invalid_value() -> None:
+    assert parse_retry_after_header('not-a-date-or-number') is None

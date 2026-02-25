@@ -282,7 +282,7 @@ class AbstractHttpCrawler(
             self._raise_for_session_blocked_status_code(
                 context.session,
                 status_code,
-                url=context.request.url,
+                request_url=context.request.url,
                 retry_after_header=context.http_response.headers.get('retry-after'),
             )
         self._raise_for_error_status_code(status_code)
