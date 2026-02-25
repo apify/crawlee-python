@@ -909,7 +909,10 @@ async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> Non
     assert (await store.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0')) == {'hello': 'last_world'}
 
 
-async def test_max_requests_per_crawl() -> None:
+@pytest.mark.parametrize(
+    'use_failed_requests', [pytest.param(True, id='failed requests'), pytest.param(False, id='finished requests')]
+)
+async def test_max_requests_per_crawl(*, use_failed_requests: bool) -> None:
     start_urls = [
         'http://test.io/1',
         'http://test.io/2',
@@ -927,14 +930,17 @@ async def test_max_requests_per_crawl() -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
+        if use_failed_requests:
+            raise RuntimeError('Arbitrary crash for testing purposes')
         processed_urls.append(context.request.url)
 
     stats = await crawler.run(start_urls)
 
     # Verify that only 3 out of the 5 provided URLs were made
-    assert len(processed_urls) == 3
+    if not use_failed_requests:
+        assert len(processed_urls) == 3
+        assert stats.requests_finished == 3
     assert stats.requests_total == 3
-    assert stats.requests_finished == 3
 
 
 async def test_max_crawl_depth() -> None:

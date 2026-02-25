@@ -566,7 +566,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if self._max_requests_per_crawl is None:
             return
 
-        if self._statistics.state.requests_finished >= self._max_requests_per_crawl:
+        if self._statistics.state.requests_total >= self._max_requests_per_crawl:
             self.stop(
                 reason=f'The crawler has reached its limit of {self._max_requests_per_crawl} requests per crawl. '
             )
