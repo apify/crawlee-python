@@ -346,9 +346,7 @@ class ThrottlingRequestManager(RequestManager):
                 return request
 
             # Domain is throttled — move this request to the sub-queue.
-            logger.debug(
-                f'Request to {request.url} moved to sub-queue — domain "{domain}" is throttled'
-            )
+            logger.debug(f'Request to {request.url} moved to sub-queue — domain "{domain}" is throttled')
             sq = await self._get_or_create_sub_queue(domain)
             await sq.add_request(request)
 

@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, patch
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 import pytest
 
@@ -36,11 +40,12 @@ def manager(mock_inner: AsyncMock) -> ThrottlingRequestManager:
 
 
 @pytest.fixture(autouse=True)
-def mock_request_queue_open() -> AsyncMock:
+def mock_request_queue_open() -> Iterator[AsyncMock]:
     """Mock RequestQueue.open to avoid hitting real storage during tests."""
     target = 'crawlee.request_loaders._throttling_request_manager.RequestQueue.open'
     with patch(target, new_callable=AsyncMock) as mocked:
-        async def mock_open(*args: any, **kwargs: any) -> AsyncMock:  # noqa: ARG001
+
+        async def mock_open(*_args: Any, **_kwargs: Any) -> AsyncMock:
             sq = AsyncMock()
             sq.fetch_next_request = AsyncMock(return_value=None)
             sq.add_request = AsyncMock()
@@ -205,7 +210,7 @@ async def test_mixed_throttled_and_unthrottled(
     assert 'throttled.com' in manager._sub_queues
 
     sq = manager._sub_queues['throttled.com']
-    sq.add_request.assert_called_once_with(throttled_req)
+    cast('AsyncMock', sq.add_request).assert_called_once_with(throttled_req)
 
 
 @pytest.mark.asyncio
@@ -221,21 +226,22 @@ async def test_sleep_instead_of_busy_wait(manager: ThrottlingRequestManager, moc
     target = 'crawlee.request_loaders._throttling_request_manager.asyncio.sleep'
     with patch(target, new_callable=AsyncMock) as mock_sleep:
         # Instead of actually sleeping, we simulate the time passing by unthrottling the domain
-        async def sleep_side_effect(*args: any, **kwargs: any) -> None:  # noqa: ARG001
+        async def sleep_side_effect(*_args: Any, **_kwargs: Any) -> None:
             # Clear throttle so recursive call succeeds
             manager._domain_states['throttled.com'].throttled_until = datetime.now(timezone.utc)
             # Setup the sub-queue to return the request now
             sq = manager._sub_queues['throttled.com']
-            sq.fetch_next_request.side_effect = [throttled_req, None]
+            cast('AsyncMock', sq.fetch_next_request).side_effect = [throttled_req, None]
             # Must return False then True so loop proceeds
-            sq.is_empty.side_effect = [False, True]
+            cast('AsyncMock', sq.is_empty).side_effect = [False, True]
 
         mock_sleep.side_effect = sleep_side_effect
-        
+
         # When request is moved to sub-queue, we must ensure it isn't "empty" so it triggers sleep
-        async def mock_add_request(*args: any, **kwargs: any) -> None:
+        async def mock_add_request(*_args: Any, **_kwargs: Any) -> None:
             sq = manager._sub_queues['throttled.com']
-            sq.is_empty.return_value = False
+            cast('AsyncMock', sq.is_empty).return_value = False
+
         manager._sub_queues = {'throttled.com': AsyncMock()}
         manager._sub_queues['throttled.com'].add_request.side_effect = mock_add_request
         manager._sub_queues['throttled.com'].is_empty.return_value = True
@@ -267,7 +273,7 @@ async def test_reclaim_request_delegates(manager: ThrottlingRequestManager, mock
 @pytest.mark.asyncio
 async def test_reclaim_request_delegates_to_sub_queue(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
     request = _make_request('https://example.com')
-    
+
     # Setup state manually assuming it was fetched from a sub-queue
     sq = AsyncMock()
     manager._sub_queues['example.com'] = sq
