@@ -1,1 +1,1 @@
-.rules
+.rules.md
