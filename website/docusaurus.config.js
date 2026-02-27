@@ -242,10 +242,6 @@ module.exports = {
                 hideable: true,
             },
         },
-        announcementBar: {
-            id: `apify-1m-challenge`,
-            content: `<b><a href="https://apify.com/challenge">Apify $1M Challenge 💰</a></b> Earn and win building with Crawlee!`,
-        },
         navbar: {
             hideOnScroll: true,
             logo: {
