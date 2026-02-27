@@ -1,0 +1,127 @@
+# Coding guidelines
+
+This file provides guidance to programming agents when working with code in this repository.
+
+## Development Commands
+
+All commands use `uv` (package manager) and `poe` (task runner):
+
+```bash
+# Install all dependencies (dev + extras + pre-commit + playwright)
+uv run poe install-dev
+
+# Run full check suite (lint + type-check + unit tests)
+uv run poe check-code
+
+# Linting (ruff format check + ruff check)
+uv run poe lint
+
+# Auto-fix formatting
+uv run poe format
+
+# Type checking (ty)
+uv run poe type-check
+
+# Run all unit tests
+uv run poe unit-tests
+
+# Run a single test file
+uv run pytest tests/unit/path/to/test_file.py
+
+# Run a single test by name
+uv run pytest tests/unit/path/to/test_file.py::test_name -v
+
+# Run tests with coverage XML report
+uv run poe unit-tests-cov
+
+# Build package
+uv run poe build
+
+# Clean build artifacts
+uv run poe clean
+```
+
+Note: `uv run poe unit-tests` first runs tests marked `@pytest.mark.run_alone` in isolation, then runs the rest with `-x` (fail-fast) and parallelism via `pytest-xdist`.
+
+## Code Style
+
+- **Linter/formatter**: Ruff with `select = ["ALL"]` and specific ignores
+- **Line length**: 120 characters
+- **Quotes**: Single quotes (double for docstrings)
+- **Docstrings**: Google format (enforced by Ruff)
+- **Type checker**: ty (Astral's type checker), target Python 3.10
+- **Async mode**: pytest-asyncio in `auto` mode (no need for `@pytest.mark.asyncio`)
+- **Commit format**: Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, etc.)
+
+## Architecture
+
+### Crawler Hierarchy
+
+```
+BasicCrawler[TCrawlingContext, TStatisticsState]
+├── AbstractHttpCrawler  →  HttpCrawler, BeautifulSoupCrawler, ParselCrawler
+├── PlaywrightCrawler
+└── AdaptivePlaywrightCrawler (extends PlaywrightCrawler)
+```
+
+- **BasicCrawler** (`src/crawlee/crawlers/_basic/`): Core request lifecycle, autoscaling pool, retries, session management, router dispatch. Generic over `TCrawlingContext`.
+- **AbstractHttpCrawler** (`src/crawlee/crawlers/_abstract_http/`): Adds HTTP client integration, response parsing, pre-navigation hooks. Generic over parser result type.
+- **PlaywrightCrawler** (`src/crawlee/crawlers/_playwright/`): Browser-based crawling with Playwright.
+
+### Context Pipeline (Middleware Pattern)
+
+Contexts are progressively enhanced through `ContextPipeline` middleware:
+
+```
+BasicCrawlingContext → HttpCrawlingContext → ParsedHttpCrawlingContext → BeautifulSoupCrawlingContext
+```
+
+Each middleware is an async generator that wraps the next handler, enabling setup/teardown around request processing.
+
+### Storage Layer
+
+Three-tier design:
+- **High-level**: `Dataset`, `KeyValueStore`, `RequestQueue` in `src/crawlee/storages/`
+- **Storage clients** (`src/crawlee/storage_clients/`): `FileSystemStorageClient` (default), `MemoryStorageClient`, `SqlStorageClient`, `RedisStorageClient`
+- **Instance caching**: `StorageInstanceManager` is a global singleton that caches storage instances by ID/name
+
+### Service Locator
+
+`src/crawlee/_service_locator.py` is a global singleton managing `Configuration`, `EventManager`, `StorageClient`, and `StorageInstanceManager`. Prevents double-initialization with `ServiceConflictError`.
+
+### HTTP Clients
+
+Pluggable via `HttpClient` interface in `src/crawlee/http_clients/`:
+- `ImpitHttpClient` (default), `HttpxHttpClient`, `CurlImpersonateHttpClient`
+- Each provides `crawl()` (for crawler pipeline) and `send_request()` (for in-handler use)
+
+### Request Model
+
+`Request` (`src/crawlee/_request.py`) uses `unique_key` for deduplication. Lifecycle states: `UNPROCESSED → DONE`. Crawlee-specific metadata stored in `user_data['__crawlee']`.
+
+### Router
+
+```python
+@crawler.router.default_handler
+async def handler(context: BeautifulSoupCrawlingContext): ...
+
+@crawler.router.handler(label='detail')
+async def detail(context: BeautifulSoupCrawlingContext): ...
+```
+
+Requests are routed by their `label` field; unmatched requests go to the default handler.
+
+### Key Directories
+
+- `src/crawlee/crawlers/` - All crawler implementations
+- `src/crawlee/storages/` - Dataset, KVS, RequestQueue
+- `src/crawlee/storage_clients/` - Backend implementations
+- `src/crawlee/http_clients/` - HTTP client implementations
+- `src/crawlee/browsers/` - Playwright browser pool and plugins
+- `src/crawlee/sessions/` - Session management with cookie persistence
+- `src/crawlee/events/` - Event system (persist state, progress, aborting)
+- `src/crawlee/_autoscaling/` - Autoscaled pool for concurrency control
+- `src/crawlee/fingerprint_suite/` - Anti-bot fingerprint generation
+- `src/crawlee/project_template/` - CLI scaffolding template (excluded from linting)
+- `tests/unit/` - Unit tests
+- `tests/e2e/` - End-to-end tests (require `apify-cli` + API token)

@@ -15,9 +15,9 @@
 .serena
 .windsurf
 .zed-ai
-AGENTS.md
-CLAUDE.md
-GEMINI.md
+AGENTS.local.md
+CLAUDE.local.md
+GEMINI.local.md
 
 # Cache
 __pycache__
