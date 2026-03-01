@@ -190,6 +190,7 @@ Why Crawlee is the preferred choice for web scraping and crawling?
 - **Simple integration** – Crawlee crawlers are regular Python scripts, requiring no additional launcher executor. This flexibility allows to integrate a crawler directly into other applications.
 - **State persistence** – Supports state persistence during interruptions, saving time and costs by avoiding the need to restart scraping pipelines from scratch after an issue.
 - **Organized data storages** – Allows saving of multiple types of results in a single scraping run. Offers several storing options (see [datasets](https://crawlee.dev/python/api/class/Dataset) & [key-value stores](https://crawlee.dev/python/api/class/KeyValueStore)).
+- [Anchor Browser](https://anchorbrowser.io) - Cloud browser infrastructure for AI agents with built-in stealth, proxies, and CDP/Playwright/Puppeteer support
 
 ## Running on the Apify platform
 
