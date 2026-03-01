@@ -95,3 +95,15 @@ def test_storage_client_conflict() -> None:
 
     with pytest.raises(ServiceConflictError, match=r'StorageClient is already in use.'):
         service_locator.set_storage_client(custom_storage_client)
+
+
+def test_storage_client_overwrite_possible_after_reset() -> None:
+    service_locator.set_event_manager(LocalEventManager())
+    service_locator.set_configuration(Configuration())
+    service_locator.set_storage_client(MemoryStorageClient())
+
+    service_locator.reset()
+
+    service_locator.set_event_manager(LocalEventManager())
+    service_locator.set_configuration(Configuration())
+    service_locator.set_storage_client(MemoryStorageClient())

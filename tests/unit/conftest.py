@@ -64,9 +64,7 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
         monkeypatch.setenv('CRAWLEE_STORAGE_DIR', str(tmp_path))
 
         # Reset the services in the service locator.
-        service_locator._configuration = None
-        service_locator._event_manager = None
-        service_locator._storage_client = None
+        service_locator.reset()
         service_locator.storage_instance_manager.clear_cache()
 
         # Verify that the test environment was set up correctly.
