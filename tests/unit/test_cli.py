@@ -251,3 +251,8 @@ def test_create_existing_folder_interactive_multiple_attempts(
             'install_project': True,
         },
     )
+
+
+def test_older_mac():
+    import platform
+    raise Exception(platform.mac_ver())
