@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, Protocol, TypedDict
 
-from playwright.async_api import APIResponse, Response
+from playwright.async_api import APIResponse
 
 from crawlee import HttpHeaders
 from crawlee._utils.docs import docs_group
@@ -11,6 +11,7 @@ from crawlee._utils.docs import docs_group
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+    from playwright.async_api import Response
     from typing_extensions import NotRequired, Self
 
 
