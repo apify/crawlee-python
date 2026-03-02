@@ -613,17 +613,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
     async def get_request_manager(self) -> RequestManager:
-        """Return the configured request manager. If none is configured, open and return the default request queue.
-
-        The returned manager is wrapped with `ThrottlingRequestManager` to enforce
-        per-domain delays from 429 responses and robots.txt crawl-delay directives.
-        """
+        """Return the configured request manager. If none is configured, open and return the default request queue."""
         if not self._request_manager:
-            inner = await RequestQueue.open(
+            self._request_manager = await RequestQueue.open(
                 storage_client=self._service_locator.get_storage_client(),
                 configuration=self._service_locator.get_configuration(),
             )
-            self._request_manager = ThrottlingRequestManager(inner)
 
         return self._request_manager
 
@@ -722,13 +717,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                         configuration=self._service_locator.get_configuration(),
                     )
                 elif isinstance(request_manager, ThrottlingRequestManager):
+                    domains = list(request_manager._domains)  # noqa: SLF001
                     await request_manager.drop()
                     inner = await RequestQueue.open(
                         storage_client=self._service_locator.get_storage_client(),
                         configuration=self._service_locator.get_configuration(),
                     )
-                    self._throttling_manager = ThrottlingRequestManager(inner)
-                    self._request_manager = self._throttling_manager
+                    self._request_manager = ThrottlingRequestManager(
+                        inner, domains=domains, service_locator=self._service_locator
+                    )
 
         if requests is not None:
             await self.add_requests(requests)
@@ -1598,7 +1595,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         ):
             raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
-    # NOTE: _parse_retry_after_header has been moved to crawlee._utils.http.parse_retry_after_header
     def _check_request_collision(self, request: Request, session: Session | None) -> None:
         """Raise an exception if a request cannot access required resources.
 

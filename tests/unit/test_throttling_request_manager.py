@@ -15,6 +15,10 @@ from crawlee._request import Request
 from crawlee._utils.http import parse_retry_after_header
 from crawlee.request_loaders._throttling_request_manager import ThrottlingRequestManager
 
+THROTTLED_DOMAIN = 'throttled.com'
+NON_THROTTLED_DOMAIN = 'free.com'
+TEST_DOMAINS = [THROTTLED_DOMAIN]
+
 
 @pytest.fixture
 def mock_inner() -> AsyncMock:
@@ -35,8 +39,8 @@ def mock_inner() -> AsyncMock:
 
 @pytest.fixture
 def manager(mock_inner: AsyncMock) -> ThrottlingRequestManager:
-    """Create a ThrottlingRequestManager wrapping the mock."""
-    return ThrottlingRequestManager(mock_inner)
+    """Create a ThrottlingRequestManager wrapping the mock with test domains."""
+    return ThrottlingRequestManager(mock_inner, domains=TEST_DOMAINS)
 
 
 @pytest.fixture(autouse=True)
@@ -49,6 +53,7 @@ def mock_request_queue_open() -> Iterator[AsyncMock]:
             sq = AsyncMock()
             sq.fetch_next_request = AsyncMock(return_value=None)
             sq.add_request = AsyncMock()
+            sq.add_requests = AsyncMock()
             sq.reclaim_request = AsyncMock()
             sq.mark_request_as_handled = AsyncMock()
             sq.get_handled_count = AsyncMock(return_value=0)
@@ -67,45 +72,98 @@ def _make_request(url: str) -> Request:
     return Request.from_url(url)
 
 
-# ── Core Throttling Tests ─────────────────────────────────
+# ── Request Routing Tests ─────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_non_throttled_passes_through(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
-    """Requests for non-throttled domains should return immediately."""
-    request = _make_request('https://example.com/page1')
-    mock_inner.fetch_next_request.return_value = request
+async def test_add_request_routes_listed_domain_to_sub_queue(
+    manager: ThrottlingRequestManager,
+    mock_inner: AsyncMock,
+    mock_request_queue_open: AsyncMock,
+) -> None:
+    """Requests for listed domains should be routed to their sub-queue, not inner."""
+    request = _make_request(f'https://{THROTTLED_DOMAIN}/page1')
+    await manager.add_request(request)
 
-    result = await manager.fetch_next_request()
+    mock_request_queue_open.assert_called_once()
+    assert THROTTLED_DOMAIN in manager._sub_queues
+    sq = manager._sub_queues[THROTTLED_DOMAIN]
+    cast('AsyncMock', sq.add_request).assert_called_once_with(request, forefront=False)
+    mock_inner.add_request.assert_not_called()
 
-    assert result is not None
-    assert result.url == 'https://example.com/page1'
+
+@pytest.mark.asyncio
+async def test_add_request_routes_non_listed_domain_to_inner(
+    manager: ThrottlingRequestManager,
+    mock_inner: AsyncMock,
+) -> None:
+    """Requests for non-listed domains should go to the inner queue."""
+    request = _make_request(f'https://{NON_THROTTLED_DOMAIN}/page1')
+    await manager.add_request(request)
+
+    mock_inner.add_request.assert_called_once_with(request, forefront=False)
+    assert NON_THROTTLED_DOMAIN not in manager._sub_queues
+
+
+@pytest.mark.asyncio
+async def test_add_request_with_string_url(
+    manager: ThrottlingRequestManager,
+    mock_request_queue_open: AsyncMock,
+) -> None:
+    """add_request should also work when given a plain URL string."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await manager.add_request(url)
+
+    mock_request_queue_open.assert_called_once()
+    sq = manager._sub_queues[THROTTLED_DOMAIN]
+    cast('AsyncMock', sq.add_request).assert_called_once_with(url, forefront=False)
+
+
+@pytest.mark.asyncio
+async def test_add_requests_routes_mixed_domains(
+    manager: ThrottlingRequestManager,
+    mock_inner: AsyncMock,
+) -> None:
+    """add_requests should split requests by domain and route them correctly."""
+    throttled_req = _make_request(f'https://{THROTTLED_DOMAIN}/page1')
+    free_req = _make_request(f'https://{NON_THROTTLED_DOMAIN}/page1')
+
+    await manager.add_requests([throttled_req, free_req])
+
+    # Inner gets only the non-listed domain request
+    mock_inner.add_requests.assert_called_once()
+    inner_call_args = mock_inner.add_requests.call_args
+    assert free_req in inner_call_args[0][0]
+
+    # Sub-queue gets the listed domain request
+    assert THROTTLED_DOMAIN in manager._sub_queues
+
+
+# ── Core Throttling Tests ─────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_429_triggers_domain_delay(manager: ThrottlingRequestManager) -> None:
     """After record_domain_delay(), the domain should be throttled."""
-    manager.record_domain_delay('https://example.com/page1')
-
-    assert manager._is_domain_throttled('example.com')
+    manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/page1')
+    assert manager._is_domain_throttled(THROTTLED_DOMAIN)
 
 
 @pytest.mark.asyncio
 async def test_different_domains_independent(manager: ThrottlingRequestManager) -> None:
-    """Throttling example.com should NOT affect other-site.com."""
-    manager.record_domain_delay('https://example.com/page1')
-
-    assert manager._is_domain_throttled('example.com')
-    assert not manager._is_domain_throttled('other-site.com')
+    """Throttling one domain should NOT affect other domains."""
+    manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/page1')
+    assert manager._is_domain_throttled(THROTTLED_DOMAIN)
+    assert not manager._is_domain_throttled(NON_THROTTLED_DOMAIN)
 
 
 @pytest.mark.asyncio
 async def test_exponential_backoff(manager: ThrottlingRequestManager) -> None:
     """Consecutive 429s should increase delay exponentially."""
-    url = 'https://example.com/page1'
+    url = f'https://{THROTTLED_DOMAIN}/page1'
 
     manager.record_domain_delay(url)
-    state = manager._domain_states['example.com']
+    state = manager._domain_states[THROTTLED_DOMAIN]
     first_until = state.throttled_until
 
     manager.record_domain_delay(url)
@@ -118,12 +176,12 @@ async def test_exponential_backoff(manager: ThrottlingRequestManager) -> None:
 @pytest.mark.asyncio
 async def test_max_delay_cap(manager: ThrottlingRequestManager) -> None:
     """Backoff should cap at _MAX_DELAY (60s)."""
-    url = 'https://example.com/page1'
+    url = f'https://{THROTTLED_DOMAIN}/page1'
 
     for _ in range(20):
         manager.record_domain_delay(url)
 
-    state = manager._domain_states['example.com']
+    state = manager._domain_states[THROTTLED_DOMAIN]
     now = datetime.now(timezone.utc)
     actual_delay = state.throttled_until - now
 
@@ -133,11 +191,11 @@ async def test_max_delay_cap(manager: ThrottlingRequestManager) -> None:
 @pytest.mark.asyncio
 async def test_retry_after_header_priority(manager: ThrottlingRequestManager) -> None:
     """Explicit Retry-After should override exponential backoff."""
-    url = 'https://example.com/page1'
+    url = f'https://{THROTTLED_DOMAIN}/page1'
 
     manager.record_domain_delay(url, retry_after=timedelta(seconds=30))
 
-    state = manager._domain_states['example.com']
+    state = manager._domain_states[THROTTLED_DOMAIN]
     now = datetime.now(timezone.utc)
     actual_delay = state.throttled_until - now
 
@@ -148,14 +206,14 @@ async def test_retry_after_header_priority(manager: ThrottlingRequestManager) ->
 @pytest.mark.asyncio
 async def test_success_resets_backoff(manager: ThrottlingRequestManager) -> None:
     """Successful request should reset the consecutive 429 count."""
-    url = 'https://example.com/page1'
+    url = f'https://{THROTTLED_DOMAIN}/page1'
 
     manager.record_domain_delay(url)
     manager.record_domain_delay(url)
-    assert manager._domain_states['example.com'].consecutive_429_count == 2
+    assert manager._domain_states[THROTTLED_DOMAIN].consecutive_429_count == 2
 
     manager.record_success(url)
-    assert manager._domain_states['example.com'].consecutive_429_count == 0
+    assert manager._domain_states[THROTTLED_DOMAIN].consecutive_429_count == 0
 
 
 # ── Crawl-Delay Integration Tests ─────────────────────────
@@ -163,121 +221,124 @@ async def test_success_resets_backoff(manager: ThrottlingRequestManager) -> None
 
 @pytest.mark.asyncio
 async def test_crawl_delay_integration(manager: ThrottlingRequestManager) -> None:
-    """set_crawl_delay() should enforce per-domain minimum interval."""
-    url = 'https://example.com/page1'
+    """set_crawl_delay() should record the delay for the domain."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
     manager.set_crawl_delay(url, 5)
 
-    state = manager._domain_states['example.com']
+    state = manager._domain_states[THROTTLED_DOMAIN]
     assert state.crawl_delay == timedelta(seconds=5)
 
 
 @pytest.mark.asyncio
 async def test_crawl_delay_throttles_after_dispatch(manager: ThrottlingRequestManager) -> None:
     """After dispatching a request, crawl-delay should throttle the next one."""
-    url = 'https://example.com/page1'
+    url = f'https://{THROTTLED_DOMAIN}/page1'
     manager.set_crawl_delay(url, 5)
 
     manager._mark_domain_dispatched(url)
 
-    assert manager._is_domain_throttled('example.com')
+    assert manager._is_domain_throttled(THROTTLED_DOMAIN)
 
 
-# ── Sleep-Based Scheduling Tests ────────────────────────
+# ── Fetch Scheduling Tests ────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_mixed_throttled_and_unthrottled(
+async def test_fetch_from_unthrottled_sub_queue(
     manager: ThrottlingRequestManager,
     mock_inner: AsyncMock,
-    mock_request_queue_open: AsyncMock,
 ) -> None:
-    """Throttled domain requests should be moved to sub-queues; unthrottled ones returned."""
-    throttled_req = _make_request('https://throttled.com/page1')
-    unthrottled_req = _make_request('https://free.com/page1')
+    """fetch_next_request should return from an unthrottled sub-queue."""
+    request = _make_request(f'https://{THROTTLED_DOMAIN}/page1')
 
-    manager.record_domain_delay('https://throttled.com/page1')
-
-    # inner returns throttled, then unthrottled
-    mock_inner.fetch_next_request.side_effect = [throttled_req, unthrottled_req]
+    sq = AsyncMock()
+    sq.fetch_next_request = AsyncMock(return_value=request)
+    manager._sub_queues[THROTTLED_DOMAIN] = sq
 
     result = await manager.fetch_next_request()
 
     assert result is not None
-    assert result.url == 'https://free.com/page1'
-
-    # Verify throttled request was moved to sub-queue
-    mock_request_queue_open.assert_called_once()
-    assert 'throttled.com' in manager._sub_queues
-
-    sq = manager._sub_queues['throttled.com']
-    cast('AsyncMock', sq.add_request).assert_called_once_with(throttled_req)
+    assert result.url == f'https://{THROTTLED_DOMAIN}/page1'
+    mock_inner.fetch_next_request.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_sleep_instead_of_busy_wait(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
-    """When all domains are throttled and queue is empty, should sleep (not spin)."""
-    throttled_req = _make_request('https://throttled.com/page1')
+async def test_fetch_falls_back_to_inner(
+    manager: ThrottlingRequestManager,
+    mock_inner: AsyncMock,
+) -> None:
+    """When sub-queues are empty, should return from inner queue."""
+    request = _make_request(f'https://{NON_THROTTLED_DOMAIN}/page1')
+    mock_inner.fetch_next_request.return_value = request
 
-    manager.record_domain_delay('https://throttled.com/page1', retry_after=timedelta(seconds=0.2))
+    result = await manager.fetch_next_request()
 
-    # inner queue returns the request first time, then None
-    mock_inner.fetch_next_request.side_effect = [throttled_req, None]
+    assert result is not None
+    assert result.url == f'https://{NON_THROTTLED_DOMAIN}/page1'
+
+
+@pytest.mark.asyncio
+async def test_fetch_skips_throttled_sub_queue(
+    manager: ThrottlingRequestManager,
+    mock_inner: AsyncMock,
+) -> None:
+    """Should skip throttled sub-queues and fall through to inner."""
+    manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/page1')
+
+    sq = AsyncMock()
+    sq.fetch_next_request = AsyncMock(return_value=_make_request(f'https://{THROTTLED_DOMAIN}/page1'))
+    sq.is_empty = AsyncMock(return_value=False)
+    manager._sub_queues[THROTTLED_DOMAIN] = sq
+
+    inner_req = _make_request(f'https://{NON_THROTTLED_DOMAIN}/page1')
+    mock_inner.fetch_next_request.return_value = inner_req
+
+    result = await manager.fetch_next_request()
+
+    assert result is not None
+    assert result.url == f'https://{NON_THROTTLED_DOMAIN}/page1'
+
+
+@pytest.mark.asyncio
+async def test_sleep_when_all_throttled(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    """When all domains are throttled and inner is empty, should sleep and retry."""
+    request = _make_request(f'https://{THROTTLED_DOMAIN}/page1')
+    manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/page1', retry_after=timedelta(seconds=0.2))
+
+    sq = AsyncMock()
+    sq.is_empty = AsyncMock(return_value=False)
+    sq.fetch_next_request = AsyncMock(return_value=request)
+    manager._sub_queues[THROTTLED_DOMAIN] = sq
+
+    mock_inner.fetch_next_request.return_value = None
 
     target = 'crawlee.request_loaders._throttling_request_manager.asyncio.sleep'
     with patch(target, new_callable=AsyncMock) as mock_sleep:
-        # Instead of actually sleeping, we simulate the time passing by unthrottling the domain
+
         async def sleep_side_effect(*_args: Any, **_kwargs: Any) -> None:
-            # Clear throttle so recursive call succeeds
-            manager._domain_states['throttled.com'].throttled_until = datetime.now(timezone.utc)
-            # Setup the sub-queue to return the request now
-            sq = manager._sub_queues['throttled.com']
-            cast('AsyncMock', sq.fetch_next_request).side_effect = [throttled_req, None]
-            # Must return False then True so loop proceeds
-            cast('AsyncMock', sq.is_empty).side_effect = [False, True]
+            manager._domain_states[THROTTLED_DOMAIN].throttled_until = datetime.now(timezone.utc)
 
         mock_sleep.side_effect = sleep_side_effect
-
-        # When request is moved to sub-queue, we must ensure it isn't "empty" so it triggers sleep
-        async def mock_add_request(*_args: Any, **_kwargs: Any) -> None:
-            sq = manager._sub_queues['throttled.com']
-            cast('AsyncMock', sq.is_empty).return_value = False
-
-        manager._sub_queues = {'throttled.com': AsyncMock()}
-        manager._sub_queues['throttled.com'].add_request.side_effect = mock_add_request
-        manager._sub_queues['throttled.com'].is_empty.return_value = True
 
         result = await manager.fetch_next_request()
 
         mock_sleep.assert_called_once()
         assert result is not None
-        assert result.url == 'https://throttled.com/page1'
+        assert result.url == f'https://{THROTTLED_DOMAIN}/page1'
 
 
 # ── Delegation Tests ────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_add_request_delegates(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
-    request = _make_request('https://example.com')
-    await manager.add_request(request)
-    mock_inner.add_request.assert_called_once_with(request, forefront=False)
-
-
-@pytest.mark.asyncio
-async def test_reclaim_request_delegates(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
-    request = _make_request('https://example.com')
-    await manager.reclaim_request(request)
-    mock_inner.reclaim_request.assert_called_once_with(request, forefront=False)
-
-
-@pytest.mark.asyncio
-async def test_reclaim_request_delegates_to_sub_queue(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
-    request = _make_request('https://example.com')
-
-    # Setup state manually assuming it was fetched from a sub-queue
+async def test_reclaim_request_routes_to_sub_queue(
+    manager: ThrottlingRequestManager,
+    mock_inner: AsyncMock,
+) -> None:
+    """reclaim_request should route to sub-queue for listed domains."""
+    request = _make_request(f'https://{THROTTLED_DOMAIN}/page1')
     sq = AsyncMock()
-    manager._sub_queues['example.com'] = sq
-    manager._dispatched_origins[request.unique_key] = 'example.com'
+    manager._sub_queues[THROTTLED_DOMAIN] = sq
 
     await manager.reclaim_request(request)
 
@@ -286,73 +347,108 @@ async def test_reclaim_request_delegates_to_sub_queue(manager: ThrottlingRequest
 
 
 @pytest.mark.asyncio
-async def test_mark_request_as_handled_delegates(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
-    request = _make_request('https://example.com')
+async def test_reclaim_request_routes_to_inner(
+    manager: ThrottlingRequestManager,
+    mock_inner: AsyncMock,
+) -> None:
+    """reclaim_request should route to inner for non-listed domains."""
+    request = _make_request(f'https://{NON_THROTTLED_DOMAIN}/page1')
+
+    await manager.reclaim_request(request)
+
+    mock_inner.reclaim_request.assert_called_once_with(request, forefront=False)
+
+
+@pytest.mark.asyncio
+async def test_mark_request_as_handled_routes_to_sub_queue(
+    manager: ThrottlingRequestManager,
+    mock_inner: AsyncMock,
+) -> None:
+    """mark_request_as_handled should route to sub-queue for listed domains."""
+    request = _make_request(f'https://{THROTTLED_DOMAIN}/page1')
+    sq = AsyncMock()
+    manager._sub_queues[THROTTLED_DOMAIN] = sq
+
     await manager.mark_request_as_handled(request)
+
+    sq.mark_request_as_handled.assert_called_once_with(request)
+    mock_inner.mark_request_as_handled.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_mark_request_as_handled_routes_to_inner(
+    manager: ThrottlingRequestManager,
+    mock_inner: AsyncMock,
+) -> None:
+    """mark_request_as_handled should route to inner for non-listed domains."""
+    request = _make_request(f'https://{NON_THROTTLED_DOMAIN}/page1')
+
+    await manager.mark_request_as_handled(request)
+
     mock_inner.mark_request_as_handled.assert_called_once_with(request)
 
 
 @pytest.mark.asyncio
 async def test_get_handled_count_aggregates(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    """get_handled_count should sum inner and all sub-queues."""
     mock_inner.get_handled_count.return_value = 42
 
     sq = AsyncMock()
     sq.get_handled_count.return_value = 10
-    manager._sub_queues['example.com'] = sq
-    manager._transferred_requests_count = 5
+    manager._sub_queues[THROTTLED_DOMAIN] = sq
 
-    assert await manager.get_handled_count() == 47
+    assert await manager.get_handled_count() == 52
 
 
 @pytest.mark.asyncio
 async def test_get_total_count_aggregates(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    """get_total_count should sum inner and all sub-queues."""
     mock_inner.get_total_count.return_value = 100
 
     sq = AsyncMock()
     sq.get_total_count.return_value = 20
-    manager._sub_queues['example.com'] = sq
-    manager._transferred_requests_count = 10
+    manager._sub_queues[THROTTLED_DOMAIN] = sq
 
-    assert await manager.get_total_count() == 110
+    assert await manager.get_total_count() == 120
 
 
 @pytest.mark.asyncio
 async def test_is_empty_aggregates(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    """is_empty should return False if any queue has requests."""
     mock_inner.is_empty.return_value = True
     assert await manager.is_empty() is True
 
     sq = AsyncMock()
     sq.is_empty.return_value = False
-    manager._sub_queues['example.com'] = sq
+    manager._sub_queues[THROTTLED_DOMAIN] = sq
 
     assert await manager.is_empty() is False
 
 
 @pytest.mark.asyncio
 async def test_is_finished_aggregates(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
+    """is_finished should return False if any queue is not finished."""
     mock_inner.is_finished.return_value = True
     assert await manager.is_finished() is True
 
     sq = AsyncMock()
     sq.is_finished.return_value = False
-    manager._sub_queues['example.com'] = sq
+    manager._sub_queues[THROTTLED_DOMAIN] = sq
 
     assert await manager.is_finished() is False
 
 
 @pytest.mark.asyncio
 async def test_drop_clears_all(manager: ThrottlingRequestManager, mock_inner: AsyncMock) -> None:
-    request = _make_request('https://example.com')
+    """drop should clear inner, all sub-queues, and internal state."""
     sq = AsyncMock()
-    manager._sub_queues['example.com'] = sq
-    manager._dispatched_origins[request.unique_key] = 'inner'
+    manager._sub_queues[THROTTLED_DOMAIN] = sq
 
     await manager.drop()
 
     mock_inner.drop.assert_called_once()
     sq.drop.assert_called_once()
     assert len(manager._sub_queues) == 0
-    assert len(manager._dispatched_origins) == 0
 
 
 # ── Utility Tests ──────────────────────────────────────
