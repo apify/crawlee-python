@@ -166,9 +166,14 @@ class RequestQueue(Storage, RequestManager):
             return response.processed_requests[0]
 
         if response.unprocessed_requests:
-            logger.warning(f'Request {request.url} was not processed and returned as unprocessed.')
+            logger.warning(
+                f'Request {request.url} was not processed by storage client "{self._client.__class__.__name__}".'
+            )
         else:
-            logger.warning(f'Request {request.url} was not processed: empty response from the storage client.')
+            logger.warning(
+                f'Request {request.url} was not processed by storage client "{self._client.__class__.__name__}" '
+                'received empty response.'
+            )
         return None
 
     @override
