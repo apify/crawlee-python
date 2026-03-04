@@ -125,6 +125,7 @@ async def test_add_request_string_url(rq: RequestQueue) -> None:
     result = await rq.add_request(url)
 
     # Verify request was added
+    assert result is not None
     assert result.unique_key is not None
     assert result.was_already_present is False
     assert result.was_already_handled is False
@@ -142,6 +143,7 @@ async def test_add_request_object(rq: RequestQueue) -> None:
     result = await rq.add_request(request)
 
     # Verify request was added
+    assert result is not None
     assert result.unique_key is not None
     assert result.was_already_present is False
     assert result.was_already_handled is False
@@ -158,10 +160,13 @@ async def test_add_duplicate_request(rq: RequestQueue) -> None:
     url = 'https://example.com'
     first_result = await rq.add_request(url)
 
+    assert first_result is not None
+
     # Add the same request again
     second_result = await rq.add_request(url)
 
     # Verify the second request was detected as duplicate
+    assert second_result is not None
     assert second_result.was_already_present is True
     assert second_result.unique_key == first_result.unique_key
 
@@ -336,7 +341,7 @@ async def test_fetch_next_request_and_mark_handled(rq: RequestQueue) -> None:
     assert metadata.pending_request_count == 0
 
     # Verify queue is empty
-    empty_request = await rq.fetch_next_request()
+    empty_request: Request | None = await rq.fetch_next_request()
     assert empty_request is None
 
 
@@ -344,6 +349,9 @@ async def test_get_request_by_id(rq: RequestQueue) -> None:
     """Test retrieving a request by its ID."""
     # Add a request
     added_result = await rq.add_request('https://example.com')
+
+    assert added_result is not None
+
     unique_key = added_result.unique_key
 
     # Retrieve the request by ID
@@ -791,6 +799,7 @@ async def test_alias_request_operations(
 
     for url in urls:
         result = await rq.add_request(url)
+        assert result is not None
         assert result.was_already_present is False
 
     # Test queue metadata

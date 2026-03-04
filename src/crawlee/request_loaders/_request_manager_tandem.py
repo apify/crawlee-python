@@ -49,7 +49,7 @@ class RequestManagerTandem(RequestManager):
         return (await self._read_only_loader.is_finished()) and (await self._read_write_manager.is_finished())
 
     @override
-    async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest:
+    async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest | None:
         return await self._read_write_manager.add_request(request, forefront=forefront)
 
     @override
