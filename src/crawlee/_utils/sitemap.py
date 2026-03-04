@@ -549,11 +549,12 @@ async def _discover_for_hostname(
             yield sitemap_url
 
     # Check maybe provided URLs have sitemap url
-    sitemap_url = next((url for url in hostname_urls if SITEMAP_URL_PATTERN.search(url)), None)
+    matching_sitemap_urls = [url for url in hostname_urls if SITEMAP_URL_PATTERN.search(url)]
 
-    if sitemap_url:
-        if _check_and_add(sitemap_url):
-            yield sitemap_url
+    if matching_sitemap_urls:
+        for sitemap_url in matching_sitemap_urls:
+            if _check_and_add(sitemap_url):
+                yield sitemap_url
     else:
         # Check common sitemap locations
         base_url = URL(hostname_urls[0])
