@@ -574,6 +574,8 @@ async def _discover_for_hostname(
                 logger.warning(f'Proxy error when checking {candidate} with sitemap discovery for {hostname}')
             except asyncio.TimeoutError:
                 logger.warning(f'Timeout when checking {candidate} with sitemap discovery for {hostname}')
+            except Exception:
+                logger.warning(f'Error when checking {candidate} with sitemap discovery for {hostname}', exc_info=True)
 
 
 async def discover_valid_sitemaps(
