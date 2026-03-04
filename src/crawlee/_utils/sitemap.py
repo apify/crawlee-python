@@ -520,8 +520,7 @@ async def _merge_async_generators(*generators: AsyncGenerator) -> AsyncGenerator
     finally:
         for task in tasks:
             task.cancel()
-
-
+        await asyncio.gather(*tasks, return_exceptions=True)
 async def _discover_for_hostname(
     hostname: str,
     hostname_urls: list[str],
