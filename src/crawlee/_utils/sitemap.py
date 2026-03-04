@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import zlib
 from codecs import getincrementaldecoder
+from collections import defaultdict
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -16,6 +18,9 @@ from xml.sax.handler import ContentHandler
 from typing_extensions import NotRequired, override
 from yarl import URL
 
+from crawlee._utils.web import is_status_code_successful
+from crawlee.errors import ProxyError
+
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
     from xml.sax.xmlreader import AttributesImpl
@@ -27,6 +32,8 @@ logger = getLogger(__name__)
 
 VALID_CHANGE_FREQS = {'always', 'hourly', 'daily', 'weekly', 'monthly', 'yearly', 'never'}
 SITEMAP_HEADERS = {'accept': 'text/plain, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8'}
+SITEMAP_URL_PATTERN = re.compile(r'sitemap\.(?:xml|txt)(?:\.gz)?$', re.IGNORECASE)
+COMMON_SITEMAP_PATHS = ['/sitemap.xml', '/sitemap.txt', '/sitemap_index.xml']
 
 
 @dataclass()
@@ -384,7 +391,7 @@ class Sitemap:
     @classmethod
     async def try_common_names(cls, url: str, http_client: HttpClient, proxy_info: ProxyInfo | None = None) -> Sitemap:
         base_url = URL(url)
-        sitemap_urls = [str(base_url.with_path('/sitemap.xml')), str(base_url.with_path('/sitemap.txt'))]
+        sitemap_urls = [str(base_url.with_path(path)) for path in COMMON_SITEMAP_PATHS]
         return await cls.load(sitemap_urls, http_client, proxy_info)
 
     @classmethod
@@ -484,3 +491,136 @@ async def parse_sitemap(
                 yield result
         else:
             logger.warning(f'Invalid source configuration: {source}')
+
+
+async def _merge_async_generators(*generators: AsyncGenerator) -> AsyncGenerator:
+    queue: asyncio.Queue = asyncio.Queue()
+
+    end_feed = object()
+
+    async def feed(gen: AsyncGenerator) -> None:
+        try:
+            async for item in gen:
+                await queue.put(item)
+        except Exception:
+            logger.warning(f'Error in generator: {gen}', exc_info=True)
+        finally:
+            await queue.put(end_feed)
+
+    tasks = [asyncio.create_task(feed(gen)) for gen in generators]
+    remaining_tasks = len(tasks)
+
+    try:
+        while remaining_tasks > 0:
+            item = await queue.get()
+            if item is end_feed:
+                remaining_tasks -= 1
+            else:
+                yield item
+    finally:
+        for task in tasks:
+            task.cancel()
+
+
+async def _discover_for_hostname(
+    hostname: str,
+    hostname_urls: list[str],
+    *,
+    http_client: HttpClient,
+    proxy_info: ProxyInfo | None = None,
+    request_timeout: timedelta,
+    method_for_checking: Literal['HEAD', 'GET'] = 'HEAD',
+) -> AsyncGenerator[str, None]:
+    # Import here to avoid circular imports.
+    from crawlee._utils.robots import RobotsTxtFile  # noqa: PLC0415
+
+    domain_seen: set[str] = set()
+    hostname_urls = list(set(hostname_urls))  # Remove duplicates
+
+    def _check_and_add(url: str) -> bool:
+        if url in domain_seen:
+            return False
+        domain_seen.add(url)
+        return True
+
+    # Try getting sitemaps from robots.txt first
+    robots = await RobotsTxtFile.find(url=hostname_urls[0], http_client=http_client, proxy_info=proxy_info)
+    for sitemap_url in robots.get_sitemaps():
+        if _check_and_add(sitemap_url):
+            yield sitemap_url
+
+    # Check maybe provided URLs have sitemap url
+    sitemap_url = next((url for url in hostname_urls if SITEMAP_URL_PATTERN.search(url)), None)
+
+    if sitemap_url:
+        if _check_and_add(sitemap_url):
+            yield sitemap_url
+    else:
+        # Check common sitemap locations
+        base_url = URL(hostname_urls[0])
+        for path in COMMON_SITEMAP_PATHS:
+            candidate = str(base_url.with_path(path))
+            if candidate in domain_seen:
+                continue
+            try:
+                response = await http_client.send_request(
+                    candidate, method=method_for_checking, proxy_info=proxy_info, timeout=request_timeout
+                )
+                if is_status_code_successful(response.status_code) and _check_and_add(candidate):
+                    yield candidate
+            except ProxyError:
+                logger.warning(f'Proxy error when checking {candidate} with sitemap discovery for {hostname}')
+            except asyncio.TimeoutError:
+                logger.warning(f'Timeout when checking {candidate} with sitemap discovery for {hostname}')
+
+
+async def discover_valid_sitemaps(
+    urls: list[str],
+    *,
+    http_client: HttpClient,
+    proxy_info: ProxyInfo | None = None,
+    request_timeout: timedelta = timedelta(seconds=20),
+    method_for_checking: Literal['HEAD', 'GET'] = 'HEAD',
+) -> AsyncGenerator[str, None]:
+    """Discover related sitemaps for the given URLs.
+
+    Args:
+        urls: List of URLs to discover sitemaps for.
+        http_client: `HttpClient` to use for making requests.
+        proxy_info: Proxy configuration to use for requests.
+        request_timeout: Timeout for each request when checking for sitemaps.
+        method_for_checking: HTTP method to use when checking for sitemap existence (HEAD or GET).
+    """
+    # Use a set to track seen sitemap URLs and avoid duplicates
+    seen = set()
+
+    grouped_urls = defaultdict(list)
+    for url in urls:
+        try:
+            hostname = URL(url).host
+        except ValueError:
+            logger.warning(f'Invalid URL {url} skipped')
+            continue
+
+        if not hostname:
+            logger.warning(f'URL {url} without host skipped')
+            continue
+
+        grouped_urls[hostname].append(url)
+
+    generators = [
+        _discover_for_hostname(
+            hostname,
+            hostname_urls,
+            http_client=http_client,
+            proxy_info=proxy_info,
+            request_timeout=request_timeout,
+            method_for_checking=method_for_checking,
+        )
+        for hostname, hostname_urls in grouped_urls.items()
+    ]
+
+    async for sitemap_url in _merge_async_generators(*generators):
+        if sitemap_url not in seen:
+            seen.add(sitemap_url)
+            yield sitemap_url
