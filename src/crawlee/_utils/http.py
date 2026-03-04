@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 
 
 def parse_retry_after_header(value: str | None) -> timedelta | None:
@@ -28,7 +29,6 @@ def parse_retry_after_header(value: str | None) -> timedelta | None:
         pass
 
     # Try parsing as HTTP-date (e.g., "Wed, 21 Oct 2015 07:28:00 GMT").
-    from email.utils import parsedate_to_datetime  # noqa: PLC0415
 
     try:
         retry_date = parsedate_to_datetime(value)

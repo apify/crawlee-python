@@ -717,15 +717,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                         configuration=self._service_locator.get_configuration(),
                     )
                 elif isinstance(request_manager, ThrottlingRequestManager):
-                    domains = list(request_manager._domains)  # noqa: SLF001
-                    await request_manager.drop()
-                    inner = await RequestQueue.open(
-                        storage_client=self._service_locator.get_storage_client(),
-                        configuration=self._service_locator.get_configuration(),
-                    )
-                    self._request_manager = ThrottlingRequestManager(
-                        inner, domains=domains, service_locator=self._service_locator
-                    )
+                    self._request_manager = await request_manager.recreate_purged()
 
         if requests is not None:
             await self.add_requests(requests)
