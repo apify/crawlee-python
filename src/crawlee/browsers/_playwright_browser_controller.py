@@ -72,7 +72,9 @@ class PlaywrightBrowserController(BrowserController):
         self._fingerprint_generator = fingerprint_generator
         self._use_incognito_pages = use_incognito_pages
 
-        self._browser_context: BrowserContext | None = None
+        self._browser_context: BrowserContext | None = (
+            self._browser.contexts[0] if len(self._browser.contexts) > 0 else None
+        )
         self._pages = list[Page]()
         self._last_page_opened_at = datetime.now(timezone.utc)
 
