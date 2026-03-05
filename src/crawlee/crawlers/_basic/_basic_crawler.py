@@ -702,6 +702,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         self._running = True
 
+        if self._respect_robots_txt_file and not isinstance(self._request_manager, ThrottlingRequestManager):
+            self._logger.warning(
+                'The `respect_robots_txt_file` option is enabled, but the crawler is not using '
+                '`ThrottlingRequestManager`. Crawl-delay directives from robots.txt will not be '
+                'enforced. To enable crawl-delay support, configure the crawler to use '
+                '`ThrottlingRequestManager` as the request manager.'
+            )
+
         if self._has_finished_before:
             await self._statistics.reset()
 
