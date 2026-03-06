@@ -1244,7 +1244,8 @@ async def test_crawler_uses_default_storages(tmp_path: Path) -> None:
 
     assert dataset is await crawler.get_dataset()
     assert kvs is await crawler.get_key_value_store()
-    assert rq is await crawler.get_request_manager()
+    manager = await crawler.get_request_manager()
+    assert manager is rq
 
 
 async def test_crawler_can_use_other_storages(tmp_path: Path) -> None:
@@ -1262,7 +1263,8 @@ async def test_crawler_can_use_other_storages(tmp_path: Path) -> None:
 
     assert dataset is not await crawler.get_dataset()
     assert kvs is not await crawler.get_key_value_store()
-    assert rq is not await crawler.get_request_manager()
+    manager = await crawler.get_request_manager()
+    assert manager is not rq
 
 
 async def test_crawler_can_use_other_storages_of_same_type(tmp_path: Path) -> None:
@@ -1299,7 +1301,8 @@ async def test_crawler_can_use_other_storages_of_same_type(tmp_path: Path) -> No
     # Assert that the storages are different
     assert dataset is not await crawler.get_dataset()
     assert kvs is not await crawler.get_key_value_store()
-    assert rq is not await crawler.get_request_manager()
+    manager = await crawler.get_request_manager()
+    assert manager is not rq
 
     # Assert that all storages exists on the filesystem
     for path in expected_paths:
