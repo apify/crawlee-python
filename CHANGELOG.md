@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Use specialized Playwright docker images in templates ([#1757](https://github.com/apify/crawlee-python/pull/1757)) ([747c0cf](https://github.com/apify/crawlee-python/commit/747c0cf4a82296a2e3ea5cac5ef4c9578ea62a0c)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1756](https://github.com/apify/crawlee-python/issues/1756)
+- Add `discover_valid_sitemaps` utility ([#1777](https://github.com/apify/crawlee-python/pull/1777)) ([872447b](https://github.com/apify/crawlee-python/commit/872447b60bbdb3926068064a971492807b1bdfbb)) by [@Mantisus](https://github.com/Mantisus), closes [#1740](https://github.com/apify/crawlee-python/issues/1740)
 
 ### 🐛 Bug Fixes
 
@@ -16,29 +17,6 @@ All notable changes to this project will be documented in this file.
 - **playwright:** Dispose of `APIResponse` body for `send_request` ([#1771](https://github.com/apify/crawlee-python/pull/1771)) ([29d301b](https://github.com/apify/crawlee-python/commit/29d301bf9d7795f2fbaddb99235a7157b880f60c)) by [@kozlice](https://github.com/kozlice)
 - Return `None` from `add_request` when storage client fails to enqueue request ([#1775](https://github.com/apify/crawlee-python/pull/1775)) ([944753a](https://github.com/apify/crawlee-python/commit/944753a71956c30f3ce0896ffa24be7de5348933)) by [@Mantisus](https://github.com/Mantisus)
 - Re-use pre-existing browser context in `PlaywrightBrowserController` ([#1778](https://github.com/apify/crawlee-python/pull/1778)) ([4487543](https://github.com/apify/crawlee-python/commit/44875433df83d433aa69ada458b91df3ad569f5e)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1776](https://github.com/apify/crawlee-python/issues/1776)
-
-### 📚 Documentation
-
-- Improve clipboard handling for Safari in `LLMButtons` component ([#1755](https://github.com/apify/crawlee-python/pull/1755)) ([c93ba2f](https://github.com/apify/crawlee-python/commit/c93ba2f2b55a980a37ca33f5de239f2c371cd7a0)) by [@birosrichard](https://github.com/birosrichard)
-- Remove $1M challenge banner ([#1769](https://github.com/apify/crawlee-python/pull/1769)) ([f3ba45a](https://github.com/apify/crawlee-python/commit/f3ba45a9c7bdefcb5a08f6c1a68535f1ffe21086)) by [@Copilot](https://github.com/Copilot), closes [#1768](https://github.com/apify/crawlee-python/issues/1768)
-
-### 🧪 Testing
-
-- Relax timing assertion in `test_abort_works` to fix flaky test ([#1754](https://github.com/apify/crawlee-python/pull/1754)) ([7663404](https://github.com/apify/crawlee-python/commit/7663404dd9a309a7c3a680a6005250b2007b04ff)) by [@vdusek](https://github.com/vdusek)
-- Fix flaky test_timeout_in_handler ([#1764](https://github.com/apify/crawlee-python/pull/1764)) ([7f7d45e](https://github.com/apify/crawlee-python/commit/7f7d45e1418787a8f15ecf4d422e650a34e924a7)) by [@vdusek](https://github.com/vdusek)
-
-### ⚙️ Miscellaneous Tasks
-
-- Trigger doc release on stable release ([#1758](https://github.com/apify/crawlee-python/pull/1758)) ([9e3969d](https://github.com/apify/crawlee-python/commit/9e3969d98820123e125600c2d13c3af17f551106)) by [@vdusek](https://github.com/vdusek)
-- **release:** Update changelog and package version [skip ci] ([fe94362](https://github.com/apify/crawlee-python/commit/fe94362383611978a1f0dab22986c6248becd0ac)) by [@github-actions[bot]](https://github.com/github-actions[bot])
-- **release:** Update changelog and package version [skip ci] ([9737752](https://github.com/apify/crawlee-python/commit/9737752ae99887a344d0d101d188d16e33c4ff4c)) by [@github-actions[bot]](https://github.com/github-actions[bot])
-- **release:** Update changelog and package version [skip ci] ([360dd3e](https://github.com/apify/crawlee-python/commit/360dd3eb180fb6489129ccce270a3010240d5064)) by [@github-actions[bot]](https://github.com/github-actions[bot])
-- Update on_master workflow conditions ([#1761](https://github.com/apify/crawlee-python/pull/1761)) ([da33a15](https://github.com/apify/crawlee-python/commit/da33a158a00f07f56d4bae2244ed1c3973549376)) by [@vdusek](https://github.com/vdusek)
-- **release:** Update changelog and package version [skip ci] ([a918a34](https://github.com/apify/crawlee-python/commit/a918a346014c5d96ef0587a35909bf880b59a516)) by [@github-actions[bot]](https://github.com/github-actions[bot])
-- Add agent instruction files as symlinks to .rules.md ([#1767](https://github.com/apify/crawlee-python/pull/1767)) ([d4c51f8](https://github.com/apify/crawlee-python/commit/d4c51f8c03796777f4f4f024fb065a53eb7ee8b4)) by [@vdusek](https://github.com/vdusek)
-- **release:** Update changelog and package version [skip ci] ([d38a05e](https://github.com/apify/crawlee-python/commit/d38a05e3d41d3371e081f26436d07fa2a6a3b224)) by [@github-actions[bot]](https://github.com/github-actions[bot])
-- Configure codecov checks as informational ([#1774](https://github.com/apify/crawlee-python/pull/1774)) ([ee1501f](https://github.com/apify/crawlee-python/commit/ee1501f9fed3d1ef4cdca20ca24516b0c23e7fa7)) by [@vdusek](https://github.com/vdusek)
-- **release:** Update changelog and package version [skip ci] ([9fee0a2](https://github.com/apify/crawlee-python/commit/9fee0a2d9de1f91dbba996ab185615e138c990fc)) by [@github-actions[bot]](https://github.com/github-actions[bot])
 
 
 <!-- git-cliff-unreleased-end -->
