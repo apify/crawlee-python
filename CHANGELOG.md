@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.4.1 - **not yet released**
+## [1.5.0](https://github.com/apify/crawlee-python/releases/tag/v1.5.0) (2026-03-06)
 
 ### 🚀 Features
 
@@ -19,7 +18,6 @@ All notable changes to this project will be documented in this file.
 - Re-use pre-existing browser context in `PlaywrightBrowserController` ([#1778](https://github.com/apify/crawlee-python/pull/1778)) ([4487543](https://github.com/apify/crawlee-python/commit/44875433df83d433aa69ada458b91df3ad569f5e)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1776](https://github.com/apify/crawlee-python/issues/1776)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.4.0](https://github.com/apify/crawlee-python/releases/tag/v1.4.0) (2026-02-17)
 
 ### 🚀 Features
