@@ -271,7 +271,7 @@ async def test_sleep_when_all_throttled(manager: ThrottlingRequestManager) -> No
     url = f'https://{THROTTLED_DOMAIN}/page1'
     await manager.add_request(url)
 
-    manager.record_domain_delay(url, retry_after=timedelta(seconds=0.2))
+    manager.record_domain_delay(url, retry_after=timedelta(seconds=10))
 
     target = 'crawlee.request_loaders._throttling_request_manager.asyncio.sleep'
     with patch(target, new_callable=AsyncMock) as mock_sleep:
