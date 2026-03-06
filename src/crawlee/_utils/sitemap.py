@@ -32,7 +32,7 @@ logger = getLogger(__name__)
 
 VALID_CHANGE_FREQS = {'always', 'hourly', 'daily', 'weekly', 'monthly', 'yearly', 'never'}
 SITEMAP_HEADERS = {'accept': 'text/plain, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8'}
-SITEMAP_URL_PATTERN = re.compile(r'sitemap\.(?:xml|txt)(?:\.gz)?$', re.IGNORECASE)
+SITEMAP_URL_PATTERN = re.compile(r'\/sitemap\.(?:xml|txt)(?:\.gz)?$', re.IGNORECASE)
 COMMON_SITEMAP_PATHS = ['/sitemap.xml', '/sitemap.txt', '/sitemap_index.xml']
 
 
@@ -520,7 +520,7 @@ async def _merge_async_generators(*generators: AsyncGenerator) -> AsyncGenerator
     finally:
         for task in tasks:
             task.cancel()
-        await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 async def _discover_for_hostname(
