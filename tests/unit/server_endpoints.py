@@ -57,6 +57,16 @@ PROBLEMATIC_LINKS = b"""\
     <a href=https://avatars.githubusercontent.com/apify>Apify avatar/a>
 </body></html>"""
 
+NON_HREF_LINKS = b"""\
+<html><head>
+    <title>Hello</title>
+</head>
+<body>
+    <a href="/page_1"></a>
+    <li data-href="/page_2"></a>
+</body></html>
+"""
+
 GENERIC_RESPONSE = b"""\
 <html><head>
     <title>Hello</title>

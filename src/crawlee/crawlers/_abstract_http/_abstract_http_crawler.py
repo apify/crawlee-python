@@ -176,6 +176,7 @@ class AbstractHttpCrawler(
         async def extract_links(
             *,
             selector: str = 'a',
+            attribute: str = 'href',
             label: str | None = None,
             user_data: dict[str, Any] | None = None,
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
@@ -191,10 +192,12 @@ class AbstractHttpCrawler(
             kwargs.setdefault('strategy', 'same-hostname')
             strategy = kwargs.get('strategy', 'same-hostname')
 
-            links_iterator: Iterator[str] = iter(self._parser.find_links(parsed_content, selector=selector))
+            links_iterator: Iterator[str] = iter(
+                self._parser.find_links(parsed_content, selector=selector, attribute=attribute)
+            )
 
             # Get base URL from <base> tag if present
-            extracted_base_urls = list(self._parser.find_links(parsed_content, 'base[href]'))
+            extracted_base_urls = list(self._parser.find_links(parsed_content, 'base', 'href'))
             base_url: str = (
                 str(extracted_base_urls[0])
                 if extracted_base_urls

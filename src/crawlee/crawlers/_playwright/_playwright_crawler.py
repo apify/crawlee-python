@@ -373,6 +373,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         async def extract_links(
             *,
             selector: str = 'a',
+            attribute: str = 'href',
             label: str | None = None,
             user_data: dict | None = None,
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
@@ -394,7 +395,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
             elements = await context.page.query_selector_all(selector)
             links_iterator: Iterator[str] = iter(
-                [url for element in elements if (url := await element.get_attribute('href')) is not None]
+                [url for element in elements if (url := await element.get_attribute(attribute)) is not None]
             )
 
             # Get base URL from <base> tag if present

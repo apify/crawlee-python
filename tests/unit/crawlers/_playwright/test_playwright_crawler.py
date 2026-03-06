@@ -817,6 +817,21 @@ async def test_extract_links(server_url: URL) -> None:
     assert extracted_links[0] == str(server_url / 'page_1')
 
 
+async def test_extract_non_href_links(server_url: URL) -> None:
+    crawler = PlaywrightCrawler()
+    extracted_links: list[str] = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        links = await context.extract_links(selector='li', attribute='data-href')
+        extracted_links.extend(request.url for request in links)
+
+    await crawler.run([str(server_url / 'non_href_links')])
+
+    assert len(extracted_links) == 1
+    assert extracted_links[0] == str(server_url / 'page_2')
+
+
 async def test_reduced_logs_from_playwright_navigation_timeout(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.INFO)
     crawler = PlaywrightCrawler(configure_logging=False)
