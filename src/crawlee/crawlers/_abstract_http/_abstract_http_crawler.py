@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
+TContext = TypeVar('TContext')
 
 
 class HttpCrawlerOptions(
@@ -77,6 +78,7 @@ class AbstractHttpCrawler(
         self._parser = parser
         self._navigation_timeout = navigation_timeout or timedelta(minutes=1)
         self._pre_navigation_hooks: list[Callable[[BasicCrawlingContext], Awaitable[None]]] = []
+        self._post_navigation_hooks: list[Callable[[HttpCrawlingContext], Awaitable[None]]] = []
         self._shared_navigation_timeouts: dict[int, SharedTimeout] = {}
 
         if '_context_pipeline' not in kwargs:
@@ -120,6 +122,7 @@ class AbstractHttpCrawler(
             ContextPipeline()
             .compose(self._execute_pre_navigation_hooks)
             .compose(self._make_http_request)
+            .compose(self._execute_post_navigation_hooks)
             .compose(self._handle_status_code_response)
             .compose(self._parse_http_response)
             .compose(self._handle_blocked_request_by_content)
@@ -139,6 +142,14 @@ class AbstractHttpCrawler(
             yield context
         finally:
             self._shared_navigation_timeouts.pop(context_id, None)
+
+    async def _execute_post_navigation_hooks(
+        self, context: HttpCrawlingContext
+    ) -> AsyncGenerator[HttpCrawlingContext, None]:
+        for hook in self._post_navigation_hooks:
+            await hook(context)
+
+        yield context
 
     async def _parse_http_response(
         self, context: HttpCrawlingContext
@@ -308,3 +319,11 @@ class AbstractHttpCrawler(
             hook: A coroutine function to be called before each navigation.
         """
         self._pre_navigation_hooks.append(hook)
+
+    def post_navigation_hook(self, hook: Callable[[HttpCrawlingContext], Awaitable[None]]) -> None:
+        """Register a hook to be called after each navigation.
+
+        Args:
+            hook: A coroutine function to be called after each navigation.
+        """
+        self._post_navigation_hooks.append(hook)

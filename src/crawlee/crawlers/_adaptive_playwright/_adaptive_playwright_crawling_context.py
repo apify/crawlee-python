@@ -9,6 +9,7 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers import AbstractHttpParser, ParsedHttpCrawlingContext, PlaywrightCrawlingContext
+from crawlee.crawlers._playwright._playwright_post_nav_crawling_context import PlaywrightPostNavCrawlingContext
 from crawlee.crawlers._playwright._types import PlaywrightHttpResponse
 
 if TYPE_CHECKING:
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
     from playwright.async_api import Page, Response
     from typing_extensions import Self
 
+    from crawlee.crawlers._abstract_http._http_crawling_context import HttpCrawlingContext
     from crawlee.crawlers._playwright._types import BlockRequestsFunction, GotoOptions
 
 
@@ -199,6 +201,61 @@ class AdaptivePlaywrightCrawlingContext(
             _static_parser=parser,
             **context_kwargs,
         )
+
+
+@dataclass(frozen=True)
+@docs_group('Crawling contexts')
+class AdaptivePlaywrightPostNavCrawlingContext(BasicCrawlingContext):
+    """A post-navigation crawling context for the `AdaptivePlaywrightCrawler`.
+
+    Wraps either `HttpCrawlingContext` (static sub-crawler) or `PlaywrightPostNavCrawlingContext` (browser
+    sub-crawler). Playwright-specific attributes (`page`, `response`) raise `AdaptiveContextError` when accessed
+    during static crawling.
+    """
+
+    _page: Page | None = None
+    _response: Response | None = None
+
+    @property
+    def page(self) -> Page:
+        """The Playwright `Page` object for the current page.
+
+        Raises `AdaptiveContextError` if accessed during static crawling.
+        """
+        if not self._page:
+            raise AdaptiveContextError('Page was not crawled with PlaywrightCrawler.')
+        return self._page
+
+    @property
+    def response(self) -> Response:
+        """The Playwright `Response` object containing the response details for the current URL.
+
+        Raises `AdaptiveContextError` if accessed during static crawling.
+        """
+        if not self._response:
+            raise AdaptiveContextError('Response was not crawled with PlaywrightCrawler.')
+        return self._response
+
+    @classmethod
+    async def from_post_navigation_context(
+        cls, context: HttpCrawlingContext | PlaywrightPostNavCrawlingContext
+    ) -> Self:
+        """Initialize a new instance from an existing post-navigation context."""
+        context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
+
+        context_kwargs['_page'] = context_kwargs.pop('page', None)
+        context_kwargs['_response'] = context_kwargs.pop('response', None)
+
+        # block_requests and goto_options are useful only on pre-navigation contexts.
+        context_kwargs.pop('block_requests', None)
+        context_kwargs.pop('goto_options', None)
+
+        if isinstance(context, PlaywrightPostNavCrawlingContext):
+            protocol_guess = await context_kwargs['_page'].evaluate('() => performance.getEntries()[0].nextHopProtocol')
+            context_kwargs['http_response'] = await PlaywrightHttpResponse.from_playwright_response(
+                response=context.response, protocol=protocol_guess or ''
+            )
+        return cls(**context_kwargs)
 
 
 @dataclass(frozen=True)
