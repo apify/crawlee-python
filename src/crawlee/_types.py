@@ -165,10 +165,10 @@ class EnqueueLinksKwargs(TypedDict):
             combination of protocol, domain, and port, ensuring a strict scope for the crawl.
     """
 
-    include: NotRequired[list[re.Pattern | Glob]]
+    include: NotRequired[Sequence[re.Pattern | Glob]]
     """List of regular expressions or globs that URLs must match to be enqueued."""
 
-    exclude: NotRequired[list[re.Pattern | Glob]]
+    exclude: NotRequired[Sequence[re.Pattern | Glob]]
     """List of regular expressions or globs that URLs must not match to be enqueued."""
 
 

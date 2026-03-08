@@ -67,7 +67,7 @@ async def test_static_crawler_actor_at_apify(
             'start_url': default_start_url,
             'install_project': False,
         },
-        output_dir=tmp_path,
+        output_dir=tmp_path,  # ty: ignore[invalid-argument-type]
     )
 
     patch_crawlee_version_in_project(

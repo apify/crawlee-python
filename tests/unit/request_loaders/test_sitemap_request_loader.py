@@ -182,7 +182,7 @@ async def test_transform_request_function(server_url: URL, http_client: HttpClie
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
 
     def transform_request(request_options: RequestOptions) -> RequestOptions | RequestTransformAction:
-        request_options['user_data'] = {'transformed': True}
+        request_options['user_data'] = {'transformed': True}  # ty: ignore[invalid-assignment]
         return request_options
 
     sitemap_loader = SitemapRequestLoader(

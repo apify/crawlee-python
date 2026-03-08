@@ -103,7 +103,7 @@ class AbstractHttpCrawler(
         class _ParsedHttpCrawler(AbstractHttpCrawler):
             def __init__(
                 self,
-                parser: AbstractHttpParser[TParseResult, TSelectResult] = static_parser,
+                parser: AbstractHttpParser[TParseResult, TSelectResult] = static_parser,  # ty: ignore[invalid-parameter-default]
                 **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[TParseResult]]],
             ) -> None:
                 kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline()
