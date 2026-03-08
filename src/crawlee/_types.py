@@ -387,6 +387,7 @@ class EnqueueLinksFunction(Protocol):
         self,
         *,
         selector: str | None = None,
+        attribute: str | None = None,
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
@@ -411,6 +412,7 @@ class EnqueueLinksFunction(Protocol):
         self,
         *,
         selector: str | None = None,
+        attribute: str | None = None,
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
@@ -428,6 +430,7 @@ class EnqueueLinksFunction(Protocol):
                 - `PlaywrightCrawler` supports CSS and XPath selectors.
                 - `ParselCrawler` supports CSS selectors.
                 - `BeautifulSoupCrawler` supports CSS selectors.
+            attribute: Which node attribute to extract the links from.
             label: Label for the newly created `Request` objects, used for request routing.
             user_data: User data to be provided to the newly created `Request` objects.
             transform_request_function: A function that takes `RequestOptions` and returns either:
@@ -457,6 +460,7 @@ class ExtractLinksFunction(Protocol):
         self,
         *,
         selector: str = 'a',
+        attribute: str = 'href',
         label: str | None = None,
         user_data: dict[str, Any] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
@@ -470,6 +474,7 @@ class ExtractLinksFunction(Protocol):
                 - `PlaywrightCrawler` supports CSS and XPath selectors.
                 - `ParselCrawler` supports CSS selectors.
                 - `BeautifulSoupCrawler` supports CSS selectors.
+            attribute: Which node attribute to extract the links from.
             label: Label for the newly created `Request` objects, used for request routing.
             user_data: User data to be provided to the newly created `Request` objects.
             transform_request_function: A function that takes `RequestOptions` and returns either:

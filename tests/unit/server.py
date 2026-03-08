@@ -20,6 +20,7 @@ from tests.unit.server_endpoints import (
     HELLO_WORLD,
     INCAPSULA,
     INFINITE_SCROLL,
+    NON_HREF_LINKS,
     PROBLEMATIC_LINKS,
     RESOURCE_LOADING_PAGE,
     ROBOTS_TXT,
@@ -108,6 +109,7 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         'page_3': generic_response_endpoint,
         'base_page': base_index_endpoint,
         'problematic_links': problematic_links_endpoint,
+        'non_href_links': non_href_links_endpoint,
         'set_cookies': set_cookies,
         'set_complex_cookies': set_complex_cookies,
         'cookies': get_cookies,
@@ -301,6 +303,14 @@ async def problematic_links_endpoint(_scope: dict[str, Any], _receive: Receive, 
     await send_html_response(
         send,
         PROBLEMATIC_LINKS,
+    )
+
+
+async def non_href_links_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Handle requests with a page containing non-href links."""
+    await send_html_response(
+        send,
+        NON_HREF_LINKS,
     )
 
 

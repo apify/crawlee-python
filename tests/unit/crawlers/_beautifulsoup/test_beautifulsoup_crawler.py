@@ -250,6 +250,21 @@ async def test_extract_links(server_url: URL, http_client: HttpClient) -> None:
     assert extracted_links[0] == str(server_url / 'page_1')
 
 
+async def test_extract_non_href_links(server_url: URL, http_client: HttpClient) -> None:
+    crawler = BeautifulSoupCrawler(http_client=http_client)
+    extracted_links: list[str] = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        links = await context.extract_links(selector='li', attribute='data-href')
+        extracted_links.extend(request.url for request in links)
+
+    await crawler.run([str(server_url / 'non_href_links')])
+
+    assert len(extracted_links) == 1
+    assert extracted_links[0] == str(server_url / 'page_2')
+
+
 @pytest.mark.parametrize(
     ('queue_name', 'queue_alias', 'by_id'),
     [

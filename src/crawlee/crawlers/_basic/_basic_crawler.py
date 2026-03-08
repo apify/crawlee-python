@@ -997,6 +997,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         async def enqueue_links(
             *,
             selector: str | None = None,
+            attribute: str | None = None,
             label: str | None = None,
             user_data: dict[str, Any] | None = None,
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
@@ -1010,9 +1011,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             kwargs.setdefault('strategy', 'same-hostname')
 
             if requests:
-                if any((selector, label, user_data, transform_request_function)):
+                if any((selector, attribute, label, user_data, transform_request_function)):
                     raise ValueError(
-                        'You cannot provide `selector`, `label`, `user_data` or '
+                        'You cannot provide `selector`, `attribute`, `label`, `user_data` or '
                         '`transform_request_function` arguments when `requests` is provided.'
                     )
                 # Add directly passed requests.
@@ -1024,6 +1025,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 await context.add_requests(
                     await extract_links(
                         selector=selector or 'a',
+                        attribute=attribute or 'href',
                         label=label,
                         user_data=user_data,
                         transform_request_function=transform_request_function,
