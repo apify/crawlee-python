@@ -197,7 +197,7 @@ class AbstractHttpCrawler(
             )
 
             # Get base URL from <base> tag if present
-            extracted_base_urls = list(self._parser.find_links(parsed_content, 'base', 'href'))
+            extracted_base_urls = list(self._parser.find_links(parsed_content, 'base[href]', 'href'))
             base_url: str = (
                 str(extracted_base_urls[0])
                 if extracted_base_urls
