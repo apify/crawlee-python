@@ -79,8 +79,9 @@ class RequestList(RequestLoader):
             logger=logger,
         )
 
+        self._requests: AsyncIterator[str | Request]
         if isinstance(requests, AsyncIterable):
-            self._requests = requests.__aiter__()
+            self._requests = requests.__aiter__()  # ty: ignore[invalid-assignment]
         elif requests is None:
             self._requests = self._iterate_in_threadpool([])
         else:
