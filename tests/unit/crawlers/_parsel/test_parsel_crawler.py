@@ -67,6 +67,32 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL, http_cli
     }
 
 
+async def test_enqueue_non_href_links(redirect_server_url: URL, server_url: URL, http_client: HttpClient) -> None:
+    redirect_target = str(server_url / 'start_enqueue_non_href')
+    redirect_url = str(redirect_server_url.with_path('redirect').with_query(url=redirect_target))
+    requests = [redirect_url]
+
+    crawler = ParselCrawler(http_client=http_client)
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links(selector='img', attribute='src')
+
+    await crawler.run(requests)
+
+    first_visited = visit.call_args_list[0][0][0]
+    visited = {call[0][0] for call in visit.call_args_list}
+
+    assert first_visited == redirect_url
+    assert visited == {
+        redirect_url,
+        str(server_url / 'base_subpath/image_1'),
+        str(server_url / 'image_2'),
+    }
+
+
 async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: URL) -> None:
     """Call `enqueue_links` with arguments that can't be used together."""
     crawler = ParselCrawler(max_request_retries=1)

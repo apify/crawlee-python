@@ -17,6 +17,18 @@ START_ENQUEUE = b"""\
     <a href="mailto:test@test.com">test@test.com</a>
 </body></html>"""
 
+START_ENQUEUE_NON_HREF = """\
+<html><head>
+    <base href="{host}/base_subpath/">
+    <title>Hello</title>
+</head>
+<body>
+    <a href="/page_3">Link A</a>
+    <a href="/page_2">Link B</a>
+    <img src="image_1"/>
+    <img src="/image_2"/>
+</body></html>"""
+
 SECONDARY_INDEX = b"""\
 <html><head>
     <title>Hello</title>
