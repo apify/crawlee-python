@@ -63,7 +63,7 @@ NON_HREF_LINKS = b"""\
 </head>
 <body>
     <a href="/page_1"></a>
-    <li data-href="/page_2"></a>
+    <li data-href="/page_2"></li>
 </body></html>
 """
 
