@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import gzip
+from typing import TYPE_CHECKING
 
 from yarl import URL
 
@@ -8,6 +9,9 @@ from crawlee import RequestOptions, RequestTransformAction
 from crawlee.http_clients._base import HttpClient
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
 from crawlee.storages import KeyValueStore
+
+if TYPE_CHECKING:
+    from crawlee._types import JsonSerializable
 
 BASIC_SITEMAP = """
 <?xml version="1.0" encoding="UTF-8"?>
@@ -182,7 +186,8 @@ async def test_transform_request_function(server_url: URL, http_client: HttpClie
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
 
     def transform_request(request_options: RequestOptions) -> RequestOptions | RequestTransformAction:
-        request_options['user_data'] = {'transformed': True}  # ty: ignore[invalid-assignment]
+        user_data: dict[str, JsonSerializable] = {'transformed': True}
+        request_options['user_data'] = user_data
         return request_options
 
     sitemap_loader = SitemapRequestLoader(
