@@ -113,6 +113,7 @@ class BrowserPool:
         headless: bool | None = None,
         fingerprint_generator: FingerprintGenerator | None = None,
         use_incognito_pages: bool | None = False,
+        cdp_endpoint_url: str | None = None,
         **kwargs: Any,
     ) -> BrowserPool:
         """Initialize a new instance with a single `PlaywrightBrowserPlugin` configured with the provided options.
@@ -135,6 +136,8 @@ class BrowserPool:
                 to generate browser fingerprints together with consistent headers.
             use_incognito_pages: By default pages share the same browser context. If set to True each page uses its
                 own context that is destroyed once the page is closed or crashes.
+            cdp_endpoint_url: A CDP websocket endpoint or http url to connect to. For example http://localhost:9222/
+                or ws://127.0.0.1:9222/devtools/browser/387adf4c-243f-4051-a181-46798f4a46f4.
             kwargs: Additional arguments for default constructor.
         """
         plugin_options: dict = defaultdict(dict)
@@ -146,6 +149,9 @@ class BrowserPool:
 
         if use_incognito_pages is not None:
             plugin_options['use_incognito_pages'] = use_incognito_pages
+
+        if cdp_endpoint_url is not None:
+            plugin_options['cdp_endpoint_url'] = cdp_endpoint_url
 
         if browser_type:
             plugin_options['browser_type'] = browser_type

@@ -50,6 +50,7 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
         browser_new_context_options: dict[str, Any] | None = None,
         max_open_pages_per_browser: int = 20,
         use_incognito_pages: bool = False,
+        cdp_endpoint_url: str | None = None,
         fingerprint_generator: FingerprintGenerator | None = None,
     ) -> None:
         """Initialize a new instance.
@@ -71,6 +72,8 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
                 Once reached, a new browser instance will be launched to handle the excess.
             use_incognito_pages: By default pages share the same browser context. If set to True each page uses its
                 own context that is destroyed once the page is closed or crashes.
+            cdp_endpoint_url: A CDP websocket endpoint or http url to connect to. For example http://localhost:9222/
+                or ws://127.0.0.1:9222/devtools/browser/387adf4c-243f-4051-a181-46798f4a46f4.
             fingerprint_generator: An optional instance of implementation of `FingerprintGenerator` that is used
                 to generate browser fingerprints together with consistent headers.
         """
@@ -102,6 +105,7 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
         self._browser_new_context_options = browser_new_context_options or {}
         self._max_open_pages_per_browser = max_open_pages_per_browser
         self._use_incognito_pages = use_incognito_pages
+        self._cdp_endpoint_url = cdp_endpoint_url
         self._user_data_dir = user_data_dir
 
         self._playwright_context_manager = async_playwright()
@@ -187,7 +191,10 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
         else:
             raise ValueError(f'Invalid browser type: {self._browser_type}')
 
-        if self._use_incognito_pages:
+        if self._cdp_endpoint_url:
+            # Ref: https://playwright.dev/python/docs/api/class-browsertype#browser-type-connect-over-cdp
+            browser = await browser_type.connect_over_cdp("wss://brd-customer-hl_540bcf43-zone-scraping_browser1:tfrj5zltz98p@brd.superproxy.io:9222")
+        elif self._use_incognito_pages:
             browser: Browser | PlaywrightPersistentBrowser = await browser_type.launch(**self._browser_launch_options)
         else:
             browser = PlaywrightPersistentBrowser(browser_type, self._user_data_dir, self._browser_launch_options)

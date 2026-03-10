@@ -109,6 +109,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         fingerprint_generator: FingerprintGenerator | None | Literal['default'] = 'default',
         headless: bool | None = None,
         use_incognito_pages: bool | None = None,
+        cdp_endpoint_url: str | None = None,
         navigation_timeout: timedelta | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext, StatisticsState]],
     ) -> None:
@@ -137,6 +138,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 This option should not be used if `browser_pool` is provided.
             use_incognito_pages: By default pages share the same browser context. If set to True each page uses its
                 own context that is destroyed once the page is closed or crashes.
+                This option should not be used if `browser_pool` is provided.
+            cdp_endpoint_url: A CDP websocket endpoint or http url to connect to. For example http://localhost:9222/
+                or ws://127.0.0.1:9222/devtools/browser/387adf4c-243f-4051-a181-46798f4a46f4.
                 This option should not be used if `browser_pool` is provided.
             navigation_timeout: Timeout for navigation (the process between opening a Playwright page and calling
                 the request handler)
@@ -184,6 +188,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
                 browser_launch_options=browser_launch_options,
                 browser_new_context_options=browser_new_context_options,
                 use_incognito_pages=use_incognito_pages,
+                cdp_endpoint_url=cdp_endpoint_url,
                 fingerprint_generator=fingerprint_generator,
             )
 
