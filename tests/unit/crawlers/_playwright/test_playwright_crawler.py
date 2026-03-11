@@ -89,19 +89,18 @@ async def test_enqueue_links(redirect_server_url: URL, server_url: URL) -> None:
 
     await crawler.run(requests)
 
-    first_visited = visit.call_args_list[0][0][0]
-    visited = {call[0][0] for call in visit.call_args_list[1:]}
-
-    assert first_visited == redirect_url
-    assert visited == {
-        str(server_url / 'sub_index'),
-        str(server_url / 'page_1'),
-        str(server_url / 'page_2'),
-        str(server_url / 'page_3'),
-        str(server_url / 'page_4'),
-        str(server_url / 'base_page'),
-        str(server_url / 'base_subpath/page_5'),
-    }
+    expected_visit_calls = [
+        mock.call(redirect_url),
+        mock.call(str(server_url / 'sub_index')),
+        mock.call(str(server_url / 'page_1')),
+        mock.call(str(server_url / 'page_2')),
+        mock.call(str(server_url / 'page_3')),
+        mock.call(str(server_url / 'page_4')),
+        mock.call(str(server_url / 'base_page')),
+        mock.call(str(server_url / 'base_subpath/page_5')),
+    ]
+    assert visit.mock_calls[0] == expected_visit_calls[0]
+    visit.assert_has_calls(expected_visit_calls, any_order=True)
 
 
 async def test_enqueue_non_href_links(redirect_server_url: URL, server_url: URL) -> None:
@@ -118,15 +117,12 @@ async def test_enqueue_non_href_links(redirect_server_url: URL, server_url: URL)
 
     await crawler.run(requests)
 
-    first_visited = visit.call_args_list[0][0][0]
-    visited = {call[0][0] for call in visit.call_args_list}
-
-    assert first_visited == redirect_url
-    assert visited == {
-        redirect_url,
-        str(server_url / 'base_subpath/image_1'),
-        str(server_url / 'image_2'),
-    }
+    expected_visit_calls = [
+        mock.call(redirect_url),
+        mock.call(str(server_url / 'base_subpath/image_1')),
+        mock.call(str(server_url / 'image_2')),
+    ]
+    visit.assert_has_calls(expected_visit_calls, any_order=True)
 
 
 async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: URL) -> None:
@@ -171,9 +167,11 @@ async def test_enqueue_links_with_transform_request_function(server_url: URL) ->
 
     await crawler.run([str(server_url / 'start_enqueue')])
 
-    visited = {call[0][0] for call in visit.call_args_list}
-
-    assert visited == {str(server_url / 'start_enqueue'), str(server_url / 'sub_index')}
+    expected_visit_calls = [
+        mock.call(str(server_url / 'start_enqueue')),
+        mock.call(str(server_url / 'sub_index')),
+    ]
+    visit.assert_has_calls(expected_visit_calls, any_order=True)
 
     # all urls added to `enqueue_links` must have a custom header
     assert headers[1]['transform-header'] == 'my-header'
@@ -701,14 +699,14 @@ async def test_respect_robots_txt(server_url: URL) -> None:
         await context.enqueue_links()
 
     await crawler.run([str(server_url / 'start_enqueue')])
-    visited = {call[0][0] for call in visit.call_args_list}
 
-    assert visited == {
-        str(server_url / 'start_enqueue'),
-        str(server_url / 'sub_index'),
-        str(server_url / 'base_page'),
-        str(server_url / 'base_subpath/page_5'),
-    }
+    expected_visit_calls = [
+        mock.call(str(server_url / 'start_enqueue')),
+        mock.call(str(server_url / 'sub_index')),
+        mock.call(str(server_url / 'base_page')),
+        mock.call(str(server_url / 'base_subpath/page_5')),
+    ]
+    visit.assert_has_calls(expected_visit_calls, any_order=True)
 
 
 async def test_respect_robots_txt_with_problematic_links(server_url: URL) -> None:
@@ -731,17 +729,19 @@ async def test_respect_robots_txt_with_problematic_links(server_url: URL) -> Non
 
     await crawler.run([str(server_url / 'problematic_links')])
 
-    visited = {call[0][0] for call in visit.call_args_list}
-    failed = {call[0][0] for call in fail.call_args_list}
-
     # Email must be skipped
     # https://avatars.githubusercontent.com/apify does not get robots.txt, but is correct for the crawler.
-    assert visited == {str(server_url / 'problematic_links'), 'https://avatars.githubusercontent.com/apify'}
+    expected_visit_calls = [
+        mock.call(str(server_url / 'problematic_links')),
+        mock.call('https://avatars.githubusercontent.com/apify'),
+    ]
+    visit.assert_has_calls(expected_visit_calls, any_order=True)
 
     # The budplaceholder.com does not exist.
-    assert failed == {
-        'https://budplaceholder.com/',
-    }
+    expected_fail_calls = [
+        mock.call('https://budplaceholder.com/'),
+    ]
+    fail.assert_has_calls(expected_fail_calls, any_order=True)
 
 
 async def test_on_skipped_request(server_url: URL) -> None:
@@ -758,14 +758,13 @@ async def test_on_skipped_request(server_url: URL) -> None:
 
     await crawler.run([str(server_url / 'start_enqueue')])
 
-    skipped = {call[0][0] for call in skip.call_args_list}
-
-    assert skipped == {
-        str(server_url / 'page_1'),
-        str(server_url / 'page_2'),
-        str(server_url / 'page_3'),
-        str(server_url / 'page_4'),
-    }
+    expected_skip_calls = [
+        mock.call(str(server_url / 'page_1')),
+        mock.call(str(server_url / 'page_2')),
+        mock.call(str(server_url / 'page_3')),
+        mock.call(str(server_url / 'page_4')),
+    ]
+    skip.assert_has_calls(expected_skip_calls, any_order=True)
 
 
 async def test_send_request(server_url: URL) -> None:
@@ -1112,12 +1111,9 @@ async def test_enqueue_links_with_limit(server_url: URL) -> None:
 
     await crawler.run(requests)
 
-    first_visited = visit.call_args_list[0][0][0]
-    visited = {call[0][0] for call in visit.call_args_list}
-
-    assert first_visited == start_url
     # Only one link should be enqueued from sub_index due to the limit
-    assert visited == {
-        start_url,
-        str(server_url / 'page_3'),
-    }
+    expected_visit_calls = [
+        mock.call(start_url),
+        mock.call(str(server_url / 'page_3')),
+    ]
+    visit.assert_has_calls(expected_visit_calls, any_order=True)
