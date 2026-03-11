@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.5.1 - **not yet released**
+
+### 🚀 Features
+
+- Allow non-href links extract &amp; enqueue ([#1781](https://github.com/apify/crawlee-python/pull/1781)) ([6db365d](https://github.com/apify/crawlee-python/commit/6db365d1625206d8d691256c9cd4b44a821238bb)) by [@kozlice](https://github.com/kozlice)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.5.0](https://github.com/apify/crawlee-python/releases/tag/v1.5.0) (2026-03-06)
 
 ### 🚀 Features
