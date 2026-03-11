@@ -52,7 +52,6 @@ def _make_request(url: str) -> Request:
 # ── Request Routing Tests ─────────────────────────────────
 
 
-@pytest.mark.asyncio
 async def test_add_request_routes_listed_domain_to_sub_queue(
     manager: ThrottlingRequestManager,
     inner_queue: RequestQueue,
@@ -69,7 +68,6 @@ async def test_add_request_routes_listed_domain_to_sub_queue(
     assert await manager._sub_queues[THROTTLED_DOMAIN].get_total_count() == 1
 
 
-@pytest.mark.asyncio
 async def test_add_request_routes_non_listed_domain_to_inner(
     manager: ThrottlingRequestManager,
     inner_queue: RequestQueue,
@@ -82,7 +80,6 @@ async def test_add_request_routes_non_listed_domain_to_inner(
     assert NON_THROTTLED_DOMAIN not in manager._sub_queues
 
 
-@pytest.mark.asyncio
 async def test_add_request_with_string_url(
     manager: ThrottlingRequestManager,
 ) -> None:
@@ -94,7 +91,6 @@ async def test_add_request_with_string_url(
     assert await manager._sub_queues[THROTTLED_DOMAIN].get_total_count() == 1
 
 
-@pytest.mark.asyncio
 async def test_add_requests_routes_mixed_domains(
     manager: ThrottlingRequestManager,
     inner_queue: RequestQueue,
@@ -116,14 +112,12 @@ async def test_add_requests_routes_mixed_domains(
 # ── Core Throttling Tests ─────────────────────────────────
 
 
-@pytest.mark.asyncio
 async def test_429_triggers_domain_delay(manager: ThrottlingRequestManager) -> None:
     """After record_domain_delay(), the domain should be throttled."""
     manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/page1')
     assert manager._is_domain_throttled(THROTTLED_DOMAIN)
 
 
-@pytest.mark.asyncio
 async def test_different_domains_independent(manager: ThrottlingRequestManager) -> None:
     """Throttling one domain should NOT affect other domains."""
     manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/page1')
@@ -131,7 +125,6 @@ async def test_different_domains_independent(manager: ThrottlingRequestManager) 
     assert not manager._is_domain_throttled(NON_THROTTLED_DOMAIN)
 
 
-@pytest.mark.asyncio
 async def test_exponential_backoff(manager: ThrottlingRequestManager) -> None:
     """Consecutive 429s should increase delay exponentially."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
@@ -147,9 +140,8 @@ async def test_exponential_backoff(manager: ThrottlingRequestManager) -> None:
     assert state.consecutive_429_count == 2
 
 
-@pytest.mark.asyncio
 async def test_max_delay_cap(manager: ThrottlingRequestManager) -> None:
-    """Backoff should cap at _MAX_DELAY (60s)."""
+    """Backoff should cap at max_delay (60s)."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
 
     for _ in range(20):
@@ -159,10 +151,9 @@ async def test_max_delay_cap(manager: ThrottlingRequestManager) -> None:
     now = datetime.now(timezone.utc)
     actual_delay = state.throttled_until - now
 
-    assert actual_delay <= manager._MAX_DELAY + timedelta(seconds=1)
+    assert actual_delay <= manager._max_delay + timedelta(seconds=1)
 
 
-@pytest.mark.asyncio
 async def test_retry_after_header_priority(manager: ThrottlingRequestManager) -> None:
     """Explicit Retry-After should override exponential backoff."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
@@ -177,7 +168,6 @@ async def test_retry_after_header_priority(manager: ThrottlingRequestManager) ->
     assert actual_delay <= timedelta(seconds=31)
 
 
-@pytest.mark.asyncio
 async def test_success_resets_backoff(manager: ThrottlingRequestManager) -> None:
     """Successful request should reset the consecutive 429 count."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
@@ -193,7 +183,6 @@ async def test_success_resets_backoff(manager: ThrottlingRequestManager) -> None
 # ── Crawl-Delay Integration Tests ─────────────────────────
 
 
-@pytest.mark.asyncio
 async def test_crawl_delay_integration(manager: ThrottlingRequestManager) -> None:
     """set_crawl_delay() should record the delay for the domain."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
@@ -203,7 +192,6 @@ async def test_crawl_delay_integration(manager: ThrottlingRequestManager) -> Non
     assert state.crawl_delay == timedelta(seconds=5)
 
 
-@pytest.mark.asyncio
 async def test_crawl_delay_throttles_after_dispatch(manager: ThrottlingRequestManager) -> None:
     """After dispatching a request, crawl-delay should throttle the next one."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
@@ -217,7 +205,6 @@ async def test_crawl_delay_throttles_after_dispatch(manager: ThrottlingRequestMa
 # ── Fetch Scheduling Tests ────────────────────────────
 
 
-@pytest.mark.asyncio
 async def test_fetch_from_unthrottled_sub_queue(
     manager: ThrottlingRequestManager,
 ) -> None:
@@ -231,7 +218,6 @@ async def test_fetch_from_unthrottled_sub_queue(
     assert result.url == url
 
 
-@pytest.mark.asyncio
 async def test_fetch_falls_back_to_inner(
     manager: ThrottlingRequestManager,
 ) -> None:
@@ -245,7 +231,6 @@ async def test_fetch_falls_back_to_inner(
     assert result.url == url
 
 
-@pytest.mark.asyncio
 async def test_fetch_skips_throttled_sub_queue(
     manager: ThrottlingRequestManager,
 ) -> None:
@@ -265,7 +250,6 @@ async def test_fetch_skips_throttled_sub_queue(
     assert result.url == free_url
 
 
-@pytest.mark.asyncio
 async def test_sleep_when_all_throttled(manager: ThrottlingRequestManager) -> None:
     """When all domains are throttled and inner is empty, should sleep and retry."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
@@ -291,7 +275,6 @@ async def test_sleep_when_all_throttled(manager: ThrottlingRequestManager) -> No
 # ── Delegation Tests ────────────────────────────────────
 
 
-@pytest.mark.asyncio
 async def test_reclaim_request_routes_to_sub_queue(
     manager: ThrottlingRequestManager,
 ) -> None:
@@ -309,7 +292,6 @@ async def test_reclaim_request_routes_to_sub_queue(
     assert not await manager._sub_queues[THROTTLED_DOMAIN].is_empty()
 
 
-@pytest.mark.asyncio
 async def test_reclaim_request_routes_to_inner(
     manager: ThrottlingRequestManager,
     inner_queue: RequestQueue,
@@ -327,7 +309,6 @@ async def test_reclaim_request_routes_to_inner(
     assert not await inner_queue.is_empty()
 
 
-@pytest.mark.asyncio
 async def test_mark_request_as_handled_routes_to_sub_queue(
     manager: ThrottlingRequestManager,
 ) -> None:
@@ -343,7 +324,6 @@ async def test_mark_request_as_handled_routes_to_sub_queue(
     assert await manager._sub_queues[THROTTLED_DOMAIN].get_handled_count() == 1
 
 
-@pytest.mark.asyncio
 async def test_mark_request_as_handled_routes_to_inner(
     manager: ThrottlingRequestManager,
     inner_queue: RequestQueue,
@@ -360,7 +340,6 @@ async def test_mark_request_as_handled_routes_to_inner(
     assert await inner_queue.get_handled_count() == 1
 
 
-@pytest.mark.asyncio
 async def test_get_handled_count_aggregates(manager: ThrottlingRequestManager) -> None:
     """get_handled_count should sum inner and all sub-queues."""
     throttled_url = f'https://{THROTTLED_DOMAIN}/page1'
@@ -381,7 +360,6 @@ async def test_get_handled_count_aggregates(manager: ThrottlingRequestManager) -
     assert await manager.get_handled_count() == 2
 
 
-@pytest.mark.asyncio
 async def test_get_total_count_aggregates(manager: ThrottlingRequestManager) -> None:
     """get_total_count should sum inner and all sub-queues."""
     throttled_url = f'https://{THROTTLED_DOMAIN}/page1'
@@ -393,7 +371,6 @@ async def test_get_total_count_aggregates(manager: ThrottlingRequestManager) -> 
     assert await manager.get_total_count() == 2
 
 
-@pytest.mark.asyncio
 async def test_is_empty_aggregates(manager: ThrottlingRequestManager) -> None:
     """is_empty should return False if any queue has requests."""
     assert await manager.is_empty() is True
@@ -402,7 +379,6 @@ async def test_is_empty_aggregates(manager: ThrottlingRequestManager) -> None:
     assert await manager.is_empty() is False
 
 
-@pytest.mark.asyncio
 async def test_is_finished_aggregates(manager: ThrottlingRequestManager) -> None:
     """is_finished should return True only when all queues are finished."""
     assert await manager.is_finished() is True
@@ -418,7 +394,6 @@ async def test_is_finished_aggregates(manager: ThrottlingRequestManager) -> None
     assert await manager.is_finished() is True
 
 
-@pytest.mark.asyncio
 async def test_drop_clears_all(
     manager: ThrottlingRequestManager,
 ) -> None:
@@ -432,7 +407,6 @@ async def test_drop_clears_all(
     assert len(manager._sub_queues) == 0
 
 
-@pytest.mark.asyncio
 async def test_recreate_purged(
     manager: ThrottlingRequestManager,
 ) -> None:

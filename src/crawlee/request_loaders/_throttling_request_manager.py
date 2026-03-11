@@ -81,18 +81,14 @@ class ThrottlingRequestManager(RequestManager):
         ```
     """
 
-    _BASE_DELAY = timedelta(seconds=2)
-    """Initial delay after the first 429 response from a domain."""
-
-    _MAX_DELAY = timedelta(seconds=60)
-    """Maximum delay between requests to a rate-limited domain."""
-
     def __init__(
         self,
         inner: RequestManager,
         *,
         domains: Sequence[str],
         service_locator: ServiceLocator | None = None,
+        base_delay: timedelta = timedelta(seconds=2),
+        max_delay: timedelta = timedelta(seconds=60),
     ) -> None:
         """Initialize the throttling manager.
 
@@ -104,9 +100,13 @@ class ThrottlingRequestManager(RequestManager):
             service_locator: Service locator for creating sub-queues. If not
                 provided, defaults to the global service locator, ensuring
                 consistency with the crawler's storage backend.
+            base_delay: Initial delay after the first 429 response from a domain.
+            max_delay: Maximum delay between requests to a rate-limited domain.
         """
         self._inner = inner
         self._service_locator = service_locator if service_locator is not None else global_service_locator
+        self._base_delay = base_delay
+        self._max_delay = max_delay
         self._domain_states: dict[str, _DomainState] = {d: _DomainState(domain=d) for d in domains}
         self._sub_queues: dict[str, RequestQueue] = {}
 
@@ -142,7 +142,7 @@ class ThrottlingRequestManager(RequestManager):
     def _get_earliest_available_time(self) -> datetime:
         """Get the earliest time any throttled domain becomes available."""
         now = datetime.now(timezone.utc)
-        earliest = now + self._MAX_DELAY  # Fallback upper bound.
+        earliest = now + self._max_delay  # Fallback upper bound.
 
         for state in self._domain_states.values():
             if state.throttled_until > now and state.throttled_until < earliest:
@@ -173,10 +173,10 @@ class ThrottlingRequestManager(RequestManager):
         state.consecutive_429_count += 1
 
         # Calculate delay: use Retry-After if provided, otherwise exponential backoff.
-        delay = retry_after if retry_after is not None else self._BASE_DELAY * (2 ** (state.consecutive_429_count - 1))
+        delay = retry_after if retry_after is not None else self._base_delay * (2 ** (state.consecutive_429_count - 1))
 
         # Cap the delay.
-        delay = min(delay, self._MAX_DELAY)
+        delay = min(delay, self._max_delay)
 
         state.throttled_until = now + delay
 
@@ -242,6 +242,8 @@ class ThrottlingRequestManager(RequestManager):
 
         This is used during crawler purge to reconstruct the throttler with empty
         queues while preserving domain configuration and service locator.
+
+        Note: The inner manager is always recreated as a ``RequestQueue``.
         """
         await self.drop()
 
@@ -254,6 +256,8 @@ class ThrottlingRequestManager(RequestManager):
             inner,
             domains=list(self._domain_states.keys()),
             service_locator=self._service_locator,
+            base_delay=self._base_delay,
+            max_delay=self._max_delay,
         )
 
     @override
@@ -275,15 +279,9 @@ class ThrottlingRequestManager(RequestManager):
 
         if domain in self._domain_states:
             sq = await self._get_or_create_sub_queue(domain)
-            result = await sq.add_request(request, forefront=forefront)
-        else:
-            result = await self._inner.add_request(request, forefront=forefront)
+            return await sq.add_request(request, forefront=forefront)
 
-        if result is None:
-            msg = 'add_request unexpectedly returned None'
-            raise RuntimeError(msg)
-
-        return result
+        return await self._inner.add_request(request, forefront=forefront)
 
     @override
     async def add_requests(
@@ -388,36 +386,39 @@ class ThrottlingRequestManager(RequestManager):
         If the inner queue is also empty and all sub-queues are throttled,
         sleeps until the earliest domain becomes available.
         """
-        # Collect unthrottled domains and sort by throttled_until (longest-overdue first).
-        available_domains = [
-            domain
-            for domain in self._domain_states
-            if domain in self._sub_queues and not self._is_domain_throttled(domain)
-        ]
-        available_domains.sort(
-            key=lambda d: self._domain_states[d].throttled_until,
-        )
+        while True:
+            # Collect unthrottled domains and sort by throttled_until (longest-overdue first).
+            available_domains = [
+                domain
+                for domain in self._domain_states
+                if domain in self._sub_queues and not self._is_domain_throttled(domain)
+            ]
+            available_domains.sort(
+                key=lambda d: self._domain_states[d].throttled_until,
+            )
 
-        for domain in available_domains:
-            sq = self._sub_queues[domain]
-            req = await sq.fetch_next_request()
-            if req:
-                self._mark_domain_dispatched(req.url)
-                return req
+            for domain in available_domains:
+                sq = self._sub_queues[domain]
+                req = await sq.fetch_next_request()
+                if req:
+                    self._mark_domain_dispatched(req.url)
+                    return req
 
-        # Try fetching from the inner queue (non-throttled domains).
-        request = await self._inner.fetch_next_request()
-        if request is not None:
-            return request
+            # Try fetching from the inner queue (non-throttled domains).
+            request = await self._inner.fetch_next_request()
+            if request is not None:
+                return request
 
-        # No requests in inner queue. Check if any sub-queues still have requests.
-        have_sq_requests = False
-        for sq in self._sub_queues.values():
-            if not await sq.is_empty():
-                have_sq_requests = True
-                break
+            # No requests in inner queue. Check if any sub-queues still have requests.
+            have_sq_requests = False
+            for sq in self._sub_queues.values():
+                if not await sq.is_empty():
+                    have_sq_requests = True
+                    break
 
-        if have_sq_requests:
+            if not have_sq_requests:
+                return None
+
             # Requests exist but all domains are throttled and inner is empty. Sleep and retry.
             earliest = self._get_earliest_available_time()
             sleep_duration = max(
@@ -429,6 +430,3 @@ class ThrottlingRequestManager(RequestManager):
                 f'Sleeping {sleep_duration:.1f}s until earliest domain is available.'
             )
             await asyncio.sleep(sleep_duration)
-            return await self.fetch_next_request()
-
-        return None
