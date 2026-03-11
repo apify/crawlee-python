@@ -37,11 +37,11 @@ class ParselParser(AbstractHttpParser[Selector, Selector]):
         return parsed_content.type in ('html', 'xml') and parsed_content.css(selector).get() is not None
 
     @override
-    def find_links(self, parsed_content: Selector, selector: str) -> Iterable[str]:
+    def find_links(self, parsed_content: Selector, selector: str, attribute: str) -> Iterable[str]:
         link: Selector
         urls: list[str] = []
         for link in parsed_content.css(selector):
-            url = link.xpath('@href').get()
+            url = link.xpath(f'@{attribute}').get()
             if url:
                 urls.append(url.strip())
         return urls
