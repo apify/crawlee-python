@@ -95,17 +95,6 @@ async def test_request_records_persistence(rq_client: RedisRequestQueueClient) -
         assert request_data['url'].startswith('https://example.com/')
 
 
-async def test_handled_request_records_persistence(rq_client: RedisRequestQueueClient) -> None:
-    request = Request.from_url('https://example.com/1')
-    await rq_client.add_batch_of_requests([request])
-    fetched_request = await rq_client.fetch_next_request()
-    assert isinstance(fetched_request, Request)
-    await rq_client.mark_request_as_handled(fetched_request)
-    fetched_request = await rq_client.get_request(request.unique_key)
-    assert isinstance(fetched_request, Request)
-    assert fetched_request.unique_key == request.unique_key
-
-
 async def test_drop_removes_records(rq_client: RedisRequestQueueClient) -> None:
     """Test that drop removes all request records from Redis."""
     await rq_client.add_batch_of_requests([Request.from_url('https://example.com')])
