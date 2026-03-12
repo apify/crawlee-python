@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - **redis:** Do not remove handled request data from request queue ([#1787](https://github.com/apify/crawlee-python/pull/1787)) ([3008c61](https://github.com/apify/crawlee-python/commit/3008c61dcbe07ccdf3c43f198b37582cc1356c9a)) by [@kozlice](https://github.com/kozlice)
+- **redis:** Update actual `Request` state in request queue Redis storage client ([#1789](https://github.com/apify/crawlee-python/pull/1789)) ([787231c](https://github.com/apify/crawlee-python/commit/787231cebeb863ee2b4395964a79a37053dbec01)) by [@Mantisus](https://github.com/Mantisus)
 
 
 <!-- git-cliff-unreleased-end -->
