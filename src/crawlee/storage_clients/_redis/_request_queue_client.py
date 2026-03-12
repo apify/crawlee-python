@@ -402,7 +402,6 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 await await_redis_response(pipe.bf().add(self._handled_filter_key, request.unique_key))
 
             await await_redis_response(pipe.hdel(self._in_progress_key, request.unique_key))
-            await await_redis_response(pipe.hdel(self._data_key, request.unique_key))
 
             await self._update_metadata(
                 pipe,
