@@ -8,7 +8,6 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import CursorResult, exists, func, or_, select, update
-from sqlalchemy import func as sql_func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only
 from typing_extensions import NotRequired, Self, override
@@ -778,22 +777,22 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
     @override
     async def _apply_buffer_updates(self, session: AsyncSession, max_buffer_id: int) -> None:
         aggregations: list[ColumnElement[Any]] = [
-            sql_func.max(self._BUFFER_TABLE.accessed_at).label('max_accessed_at'),
-            sql_func.max(self._BUFFER_TABLE.modified_at).label('max_modified_at'),
-            sql_func.sum(self._BUFFER_TABLE.delta_handled_count).label('delta_handled_count'),
-            sql_func.sum(self._BUFFER_TABLE.delta_pending_count).label('delta_pending_count'),
-            sql_func.sum(self._BUFFER_TABLE.delta_total_count).label('delta_total_count'),
+            func.max(self._BUFFER_TABLE.accessed_at).label('max_accessed_at'),
+            func.max(self._BUFFER_TABLE.modified_at).label('max_modified_at'),
+            func.sum(self._BUFFER_TABLE.delta_handled_count).label('delta_handled_count'),
+            func.sum(self._BUFFER_TABLE.delta_pending_count).label('delta_pending_count'),
+            func.sum(self._BUFFER_TABLE.delta_total_count).label('delta_total_count'),
         ]
 
         if not self._had_multiple_clients:
             aggregations.append(
-                sql_func.count(sql_func.distinct(self._BUFFER_TABLE.client_id)).label('unique_clients_count')
+                func.count(func.distinct(self._BUFFER_TABLE.client_id)).label('unique_clients_count')
             )
 
         if self._storage_client.get_dialect_name() == 'postgresql':
-            aggregations.append(sql_func.bool_or(self._BUFFER_TABLE.need_recalc).label('need_recalc'))
+            aggregations.append(func.bool_or(self._BUFFER_TABLE.need_recalc).label('need_recalc'))
         else:
-            aggregations.append(sql_func.max(self._BUFFER_TABLE.need_recalc).label('need_recalc'))
+            aggregations.append(func.max(self._BUFFER_TABLE.need_recalc).label('need_recalc'))
 
         aggregation_stmt = select(*aggregations).where(
             self._BUFFER_TABLE.storage_id == self._id, self._BUFFER_TABLE.id <= max_buffer_id
