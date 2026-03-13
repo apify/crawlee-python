@@ -25,6 +25,9 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   code_checks:
     name: Code checks
@@ -51,6 +54,8 @@ jobs:
   changelog_update:
     name: Changelog update
     needs: [release_prepare]
+    permissions:
+      contents: write
     uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
     with:
       version_number: ${{ needs.release_prepare.outputs.version_number }}
@@ -61,6 +66,8 @@ jobs:
     name: GitHub release
     needs: [release_prepare, changelog_update]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -100,6 +107,10 @@ jobs:
   doc_release:
     name: Doc release
     needs: [changelog_update, pypi_publish]
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
     uses: ./.github/workflows/_release_docs.yaml
     with:
       # Use the ref from the changelog update to include the updated changelog.
