@@ -268,7 +268,9 @@ class ThrottlingRequestManager(RequestManager):
         self._sub_queues.clear()
 
     @override
-    async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest:
+    async def add_request(  # type: ignore[invalid-method-override]
+        self, request: str | Request, *, forefront: bool = False
+    ) -> ProcessedRequest | None:
         """Add a request, routing it to the appropriate queue.
 
         Requests for explicitly configured domains are routed directly to their
@@ -279,14 +281,9 @@ class ThrottlingRequestManager(RequestManager):
 
         if domain in self._domain_states:
             sq = await self._get_or_create_sub_queue(domain)
-            result = await sq.add_request(request, forefront=forefront)
-        else:
-            result = await self._inner.add_request(request, forefront=forefront)
+            return await sq.add_request(request, forefront=forefront)
 
-        if result is not None:
-            return result
-
-        return result
+        return await self._inner.add_request(request, forefront=forefront)
 
     @override
     async def add_requests(
