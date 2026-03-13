@@ -279,9 +279,14 @@ class ThrottlingRequestManager(RequestManager):
 
         if domain in self._domain_states:
             sq = await self._get_or_create_sub_queue(domain)
-            return await sq.add_request(request, forefront=forefront)
+            result = await sq.add_request(request, forefront=forefront)
+        else:
+            result = await self._inner.add_request(request, forefront=forefront)
 
-        return await self._inner.add_request(request, forefront=forefront)
+        if result is not None:
+            return result
+
+        return result
 
     @override
     async def add_requests(
