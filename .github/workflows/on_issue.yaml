@@ -6,6 +6,9 @@ on:
     types:
       - opened
 
+permissions:
+  contents: read
+
 jobs:
   label_issues:
     name: Add labels

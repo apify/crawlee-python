@@ -12,6 +12,9 @@ concurrency:
   group: scheduled-tests
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 env:
   NODE_VERSION: 22
   PYTHON_VERSION: 3.14
