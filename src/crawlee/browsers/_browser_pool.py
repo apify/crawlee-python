@@ -100,7 +100,7 @@ class BrowserPool:
         self._plugins_cycle = itertools.cycle(self._plugins)  # Cycle through the plugins
 
         self._pre_page_create_hooks: list[
-            Callable[[str, BrowserController, Mapping[str, Any], ProxyInfo | None], Awaitable[None]]
+            Callable[[str, BrowserController, dict[str, Any], ProxyInfo | None], Awaitable[None]]
         ] = []
         self._post_page_create_hooks: list[Callable[[CrawleePage, BrowserController], Awaitable[None]]] = []
         self._pre_page_close_hooks: list[Callable[[CrawleePage, BrowserController], Awaitable[None]]] = []
@@ -308,7 +308,7 @@ class BrowserPool:
         try:
             if not browser_controller:
                 browser_controller = await asyncio.wait_for(self._launch_new_browser(plugin), timeout)
-            browser_new_context_options = plugin.browser_new_context_options
+            browser_new_context_options = dict(plugin.browser_new_context_options)
 
             await self._execute_hooks(
                 self._pre_page_create_hooks, page_id, browser_controller, browser_new_context_options, proxy_info
@@ -394,7 +394,7 @@ class BrowserPool:
             crawlee_page.page.close: Callable[..., Awaitable[None]] = close_with_hooks
 
     def pre_page_create_hook(
-        self, hook: Callable[[str, BrowserController, Mapping[str, Any], ProxyInfo | None], Awaitable[None]]
+        self, hook: Callable[[str, BrowserController, dict[str, Any], ProxyInfo | None], Awaitable[None]]
     ) -> None:
         """Register a hook to be called just before a new page is created.
 

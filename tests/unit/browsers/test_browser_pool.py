@@ -1,14 +1,22 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock
 
 import pytest
 
 from crawlee.browsers import BrowserPool, PlaywrightBrowserPlugin
+from crawlee.browsers._browser_controller import BrowserController
+from crawlee.browsers._types import CrawleePage
 from tests.unit.utils import run_alone_on_mac
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from typing import Any
+
     from yarl import URL
+
+    from crawlee.proxy_configuration import ProxyInfo
 
 
 async def test_default_plugin_new_page_creation(server_url: URL) -> None:
@@ -192,3 +200,157 @@ async def test_browser_pool_retire_browser_after_page_count(
             assert first_browser is second_browser
         else:
             assert first_browser is not second_browser
+
+
+async def test_pre_page_create_hook_is_called() -> None:
+    call_mock = AsyncMock()
+
+    async with BrowserPool() as browser_pool:
+
+        @browser_pool.pre_page_create_hook
+        async def hook(
+            page_id: str,
+            controller: BrowserController,
+            browser_new_context_options: dict[str, Any],
+            proxy_info: ProxyInfo | None,
+        ) -> None:
+            await call_mock(page_id, controller, browser_new_context_options, proxy_info)
+
+            browser_new_context_options['user_agent'] = 'Modified User-Agent'
+
+            assert len(controller.pages) == 0
+
+        test_page = await browser_pool.new_page()
+        user_agent = await test_page.page.evaluate('navigator.userAgent')
+
+        await test_page.page.close()
+
+    assert user_agent == 'Modified User-Agent'
+
+    call_mock.assert_awaited_once()
+    page_id, controller, _, proxy_info = call_mock.call_args[0]
+
+    assert isinstance(page_id, str)
+    assert test_page.id == page_id
+    assert isinstance(controller, BrowserController)
+    assert proxy_info is None
+
+
+async def test_post_page_create_hook_is_called() -> None:
+    call_mock = AsyncMock()
+
+    async with BrowserPool() as browser_pool:
+
+        @browser_pool.post_page_create_hook
+        async def hook(crawlee_page: CrawleePage, controller: BrowserController) -> None:
+            await call_mock(crawlee_page, controller)
+            await crawlee_page.page.evaluate('window.__hook_applied = true')
+
+            assert isinstance(crawlee_page, CrawleePage)
+
+            assert len(controller.pages) == 1
+
+        test_page = await browser_pool.new_page()
+
+        js_result = await test_page.page.evaluate('window.__hook_applied')
+
+        await test_page.page.close()
+
+    assert js_result is True
+
+    call_mock.assert_awaited_once()
+    crawlee_page, controller = call_mock.call_args[0]
+
+    assert test_page is crawlee_page
+    assert isinstance(controller, BrowserController)
+
+
+async def test_pre_page_close_hook() -> None:
+    call_mock = AsyncMock()
+
+    async with BrowserPool() as browser_pool:
+
+        @browser_pool.pre_page_close_hook
+        async def hook(crawlee_page: CrawleePage, controller: BrowserController) -> None:
+            await call_mock(crawlee_page, controller)
+
+            assert not crawlee_page.page.is_closed()
+            assert len(controller.pages) == 1
+
+        test_page = await browser_pool.new_page()
+        await test_page.page.close()
+
+    call_mock.assert_awaited_once()
+    assert test_page.page.is_closed()
+
+
+async def test_post_page_close_hook() -> None:
+    call_mock = AsyncMock()
+
+    async with BrowserPool() as browser_pool:
+
+        @browser_pool.post_page_close_hook
+        async def hook(page_id: str, controller: BrowserController) -> None:
+            await call_mock(page_id, controller)
+
+            assert len(controller.pages) == 0
+
+        test_page = await browser_pool.new_page()
+        await test_page.page.close()
+
+    page_id, controller = call_mock.call_args[0]
+
+    call_mock.assert_awaited_once()
+    assert test_page.id == page_id
+    assert isinstance(controller, BrowserController)
+
+
+async def test_page_hooks_execution_order() -> None:
+    call_order: list[str] = []
+
+    async with BrowserPool() as browser_pool:
+
+        @browser_pool.pre_page_create_hook
+        async def pre_create(
+            _page_id: str,
+            _controller: BrowserController,
+            _browser_new_context_options: Mapping[str, Any],
+            _proxy_info: ProxyInfo | None,
+        ) -> None:
+            call_order.append('pre_create')
+
+        @browser_pool.post_page_create_hook
+        async def post_create(_crawlee_page: CrawleePage, _controller: BrowserController) -> None:
+            call_order.append('post_create')
+
+        @browser_pool.pre_page_close_hook
+        async def pre_close(_crawlee_page: CrawleePage, _controller: BrowserController) -> None:
+            call_order.append('pre_close')
+
+        @browser_pool.post_page_close_hook
+        async def post_close(_page_id: str, _controller: BrowserController) -> None:
+            call_order.append('post_close')
+
+        page = await browser_pool.new_page()
+        await page.page.close()
+
+    assert call_order == ['pre_create', 'post_create', 'pre_close', 'post_close']
+
+
+async def test_multiple_hooks_all_called() -> None:
+    call_order: list[str] = []
+
+    async with BrowserPool() as browser_pool:
+
+        @browser_pool.post_page_create_hook
+        async def first(_crawlee_page: CrawleePage, _controller: BrowserController) -> None:
+            call_order.append('first')
+
+        @browser_pool.post_page_create_hook
+        async def second(_crawlee_page: CrawleePage, _controller: BrowserController) -> None:
+            call_order.append('second')
+
+        page = await browser_pool.new_page()
+        await page.page.close()
+
+    assert call_order == ['first', 'second']
