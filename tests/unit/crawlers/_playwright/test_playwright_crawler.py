@@ -47,7 +47,12 @@ if TYPE_CHECKING:
     from crawlee._request import RequestOptions
     from crawlee._types import HttpMethod, HttpPayload
     from crawlee.browsers._types import BrowserType
-    from crawlee.crawlers import BasicCrawlingContext, PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
+    from crawlee.crawlers import (
+        BasicCrawlingContext,
+        PlaywrightCrawlingContext,
+        PlaywrightPostNavCrawlingContext,
+        PlaywrightPreNavCrawlingContext,
+    )
 
 
 @pytest.mark.parametrize(
@@ -1081,3 +1086,111 @@ async def test_enqueue_links_with_limit(server_url: URL) -> None:
         start_url,
         str(server_url / 'page_3'),
     }
+
+
+async def test_playwright_crawler_pre_navigation_hook_exectuion(server_url: URL) -> None:
+    """Test that pre-navigation hooks are executed."""
+    crawler = PlaywrightCrawler(request_handler=AsyncMock())
+
+    call_mock = AsyncMock()
+
+    #  Register pre navigation hook.
+    @crawler.pre_navigation_hook
+    async def pre_nav_hook(_context: PlaywrightPreNavCrawlingContext) -> None:
+        await call_mock()
+
+    await crawler.run([str(server_url)])
+
+    call_mock.assert_called_once()
+
+
+async def test_playwright_crawler_post_navigation_hook_exectuion(server_url: URL) -> None:
+    """Test that post-navigation hooks are executed."""
+    crawler = PlaywrightCrawler(request_handler=AsyncMock())
+
+    call_mock = AsyncMock()
+
+    #  Register post navigation hook.
+    @crawler.post_navigation_hook
+    async def post_nav_hook(_context: PlaywrightPostNavCrawlingContext) -> None:
+        await call_mock()
+
+    await crawler.run([str(server_url)])
+
+    call_mock.assert_called_once()
+
+
+async def test_playwright_crawler_pre_navigation_hook_execution(server_url: URL) -> None:
+    """Test that pre-navigation hooks are executed."""
+    crawler = PlaywrightCrawler(request_handler=AsyncMock())
+
+    call_mock = AsyncMock()
+
+    # Register pre navigation hook.
+    @crawler.pre_navigation_hook
+    async def pre_nav_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+        await call_mock(context.page.url)
+
+    await crawler.run([str(server_url)])
+
+    # `pre_navigation_hook` is called before the request is made, so the loaded URL should be 'about:blank'.
+    call_mock.assert_called_once_with('about:blank')
+
+
+async def test_playwright_crawler_post_navigation_hook_execution(server_url: URL) -> None:
+    """Test that post-navigation hooks are executed."""
+    crawler = PlaywrightCrawler(request_handler=AsyncMock())
+
+    call_mock = AsyncMock()
+
+    # Register post navigation hook.
+    @crawler.post_navigation_hook
+    async def post_nav_hook(context: PlaywrightPostNavCrawlingContext) -> None:
+        await call_mock(context.page.url)
+
+    await crawler.run([str(server_url)])
+
+    # `post_navigation_hook` is called after the request is made, so the loaded URL should be the result URL.
+    call_mock.assert_called_once_with(str(server_url))
+
+
+async def test_playwright_navigation_hooks_order(server_url: URL) -> None:
+    """Test that post-navigation hooks are executed in correct order."""
+    execution_order = []
+
+    crawler = PlaywrightCrawler()
+
+    #  Register final context handler.
+    @crawler.router.default_handler
+    async def default_request_handler(_context: PlaywrightCrawlingContext) -> None:
+        execution_order.append('final handler')
+
+    #  Register pre navigation hook.
+    @crawler.pre_navigation_hook
+    async def pre_nav_hook_1(_context: PlaywrightPreNavCrawlingContext) -> None:
+        execution_order.append('pre-navigation-hook 1')
+
+    #  Register pre navigation hook.
+    @crawler.pre_navigation_hook
+    async def pre_nav_hook(_context: PlaywrightPreNavCrawlingContext) -> None:
+        execution_order.append('pre-navigation-hook 2')
+
+    #  Register post navigation hook.
+    @crawler.post_navigation_hook
+    async def post_nav_hook_1(_context: PlaywrightPostNavCrawlingContext) -> None:
+        execution_order.append('post-navigation-hook 1')
+
+    #  Register post navigation hook.
+    @crawler.post_navigation_hook
+    async def post_nav_hook_2(_context: PlaywrightPostNavCrawlingContext) -> None:
+        execution_order.append('post-navigation-hook 2')
+
+    await crawler.run([str(server_url)])
+
+    assert execution_order == [
+        'pre-navigation-hook 1',
+        'pre-navigation-hook 2',
+        'post-navigation-hook 1',
+        'post-navigation-hook 2',
+        'final handler',
+    ]

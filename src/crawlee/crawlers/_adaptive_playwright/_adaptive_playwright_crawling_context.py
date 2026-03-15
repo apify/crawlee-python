@@ -9,6 +9,7 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers import AbstractHttpParser, ParsedHttpCrawlingContext, PlaywrightCrawlingContext
+from crawlee.crawlers._abstract_http._http_crawling_context import HttpCrawlingContext
 from crawlee.crawlers._playwright._playwright_post_nav_crawling_context import PlaywrightPostNavCrawlingContext
 from crawlee.crawlers._playwright._types import PlaywrightHttpResponse
 
@@ -18,7 +19,6 @@ if TYPE_CHECKING:
     from playwright.async_api import Page, Response
     from typing_extensions import Self
 
-    from crawlee.crawlers._abstract_http._http_crawling_context import HttpCrawlingContext
     from crawlee.crawlers._playwright._types import BlockRequestsFunction, GotoOptions
 
 
@@ -205,12 +205,56 @@ class AdaptivePlaywrightCrawlingContext(
 
 @dataclass(frozen=True)
 @docs_group('Crawling contexts')
-class AdaptivePlaywrightPostNavCrawlingContext(BasicCrawlingContext):
-    """A post-navigation crawling context for the `AdaptivePlaywrightCrawler`.
+class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
+    """A wrapper around BasicCrawlingContext or AdaptivePlaywrightCrawlingContext.
 
-    Wraps either `HttpCrawlingContext` (static sub-crawler) or `PlaywrightPostNavCrawlingContext` (browser
-    sub-crawler). Playwright-specific attributes (`page`, `response`) raise `AdaptiveContextError` when accessed
-    during static crawling.
+    Trying to access `page` on this context will raise AdaptiveContextError if wrapped context is BasicCrawlingContext.
+    """
+
+    _page: Page | None = None
+    block_requests: BlockRequestsFunction | None = None
+    """Blocks network requests matching specified URL patterns."""
+
+    goto_options: GotoOptions | None = None
+    """Additional options to pass to Playwright's `Page.goto()` method. The `timeout` option is not supported."""
+
+    @property
+    def page(self) -> Page:
+        """The Playwright `Page` object for the current page.
+
+        Raises `AdaptiveContextError` if accessed during static crawling.
+        """
+        if self._page is not None:
+            return self._page
+        raise AdaptiveContextError(
+            'Page was crawled with static sub crawler and not with crawled with PlaywrightCrawler. For Playwright only '
+            'hooks please use `playwright_only`=True when registering the hook. '
+            'For example: @crawler.pre_navigation_hook(playwright_only=True)'
+        )
+
+    @classmethod
+    def from_pre_navigation_context(cls, context: BasicCrawlingContext) -> Self:
+        """Initialize a new instance from an existing pre-navigation `BasicCrawlingContext`."""
+        context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
+        context_kwargs['_page'] = context_kwargs.pop('page', None)
+
+        # For static sub crawler replace block requests by function doing nothing.
+        async def dummy_block_requests(
+            url_patterns: list[str] | None = None,  # noqa:ARG001
+            extra_url_patterns: list[str] | None = None,  # noqa:ARG001
+        ) -> None:
+            return
+
+        context_kwargs['block_requests'] = context_kwargs.pop('block_requests', dummy_block_requests)
+        return cls(**context_kwargs)
+
+
+@dataclass(frozen=True)
+@docs_group('Crawling contexts')
+class AdaptivePlaywrightPostNavCrawlingContext(HttpCrawlingContext):
+    """A wrapper around HttpCrawlingContext or AdaptivePlaywrightCrawlingContext.
+
+    Trying to access `page` on this context will raise AdaptiveContextError if wrapped context is HttpCrawlingContext.
     """
 
     _page: Page | None = None
@@ -255,50 +299,4 @@ class AdaptivePlaywrightPostNavCrawlingContext(BasicCrawlingContext):
             context_kwargs['http_response'] = await PlaywrightHttpResponse.from_playwright_response(
                 response=context.response, protocol=protocol_guess or ''
             )
-        return cls(**context_kwargs)
-
-
-@dataclass(frozen=True)
-@docs_group('Crawling contexts')
-class AdaptivePlaywrightPreNavCrawlingContext(BasicCrawlingContext):
-    """A wrapper around BasicCrawlingContext or AdaptivePlaywrightCrawlingContext.
-
-    Trying to access `page` on this context will raise AdaptiveContextError if wrapped context is BasicCrawlingContext.
-    """
-
-    _page: Page | None = None
-    block_requests: BlockRequestsFunction | None = None
-    """Blocks network requests matching specified URL patterns."""
-
-    goto_options: GotoOptions | None = None
-    """Additional options to pass to Playwright's `Page.goto()` method. The `timeout` option is not supported."""
-
-    @property
-    def page(self) -> Page:
-        """The Playwright `Page` object for the current page.
-
-        Raises `AdaptiveContextError` if accessed during static crawling.
-        """
-        if self._page is not None:
-            return self._page
-        raise AdaptiveContextError(
-            'Page was crawled with static sub crawler and not with crawled with PlaywrightCrawler. For Playwright only '
-            'hooks please use `playwright_only`=True when registering the hook. '
-            'For example: @crawler.pre_navigation_hook(playwright_only=True)'
-        )
-
-    @classmethod
-    def from_pre_navigation_context(cls, context: BasicCrawlingContext) -> Self:
-        """Initialize a new instance from an existing pre-navigation `BasicCrawlingContext`."""
-        context_kwargs = {field.name: getattr(context, field.name) for field in fields(context)}
-        context_kwargs['_page'] = context_kwargs.pop('page', None)
-
-        # For static sub crawler replace block requests by function doing nothing.
-        async def dummy_block_requests(
-            url_patterns: list[str] | None = None,  # noqa:ARG001
-            extra_url_patterns: list[str] | None = None,  # noqa:ARG001
-        ) -> None:
-            return
-
-        context_kwargs['block_requests'] = context_kwargs.pop('block_requests', dummy_block_requests)
         return cls(**context_kwargs)
