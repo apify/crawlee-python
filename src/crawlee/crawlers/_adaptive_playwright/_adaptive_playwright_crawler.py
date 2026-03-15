@@ -206,12 +206,14 @@ class AdaptivePlaywrightCrawler(
         ]()
 
         async def adaptive_post_navigation_hook_static(context: HttpCrawlingContext) -> None:
+            adaptive_context = await AdaptivePlaywrightPostNavCrawlingContext.from_post_navigation_context(context)
             for hook in self._post_navigation_hooks:
-                await hook(await AdaptivePlaywrightPostNavCrawlingContext.from_post_navigation_context(context))
+                await hook(adaptive_context)
 
         async def adaptive_post_navigation_hook_pw(context: PlaywrightPostNavCrawlingContext) -> None:
+            adaptive_context = await AdaptivePlaywrightPostNavCrawlingContext.from_post_navigation_context(context)
             for hook in self._post_navigation_hooks + self._post_navigation_hooks_pw_only:
-                await hook(await AdaptivePlaywrightPostNavCrawlingContext.from_post_navigation_context(context))
+                await hook(adaptive_context)
 
         static_crawler.post_navigation_hook(adaptive_post_navigation_hook_static)
         playwright_crawler.post_navigation_hook(adaptive_post_navigation_hook_pw)
