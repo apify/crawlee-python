@@ -315,8 +315,8 @@ async def test_adaptive_crawling_post_nav_change_to_context(test_urls: list[str]
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
         user_data_in_handler.append(context.request.user_data.get('data', None))
 
-    @crawler.pre_navigation_hook
-    async def pre_nav_hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+    @crawler.post_navigation_hook
+    async def post_nav_hook(context: AdaptivePlaywrightPostNavCrawlingContext) -> None:
         user_data_in_post_nav_hook.append(context.request.user_data.get('data', None))
         try:
             # page is available only if it was crawled by PlaywrightCrawler.

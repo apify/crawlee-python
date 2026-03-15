@@ -485,8 +485,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
     async def _execute_post_navigation_hooks(
         self, context: PlaywrightPostNavCrawlingContext
     ) -> AsyncGenerator[PlaywrightPostNavCrawlingContext, None]:
-        for hook in self._post_navigation_hooks:
-            await hook(context)
+        async with browser_page_context(context.page):
+            for hook in self._post_navigation_hooks:
+                await hook(context)
         yield context
 
     async def _create_crawling_context(

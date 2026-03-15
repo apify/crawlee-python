@@ -32,7 +32,6 @@ if TYPE_CHECKING:
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
-TContext = TypeVar('TContext')
 
 
 class HttpCrawlerOptions(
