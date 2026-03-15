@@ -20,11 +20,13 @@ from tests.unit.server_endpoints import (
     HELLO_WORLD,
     INCAPSULA,
     INFINITE_SCROLL,
+    NON_HREF_LINKS,
     PROBLEMATIC_LINKS,
     RESOURCE_LOADING_PAGE,
     ROBOTS_TXT,
     SECONDARY_INDEX,
     START_ENQUEUE,
+    START_ENQUEUE_NON_HREF,
 )
 
 if TYPE_CHECKING:
@@ -101,6 +103,7 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
     assert scope['type'] == 'http'
     paths: dict[str, PathHandler] = {
         'start_enqueue': start_enqueue_endpoint,
+        'start_enqueue_non_href': start_enqueue_non_href_endpoint,
         'sub_index': secondary_index_endpoint,
         'incapsula': incapsula_endpoint,
         'page_1': generic_response_endpoint,
@@ -108,6 +111,7 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         'page_3': generic_response_endpoint,
         'base_page': base_index_endpoint,
         'problematic_links': problematic_links_endpoint,
+        'non_href_links': non_href_links_endpoint,
         'set_cookies': set_cookies,
         'set_complex_cookies': set_complex_cookies,
         'cookies': get_cookies,
@@ -304,6 +308,14 @@ async def problematic_links_endpoint(_scope: dict[str, Any], _receive: Receive, 
     )
 
 
+async def non_href_links_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Handle requests with a page containing non-href links."""
+    await send_html_response(
+        send,
+        NON_HREF_LINKS,
+    )
+
+
 async def redirect_to_url(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle requests that should redirect to a specified full URL."""
     query_params = get_query_params(scope.get('query_string', b''))
@@ -447,6 +459,16 @@ async def base_index_endpoint(_scope: dict[str, Any], _receive: Receive, send: S
     """Handle requests for the base index page."""
     host = f'http://{get_headers_dict(_scope).get("host", "localhost")}'
     content = BASE_INDEX.format(host=host).encode()
+    await send_html_response(
+        send,
+        content,
+    )
+
+
+async def start_enqueue_non_href_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Handle requests for the base index page."""
+    host = f'http://{get_headers_dict(_scope).get("host", "localhost")}'
+    content = START_ENQUEUE_NON_HREF.format(host=host).encode()
     await send_html_response(
         send,
         content,

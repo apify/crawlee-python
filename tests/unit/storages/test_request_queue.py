@@ -361,6 +361,17 @@ async def test_get_request_by_id(rq: RequestQueue) -> None:
     assert retrieved_request.url == 'https://example.com'
 
 
+async def test_handled_request_records_persistence(rq: RequestQueue) -> None:
+    request = Request.from_url('https://example.com/1')
+    await rq.add_request(request)
+    fetched_request = await rq.fetch_next_request()
+    assert isinstance(fetched_request, Request)
+    await rq.mark_request_as_handled(fetched_request)
+    fetched_request = await rq.get_request(request.unique_key)
+    assert isinstance(fetched_request, Request)
+    assert fetched_request.unique_key == request.unique_key
+
+
 async def test_get_non_existent_request(rq: RequestQueue) -> None:
     """Test retrieving a request that doesn't exist."""
     non_existent_request = await rq.get_request('non-existent-id')

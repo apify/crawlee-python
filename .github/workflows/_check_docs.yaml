@@ -7,6 +7,9 @@ on:
   # Runs when invoked by another workflow.
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   doc_checks:
     name: Doc checks
