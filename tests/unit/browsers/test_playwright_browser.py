@@ -42,3 +42,13 @@ async def test_delete_temp_folder_with_close_browser(playwright: Playwright) -> 
     assert current_temp_dir.exists()
     await persist_browser.close()
     assert not current_temp_dir.exists()
+
+
+async def test_new_context_unsupported_options(playwright: Playwright) -> None:
+    persist_browser = PlaywrightPersistentBrowser(
+        playwright.chromium, user_data_dir=None, browser_launch_options={'headless': True}
+    )
+    # This should not crash despite 'storage_state' being invalid for launch_persistent_context
+    context = await persist_browser.new_context(storage_state={'cookies': [], 'origins': []})
+    assert context is not None
+    await persist_browser.close()
