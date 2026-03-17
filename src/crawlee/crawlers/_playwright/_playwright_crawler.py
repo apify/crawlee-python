@@ -245,12 +245,15 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         self._shared_navigation_timeouts[context_id] = SharedTimeout(self._navigation_timeout)
 
         try:
+            # Only use the page context manager here — it sets the current page in a context variable,
+            # making it accessible to PlaywrightHttpClient in subsequent pipeline steps.
             async with browser_page_context(crawlee_page.page):
                 for hook in self._pre_navigation_hooks:
                     async with self._shared_navigation_timeouts[context_id]:
                         await hook(pre_navigation_context)
 
-            yield pre_navigation_context
+                # Yield should be inside the browser_page_context.
+                yield pre_navigation_context
         finally:
             self._shared_navigation_timeouts.pop(context_id, None)
 
@@ -486,9 +489,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
     async def _execute_post_navigation_hooks(
         self, context: PlaywrightPostNavCrawlingContext
     ) -> AsyncGenerator[PlaywrightPostNavCrawlingContext, None]:
-        async with browser_page_context(context.page):
-            for hook in self._post_navigation_hooks:
-                await hook(context)
+        for hook in self._post_navigation_hooks:
+            await hook(context)
         yield context
 
     async def _create_crawling_context(
@@ -496,25 +498,24 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
     ) -> AsyncGenerator[PlaywrightCrawlingContext, Exception | None]:
         extract_links = self._create_extract_links_function(context)
 
-        async with browser_page_context(context.page):
-            error = yield PlaywrightCrawlingContext(
-                request=context.request,
-                session=context.session,
-                add_requests=context.add_requests,
-                send_request=context.send_request,
-                push_data=context.push_data,
-                use_state=context.use_state,
-                proxy_info=context.proxy_info,
-                get_key_value_store=context.get_key_value_store,
-                log=context.log,
-                page=context.page,
-                goto_options=context.goto_options,
-                response=context.response,
-                infinite_scroll=lambda: infinite_scroll(context.page),
-                extract_links=extract_links,
-                enqueue_links=self._create_enqueue_links_function(context, extract_links),
-                block_requests=partial(block_requests, page=context.page),
-            )
+        error = yield PlaywrightCrawlingContext(
+            request=context.request,
+            session=context.session,
+            add_requests=context.add_requests,
+            send_request=context.send_request,
+            push_data=context.push_data,
+            use_state=context.use_state,
+            proxy_info=context.proxy_info,
+            get_key_value_store=context.get_key_value_store,
+            log=context.log,
+            page=context.page,
+            goto_options=context.goto_options,
+            response=context.response,
+            infinite_scroll=lambda: infinite_scroll(context.page),
+            extract_links=extract_links,
+            enqueue_links=self._create_enqueue_links_function(context, extract_links),
+            block_requests=partial(block_requests, page=context.page),
+        )
 
         if context.session:
             pw_cookies = await self._get_cookies(context.page)

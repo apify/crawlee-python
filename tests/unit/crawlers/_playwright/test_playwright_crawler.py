@@ -773,15 +773,19 @@ async def test_on_skipped_request(server_url: URL) -> None:
 
 
 async def test_send_request(server_url: URL) -> None:
-    """Check that the persist context works with fingerprints."""
     check_data: dict[str, Any] = {}
 
     crawler = PlaywrightCrawler()
 
     @crawler.pre_navigation_hook
-    async def some_hook(context: PlaywrightPreNavCrawlingContext) -> None:
+    async def pre_hook(context: PlaywrightPreNavCrawlingContext) -> None:
         send_request_response = await context.send_request(str(server_url / 'user-agent'))
         check_data['pre_send_request'] = dict(json.loads(await send_request_response.read()))
+
+    @crawler.post_navigation_hook
+    async def post_hook(context: PlaywrightPostNavCrawlingContext) -> None:
+        send_request_response = await context.send_request(str(server_url / 'user-agent'))
+        check_data['post_send_request'] = dict(json.loads(await send_request_response.read()))
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
@@ -794,8 +798,9 @@ async def test_send_request(server_url: URL) -> None:
 
     assert check_data['default'].get('user-agent') is not None
     assert check_data['send_request'].get('user-agent') is not None
-    assert check_data['pre_send_request'] == check_data['send_request']
 
+    assert check_data['pre_send_request'] == check_data['send_request']
+    assert check_data['post_send_request'] == check_data['send_request']
     assert check_data['default'] == check_data['send_request']
 
 
