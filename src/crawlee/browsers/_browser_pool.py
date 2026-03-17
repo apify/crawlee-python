@@ -387,15 +387,17 @@ class BrowserPool:
             original_close = crawlee_page.page.close
 
             async def close_with_hooks(*args: Any, **kwargs: Any) -> None:
-                await self._execute_hooks(self._pre_page_close_hooks, crawlee_page, browser_controller)
-                await original_close(*args, **kwargs)
+                try:
+                    await self._execute_hooks(self._pre_page_close_hooks, crawlee_page, browser_controller)
+                finally:
+                    await original_close(*args, **kwargs)
                 await self._execute_hooks(self._post_page_close_hooks, crawlee_page.id, browser_controller)
 
             crawlee_page.page.close: Callable[..., Awaitable[None]] = close_with_hooks
 
     def pre_page_create_hook(
         self, hook: Callable[[str, BrowserController, dict[str, Any], ProxyInfo | None], Awaitable[None]]
-    ) -> None:
+    ) -> Callable[[str, BrowserController, dict[str, Any], ProxyInfo | None], Awaitable[None]]:
         """Register a hook to be called just before a new page is created.
 
         The hook receives the page ID, `BrowserController`, `browser_new_context_options`, and `ProxyInfo`.
@@ -406,7 +408,11 @@ class BrowserPool:
         """
         self._pre_page_create_hooks.append(hook)
 
-    def post_page_create_hook(self, hook: Callable[[CrawleePage, BrowserController], Awaitable[None]]) -> None:
+        return hook
+
+    def post_page_create_hook(
+        self, hook: Callable[[CrawleePage, BrowserController], Awaitable[None]]
+    ) -> Callable[[CrawleePage, BrowserController], Awaitable[None]]:
         """Register a hook to be called right after a new page is created.
 
         The hook receives the newly created `CrawleePage` and the `BrowserController`. Use it to apply
@@ -414,7 +420,11 @@ class BrowserPool:
         """
         self._post_page_create_hooks.append(hook)
 
-    def pre_page_close_hook(self, hook: Callable[[CrawleePage, BrowserController], Awaitable[None]]) -> None:
+        return hook
+
+    def pre_page_close_hook(
+        self, hook: Callable[[CrawleePage, BrowserController], Awaitable[None]]
+    ) -> Callable[[CrawleePage, BrowserController], Awaitable[None]]:
         """Register a hook to be called just before a page is closed.
 
         The hook receives the `CrawleePage` and the `BrowserController`. Use it to collect last-second data,
@@ -422,10 +432,16 @@ class BrowserPool:
         """
         self._pre_page_close_hooks.append(hook)
 
-    def post_page_close_hook(self, hook: Callable[[str, BrowserController], Awaitable[None]]) -> None:
+        return hook
+
+    def post_page_close_hook(
+        self, hook: Callable[[str, BrowserController], Awaitable[None]]
+    ) -> Callable[[str, BrowserController], Awaitable[None]]:
         """Register a hook to be called right after a page is closed.
 
         The hook receives the page ID and the `BrowserController`. Use it for cleanup or logging
         after a page's lifecycle ends.
         """
         self._post_page_close_hooks.append(hook)
+
+        return hook
