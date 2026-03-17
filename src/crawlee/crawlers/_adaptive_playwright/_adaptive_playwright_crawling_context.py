@@ -188,7 +188,7 @@ class AdaptivePlaywrightCrawlingContext(
         context_kwargs['_page'] = context_kwargs.pop('page')
         context_kwargs['_infinite_scroll'] = context_kwargs.pop('infinite_scroll')
         # This might not be always available.
-        protocol_guess = await context_kwargs['_page'].evaluate('() => performance.getEntries()[0].nextHopProtocol')
+        protocol_guess = await context_kwargs['_page'].evaluate('() => performance.getEntries()[0]?.nextHopProtocol')
         http_response = await PlaywrightHttpResponse.from_playwright_response(
             response=context.response, protocol=protocol_guess or ''
         )
@@ -295,7 +295,9 @@ class AdaptivePlaywrightPostNavCrawlingContext(HttpCrawlingContext):
         context_kwargs.pop('goto_options', None)
 
         if isinstance(context, PlaywrightPostNavCrawlingContext):
-            protocol_guess = await context_kwargs['_page'].evaluate('() => performance.getEntries()[0].nextHopProtocol')
+            protocol_guess = await context_kwargs['_page'].evaluate(
+                '() => performance.getEntries()[0]?.nextHopProtocol'
+            )
             context_kwargs['http_response'] = await PlaywrightHttpResponse.from_playwright_response(
                 response=context.response, protocol=protocol_guess or ''
             )
