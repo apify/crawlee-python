@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
 import shutil
 import tempfile
 from logging import getLogger
@@ -68,21 +67,8 @@ class PlaywrightPersistentBrowser(Browser):
             user_data_dir = tempfile.mkdtemp(prefix=self._TMP_DIR_PREFIX)
             self._temp_dir = Path(user_data_dir)
 
-        launch_persistent_context_sig = inspect.signature(self._browser_type.launch_persistent_context)
-        filtered_launch_options = {
-            key: value for key, value in launch_options.items() if key in launch_persistent_context_sig.parameters
-        }
-
-        removed_options = set(launch_options.keys()) - set(filtered_launch_options.keys())
-        if removed_options:
-            logger.warning(
-                f"The following options are not supported by Playwright's launch_persistent_context "
-                f'and will be ignored: {removed_options}. '
-                'To use these options, consider using incognito pages (use_incognito_pages=True).'
-            )
-
         self._context = await self._browser_type.launch_persistent_context(
-            user_data_dir=user_data_dir, **filtered_launch_options
+            user_data_dir=user_data_dir, **launch_options
         )
 
         if self._temp_dir:

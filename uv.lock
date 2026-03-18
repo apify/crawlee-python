@@ -787,7 +787,6 @@ name = "crawlee"
 version = "1.5.0"
 source = { editable = "." }
 dependencies = [
-    { name = "apify-fingerprint-datapoints" },
     { name = "async-timeout" },
     { name = "browserforge" },
     { name = "cachetools" },
@@ -927,10 +926,9 @@ dev = [
 requires-dist = [
     { name = "aiomysql", marker = "extra == 'sql-mysql'", specifier = ">=0.3.2" },
     { name = "aiosqlite", marker = "extra == 'sql-sqlite'", specifier = ">=0.21.0" },
-    { name = "apify-fingerprint-datapoints", specifier = ">=0.11.0" },
-    { name = "apify-fingerprint-datapoints", marker = "extra == 'adaptive-crawler'", specifier = ">=0.0.3" },
-    { name = "apify-fingerprint-datapoints", marker = "extra == 'httpx'", specifier = ">=0.0.2" },
-    { name = "apify-fingerprint-datapoints", marker = "extra == 'playwright'", specifier = ">=0.0.2" },
+    { name = "apify-fingerprint-datapoints", marker = "extra == 'adaptive-crawler'", specifier = ">=0.11.0" },
+    { name = "apify-fingerprint-datapoints", marker = "extra == 'httpx'", specifier = ">=0.11.0" },
+    { name = "apify-fingerprint-datapoints", marker = "extra == 'playwright'", specifier = ">=0.11.0" },
     { name = "async-timeout", specifier = ">=5.0.1" },
     { name = "asyncpg", marker = "extra == 'sql-postgres'", specifier = ">=0.24.0" },
     { name = "beautifulsoup4", extras = ["lxml"], marker = "extra == 'beautifulsoup'", specifier = ">=4.12.0" },
