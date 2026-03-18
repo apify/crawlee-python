@@ -11,10 +11,12 @@ from crawlee.browsers import PlaywrightBrowserController
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+
 @pytest.fixture
 async def playwright() -> AsyncGenerator[Playwright, None]:
     async with async_playwright() as playwright:
         yield playwright
+
 
 @pytest.fixture
 async def browser(playwright: Playwright) -> AsyncGenerator[Browser, None]:
@@ -22,11 +24,13 @@ async def browser(playwright: Playwright) -> AsyncGenerator[Browser, None]:
     yield browser
     await browser.close()
 
+
 async def test_controller_validation_typo(browser: Browser) -> None:
     controller = PlaywrightBrowserController(browser)
     with pytest.raises(TypeError, match=r'"headles" is not a valid Playwright context option.'):
         await controller.new_page(browser_new_context_options={'headles': True})
     await controller.close()
+
 
 async def test_controller_validation_cross_mode_persistent(browser: Browser, caplog: pytest.LogCaptureFixture) -> None:
     # Default is persistent mode (use_incognito_pages=False)
@@ -38,6 +42,7 @@ async def test_controller_validation_cross_mode_persistent(browser: Browser, cap
         await page.close()
     await controller.close()
 
+
 async def test_controller_validation_cross_mode_incognito(browser: Browser, caplog: pytest.LogCaptureFixture) -> None:
     controller = PlaywrightBrowserController(browser, use_incognito_pages=True)
     # env is persistent-only
@@ -46,6 +51,7 @@ async def test_controller_validation_cross_mode_incognito(browser: Browser, capl
         assert 'Option "env" is only supported in persistent context mode' in caplog.text
         await page.close()
     await controller.close()
+
 
 async def test_controller_validation_valid_common(browser: Browser) -> None:
     controller = PlaywrightBrowserController(browser)
