@@ -11,7 +11,7 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 import MultipleLaunchExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler/multiple_launch_example.py';
 import BrowserConfigurationExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler/browser_configuration_example.py';
 import PreNavigationExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler/pre_navigation_hook_example.py';
-
+import BrowserPoolPageHooksExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler/browser_pool_page_hooks_example.py';
 import PluginBrowserConfigExample from '!!raw-loader!./code_examples/playwright_crawler/plugin_browser_configuration_example.py';
 
 A <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> is a browser-based crawler. In contrast to HTTP-based crawlers like <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> or <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, it uses a real browser to render pages and extract data. It is built on top of the [Playwright](https://playwright.dev/python/) browser automation library. While browser-based crawlers are typically slower and less efficient than HTTP-based crawlers, they can handle dynamic, client-side rendered sites that standard HTTP-based crawlers cannot manage.
@@ -57,9 +57,17 @@ You can also configure each plugin used by <ApiLink to="class/BrowserPool">`Brow
 
 For an example of how to implement a custom browser plugin, see the [Camoufox example](../examples/playwright-crawler-with-camoufox). [Camoufox](https://camoufox.com/) is a stealth browser plugin designed to reduce detection by anti-scraping measures and is fully compatible with <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.
 
-## Page configuration with pre-navigation hooks
+## Page configuration with lifecycle page hooks
 
-In some use cases, you may need to configure the [page](https://playwright.dev/python/docs/api/class-page) before it navigates to the target URL. For instance, you might set navigation timeouts or manipulate other page-level settings. For such cases you can use the <ApiLink to="class/PlaywrightCrawler#pre_navigation_hook">`pre_navigation_hook`</ApiLink> method of the <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>. This method is called before the page navigates to the target URL and allows you to configure the page instance.
+For additional setup or event-driven actions around page creation and closure, the <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> exposes four lifecycle hooks: <ApiLink to="class/BrowserPool#pre_page_create_hook">`pre_page_create_hook`</ApiLink>, <ApiLink to="class/BrowserPool#post_page_create_hook">`post_page_create_hook`</ApiLink>, <ApiLink to="class/BrowserPool#pre_page_close_hook">`pre_page_close_hook`</ApiLink>, and <ApiLink to="class/BrowserPool#post_page_close_hook">`post_page_close_hook`</ApiLink>. To use them, create a `BrowserPool` instance and pass it to <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> via the `browser_pool` argument.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {BrowserPoolPageHooksExample}
+</RunnableCodeBlock>
+
+## Navigation hooks
+
+Navigation hooks allow for additional configuration at specific points during page navigation. For example, the <ApiLink to="class/PlaywrightCrawler#pre_navigation_hook">`pre_navigation_hook`</ApiLink> is called before each navigation and provides <ApiLink to="class/PlaywrightPreNavCrawlingContext">`PlaywrightPreNavCrawlingContext`</ApiLink> - including the [page](https://playwright.dev/python/docs/api/class-page) instance and a <ApiLink to="class/PlaywrightPreNavCrawlingContext#block_requests">`block_requests`</ApiLink> helper for filtering unwanted resource types and URL patterns. See the [block requests example](https://crawlee.dev/python/docs/examples/playwright-crawler-with-block-requests) for a dedicated walkthrough.
 
 <RunnableCodeBlock className="language-python" language="python">
     {PreNavigationExample}
@@ -67,4 +75,4 @@ In some use cases, you may need to configure the [page](https://playwright.dev/p
 
 ## Conclusion
 
-This guide introduced the <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> and explained how to configure it using <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> and <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink>. You learned how to launch multiple browsers, configure browser and context settings, and apply pre-navigation hooks. If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!
+This guide introduced the <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> and explained how to configure it using <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> and <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink>. You learned how to launch multiple browsers, configure browser and context settings, use <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> lifecycle page hooks, and apply navigation hooks. If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!
