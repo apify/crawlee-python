@@ -4,6 +4,7 @@ from crawlee._utils.try_import import try_import as _try_import
 # These imports have only mandatory dependencies, so they are imported directly.
 from ._adaptive_playwright_crawling_context import (
     AdaptivePlaywrightCrawlingContext,
+    AdaptivePlaywrightPostNavCrawlingContext,
     AdaptivePlaywrightPreNavCrawlingContext,
 )
 
@@ -22,6 +23,7 @@ __all__ = [
     'AdaptivePlaywrightCrawler',
     'AdaptivePlaywrightCrawlerStatisticState',
     'AdaptivePlaywrightCrawlingContext',
+    'AdaptivePlaywrightPostNavCrawlingContext',
     'AdaptivePlaywrightPreNavCrawlingContext',
     'RenderingType',
     'RenderingTypePrediction',
