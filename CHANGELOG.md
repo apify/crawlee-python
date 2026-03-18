@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Allow non-href links extract &amp; enqueue ([#1781](https://github.com/apify/crawlee-python/pull/1781)) ([6db365d](https://github.com/apify/crawlee-python/commit/6db365d1625206d8d691256c9cd4b44a821238bb)) by [@kozlice](https://github.com/kozlice)
+- Add `post_navigation_hooks` to crawlers ([#1795](https://github.com/apify/crawlee-python/pull/1795)) ([38ceda6](https://github.com/apify/crawlee-python/commit/38ceda635a18cb2f14efc7c8e8b67f3adb7e53fd)) by [@Mantisus](https://github.com/Mantisus)
 
 ### 🐛 Bug Fixes
 
