@@ -10,7 +10,7 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
 import MultipleLaunchExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler/multiple_launch_example.py';
 import BrowserConfigurationExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler/browser_configuration_example.py';
-import PreNavigationExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler/pre_navigation_hook_example.py';
+import NavigationHooksExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler/navigation_hooks_example.py';
 import BrowserPoolPageHooksExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler/browser_pool_page_hooks_example.py';
 import PluginBrowserConfigExample from '!!raw-loader!./code_examples/playwright_crawler/plugin_browser_configuration_example.py';
 
@@ -67,10 +67,10 @@ For additional setup or event-driven actions around page creation and closure, t
 
 ## Navigation hooks
 
-Navigation hooks allow for additional configuration at specific points during page navigation. For example, the <ApiLink to="class/PlaywrightCrawler#pre_navigation_hook">`pre_navigation_hook`</ApiLink> is called before each navigation and provides <ApiLink to="class/PlaywrightPreNavCrawlingContext">`PlaywrightPreNavCrawlingContext`</ApiLink> - including the [page](https://playwright.dev/python/docs/api/class-page) instance and a <ApiLink to="class/PlaywrightPreNavCrawlingContext#block_requests">`block_requests`</ApiLink> helper for filtering unwanted resource types and URL patterns. See the [block requests example](https://crawlee.dev/python/docs/examples/playwright-crawler-with-block-requests) for a dedicated walkthrough.
+Navigation hooks allow for additional configuration at specific points during page navigation. The <ApiLink to="class/PlaywrightCrawler#pre_navigation_hook">`pre_navigation_hook`</ApiLink> is called before each navigation and provides <ApiLink to="class/PlaywrightPreNavCrawlingContext">`PlaywrightPreNavCrawlingContext`</ApiLink> - including the [page](https://playwright.dev/python/docs/api/class-page) instance and a <ApiLink to="class/PlaywrightPreNavCrawlingContext#block_requests">`block_requests`</ApiLink> helper for filtering unwanted resource types and URL patterns. See the [block requests example](https://crawlee.dev/python/docs/examples/playwright-crawler-with-block-requests) for a dedicated walkthrough. Similarly, the <ApiLink to="class/PlaywrightCrawler#post_navigation_hook">`post_navigation_hook`</ApiLink> is called after each navigation and provides <ApiLink to="class/PlaywrightPostNavCrawlingContext">`PlaywrightPostNavCrawlingContext`</ApiLink> - useful for post-load checks such as detecting CAPTCHAs or verifying page state.
 
 <RunnableCodeBlock className="language-python" language="python">
-    {PreNavigationExample}
+    {NavigationHooksExample}
 </RunnableCodeBlock>
 
 ## Conclusion
