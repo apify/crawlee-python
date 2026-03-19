@@ -6,7 +6,7 @@ from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Iterab
 from logging import getLogger
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from typing_extensions import override
 
 from crawlee._request import Request
@@ -106,10 +106,14 @@ class RequestList(RequestLoader):
         if self._persist_request_data:
             async with self._requests_lock:
                 if not await self._requests_data.has_persisted_state():
-                    self._requests_data.current_value.requests = [
-                        request if isinstance(request, Request) else Request.from_url(request)
-                        async for request in self._requests
-                    ]
+                    self._requests_data.current_value.requests = []
+                    async for processing_request in self._requests:
+                        try:
+                            request = self._transform_request(processing_request)
+                        except ValidationError:
+                            logger.warning(f'Invalid request encountered in the request list: {processing_request}')
+                            continue
+                        self._requests_data.current_value.requests.append(request)
                     await self._requests_data.persist_state()
 
                 self._requests = self._iterate_in_threadpool(
@@ -202,11 +206,18 @@ class RequestList(RequestLoader):
                     self._next = (self._next[0], to_enqueue[0])
 
     async def _dequeue_requests(self, count: int) -> AsyncGenerator[Request | None]:
-        for _ in range(count):
+        while count > 0:
             try:
-                yield self._transform_request(await self._requests.__anext__())
-            except StopAsyncIteration:  # noqa: PERF203
+                processing_request = await self._requests.__anext__()
+                try:
+                    request = self._transform_request(processing_request)
+                except ValidationError:
+                    logger.warning(f'Invalid request encountered in the request list: {processing_request}')
+                    continue
+                yield request
+            except StopAsyncIteration:
                 yield None
+            count -= 1
 
     async def _iterate_in_threadpool(self, iterable: Iterable[str | Request]) -> AsyncIterator[str | Request]:
         """Inspired by a function of the same name from encode/starlette."""
