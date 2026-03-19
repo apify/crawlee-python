@@ -840,7 +840,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
         )
 
-    async def _use_state(
+    async def use_state(
         self,
         default_value: dict[str, JsonSerializable] | None = None,
     ) -> dict[str, JsonSerializable]:
@@ -1421,7 +1421,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             add_requests=result.add_requests,
             push_data=result.push_data,
             get_key_value_store=result.get_key_value_store,
-            use_state=self._use_state,
+            use_state=self.use_state,
             log=self._logger,
         )
         self._context_result_map[context] = result

@@ -815,6 +815,20 @@ async def test_context_use_state() -> None:
     assert value == {'hello': 'world'}
 
 
+async def test_crawler_use_state() -> None:
+    crawler = BasicCrawler()
+
+    await crawler.use_state({'hello': 'world'})
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        # The state set by the crawler must be available in the context of the request handler
+        state = await context.use_state()
+        assert state == {'hello': 'world'}
+
+    await crawler.run(['https://hello.world'])
+
+
 async def test_context_use_state_crawlers_share_state() -> None:
     async def handler(context: BasicCrawlingContext) -> None:
         state = await context.use_state({'urls': []})
