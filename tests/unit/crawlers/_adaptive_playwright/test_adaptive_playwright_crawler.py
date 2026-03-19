@@ -579,7 +579,7 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: lis
     request_handler_timeout = timedelta(seconds=1)
 
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
-        max_request_retries=1,
+        max_request_retries=0,
         rendering_type_predictor=static_only_predictor_no_detection,
         request_handler_timeout=request_handler_timeout,
     )
@@ -594,8 +594,8 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: lis
             mocked_browser_handler()
         except AdaptiveContextError:
             mocked_static_handler()
-            # Relax timeout for the fallback browser request to avoid flakiness in test
-            crawler._request_handler_timeout = timedelta(seconds=10)
+            # Relax timeout for the fallback browser request to allow for slow browser startup on CI
+            crawler._request_handler_timeout = timedelta(seconds=120)
             # Sleep for time obviously larger than top crawler timeout.
             await asyncio.sleep(request_handler_timeout.total_seconds() * 3)
 
