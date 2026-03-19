@@ -253,7 +253,7 @@ async def test_handle_invalid_url() -> None:
     await request_list.mark_request_as_handled(request)
 
 
-async def test_handle_invalide_url_with_persistence() -> None:
+async def test_handle_invalid_url_with_persistence() -> None:
     """Test that invalid URLs are handled gracefully even when persistence is enabled."""
     persist_key = 'test_invalid_url_persistence'
     request_list = RequestList(['invalid-url.com', 'https://valid.placeholder.com'], persist_requests_key=persist_key)
