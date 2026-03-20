@@ -2,14 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.5.1 - **not yet released**
+## [1.6.0](https://github.com/apify/crawlee-python/releases/tag/v1.6.0) (2026-03-20)
 
 ### 🚀 Features
 
 - Allow non-href links extract &amp; enqueue ([#1781](https://github.com/apify/crawlee-python/pull/1781)) ([6db365d](https://github.com/apify/crawlee-python/commit/6db365d1625206d8d691256c9cd4b44a821238bb)) by [@kozlice](https://github.com/kozlice)
 - Add `post_navigation_hooks` to crawlers ([#1795](https://github.com/apify/crawlee-python/pull/1795)) ([38ceda6](https://github.com/apify/crawlee-python/commit/38ceda635a18cb2f14efc7c8e8b67f3adb7e53fd)) by [@Mantisus](https://github.com/Mantisus)
 - Add page lifecycle hooks to `BrowserPool` ([#1791](https://github.com/apify/crawlee-python/pull/1791)) ([6f2ac13](https://github.com/apify/crawlee-python/commit/6f2ac13fea4cfa8a65e6e41430d3e8d28cc3a787)) by [@Mantisus](https://github.com/Mantisus)
+- Expose `BrowserType` and `CrawleePage` ([#1798](https://github.com/apify/crawlee-python/pull/1798)) ([b50b9f2](https://github.com/apify/crawlee-python/commit/b50b9f2a8396dcee2bd7eaf76c94d24912c2bc5f)) by [@Mantisus](https://github.com/Mantisus)
+- Expose `use_state` in `BasicCrawler` ([#1799](https://github.com/apify/crawlee-python/pull/1799)) ([d121873](https://github.com/apify/crawlee-python/commit/d121873a7f5902b911dd04b4aa9eaf75a8449323)) by [@Mantisus](https://github.com/Mantisus)
 
 ### 🐛 Bug Fixes
 
@@ -17,7 +18,6 @@ All notable changes to this project will be documented in this file.
 - **redis:** Update actual `Request` state in request queue Redis storage client ([#1789](https://github.com/apify/crawlee-python/pull/1789)) ([787231c](https://github.com/apify/crawlee-python/commit/787231cebeb863ee2b4395964a79a37053dbec01)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.5.0](https://github.com/apify/crawlee-python/releases/tag/v1.5.0) (2026-03-06)
 
 ### 🚀 Features
