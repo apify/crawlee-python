@@ -576,15 +576,17 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: lis
     crawler.
     """
     static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
-    request_handler_timeout = timedelta(seconds=1)
+    # Use a generous timeout so the static pipeline has enough time to reach the handler even on slow CI.
+    # The handler will block indefinitely, so the timeout will always fire during the handler's wait.
+    request_handler_timeout = timedelta(seconds=10)
 
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         max_request_retries=0,
         rendering_type_predictor=static_only_predictor_no_detection,
         request_handler_timeout=request_handler_timeout,
     )
-    mocked_static_handler = Mock()
-    mocked_browser_handler = Mock()
+    mocked_static_handler = Mock(name='static_handler')
+    mocked_browser_handler = Mock(name='browser_handler')
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
@@ -596,13 +598,13 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: lis
             mocked_static_handler()
             # Relax timeout for the fallback browser request to allow for slow browser startup on CI
             crawler._request_handler_timeout = timedelta(seconds=120)
-            # Sleep for time obviously larger than top crawler timeout.
-            await asyncio.sleep(request_handler_timeout.total_seconds() * 3)
+            # Block indefinitely - will be cancelled when the request_handler_timeout fires.
+            await asyncio.Event().wait()
 
     await crawler.run(test_urls[:1])
 
     mocked_static_handler.assert_called_once_with()
-    # Browser handler was capable of running despite static handler having sleep time larger than top handler timeout.
+    # Browser handler was capable of running despite static handler blocking longer than the handler timeout.
     mocked_browser_handler.assert_called_once_with()
 
 
