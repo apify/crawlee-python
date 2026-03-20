@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock
 
@@ -103,7 +104,10 @@ async def test_new_page_with_each_plugin(server_url: URL) -> None:
 
 @run_alone_on_mac
 async def test_with_default_plugin_constructor(server_url: URL) -> None:
-    async with BrowserPool.with_default_plugin(headless=True, browser_type='firefox') as browser_pool:
+    # Use a generous operation timeout so that Firefox has enough time to launch on slow Windows CI.
+    async with BrowserPool.with_default_plugin(
+        headless=True, browser_type='firefox', operation_timeout=timedelta(seconds=60)
+    ) as browser_pool:
         assert len(browser_pool.plugins) == 1
         assert isinstance(browser_pool.plugins[0], PlaywrightBrowserPlugin)
 
