@@ -35,12 +35,10 @@ keywords = [
 ]
 dependencies = [
     "async-timeout>=5.0.1",
-    "browserforge>=1.2.4",
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
     "impit>=0.8.0",
     "more-itertools>=10.2.0",
-    "playwright>=1.58.0",
     "protego>=0.5.0",
     "psutil>=6.0.0",
     "pydantic-settings>=2.12.0",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 from asyncio import Lock
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any, cast
 
 from browserforge.injectors.playwright import AsyncNewContext
@@ -29,13 +30,17 @@ from logging import getLogger
 
 logger = getLogger(__name__)
 
-# Cache Playwright signatures to avoid overhead in critical path
-_launch_persistent_context_params = set(inspect.signature(PlaywrightBrowserType.launch_persistent_context).parameters)
-_new_context_params = set(inspect.signature(Browser.new_context).parameters)
 
-_common_context_options = _launch_persistent_context_params & _new_context_params
-_persistent_unique_context_options = _launch_persistent_context_params - _new_context_params
-_incognito_unique_context_options = _new_context_params - _launch_persistent_context_params
+# Cache Playwright signatures to avoid overhead in critical path
+@lru_cache(maxsize=1)
+def _get_context_params_cache() -> dict[str, set[str]]:
+    launch_persistent_params = set(inspect.signature(PlaywrightBrowserType.launch_persistent_context).parameters)
+    new_context_params = set(inspect.signature(Browser.new_context).parameters)
+    return {
+        'common': launch_persistent_params & new_context_params,
+        'persistent_unique': launch_persistent_params - new_context_params,
+        'incognito_unique': new_context_params - launch_persistent_params,
+    }
 
 
 @docs_group('Browser management')
@@ -233,23 +238,25 @@ class PlaywrightBrowserController(BrowserController):
         """
         browser_new_context_options = dict(browser_new_context_options) if browser_new_context_options else {}
 
+        params_cache = _get_context_params_cache()
+
         filtered_options = {}
         for key, value in browser_new_context_options.items():
             if self._use_incognito_pages:
                 # Incognito mode (new_context)
-                if key in _common_context_options or key in _incognito_unique_context_options:
+                if key in params_cache['common'] or key in params_cache['incognito_unique']:
                     filtered_options[key] = value
-                elif key in _persistent_unique_context_options:
+                elif key in params_cache['persistent_unique']:
                     logger.warning(
                         f'Option "{key}" is only supported in persistent context mode '
                         '(use_incognito_pages=False) and will be ignored.'
                     )
                 else:
                     raise TypeError(f'"{key}" is not a valid Playwright context option.')
-            elif key in _common_context_options or key in _persistent_unique_context_options:
+            elif key in params_cache['common'] or key in params_cache['persistent_unique']:
                 # Persistent mode (launch_persistent_context)
                 filtered_options[key] = value
-            elif key in _incognito_unique_context_options:
+            elif key in params_cache['incognito_unique']:
                 logger.warning(
                     f'Option "{key}" is only supported in incognito context mode '
                     '(use_incognito_pages=True) and will be ignored.'
