@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.6.1 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Handle invalid URLs in `RequestList` ([#1803](https://github.com/apify/crawlee-python/pull/1803)) ([0b2e3fc](https://github.com/apify/crawlee-python/commit/0b2e3fc5cbca371131b54085e052a6cda6361b0f)) by [@Mantisus](https://github.com/Mantisus), closes [#1802](https://github.com/apify/crawlee-python/issues/1802)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.6.0](https://github.com/apify/crawlee-python/releases/tag/v1.6.0) (2026-03-20)
 
 ### 🚀 Features
