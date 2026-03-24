@@ -61,6 +61,7 @@ from crawlee.errors import (
     UserDefinedErrorHandlerError,
     UserHandlerTimeoutError,
 )
+from crawlee.events import EventManager
 from crawlee.events._types import Event, EventCrawlerStatusData
 from crawlee.http_clients import ImpitHttpClient
 from crawlee.router import Router
@@ -90,7 +91,6 @@ if TYPE_CHECKING:
         PushDataKwargs,
     )
     from crawlee.configuration import Configuration
-    from crawlee.events import EventManager
     from crawlee.http_clients import HttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.request_loaders import RequestManager
@@ -783,7 +783,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 self._crawler_state_rec_task,
                 *self._additional_context_managers,
             )
-            if cm and getattr(cm, 'active', False) is False
+            if cm and (isinstance(cm, EventManager) or not getattr(cm, 'active', False))
         ]
 
         async with AsyncExitStack() as exit_stack:

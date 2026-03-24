@@ -93,6 +93,9 @@ class EventManager:
             delay=self._persist_state_interval,
         )
 
+        # Reference count for active contexts.
+        self._ref_count = 0
+
         # Flag to indicate the context state.
         self._active = False
 
@@ -102,13 +105,11 @@ class EventManager:
         return self._active
 
     async def __aenter__(self) -> EventManager:
-        """Initialize the event manager upon entering the async context.
+        """Initialize the event manager upon entering the async context."""
+        self._ref_count += 1
 
-        Raises:
-            RuntimeError: If the context manager is already active.
-        """
-        if self._active:
-            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
+        if self._ref_count > 1:
+            return self
 
         self._active = True
         self._emit_persist_state_event_rec_task.start()
@@ -129,6 +130,11 @@ class EventManager:
         """
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
+
+        self._ref_count -= 1
+
+        if self._ref_count > 0:
+            return
 
         # Stop persist state event periodic emission and manually emit last one to ensure latest state is saved.
         await self._emit_persist_state_event_rec_task.stop()
