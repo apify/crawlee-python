@@ -129,3 +129,13 @@ class RequestQueueClient(ABC):
         Returns:
             True if the request queue is empty, False otherwise.
         """
+
+    async def is_finished(self) -> bool:
+        """Check if the request queue is finished.
+
+        Default implementation falls back to `is_empty`, but clients can implement more suitable logic if needed.
+
+        Returns:
+            True if the request queue is finished, False otherwise.
+        """
+        return await self.is_empty()

@@ -318,7 +318,7 @@ class RequestQueue(Storage, RequestManager):
             logger.debug('Background add requests tasks are still in progress.')
             return False
 
-        if await self.is_empty():
+        if await self._client.is_finished():
             logger.debug('The request queue is empty.')
             return True
 
