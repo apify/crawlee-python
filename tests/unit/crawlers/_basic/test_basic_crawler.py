@@ -2052,9 +2052,6 @@ async def test_new_request_error_handler() -> None:
 async def test_multiple_crawlers_with_global_event_manager() -> None:
     """Test that multiple crawlers work correctly when using the global event manager."""
 
-    # Test is skipped in older Python versions.
-    from asyncio import Barrier  # type:ignore[attr-defined] # noqa: PLC0415
-
     rq1 = await RequestQueue.open(alias='rq1')
     rq2 = await RequestQueue.open(alias='rq2')
 
@@ -2073,7 +2070,7 @@ async def test_multiple_crawlers_with_global_event_manager() -> None:
         await started_event.wait()
         await crawler_2.run(['https://b.placeholder.com'])
 
-    handler_barrier = Barrier(2)
+    handler_barrier = asyncio.Barrier(2)  # ty:ignore[unresolved-attribute]  # Test is skipped in older Python versions.
 
     handler_call = AsyncMock()
 
