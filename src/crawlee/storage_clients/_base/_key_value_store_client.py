@@ -3,10 +3,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
+from crawlee.storage_clients.models import KeyValueStoreRecordMetadata
+
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-    from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
+    from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord
 
 
 class KeyValueStoreClient(ABC):
@@ -73,10 +75,9 @@ class KeyValueStoreClient(ABC):
         The backend method for the `KeyValueStore.iterate_keys` call.
         """
         # This syntax is to make type checker properly work with abstract AsyncIterator.
-        # https://mypy.readthedocs.io/en/stable/more_types.html#asynchronous-iterators
         raise NotImplementedError
         if False:
-            yield 0
+            yield KeyValueStoreRecordMetadata()
 
     @abstractmethod
     async def get_public_url(self, *, key: str) -> str:
