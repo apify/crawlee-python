@@ -2119,7 +2119,7 @@ async def test_multiple_crawlers_with_global_event_manager() -> None:
     await rq2.drop()
 
 
-async def test_globa_and_local_event_manager_in_crawler_run() -> None:
+async def test_global_and_local_event_manager_in_crawler_run() -> None:
     """Test that both global and local event managers are used in crawler run"""
 
     config = service_locator.get_configuration()
