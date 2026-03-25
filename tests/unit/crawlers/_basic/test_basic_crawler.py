@@ -26,8 +26,7 @@ from crawlee._utils.robots import RobotsTxtFile
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
-from crawlee.events import Event, EventCrawlerStatusData
-from crawlee.events._local_event_manager import LocalEventManager
+from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
 from crawlee.request_loaders import RequestList, RequestManagerTandem
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics
@@ -2118,3 +2117,36 @@ async def test_multiple_crawlers_with_global_event_manager() -> None:
 
     await rq1.drop()
     await rq2.drop()
+
+
+async def test_globa_and_local_event_manager_in_crawler_run() -> None:
+    """Test that both global and local event managers are used in crawler run"""
+
+    config = service_locator.get_configuration()
+
+    local_event_manager = LocalEventManager.from_config(config)
+
+    crawler = BasicCrawler(event_manager=local_event_manager)
+
+    handler_call = AsyncMock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        global_event_manager = service_locator.get_event_manager()
+        handler_call(local_event_manager.active, global_event_manager.active)
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    assert handler_call.call_count == 1
+
+    local_em_state, global_em_state = handler_call.call_args_list[0][0]
+
+    # Both event managers should be active.
+    assert local_em_state is True
+    assert global_em_state is True
+
+    global_event_manager = service_locator.get_event_manager()
+
+    # After crawler is finished, both event managers should be inactive.
+    assert local_event_manager.active is False
+    assert global_event_manager.active is False

@@ -768,14 +768,18 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         return final_statistics
 
     async def _run_crawler(self) -> None:
-        event_manager = self._service_locator.get_event_manager()
+        local_event_manager = self._service_locator.get_event_manager()
+        global_event_manager = service_locator.get_event_manager()
+        if local_event_manager is global_event_manager:
+            local_event_manager = None  # Avoid entering the same event manager context twice
 
         # Collect the context managers to be entered. Context managers that are already active are excluded,
         # as they were likely entered by the caller, who will also be responsible for exiting them.
         contexts_to_enter = [
             cm
             for cm in (
-                event_manager,
+                global_event_manager,
+                local_event_manager,
                 self._snapshotter,
                 self._statistics,
                 self._session_pool if self._use_session_pool else None,
