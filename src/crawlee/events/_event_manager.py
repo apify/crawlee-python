@@ -94,24 +94,19 @@ class EventManager:
         )
 
         # Reference count for active contexts.
-        self._ref_count = 0
-
-        # Flag to indicate the context state.
-        self._active = False
+        self._active_ref_count = 0
 
     @property
     def active(self) -> bool:
         """Indicate whether the context is active."""
-        return self._active
+        return self._active_ref_count > 0
 
     async def __aenter__(self) -> EventManager:
         """Initialize the event manager upon entering the async context."""
-        self._ref_count += 1
-
-        if self._ref_count > 1:
+        self._active_ref_count += 1
+        if self._active_ref_count > 1:
             return self
 
-        self._active = True
         self._emit_persist_state_event_rec_task.start()
         return self
 
@@ -128,24 +123,23 @@ class EventManager:
         Raises:
             RuntimeError: If the context manager is not active.
         """
-        if not self._active:
+        if not self.active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        self._ref_count -= 1
-
-        # Emit persist state event to ensure the latest state is saved before closing the context.
-        await self._emit_persist_state_event()
-
-        if self._ref_count > 0:
+        if self._active_ref_count > 1:
+            # Emit persist state event to ensure the latest state is saved before closing the context.
+            await self._emit_persist_state_event()
+            self._active_ref_count -= 1
             return
 
         # Stop persist state event periodic emission and manually emit last one to ensure latest state is saved.
         await self._emit_persist_state_event_rec_task.stop()
+        await self._emit_persist_state_event()
         await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
         self._event_emitter.remove_all_listeners()
         self._listener_tasks.clear()
         self._listeners_to_wrappers.clear()
-        self._active = False
+        self._active_ref_count -= 1
 
     @overload
     def on(self, *, event: Literal[Event.PERSIST_STATE], listener: EventListener[EventPersistStateData]) -> None: ...

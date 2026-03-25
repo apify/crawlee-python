@@ -61,7 +61,6 @@ from crawlee.errors import (
     UserDefinedErrorHandlerError,
     UserHandlerTimeoutError,
 )
-from crawlee.events import EventManager
 from crawlee.events._types import Event, EventCrawlerStatusData
 from crawlee.http_clients import ImpitHttpClient
 from crawlee.router import Router
@@ -91,6 +90,7 @@ if TYPE_CHECKING:
         PushDataKwargs,
     )
     from crawlee.configuration import Configuration
+    from crawlee.events import EventManager
     from crawlee.http_clients import HttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.request_loaders import RequestManager
@@ -773,26 +773,31 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if local_event_manager is global_event_manager:
             local_event_manager = None  # Avoid entering the same event manager context twice
 
+        # The event managers are always entered.
+        contexts_to_enter: list[Any] = (
+            [global_event_manager, local_event_manager] if local_event_manager else [global_event_manager]
+        )
+
         # Collect the context managers to be entered. Context managers that are already active are excluded,
         # as they were likely entered by the caller, who will also be responsible for exiting them.
-        contexts_to_enter = [
-            cm
-            for cm in (
-                global_event_manager,
-                local_event_manager,
-                self._snapshotter,
-                self._statistics,
-                self._session_pool if self._use_session_pool else None,
-                self._http_client,
-                self._crawler_state_rec_task,
-                *self._additional_context_managers,
-            )
-            if cm and (isinstance(cm, EventManager) or not getattr(cm, 'active', False))
-        ]
+        contexts_to_enter.extend(
+            [
+                cm
+                for cm in (
+                    self._snapshotter,
+                    self._statistics,
+                    self._session_pool if self._use_session_pool else None,
+                    self._http_client,
+                    self._crawler_state_rec_task,
+                    *self._additional_context_managers,
+                )
+                if cm and getattr(cm, 'active', False) is False
+            ]
+        )
 
         async with AsyncExitStack() as exit_stack:
             for context in contexts_to_enter:
-                await exit_stack.enter_async_context(context)  # ty: ignore[invalid-argument-type]
+                await exit_stack.enter_async_context(context)
 
             await self._autoscaled_pool.run()
 
