@@ -74,8 +74,8 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
 
         # Reset global class variables to ensure test isolation.
         KeyValueStore._autosaved_values = {}
-        Statistics._Statistics__next_id = 0  # type:ignore[attr-defined] # Mangled attribute
-        BasicCrawler._BasicCrawler__next_id = 0  # type:ignore[attr-defined] # Mangled attribute
+        Statistics._Statistics__next_id = 0  # ty:ignore[unresolved-attribute] # Mangled attribute
+        BasicCrawler._BasicCrawler__next_id = 0  # ty:ignore[unresolved-attribute] # Mangled attribute
 
     return _prepare_test_env
 
