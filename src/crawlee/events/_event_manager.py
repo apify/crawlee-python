@@ -133,12 +133,14 @@ class EventManager:
 
         self._ref_count -= 1
 
+        # Emit persist state event to ensure the latest state is saved before closing the context.
+        await self._emit_persist_state_event()
+
         if self._ref_count > 0:
             return
 
         # Stop persist state event periodic emission and manually emit last one to ensure latest state is saved.
         await self._emit_persist_state_event_rec_task.stop()
-        await self._emit_persist_state_event()
         await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
         self._event_emitter.remove_all_listeners()
         self._listener_tasks.clear()
