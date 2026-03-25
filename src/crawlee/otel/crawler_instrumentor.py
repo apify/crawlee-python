@@ -69,10 +69,10 @@ class CrawlerInstrumentor(BaseInstrumentor):
 
             async def middleware_wrapper(wrapped: Any, instance: _Middleware, args: Any, kwargs: Any) -> Any:
                 with self._tracer.start_as_current_span(
-                    name=f'{instance.generator.__name__}, {wrapped.__name__}',  # type:ignore[attr-defined]  # valid in our context
+                    name=f'{instance.generator.__name__}, {wrapped.__name__}',  # ty:ignore[unresolved-attribute]  # valid in our context
                     attributes={
                         URL_FULL: instance.input_context.request.url,
-                        CODE_FUNCTION_NAME: instance.generator.__qualname__,  # type:ignore[attr-defined]  # valid in our context
+                        CODE_FUNCTION_NAME: instance.generator.__qualname__,  # ty:ignore[unresolved-attribute]  # valid in our context
                     },
                 ):
                     return await wrapped(*args, **kwargs)

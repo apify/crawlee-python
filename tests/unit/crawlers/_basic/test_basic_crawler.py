@@ -1168,7 +1168,7 @@ async def test_crawler_multiple_stops_in_parallel() -> None:
     # Set concurrency to 2 to ensure two urls are being visited in parallel.
     crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=2, max_concurrency=2))
 
-    both_handlers_started = asyncio.Barrier(2)  # type:ignore[attr-defined]  # Test is skipped in older Python versions.
+    both_handlers_started = asyncio.Barrier(2)  # ty:ignore[unresolved-attribute]  # Test is skipped in older Python versions.
     only_one_handler_at_a_time = asyncio.Semaphore(1)
 
     @crawler.router.default_handler
@@ -1352,7 +1352,7 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
     Result should be incremented by 2.
     Method `use_state` must be implemented in a way that prevents race conditions in such scenario."""
     # Test is skipped in older Python versions.
-    from asyncio import Barrier  # type:ignore[attr-defined] # noqa: PLC0415
+    from asyncio import Barrier  # ty:ignore[unresolved-import] # noqa: PLC0415
 
     crawler = BasicCrawler()
     store = await crawler.get_key_value_store()
@@ -1393,7 +1393,7 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     Crawler should attempt to retry it.
     This test creates situation where the request handler times out twice, on third retry it does not time out."""
     # Test is skipped in older Python versions.
-    from asyncio import timeout  # type:ignore[attr-defined] # noqa: PLC0415
+    from asyncio import timeout  # ty:ignore[unresolved-import] # noqa: PLC0415
 
     non_realtime_system_coefficient = 10
     handler_timeout = timedelta(seconds=1)
