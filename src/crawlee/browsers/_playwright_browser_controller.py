@@ -224,6 +224,31 @@ class PlaywrightBrowserController(BrowserController):
         """Handle actions after a page is closed."""
         self._pages.remove(page)
 
+    def _filter_context_options(self, options: dict[str, Any]) -> dict[str, Any]:
+        """Filter browser context options based on the current mode (incognito vs persistent).
+
+        Options that are valid only in the other mode are dropped with a warning. Unrecognized options are kept
+        and passed through so that Playwright itself can raise an appropriate error.
+        """
+        params_cache = _get_context_params_cache()
+        filtered = dict[str, Any]()
+
+        for key, value in options.items():
+            if self._use_incognito_pages and key in params_cache['persistent_unique']:
+                logger.warning(
+                    f'Option "{key}" is only supported in persistent context mode '
+                    '(use_incognito_pages=False) and will be ignored.'
+                )
+            elif not self._use_incognito_pages and key in params_cache['incognito_unique']:
+                logger.warning(
+                    f'Option "{key}" is only supported in incognito context mode '
+                    '(use_incognito_pages=True) and will be ignored.'
+                )
+            else:
+                filtered[key] = value
+
+        return filtered
+
     async def _create_browser_context(
         self,
         browser_new_context_options: Mapping[str, Any] | None = None,
@@ -238,31 +263,7 @@ class PlaywrightBrowserController(BrowserController):
         """
         browser_new_context_options = dict(browser_new_context_options) if browser_new_context_options else {}
 
-        params_cache = _get_context_params_cache()
-
-        filtered_options = {}
-        for key, value in browser_new_context_options.items():
-            if self._use_incognito_pages:
-                # Incognito mode (new_context)
-                if key in params_cache['common'] or key in params_cache['incognito_unique']:
-                    filtered_options[key] = value
-                elif key in params_cache['persistent_unique']:
-                    logger.warning(
-                        f'Option "{key}" is only supported in persistent context mode '
-                        '(use_incognito_pages=False) and will be ignored.'
-                    )
-                else:
-                    raise TypeError(f'"{key}" is not a valid Playwright context option.')
-            elif key in params_cache['common'] or key in params_cache['persistent_unique']:
-                # Persistent mode (launch_persistent_context)
-                filtered_options[key] = value
-            elif key in params_cache['incognito_unique']:
-                logger.warning(
-                    f'Option "{key}" is only supported in incognito context mode '
-                    '(use_incognito_pages=True) and will be ignored.'
-                )
-            else:
-                raise TypeError(f'"{key}" is not a valid Playwright context option.')
+        filtered_options = self._filter_context_options(browser_new_context_options)
 
         if proxy_info:
             if filtered_options.get('proxy'):

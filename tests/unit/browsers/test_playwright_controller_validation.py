@@ -25,9 +25,10 @@ async def browser(playwright: Playwright) -> AsyncGenerator[Browser, None]:
     await browser.close()
 
 
-async def test_controller_validation_typo(browser: Browser) -> None:
+async def test_controller_validation_typo_passed_through(browser: Browser) -> None:
+    """Invalid options (e.g. typos) are passed through so Playwright raises its own error."""
     controller = PlaywrightBrowserController(browser)
-    with pytest.raises(TypeError, match=r'"headles" is not a valid Playwright context option.'):
+    with pytest.raises(TypeError):
         await controller.new_page(browser_new_context_options={'headles': True})
     await controller.close()
 
