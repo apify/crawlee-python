@@ -204,6 +204,8 @@ class ThrottlingRequestManager(RequestManager):
     def set_crawl_delay(self, url: str, delay_seconds: int) -> None:
         """Set the robots.txt crawl-delay for a domain.
 
+        If the crawl-delay is already set for the domain, this is a no-op.
+
         Args:
             url: A URL from the domain to throttle.
             delay_seconds: The crawl-delay value in seconds.
@@ -214,6 +216,9 @@ class ThrottlingRequestManager(RequestManager):
 
         state = self._domain_states.get(domain)
         if state is None:
+            return
+
+        if state.crawl_delay is not None:
             return
 
         state.crawl_delay = timedelta(seconds=delay_seconds)
@@ -243,9 +248,14 @@ class ThrottlingRequestManager(RequestManager):
         This is used during crawler purge to reconstruct the throttler with empty
         queues while preserving domain configuration and service locator.
 
-        Note: The inner manager is always recreated as a ``RequestQueue``.
+        Raises:
+            TypeError: If the inner manager is not a ``RequestQueue``.
         """
         await self.drop()
+
+        if not isinstance(self._inner, RequestQueue):
+            msg = f'recreate_purged only supports RequestQueue as the inner manager, got {type(self._inner).__name__}'
+            raise TypeError(msg)
 
         inner = await RequestQueue.open(
             storage_client=self._service_locator.get_storage_client(),
@@ -268,9 +278,7 @@ class ThrottlingRequestManager(RequestManager):
         self._sub_queues.clear()
 
     @override
-    async def add_request(  # type: ignore[invalid-method-override]
-        self, request: str | Request, *, forefront: bool = False
-    ) -> ProcessedRequest | None:
+    async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest | None:
         """Add a request, routing it to the appropriate queue.
 
         Requests for explicitly configured domains are routed directly to their

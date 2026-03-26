@@ -158,7 +158,7 @@ class RequestQueue(Storage, RequestManager):
         request: str | Request,
         *,
         forefront: bool = False,
-    ) -> ProcessedRequest:
+    ) -> ProcessedRequest | None:
         request = self._transform_request(request)
         response = await self._client.add_batch_of_requests([request], forefront=forefront)
         return response.processed_requests[0]

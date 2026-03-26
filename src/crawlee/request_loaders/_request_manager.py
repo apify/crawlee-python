@@ -28,7 +28,7 @@ class RequestManager(RequestLoader, ABC):
         request: str | Request,
         *,
         forefront: bool = False,
-    ) -> ProcessedRequest:
+    ) -> ProcessedRequest | None:
         """Add a single request to the manager and store it in underlying resource client.
 
         Args:
@@ -37,7 +37,7 @@ class RequestManager(RequestLoader, ABC):
                 of the manager.
 
         Returns:
-            Information about the request addition to the manager.
+            Information about the request addition to the manager, or None if the request was not added.
         """
 
     async def add_requests(
@@ -64,7 +64,8 @@ class RequestManager(RequestLoader, ABC):
         processed_requests = list[ProcessedRequest]()
         for request in requests:
             processed_request = await self.add_request(request, forefront=forefront)
-            processed_requests.append(processed_request)
+            if processed_request is not None:
+                processed_requests.append(processed_request)
 
     @abstractmethod
     async def reclaim_request(self, request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
