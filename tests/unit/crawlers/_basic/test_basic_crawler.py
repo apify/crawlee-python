@@ -2117,7 +2117,7 @@ async def test_multiple_crawlers_with_global_event_manager() -> None:
 
 
 async def test_global_and_local_event_manager_in_crawler_run() -> None:
-    """Test that both global and local event managers are used in crawler run"""
+    """Test that both global and local event managers are used in crawler run."""
 
     config = service_locator.get_configuration()
 
