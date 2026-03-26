@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
+_UNSUPPORTED_PERSISTENT_CONTEXT_OPTIONS = frozenset({'storage_state'})
+
 
 @docs_group('Browser management')
 class PlaywrightPersistentBrowser(Browser):
@@ -58,6 +60,14 @@ class PlaywrightPersistentBrowser(Browser):
         """Create persistent context instead of regular one. Merge launch options with context options."""
         if self._context:
             raise RuntimeError('Persistent browser can have only one context')
+
+        unsupported_options = _UNSUPPORTED_PERSISTENT_CONTEXT_OPTIONS.intersection(context_options)
+        if unsupported_options:
+            unsupported_list = ', '.join(sorted(unsupported_options))
+            raise ValueError(
+                'The following browser_new_context_options are not supported when using a persistent browser '
+                f'context: {unsupported_list}. Use `use_incognito_pages=True` if you need these options.'
+            )
 
         launch_options = self._browser_launch_options | context_options
 

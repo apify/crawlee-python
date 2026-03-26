@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock
 
 import pytest
 from playwright.async_api import async_playwright
@@ -42,3 +43,13 @@ async def test_delete_temp_folder_with_close_browser(playwright: Playwright) -> 
     assert current_temp_dir.exists()
     await persist_browser.close()
     assert not current_temp_dir.exists()
+
+
+async def test_new_context_rejects_storage_state_for_persistent_browser() -> None:
+    mocked_browser_type = AsyncMock()
+    persist_browser = PlaywrightPersistentBrowser(mocked_browser_type, user_data_dir=None, browser_launch_options={})
+
+    with pytest.raises(ValueError, match='storage_state'):
+        await persist_browser.new_context(storage_state={'cookies': []})
+
+    mocked_browser_type.launch_persistent_context.assert_not_awaited()
