@@ -661,6 +661,9 @@ class BasicCrawlingContext:
     log: logging.Logger
     """Logger instance."""
 
+    register_deferred_cleanup: Callable[[Callable[[], Coroutine[None, None, None]]], None]
+    """Register an async callback to be called after request processing completes (including error handlers)."""
+
     async def get_snapshot(self) -> PageSnapshot:
         """Get snapshot of crawled page."""
         return PageSnapshot()
