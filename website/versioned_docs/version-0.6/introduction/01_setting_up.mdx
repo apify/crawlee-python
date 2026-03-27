@@ -1,0 +1,153 @@
+---
+id: setting-up
+title: Setting up
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import CodeBlock from '@theme/CodeBlock';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+This guide will help you get started with Crawlee by setting it up on your computer. Follow the steps below to ensure a smooth installation process.
+
+## Prerequisites
+
+Before installing Crawlee itself, make sure that your system meets the following requirements:
+
+- **Python 3.9 or higher**: Crawlee requires Python 3.9 or a newer version. You can download Python from the [official website](https://python.org/downloads/).
+- **Python package manager**: While this guide uses [pip](https://pip.pypa.io/) (the most common package manager), you can also use any package manager you want. You can download pip from the [official website](https://pip.pypa.io/en/stable/installation/).
+
+### Verifying prerequisites
+
+To check if Python and pip are installed, run the following commands:
+
+```sh
+python --version
+```
+
+```sh
+python -m pip --version
+```
+
+If these commands return the respective versions, you're ready to continue.
+
+## Installing Crawlee
+
+Crawlee is available as [`crawlee`](https://pypi.org/project/crawlee/) package on PyPI. This package includes the core functionality, while additional features are available as optional extras to keep dependencies and package size minimal.
+
+### Basic installation
+
+To install the core package, run:
+
+```sh
+python -m pip install crawlee
+```
+
+After installation, verify that Crawlee is installed correctly by checking its version:
+
+```sh
+python -c 'import crawlee; print(crawlee.__version__)'
+```
+
+### Full installation
+
+If you do not mind the package size, you can run the following command to install Crawlee with all optional features:
+
+```sh
+python -m pip install 'crawlee[all]'
+```
+
+### Installing specific extras
+
+Depending on your use case, you may want to install specific extras to enable additional functionality:
+
+For using the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, install the `beautifulsoup` extra:
+
+```sh
+python -m pip install 'crawlee[beautifulsoup]'
+```
+
+For using the <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>, install the `parsel` extra:
+
+```sh
+python -m pip install 'crawlee[parsel]'
+```
+
+For using the <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, install the `curl-impersonate` extra:
+
+```sh
+python -m pip install 'crawlee[curl-impersonate]'
+```
+
+If you plan to use a (headless) browser with <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, install Crawlee with the `playwright` extra:
+
+```sh
+python -m pip install 'crawlee[playwright]'
+```
+
+After installing the playwright extra, install the necessary Playwright dependencies:
+
+```sh
+playwright install
+```
+
+### Installing multiple extras
+
+You can install multiple extras at once by using a comma as a separator:
+
+```sh
+python -m pip install 'crawlee[beautifulsoup,curl-impersonate]'
+```
+
+## Start a new project
+
+The quickest way to get started with Crawlee is by using the Crawlee CLI and selecting one of the prepared templates. The CLI helps you set up a new project in seconds.
+
+### Using Crawlee CLI with Pipx
+
+First, ensure you have Pipx installed. You can check if Pipx is installed by running:
+
+```sh
+pipx --version
+```
+
+If Pipx is not installed, follow the official [installation guide](https://pipx.pypa.io/stable/installation/).
+
+Then, run the Crawlee CLI using Pipx and choose from the available templates:
+
+```sh
+pipx run 'crawlee[cli]' create my-crawler
+```
+
+### Using Crawlee CLI directly
+
+If you already have `crawlee` installed, you can spin it up by running:
+
+```sh
+crawlee create my_crawler
+```
+
+Follow the interactive prompts in the CLI to choose a crawler type and set up your new project.
+
+### Running your project
+
+To run your newly created project, navigate to the project directory, activate the virtual environment, and execute the Python interpreter with the project module:
+
+<Tabs>
+  <TabItem value="Linux" label="Linux" default>
+      <CodeBlock language="sh">cd my_crawler/</CodeBlock>
+      <CodeBlock language="sh">source .venv/bin/activate</CodeBlock>
+      <CodeBlock language="sh">python -m my_crawler</CodeBlock>
+  </TabItem>
+<TabItem value="Windows" label="Windows" default>
+      <CodeBlock language="sh">cd my_crawler/</CodeBlock>
+      <CodeBlock language="sh">venv\Scripts\activate</CodeBlock>
+      <CodeBlock language="sh">python -m my_crawler</CodeBlock>
+  </TabItem>
+</Tabs>
+
+Congratulations! You have successfully set up and executed your first Crawlee project.
+
+## Next steps
+
+Next, you will learn how to create a very simple crawler and Crawlee components while building it.

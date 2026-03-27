@@ -1,0 +1,51 @@
+---
+id: gcp-cloud-run
+title: Cloud Run
+description: Prepare your crawler to run in Cloud Run on Google Cloud Platform.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+
+import CodeBlock from '@theme/CodeBlock';
+
+import GoogleCloudRun from '!!raw-loader!./code_examples/google/cloud_run_example.py';
+
+
+[Google Cloud Run](https://cloud.google.com/run)  is a container-based serverless platform that allows you to run web crawlers with headless browsers. This service is recommended when your Crawlee applications need browser rendering capabilities, require more granular control, or have complex dependencies that aren't supported by [Cloud Functions](./gcp-cloud-run-functions).
+
+GCP Cloud Run allows you to deploy using Docker containers, giving you full control over your environment and the flexibility to use any web server framework of your choice, unlike Cloud Functions which are limited to [Flask](https://flask.palletsprojects.com/en/stable/).
+
+## Preparing the project
+
+We'll prepare our project using [Litestar](https://litestar.dev/) and the [Uvicorn](https://www.uvicorn.org/) web server. The HTTP server handler will wrap the crawler to communicate with clients. Because the Cloud Run platform sees only an opaque Docker container, we have to take care of this bit ourselves.
+
+:::info
+
+GCP passes you an environment variable called `PORT` - your HTTP server is expected to be listening on this port (GCP exposes this one to the outer world).
+
+:::
+
+<CodeBlock className="language-python">
+    {GoogleCloudRun.replace(/^.*?\n/, '')}
+</CodeBlock>
+
+
+:::tip
+
+Always make sure to keep all the logic in the request handler - as with other FaaS services, your request handlers have to be **stateless.**
+
+:::
+
+## Deploying to Google Cloud Platform
+
+Now, we’re ready to deploy! If you have initialized your project using `uvx crawlee create`, the initialization script has prepared a Dockerfile for you.
+
+All you have to do now is run `gcloud run deploy` in your project folder (the one with your Dockerfile in it). The gcloud CLI application will ask you a few questions, such as what region you want to deploy your application in, or whether you want to make your application public or private.
+
+After answering those questions, you should be able to see your application in the GCP dashboard and run it using the link you find there.
+
+:::tip
+
+In case your first execution of your newly created Cloud Run fails, try editing the Run configuration - mainly setting the available memory to 1GiB or more and updating the request timeout according to the size of the website you are scraping.
+
+:::

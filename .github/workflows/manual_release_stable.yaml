@@ -104,15 +104,83 @@ jobs:
       # TODO: add job for publish package to Conda
       # https://github.com/apify/crawlee-python/issues/104
 
+  version_docs:
+    name: Version docs
+    needs: [release_prepare, changelog_update, pypi_publish]
+    runs-on: ubuntu-latest
+    outputs:
+      version_docs_commitish: ${{ steps.commit_versioned_docs.outputs.commit_long_sha }}
+    permissions:
+      contents: write
+    env:
+      NODE_VERSION: 22
+      PYTHON_VERSION: 3.14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+          ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up uv package manager
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies
+        run: uv run poe install-dev
+
+      - name: Install website dependencies
+        run: |
+          cd website
+          corepack enable
+          yarn install
+
+      - name: Snapshot the current version
+        run: |
+          cd website
+          VERSION="$(python -c "import tomllib, pathlib; print(tomllib.loads(pathlib.Path('../pyproject.toml').read_text())['project']['version'])")"
+          MAJOR_MINOR="$(echo "$VERSION" | cut -d. -f1-2)"
+          export MAJOR_MINOR
+          # Remove existing version if present (patch releases override)
+          rm -rf "versioned_docs/version-${MAJOR_MINOR}"
+          rm -rf "versioned_sidebars/version-${MAJOR_MINOR}-sidebars.json"
+          jq 'map(select(. != env.MAJOR_MINOR))' versions.json > tmp.json && mv tmp.json versions.json
+          # Copy changelog
+          cp ../CHANGELOG.md ../docs/changelog.md
+          # Build API reference and create version snapshots
+          bash build_api_reference.sh
+          npx docusaurus docs:version "$MAJOR_MINOR"
+          npx docusaurus api:version "$MAJOR_MINOR"
+
+      - name: Commit and push versioned docs
+        id: commit_versioned_docs
+        uses: EndBug/add-and-commit@v10
+        with:
+          add: "website/versioned_docs website/versioned_sidebars website/versions.json"
+          message: "docs: version ${{ needs.release_prepare.outputs.version_number }} docs [skip ci]"
+          default_author: github_actions
+
   doc_release:
     name: Doc release
-    needs: [changelog_update, pypi_publish]
+    needs: [changelog_update, pypi_publish, version_docs]
     permissions:
       contents: write
       pages: write
       id-token: write
     uses: ./.github/workflows/_release_docs.yaml
     with:
-      # Use the ref from the changelog update to include the updated changelog.
-      ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
+      # Use the version_docs commit to include both changelog and versioned docs.
+      ref: ${{ needs.version_docs.outputs.version_docs_commitish }}
     secrets: inherit
