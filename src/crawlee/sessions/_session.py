@@ -217,8 +217,6 @@ class Session:
         to use `mark_bad` method.
         """
         self._error_score += self._max_error_score
-        self._usage_count += 1
-        # Note: We emit an event here because of the Puppeteer in TS implementation.
 
     def is_blocked_status_code(
         self,
