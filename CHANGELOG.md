@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file.
 - Handle invalid URLs in `RequestList` ([#1803](https://github.com/apify/crawlee-python/pull/1803)) ([0b2e3fc](https://github.com/apify/crawlee-python/commit/0b2e3fc5cbca371131b54085e052a6cda6361b0f)) by [@Mantisus](https://github.com/Mantisus), closes [#1802](https://github.com/apify/crawlee-python/issues/1802)
 - **playwright:** Filter unsupported context options in persistent browser ([#1796](https://github.com/apify/crawlee-python/pull/1796)) ([69ad22e](https://github.com/apify/crawlee-python/commit/69ad22e60ef558d8c26e84e2bd165fe03f116b7f)) by [@sushant-mutnale](https://github.com/sushant-mutnale), closes [#1784](https://github.com/apify/crawlee-python/issues/1784)
 
+### ⚡ Performance
+
+- Offload BeautifulSoup parsing to a thread via `asyncio.to_thread` ([#1817](https://github.com/apify/crawlee-python/pull/1817)) ([d612ffa](https://github.com/apify/crawlee-python/commit/d612ffa1730f2aacfb7a28ae2b0ce2f4eda77692)) by [@vdusek](https://github.com/vdusek)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [1.6.0](https://github.com/apify/crawlee-python/releases/tag/v1.6.0) (2026-03-20)
