@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.6.1 - **not yet released**
+## [1.6.1](https://github.com/apify/crawlee-python/releases/tag/v1.6.1) (2026-03-30)
 
 ### 🐛 Bug Fixes
 
@@ -17,7 +16,6 @@ All notable changes to this project will be documented in this file.
 - Offload BeautifulSoup parsing to a thread via `asyncio.to_thread` ([#1817](https://github.com/apify/crawlee-python/pull/1817)) ([d612ffa](https://github.com/apify/crawlee-python/commit/d612ffa1730f2aacfb7a28ae2b0ce2f4eda77692)) by [@vdusek](https://github.com/vdusek)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.6.0](https://github.com/apify/crawlee-python/releases/tag/v1.6.0) (2026-03-20)
 
 ### 🚀 Features
