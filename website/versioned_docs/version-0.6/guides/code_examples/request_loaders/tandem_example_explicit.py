@@ -12,7 +12,7 @@ async def main() -> None:
     # Open the default request queue.
     request_queue = await RequestQueue.open()
 
-    # And combine them together to a sinhle request manager.
+    # And combine them together to a single request manager.
     request_manager = RequestManagerTandem(request_list, request_queue)
 
     # Create a crawler and pass the request manager to it.
