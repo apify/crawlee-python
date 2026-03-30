@@ -23,6 +23,7 @@ class MockContext(BasicCrawlingContext):
             use_state=AsyncMock(),
             get_key_value_store=AsyncMock(),
             log=logging.getLogger(),
+            register_deferred_cleanup=lambda _: None,
         )
 
 

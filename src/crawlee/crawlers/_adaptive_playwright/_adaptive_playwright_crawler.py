@@ -320,6 +320,7 @@ class AdaptivePlaywrightCrawler(
             get_key_value_store=result.get_key_value_store,
             use_state=use_state_function,
             log=context.log,
+            register_deferred_cleanup=context.register_deferred_cleanup,
         )
 
         try:

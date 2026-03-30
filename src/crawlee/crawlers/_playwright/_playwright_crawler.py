@@ -236,6 +236,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             proxy_info=context.proxy_info,
             get_key_value_store=context.get_key_value_store,
             log=context.log,
+            register_deferred_cleanup=context.register_deferred_cleanup,
             page=crawlee_page.page,
             block_requests=partial(block_requests, page=crawlee_page.page),
             goto_options=GotoOptions(**self._goto_options),
@@ -296,62 +297,68 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             The enhanced crawling context with the Playwright-specific features (page, response, enqueue_links,
                 infinite_scroll and block_requests).
         """
-        async with context.page:
-            if context.session:
-                session_cookies = context.session.cookies.get_cookies_as_playwright_format()
-                await self._update_cookies(context.page, session_cookies)
+        # Enter the page context manager, but defer its cleanup (page.close()) so the page stays open
+        # during error handler execution.
+        await context.page.__aenter__()
 
-            if context.request.headers:
-                await context.page.set_extra_http_headers(context.request.headers.model_dump())
-            # Navigate to the URL and get response.
-            if context.request.method != 'GET':
-                # Call the notification only once
-                warnings.warn(
-                    'Using other request methods than GET or adding payloads has a high impact on performance'
-                    ' in recent versions of Playwright. Use only when necessary.',
-                    category=UserWarning,
-                    stacklevel=2,
-                )
+        context.register_deferred_cleanup(lambda: context.page.__aexit__(None, None, None))
 
-                route_handler = self._prepare_request_interceptor(
-                    method=context.request.method,
-                    headers=context.request.headers,
-                    payload=context.request.payload,
-                )
+        if context.session:
+            session_cookies = context.session.cookies.get_cookies_as_playwright_format()
+            await self._update_cookies(context.page, session_cookies)
 
-                # Set route_handler only for current request
-                await context.page.route(context.request.url, route_handler)
-
-            try:
-                async with self._shared_navigation_timeouts[id(context)] as remaining_timeout:
-                    response = await context.page.goto(
-                        context.request.url, timeout=remaining_timeout.total_seconds() * 1000, **context.goto_options
-                    )
-                context.request.state = RequestState.AFTER_NAV
-            except playwright.async_api.TimeoutError as exc:
-                raise asyncio.TimeoutError from exc
-
-            if response is None:
-                raise SessionError(f'Failed to load the URL: {context.request.url}')
-
-            # Set the loaded URL to the actual URL after redirection.
-            context.request.loaded_url = context.page.url
-
-            yield PlaywrightPostNavCrawlingContext(
-                request=context.request,
-                session=context.session,
-                add_requests=context.add_requests,
-                send_request=context.send_request,
-                push_data=context.push_data,
-                use_state=context.use_state,
-                proxy_info=context.proxy_info,
-                get_key_value_store=context.get_key_value_store,
-                log=context.log,
-                page=context.page,
-                block_requests=context.block_requests,
-                goto_options=context.goto_options,
-                response=response,
+        if context.request.headers:
+            await context.page.set_extra_http_headers(context.request.headers.model_dump())
+        # Navigate to the URL and get response.
+        if context.request.method != 'GET':
+            # Call the notification only once
+            warnings.warn(
+                'Using other request methods than GET or adding payloads has a high impact on performance'
+                ' in recent versions of Playwright. Use only when necessary.',
+                category=UserWarning,
+                stacklevel=2,
             )
+
+            route_handler = self._prepare_request_interceptor(
+                method=context.request.method,
+                headers=context.request.headers,
+                payload=context.request.payload,
+            )
+
+            # Set route_handler only for current request
+            await context.page.route(context.request.url, route_handler)
+
+        try:
+            async with self._shared_navigation_timeouts[id(context)] as remaining_timeout:
+                response = await context.page.goto(
+                    context.request.url, timeout=remaining_timeout.total_seconds() * 1000, **context.goto_options
+                )
+            context.request.state = RequestState.AFTER_NAV
+        except playwright.async_api.TimeoutError as exc:
+            raise asyncio.TimeoutError from exc
+
+        if response is None:
+            raise SessionError(f'Failed to load the URL: {context.request.url}')
+
+        # Set the loaded URL to the actual URL after redirection.
+        context.request.loaded_url = context.page.url
+
+        yield PlaywrightPostNavCrawlingContext(
+            request=context.request,
+            session=context.session,
+            add_requests=context.add_requests,
+            send_request=context.send_request,
+            push_data=context.push_data,
+            use_state=context.use_state,
+            proxy_info=context.proxy_info,
+            get_key_value_store=context.get_key_value_store,
+            log=context.log,
+            register_deferred_cleanup=context.register_deferred_cleanup,
+            page=context.page,
+            block_requests=context.block_requests,
+            goto_options=context.goto_options,
+            response=response,
+        )
 
     def _create_extract_links_function(self, context: PlaywrightPreNavCrawlingContext) -> ExtractLinksFunction:
         """Create a callback function for extracting links from context.
@@ -495,10 +502,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
     async def _create_crawling_context(
         self, context: PlaywrightPostNavCrawlingContext
-    ) -> AsyncGenerator[PlaywrightCrawlingContext, Exception | None]:
+    ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
         extract_links = self._create_extract_links_function(context)
 
-        error = yield PlaywrightCrawlingContext(
+        yield PlaywrightCrawlingContext(
             request=context.request,
             session=context.session,
             add_requests=context.add_requests,
@@ -508,6 +515,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             proxy_info=context.proxy_info,
             get_key_value_store=context.get_key_value_store,
             log=context.log,
+            register_deferred_cleanup=context.register_deferred_cleanup,
             page=context.page,
             goto_options=context.goto_options,
             response=context.response,
@@ -520,10 +528,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         if context.session:
             pw_cookies = await self._get_cookies(context.page)
             context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
-
-        # Collect data in case of errors, before the page object is closed.
-        if error:
-            await self.statistics.error_tracker.add(error=error, context=context, early=True)
 
     def pre_navigation_hook(self, hook: Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]) -> None:
         """Register a hook to be called before each navigation.
