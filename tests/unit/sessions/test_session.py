@@ -82,9 +82,27 @@ def test_multiple_marks(session: Session) -> None:
 
 def test_retire_method(session: Session) -> None:
     """Test that retire method properly sets the session as unusable."""
+    initial_usage_count = session.usage_count
     session.retire()
     assert not session.is_usable
     assert session.error_score == 3.0
+    assert session.usage_count == initial_usage_count
+
+
+def test_mark_good_at_usage_limit_no_double_increment() -> None:
+    """Test that mark_good at max usage count does not double-increment usage_count via retire."""
+    session = Session(max_usage_count=5, usage_count=4)
+    session.mark_good()
+    assert session.usage_count == 5
+    assert not session.is_usable
+
+
+def test_mark_bad_at_usage_limit_no_double_increment() -> None:
+    """Test that mark_bad at max usage count does not double-increment usage_count via retire."""
+    session = Session(max_usage_count=5, usage_count=4)
+    session.mark_bad()
+    assert session.usage_count == 5
+    assert not session.is_usable
 
 
 def test_retire_on_blocked_status_code(session: Session) -> None:
