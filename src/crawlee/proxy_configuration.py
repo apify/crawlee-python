@@ -241,6 +241,9 @@ class _ProxyTierTracker:
 
     def predict_tier(self, domain: str) -> int:
         histogram = self._histogram_by_domain[domain]
+        max_tier = len(histogram) - 1
+
+        self._current_tier_by_domain[domain] = max(0, min(max_tier, self._current_tier_by_domain[domain]))
         current_tier = self._current_tier_by_domain[domain]
 
         for index, value in enumerate(histogram):
@@ -250,12 +253,14 @@ class _ProxyTierTracker:
                 histogram[index] -= 1
 
         left = histogram[current_tier - 1] if current_tier > 0 else float('inf')
-        right = histogram[current_tier + 1] if current_tier < len(histogram) - 1 else float('inf')
+        right = histogram[current_tier + 1] if current_tier < max_tier else float('inf')
 
         if histogram[current_tier] > min(left, right):
             self._current_tier_by_domain[domain] = current_tier - 1 if left <= right else current_tier + 1
         elif histogram[current_tier] == left:
             self._current_tier_by_domain[domain] -= 1
+
+        self._current_tier_by_domain[domain] = max(0, min(max_tier, self._current_tier_by_domain[domain]))
 
         return self._current_tier_by_domain[domain]
 

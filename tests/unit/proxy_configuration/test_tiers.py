@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from yarl import URL
+
 from crawlee import Request
-from crawlee.proxy_configuration import ProxyConfiguration
+from crawlee.proxy_configuration import ProxyConfiguration, _ProxyTierTracker
 
 
 async def test_rotates_proxies_uniformly_with_no_request() -> None:
@@ -176,3 +178,15 @@ async def test_none_proxy_rotates_proxies_uniformly_with_no_request() -> None:
     # Proxy rotation starts from the beginning of the proxy list after last proxy in tier was used. No proxy used again.
     info = await config.new_proxy_info(None, None, None)
     assert info is None, 'First entry in tired_proxy_urls is None. config.new_proxy_info is expected to generate None.'
+
+
+def test_predict_tier_bounds_with_single_tier() -> None:
+    """With a single tier, predict_tier should always return 0."""
+    tracker = _ProxyTierTracker([[URL('http://proxy:1111')]])
+    tracker.add_error('example.com', 0)
+
+    # Each call mutates internal state (decaying histogram, potentially shifting tiers). The error score starts
+    # at 10 and decays by 1 per call, so 20 iterations covers the full decay to zero and beyond.
+    for _ in range(20):
+        tier = tracker.predict_tier('example.com')
+        assert tier == 0
