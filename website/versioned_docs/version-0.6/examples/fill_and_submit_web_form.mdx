@@ -1,0 +1,113 @@
+---
+id: fill-and-submit-web-form
+title: Fill and submit web form
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import RequestExample from '!!raw-loader!roa-loader!./code_examples/fill_and_submit_web_form_request.py';
+import CrawlerExample from '!!raw-loader!roa-loader!./code_examples/fill_and_submit_web_form_crawler.py';
+
+This example demonstrates how to fill and submit a web form using the <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> crawler. The same approach applies to any crawler that inherits from it, such as the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> or <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>.
+
+We are going to use the [httpbin.org](https://httpbin.org) website to demonstrate how it works.
+
+## Investigate the form fields
+
+First, we need to examine the form fields and the form's action URL. You can do this by opening the [httpbin.org/forms/post](https://httpbin.org/forms/post) page in a browser and inspecting the form fields.
+
+In Chrome, right-click on the page and select "Inspect" or press `Ctrl+Shift+I`.
+Use the element selector (`Ctrl+Shift+C`) to click on the form element you want to inspect.
+
+![HTML input element name](/img/fill-and-submit-web-form/00.jpg 'HTML input element name.')
+
+Identify the field names. For example, the customer name field is `custname`, the email field is `custemail`, and the phone field is `custtel`.
+
+Now navigate to the "Network" tab in developer tools and submit the form by clicking the "Submit order" button.
+
+![Submitting the form](/img/fill-and-submit-web-form/01.jpg 'Submitting the form.')
+
+Find the form submission request and examine its details. The "Headers" tab will show the submission URL, in this case, it is `https://httpbin.org/post`.
+
+![Network request investigation](/img/fill-and-submit-web-form/02.jpg 'Network request investigation.')
+
+The "Payload" tab will display the form fields and their submitted values. This method could be an alternative to inspecting the HTML source code directly.
+
+![Network payload investigation](/img/fill-and-submit-web-form/03.jpg 'Network payload investigation.')
+
+## Preparing a POST request
+
+Now, let's create a POST request with the form fields and their values using the <ApiLink to="class/Request">`Request`</ApiLink> class, specifically its <ApiLink to="class/Request#from_url">`Request.from_url`</ApiLink> constructor:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {RequestExample}
+</RunnableCodeBlock>
+
+Alternatively, you can send form data as URL parameters using the `url` argument. It depends on the form and how it is implemented. However, sending the data as a POST request body using the `payload` is generally a better approach.
+
+## Implementing the crawler
+
+Finally, let's implement the crawler and run it with the prepared request. Although we are using the <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink>, the process is the same for any crawler that inherits from it.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {CrawlerExample}
+</RunnableCodeBlock>
+
+## Running the crawler
+
+Finally, run your crawler. Your logs should show something like this:
+
+```plaintext
+...
+[crawlee.http_crawler._http_crawler] INFO  Processing https://httpbin.org/post ...
+[crawlee.http_crawler._http_crawler] INFO  Response: {
+  "args": {},
+  "data": "",
+  "files": {},
+  "form": {
+    "comments": "Please ring the doorbell upon arrival.",
+    "custemail": "johndoe@example.com",
+    "custname": "John Doe",
+    "custtel": "1234567890",
+    "delivery": "13:00",
+    "size": "large",
+    "topping": [
+      "bacon",
+      "cheese",
+      "mushroom"
+    ]
+  },
+  "headers": {
+    "Accept": "*/*",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Content-Length": "190",
+    "Content-Type": "application/x-www-form-urlencoded",
+    "Host": "httpbin.org",
+    "User-Agent": "python-httpx/0.27.0",
+    "X-Amzn-Trace-Id": "Root=1-66c849d6-1ae432fb7b4156e6149ff37f"
+  },
+  "json": null,
+  "origin": "78.80.81.196",
+  "url": "https://httpbin.org/post"
+}
+
+[crawlee._autoscaling.autoscaled_pool] INFO  Waiting for remaining tasks to finish
+[crawlee.http_crawler._http_crawler] INFO  Final request statistics:
+┌───────────────────────────────┬──────────┐
+│ requests_finished             │ 1        │
+│ requests_failed               │ 0        │
+│ retry_histogram               │ [1]      │
+│ request_avg_failed_duration   │ None     │
+│ request_avg_finished_duration │ 0.678442 │
+│ requests_finished_per_minute  │ 85       │
+│ requests_failed_per_minute    │ 0        │
+│ request_total_duration        │ 0.678442 │
+│ requests_total                │ 1        │
+│ crawler_runtime               │ 0.707666 │
+└───────────────────────────────┴──────────┘
+```
+
+This log output confirms that the crawler successfully submitted the form and processed the response. Congratulations! You have successfully filled and submitted a web form using the <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink>.

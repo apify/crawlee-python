@@ -1,0 +1,133 @@
+---
+id: quick-start
+title: Quick start
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import BeautifulsoupCrawlerExample from '!!raw-loader!roa-loader!./code_examples/beautifulsoup_crawler_example.py';
+import ParselCrawlerExample from '!!raw-loader!roa-loader!./code_examples/parsel_crawler_example.py';
+import PlaywrightCrawlerExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler_example.py';
+
+import PlaywrightCrawlerHeadfulExample from '!!raw-loader!./code_examples/playwright_crawler_headful_example.py';
+
+This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding of how Crawlee works, check out the [Introduction](../introduction/index.mdx) section, which provides a comprehensive step-by-step guide to creating your first scraper.
+
+## Choose your crawler
+
+Crawlee offers the following main crawler classes: <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>, and <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>. All crawlers share the same interface, providing maximum flexibility when switching between them.
+
+:::caution Minimum Python version
+
+Crawlee requires Python 3.10 or higher.
+
+:::
+
+### BeautifulSoupCrawler
+
+The <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> is a plain HTTP crawler that parses HTML using the well-known [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library. It crawls the web using an HTTP client that mimics a browser. This crawler is very fast and efficient but cannot handle JavaScript rendering.
+
+### ParselCrawler
+
+The <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> is similar to the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> but uses the [Parsel](https://pypi.org/project/parsel/) library for HTML parsing. Parsel is a lightweight library that provides a CSS selector-based API for extracting data from HTML documents. If you are familiar with the [Scrapy](https://scrapy.org/) framework, you will feel right at home with Parsel. As with the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, the <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> cannot handle JavaScript rendering.
+
+### PlaywrightCrawler
+
+The <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> uses a headless browser controlled by the [Playwright](https://playwright.dev/) library. It can manage Chromium, Firefox, Webkit, and other browsers. Playwright is the successor to the [Puppeteer](https://pptr.dev/) library and is becoming the de facto standard in headless browser automation. If you need a headless browser, choose Playwright.
+
+## Installation
+
+Crawlee is available the [`crawlee`](https://pypi.org/project/crawlee/) package on PyPI. This package includes the core functionality, while additional features are available as optional extras to keep dependencies and package size minimal.
+
+You can install Crawlee with all features or choose only the ones you need. For installing it using the [pip](https://pip.pypa.io/en/stable/) package manager, run the following command:
+
+```sh
+python -m pip install 'crawlee[all]'
+```
+
+Verify that Crawlee is successfully installed:
+
+```sh
+python -c 'import crawlee; print(crawlee.__version__)'
+```
+
+If you plan to use the <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, you'll need to install Playwright dependencies, including the browser binaries. To do this, run the following command:
+
+```sh
+playwright install
+```
+
+For detailed installation instructions, see the [Setting up](../introduction/01_setting_up.mdx) documentation page.
+
+## Crawling
+
+Run the following example to perform a recursive crawl of the Crawlee website using the selected crawler.
+
+<Tabs groupId="quickStart">
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler" default>
+        <RunnableCodeBlock className="language-python" language="python">
+            {BeautifulsoupCrawlerExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="ParselCrawler" label="ParselCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {ParselCrawlerExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {PlaywrightCrawlerExample}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>
+
+When you run the example, you will see Crawlee automating the data extraction process in your terminal.
+
+{/* TODO: improve the logging and add here a sample */}
+
+## Running headful browser
+
+By default, browsers controlled by Playwright run in headless mode (without a visible window). However, you can configure the crawler to run in a headful mode, which is useful during the development phase to observe the browser's actions. You can also switch from the default Chromium browser to Firefox or WebKit.
+
+<CodeBlock language="python">
+    {PlaywrightCrawlerHeadfulExample}
+</CodeBlock>
+
+When you run the example code, you'll see an automated browser navigating through the Crawlee website.
+
+{/* TODO: add video example */}
+
+## Results
+
+By default, Crawlee stores data in the `./storage` directory within your current working directory. The results of your crawl will be saved as JSON files under `./storage/datasets/default/`.
+
+To view the results, you can use the `cat` command:
+
+```sh
+cat ./storage/datasets/default/000000001.json
+```
+
+The JSON file will contain data similar to the following:
+
+```json
+{
+    "url": "https://crawlee.dev/",
+    "title": "Crawlee · Build reliable crawlers. Fast. | Crawlee"
+}
+```
+
+:::tip
+
+If you want to change the storage directory, you can set the `CRAWLEE_STORAGE_DIR` environment variable to your preferred path.
+
+:::
+
+## Examples and further reading
+
+For more examples showcasing various features of Crawlee, visit the [Examples](/docs/examples) section of the documentation. To get a deeper understanding of Crawlee and its components, read the step-by-step [Introduction](../introduction/index.mdx) guide.
+
+[//]: # (TODO: add related links once they are ready)

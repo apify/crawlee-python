@@ -1,0 +1,38 @@
+---
+id: http-crawlers
+title: HTTP crawlers
+description: Crawlee supports multiple HTTP crawlers that can be used to extract data from server-rendered webpages.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Generic class <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> is parent to <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> and <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> and it could be used as parent for your crawler with custom content parsing requirements.
+
+It already includes almost all the functionality to crawl webpages and the only missing part is the parser that should be used to parse HTTP responses, and a context dataclass that defines what context helpers will be available to user handler functions.
+
+## `BeautifulSoupCrawler`
+
+<ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> uses <ApiLink to="class/BeautifulSoupParser">`BeautifulSoupParser`</ApiLink> to parse the HTTP response and makes it available in <ApiLink to="class/BeautifulSoupCrawlingContext">`BeautifulSoupCrawlingContext`</ApiLink> in the `.soup` or `.parsed_content` attribute.
+
+## `ParselCrawler`
+
+<ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> uses <ApiLink to="class/ParselParser">`ParselParser`</ApiLink> to parse the HTTP response and makes it available in <ApiLink to="class/ParselCrawlingContext">`ParselCrawlingContext`</ApiLink> in the `.selector` or `.parsed_content` attribute.
+
+## `HttpCrawler`
+
+<ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> uses <ApiLink to="class/NoParser">`NoParser`</ApiLink> that does not parse the HTTP response at all and is to be used if no parsing is required.
+
+## Creating your own HTTP crawler
+
+### Why?
+
+In case you want to use some custom parser for parsing HTTP responses, and the rest of the <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> functionality suit your needs.
+
+### How?
+
+You need to define at least 2 new classes and decide what will be the type returned by the parser's `parse` method.
+Parser will inherit from <ApiLink to="class/AbstractHttpParser">`AbstractHttpParser`</ApiLink> and it will need to implement all it's abstract methods. Crawler will inherit from <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> and it will need to implement all it's abstract methods. Newly defined parser is then used in the `parser` argument of `AbstractHttpCrawler.__init__` method.
+
+To get better idea and as an example please see one of our own HTTP-based crawlers mentioned above.

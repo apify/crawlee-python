@@ -140,6 +140,9 @@ packages = ["src/crawlee"]
 [tool.ruff]
 line-length = 120
 include = ["src/**/*.py", "tests/**/*.py", "docs/**/*.py", "website/**/*.py"]
+exclude = [
+    "website/versioned_docs/**",
+]
 extend-exclude = ["src/crawlee/project_template"]
 
 [tool.ruff.lint]
@@ -251,6 +254,7 @@ include = ["src", "tests", "scripts", "docs", "website"]
 exclude = [
     "src/crawlee/project_template",
     "docs/guides/code_examples/storage_clients/custom_storage_client_example.py",
+    "website/versioned_docs",
 ]
 
 [[tool.ty.overrides]]

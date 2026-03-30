@@ -1,5 +1,4 @@
 import Link from '@docusaurus/Link';
-import { useLocation } from '@docusaurus/router';
 import { useThemeConfig } from '@docusaurus/theme-common';
 import {
     splitNavbarItems,
@@ -38,32 +37,10 @@ function NavbarContentLayout({ left, right }) {
     );
 }
 
-const VERSIONS_ITEM = {
-    type: 'docsVersionDropdown',
-    position: 'left',
-    label: 'Versions',
-    dropdownItemsAfter: [
-        {
-            href: 'https://sdk.apify.com/docs/guides/getting-started',
-            label: '2.2',
-        },
-        {
-            href: 'https://sdk.apify.com/docs/1.3.1/guides/getting-started',
-            label: '1.3',
-        },
-    ],
-    dropdownItemsBefore: [],
-};
-
 export default function NavbarContent() {
-    const location = useLocation();
     const mobileSidebar = useNavbarMobileSidebar();
     const items = useNavbarItems();
-    const effectiveItems = location.pathname?.endsWith('/python/')
-        || location.pathname?.endsWith('/python')
-        ? items
-        : [...items, VERSIONS_ITEM];
-    const [leftItems, rightItems] = splitNavbarItems(effectiveItems);
+    const [leftItems, rightItems] = splitNavbarItems(items);
     const searchBarItem = items.find((item) => item.type === 'search');
     return (
         <NavbarContentLayout

@@ -94,7 +94,6 @@ module.exports = {
                     path: '../docs',
                     sidebarPath: './sidebars.js',
                     rehypePlugins: [externalLinkProcessor],
-                    // disableVersioning: true,
                     editUrl: (doc) => {
                         return `https://github.com/apify/crawlee-python/edit/master/website/${doc.versionDocsDirPath}/${doc.docPath}`;
                     },
@@ -118,6 +117,7 @@ module.exports = {
                 },
                 sortSidebar: groupSort,
                 routeBasePath: 'api',
+                python: true,
                 pythonOptions: {
                     pythonModulePath: path.join(__dirname, '../src/crawlee'),
                     moduleShortcutsPath: path.join(__dirname, 'module_shortcuts.json'),
@@ -172,6 +172,12 @@ module.exports = {
                     includeVersionedDocs: false,
                     enableLlmsFullTxt: true,
                     relativePaths: false,
+                    excludeRoutes: [
+                        '/python/api/[0-9]*/**',
+                        '/python/api/[0-9]*',
+                        '/python/api/next/**',
+                        '/python/api/next',
+                    ],
                 },
             },
         ],
@@ -280,6 +286,12 @@ module.exports = {
                     rel: 'dofollow',
                     label: 'Blog',
                     position: 'left',
+                },
+                {
+                    type: 'docsVersionDropdown',
+                    position: 'right',
+                    dropdownItemsBefore: [],
+                    dropdownItemsAfter: [],
                 },
             ],
         },

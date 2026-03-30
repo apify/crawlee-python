@@ -1,0 +1,45 @@
+---
+id: gcp-cloud-run-functions
+title: Cloud Run functions
+description: Prepare your crawler to run in Cloud Run functions on Google Cloud Platform.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+
+import CodeBlock from '@theme/CodeBlock';
+
+import GoogleFunctions from '!!raw-loader!./code_examples/google/google_example.py';
+
+[Google Cloud Run Functions](https://cloud.google.com/functions) is a serverless execution environment for running simple HTTP-based web scrapers. This service is best suited for lightweight crawlers that don't require browser rendering capabilities and can be executed via HTTP requests.
+
+## Updating the project
+
+For the project foundation, use <ApiLink to="class/BeautifulSoupCrawler">BeautifulSoupCrawler</ApiLink> as described in this [example](../examples/beautifulsoup-crawler).
+
+Add [`functions-framework`](https://pypi.org/project/functions-framework/) to your dependencies file `requirements.txt`. If you're using a project manager like `poetry` or `uv`, export your dependencies to `requirements.txt`.
+
+Update the project code to make it compatible with Cloud Functions and return data in JSON format. Also add an entry point that Cloud Functions will use to run the project.
+
+<CodeBlock className="language-python">
+    {GoogleFunctions.replace(/^.*?\n/, '')}
+</CodeBlock>
+
+You can test your project locally. Start the server by running:
+
+```bash
+functions-framework --target=crawlee_run
+```
+
+Then make a GET request to `http://127.0.0.1:8080/`, for example in your browser.
+
+## Deploying to Google Cloud Platform
+
+In the Google Cloud dashboard, create a new function, allocate memory and CPUs to it, set region and function timeout.
+
+When deploying, select **"Use an inline editor to create a function"**. This allows you to configure the project using only the Google Cloud Console dashboard.
+
+Using the `inline editor`, update the function files according to your project. **Make sure** to update the `requirements.txt` file to match your project's dependencies.
+
+Also, make sure to set the **Function entry point** to the name of the function decorated with `@functions_framework.http`, which in our case is `crawlee_run`.
+
+After the Function deploys, you can test it by clicking the "Test" button. This button opens a popup with a `curl` script that calls your new Cloud Function. To avoid having to install the `gcloud` CLI application locally, you can also run this script in the Cloud Shell by clicking the link above the code block.

@@ -1,0 +1,49 @@
+---
+id: scaling-crawlers
+title: Scaling crawlers
+description: Learn how to scale your crawlers by controlling concurrency and limiting requests per minute.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import MaxTasksPerMinuteExample from '!!raw-loader!roa-loader!./code_examples/scaling_crawlers/max_tasks_per_minute_example.py';
+import MinAndMaxConcurrencyExample from '!!raw-loader!roa-loader!./code_examples/scaling_crawlers/min_and_max_concurrency_example.py';
+
+As we build our crawler, we may want to control how many tasks it performs at any given time. In other words, how many requests it makes to the web we are trying to scrape. Crawlee offers several options to fine-tune the number of parallel tasks, limit the number of requests per minute, and optimize scaling based on available system resources.
+
+:::tip
+
+All of these options are available across all crawlers provided by Crawlee. In this guide, we are using the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> as an example. You should also explore the <ApiLink to="class/ConcurrencySettings">`ConcurrencySettings`</ApiLink>.
+
+:::
+
+## Max tasks per minute
+
+The `max_tasks_per_minute` setting in <ApiLink to="class/ConcurrencySettings">`ConcurrencySettings`</ApiLink> controls how many total tasks the crawler can process per minute. It ensures that tasks are spread evenly throughout the minute, preventing a sudden burst at the `max_concurrency` limit followed by idle time. By default, this is set to `Infinity`, meaning the crawler can run at full speed, limited only by `max_concurrency`. Use this option if you want to throttle your crawler to avoid overwhelming the target website with continuous requests.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {MaxTasksPerMinuteExample}
+</RunnableCodeBlock>
+
+## Minimum and maximum concurrency
+
+The `min_concurrency` and `max_concurrency` options in the <ApiLink to="class/ConcurrencySettings">`ConcurrencySettings`</ApiLink> define the minimum and maximum number of parallel tasks that can run at any given time. By default, crawlers start with a single parallel task and gradually scale up to a maximum of concurrent requests.
+
+:::caution Avoid setting minimum concurrency too high
+
+If you set `min_concurrency` too high compared to the available system resources, the crawler may run very slowly or even crash. It is recommended to stick with the default value and let the crawler automatically adjust concurrency based on the system's available resources.
+
+:::
+
+## Desired concurrency
+
+The `desired_concurrency` option in the <ApiLink to="class/ConcurrencySettings">`ConcurrencySettings`</ApiLink> specifies the initial number of parallel tasks to start with, assuming sufficient resources are available. It defaults to the same value as `min_concurrency`.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {MinAndMaxConcurrencyExample}
+</RunnableCodeBlock>
+
+## Autoscaled pool
+
+The <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink> manages a pool of asynchronous, resource-intensive tasks that run in parallel. It automatically starts new tasks only when there is enough free CPU and memory. To monitor system resources, it leverages the <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> and <ApiLink to="class/SystemStatus">`SystemStatus`</ApiLink> classes. If any task raises an exception, the error is propagated, and the pool is stopped. Every crawler uses an <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink> under the hood.

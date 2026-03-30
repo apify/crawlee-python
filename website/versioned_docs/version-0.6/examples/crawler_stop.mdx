@@ -1,0 +1,15 @@
+---
+id: crawler-stop
+title: Stopping a Crawler with stop method
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import BeautifulSoupExample from '!!raw-loader!roa-loader!./code_examples/beautifulsoup_crawler_stop.py';
+
+This example demonstrates how to use `stop` method of <ApiLink to="class/BasicCrawler">`BasicCrawler`</ApiLink> to stop crawler once the crawler finds what it is looking for. This method is available to all crawlers that inherit from <ApiLink to="class/BasicCrawler">`BasicCrawler`</ApiLink> and in the example below it is shown on <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>. Simply call `crawler.stop()` to stop the crawler. It will not continue to crawl through new requests. Requests that are already being concurrently processed are going to get finished. It is possible to call `stop` method with optional argument `reason` that is a string that will be used in logs and it can improve logs readability especially if you have multiple different conditions for triggering `stop`.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {BeautifulSoupExample}
+</RunnableCodeBlock>
