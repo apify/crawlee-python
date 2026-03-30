@@ -75,7 +75,10 @@ class LocalEventManager(EventManager):
         It starts emitting system info events at regular intervals.
         """
         await super().__aenter__()
-        self._emit_system_info_event_rec_task.start()
+
+        if self._active_ref_count == 1:
+            self._emit_system_info_event_rec_task.start()
+
         return self
 
     async def __aexit__(
@@ -88,7 +91,9 @@ class LocalEventManager(EventManager):
 
         It stops emitting system info events and closes the event manager.
         """
-        await self._emit_system_info_event_rec_task.stop()
+        if self._active_ref_count == 1:
+            await self._emit_system_info_event_rec_task.stop()
+
         await super().__aexit__(exc_type, exc_value, exc_traceback)
 
     async def _emit_system_info_event(self) -> None:

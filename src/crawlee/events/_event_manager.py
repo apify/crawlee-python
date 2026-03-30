@@ -129,6 +129,7 @@ class EventManager:
         if self._active_ref_count > 1:
             # Emit persist state event to ensure the latest state is saved before closing the context.
             await self._emit_persist_state_event()
+            await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
             self._active_ref_count -= 1
             return
 
