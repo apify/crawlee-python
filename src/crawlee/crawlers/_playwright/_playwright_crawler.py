@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import logging
 import warnings
 from datetime import timedelta
@@ -302,11 +301,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         # during error handler execution.
         await context.page.__aenter__()
 
-        async def _close_page() -> None:
-            with contextlib.suppress(Exception):
-                await context.page.__aexit__(None, None, None)
-
-        context.register_deferred_cleanup(_close_page)
+        context.register_deferred_cleanup(lambda: context.page.__aexit__(None, None, None))
 
         if context.session:
             session_cookies = context.session.cookies.get_cookies_as_playwright_format()
@@ -507,10 +502,10 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
     async def _create_crawling_context(
         self, context: PlaywrightPostNavCrawlingContext
-    ) -> AsyncGenerator[PlaywrightCrawlingContext, Exception | None]:
+    ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
         extract_links = self._create_extract_links_function(context)
 
-        error = yield PlaywrightCrawlingContext(
+        yield PlaywrightCrawlingContext(
             request=context.request,
             session=context.session,
             add_requests=context.add_requests,
@@ -533,10 +528,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         if context.session:
             pw_cookies = await self._get_cookies(context.page)
             context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
-
-        # Collect data in case of errors, before the page object is closed.
-        if error:
-            await self.statistics.error_tracker.add(error=error, context=context, early=True)
 
     def pre_navigation_hook(self, hook: Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]) -> None:
         """Register a hook to be called before each navigation.
