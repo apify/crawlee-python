@@ -21,6 +21,7 @@
             "automergeType": "branch"
         }
     ],
+    "minimumReleaseAge": "1 day",
     "schedule": ["before 7am every weekday"],
     "ignoreDeps": ["crawlee", "docusaurus-plugin-typedoc-api"]
 }
