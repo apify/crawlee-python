@@ -1,3 +1,4 @@
+import BrowserOnly from '@docusaurus/BrowserOnly';
 import { useDoc } from '@docusaurus/plugin-content-docs/client';
 import LLMButtons from '@site/src/components/LLMButtons';
 import Heading from '@theme/Heading';
@@ -26,7 +27,7 @@ export default function DocItemContent({ children }) {
             {syntheticTitle && (
                 <div className={styles.docItemContent}>
                     {syntheticTitle && <Heading as="h1">{syntheticTitle}</Heading>}
-                    <LLMButtons />
+                    <BrowserOnly>{() => <LLMButtons />}</BrowserOnly>
                 </div>
             )}
             <MDXContent>{children}</MDXContent>
