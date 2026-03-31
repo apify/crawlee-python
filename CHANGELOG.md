@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.6.2 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **file-system:** Reclaim orphaned in-progress requests on RQ recovery ([#1825](https://github.com/apify/crawlee-python/pull/1825)) ([e86794a](https://github.com/apify/crawlee-python/commit/e86794a6e5605432c9331c7cd99edf885527a3eb)) by [@vdusek](https://github.com/vdusek)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.6.1](https://github.com/apify/crawlee-python/releases/tag/v1.6.1) (2026-03-30)
 
 ### 🐛 Bug Fixes
