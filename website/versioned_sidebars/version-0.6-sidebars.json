@@ -4,7 +4,7 @@
     {
       "type": "category",
       "label": "Introduction",
-      "collapsed": false,
+      "collapsed": true,
       "link": {
         "type": "doc",
         "id": "introduction/introduction"
@@ -24,6 +24,7 @@
     {
       "type": "category",
       "label": "Guides",
+      "collapsed": true,
       "link": {
         "type": "generated-index",
         "title": "Guides",
@@ -42,6 +43,7 @@
     {
       "type": "category",
       "label": "Deployment",
+      "collapsed": true,
       "link": {
         "type": "generated-index",
         "title": "Deployment guides",
@@ -67,6 +69,7 @@
     {
       "type": "category",
       "label": "Examples",
+      "collapsed": true,
       "link": {
         "type": "generated-index",
         "title": "Examples",
@@ -85,6 +88,7 @@
     {
       "type": "category",
       "label": "Upgrading",
+      "collapsed": true,
       "link": {
         "type": "generated-index",
         "title": "Upgrading",
