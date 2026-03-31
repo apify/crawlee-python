@@ -28,7 +28,7 @@ function getVersionItems(versions, configs) {
             const version = versionMap.get(name);
             if (!version) {
                 throw new Error(
-                    `No docs version exist for name '${name}', please verify your 'docsVersionDropdown' navbar item versions config.\nAvailable version names:\n- ${versions.map((v) => `${v.name}`).join('\n- ')}`,
+                    `No docs version exists for name '${name}', please verify your 'docsVersionDropdown' navbar item versions config.\nAvailable version names:\n- ${versions.map((v) => `${v.name}`).join('\n- ')}`,
                 );
             }
             return { version, label: config?.label ?? version.label };
