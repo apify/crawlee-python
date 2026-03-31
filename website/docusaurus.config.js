@@ -269,7 +269,7 @@ module.exports = {
                     position: 'left',
                 },
                 {
-                    to: '/api',
+                    type: 'custom-api',
                     label: 'API',
                     position: 'left',
                     activeBaseRegex: 'api/(?!.*/changelog)',
