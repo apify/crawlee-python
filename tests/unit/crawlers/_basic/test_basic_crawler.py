@@ -26,8 +26,7 @@ from crawlee._utils.robots import RobotsTxtFile
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
-from crawlee.events import Event, EventCrawlerStatusData
-from crawlee.events._local_event_manager import LocalEventManager
+from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
 from crawlee.request_loaders import RequestList, RequestManagerTandem
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics
@@ -2047,3 +2046,104 @@ async def test_new_request_error_handler() -> None:
     assert error_request is not None
     assert error_request.state == RequestState.DONE
     assert error_request.was_already_handled
+
+
+@pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.Barrier was introduced in Python 3.11.')
+async def test_multiple_crawlers_with_global_event_manager() -> None:
+    """Test that multiple crawlers work correctly when using the global event manager."""
+
+    rq1 = await RequestQueue.open(alias='rq1')
+    rq2 = await RequestQueue.open(alias='rq2')
+
+    crawler_1 = BasicCrawler(request_manager=rq1)
+    crawler_2 = BasicCrawler(request_manager=rq2)
+
+    started_event = asyncio.Event()
+    finished_event = asyncio.Event()
+
+    async def launch_crawler_1() -> None:
+        await crawler_1.run(['https://a.placeholder.com'])
+        finished_event.set()
+
+    async def launch_crawler_2() -> None:
+        # Ensure that crawler_1 is already running and has activated event_manager
+        await started_event.wait()
+        await crawler_2.run(['https://b.placeholder.com'])
+
+    handler_barrier = asyncio.Barrier(2)  # ty:ignore[unresolved-attribute]  # Test is skipped in older Python versions.
+
+    handler_call = AsyncMock()
+
+    @crawler_1.router.default_handler
+    async def handler_1(context: BasicCrawlingContext) -> None:
+        started_event.set()
+        # Ensure that both handlers are running at the same time.
+        await handler_barrier.wait()
+        event_manager = service_locator.get_event_manager()
+
+        await handler_call(event_manager.active)
+
+    @crawler_2.router.default_handler
+    async def handler_2(context: BasicCrawlingContext) -> None:
+        # Ensure that both handlers are running at the same time.
+        await handler_barrier.wait()
+        # Ensure that crawler_1 is finished and closed all active contexts.
+        await finished_event.wait()
+        # Check that event manager is active and can be used in the second crawler.
+        event_manager = service_locator.get_event_manager()
+
+        await handler_call(event_manager.active)
+
+    await asyncio.gather(
+        launch_crawler_1(),
+        launch_crawler_2(),
+    )
+
+    assert handler_call.call_count == 2
+
+    first_call = handler_call.call_args_list[0]
+    second_call = handler_call.call_args_list[1]
+
+    assert first_call[0][0] is True
+    assert second_call[0][0] is True
+
+    event_manager = service_locator.get_event_manager()
+
+    # After both crawlers are finished, event manager should be inactive.
+    assert event_manager.active is False
+
+    await rq1.drop()
+    await rq2.drop()
+
+
+async def test_global_and_local_event_manager_in_crawler_run() -> None:
+    """Test that both global and local event managers are used in crawler run."""
+
+    config = service_locator.get_configuration()
+
+    local_event_manager = LocalEventManager.from_config(config)
+
+    crawler = BasicCrawler(event_manager=local_event_manager)
+
+    handler_call = AsyncMock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        global_event_manager = service_locator.get_event_manager()
+        handler_call(local_event_manager.active, global_event_manager.active)
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    assert handler_call.call_count == 1
+
+    local_em_state, global_em_state = handler_call.call_args_list[0][0]
+
+    # Both event managers should be active.
+    assert local_em_state is True
+    assert global_em_state is True
+
+    global_event_manager = service_locator.get_event_manager()
+
+    # After crawler is finished, both event managers should be inactive.
+    assert local_event_manager.active is False
+    assert global_event_manager.active is False
