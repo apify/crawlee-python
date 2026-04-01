@@ -157,12 +157,13 @@ jobs:
           rm -rf "versioned_docs/version-${MAJOR_MINOR}"
           rm -rf "versioned_sidebars/version-${MAJOR_MINOR}-sidebars.json"
           jq 'map(select(. != env.MAJOR_MINOR))' versions.json > tmp.json && mv tmp.json versions.json
-          # Copy changelog
-          cp ../CHANGELOG.md ../docs/changelog.md
           # Build API reference and create version snapshots
           bash build_api_reference.sh
           npx docusaurus docs:version "$MAJOR_MINOR"
           npx docusaurus api:version "$MAJOR_MINOR"
+          # Changelog is not versioned - it is copied from root at build time
+          rm -f "versioned_docs/version-${MAJOR_MINOR}/changelog.md"
+          echo "changelog.md" > "versioned_docs/version-${MAJOR_MINOR}/.gitignore"
 
       - name: Commit and push versioned docs
         id: commit_versioned_docs
