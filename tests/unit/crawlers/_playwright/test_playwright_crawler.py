@@ -21,7 +21,10 @@ from crawlee import (
     service_locator,
 )
 from crawlee.configuration import Configuration
-from crawlee.crawlers import PlaywrightCrawler
+from crawlee.crawlers import (
+    PlaywrightCrawler,
+    PlaywrightCrawlingContext,
+)
 from crawlee.fingerprint_suite import (
     DefaultFingerprintGenerator,
     FingerprintGenerator,
@@ -49,7 +52,6 @@ if TYPE_CHECKING:
     from crawlee.browsers._types import BrowserType
     from crawlee.crawlers import (
         BasicCrawlingContext,
-        PlaywrightCrawlingContext,
         PlaywrightPostNavCrawlingContext,
         PlaywrightPreNavCrawlingContext,
     )
@@ -1203,3 +1205,33 @@ async def test_playwright_navigation_hooks_order(server_url: URL) -> None:
         'post-navigation-hook 2',
         'final handler',
     ]
+
+
+async def test_error_handler_can_access_page(server_url: URL) -> None:
+    """Test that the error handler can access the Page object via PlaywrightCrawlingContext."""
+
+    crawler = PlaywrightCrawler(max_request_retries=2)
+
+    request_handler = mock.AsyncMock(side_effect=RuntimeError('Intentional crash'))
+    crawler.router.default_handler(request_handler)
+
+    error_handler_calls: list[str | None] = []
+
+    @crawler.error_handler
+    async def error_handler(context: BasicCrawlingContext | PlaywrightCrawlingContext, _error: Exception) -> None:
+        error_handler_calls.append(
+            await context.page.content() if isinstance(context, PlaywrightCrawlingContext) else None
+        )
+
+    failed_handler_calls: list[str | None] = []
+
+    @crawler.failed_request_handler
+    async def failed_handler(context: BasicCrawlingContext | PlaywrightCrawlingContext, _error: Exception) -> None:
+        failed_handler_calls.append(
+            await context.page.content() if isinstance(context, PlaywrightCrawlingContext) else None
+        )
+
+    await crawler.run([str(server_url / 'hello-world')])
+
+    assert error_handler_calls == [HELLO_WORLD.decode(), HELLO_WORLD.decode()]
+    assert failed_handler_calls == [HELLO_WORLD.decode()]

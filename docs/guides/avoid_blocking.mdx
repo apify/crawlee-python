@@ -10,6 +10,7 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
 import PlaywrightDefaultFingerprintGenerator from '!!raw-loader!roa-loader!./code_examples/avoid_blocking/playwright_with_fingerprint_generator.py';
 import PlaywrightWithCamoufox from '!!raw-loader!roa-loader!../examples/code_examples/playwright_crawler_with_camoufox.py';
+import PlaywrightWithCloakBrowser from '!!raw-loader!roa-loader!./code_examples/avoid_blocking/playwright_with_cloakbrowser.py';
 
 import PlaywrightDefaultFingerprintGeneratorWithArgs from '!!raw-loader!./code_examples/avoid_blocking/default_fingerprint_generator_with_args.py';
 
@@ -39,6 +40,14 @@ In some cases even <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</Ap
 
 <RunnableCodeBlock className="language-python" language="python">
     {PlaywrightWithCamoufox}
+</RunnableCodeBlock>
+
+## Using CloakBrowser
+
+For sites with aggressive anti-bot protection, [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) takes a different approach. Instead of overriding fingerprints at the JavaScript level (which anti-bot scripts can detect as tampering), CloakBrowser ships a custom Chromium binary with fingerprints modified directly in the C++ source code. It is also Chromium-based, which can matter when a target site behaves differently with Firefox than with Chrome. Install it separately with `pip install cloakbrowser` — the plugin calls `ensure_binary()` which automatically downloads and caches the Chromium binary on first run.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {PlaywrightWithCloakBrowser}
 </RunnableCodeBlock>
 
 **Related links**

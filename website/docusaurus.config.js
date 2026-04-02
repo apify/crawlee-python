@@ -1,5 +1,6 @@
 /* eslint-disable global-require */
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const { externalLinkProcessor } = require('./tools/utils/externalLink');
 
@@ -232,6 +233,35 @@ module.exports = {
                 },
             };
         },
+        // Copy root CHANGELOG.md to docs/ and all versioned_docs/ so every
+        // doc version displays the same (latest) changelog — not a snapshot.
+        function changelogFromRoot() {
+            const sourceChangelog = path.join(__dirname, '..', 'CHANGELOG.md');
+            return {
+                name: 'changelog-from-root',
+                async loadContent() {
+                    if (!fs.existsSync(sourceChangelog)) return;
+
+                    const changelog = fs.readFileSync(sourceChangelog, 'utf-8');
+                    const docsDir = path.join(__dirname, '..', 'docs');
+                    const versionedDocsDir = path.join(__dirname, 'versioned_docs');
+
+                    const targetDirs = [docsDir];
+                    if (fs.existsSync(versionedDocsDir)) {
+                        for (const version of fs.readdirSync(versionedDocsDir)) {
+                            targetDirs.push(path.join(versionedDocsDir, version));
+                        }
+                    }
+
+                    for (const dir of targetDirs) {
+                        fs.writeFileSync(path.join(dir, 'changelog.md'), changelog);
+                    }
+                },
+                getPathsToWatch() {
+                    return [sourceChangelog];
+                },
+            };
+        },
         [
             path.resolve(__dirname, 'src/plugins/docusaurus-plugin-segment'),
             {
@@ -269,7 +299,7 @@ module.exports = {
                     position: 'left',
                 },
                 {
-                    to: '/api',
+                    type: 'custom-api',
                     label: 'API',
                     position: 'left',
                     activeBaseRegex: 'api/(?!.*/changelog)',

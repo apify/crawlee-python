@@ -768,27 +768,36 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         return final_statistics
 
     async def _run_crawler(self) -> None:
-        event_manager = self._service_locator.get_event_manager()
+        local_event_manager = self._service_locator.get_event_manager()
+        global_event_manager = service_locator.get_event_manager()
+        if local_event_manager is global_event_manager:
+            local_event_manager = None  # Avoid entering the same event manager context twice
+
+        # The event managers are always entered.
+        contexts_to_enter: list[Any] = (
+            [global_event_manager, local_event_manager] if local_event_manager else [global_event_manager]
+        )
 
         # Collect the context managers to be entered. Context managers that are already active are excluded,
         # as they were likely entered by the caller, who will also be responsible for exiting them.
-        contexts_to_enter = [
-            cm
-            for cm in (
-                event_manager,
-                self._snapshotter,
-                self._statistics,
-                self._session_pool if self._use_session_pool else None,
-                self._http_client,
-                self._crawler_state_rec_task,
-                *self._additional_context_managers,
-            )
-            if cm and getattr(cm, 'active', False) is False
-        ]
+        contexts_to_enter.extend(
+            [
+                cm
+                for cm in (
+                    self._snapshotter,
+                    self._statistics,
+                    self._session_pool if self._use_session_pool else None,
+                    self._http_client,
+                    self._crawler_state_rec_task,
+                    *self._additional_context_managers,
+                )
+                if cm and getattr(cm, 'active', False) is False
+            ]
+        )
 
         async with AsyncExitStack() as exit_stack:
             for context in contexts_to_enter:
-                await exit_stack.enter_async_context(context)  # ty: ignore[invalid-argument-type]
+                await exit_stack.enter_async_context(context)
 
             await self._autoscaled_pool.run()
 
@@ -1413,6 +1422,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         proxy_info = await self._get_proxy_info(request, session)
         result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store, request=request)
 
+        deferred_cleanup: list[Callable[[], Awaitable[None]]] = []
+
         context = BasicCrawlingContext(
             request=result.request,
             session=session,
@@ -1423,6 +1434,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             get_key_value_store=result.get_key_value_store,
             use_state=self.use_state,
             log=self._logger,
+            register_deferred_cleanup=deferred_cleanup.append,
         )
         self._context_result_map[context] = result
 
@@ -1508,6 +1520,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 exc_info=internal_error,
             )
             raise
+
+        finally:
+            for cleanup in deferred_cleanup:
+                try:
+                    await cleanup()
+                except Exception:  # noqa: PERF203
+                    self._logger.exception('Error in deferred cleanup')
 
     async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
         context.request.state = RequestState.BEFORE_NAV

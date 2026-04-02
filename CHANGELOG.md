@@ -3,20 +3,29 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 1.6.1 - **not yet released**
+## 1.6.2 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **file-system:** Reclaim orphaned in-progress requests on RQ recovery ([#1825](https://github.com/apify/crawlee-python/pull/1825)) ([e86794a](https://github.com/apify/crawlee-python/commit/e86794a6e5605432c9331c7cd99edf885527a3eb)) by [@vdusek](https://github.com/vdusek)
+- Prevent premature `EventManager` shutdown when multiple crawlers share it ([#1810](https://github.com/apify/crawlee-python/pull/1810)) ([2efb668](https://github.com/apify/crawlee-python/commit/2efb668ad54fb3e8d740066446563d1e8a39d2e8)) by [@Mantisus](https://github.com/Mantisus), closes [#1805](https://github.com/apify/crawlee-python/issues/1805), [#1808](https://github.com/apify/crawlee-python/issues/1808)
+
+
+<!-- git-cliff-unreleased-end -->
+## [1.6.1](https://github.com/apify/crawlee-python/releases/tag/v1.6.1) (2026-03-30)
 
 ### 🐛 Bug Fixes
 
 - Handle invalid URLs in `RequestList` ([#1803](https://github.com/apify/crawlee-python/pull/1803)) ([0b2e3fc](https://github.com/apify/crawlee-python/commit/0b2e3fc5cbca371131b54085e052a6cda6361b0f)) by [@Mantisus](https://github.com/Mantisus), closes [#1802](https://github.com/apify/crawlee-python/issues/1802)
 - **playwright:** Filter unsupported context options in persistent browser ([#1796](https://github.com/apify/crawlee-python/pull/1796)) ([69ad22e](https://github.com/apify/crawlee-python/commit/69ad22e60ef558d8c26e84e2bd165fe03f116b7f)) by [@sushant-mutnale](https://github.com/sushant-mutnale), closes [#1784](https://github.com/apify/crawlee-python/issues/1784)
 - Remove double usage_count increment in Session.retire() ([#1816](https://github.com/apify/crawlee-python/pull/1816)) ([c40d411](https://github.com/apify/crawlee-python/commit/c40d411b024ba2aae531a3c97609f78ad2c2757e)) by [@vdusek](https://github.com/vdusek)
+- Defer page object cleanup to make it accessible in error handlers ([#1814](https://github.com/apify/crawlee-python/pull/1814)) ([7eeb500](https://github.com/apify/crawlee-python/commit/7eeb5007cfb911901203ea21e1fd40127641feb1)) by [@janbuchar](https://github.com/janbuchar), closes [#1482](https://github.com/apify/crawlee-python/issues/1482)
 
 ### ⚡ Performance
 
 - Offload BeautifulSoup parsing to a thread via `asyncio.to_thread` ([#1817](https://github.com/apify/crawlee-python/pull/1817)) ([d612ffa](https://github.com/apify/crawlee-python/commit/d612ffa1730f2aacfb7a28ae2b0ce2f4eda77692)) by [@vdusek](https://github.com/vdusek)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.6.0](https://github.com/apify/crawlee-python/releases/tag/v1.6.0) (2026-03-20)
 
 ### 🚀 Features

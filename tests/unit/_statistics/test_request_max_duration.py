@@ -8,9 +8,10 @@ from crawlee.statistics import Statistics
 async def test_request_max_duration_tracks_maximum() -> None:
     """Test that request_max_duration correctly tracks the maximum duration, not the minimum."""
 
-    # asyncio.sleep() can sleep slightly shorter than expected https://bugs.python.org/issue31539#msg302699
-    asyncio_sleep_time_tolerance = 0.015
-    sleep_time = 0.05
+    # asyncio.sleep() can sleep significantly shorter than expected on Windows due to poor timer resolution
+    # https://bugs.python.org/issue31539#msg302699
+    asyncio_sleep_time_tolerance = 0.05
+    sleep_time = 0.2
 
     async with Statistics.with_default_state() as statistics:
         # Record a short request
@@ -20,7 +21,7 @@ async def test_request_max_duration_tracks_maximum() -> None:
 
         # Record a longer request
         statistics.record_request_processing_start('request_2')
-        await asyncio.sleep(sleep_time)  # 50ms delay
+        await asyncio.sleep(sleep_time)  # 200ms delay
         statistics.record_request_processing_finish('request_2')
         second_duration = statistics.state.request_max_duration
 

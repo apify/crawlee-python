@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     import json
     import logging
     import re
-    from collections.abc import Callable, Coroutine, Sequence
+    from collections.abc import Awaitable, Coroutine, Sequence
 
     from typing_extensions import NotRequired, Required, Self, Unpack
 
@@ -38,6 +38,9 @@ T = TypeVar('T')
 HttpMethod = Literal['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
 
 HttpPayload = bytes
+
+DeferredCleanupCallback = Callable[[], 'Awaitable[Any]']
+"""An async callback to be called after request processing completes (including error handlers)."""
 
 RequestTransformAction = Literal['skip', 'unchanged']
 
@@ -660,6 +663,9 @@ class BasicCrawlingContext:
 
     log: logging.Logger
     """Logger instance."""
+
+    register_deferred_cleanup: Callable[[DeferredCleanupCallback], None]
+    """Register an async callback to be called after request processing completes (including error handlers)."""
 
     async def get_snapshot(self) -> PageSnapshot:
         """Get snapshot of crawled page."""
