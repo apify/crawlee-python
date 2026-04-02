@@ -55,7 +55,7 @@ async def test_emit_invokes_registered_sync_listener(
     event_manager.on(event=Event.SYSTEM_INFO, listener=sync_listener)
     event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
 
-    await asyncio.sleep(0.1)  # Allow some time for the event to be processed
+    await event_manager.wait_for_all_listeners_to_complete()
 
     assert sync_listener.call_count == 1
     assert sync_listener.call_args[0] == (event_system_info_data,)
@@ -71,7 +71,7 @@ async def test_emit_invokes_both_sync_and_async_listeners(
     event_manager.on(event=Event.SYSTEM_INFO, listener=async_listener)
     event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
 
-    await asyncio.sleep(0.1)  # Allow some time for the event to be processed
+    await event_manager.wait_for_all_listeners_to_complete()
 
     assert async_listener.call_count == 1
     assert async_listener.call_args[0] == (event_system_info_data,)
@@ -90,7 +90,7 @@ async def test_emit_event_with_no_listeners(
 
     # Attempt to emit an event for which no listeners are registered, it should not fail
     event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
-    await asyncio.sleep(0.1)  # Allow some time for the event to be processed
+    await event_manager.wait_for_all_listeners_to_complete()
 
     # Ensure the listener for the other event was not called
     assert async_listener.call_count == 0
@@ -114,7 +114,7 @@ async def test_emit_invokes_parameterless_listener(
     event_manager.on(event=Event.SYSTEM_INFO, listener=async_listener)
 
     event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
-    await asyncio.sleep(0.1)  # Allow some time for the event to be processed
+    await event_manager.wait_for_all_listeners_to_complete()
 
     assert sync_mock.call_count == 1
     assert async_mock.call_count == 1
@@ -139,7 +139,7 @@ async def test_removed_listener_not_invoked_on_emit(
     event_manager.off(event=Event.SYSTEM_INFO, listener=async_listener)
     event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
 
-    await asyncio.sleep(0.1)  # Allow some time for the event to be processed
+    await event_manager.wait_for_all_listeners_to_complete()
     assert async_listener.call_count == 0
 
 
