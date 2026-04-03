@@ -1455,10 +1455,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             await self._mark_request_as_handled(request)
 
-            # Record successful request to reset rate limit backoff for this domain.
-            if isinstance(request_manager, ThrottlingRequestManager):
-                request_manager.record_success(request.url)
-
             if session and session.is_usable:
                 session.mark_good()
 

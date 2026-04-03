@@ -13,7 +13,7 @@ When crawling websites that enforce rate limits (HTTP 429) or specify `crawl-del
 
 ## Overview
 
-The <ApiLink to="class/ThrottlingRequestManager">`ThrottlingRequestManager`</ApiLink> wraps a <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> and manages per-domain throttling. You specify which domains to throttle at initialization, and the manager automatically:
+The <ApiLink to="class/ThrottlingRequestManager">`ThrottlingRequestManager`</ApiLink> wraps a <ApiLink to="class/RequestManager">`RequestManager`</ApiLink> (typically a <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>) and manages per-domain throttling. You specify which domains to throttle at initialization, and the manager automatically:
 
 - **Routes requests** for listed domains into dedicated sub-queues at insertion time.
 - **Enforces delays** from HTTP 429 responses (exponential backoff) and `robots.txt` crawl-delay directives.
