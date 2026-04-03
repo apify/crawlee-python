@@ -773,6 +773,7 @@ dependencies = [
     { name = "async-timeout" },
     { name = "cachetools" },
     { name = "colorama" },
+    { name = "crawlee-storage" },
     { name = "impit" },
     { name = "more-itertools" },
     { name = "protego" },
@@ -920,6 +921,7 @@ requires-dist = [
     { name = "colorama", specifier = ">=0.4.0" },
     { name = "cookiecutter", marker = "extra == 'cli'", specifier = ">=2.6.0" },
     { name = "crawlee", extras = ["adaptive-crawler", "beautifulsoup", "cli", "curl-impersonate", "httpx", "parsel", "playwright", "otel", "sql-sqlite", "sql-postgres", "redis"], marker = "extra == 'all'" },
+    { name = "crawlee-storage", git = "https://github.com/apify/crawlee-storage.git?subdirectory=crawlee-storage-python" },
     { name = "cryptography", marker = "extra == 'sql-mysql'", specifier = ">=46.0.5" },
     { name = "curl-cffi", marker = "extra == 'curl-impersonate'", specifier = ">=0.9.0" },
     { name = "html5lib", marker = "extra == 'beautifulsoup'", specifier = ">=1.0" },
@@ -984,6 +986,11 @@ dev = [
     { name = "types-python-dateutil", specifier = "<3.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = "<1.0.0" },
 ]
+
+[[package]]
+name = "crawlee-storage"
+version = "0.1.0"
+source = { git = "https://github.com/apify/crawlee-storage.git?subdirectory=crawlee-storage-python#5c219e3005a116a21d72e038421e71ba5ddef1c5" }
 
 [[package]]
 name = "cryptography"
