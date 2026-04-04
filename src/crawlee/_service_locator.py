@@ -3,12 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
-from crawlee.configuration import Configuration
-from crawlee.errors import ServiceConflictError
-from crawlee.events import EventManager, LocalEventManager
-from crawlee.storage_clients import FileSystemStorageClient, StorageClient
 
 if TYPE_CHECKING:
+    from crawlee.configuration import Configuration
+    from crawlee.events import EventManager
+    from crawlee.storage_clients import StorageClient
     from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
 from logging import getLogger
@@ -38,6 +37,8 @@ class ServiceLocator:
     def get_configuration(self) -> Configuration:
         """Get the configuration."""
         if self._configuration is None:
+            from crawlee.configuration import Configuration  # noqa: PLC0415
+
             logger.debug('No configuration set, implicitly creating and using default Configuration.')
             self._configuration = Configuration()
 
@@ -52,10 +53,14 @@ class ServiceLocator:
         Raises:
             ServiceConflictError: If the configuration has already been retrieved before.
         """
+        from crawlee.errors import ServiceConflictError  # noqa: PLC0415
+
         if self._configuration is configuration:
             # Same instance, no need to anything
             return
         if self._configuration:
+            from crawlee.configuration import Configuration  # noqa: PLC0415
+
             raise ServiceConflictError(Configuration, configuration, self._configuration)
 
         self._configuration = configuration
@@ -63,6 +68,8 @@ class ServiceLocator:
     def get_event_manager(self) -> EventManager:
         """Get the event manager."""
         if self._event_manager is None:
+            from crawlee.events import LocalEventManager  # noqa: PLC0415
+
             logger.debug('No event manager set, implicitly creating and using default LocalEventManager.')
             if self._configuration is None:
                 logger.warning(
@@ -82,10 +89,14 @@ class ServiceLocator:
         Raises:
             ServiceConflictError: If the event manager has already been retrieved before.
         """
+        from crawlee.errors import ServiceConflictError  # noqa: PLC0415
+
         if self._event_manager is event_manager:
             # Same instance, no need to anything
             return
         if self._event_manager:
+            from crawlee.events import EventManager  # noqa: PLC0415
+
             raise ServiceConflictError(EventManager, event_manager, self._event_manager)
 
         self._event_manager = event_manager
@@ -93,6 +104,8 @@ class ServiceLocator:
     def get_storage_client(self) -> StorageClient:
         """Get the storage client."""
         if self._storage_client is None:
+            from crawlee.storage_clients import FileSystemStorageClient  # noqa: PLC0415
+
             logger.debug('No storage client set, implicitly creating and using default FileSystemStorageClient.')
             if self._configuration is None:
                 logger.warning(
@@ -112,10 +125,14 @@ class ServiceLocator:
         Raises:
             ServiceConflictError: If the storage client has already been retrieved before.
         """
+        from crawlee.errors import ServiceConflictError  # noqa: PLC0415
+
         if self._storage_client is storage_client:
             # Same instance, no need to anything
             return
         if self._storage_client:
+            from crawlee.storage_clients import StorageClient  # noqa: PLC0415
+
             raise ServiceConflictError(StorageClient, storage_client, self._storage_client)
 
         self._storage_client = storage_client
