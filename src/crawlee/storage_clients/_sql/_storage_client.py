@@ -72,8 +72,10 @@ class SqlStorageClient(StorageClient):
         self._initialized = False
         self.session_maker: None | async_sessionmaker[AsyncSession] = None
 
-        # Flag needed to apply optimizations only for default database
-        self._default_flag = self._engine is None and self._connection_string is None
+        # Flag needed to apply optimizations only for SQLite database
+        self._optimization_flag = self._engine is None and (
+            self._connection_string is None or self._connection_string.startswith('sqlite')
+        )
         self._dialect_name: str | None = None
 
         # Call the notification only once
@@ -129,7 +131,7 @@ class SqlStorageClient(StorageClient):
                 # This is likely an attempt to create a database from several parallel processes.
                 try:
                     # Set SQLite pragmas for performance and consistency
-                    if self._default_flag:
+                    if self._optimization_flag:
                         await conn.execute(text('PRAGMA journal_mode=WAL'))  # Better concurrency
                         await conn.execute(text('PRAGMA synchronous=NORMAL'))  # Balanced safety/speed
                         await conn.execute(text('PRAGMA cache_size=100000'))  # 100MB cache
