@@ -7,9 +7,11 @@ from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import CursorResult, delete, select
 from sqlalchemy import func as sql_func
+from sqlalchemy.exc import SQLAlchemyError
 from typing_extensions import Self, override
 
 from crawlee._utils.file import infer_mime_type
+from crawlee.errors import StorageWriteError
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import (
     KeyValueStoreMetadata,
@@ -175,10 +177,15 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
             conflict_cols=['key_value_store_id', 'key'],
         )
 
-        async with self.get_session(with_simple_commit=True) as session:
-            await session.execute(upsert_stmt)
+        async with self.get_session() as session:
+            try:
+                await session.execute(upsert_stmt)
 
-            await self._add_buffer_record(session, update_modified_at=True)
+                await self._add_buffer_record(session, update_modified_at=True)
+                await session.commit()
+            except SQLAlchemyError as e:
+                await session.rollback()
+                raise StorageWriteError(e) from e
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:

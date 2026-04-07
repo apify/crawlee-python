@@ -3,8 +3,10 @@ from __future__ import annotations
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
 
+from redis.exceptions import RedisError
 from typing_extensions import NotRequired, override
 
+from crawlee.errors import StorageWriteError
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
@@ -125,13 +127,17 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
             data = [data]
 
         async with self._get_pipeline() as pipe:
-            pipe.json().arrappend(self._items_key, '$', *data)
-            await self._update_metadata(
-                pipe,
-                **_DatasetMetadataUpdateParams(
-                    update_accessed_at=True, update_modified_at=True, delta_item_count=len(data)
-                ),
-            )
+            try:
+                pipe.json().arrappend(self._items_key, '$', *data)
+                await self._update_metadata(
+                    pipe,
+                    **_DatasetMetadataUpdateParams(
+                        update_accessed_at=True, update_modified_at=True, delta_item_count=len(data)
+                    ),
+                )
+
+            except RedisError as e:
+                raise StorageWriteError(e) from e
 
     @override
     async def get_data(

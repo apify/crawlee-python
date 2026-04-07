@@ -17,6 +17,7 @@ from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import atomic_write, infer_mime_type, json_dumps
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
+from crawlee.errors import StorageWriteError
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
@@ -328,17 +329,20 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         record_metadata_content = await json_dumps(record_metadata.model_dump())
 
         async with self._lock:
-            # Ensure the key-value store directory exists.
-            await asyncio.to_thread(self.path_to_kvs.mkdir, parents=True, exist_ok=True)
+            try:
+                # Ensure the key-value store directory exists.
+                await asyncio.to_thread(self.path_to_kvs.mkdir, parents=True, exist_ok=True)
 
-            # Write the value to the file.
-            await atomic_write(record_path, value_bytes)
+                # Write the value to the file.
+                await atomic_write(record_path, value_bytes)
 
-            # Write the record metadata to the file.
-            await atomic_write(record_metadata_filepath, record_metadata_content)
+                # Write the record metadata to the file.
+                await atomic_write(record_metadata_filepath, record_metadata_content)
 
-            # Update the KVS metadata to record the access and modification.
-            await self._update_metadata(update_accessed_at=True, update_modified_at=True)
+                # Update the KVS metadata to record the access and modification.
+                await self._update_metadata(update_accessed_at=True, update_modified_at=True)
+            except OSError as e:
+                raise StorageWriteError(e) from e
 
     @override
     async def delete_value(self, *, key: str) -> None:

@@ -4,9 +4,11 @@ import json
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
+from redis.exceptions import RedisError
 from typing_extensions import override
 
 from crawlee._utils.file import infer_mime_type
+from crawlee.errors import StorageWriteError
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
@@ -143,17 +145,23 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
         )
 
         async with self._get_pipeline() as pipe:
-            # redis-py typing issue
-            await await_redis_response(pipe.hset(self._items_key, key, value_bytes))  # ty: ignore[invalid-argument-type]
+            try:
+                # redis-py typing issue
+                await await_redis_response(pipe.hset(self._items_key, key, value_bytes))  # ty: ignore[invalid-argument-type]
 
-            await await_redis_response(
-                pipe.hset(
-                    self._metadata_items_key,
-                    key,
-                    item_metadata.model_dump_json(),
+                await await_redis_response(
+                    pipe.hset(
+                        self._metadata_items_key,
+                        key,
+                        item_metadata.model_dump_json(),
+                    )
                 )
-            )
-            await self._update_metadata(pipe, **MetadataUpdateParams(update_accessed_at=True, update_modified_at=True))
+                await self._update_metadata(
+                    pipe, **MetadataUpdateParams(update_accessed_at=True, update_modified_at=True)
+                )
+
+            except RedisError as e:
+                raise StorageWriteError(e) from e
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:

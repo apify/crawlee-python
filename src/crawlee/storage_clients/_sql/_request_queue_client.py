@@ -483,6 +483,9 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
             await self._add_buffer_record(session)
 
+        if not requests_db:
+            return None
+
         requests = [Request.model_validate_json(r.data) for r in requests_db if r.request_id in blocked_ids]
 
         if not requests:

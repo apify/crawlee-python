@@ -15,6 +15,7 @@ from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import atomic_write, json_dumps
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
+from crawlee.errors import StorageWriteError
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
@@ -222,21 +223,24 @@ class FileSystemDatasetClient(DatasetClient):
     @override
     async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
         async with self._lock:
-            new_item_count = self._metadata.item_count
-            if isinstance(data, list):
-                for item in data:
+            try:
+                new_item_count = self._metadata.item_count
+                if isinstance(data, list):
+                    for item in data:
+                        new_item_count += 1
+                        await self._push_item(item, new_item_count)
+                else:
                     new_item_count += 1
-                    await self._push_item(item, new_item_count)
-            else:
-                new_item_count += 1
-                await self._push_item(data, new_item_count)
+                    await self._push_item(data, new_item_count)
 
-            # now update metadata under the same lock
-            await self._update_metadata(
-                update_accessed_at=True,
-                update_modified_at=True,
-                new_item_count=new_item_count,
-            )
+                # now update metadata under the same lock
+                await self._update_metadata(
+                    update_accessed_at=True,
+                    update_modified_at=True,
+                    new_item_count=new_item_count,
+                )
+            except OSError as e:
+                raise StorageWriteError(e) from e
 
     @override
     async def get_data(

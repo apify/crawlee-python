@@ -6,8 +6,10 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Select, insert, select
 from sqlalchemy import func as sql_func
+from sqlalchemy.exc import SQLAlchemyError
 from typing_extensions import Self, override
 
+from crawlee.errors import StorageWriteError
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
@@ -145,10 +147,15 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
         db_items = [{'dataset_id': self._id, 'data': item} for item in data]
         stmt = insert(self._ITEM_TABLE).values(db_items)
 
-        async with self.get_session(with_simple_commit=True) as session:
-            await session.execute(stmt)
+        async with self.get_session() as session:
+            try:
+                await session.execute(stmt)
 
-            await self._add_buffer_record(session, update_modified_at=True, delta_item_count=len(data))
+                await self._add_buffer_record(session, update_modified_at=True, delta_item_count=len(data))
+                await session.commit()
+            except SQLAlchemyError as e:
+                await session.rollback()
+                raise StorageWriteError(e) from e
 
     @override
     async def get_data(
