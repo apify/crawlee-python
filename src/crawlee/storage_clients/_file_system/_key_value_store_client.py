@@ -151,7 +151,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
     @override
     async def get_public_url(self, *, key: str) -> str:
-        return self._native_client.get_public_url(key)
+        return await self._native_client.get_public_url(key)
 
     @override
     async def record_exists(self, *, key: str) -> bool:
