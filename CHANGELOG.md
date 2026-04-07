@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - **file-system:** Reclaim orphaned in-progress requests on RQ recovery ([#1825](https://github.com/apify/crawlee-python/pull/1825)) ([e86794a](https://github.com/apify/crawlee-python/commit/e86794a6e5605432c9331c7cd99edf885527a3eb)) by [@vdusek](https://github.com/vdusek)
 - Prevent premature `EventManager` shutdown when multiple crawlers share it ([#1810](https://github.com/apify/crawlee-python/pull/1810)) ([2efb668](https://github.com/apify/crawlee-python/commit/2efb668ad54fb3e8d740066446563d1e8a39d2e8)) by [@Mantisus](https://github.com/Mantisus), closes [#1805](https://github.com/apify/crawlee-python/issues/1805), [#1808](https://github.com/apify/crawlee-python/issues/1808)
+- Apply SQLite optimizations to the custom `connection_string` in `SqlStorageClient` ([#1837](https://github.com/apify/crawlee-python/pull/1837)) ([8b53e27](https://github.com/apify/crawlee-python/commit/8b53e273067e27b4ef4b2b4bb40277b15ef6b058)) by [@Mantisus](https://github.com/Mantisus)
 
 
 <!-- git-cliff-unreleased-end -->
