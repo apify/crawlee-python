@@ -431,6 +431,8 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             .limit(self._MAX_BATCH_FETCH_SIZE)
         )
 
+        requests_db = None
+
         async with self.get_session(with_simple_commit=True) as session:
             # We use the `skip_locked` database mechanism to prevent the 'interception' of requests by another client
             if dialect in {'postgresql', 'mysql', 'mariadb'}:
