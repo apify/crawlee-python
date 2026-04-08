@@ -82,10 +82,17 @@ async def test_crawler_instrumentor_capability(server_url: URL) -> None:
     assert telemetry_data[2]['context']['trace_id'] != telemetry_data[1]['context']['trace_id']
 
     # Crawler telemetry - all crawler spans will be in one trace as there is only one request in this test.
-    assert telemetry_data[3]['name'] == '_execute_pre_navigation_hooks, action'
-    assert telemetry_data[3]['attributes']['code.function.name'] == 'AbstractHttpCrawler._execute_pre_navigation_hooks'
+    assert telemetry_data[3]['name'] == '_manage_shared_navigation_timeout, action'
+    assert (
+        telemetry_data[3]['attributes']['code.function.name'] == 'AbstractHttpCrawler._manage_shared_navigation_timeout'
+    )
     assert telemetry_data[3]['attributes']['url.full'] == str(server_url)
     assert telemetry_data[3]['resource']['attributes'] == dict(resource.attributes)
+
+    assert telemetry_data[4]['name'] == '_execute_pre_navigation_hooks, action'
+    assert telemetry_data[4]['attributes']['code.function.name'] == 'AbstractHttpCrawler._execute_pre_navigation_hooks'
+    assert telemetry_data[4]['attributes']['url.full'] == str(server_url)
+    assert telemetry_data[4]['resource']['attributes'] == dict(resource.attributes)
 
     assert telemetry_data[-1]['name'] == '__run_task_function'
     assert telemetry_data[-1]['attributes']['code.function.name'] == 'BasicCrawler.__run_task_function'
