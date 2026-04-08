@@ -3,12 +3,15 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import inspect, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from crawlee.configuration import Configuration
+from crawlee.errors import StorageWriteError
 from crawlee.storage_clients import SqlStorageClient
 from crawlee.storage_clients._sql._db_models import KeyValueStoreMetadataDb, KeyValueStoreRecordDb
 from crawlee.storage_clients.models import KeyValueStoreMetadata
@@ -281,3 +284,21 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
         assert record.value == test_value
 
         await reopened_client.drop()
+
+
+async def test_error_handling_on_set_failure(kvs_client: SqlKeyValueStoreClient) -> None:
+    """Test that StorageWriteError is raised when SQL writing fails."""
+    with patch(
+        'crawlee.storage_clients._sql._key_value_store_client.SqlKeyValueStoreClient.get_session',
+    ) as mock_get_session:
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.execute = AsyncMock(side_effect=SQLAlchemyError('db error'))
+        mock_get_session.return_value = mock_session
+
+        with pytest.raises(StorageWriteError) as exc_info:
+            await kvs_client.set_value(key='test', value='test-value')
+
+        assert isinstance(exc_info.value.cause, SQLAlchemyError)
+        assert str(exc_info.value.cause) == 'db error'

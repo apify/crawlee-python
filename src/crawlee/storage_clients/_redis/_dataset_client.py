@@ -126,8 +126,8 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         if isinstance(data, dict):
             data = [data]
 
-        async with self._get_pipeline() as pipe:
-            try:
+        try:
+            async with self._get_pipeline() as pipe:
                 pipe.json().arrappend(self._items_key, '$', *data)
                 await self._update_metadata(
                     pipe,
@@ -136,8 +136,8 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
                     ),
                 )
 
-            except RedisError as e:
-                raise StorageWriteError(e) from e
+        except RedisError as e:
+            raise StorageWriteError(e) from e
 
     @override
     async def get_data(

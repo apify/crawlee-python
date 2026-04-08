@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import asyncio
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from redis.exceptions import RedisError
 
+from crawlee.errors import StorageWriteError
 from crawlee.storage_clients import RedisStorageClient
 from crawlee.storage_clients._redis._utils import await_redis_response
 
@@ -144,3 +147,22 @@ async def test_metadata_record_updates(dataset_client: RedisDatasetClient) -> No
     assert metadata.created_at == initial_created
     assert metadata.modified_at > initial_modified
     assert metadata.accessed_at > accessed_after_get
+
+
+async def test_error_handling_on_push_failure(dataset_client: RedisDatasetClient) -> None:
+    """Test that StorageWriteError is raised when Redis writing fails."""
+    mock_pipe = MagicMock()
+    mock_pipe.execute = AsyncMock(side_effect=RedisError('connection lost'))
+
+    mock_pipeline_ctx = MagicMock()
+    mock_pipeline_ctx.__aenter__ = AsyncMock(return_value=mock_pipe)
+    mock_pipeline_ctx.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch.object(dataset_client.redis, 'pipeline', return_value=mock_pipeline_ctx),
+        pytest.raises(StorageWriteError) as exc_info,
+    ):
+        await dataset_client.push_data({'test': 'data'})
+
+    assert isinstance(exc_info.value.cause, RedisError)
+    assert str(exc_info.value.cause) == 'connection lost'

@@ -143,9 +143,8 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             content_type=content_type,
             size=size,
         )
-
-        async with self._get_pipeline() as pipe:
-            try:
+        try:
+            async with self._get_pipeline() as pipe:
                 # redis-py typing issue
                 await await_redis_response(pipe.hset(self._items_key, key, value_bytes))  # ty: ignore[invalid-argument-type]
 
@@ -160,8 +159,8 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
                     pipe, **MetadataUpdateParams(update_accessed_at=True, update_modified_at=True)
                 )
 
-            except RedisError as e:
-                raise StorageWriteError(e) from e
+        except RedisError as e:
+            raise StorageWriteError(e) from e
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:

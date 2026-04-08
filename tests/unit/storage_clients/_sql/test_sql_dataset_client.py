@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import asyncio
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import inspect, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from crawlee.configuration import Configuration
+from crawlee.errors import StorageWriteError
 from crawlee.storage_clients import SqlStorageClient
 from crawlee.storage_clients._sql._db_models import DatasetItemDb, DatasetMetadataDb
 
@@ -231,3 +234,21 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
         assert data.items[0] == test_data
 
         await reopened_client.drop()
+
+
+async def test_error_handling_on_push_failure(dataset_client: SqlDatasetClient) -> None:
+    """Test that StorageWriteError is raised when SQL writing fails."""
+    with patch(
+        'crawlee.storage_clients._sql._dataset_client.SqlDatasetClient.get_session',
+    ) as mock_get_session:
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.execute = AsyncMock(side_effect=SQLAlchemyError('db error'))
+        mock_get_session.return_value = mock_session
+
+        with pytest.raises(StorageWriteError) as exc_info:
+            await dataset_client.push_data({'key': 'value'})
+
+        assert isinstance(exc_info.value.cause, SQLAlchemyError)
+        assert str(exc_info.value.cause) == 'db error'

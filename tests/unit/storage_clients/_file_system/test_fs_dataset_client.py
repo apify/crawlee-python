@@ -4,11 +4,13 @@ import asyncio
 import json
 from pathlib import Path
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 
 from crawlee._consts import METADATA_FILENAME
 from crawlee.configuration import Configuration
+from crawlee.errors import StorageWriteError
 from crawlee.storage_clients import FileSystemStorageClient
 
 if TYPE_CHECKING:
@@ -151,3 +153,15 @@ async def test_data_persistence_across_reopens() -> None:
     assert data.items[0] == test_data
 
     await reopened_client.drop()
+
+
+async def test_error_handling_on_push_failure(dataset_client: FileSystemDatasetClient) -> None:
+    """Test that StorageWriteError is raised when file writing fails."""
+    with (
+        patch('crawlee.storage_clients._file_system._dataset_client.atomic_write', side_effect=OSError('disk full')),
+        pytest.raises(StorageWriteError) as exc_info,
+    ):
+        await dataset_client.push_data({'test': 'data'})
+
+    assert isinstance(exc_info.value.cause, OSError)
+    assert str(exc_info.value.cause) == 'disk full'
