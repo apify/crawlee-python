@@ -130,23 +130,29 @@ class AbstractHttpCrawler(
     async def _execute_pre_navigation_hooks(
         self, context: BasicCrawlingContext
     ) -> AsyncGenerator[BasicCrawlingContext, None]:
-        context_id = id(context)
-        self._shared_navigation_timeouts[context_id] = SharedTimeout(self._navigation_timeout)
+        request_id = id(context.request)
+        self._shared_navigation_timeouts[request_id] = SharedTimeout(self._navigation_timeout)
 
         try:
             for hook in self._pre_navigation_hooks:
-                async with self._shared_navigation_timeouts[context_id]:
+                async with self._shared_navigation_timeouts[request_id]:
                     await hook(context)
 
             yield context
         finally:
-            self._shared_navigation_timeouts.pop(context_id, None)
+            self._shared_navigation_timeouts.pop(request_id, None)
 
     async def _execute_post_navigation_hooks(
         self, context: HttpCrawlingContext
     ) -> AsyncGenerator[HttpCrawlingContext, None]:
+        request_id = id(context.request)
+
         for hook in self._post_navigation_hooks:
-            await hook(context)
+            if request_id in self._shared_navigation_timeouts:
+                async with self._shared_navigation_timeouts[request_id]:
+                    await hook(context)
+            else:
+                await hook(context)
 
         yield context
 
@@ -262,7 +268,7 @@ class AbstractHttpCrawler(
         Yields:
             The original crawling context enhanced by HTTP response.
         """
-        async with self._shared_navigation_timeouts[id(context)] as remaining_timeout:
+        async with self._shared_navigation_timeouts[id(context.request)] as remaining_timeout:
             result = await self._http_client.crawl(
                 request=context.request,
                 session=context.session,
