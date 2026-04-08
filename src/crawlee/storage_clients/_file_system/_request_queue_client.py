@@ -327,7 +327,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         forefront: bool = False,
     ) -> AddRequestsResponse:
         async with self._lock:
-            self._is_empty_cache = None
             new_total_request_count = self._metadata.total_request_count
             new_pending_request_count = self._metadata.pending_request_count
             processed_requests = list[ProcessedRequest]()
@@ -477,6 +476,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             if next_request is not None:
                 state.in_progress_requests.add(next_request.unique_key)
+                # Invalidate is_empty cache since in-progress state changed.
+                self._is_empty_cache = None
 
             return next_request
 
@@ -598,14 +599,14 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 self._is_empty_cache = False
                 return False
 
-            # If we have a cached requests, check them first (fast path).
+            # If we have cached requests, check them first (fast path).
             if self._request_cache:
                 for req in self._request_cache:
                     if req.unique_key not in state.handled_requests:
                         self._is_empty_cache = False
                         return False
                 self._is_empty_cache = True
-                return len(state.in_progress_requests) == 0
+                return True
 
             # Fallback: check state for unhandled requests.
             await self._update_metadata(update_accessed_at=True)
