@@ -193,6 +193,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         # Compose the context pipeline with the Playwright-specific context enhancer.
         kwargs['_context_pipeline'] = (
             ContextPipeline()
+            .compose(self._manage_shared_navigation_timeout)
             .compose(self._open_page)
             .compose(self._navigate)
             .compose(self._execute_post_navigation_hooks)
@@ -215,6 +216,18 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         self._goto_options = goto_options or GotoOptions()
 
         super().__init__(**kwargs)
+
+    async def _manage_shared_navigation_timeout(
+        self, context: BasicCrawlingContext
+    ) -> AsyncGenerator[BasicCrawlingContext, None]:
+        """Initialize and clean up the shared navigation timeout for the current request."""
+        request_id = id(context.request)
+        self._shared_navigation_timeouts[request_id] = SharedTimeout(self._navigation_timeout)
+
+        try:
+            yield context
+        finally:
+            self._shared_navigation_timeouts.pop(request_id, None)
 
     async def _open_page(
         self,
@@ -243,20 +256,16 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         )
 
         request_id = id(pre_navigation_context.request)
-        self._shared_navigation_timeouts[request_id] = SharedTimeout(self._navigation_timeout)
 
-        try:
-            # Only use the page context manager here — it sets the current page in a context variable,
-            # making it accessible to PlaywrightHttpClient in subsequent pipeline steps.
-            async with browser_page_context(crawlee_page.page):
-                for hook in self._pre_navigation_hooks:
-                    async with self._shared_navigation_timeouts[request_id]:
-                        await hook(pre_navigation_context)
+        # Only use the page context manager here — it sets the current page in a context variable,
+        # making it accessible to PlaywrightHttpClient in subsequent pipeline steps.
+        async with browser_page_context(crawlee_page.page):
+            for hook in self._pre_navigation_hooks:
+                async with self._shared_navigation_timeouts[request_id]:
+                    await hook(pre_navigation_context)
 
-                # Yield should be inside the browser_page_context.
-                yield pre_navigation_context
-        finally:
-            self._shared_navigation_timeouts.pop(request_id, None)
+            # Yield should be inside the browser_page_context.
+            yield pre_navigation_context
 
     def _prepare_request_interceptor(
         self,
@@ -499,10 +508,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         request_id = id(context.request)
 
         for hook in self._post_navigation_hooks:
-            if request_id in self._shared_navigation_timeouts:
-                async with self._shared_navigation_timeouts[request_id]:
-                    await hook(context)
-            else:
+            async with self._shared_navigation_timeouts[request_id]:
                 await hook(context)
 
         yield context
