@@ -9,7 +9,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-04T22:02:40.053808872Z"
+exclude-newer = "2026-04-08T13:05:21.267461968Z"
 exclude-newer-span = "PT24H"
 
 [[package]]
@@ -990,7 +990,7 @@ dev = [
 [[package]]
 name = "crawlee-storage"
 version = "0.1.0"
-source = { git = "https://github.com/apify/crawlee-storage.git?subdirectory=crawlee-storage-python#5c219e3005a116a21d72e038421e71ba5ddef1c5" }
+source = { git = "https://github.com/apify/crawlee-storage.git?subdirectory=crawlee-storage-python#ceb640be7dffdad10c56c2c2fe74c916f29b1309" }
 
 [[package]]
 name = "cryptography"
