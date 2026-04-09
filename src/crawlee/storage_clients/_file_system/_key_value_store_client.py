@@ -139,14 +139,10 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         exclusive_start_key: str | None = None,
         limit: int | None = None,
     ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
-        # The native client returns a list, so we fetch all matching keys
-        # and yield them one by one.
-        items: list[dict[str, Any]] = await self._native_client.iterate_keys(
+        async for item in self._native_client.iterate_keys(
             exclusive_start_key=exclusive_start_key,
             limit=limit,
-        )
-
-        for item in items:
+        ):
             yield KeyValueStoreRecordMetadata(**item)
 
     @override

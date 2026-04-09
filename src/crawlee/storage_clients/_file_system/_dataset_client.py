@@ -185,14 +185,10 @@ class FileSystemDatasetClient(DatasetClient):
                 f'by the {self.__class__.__name__} client.'
             )
 
-        # The native client returns a list rather than an async iterator,
-        # so we fetch all matching items and yield them one by one.
-        items: list[Any] = await self._native_client.iterate_items(
+        async for item in self._native_client.iterate_items(
             offset=offset,
             limit=limit,
             desc=desc,
             skip_empty=skip_empty,
-        )
-
-        for item in items:
+        ):
             yield item
