@@ -308,18 +308,12 @@ class SitemapRequestLoader(RequestLoader):
     @override
     async def is_finished(self) -> bool:
         """Check if all URLs have been processed."""
-        if self._loading_task is None:
-            raise RuntimeError('SitemapRequestLoader has not been started.')
-
         state = await self._get_state()
         return not state.url_queue and len(state.in_progress) == 0 and self._loading_task.done()
 
     @override
     async def fetch_next_request(self) -> Request | None:
         """Fetch the next request to process."""
-        if self._loading_task is None:
-            raise RuntimeError('SitemapRequestLoader has not been started.')
-
         while not (await self.is_finished()):
             state = await self._get_state()
             if not state.url_queue:
