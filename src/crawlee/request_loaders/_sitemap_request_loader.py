@@ -327,7 +327,7 @@ class SitemapRequestLoader(RequestLoader):
                 continue
 
             async with self._queue_lock:
-                # Double-check if the queue is still empty after acquiring the lock
+                # Double-check if the queue is still not empty after acquiring the lock
                 if not state.url_queue:
                     continue
 
