@@ -198,7 +198,7 @@ async def test_in_progress_requests_recovered_after_crash() -> None:
     assert fetched is not None
 
     # Persist state explicitly (simulating what happens periodically or at crash boundary).
-    await original_client._state.persist_state()
+    await original_client._native_client.persist_state()
 
     rq_id = (await original_client.get_metadata()).id
 
