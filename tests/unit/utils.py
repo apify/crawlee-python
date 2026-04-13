@@ -25,7 +25,7 @@ async def wait_for_condition(
         timeout: Maximum time in seconds to wait before raising.
         poll_interval: Time in seconds between condition checks.
     """
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout
     while loop.time() < deadline:
         if condition():
