@@ -8,6 +8,10 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 
+[options]
+exclude-newer = "2026-04-12T11:12:07.276403525Z"
+exclude-newer-span = "PT24H"
+
 [[package]]
 name = "aiomysql"
 version = "0.3.2"

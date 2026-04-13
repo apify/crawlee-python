@@ -15,27 +15,17 @@ from crawlee._autoscaling import AutoscaledPool, SystemStatus
 from crawlee._autoscaling._types import LoadRatioInfo, SystemInfo
 from crawlee._types import ConcurrencySettings
 from crawlee._utils.time import measure_time
+from tests.unit.utils import wait_for_condition
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Awaitable
+
+T = TypeVar('T')
 
 
 @pytest.fixture
 def system_status() -> SystemStatus | Mock:
     return Mock(spec=SystemStatus)
-
-
-T = TypeVar('T')
-
-
-async def _wait_for(condition: Callable[[], bool], *, timeout: float = 5.0, poll_interval: float = 0.05) -> None:
-    """Poll ``condition`` until it returns True, or raise ``AssertionError`` on timeout."""
-    deadline = asyncio.get_event_loop().time() + timeout
-    while asyncio.get_event_loop().time() < deadline:
-        if condition():
-            return
-        await asyncio.sleep(poll_interval)
-    raise AssertionError(f'Condition not met within {timeout}s')
 
 
 def future(value: T, /) -> Awaitable[T]:
@@ -202,20 +192,20 @@ async def test_autoscales(
 
     try:
         # Wait until concurrency scales up above 1.
-        await _wait_for(lambda: pool.desired_concurrency > 1, timeout=5.0)
+        await wait_for_condition(lambda: pool.desired_concurrency > 1, timeout=5.0)
 
         # Wait until concurrency reaches maximum.
-        await _wait_for(lambda: pool.desired_concurrency == 4, timeout=5.0)
+        await wait_for_condition(lambda: pool.desired_concurrency == 4, timeout=5.0)
 
         # Multiple concurrent workers should have completed more tasks than a single worker could.
-        await _wait_for(lambda: done_count > 10, timeout=5.0)
+        await wait_for_condition(lambda: done_count > 10, timeout=5.0)
 
         # Simulate CPU overload and wait for the pool to scale down.
         overload_active = True
-        await _wait_for(lambda: pool.desired_concurrency < 4, timeout=5.0)
+        await wait_for_condition(lambda: pool.desired_concurrency < 4, timeout=5.0)
 
         # Wait until the pool scales all the way down to minimum.
-        await _wait_for(lambda: pool.desired_concurrency == 1, timeout=5.0)
+        await wait_for_condition(lambda: pool.desired_concurrency == 1, timeout=5.0)
     finally:
         pool_run_task.cancel()
         with suppress(asyncio.CancelledError):
