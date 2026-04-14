@@ -785,9 +785,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         ]
 
         if not self._had_multiple_clients:
-            aggregations.append(
-                func.count(func.distinct(self._BUFFER_TABLE.client_id)).label('unique_clients_count')
-            )
+            aggregations.append(func.count(func.distinct(self._BUFFER_TABLE.client_id)).label('unique_clients_count'))
 
         if self._storage_client.get_dialect_name() == 'postgresql':
             aggregations.append(func.bool_or(self._BUFFER_TABLE.need_recalc).label('need_recalc'))
