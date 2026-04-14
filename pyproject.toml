@@ -331,9 +331,9 @@ uv run pytest \
 """
 
 [tool.poe.tasks.build-docs]
-shell = "./build_api_reference.sh && corepack enable && yarn && yarn build"
+shell = "./build_api_reference.sh && pnpm install --frozen-lockfile && pnpm build"
 cwd = "website"
 
 [tool.poe.tasks.run-docs]
-shell = "./build_api_reference.sh && corepack enable && yarn && yarn start"
+shell = "./build_api_reference.sh && pnpm install --frozen-lockfile && pnpm start"
 cwd = "website"
