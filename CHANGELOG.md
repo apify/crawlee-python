@@ -3,16 +3,24 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 1.6.2 - **not yet released**
+## 1.6.3 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Fix potential deadlocks in `SitemapRequestLoader` and `RequestManagerTandem` ([#1843](https://github.com/apify/crawlee-python/pull/1843)) ([6226d93](https://github.com/apify/crawlee-python/commit/6226d93f4d25a63f3c88b0f6ec3d2c5431165197)) by [@Mantisus](https://github.com/Mantisus)
+
+
+<!-- git-cliff-unreleased-end -->
+## [1.6.2](https://github.com/apify/crawlee-python/releases/tag/v1.6.2) (2026-04-08)
 
 ### 🐛 Bug Fixes
 
 - **file-system:** Reclaim orphaned in-progress requests on RQ recovery ([#1825](https://github.com/apify/crawlee-python/pull/1825)) ([e86794a](https://github.com/apify/crawlee-python/commit/e86794a6e5605432c9331c7cd99edf885527a3eb)) by [@vdusek](https://github.com/vdusek)
 - Prevent premature `EventManager` shutdown when multiple crawlers share it ([#1810](https://github.com/apify/crawlee-python/pull/1810)) ([2efb668](https://github.com/apify/crawlee-python/commit/2efb668ad54fb3e8d740066446563d1e8a39d2e8)) by [@Mantisus](https://github.com/Mantisus), closes [#1805](https://github.com/apify/crawlee-python/issues/1805), [#1808](https://github.com/apify/crawlee-python/issues/1808)
 - Apply SQLite optimizations to the custom `connection_string` in `SqlStorageClient` ([#1837](https://github.com/apify/crawlee-python/pull/1837)) ([8b53e27](https://github.com/apify/crawlee-python/commit/8b53e273067e27b4ef4b2b4bb40277b15ef6b058)) by [@Mantisus](https://github.com/Mantisus)
+- Apply `SharedTimeout` to post-navigation hooks ([#1839](https://github.com/apify/crawlee-python/pull/1839)) ([88bd05a](https://github.com/apify/crawlee-python/commit/88bd05a2127ebfe3cd4eb78c514a63fc9e2cd079)) by [@vdusek](https://github.com/vdusek)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.6.1](https://github.com/apify/crawlee-python/releases/tag/v1.6.1) (2026-03-30)
 
 ### 🐛 Bug Fixes
