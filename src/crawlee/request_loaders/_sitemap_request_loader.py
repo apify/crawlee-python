@@ -160,7 +160,11 @@ class SitemapRequestLoader(RequestLoader):
 
     async def _get_state(self) -> SitemapRequestLoaderState:
         """Initialize and return the current state."""
+        if self._state.is_initialized:
+            return self._state.current_value
+
         async with self._queue_lock:
+            # Re-check if state got initialized while waiting for the lock
             if self._state.is_initialized:
                 return self._state.current_value
 
@@ -260,7 +264,6 @@ class SitemapRequestLoader(RequestLoader):
                         # Check if we have capacity in the queue
                         await self._queue_has_capacity.wait()
 
-                        state = await self._get_state()
                         async with self._queue_lock:
                             state.url_queue.append(url)
                             state.current_sitemap_processed_urls.add(url)
@@ -318,8 +321,16 @@ class SitemapRequestLoader(RequestLoader):
                 continue
 
             async with self._queue_lock:
+                # Double-check if the queue is still not empty after acquiring the lock
+                if not state.url_queue:
+                    continue
+
                 url = state.url_queue.popleft()
                 request_option = RequestOptions(url=url)
+
+                if len(state.url_queue) < self._max_buffer_size:
+                    self._queue_has_capacity.set()
+
                 if self._transform_request_function:
                     transform_request_option = self._transform_request_function(request_option)
                     if transform_request_option == 'skip':
@@ -327,10 +338,9 @@ class SitemapRequestLoader(RequestLoader):
                         continue
                     if transform_request_option != 'unchanged':
                         request_option = transform_request_option
+
                 request = Request.from_url(**request_option)
                 state.in_progress.add(request.url)
-                if len(state.url_queue) < self._max_buffer_size:
-                    self._queue_has_capacity.set()
 
             return request
 
