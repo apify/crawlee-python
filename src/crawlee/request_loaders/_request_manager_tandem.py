@@ -89,12 +89,12 @@ class RequestManagerTandem(RequestManager):
                 'Adding request from the RequestLoader to the RequestManager failed, the request has been dropped',
                 extra={'url': request.url, 'unique_key': request.unique_key},
             )
+
+            return None
+        finally:
             # Mark it as processed so that the `request` doesn't get stuck in the `in_progress` status
             # in `RequestLoader`
             await self._read_only_loader.mark_request_as_handled(request)
-            return None
-
-        await self._read_only_loader.mark_request_as_handled(request)
 
         return await self._read_write_manager.fetch_next_request()
 
