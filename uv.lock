@@ -9,7 +9,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-04T22:02:40.053808872Z"
+exclude-newer = "2026-04-13T10:48:10.994102422Z"
 exclude-newer-span = "PT24H"
 
 [[package]]
@@ -767,7 +767,7 @@ toml = [
 
 [[package]]
 name = "crawlee"
-version = "1.6.2"
+version = "1.6.3"
 source = { editable = "." }
 dependencies = [
     { name = "async-timeout" },

@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.6.3 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Fix potential deadlocks in `SitemapRequestLoader` and `RequestManagerTandem` ([#1843](https://github.com/apify/crawlee-python/pull/1843)) ([6226d93](https://github.com/apify/crawlee-python/commit/6226d93f4d25a63f3c88b0f6ec3d2c5431165197)) by [@Mantisus](https://github.com/Mantisus)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.6.2](https://github.com/apify/crawlee-python/releases/tag/v1.6.2) (2026-04-08)
 
 ### 🐛 Bug Fixes
