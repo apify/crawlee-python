@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import inspect
 from asyncio import Lock
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any, cast
 
 from browserforge.injectors.playwright import AsyncNewContext
 from playwright.async_api import Browser, BrowserContext, Page, ProxySettings
+from playwright.async_api import BrowserType as PlaywrightBrowserType
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
@@ -26,6 +29,18 @@ if TYPE_CHECKING:
 from logging import getLogger
 
 logger = getLogger(__name__)
+
+
+# Cache Playwright signatures to avoid overhead in critical path
+@lru_cache(maxsize=1)
+def _get_context_params_cache() -> dict[str, set[str]]:
+    launch_persistent_params = set(inspect.signature(PlaywrightBrowserType.launch_persistent_context).parameters)
+    new_context_params = set(inspect.signature(Browser.new_context).parameters)
+    return {
+        'common': launch_persistent_params & new_context_params,
+        'persistent_unique': launch_persistent_params - new_context_params,
+        'incognito_unique': new_context_params - launch_persistent_params,
+    }
 
 
 @docs_group('Browser management')
@@ -209,6 +224,31 @@ class PlaywrightBrowserController(BrowserController):
         """Handle actions after a page is closed."""
         self._pages.remove(page)
 
+    def _filter_context_options(self, options: dict[str, Any]) -> dict[str, Any]:
+        """Filter browser context options based on the current mode (incognito vs persistent).
+
+        Options that are valid only in the other mode are dropped with a warning. Unrecognized options are kept
+        and passed through so that Playwright itself can raise an appropriate error.
+        """
+        params_cache = _get_context_params_cache()
+        filtered = dict[str, Any]()
+
+        for key, value in options.items():
+            if self._use_incognito_pages and key in params_cache['persistent_unique']:
+                logger.warning(
+                    f'Option "{key}" is only supported in persistent context mode '
+                    '(use_incognito_pages=False) and will be ignored.'
+                )
+            elif not self._use_incognito_pages and key in params_cache['incognito_unique']:
+                logger.warning(
+                    f'Option "{key}" is only supported in incognito context mode '
+                    '(use_incognito_pages=True) and will be ignored.'
+                )
+            else:
+                filtered[key] = value
+
+        return filtered
+
     async def _create_browser_context(
         self,
         browser_new_context_options: Mapping[str, Any] | None = None,
@@ -222,11 +262,14 @@ class PlaywrightBrowserController(BrowserController):
         `self._fingerprint_generator` is available.
         """
         browser_new_context_options = dict(browser_new_context_options) if browser_new_context_options else {}
+
+        filtered_options = self._filter_context_options(browser_new_context_options)
+
         if proxy_info:
-            if browser_new_context_options.get('proxy'):
+            if filtered_options.get('proxy'):
                 logger.warning("browser_new_context_options['proxy'] overridden by explicit `proxy_info` argument.")
 
-            browser_new_context_options['proxy'] = ProxySettings(
+            filtered_options['proxy'] = ProxySettings(
                 server=f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
                 username=proxy_info.username,
                 password=proxy_info.password,
@@ -236,7 +279,7 @@ class PlaywrightBrowserController(BrowserController):
             return await AsyncNewContext(
                 browser=self._browser,
                 fingerprint=self._fingerprint_generator.generate(),
-                **browser_new_context_options,
+                **filtered_options,
             )
 
         if self._header_generator:
@@ -256,7 +299,5 @@ class PlaywrightBrowserController(BrowserController):
         else:
             extra_http_headers = None
 
-        browser_new_context_options['extra_http_headers'] = browser_new_context_options.get(
-            'extra_http_headers', extra_http_headers
-        )
-        return await self._browser.new_context(**browser_new_context_options)
+        filtered_options['extra_http_headers'] = filtered_options.get('extra_http_headers', extra_http_headers)
+        return await self._browser.new_context(**filtered_options)

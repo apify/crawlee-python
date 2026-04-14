@@ -1,6 +1,6 @@
 {
     "extends": ["config:base", ":semanticCommitTypeAll(chore)"],
-    "ignorePaths": ["docs/**", "src/crawlee/project_template/**"],
+    "ignorePaths": ["docs/**", "src/crawlee/project_template/**", "website/versioned_docs/**"],
     "pinVersions": false,
     "separateMajorMinor": false,
     "dependencyDashboard": false,
@@ -21,6 +21,7 @@
             "automergeType": "branch"
         }
     ],
+    "minimumReleaseAge": "1 day",
     "schedule": ["before 7am every weekday"],
     "ignoreDeps": ["crawlee", "docusaurus-plugin-typedoc-api"]
 }

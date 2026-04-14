@@ -1,0 +1,47 @@
+---
+id: running-in-web-server
+title: Running in web server
+description: Running in web server
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import CodeBlock from '@theme/CodeBlock';
+
+import Crawler from '!!raw-loader!./code_examples/running_in_web_server/crawler.py';
+import Server from '!!raw-loader!./code_examples/running_in_web_server/server.py';
+
+
+Most of the time, Crawlee jobs are run as batch jobs. You have a list of URLs you want to scrape every week or you might want to scrape a whole website once per day. After the scrape, you send the data to your warehouse for analytics. Batch jobs are efficient because they can use Crawlee's built-in autoscaling to fully utilize the resources you have available. But sometimes you have a use-case where you need to return scrape data as soon as possible. There might be a user waiting on the other end so every millisecond counts. This is where running Crawlee in a web server comes in.
+
+We will build a simple HTTP server that receives a page URL and returns the page title in the response.
+
+## Set up a web server
+
+There are many popular web server frameworks for Python, such as [Flask](https://flask.palletsprojects.com/en/stable/), [Django](https://www.djangoproject.com/), [Pyramid](https://trypyramid.com/), ... In this guide, we will use the [FastAPI](https://fastapi.tiangolo.com/) to keep things simple.
+
+This will be our core server setup:
+
+<CodeBlock className="language-python" title="server.py">
+    {Server}
+</CodeBlock>
+
+The server has two endpoints.
+- `/` - The index is just giving short description of the server with example link to the second endpoint.
+- `/scrape` - This is the endpoint that receives a `url` parameter and returns the page title scraped from the URL
+
+To run the example server, make sure that you have installed the [fastapi[standard]](https://fastapi.tiangolo.com/#installation) and from the directory where the example code is located you can use the following command:
+```
+fastapi dev server.py
+```
+
+## Create a crawler
+
+We will create a standard <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> and use the `keep_alive=true` option to keep the crawler running even if there are no requests currently in the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>. This way it will always be waiting for new requests to come in.
+
+<CodeBlock className="language-python" title="crawler.py">
+    {Crawler}
+</CodeBlock>
+
+Crawler is defined inside of [Lifespan](https://fastapi.tiangolo.com/advanced/events/#lifespan) which is a FastAPI way to run some start up/ teardown code for the app. There are two objects that we want to save to the app state so that they can be accessed in any endpoint through `request.state`:
+- `crawler` holds instance of our crawler and allows the app to interact with it.
+- `requests_to_results` is dictionary that is used to temporarily register expected results for each request and populate them when they are made available by the crawler.

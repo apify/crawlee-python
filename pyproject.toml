@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "crawlee"
-version = "1.5.1"
+version = "1.6.3"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = { file = "LICENSE" }
@@ -140,6 +140,9 @@ packages = ["src/crawlee"]
 [tool.ruff]
 line-length = 120
 include = ["src/**/*.py", "tests/**/*.py", "docs/**/*.py", "website/**/*.py"]
+exclude = [
+    "website/versioned_docs/**",
+]
 extend-exclude = ["src/crawlee/project_template"]
 
 [tool.ruff.lint]
@@ -251,6 +254,7 @@ include = ["src", "tests", "scripts", "docs", "website"]
 exclude = [
     "src/crawlee/project_template",
     "docs/guides/code_examples/storage_clients/custom_storage_client_example.py",
+    "website/versioned_docs",
 ]
 
 [[tool.ty.overrides]]
@@ -267,6 +271,10 @@ exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "assert_never()"]
 
 [tool.ipdb]
 context = 7
+
+[tool.uv]
+# Minimal defense against supply-chain attacks.
+exclude-newer = "24 hours"
 
 # Run tasks with: uv run poe <task>
 [tool.poe.tasks]

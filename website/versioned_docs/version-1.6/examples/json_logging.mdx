@@ -1,0 +1,57 @@
+---
+id: configure-json-logging
+title: Сonfigure JSON logging
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import JsonLoggingExample from '!!raw-loader!roa-loader!./code_examples/configure_json_logging.py';
+
+This example demonstrates how to configure JSON line (JSONL) logging with Crawlee. By using the `use_table_logs=False` parameter, you can disable table-formatted statistics logs, which makes it easier to parse logs with external tools or to serialize them as JSON.
+
+The example shows how to integrate with the popular [`loguru`](https://github.com/delgan/loguru) library to capture Crawlee logs and format them as JSONL (one JSON object per line). This approach works well when you need to collect logs for analysis, monitoring, or when integrating with logging platforms like ELK Stack, Grafana Loki, or similar systems.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {JsonLoggingExample}
+</RunnableCodeBlock>
+
+Here's an example of what a crawler statistics log entry in JSONL format.
+
+```json
+{
+    "text": "[HttpCrawler] |   INFO   | - Final request statistics: {'requests_finished': 1, 'requests_failed': 0, 'retry_histogram': [1], 'request_avg_failed_duration': None, 'request_avg_finished_duration': 3.57098, 'requests_finished_per_minute': 17, 'requests_failed_per_minute': 0, 'request_total_duration': 3.57098, 'requests_total': 1, 'crawler_runtime': 3.59165}\n",
+    "record": {
+        "elapsed": { "repr": "0:00:05.604568", "seconds": 5.604568 },
+        "exception": null,
+        "extra": {
+            "requests_finished": 1,
+            "requests_failed": 0,
+            "retry_histogram": [1],
+            "request_avg_failed_duration": null,
+            "request_avg_finished_duration": 3.57098,
+            "requests_finished_per_minute": 17,
+            "requests_failed_per_minute": 0,
+            "request_total_duration": 3.57098,
+            "requests_total": 1,
+            "crawler_runtime": 3.59165
+        },
+        "file": {
+            "name": "_basic_crawler.py",
+            "path": "/crawlers/_basic/_basic_crawler.py"
+        },
+        "function": "run",
+        "level": { "icon": "ℹ️", "name": "INFO", "no": 20 },
+        "line": 583,
+        "message": "Final request statistics:",
+        "module": "_basic_crawler",
+        "name": "HttpCrawler",
+        "process": { "id": 198383, "name": "MainProcess" },
+        "thread": { "id": 135312814966592, "name": "MainThread" },
+        "time": {
+            "repr": "2025-03-17 17:14:45.339150+00:00",
+            "timestamp": 1742231685.33915
+        }
+    }
+}
+```

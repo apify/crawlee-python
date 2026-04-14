@@ -4,7 +4,7 @@ module.exports = {
         {
             type: 'category',
             label: 'Introduction',
-            collapsed: false,
+            collapsed: true,
             link: {
                 type: 'doc',
                 id: 'introduction/introduction',

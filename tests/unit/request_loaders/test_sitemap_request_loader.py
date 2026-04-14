@@ -2,6 +2,7 @@ import asyncio
 import base64
 import gzip
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 from yarl import URL
 
@@ -216,3 +217,79 @@ async def test_transform_request_function(server_url: URL, http_client: HttpClie
         'http://not-exists.com/catalog?item=74&desc=vacation_newfoundland',
         'http://not-exists.com/catalog?item=83&desc=vacation_usa',
     }
+
+
+async def test_transform_request_function_with_skip(server_url: URL, http_client: HttpClient) -> None:
+    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+
+    def transform_request(_request_options: RequestOptions) -> RequestOptions | RequestTransformAction:
+        return 'skip'
+
+    sitemap_loader = SitemapRequestLoader(
+        [str(sitemap_url)],
+        http_client=http_client,
+        transform_request_function=transform_request,
+    )
+
+    while not await sitemap_loader.is_finished():
+        request = await sitemap_loader.fetch_next_request()
+
+        if request:
+            await sitemap_loader.mark_request_as_handled(request)
+
+    # Even though the sitemap had URLs, all were skipped, so the loader should be empty and finished with
+    # 0 handled requests.
+    assert await sitemap_loader.is_empty()
+    assert await sitemap_loader.is_finished()
+    assert await sitemap_loader.get_total_count() == 0
+    assert await sitemap_loader.get_handled_count() == 0
+
+
+async def test_sitemap_loader_to_tandem(
+    server_url: URL,
+    http_client: HttpClient,
+) -> None:
+    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+
+    sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client)
+    request_manager = await sitemap_loader.to_tandem()
+
+    while not await sitemap_loader.is_finished():
+        request = await request_manager.fetch_next_request()
+
+        if request:
+            await request_manager.mark_request_as_handled(request)
+
+    assert await sitemap_loader.is_empty()
+    assert await sitemap_loader.is_finished()
+
+    assert await request_manager.is_empty()
+    assert await request_manager.is_finished()
+
+
+async def test_sitemap_loader_to_tandem_with_request_dropped(
+    server_url: URL,
+    http_client: HttpClient,
+) -> None:
+    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+
+    sitemap_loader = SitemapRequestLoader(
+        [str(sitemap_url)],
+        http_client=http_client,
+    )
+    request_manager = await sitemap_loader.to_tandem()
+
+    with patch.object(
+        request_manager._read_write_manager, 'add_request', side_effect=Exception('Failed to add request')
+    ):
+        while not await sitemap_loader.is_finished():
+            request = await request_manager.fetch_next_request()
+
+            if request:
+                await request_manager.mark_request_as_handled(request)
+
+        assert await sitemap_loader.is_empty()
+        assert await sitemap_loader.is_finished()
+
+        assert await request_manager.is_empty()
+        assert await request_manager.is_finished()

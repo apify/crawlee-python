@@ -136,7 +136,7 @@ async def test_preexisting_unnamed_storage_open_by_id(storage_type: type[Storage
 @pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.Barrier was introduced in Python 3.11.')
 async def test_concurrent_open_datasets() -> None:
     """Test that concurrent open datasets with the same name return the same instance."""
-    from asyncio import Barrier  # type:ignore[attr-defined] # noqa: PLC0415
+    from asyncio import Barrier  # ty:ignore[unresolved-import] # noqa: PLC0415
 
     barrier = Barrier(2)
 
@@ -161,7 +161,7 @@ async def test_concurrent_open_datasets() -> None:
 @pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.Barrier was introduced in Python 3.11.')
 async def test_concurrent_open_datasets_with_same_name_and_alias() -> None:
     """Test that concurrent open requests for the same storage return the same instance."""
-    from asyncio import Barrier  # type:ignore[attr-defined] # noqa: PLC0415
+    from asyncio import Barrier  # ty:ignore[unresolved-import] # noqa: PLC0415
 
     valid_kwargs: dict[str, str | None] = {}
 

@@ -240,3 +240,31 @@ async def test_persist_requests_key_only_persists_once() -> None:
     fetched_request = await request_list_2.fetch_next_request()
     assert fetched_request is not None
     assert fetched_request.url == 'https://once2.placeholder.com'  # From original data
+
+
+async def test_handle_invalid_url() -> None:
+    """Test that invalid URLs are handled gracefully."""
+    request_list = RequestList(['invalid-url.com', 'https://valid.placeholder.com'])
+
+    # First request is invalid, should be skipped without crashing
+    request = await request_list.fetch_next_request()
+    assert request is not None
+    assert request.url == 'https://valid.placeholder.com'
+    await request_list.mark_request_as_handled(request)
+
+
+async def test_handle_invalid_url_with_persistence() -> None:
+    """Test that invalid URLs are handled gracefully even when persistence is enabled."""
+    persist_key = 'test_invalid_url_persistence'
+    request_list = RequestList(['invalid-url.com', 'https://valid.placeholder.com'], persist_requests_key=persist_key)
+
+    # First request is invalid, should be skipped without crashing
+    request = await request_list.fetch_next_request()
+    assert request is not None
+    assert request.url == 'https://valid.placeholder.com'
+    await request_list.mark_request_as_handled(request)
+
+    # Check that the valid URL was persisted and the invalid one was not
+    kvs = await KeyValueStore.open()
+    persisted_data = await kvs.get_value(persist_key)
+    assert persisted_data is not None

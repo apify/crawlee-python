@@ -1,0 +1,40 @@
+---
+id: add-data-to-dataset
+title: Add data to dataset
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import BeautifulSoupExample from '!!raw-loader!roa-loader!./code_examples/add_data_to_dataset_bs.py';
+import PlaywrightExample from '!!raw-loader!roa-loader!./code_examples/add_data_to_dataset_pw.py';
+import DatasetExample from '!!raw-loader!roa-loader!./code_examples/add_data_to_dataset_dataset.py';
+
+This example demonstrates how to store extracted data into datasets using the <ApiLink to="class/PushDataFunction#open">`context.push_data`</ApiLink> helper function. If the specified dataset does not already exist, it will be created automatically. Additionally, you can save data to custom datasets by providing `dataset_id` or `dataset_name` parameters to the <ApiLink to="class/PushDataFunction#open">`push_data`</ApiLink> function.
+
+<Tabs groupId="main">
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {BeautifulSoupExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {PlaywrightExample}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>
+
+Each item in the dataset will be stored in its own file within the following directory:
+
+```text
+{PROJECT_FOLDER}/storage/datasets/default/
+```
+
+For more control, you can also open a dataset manually using the asynchronous constructor <ApiLink to="class/Dataset#open">`Dataset.open`</ApiLink>
+
+<RunnableCodeBlock className="language-python" language="python">
+    {DatasetExample}
+</RunnableCodeBlock>

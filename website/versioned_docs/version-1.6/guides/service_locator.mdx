@@ -1,0 +1,136 @@
+---
+id: service-locator
+title: Service locator
+description: Crawlee's service locator is a central registry for global services, managing and providing access to them throughout the whole framework.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import ServiceLocatorConfiguration from '!!raw-loader!roa-loader!./code_examples/service_locator/service_locator_configuration.py';
+import ServiceLocatorStorageClient from '!!raw-loader!roa-loader!./code_examples/service_locator/service_locator_storage_client.py';
+import ServiceLocatorEventManager from '!!raw-loader!roa-loader!./code_examples/service_locator/service_locator_event_manager.py';
+
+import ServiceCrawlerConfiguration from '!!raw-loader!roa-loader!./code_examples/service_locator/service_crawler_configuration.py';
+import ServiceCrawlerStorageClient from '!!raw-loader!roa-loader!./code_examples/service_locator/service_crawler_storage_client.py';
+import ServiceCrawlerEventManager from '!!raw-loader!roa-loader!./code_examples/service_locator/service_crawler_event_manager.py';
+
+import ServiceStorageConfiguration from '!!raw-loader!roa-loader!./code_examples/service_locator/service_storage_configuration.py';
+import ServiceStorageStorageClient from '!!raw-loader!roa-loader!./code_examples/service_locator/service_storage_storage_client.py';
+
+import ServiceConflicts from '!!raw-loader!roa-loader!./code_examples/service_locator/service_conflicts.py';
+
+The <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> is a central registry for global services. It manages and provides access to these services throughout the framework, ensuring their consistent configuration and across all components.
+
+The service locator manages three core services: <ApiLink to="class/Configuration">`Configuration`</ApiLink>, <ApiLink to="class/EventManager">`EventManager`</ApiLink>, and <ApiLink to="class/StorageClient">`StorageClient`</ApiLink>. All services are initialized lazily with defaults when first accessed.
+
+## Services
+
+There are three core services that are managed by the service locator:
+
+### Configuration
+
+<ApiLink to="class/Configuration">`Configuration`</ApiLink> is a class that provides access to application-wide settings and parameters. It allows you to configure various aspects of Crawlee, such as timeouts, logging level, persistence intervals, and various other settings. The configuration can be set directly in the code or via environment variables.
+
+### StorageClient
+
+<ApiLink to="class/StorageClient">`StorageClient`</ApiLink> is the backend implementation for storages in Crawlee. It provides a unified interface for <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, regardless of the underlying storage implementation. Storage clients were already explained in the storage clients section.
+
+Refer to the [Storage clients guide](./storage-clients) for more information about storage clients and how to use them.
+
+### EventManager
+
+<ApiLink to="class/EventManager">`EventManager`</ApiLink> is responsible for coordinating internal events in Crawlee. It allows you to register event listeners and emit events throughout the framework. Examples of such events aborting, migrating, system info, or browser-specific events like page created, page closed and more. It provides a way to listen to events and execute custom logic when certain events occur.
+
+## Service registration
+
+There are several ways to register services in Crawlee, depending on your use case and preferences.
+
+### Via service locator
+
+Services can be registered globally through the <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> before they are first accessed. There is a singleton `service_locator` instance that is used throughout the framework, making the services available to all components throughout the whole framework.
+
+<Tabs>
+
+<TabItem value="storage-client" label="Storage client">
+    <RunnableCodeBlock className="language-python" language="python">
+        {ServiceLocatorStorageClient}
+    </RunnableCodeBlock>
+</TabItem>
+
+<TabItem value="configuration" label="Configuration">
+    <RunnableCodeBlock className="language-python" language="python">
+        {ServiceLocatorConfiguration}
+    </RunnableCodeBlock>
+</TabItem>
+
+<TabItem value="event-manager" label="Event manager">
+    <RunnableCodeBlock className="language-python" language="python">
+        {ServiceLocatorEventManager}
+    </RunnableCodeBlock>
+</TabItem>
+
+</Tabs>
+
+### Via crawler constructors
+
+Alternatively services can be passed to the crawler constructors. They will be registered globally to the <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> under the hood, making them available to all components and reaching consistent configuration.
+
+<Tabs>
+
+<TabItem value="storage-client" label="Storage client">
+    <RunnableCodeBlock className="language-python" language="python">
+        {ServiceCrawlerStorageClient}
+    </RunnableCodeBlock>
+</TabItem>
+
+<TabItem value="configuration" label="Configuration">
+    <RunnableCodeBlock className="language-python" language="python">
+        {ServiceCrawlerConfiguration}
+    </RunnableCodeBlock>
+</TabItem>
+
+<TabItem value="event-manager" label="Event manager">
+    <RunnableCodeBlock className="language-python" language="python">
+        {ServiceCrawlerEventManager}
+    </RunnableCodeBlock>
+</TabItem>
+
+</Tabs>
+
+### Via storage constructors
+
+Alternatively, services can be provided when opening specific storage instances, which uses them only for that particular instance without affecting global configuration.
+
+<Tabs>
+
+<TabItem value="storage-client" label="Storage client">
+    <RunnableCodeBlock className="language-python" language="python">
+        {ServiceStorageStorageClient}
+    </RunnableCodeBlock>
+</TabItem>
+
+<TabItem value="configuration" label="Configuration">
+    <RunnableCodeBlock className="language-python" language="python">
+        {ServiceStorageConfiguration}
+    </RunnableCodeBlock>
+</TabItem>
+
+</Tabs>
+
+## Conflict prevention
+
+Once a service has been retrieved from the service locator, attempting to set a different instance will raise a <ApiLink to="class/ServiceConflictError">`ServiceConflictError`</ApiLink> to prevent accidental configuration conflicts.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {ServiceConflicts}
+</RunnableCodeBlock>
+
+## Conclusion
+
+The <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> is a tool for managing global services in Crawlee. It provides a consistent way to configure and access services throughout the framework, ensuring that all components have access to the same configuration and services.
+
+If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!
