@@ -631,6 +631,10 @@ async def test_adaptive_playwright_crawler_default_predictor(test_urls: list[str
     mocked_browser_handler.assert_called_once_with()
 
 
+@pytest.mark.flaky(
+    rerun=3,
+    reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1650.',
+)
 async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[str]) -> None:
     """Test that `context.query_selector_one` works regardless of the crawl type for BeautifulSoup variant.
 
