@@ -84,7 +84,7 @@ jobs:
           yarn install
 
           # Extract version from pyproject.toml.
-          VERSION="$(python -c "import tomllib, pathlib; print(tomllib.loads(pathlib.Path('../pyproject.toml').read_text())['project']['version'])")"
+          VERSION="$(uv version --short)"
           MAJOR_MINOR="$(echo "$VERSION" | cut -d. -f1-2)"
           MAJOR="$(echo "$VERSION" | cut -d. -f1)"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
