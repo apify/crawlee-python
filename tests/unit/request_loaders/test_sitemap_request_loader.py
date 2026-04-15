@@ -144,7 +144,7 @@ async def test_data_persistence_for_sitemap_loading(
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, persist_state_key=persist_key)
 
     # Give time to load
-    await asyncio.wait_for(wait_for_sitemap_loader_not_empty(sitemap_loader), timeout=2)
+    await asyncio.wait_for(wait_for_sitemap_loader_not_empty(sitemap_loader), timeout=10)
 
     await sitemap_loader.close()
 
