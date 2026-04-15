@@ -40,8 +40,8 @@ def retry_on_error(
             for attempt in range(max_attempts):
                 try:
                     return await func(*args, **kwargs)
-                except Exception as exc:  # noqa: PERF203
-                    if not isinstance(exc, exception_types) or attempt >= max_attempts - 1:
+                except exception_types as exc:  # noqa: PERF203
+                    if attempt >= max_attempts - 1:
                         raise
                     await _retry_sleep(base_delay_seconds * (2**attempt))
             raise RuntimeError('Unreachable')
