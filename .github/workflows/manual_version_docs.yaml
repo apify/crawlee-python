@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Git ref to checkout (branch, tag, or SHA). Defaults to the default branch."
+        description: Git ref to checkout (branch, tag, or SHA). Defaults to the default branch.
         required: false
         type: string
         default: ""
@@ -14,12 +14,12 @@ on:
   workflow_call:
     inputs:
       ref:
-        description: "Git ref to checkout (branch, tag, or SHA)"
+        description: Git ref to checkout (branch, tag, or SHA)
         required: true
         type: string
     outputs:
       version_docs_commitish:
-        description: "The commit SHA of the versioned docs commit"
+        description: The commit SHA of the versioned docs commit
         value: ${{ jobs.version_docs.outputs.version_docs_commitish }}
 
 concurrency:
@@ -29,6 +29,10 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  NODE_VERSION: 22
+  PYTHON_VERSION: "3.14"
+
 jobs:
   version_docs:
     name: Version docs
@@ -37,9 +41,6 @@ jobs:
       version_docs_commitish: ${{ steps.resolve_commitish.outputs.commitish }}
     permissions:
       contents: write
-    env:
-      NODE_VERSION: 22
-      PYTHON_VERSION: "3.14"
 
     steps:
       - name: Determine checkout ref
@@ -116,7 +117,7 @@ jobs:
         id: commit_versioned_docs
         uses: EndBug/add-and-commit@v10
         with:
-          add: "website/versioned_docs website/versioned_sidebars website/versions.json"
+          add: website/versioned_docs website/versioned_sidebars website/versions.json
           message: "docs: Version docs for v${{ steps.snapshot.outputs.version }} [skip ci]"
           default_author: github_actions
 
