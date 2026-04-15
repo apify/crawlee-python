@@ -121,7 +121,7 @@ jobs:
       contents: write
       pages: write
       id-token: write
-    uses: ./.github/workflows/_release_docs.yaml
+    uses: ./.github/workflows/manual_release_docs.yaml
     with:
       # Use the version_docs commit to include both changelog and versioned docs.
       ref: ${{ needs.version_docs.outputs.version_docs_commitish }}

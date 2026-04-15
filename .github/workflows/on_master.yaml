@@ -28,7 +28,7 @@ jobs:
       contents: write
       pages: write
       id-token: write
-    uses: ./.github/workflows/_release_docs.yaml
+    uses: ./.github/workflows/manual_release_docs.yaml
     with:
       # Use the same ref as the one that triggered the workflow.
       ref: ${{ github.ref }}
@@ -108,7 +108,7 @@ jobs:
       contents: write
       pages: write
       id-token: write
-    uses: ./.github/workflows/_release_docs.yaml
+    uses: ./.github/workflows/manual_release_docs.yaml
     with:
       # Use the ref from the changelog update to include the updated changelog.
       ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
