@@ -92,13 +92,13 @@ jobs:
           echo "Version: $VERSION, Major.Minor: $MAJOR_MINOR, Major: $MAJOR"
 
           # Remove ALL existing versions for this major (not just exact major.minor match).
-          for dir in versioned_docs/version-${MAJOR}.*; do
+          for dir in "versioned_docs/version-${MAJOR}."*; do
             if [ -d "$dir" ]; then
               echo "Removing $dir"
               rm -rf "$dir"
             fi
           done
-          for file in versioned_sidebars/version-${MAJOR}.*-sidebars.json; do
+          for file in "versioned_sidebars/version-${MAJOR}."*-sidebars.json; do
             if [ -f "$file" ]; then
               echo "Removing $file"
               rm -f "$file"
