@@ -229,7 +229,7 @@ async def test_error_handling_on_set_failure(kvs_client: RedisKeyValueStoreClien
     mock_pipeline_ctx.__aexit__ = AsyncMock(return_value=None)
 
     with (
-        patch('crawlee._utils.retry.asyncio.sleep', new_callable=AsyncMock) as mock_sleep,
+        patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
         patch.object(kvs_client.redis, 'pipeline', return_value=mock_pipeline_ctx),
         pytest.raises(RedisError),
     ):
@@ -249,7 +249,7 @@ async def test_set_value_does_not_retry_on_unexpected_exception(kvs_client: Redi
     mock_pipeline_ctx.__aexit__ = AsyncMock(return_value=None)
 
     with (
-        patch('crawlee._utils.retry.asyncio.sleep', new_callable=AsyncMock) as mock_sleep,
+        patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
         patch.object(kvs_client.redis, 'pipeline', return_value=mock_pipeline_ctx),
         pytest.raises(ValueError, match='unexpected error'),
     ):

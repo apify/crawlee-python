@@ -297,7 +297,7 @@ async def test_error_handling_on_set_failure(kvs_client: SqlKeyValueStoreClient)
         mock_get_session.return_value = mock_session
 
         with (
-            patch('crawlee._utils.retry.asyncio.sleep', new_callable=AsyncMock) as mock_sleep,
+            patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
             pytest.raises(SQLAlchemyError),
         ):
             await kvs_client.set_value(key='test', value='test-value')
@@ -318,7 +318,7 @@ async def test_set_value_does_not_retry_on_unexpected_exception(kvs_client: SqlK
         mock_get_session.return_value = mock_session
 
         with (
-            patch('crawlee._utils.retry.asyncio.sleep', new_callable=AsyncMock) as mock_sleep,
+            patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
             pytest.raises(ValueError, match='unexpected error'),
         ):
             await kvs_client.set_value(key='test', value='test-value')

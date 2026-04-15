@@ -158,7 +158,7 @@ async def test_error_handling_on_push_failure(dataset_client: RedisDatasetClient
     mock_pipeline_ctx.__aexit__ = AsyncMock(return_value=None)
 
     with (
-        patch('crawlee._utils.retry.asyncio.sleep', new_callable=AsyncMock) as mock_sleep,
+        patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
         patch.object(dataset_client.redis, 'pipeline', return_value=mock_pipeline_ctx),
         pytest.raises(RedisError),
     ):
@@ -178,7 +178,7 @@ async def test_push_data_does_not_retry_on_unexpected_exception(dataset_client: 
     mock_pipeline_ctx.__aexit__ = AsyncMock(return_value=None)
 
     with (
-        patch('crawlee._utils.retry.asyncio.sleep', new_callable=AsyncMock) as mock_sleep,
+        patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
         patch.object(dataset_client.redis, 'pipeline', return_value=mock_pipeline_ctx),
         pytest.raises(ValueError, match='unexpected error'),
     ):

@@ -247,7 +247,7 @@ async def test_error_handling_on_push_failure(dataset_client: SqlDatasetClient) 
         mock_get_session.return_value = mock_session
 
         with (
-            patch('crawlee._utils.retry.asyncio.sleep', new_callable=AsyncMock) as mock_sleep,
+            patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
             pytest.raises(SQLAlchemyError),
         ):
             await dataset_client.push_data({'test': 'data'})
@@ -268,7 +268,7 @@ async def test_push_data_does_not_retry_on_unexpected_exception(dataset_client: 
         mock_get_session.return_value = mock_session
 
         with (
-            patch('crawlee._utils.retry.asyncio.sleep', new_callable=AsyncMock) as mock_sleep,
+            patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
             pytest.raises(ValueError, match='unexpected error'),
         ):
             await dataset_client.push_data({'test': 'data'})

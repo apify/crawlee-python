@@ -32,7 +32,7 @@ async def test_retries_and_succeeds() -> None:
             raise ValueError('transient')
         return True
 
-    with patch('crawlee._utils.retry.asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+    with patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep:
         result = await func()
 
     assert result is True
@@ -46,7 +46,7 @@ async def test_reraises_after_max_attempts() -> None:
         raise ValueError('persistent')
 
     with (
-        patch('crawlee._utils.retry.asyncio.sleep', new_callable=AsyncMock),
+        patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock),
         pytest.raises(ValueError, match='persistent'),
     ):
         await func()
@@ -61,7 +61,7 @@ async def test_does_not_retry_on_unspecified_exception() -> None:
         raise TypeError('not retryable')
 
     with (
-        patch('crawlee._utils.retry.asyncio.sleep', new_callable=AsyncMock) as mock_sleep,
+        patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
         pytest.raises(TypeError),
     ):
         await func()
@@ -76,7 +76,7 @@ async def test_exponential_backoff_delays() -> None:
         raise ValueError('test backoff')
 
     with (
-        patch('crawlee._utils.retry.asyncio.sleep', new_callable=AsyncMock) as mock_sleep,
+        patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
         pytest.raises(ValueError, match='test backoff'),
     ):
         await func()
