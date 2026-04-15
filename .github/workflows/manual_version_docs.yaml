@@ -84,15 +84,15 @@ jobs:
           yarn install
 
           # Extract version from pyproject.toml.
-          VERSION="$(uv version --short)"
-          MAJOR_MINOR="$(echo "$VERSION" | cut -d. -f1-2)"
-          MAJOR="$(echo "$VERSION" | cut -d. -f1)"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Version: $VERSION, Major.Minor: $MAJOR_MINOR, Major: $MAJOR"
+          FULL_VERSION="$(uv version --short)"
+          MAJOR_MINOR_VERSION="$(echo "$FULL_VERSION" | cut -d. -f1-2)"
+          MAJOR_VERSION="$(echo "$FULL_VERSION" | cut -d. -f1)"
+          echo "version=$FULL_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $FULL_VERSION, Major.Minor: $MAJOR_MINOR_VERSION, Major: $MAJOR_VERSION"
 
           # Find the existing version for this major in versions.json (if any).
           if [[ -f versions.json ]]; then
-            OLD_VERSION="$(jq -r --arg major "$MAJOR" '.[] | select(startswith($major + "."))' versions.json | head -1)"
+            OLD_VERSION="$(jq -r --arg major "$MAJOR_VERSION" '.[] | select(startswith($major + "."))' versions.json | head -1)"
           else
             OLD_VERSION=""
             echo "[]" > versions.json
@@ -100,18 +100,18 @@ jobs:
 
           # Remove only the specific old version for this major (if found).
           if [[ -n "$OLD_VERSION" ]]; then
-            echo "Removing old version $OLD_VERSION for major $MAJOR"
+            echo "Removing old version $OLD_VERSION for major $MAJOR_VERSION"
             rm -rf "versioned_docs/version-${OLD_VERSION}"
             rm -f "versioned_sidebars/version-${OLD_VERSION}-sidebars.json"
             jq --arg old "$OLD_VERSION" '[.[] | select(. != $old)]' versions.json > tmp.json && mv tmp.json versions.json
           else
-            echo "No existing version found for major $MAJOR, nothing to remove"
+            echo "No existing version found for major $MAJOR_VERSION, nothing to remove"
           fi
 
           # Build API reference and create Docusaurus version snapshots.
           bash build_api_reference.sh
-          uv run npx docusaurus docs:version "$MAJOR_MINOR"
-          uv run npx docusaurus api:version "$MAJOR_MINOR"
+          uv run npx docusaurus docs:version "$MAJOR_MINOR_VERSION"
+          uv run npx docusaurus api:version "$MAJOR_MINOR_VERSION"
 
       - name: Commit and push versioned docs
         id: commit_versioned_docs
