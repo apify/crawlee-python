@@ -87,25 +87,22 @@ jobs:
           MAJOR="$(echo "$VERSION" | cut -d. -f1)"
           echo "Version: $VERSION, Major.Minor: $MAJOR_MINOR, Major: $MAJOR"
 
-          # Remove ALL existing versions for this major (not just exact major.minor match).
-          for dir in "versioned_docs/version-${MAJOR}."*; do
-            if [[ -d "$dir" ]]; then
-              echo "Removing $dir"
-              rm -rf "$dir"
-            fi
-          done
-          for file in "versioned_sidebars/version-${MAJOR}."*-sidebars.json; do
-            if [[ -f "$file" ]]; then
-              echo "Removing $file"
-              rm -f "$file"
-            fi
-          done
-
-          # Update versions.json to remove entries for this major version.
+          # Find the existing version for this major in versions.json (if any).
           if [[ -f versions.json ]]; then
-            jq --arg major "$MAJOR" '[.[] | select((split(".")[0]) != $major)]' versions.json > tmp.json && mv tmp.json versions.json
+            OLD_VERSION="$(jq -r --arg major "$MAJOR" '.[] | select(startswith($major + "."))' versions.json | head -1)"
           else
+            OLD_VERSION=""
             echo "[]" > versions.json
+          fi
+
+          # Remove only the specific old version for this major (if found).
+          if [[ -n "$OLD_VERSION" ]]; then
+            echo "Removing old version $OLD_VERSION for major $MAJOR"
+            rm -rf "versioned_docs/version-${OLD_VERSION}"
+            rm -f "versioned_sidebars/version-${OLD_VERSION}-sidebars.json"
+            jq --arg old "$OLD_VERSION" '[.[] | select(. != $old)]' versions.json > tmp.json && mv tmp.json versions.json
+          else
+            echo "No existing version found for major $MAJOR, nothing to remove"
           fi
 
           # Build API reference and create Docusaurus version snapshots.
