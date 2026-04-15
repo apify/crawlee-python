@@ -65,7 +65,6 @@ Session.vim
 docs/changelog.md
 website/versioned_docs/*/changelog.md
 website/versioned_docs/*/pyproject.toml
-website/versioned_docs/*/.gitignore
 
 # Website build artifacts, node dependencies
 website/build
