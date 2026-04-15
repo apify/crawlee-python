@@ -112,13 +112,6 @@ jobs:
           uv run npx docusaurus docs:version "$MAJOR_MINOR"
           uv run npx docusaurus api:version "$MAJOR_MINOR"
 
-          # Clean up non-docs artifacts from the snapshot.
-          rm -f "versioned_docs/version-${MAJOR_MINOR}/changelog.md"
-          rm -f "versioned_docs/version-${MAJOR_MINOR}/pyproject.toml"
-          rm -f "versioned_docs/version-${MAJOR_MINOR}/.gitignore"
-          rm -rf "versioned_docs/version-${MAJOR_MINOR}/.ruff_cache"
-          rm -rf "versioned_docs/version-${MAJOR_MINOR}/.ty_cache"
-
       - name: Commit and push versioned docs
         id: commit_versioned_docs
         uses: EndBug/add-and-commit@v10
