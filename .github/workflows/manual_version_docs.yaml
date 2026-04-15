@@ -75,15 +75,11 @@ jobs:
       - name: Install Python dependencies
         run: uv run poe install-dev
 
-      - name: Install website dependencies
+      - name: Snapshot the current version
         run: |
           cd website
           corepack enable
           yarn install
-
-      - name: Snapshot the current version
-        run: |
-          cd website
 
           # Extract version from pyproject.toml.
           VERSION="$(python -c "import tomllib, pathlib; print(tomllib.loads(pathlib.Path('../pyproject.toml').read_text())['project']['version'])")"
