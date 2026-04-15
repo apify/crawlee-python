@@ -45,11 +45,11 @@ jobs:
     steps:
       - name: Determine checkout ref
         id: resolve_ref
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          REF="${{ inputs.ref }}"
-          if [[ -z "$REF" ]]; then
-            REF="${{ github.event.repository.default_branch }}"
-          fi
+          REF="${INPUT_REF:-$DEFAULT_BRANCH}"
           echo "ref=$REF" >> "$GITHUB_OUTPUT"
 
       - name: Checkout repository
@@ -126,9 +126,7 @@ jobs:
 
       - name: Resolve output commitish
         id: resolve_commitish
+        env:
+          COMMIT_SHA: ${{ steps.commit_versioned_docs.outputs.commit_long_sha }}
         run: |
-          SHA="${{ steps.commit_versioned_docs.outputs.commit_long_sha }}"
-          if [[ -z "$SHA" ]]; then
-            SHA="$(git rev-parse HEAD)"
-          fi
-          echo "commitish=$SHA" >> "$GITHUB_OUTPUT"
+          echo "commitish=${COMMIT_SHA:-$(git rev-parse HEAD)}" >> "$GITHUB_OUTPUT"
