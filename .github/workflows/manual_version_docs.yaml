@@ -46,7 +46,7 @@ jobs:
         id: resolve_ref
         run: |
           REF="${{ inputs.ref }}"
-          if [ -z "$REF" ]; then
+          if [[ -z "$REF" ]]; then
             REF="${{ github.event.repository.default_branch }}"
           fi
           echo "ref=$REF" >> "$GITHUB_OUTPUT"
@@ -89,20 +89,20 @@ jobs:
 
           # Remove ALL existing versions for this major (not just exact major.minor match).
           for dir in "versioned_docs/version-${MAJOR}."*; do
-            if [ -d "$dir" ]; then
+            if [[ -d "$dir" ]]; then
               echo "Removing $dir"
               rm -rf "$dir"
             fi
           done
           for file in "versioned_sidebars/version-${MAJOR}."*-sidebars.json; do
-            if [ -f "$file" ]; then
+            if [[ -f "$file" ]]; then
               echo "Removing $file"
               rm -f "$file"
             fi
           done
 
           # Update versions.json to remove entries for this major version.
-          if [ -f versions.json ]; then
+          if [[ -f versions.json ]]; then
             jq --arg major "$MAJOR" '[.[] | select((split(".")[0]) != $major)]' versions.json > tmp.json && mv tmp.json versions.json
           else
             echo "[]" > versions.json
@@ -132,7 +132,7 @@ jobs:
         id: resolve_commitish
         run: |
           SHA="${{ steps.commit_versioned_docs.outputs.commit_long_sha }}"
-          if [ -z "$SHA" ]; then
+          if [[ -z "$SHA" ]]; then
             SHA="$(git rev-parse HEAD)"
           fi
           echo "commitish=$SHA" >> "$GITHUB_OUTPUT"
