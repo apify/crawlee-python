@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
-from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, overload
 
@@ -13,7 +12,6 @@ from crawlee import service_locator
 from crawlee._types import JsonSerializable  # noqa: TC001
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recoverable_state import RecoverableState
-from crawlee.errors import StorageWriteError
 from crawlee.storage_clients.models import KeyValueStoreMetadata
 
 from ._base import Storage
@@ -177,9 +175,6 @@ class KeyValueStore(Storage):
         key: str,
         value: Any,
         content_type: str | None = None,
-        *,
-        max_attempts: int = 5,
-        wait_time_between_retries: timedelta = timedelta(seconds=1),
     ) -> None:
         """Set a value in the KVS.
 
@@ -187,29 +182,8 @@ class KeyValueStore(Storage):
             key: Key of the record to set.
             value: Value to set.
             content_type: The MIME content type string.
-            max_attempts: The maximum number of attempts to set the value in case of failure.
-            wait_time_between_retries: Time to wait between retries.
         """
-        if max_attempts < 1:
-            raise ValueError('max_attempts must be at least 1')
-
-        wait_time_between_retries_seconds = wait_time_between_retries.total_seconds()
-        last_exception: StorageWriteError | None = None
-
-        for attempt in range(max_attempts):
-            try:
-                await self._client.set_value(key=key, value=value, content_type=content_type)
-                break
-            except StorageWriteError as e:
-                last_exception = e
-                if attempt < max_attempts - 1:
-                    await asyncio.sleep(wait_time_between_retries_seconds)
-        else:
-            if last_exception:
-                logger.warning(
-                    f'Failed to set value for key "{key}" after {max_attempts} attempts '
-                    f'with error: {last_exception.cause}'
-                )
+        await self._client.set_value(key=key, value=value, content_type=content_type)
 
     async def delete_value(self, key: str) -> None:
         """Delete a value from the KVS.

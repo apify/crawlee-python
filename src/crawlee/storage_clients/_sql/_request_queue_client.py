@@ -14,6 +14,7 @@ from typing_extensions import NotRequired, Self, override
 
 from crawlee import Request
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.retry import retry_on_error
 from crawlee.storage_clients._base import RequestQueueClient
 from crawlee.storage_clients.models import (
     AddRequestsResponse,
@@ -161,6 +162,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             },
         )
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def get_metadata(self) -> RequestQueueMetadata:
         # The database is a single place of truth
@@ -168,6 +170,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         self._had_multiple_clients = metadata.had_multiple_clients
         return metadata
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def drop(self) -> None:
         """Delete this request queue and all its records from the database.
@@ -178,6 +181,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
         self._pending_fetch_cache.clear()
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def purge(self) -> None:
         """Remove all items from this dataset while keeping the dataset structure.
@@ -390,6 +394,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             unprocessed_requests=unprocessed_requests,
         )
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def get_request(self, unique_key: str) -> Request | None:
         request_id = self._get_int_id_from_unique_key(unique_key)
@@ -409,6 +414,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
         return Request.model_validate_json(request_db.data)
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def fetch_next_request(self) -> Request | None:
         if self._pending_fetch_cache:
@@ -496,6 +502,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
         return requests[0]
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         request_id = self._get_int_id_from_unique_key(request.unique_key)
@@ -527,6 +534,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             was_already_handled=True,
         )
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def reclaim_request(
         self,
@@ -584,6 +592,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             was_already_handled=False,
         )
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def is_empty(self) -> bool:
         # Check in-memory cache for requests

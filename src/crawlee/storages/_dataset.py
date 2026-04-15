@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import asyncio
 import logging
-from datetime import timedelta
 from io import StringIO
 from typing import TYPE_CHECKING, overload
 
@@ -11,7 +9,6 @@ from typing_extensions import override
 from crawlee import service_locator
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import export_csv_to_stream, export_json_to_stream
-from crawlee.errors import StorageWriteError
 
 from ._base import Storage
 from ._key_value_store import KeyValueStore
@@ -137,13 +134,7 @@ class Dataset(Storage):
     async def purge(self) -> None:
         await self._client.purge()
 
-    async def push_data(
-        self,
-        data: list[dict[str, Any]] | dict[str, Any],
-        *,
-        max_attempts: int = 5,
-        wait_time_between_retries: timedelta = timedelta(seconds=1),
-    ) -> None:
+    async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
         """Store an object or an array of objects to the dataset.
 
         The size of the data is limited by the receiving API and therefore `push_data()` will only
@@ -153,26 +144,8 @@ class Dataset(Storage):
         Args:
             data: A JSON serializable data structure to be stored in the dataset. The JSON representation
                 of each item must be smaller than 9MB.
-            max_attempts: The maximum number of attempts to push data in case of failure.
-            wait_time_between_retries: The time to wait between retries in case of failure.
         """
-        if max_attempts < 1:
-            raise ValueError('max_attempts must be at least 1')
-
-        wait_time_between_retries_seconds = wait_time_between_retries.total_seconds()
-        last_exception: StorageWriteError | None = None
-
-        for attempt in range(max_attempts):
-            try:
-                await self._client.push_data(data=data)
-                break
-            except StorageWriteError as e:
-                last_exception = e
-                if attempt < max_attempts - 1:
-                    await asyncio.sleep(wait_time_between_retries_seconds)
-        else:
-            if last_exception:
-                logger.warning(f'Failed to push data after {max_attempts} attempts with error: {last_exception.cause}')
+        await self._client.push_data(data=data)
 
     async def get_data(
         self,

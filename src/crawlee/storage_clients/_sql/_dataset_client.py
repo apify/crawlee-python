@@ -9,7 +9,7 @@ from sqlalchemy import func as sql_func
 from sqlalchemy.exc import SQLAlchemyError
 from typing_extensions import Self, override
 
-from crawlee.errors import StorageWriteError
+from crawlee._utils.retry import retry_on_error
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
@@ -111,11 +111,13 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
             extra_metadata_fields={'item_count': 0},
         )
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def get_metadata(self) -> DatasetMetadata:
         # The database is a single place of truth
         return await self._get_metadata(DatasetMetadata)
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def drop(self) -> None:
         """Delete this dataset and all its items from the database.
@@ -124,6 +126,7 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
         """
         await self._drop()
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def purge(self) -> None:
         """Remove all items from this dataset while keeping the dataset structure.
@@ -139,6 +142,7 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
             )
         )
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
         if not isinstance(data, list):
@@ -147,16 +151,12 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
         db_items = [{'dataset_id': self._id, 'data': item} for item in data]
         stmt = insert(self._ITEM_TABLE).values(db_items)
 
-        async with self.get_session() as session:
-            try:
-                await session.execute(stmt)
+        async with self.get_session(with_simple_commit=True) as session:
+            await session.execute(stmt)
 
-                await self._add_buffer_record(session, update_modified_at=True, delta_item_count=len(data))
-                await session.commit()
-            except SQLAlchemyError as e:
-                await session.rollback()
-                raise StorageWriteError(e) from e
+            await self._add_buffer_record(session, update_modified_at=True, delta_item_count=len(data))
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def get_data(
         self,

@@ -18,7 +18,6 @@ __all__ = [
     'RequestHandlerError',
     'ServiceConflictError',
     'SessionError',
-    'StorageWriteError',
     'UserDefinedErrorHandlerError',
 ]
 
@@ -117,12 +116,3 @@ class ContextPipelineInterruptedError(Exception):
 @docs_group('Errors')
 class RequestCollisionError(Exception):
     """Raised when a request cannot be processed due to a conflict with required resources."""
-
-
-@docs_group('Errors')
-class StorageWriteError(Exception):
-    """Raised when a write operation to a storage fails."""
-
-    def __init__(self, cause: Exception) -> None:
-        super().__init__(str(cause))
-        self.cause = cause

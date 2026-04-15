@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from redis.exceptions import RedisError
 
-from crawlee.errors import StorageWriteError
 from crawlee.storage_clients import RedisStorageClient
 from crawlee.storage_clients._redis._utils import await_redis_response
 
@@ -150,7 +149,7 @@ async def test_metadata_record_updates(dataset_client: RedisDatasetClient) -> No
 
 
 async def test_error_handling_on_push_failure(dataset_client: RedisDatasetClient) -> None:
-    """Test that StorageWriteError is raised when Redis writing fails."""
+    """Test that push_data properly handles Redis errors and retries."""
     mock_pipe = MagicMock()
     mock_pipe.execute = AsyncMock(side_effect=RedisError('connection lost'))
 
@@ -159,10 +158,31 @@ async def test_error_handling_on_push_failure(dataset_client: RedisDatasetClient
     mock_pipeline_ctx.__aexit__ = AsyncMock(return_value=None)
 
     with (
+        patch('crawlee._utils.retry.asyncio.sleep', new_callable=AsyncMock) as mock_sleep,
         patch.object(dataset_client.redis, 'pipeline', return_value=mock_pipeline_ctx),
-        pytest.raises(StorageWriteError) as exc_info,
+        pytest.raises(RedisError),
     ):
         await dataset_client.push_data({'test': 'data'})
 
-    assert isinstance(exc_info.value.cause, RedisError)
-    assert str(exc_info.value.cause) == 'connection lost'
+    # Verify that retry logic was attempted
+    assert mock_sleep.call_count == 2  # Assuming default max_attempts=3
+
+
+async def test_push_data_does_not_retry_on_unexpected_exception(dataset_client: RedisDatasetClient) -> None:
+    """Test that push_data does not retry on unexpected exceptions."""
+    mock_pipe = MagicMock()
+    mock_pipe.execute = AsyncMock(side_effect=ValueError('unexpected error'))
+
+    mock_pipeline_ctx = MagicMock()
+    mock_pipeline_ctx.__aenter__ = AsyncMock(return_value=mock_pipe)
+    mock_pipeline_ctx.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch('crawlee._utils.retry.asyncio.sleep', new_callable=AsyncMock) as mock_sleep,
+        patch.object(dataset_client.redis, 'pipeline', return_value=mock_pipeline_ctx),
+        pytest.raises(ValueError, match='unexpected error'),
+    ):
+        await dataset_client.push_data({'test': 'data'})
+
+    # Verify that retry logic was not attempted
+    assert mock_sleep.call_count == 0

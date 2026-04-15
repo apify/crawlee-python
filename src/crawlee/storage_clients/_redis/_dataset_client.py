@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 from redis.exceptions import RedisError
 from typing_extensions import NotRequired, override
 
-from crawlee.errors import StorageWriteError
+from crawlee._utils.retry import retry_on_error
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
@@ -104,14 +104,17 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
             instance_kwargs={},
         )
 
+    @retry_on_error(RedisError)
     @override
     async def get_metadata(self) -> DatasetMetadata:
         return await self._get_metadata(DatasetMetadata)
 
+    @retry_on_error(RedisError)
     @override
     async def drop(self) -> None:
         await self._drop(extra_keys=[self._items_key])
 
+    @retry_on_error(RedisError)
     @override
     async def purge(self) -> None:
         await self._purge(
@@ -121,24 +124,22 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
             ),
         )
 
+    @retry_on_error(RedisError)
     @override
     async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
         if isinstance(data, dict):
             data = [data]
 
-        try:
-            async with self._get_pipeline() as pipe:
-                pipe.json().arrappend(self._items_key, '$', *data)
-                await self._update_metadata(
-                    pipe,
-                    **_DatasetMetadataUpdateParams(
-                        update_accessed_at=True, update_modified_at=True, delta_item_count=len(data)
-                    ),
-                )
+        async with self._get_pipeline() as pipe:
+            pipe.json().arrappend(self._items_key, '$', *data)
+            await self._update_metadata(
+                pipe,
+                **_DatasetMetadataUpdateParams(
+                    update_accessed_at=True, update_modified_at=True, delta_item_count=len(data)
+                ),
+            )
 
-        except RedisError as e:
-            raise StorageWriteError(e) from e
-
+    @retry_on_error(RedisError)
     @override
     async def get_data(
         self,
