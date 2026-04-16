@@ -1,13 +1,20 @@
-name: Doc release
+name: Release docs
 
 on:
   # Runs when manually triggered from the GitHub UI.
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to checkout (branch, tag, or SHA). Defaults to the default branch.
+        required: false
+        type: string
+        default: ""
 
   # Runs when invoked by another workflow.
   workflow_call:
     inputs:
       ref:
+        description: Git ref to checkout (branch, tag, or SHA)
         required: true
         type: string
 
@@ -17,11 +24,10 @@ permissions:
 env:
   NODE_VERSION: 22
   PYTHON_VERSION: 3.14
-  CHECKOUT_REF: ${{ github.event_name == 'workflow_call' && inputs.ref || github.ref }}
 
 jobs:
   release_docs:
-    name: Doc release
+    name: Release docs
     environment:
       name: github-pages
     permissions:
@@ -31,11 +37,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Determine checkout ref
+        id: resolve_ref
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          REF="${INPUT_REF:-$DEFAULT_BRANCH}"
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
-          ref: ${{ env.CHECKOUT_REF }}
+          ref: ${{ steps.resolve_ref.outputs.ref }}
 
       - name: Set up Node
         uses: actions/setup-node@v6

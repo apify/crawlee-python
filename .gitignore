@@ -63,6 +63,8 @@ Session.vim
 
 # Docs
 docs/changelog.md
+website/versioned_docs/*/changelog.md
+website/versioned_docs/*/pyproject.toml
 
 # Website build artifacts, node dependencies
 website/build
