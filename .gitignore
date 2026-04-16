@@ -69,14 +69,14 @@ website/versioned_docs/*/pyproject.toml
 # Website build artifacts, node dependencies
 website/build
 website/node_modules
-website/.yarn
+website/.pnpm-store
 website/.docusaurus
 website/api-typedoc-generated.json
 website/apify-shared-docspec-dump.jsonl
 website/docspec-dump.jsonl
 website/module_shortcuts.json
 website/typedoc-types*
-# npm lockfile (we use yarn)
+# npm lockfile (we use pnpm)
 website/package-lock.json
 
 # Default directory for memory storage

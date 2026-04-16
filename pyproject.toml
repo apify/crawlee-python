@@ -281,6 +281,7 @@ exclude-newer = "24 hours"
 apify-client = false
 apify-shared = false
 apify_fingerprint_datapoints = false
+crawlee = false
 
 # Run tasks with: uv run poe <task>
 [tool.poe.tasks]
@@ -336,10 +337,14 @@ uv run pytest \
     tests/e2e/project_template
 """
 
+[tool.poe.tasks.update-docs-theme]
+shell = "pnpm update @apify/docs-theme"
+cwd = "website"
+
 [tool.poe.tasks.build-docs]
-shell = "./build_api_reference.sh && pnpm install --frozen-lockfile && pnpm build"
+shell = "./build_api_reference.sh && pnpm install && uv run pnpm build"
 cwd = "website"
 
 [tool.poe.tasks.run-docs]
-shell = "./build_api_reference.sh && pnpm install --frozen-lockfile && pnpm start"
+shell = "./build_api_reference.sh && pnpm install && uv run pnpm start"
 cwd = "website"
