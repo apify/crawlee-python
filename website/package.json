@@ -19,7 +19,8 @@
         "lint": "pnpm lint:code",
         "lint:fix": "pnpm lint:code:fix",
         "lint:code": "eslint .",
-        "lint:code:fix": "eslint . --fix"
+        "lint:code:fix": "eslint . --fix",
+        "preinstall": "npx only-allow pnpm"
     },
     "dependencies": {
         "@apify/docusaurus-plugin-typedoc-api": "^5.1.0",
@@ -69,12 +70,5 @@
         "rimraf": "^6.0.0",
         "typescript": "^6.0.0"
     },
-    "packageManager": "pnpm@10.24.0",
-    "devEngines": {
-        "packageManager": {
-            "name": "pnpm",
-            "version": "10.x",
-            "onFail": "error"
-        }
-    }
+    "packageManager": "pnpm@10.24.0"
 }
