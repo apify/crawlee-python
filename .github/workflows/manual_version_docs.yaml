@@ -61,12 +61,15 @@ jobs:
       - name: Install Python dependencies
         run: uv run poe install-dev
 
+      - name: Install pnpm and website dependencies
+        uses: apify/workflows/pnpm-install@main
+        with:
+          working-directory: website
+
       - name: Snapshot the current version
         id: snapshot
         run: |
           cd website
-          corepack enable
-          yarn install
 
           # Extract version from pyproject.toml.
           FULL_VERSION="$(uv version --short)"
@@ -98,8 +101,8 @@ jobs:
 
           # Build API reference and create Docusaurus version snapshots.
           bash build_api_reference.sh
-          uv run npx docusaurus docs:version "$MAJOR_MINOR_VERSION"
-          uv run npx docusaurus api:version "$MAJOR_MINOR_VERSION"
+          uv run pnpm exec docusaurus docs:version "$MAJOR_MINOR_VERSION"
+          uv run pnpm exec docusaurus api:version "$MAJOR_MINOR_VERSION"
 
       - name: Commit and push versioned docs
         id: commit_versioned_docs
