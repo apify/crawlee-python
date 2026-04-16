@@ -69,7 +69,8 @@ website/versioned_docs/*/pyproject.toml
 # Website build artifacts, node dependencies
 website/build
 website/node_modules
-website/.pnpm-store
+website/yarn.lock
+website/.yarn
 website/.docusaurus
 website/api-typedoc-generated.json
 website/apify-shared-docspec-dump.jsonl
