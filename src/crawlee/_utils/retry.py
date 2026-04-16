@@ -3,6 +3,7 @@ from __future__ import annotations
 from asyncio import sleep as _retry_sleep  # Using alias for testing purposes
 from datetime import timedelta
 from functools import wraps
+from logging import getLogger
 from typing import TYPE_CHECKING, ParamSpec, TypeVar
 
 if TYPE_CHECKING:
@@ -10,6 +11,8 @@ if TYPE_CHECKING:
 
 P = ParamSpec('P')
 T = TypeVar('T')
+
+logger = getLogger(__name__)
 
 
 def retry_on_error(
@@ -34,16 +37,26 @@ def retry_on_error(
         raise ValueError('At least one exception type must be specified')
 
     def decorator(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
+
+        func_qualname = getattr(func, '__qualname__', repr(func))
+        base_delay_seconds = base_delay.total_seconds()
+
         @wraps(func)
         async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-            base_delay_seconds = base_delay.total_seconds()
             for attempt in range(max_attempts):
                 try:
                     return await func(*args, **kwargs)
-                except exception_types:  # noqa: PERF203
+                except exception_types as exc:  # noqa: PERF203
                     if attempt >= max_attempts - 1:
                         raise
-                    await _retry_sleep(base_delay_seconds * (2**attempt))
+
+                    delay = base_delay_seconds * (2**attempt)
+                    logger.debug(
+                        f'{func_qualname}: attempt {attempt + 1}/{max_attempts} failed. '
+                        f'Retrying in {delay:.2f} seconds.',
+                        exc_info=exc,
+                    )
+                    await _retry_sleep(delay)
             raise RuntimeError('Unreachable')
 
         return wrapper
