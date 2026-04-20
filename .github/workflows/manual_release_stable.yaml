@@ -97,7 +97,7 @@ jobs:
           is_prerelease: ""
           version_number: ${{ needs.release_prepare.outputs.version_number }}
           ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
-      # Publishes the package to PyPI using PyPA official GitHub action with OIDC authentication.
+      # Publish the package to PyPI using PyPA official GitHub action with OIDC authentication.
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
 
@@ -111,6 +111,7 @@ jobs:
       contents: write
     uses: ./.github/workflows/manual_version_docs.yaml
     with:
+      # Commit the version docs changes on top of the changelog commit.
       ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
     secrets: inherit
 
@@ -123,6 +124,6 @@ jobs:
       id-token: write
     uses: ./.github/workflows/manual_release_docs.yaml
     with:
-      # Use the version_docs commit to include both changelog and versioned docs.
+      # Use the commit with the version docs changes as the source for the release docs.
       ref: ${{ needs.version_docs.outputs.version_docs_commitish }}
     secrets: inherit

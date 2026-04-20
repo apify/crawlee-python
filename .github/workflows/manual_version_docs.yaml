@@ -3,23 +3,17 @@ name: Version docs
 on:
   # Runs when manually triggered from the GitHub UI.
   workflow_dispatch:
-    inputs:
-      ref:
-        description: Git ref to checkout (branch, tag, or SHA). Defaults to the default branch.
-        required: false
-        type: string
-        default: ""
 
   # Runs when invoked by another workflow.
   workflow_call:
     inputs:
       ref:
-        description: Git ref to checkout (branch, tag, or SHA)
+        description: Git ref to checkout.
         required: true
         type: string
     outputs:
       version_docs_commitish:
-        description: The commit SHA of the versioned docs commit
+        description: The commit SHA of the versioned docs commit.
         value: ${{ jobs.version_docs.outputs.version_docs_commitish }}
 
 concurrency:
@@ -43,20 +37,11 @@ jobs:
       contents: write
 
     steps:
-      - name: Determine checkout ref
-        id: resolve_ref
-        env:
-          INPUT_REF: ${{ inputs.ref }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        run: |
-          REF="${INPUT_REF:-$DEFAULT_BRANCH}"
-          echo "ref=$REF" >> "$GITHUB_OUTPUT"
-
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
-          ref: ${{ steps.resolve_ref.outputs.ref }}
+          ref: ${{ inputs.ref || github.event.repository.default_branch }}
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -123,6 +108,8 @@ jobs:
           add: website/versioned_docs website/versioned_sidebars website/versions.json
           message: "docs: Version docs for v${{ steps.snapshot.outputs.version }} [skip ci]"
           default_author: github_actions
+          # `actions/checkout` detaches HEAD on SHA refs; EndBug needs a branch to push.
+          new_branch: ${{ github.event.repository.default_branch }}
 
       - name: Resolve output commitish
         id: resolve_commitish
