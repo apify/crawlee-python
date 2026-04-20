@@ -111,6 +111,7 @@ jobs:
           add: website/versioned_docs website/versioned_sidebars website/versions.json
           message: "docs: Version docs for v${{ steps.snapshot.outputs.version }} [skip ci]"
           default_author: github_actions
+          pull: '--rebase --autostash'
           # `actions/checkout` detaches HEAD on SHA refs; EndBug needs a branch to push.
           new_branch: ${{ github.event.repository.default_branch }}
 
