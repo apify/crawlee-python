@@ -53,8 +53,10 @@ from crawlee._utils.web import is_status_code_client_error, is_status_code_serve
 from crawlee.errors import (
     ContextPipelineInitializationError,
     ContextPipelineInterruptedError,
+    CriticalError,
     HttpClientStatusCodeError,
     HttpStatusCodeError,
+    NonRetryableError,
     RequestCollisionError,
     RequestHandlerError,
     SessionError,
@@ -961,6 +963,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if context.request.no_retry:
             return False
 
+        if isinstance(error, NonRetryableError):
+            return False
+
         # Do not retry on client errors.
         if isinstance(error, HttpClientStatusCodeError):
             return False
@@ -1469,6 +1474,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             primary_error = cast(
                 'RequestHandlerError[TCrawlingContext]', primary_error
             )  # valid thanks to ContextPipeline
+
+            if isinstance(primary_error.wrapped_exception, CriticalError):
+                self._logger.critical(
+                    'A CriticalError occurred in the user-defined request handler. Crawling will be terminated.',
+                    exc_info=primary_error.wrapped_exception,
+                )
+                raise primary_error.wrapped_exception
 
             self._logger.debug(
                 'An exception occurred in the user-defined request handler',

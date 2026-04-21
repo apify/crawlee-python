@@ -11,8 +11,10 @@ __all__ = [
     'ContextPipelineFinalizationError',
     'ContextPipelineInitializationError',
     'ContextPipelineInterruptedError',
+    'CriticalError',
     'HttpClientStatusCodeError',
     'HttpStatusCodeError',
+    'NonRetryableError',
     'ProxyError',
     'RequestCollisionError',
     'RequestHandlerError',
@@ -31,6 +33,16 @@ class UserDefinedErrorHandlerError(Exception):
 
 class UserHandlerTimeoutError(UserDefinedErrorHandlerError):
     """Raised when a router fails due to user raised timeout. This is different from user-defined handler timing out."""
+
+
+@docs_group('Errors')
+class CriticalError(Exception):
+    """Raised for severe errors where the crawl should be immediately aborted or gracefully shut down."""
+
+
+@docs_group('Errors')
+class NonRetryableError(Exception):
+    """Raised when a request failed and it is known that retrying will not resolve the issue."""
 
 
 @docs_group('Errors')
