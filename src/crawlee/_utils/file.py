@@ -154,8 +154,14 @@ async def export_json_to_stream(
     dst: TextIO,
     **kwargs: Unpack[ExportDataJsonKwargs],
 ) -> None:
-    items = [item async for item in iterator]
-    json.dump(items, dst, **kwargs)
+    dst.write('[\n')
+    is_first = True
+    async for item in iterator:
+        if not is_first:
+            dst.write(',\n')
+        is_first = False
+        json.dump(item, dst, **kwargs)
+    dst.write('\n]\n')
 
 
 async def export_csv_to_stream(

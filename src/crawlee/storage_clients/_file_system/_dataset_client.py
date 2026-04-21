@@ -451,8 +451,9 @@ class FileSystemDatasetClient(DatasetClient):
             item: The data item to add to the dataset.
             item_id: The sequential ID to use for this item's filename.
         """
-        # Generate the filename for the new item using zero-padded numbering.
-        filename = f'{str(item_id).zfill(self._ITEM_FILENAME_DIGITS)}.json'
+        # Generate the filename for the new item using zero-padded numbering and a random suffix to prevent cross-process overwrites.
+        uid = crypto_random_object_id()[:8]
+        filename = f'{str(item_id).zfill(self._ITEM_FILENAME_DIGITS)}_{uid}.json'
         file_path = self.path_to_dataset / filename
 
         # Ensure the dataset directory exists.
@@ -475,7 +476,7 @@ class FileSystemDatasetClient(DatasetClient):
         files = await asyncio.to_thread(
             lambda: sorted(
                 self.path_to_dataset.glob('*.json'),
-                key=lambda f: int(f.stem) if f.stem.isdigit() else 0,
+                key=lambda f: int(f.stem.split('_')[0]) if f.stem.split('_')[0].isdigit() else 0,
             )
         )
 
