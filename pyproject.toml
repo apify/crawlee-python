@@ -77,6 +77,9 @@ sql_postgres = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
     "asyncpg>=0.24.0"
 ]
+stragehard = [
+    "stagehand>=3.19.0",
+]
 sql_sqlite = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
     "aiosqlite>=0.21.0",
