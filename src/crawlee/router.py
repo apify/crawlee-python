@@ -32,6 +32,10 @@ class Router(Generic[TCrawlingContext]):
 
     router = Router[HttpCrawlingContext]()
 
+    # Middleware executed for every request before the handlers
+    @router.use
+    async def logging_middleware(context: HttpCrawlingContext) -> None:
+        context.log.info(f'Processing request: {context.request.url} label={context.request.label}')
 
     # Handler for requests without a matching label handler
     @router.default_handler
@@ -59,7 +63,7 @@ class Router(Generic[TCrawlingContext]):
     def __init__(self) -> None:
         self._default_handler: RequestHandler[TCrawlingContext] | None = None
         self._handlers_by_label = dict[str, RequestHandler[TCrawlingContext]]()
-        self._middlewares: list[Callable[[TCrawlingContext], Awaitable]] = []
+        self._middlewares: list[RequestHandler[TCrawlingContext]] = []
 
     def default_handler(self: Router, handler: RequestHandler[TCrawlingContext]) -> RequestHandler[TCrawlingContext]:
         """Register a default request handler.
@@ -92,7 +96,7 @@ class Router(Generic[TCrawlingContext]):
 
         return wrapper
 
-    def use(self, middleware: Callable[[TCrawlingContext], Awaitable]) -> Callable[[TCrawlingContext], Awaitable]:
+    def use(self, middleware: RequestHandler[TCrawlingContext]) -> RequestHandler[TCrawlingContext]:
         """Register a middleware.
 
         A middleware is a function that is executed before the request handler.
