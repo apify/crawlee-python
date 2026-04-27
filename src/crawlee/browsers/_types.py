@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 from playwright.async_api import Page
 
@@ -40,6 +40,7 @@ class StagehandOptions:
     self_heal: bool = True
     dom_settle_timeout_ms: float | None = None
     system_prompt: str | None = None
+    local_ready_timeout_s: float = 15.0
 
 
 class StagehandPage(Page):
@@ -51,11 +52,8 @@ class StagehandPage(Page):
     """
 
     def __init__(self, page: Page, session: AsyncSession) -> None:
-        self._page = page
+        super().__init__(page._impl_obj)  # noqa: SLF001
         self._session = session
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._page, name)
 
     async def act(self, **kwargs: Unpack[SessionActParams]) -> SessionActResponse:
         """Perform an action on the page using natural language.
@@ -68,7 +66,7 @@ class StagehandPage(Page):
         Returns:
             The action result from Stagehand.
         """
-        return await self._session.act(page=self._page, **kwargs)
+        return await self._session.act(page=self, **kwargs)
 
     async def observe(self, **kwargs: Unpack[SessionObserveParams]) -> SessionObserveResponse:
         """Observe the page and get AI-suggested actions.
@@ -80,7 +78,7 @@ class StagehandPage(Page):
         Returns:
             Observation result with suggested actions.
         """
-        return await self._session.observe(page=self._page, **kwargs)
+        return await self._session.observe(page=self, **kwargs)
 
     async def extract(self, **kwargs: Unpack[SessionExtractParams]) -> SessionExtractResponse:
         """Extract structured data from the page using natural language.
@@ -92,7 +90,7 @@ class StagehandPage(Page):
         Returns:
             Extracted data matching the requested schema.
         """
-        return await self._session.extract(page=self._page, **kwargs)
+        return await self._session.extract(page=self, **kwargs)
 
     async def execute(self, **kwargs: Unpack[SessionExecuteParams]) -> SessionExecuteResponse:
         """Execute arbitrary code on the page via natural language instructions.
@@ -104,4 +102,4 @@ class StagehandPage(Page):
         Returns:
             The result of the executed code.
         """
-        return await self._session.execute(page=self._page, **kwargs)
+        return await self._session.execute(page=self, **kwargs)

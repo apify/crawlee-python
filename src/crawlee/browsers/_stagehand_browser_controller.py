@@ -3,9 +3,8 @@ from __future__ import annotations
 from asyncio import Lock
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
-from playwright.async_api import Browser, BrowserContext, Page, ProxySettings
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
@@ -15,10 +14,12 @@ from crawlee.browsers._types import StagehandPage
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from stagehand import AsyncSession
+    from playwright.async_api import Browser, BrowserContext, Playwright
+    from stagehand import AsyncSession, AsyncStagehand
 
-    from crawlee.browsers._types import BrowserType
+    from crawlee.browsers._types import BrowserType, StagehandOptions
     from crawlee.proxy_configuration import ProxyInfo
+
 
 logger = getLogger(__name__)
 
@@ -27,42 +28,51 @@ logger = getLogger(__name__)
 class StagehandBrowserController(BrowserController):
     """Controller for managing a Stagehand-controlled browser instance.
 
-    Bridges Crawlee's browser management with Stagehand: provides page creation via
-    Playwright (connected to Stagehand's browser via CDP) and exposes the Stagehand
-    session so the crawling context can access AI methods (act/extract/observe).
+    Bridges Crawlee's browser management with Stagehand: lazily creates a Stagehand
+    session on the first page request (injecting proxy at that point), then connects
+    Playwright to it via CDP. All pages share a single browser context per controller.
     """
 
     AUTOMATION_LIBRARY = 'stagehand'
 
     def __init__(
         self,
-        browser: Browser,
-        session: AsyncSession,
         *,
+        playwright: Playwright,
+        stagehand_client: AsyncStagehand,
+        stagehand_options: StagehandOptions,
+        base_launch_options: dict[str, Any],
         max_open_pages_per_browser: int = 20,
     ) -> None:
         """Initialize a new instance.
 
         Args:
-            browser: Playwright browser connected to Stagehand via CDP.
-            session: Active Stagehand session used for AI operations.
+            playwright: Active Playwright instance used to connect to the browser via CDP.
+            stagehand_client: Active Stagehand client used to start sessions.
+            stagehand_options: Stagehand-specific configuration.
+            base_launch_options: Browser launch options (without proxy) built by the plugin.
             max_open_pages_per_browser: Maximum number of pages open at the same time.
         """
-        self._browser = browser
-        self._session = session
+        self._playwright = playwright
+        self._stagehand_client = stagehand_client
+        self._stagehand_options = stagehand_options
+        self._base_launch_options = base_launch_options
         self._max_open_pages_per_browser = max_open_pages_per_browser
 
+        self._session: AsyncSession | None = None
+        self._browser: Browser | None = None
         self._browser_context: BrowserContext | None = None
-        self._pages = list[Page]()
+        self._session_init_lock = Lock()
+
+        self._pages = list[StagehandPage]()
         self._total_opened_pages = 0
         self._opening_pages_count = 0
         self._last_page_opened_at = datetime.now(timezone.utc)
-        self._context_creation_lock: Lock | None = None
 
     @property
     @override
-    def pages(self) -> list[Page]:
-        return self._pages  # type: ignore[return-value]
+    def pages(self) -> list[StagehandPage]:
+        return self._pages
 
     @property
     @override
@@ -92,7 +102,8 @@ class StagehandBrowserController(BrowserController):
     @property
     @override
     def is_browser_connected(self) -> bool:
-        return self._browser.is_connected()
+        # Session not yet started — controller is available for new pages.
+        return self._browser is None or self._browser.is_connected()
 
     @property
     @override
@@ -110,19 +121,6 @@ class StagehandBrowserController(BrowserController):
         browser_new_context_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> StagehandPage:
-        """Create a new page in the Stagehand-managed browser.
-
-        Args:
-            browser_new_context_options: Ignored. Context is managed by Stagehand via CDP.
-            proxy_info: Proxy configuration applied when creating the shared browser context.
-                All pages share one context, so proxy is fixed on the first call.
-
-        Returns:
-            The newly created page.
-
-        Raises:
-            ValueError: If the browser has reached the maximum number of open pages.
-        """
         if not self.has_free_capacity:
             raise ValueError('Cannot open more pages in this browser.')
 
@@ -133,31 +131,15 @@ class StagehandBrowserController(BrowserController):
             )
 
         self._opening_pages_count += 1
-
         try:
-            async with await self._get_context_creation_lock():
-                if self._browser_context is None:
-                    if proxy_info:
-                        self._browser_context = await self._browser.new_context(
-                            proxy=ProxySettings(
-                                server=f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
-                                username=proxy_info.username,
-                                password=proxy_info.password,
-                            )
-                        )
-                    elif self._browser.contexts:
-                        # Reuse the existing CDP context when no proxy is needed.
-                        self._browser_context = self._browser.contexts[0]
-                    else:
-                        self._browser_context = await self._browser.new_context()
-                elif proxy_info:
-                    logger.warning(
-                        'proxy_info is ignored for subsequent pages — all pages share the same browser context.'
-                    )
+            await self._ensure_session(proxy_info)
+
+            if self._browser is None or self._session is None or self._browser_context is None:
+                raise RuntimeError('Failed to initialize the browser session.')
 
             raw_page = await self._browser_context.new_page()
             page = StagehandPage(raw_page, self._session)
-            raw_page.on('close', lambda _: self._on_page_close(cast('Page', page)))
+            raw_page.on('close', lambda _: self._on_page_close(page))
 
             self._pages.append(page)
             self._last_page_opened_at = datetime.now(timezone.utc)
@@ -169,25 +151,67 @@ class StagehandBrowserController(BrowserController):
 
     @override
     async def close(self, *, force: bool = False) -> None:
-        """End the Stagehand session and close the browser connection.
-
-        Args:
-            force: Whether to force close all open pages before closing.
-
-        Raises:
-            ValueError: If there are still open pages when closing without force.
-        """
         if self.pages_count > 0 and not force:
             raise ValueError('Cannot close the browser while there are open pages.')
+
+        if self._session is None:
+            return
 
         try:
             await self._session.end()
         except Exception:
             logger.warning('Failed to end Stagehand session gracefully.', exc_info=True)
 
-        if self._browser.is_connected():
+        if self._browser is not None and self._browser.is_connected():
             await self._browser.close()
 
-    def _on_page_close(self, page: Page) -> None:
-        """Handle actions after a page is closed."""
+    def _on_page_close(self, page: StagehandPage) -> None:
         self._pages.remove(page)
+
+    async def _ensure_session(self, proxy_info: ProxyInfo | None = None) -> None:
+        if self._session is not None:
+            return
+        async with self._session_init_lock:
+            if self._session is not None:
+                return
+
+            opts = self._stagehand_options
+            start_kwargs: dict[str, Any] = {
+                'model_name': opts.model,
+                'verbose': opts.verbose,
+                'self_heal': opts.self_heal,
+            }
+            if opts.dom_settle_timeout_ms is not None:
+                start_kwargs['dom_settle_timeout_ms'] = opts.dom_settle_timeout_ms
+            if opts.system_prompt is not None:
+                start_kwargs['system_prompt'] = opts.system_prompt
+
+            if opts.env == 'LOCAL':
+                launch_options: dict[str, Any] = dict(self._base_launch_options)
+                if proxy_info:
+                    launch_options['proxy'] = {
+                        'server': f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
+                        'username': proxy_info.username or '',
+                        'password': proxy_info.password or '',
+                    }
+                start_kwargs['browser'] = {'type': 'local', 'launch_options': launch_options}
+            elif proxy_info:
+                logger.warning(
+                    'Proxy support in BROWSERBASE mode requires configuring proxies via '
+                    'browserbase_session_create_params. proxy_info will be ignored.'
+                )
+
+            session: AsyncSession = await self._stagehand_client.sessions.start(**start_kwargs)
+
+            cdp_url = session.data.cdp_url
+            if not cdp_url:
+                raise RuntimeError(
+                    f'No cdp_url returned from Stagehand (env={self._stagehand_options.env!r}). '
+                    'Cannot connect Playwright to the browser.'
+                )
+
+            self._browser = await self._playwright.chromium.connect_over_cdp(cdp_url)
+            self._browser_context = (
+                self._browser.contexts[0] if self._browser.contexts else await self._browser.new_context()
+            )
+            self._session = session
