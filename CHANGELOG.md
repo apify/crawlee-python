@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.6.3 - **not yet released**
+## [1.6.3](https://github.com/apify/crawlee-python/releases/tag/v1.6.3) (2026-04-27)
 
 ### 🐛 Bug Fixes
 
@@ -14,7 +13,6 @@ All notable changes to this project will be documented in this file.
 - Preserve `forefront` flag on `RequestQueue` retry path ([#1861](https://github.com/apify/crawlee-python/pull/1861)) ([dc1073a](https://github.com/apify/crawlee-python/commit/dc1073a857b13ff246145dc4fe4ec09845972e0d)) by [@vdusek](https://github.com/vdusek)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.6.2](https://github.com/apify/crawlee-python/releases/tag/v1.6.2) (2026-04-08)
 
 ### 🐛 Bug Fixes
