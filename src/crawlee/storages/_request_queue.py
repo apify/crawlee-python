@@ -348,7 +348,12 @@ class RequestQueue(Storage, RequestManager):
                 unprocessed_requests_unique_keys = {request.unique_key for request in response.unprocessed_requests}
                 retry_batch = [request for request in batch if request.unique_key in unprocessed_requests_unique_keys]
                 await asyncio.sleep((base_retry_wait * attempt).total_seconds())
-                await self._process_batch(retry_batch, base_retry_wait=base_retry_wait, attempt=attempt + 1)
+                await self._process_batch(
+                    retry_batch,
+                    base_retry_wait=base_retry_wait,
+                    attempt=attempt + 1,
+                    forefront=forefront,
+                )
 
         request_count = len(batch) - len(response.unprocessed_requests)
 

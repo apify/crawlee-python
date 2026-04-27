@@ -3,8 +3,10 @@ from __future__ import annotations
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
 
+from redis.exceptions import RedisError
 from typing_extensions import NotRequired, override
 
+from crawlee._utils.retry import retry_on_error
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
@@ -102,14 +104,17 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
             instance_kwargs={},
         )
 
+    @retry_on_error(RedisError)
     @override
     async def get_metadata(self) -> DatasetMetadata:
         return await self._get_metadata(DatasetMetadata)
 
+    @retry_on_error(RedisError)
     @override
     async def drop(self) -> None:
         await self._drop(extra_keys=[self._items_key])
 
+    @retry_on_error(RedisError)
     @override
     async def purge(self) -> None:
         await self._purge(
@@ -119,6 +124,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
             ),
         )
 
+    @retry_on_error(RedisError)
     @override
     async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
         if isinstance(data, dict):
@@ -133,6 +139,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
                 ),
             )
 
+    @retry_on_error(RedisError)
     @override
     async def get_data(
         self,

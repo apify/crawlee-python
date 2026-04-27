@@ -9,11 +9,12 @@ import pytest
 from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import MemoryStorageClient, StorageClient
+from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, UnprocessedRequest
 from crawlee.storages import RequestQueue
 from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, Sequence
 
     from crawlee.storage_clients import StorageClient
 
@@ -257,6 +258,56 @@ async def test_add_requests_with_forefront(rq: RequestQueue) -> None:
     next_request = await rq.fetch_next_request()
     assert next_request is not None
     assert next_request.url == 'https://example.com/priority'
+
+
+@pytest.mark.parametrize('forefront', [True, False])
+async def test_add_requests_retry_preserves_forefront(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    forefront: bool,
+) -> None:
+    """Regression test: when ``add_batch_of_requests`` returns unprocessed requests, the retry must preserve the
+    original `forefront` value rather than silently falling back to the parameter default."""
+    rq = await RequestQueue.open(storage_client=MemoryStorageClient())
+    forefront_calls: list[bool] = []
+
+    async def patched_add_batch(
+        requests: Sequence[Request],
+        *,
+        forefront: bool = False,
+    ) -> AddRequestsResponse:
+        forefront_calls.append(forefront)
+        if len(forefront_calls) == 1:
+            return AddRequestsResponse(
+                processed_requests=[],
+                unprocessed_requests=[UnprocessedRequest(unique_key=r.unique_key, url=r.url) for r in requests],
+            )
+        return AddRequestsResponse(
+            processed_requests=[
+                ProcessedRequest(
+                    unique_key=r.unique_key,
+                    was_already_present=False,
+                    was_already_handled=False,
+                )
+                for r in requests
+            ],
+            unprocessed_requests=[],
+        )
+
+    monkeypatch.setattr(rq._client, 'add_batch_of_requests', patched_add_batch)
+
+    try:
+        await rq.add_requests(
+            ['https://example.com/a', 'https://example.com/b'],
+            forefront=forefront,
+            wait_time_between_batches=timedelta(seconds=0),
+        )
+    finally:
+        await rq.drop()
+
+    assert forefront_calls == [forefront, forefront], (
+        f'retry must propagate the original forefront={forefront} flag, got: {forefront_calls}'
+    )
 
 
 async def test_add_requests_mixed_forefront(rq: RequestQueue) -> None:
