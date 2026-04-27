@@ -1654,11 +1654,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         current_state = self.statistics.state
 
         if (
-            failed_requests := (
-                current_state.requests_failed - (self._previous_crawler_state or current_state).requests_failed
-            )
-            > 0
-        ):
+            failed_requests := current_state.requests_failed
+            - (self._previous_crawler_state or current_state).requests_failed
+        ) > 0:
             message = f'Experiencing problems, {failed_requests} failed requests since last status update.'
         else:
             request_manager = await self.get_request_manager()

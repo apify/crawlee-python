@@ -29,7 +29,7 @@ from crawlee.errors import RequestCollisionError, SessionError, UserDefinedError
 from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
 from crawlee.request_loaders import RequestList, RequestManagerTandem
 from crawlee.sessions import Session, SessionPool
-from crawlee.statistics import FinalStatistics
+from crawlee.statistics import FinalStatistics, StatisticsState
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
@@ -40,7 +40,6 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee._types import JsonSerializable
-    from crawlee.statistics import StatisticsState
 
 
 async def test_processes_requests_from_explicit_queue() -> None:
@@ -1734,6 +1733,27 @@ async def test_status_message_emit() -> None:
     event_manager.off(event=Event.CRAWLER_STATUS, listener=listener)
 
     assert status_message_listener.called
+
+
+async def test_status_message_reports_failed_request_count() -> None:
+    """The 'Experiencing problems' status message reports the count of new failures since the last update."""
+    captured_messages: list[str] = []
+
+    async def status_callback(
+        state: StatisticsState, previous_state: StatisticsState | None, message: str
+    ) -> str | None:
+        captured_messages.append(message)
+        return None
+
+    crawler = BasicCrawler(status_message_callback=status_callback)
+    crawler._previous_crawler_state = StatisticsState(requests_failed=2)
+    crawler._statistics = Mock(state=StatisticsState(requests_failed=5))
+
+    async with service_locator.get_event_manager():
+        await crawler._crawler_state_task()
+
+    problem_messages = [m for m in captured_messages if m.startswith('Experiencing problems')]
+    assert problem_messages == ['Experiencing problems, 3 failed requests since last status update.']
 
 
 @pytest.mark.parametrize(
