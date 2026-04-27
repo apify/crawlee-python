@@ -257,6 +257,9 @@ exclude = [
     "website/versioned_docs",
 ]
 
+[tool.ty.rules]
+unused-ignore-comment = "error"
+
 [[tool.ty.overrides]]
 include = [
     "docs/**/*.py",
