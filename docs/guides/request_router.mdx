@@ -60,7 +60,7 @@ More complex crawling projects often require different processing logic for vari
 
 ## Middleware
 
-Middlewares are functions registered with `router.use()` that execute before the matched request handler on every request, regardless of the request label. Multiple middlewares can be registered and are executed sequentially in the order they were registered. If a middleware raises an exception, the execution chain is interrupted and the handler is not called.
+Middlewares are functions registered with <ApiLink to="class/Router#use">`router.use()`</ApiLink> that execute before the matched request handler on every request, regardless of the request label. Multiple middlewares can be registered and are executed sequentially in the order they were registered. If a middleware raises an exception, the execution chain is interrupted and the handler is not called.
 
 <RunnableCodeBlock className="language-python" language="python">
     {RouterMiddleware}
@@ -116,6 +116,6 @@ The <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</A
 
 ## Conclusion
 
-This guide introduced you to the <ApiLink to="class/Router">`Router`</ApiLink> class and how to organize your crawling logic. You learned how to use built-in and custom routers, implement request handlers with label-based routing, add middleware with `router.use()`, handle errors with error and failed request handlers, and configure pre-navigation hooks for different crawler types.
+This guide introduced you to the <ApiLink to="class/Router">`Router`</ApiLink> class and how to organize your crawling logic. You learned how to use built-in and custom routers, implement request handlers with label-based routing, add middleware with <ApiLink to="class/Router#use">`router.use()`</ApiLink>, handle errors with error and failed request handlers, and configure pre-navigation hooks for different crawler types.
 
 If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!
