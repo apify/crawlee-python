@@ -31,11 +31,16 @@ logger = getLogger(__name__)
 class StagehandBrowserPlugin(BrowserPlugin):
     """A plugin for managing Stagehand AI-powered browser automation.
 
-    Stagehand creates and manages the browser instance (local binary or Browserbase cloud).
-    Playwright then connects to it via CDP, enabling both standard Playwright automation
-    and AI-powered operations in the same crawling context.
+    It acts as a factory for creating `StagehandBrowserController` instances and manages the
+    lifecycle of the shared `AsyncStagehand` REST client and the Playwright context. Depending
+    on the configured environment, the browser runs locally via a bundled Chromium binary
+    (``env='LOCAL'``) or in the Browserbase cloud (``env='BROWSERBASE'``). Playwright connects
+    to the running browser via CDP, so only Chromium is supported.
 
-    Only Chromium is supported because Stagehand relies on the Chrome DevTools Protocol.
+    Not all Playwright browser and context options are supported — only those accepted by
+    Stagehand's ``BrowserLaunchOptions``. Because Stagehand creates the browser and its context
+    together in a single ``sessions.start()`` call, both ``browser_launch_options`` and
+    ``browser_new_context_options`` are merged into one set of options applied at session start.
     """
 
     AUTOMATION_LIBRARY = 'stagehand'
@@ -52,46 +57,50 @@ class StagehandBrowserPlugin(BrowserPlugin):
         """Initialize a new instance.
 
         Args:
-            user_data_dir: Path to a User Data Directory, which stores browser session data like cookies and local
-                storage.
+            user_data_dir: Path to a user data directory, which stores browser session data like
+                cookies and local storage.
             stagehand_options: Stagehand-specific configuration (model, API key, env, etc.).
-            browser_launch_options: Keyword arguments for browser launch. Supported options are
-                a subset of Playwright's ``browser_type.launch`` options that map to Stagehand's
-                ``BrowserLaunchOptions``. Unsupported keys are logged as warnings and ignored.
-            browser_new_context_options: Keyword arguments for browser context creation.
-                Options that map to Stagehand's ``BrowserLaunchOptions`` are merged with
-                ``browser_launch_options``. Unsupported keys are logged as warnings and ignored.
-            max_open_pages_per_browser: Maximum number of pages that can be open per browser.
+            browser_launch_options: Keyword arguments passed to Stagehand's ``BrowserLaunchOptions``
+                on session start. Supported keys are a subset of Playwright's ``browser_type.launch``
+                options. These take priority over ``browser_new_context_options`` for shared keys.
+            browser_new_context_options: Additional options merged with ``browser_launch_options``
+                at lower priority. Subject to the same ``BrowserLaunchOptions`` constraints.
+            max_open_pages_per_browser: The maximum number of pages that can be open in a single
+                browser instance. Once reached, a new browser instance will be launched.
         """
         config = service_locator.get_configuration()
 
         self._max_open_pages_per_browser = max_open_pages_per_browser
-
         self.stagehand_options = stagehand_options or StagehandOptions()
-        self._browser_new_context_options = browser_new_context_options or {}
 
         is_local = self.stagehand_options.env == 'LOCAL'
 
-        self._base_launch_options: dict[str, Any] = {
+        # browser_launch_options take priority over browser_new_context_options for shared keys.
+        self._browser_launch_options: dict[str, Any] = {
             'headless': config.headless,
             'chromium_sandbox': not config.disable_browser_sandbox,
+            **(browser_new_context_options or {}),
+            **(browser_launch_options or {}),
         }
+
         if config.default_browser_path:
-            self._base_launch_options['executable_path'] = config.default_browser_path
+            self._browser_launch_options.setdefault('executable_path', config.default_browser_path)
 
-        self._base_launch_options = {**self._base_launch_options, **(browser_launch_options or {})}
+        if user_data_dir is not None:
+            self._browser_launch_options['user_data_dir'] = str(user_data_dir)
 
-        self._stagehand_init_kwargs: dict[str, Any] = {
+        # Parameters for AsyncStagehand.
+        self._stagehand_init_params: dict[str, Any] = {
             'server': 'local' if is_local else 'remote',
-            'local_headless': self._base_launch_options.get('headless', config.headless),
+            'local_headless': self._browser_launch_options['headless'],
             'local_ready_timeout_s': self.stagehand_options.local_ready_timeout_s,
-            'user_data_dir': str(user_data_dir) if user_data_dir else None,
         }
-        if is_local:
-            self._stagehand_init_kwargs['model_api_key'] = self.stagehand_options.api_key
-        else:
-            self._stagehand_init_kwargs['browserbase_api_key'] = self.stagehand_options.api_key
-            self._stagehand_init_kwargs['browserbase_project_id'] = self.stagehand_options.project_id
+
+        self._stagehand_init_params['model_api_key'] = self.stagehand_options.api_key
+
+        if not is_local:
+            self._stagehand_init_params['browserbase_api_key'] = self.stagehand_options.api_key
+            self._stagehand_init_params['browserbase_project_id'] = self.stagehand_options.project_id
 
         self._stagehand_client: AsyncStagehand | None = None
         self._playwright_context_manager = async_playwright()
@@ -111,12 +120,25 @@ class StagehandBrowserPlugin(BrowserPlugin):
     @property
     @override
     def browser_launch_options(self) -> Mapping[str, Any]:
-        return self._base_launch_options
+        """Return the options passed to Stagehand's ``BrowserLaunchOptions`` on session start.
+
+        These are a subset of Playwright's ``browser_type.launch`` options — only keys recognised
+        by Stagehand's ``BrowserLaunchOptions`` take effect.
+        """
+        return self._browser_launch_options
 
     @property
     @override
     def browser_new_context_options(self) -> Mapping[str, Any]:
-        return {}
+        """Return the browser context options passed to Stagehand's ``BrowserLaunchOptions``.
+
+        Stagehand creates the browser and its context together in a single ``sessions.start()``
+        call, so context-level options such as ``viewport`` and ``locale`` are part of
+        ``BrowserLaunchOptions`` and share the same dictionary as ``browser_launch_options``.
+        Pre-navigation hooks that modify these options before the first page will take effect,
+        because session creation is deferred until the first ``new_page`` call.
+        """
+        return self._browser_launch_options
 
     @property
     @override
@@ -131,16 +153,15 @@ class StagehandBrowserPlugin(BrowserPlugin):
         self._active = True
         self._playwright = await self._playwright_context_manager.__aenter__()
 
-        # Resolve Chromium path for LOCAL mode.
         if self.stagehand_options.env == 'LOCAL':
-            if 'executable_path' not in self._base_launch_options:
+            if 'executable_path' not in self._browser_launch_options:
                 chrome_path = self._playwright.chromium.executable_path
-                self._base_launch_options['executable_path'] = chrome_path
+                self._browser_launch_options['executable_path'] = chrome_path
                 logger.debug(f'Resolved Chromium path from Playwright: {chrome_path}')
 
-            self._stagehand_init_kwargs['local_chrome_path'] = self._base_launch_options['executable_path']
+            self._stagehand_init_params['local_chrome_path'] = self._browser_launch_options['executable_path']
 
-        client = AsyncStagehand(**self._stagehand_init_kwargs)
+        client = AsyncStagehand(**self._stagehand_init_params)
         await client.__aenter__()
         self._stagehand_client = client
 
@@ -175,6 +196,5 @@ class StagehandBrowserPlugin(BrowserPlugin):
             playwright=self._playwright,
             stagehand_client=self._stagehand_client,
             stagehand_options=self.stagehand_options,
-            base_launch_options=self._base_launch_options,
             max_open_pages_per_browser=self._max_open_pages_per_browser,
         )

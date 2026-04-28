@@ -28,9 +28,10 @@ logger = getLogger(__name__)
 class StagehandBrowserController(BrowserController):
     """Controller for managing a Stagehand-controlled browser instance.
 
-    Bridges Crawlee's browser management with Stagehand: lazily creates a Stagehand
-    session on the first page request (injecting proxy at that point), then connects
-    Playwright to it via CDP. All pages share a single browser context per controller.
+    It creates and connects to the browser lazily on the first ``new_page`` call: Stagehand
+    starts a session, and Playwright then connects to it via CDP. All pages share a single
+    browser context, as Stagehand creates the browser and its context together during session
+    initialisation.
     """
 
     AUTOMATION_LIBRARY = 'stagehand'
@@ -41,22 +42,20 @@ class StagehandBrowserController(BrowserController):
         playwright: Playwright,
         stagehand_client: AsyncStagehand,
         stagehand_options: StagehandOptions,
-        base_launch_options: dict[str, Any],
         max_open_pages_per_browser: int = 20,
     ) -> None:
         """Initialize a new instance.
 
         Args:
             playwright: Active Playwright instance used to connect to the browser via CDP.
-            stagehand_client: Active Stagehand client used to start sessions.
-            stagehand_options: Stagehand-specific configuration.
-            base_launch_options: Browser launch options (without proxy) built by the plugin.
-            max_open_pages_per_browser: Maximum number of pages open at the same time.
+            stagehand_client: Active Stagehand REST client used to start and end sessions.
+            stagehand_options: Stagehand-specific configuration (model, env, self-heal, etc.).
+            browser_launch_options: Browser options built by the plugin.
+            max_open_pages_per_browser: Maximum number of pages that can be open at the same time.
         """
         self._playwright = playwright
         self._stagehand_client = stagehand_client
         self._stagehand_options = stagehand_options
-        self._base_launch_options = base_launch_options
         self._max_open_pages_per_browser = max_open_pages_per_browser
 
         self._session: AsyncSession | None = None
@@ -110,29 +109,35 @@ class StagehandBrowserController(BrowserController):
     def browser_type(self) -> BrowserType:
         return 'chromium'
 
-    async def _get_context_creation_lock(self) -> Lock:
-        if self._context_creation_lock is None:
-            self._context_creation_lock = Lock()
-        return self._context_creation_lock
-
     @override
     async def new_page(
         self,
         browser_new_context_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> StagehandPage:
+        """Create a new page in the Stagehand-managed browser.
+
+        On the first call, starts the Stagehand session with the provided options. On subsequent
+        calls, ``browser_new_context_options`` are ignored with a warning because the browser
+        context cannot be reconfigured once the session is running.
+
+        Args:
+            browser_new_context_options: Options merged on top of the plugin's launch options
+                when creating the first session. Ignored if the session already exists.
+            proxy_info: Proxy injected into the session on first creation.
+
+        Raises:
+            ValueError: If the browser has reached the maximum number of open pages.
+            RuntimeError: If the Stagehand session fails to initialise.
+        """
         if not self.has_free_capacity:
             raise ValueError('Cannot open more pages in this browser.')
 
-        if browser_new_context_options:
-            logger.warning(
-                'browser_new_context_options are ignored by StagehandBrowserController. '
-                'The existing CDP context is reused.'
-            )
-
         self._opening_pages_count += 1
         try:
-            await self._ensure_session(proxy_info)
+            # Lazily start a Stagehand session on the first page request, passing proxy and context options
+            # at that point.
+            await self._ensure_session(browser_new_context_options, proxy_info)
 
             if self._browser is None or self._session is None or self._browser_context is None:
                 raise RuntimeError('Failed to initialize the browser session.')
@@ -168,40 +173,54 @@ class StagehandBrowserController(BrowserController):
     def _on_page_close(self, page: StagehandPage) -> None:
         self._pages.remove(page)
 
-    async def _ensure_session(self, proxy_info: ProxyInfo | None = None) -> None:
+    async def _ensure_session(
+        self,
+        browser_new_context_options: Mapping[str, Any] | None = None,
+        proxy_info: ProxyInfo | None = None,
+    ) -> None:
         if self._session is not None:
             return
         async with self._session_init_lock:
             if self._session is not None:
                 return
 
-            opts = self._stagehand_options
-            start_kwargs: dict[str, Any] = {
-                'model_name': opts.model,
-                'verbose': opts.verbose,
-                'self_heal': opts.self_heal,
-            }
-            if opts.dom_settle_timeout_ms is not None:
-                start_kwargs['dom_settle_timeout_ms'] = opts.dom_settle_timeout_ms
-            if opts.system_prompt is not None:
-                start_kwargs['system_prompt'] = opts.system_prompt
+            browser_new_context_options = dict(browser_new_context_options) if browser_new_context_options else {}
 
-            if opts.env == 'LOCAL':
-                launch_options: dict[str, Any] = dict(self._base_launch_options)
+            # Parameters for sessions.start() — AI model settings from stagehand_options.
+            session_start_params: dict[str, Any] = {
+                'model_name': self._stagehand_options.model,
+                'verbose': self._stagehand_options.verbose,
+                'self_heal': self._stagehand_options.self_heal,
+            }
+            if self._stagehand_options.dom_settle_timeout_ms is not None:
+                session_start_params['dom_settle_timeout_ms'] = self._stagehand_options.dom_settle_timeout_ms
+
+            if self._stagehand_options.system_prompt is not None:
+                session_start_params['system_prompt'] = self._stagehand_options.system_prompt
+
+            if self._stagehand_options.env == 'LOCAL':
                 if proxy_info:
-                    launch_options['proxy'] = {
+                    browser_new_context_options['proxy'] = {
                         'server': f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
                         'username': proxy_info.username or '',
                         'password': proxy_info.password or '',
                     }
-                start_kwargs['browser'] = {'type': 'local', 'launch_options': launch_options}
-            elif proxy_info:
-                logger.warning(
-                    'Proxy support in BROWSERBASE mode requires configuring proxies via '
-                    'browserbase_session_create_params. proxy_info will be ignored.'
-                )
+                session_start_params['browser'] = {'type': 'local', 'launch_options': browser_new_context_options}
+            else:
+                session_start_params['browser'] = {'type': 'browserbase'}
+                if proxy_info:
+                    session_start_params['browserbase_session_create_params'] = {
+                        'proxies': [
+                            {
+                                'type': 'external',
+                                'server': f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
+                                'username': proxy_info.username or '',
+                                'password': proxy_info.password or '',
+                            }
+                        ]
+                    }
 
-            session: AsyncSession = await self._stagehand_client.sessions.start(**start_kwargs)
+            session: AsyncSession = await self._stagehand_client.sessions.start(**session_start_params)
 
             cdp_url = session.data.cdp_url
             if not cdp_url:
