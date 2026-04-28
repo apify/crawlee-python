@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.6.4 - **not yet released**
+
+### 🚀 Features
+
+- Add `use` to `Router` for middleware support with pre-handler execution ([#1857](https://github.com/apify/crawlee-python/pull/1857)) ([23d7d6c](https://github.com/apify/crawlee-python/commit/23d7d6c5865a05b75bc6c68490e3382d876cde64)) by [@Mantisus](https://github.com/Mantisus), closes [#1742](https://github.com/apify/crawlee-python/issues/1742)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.6.3](https://github.com/apify/crawlee-python/releases/tag/v1.6.3) (2026-04-27)
 
 ### 🐛 Bug Fixes
