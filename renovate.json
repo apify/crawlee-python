@@ -23,7 +23,7 @@
             "automergeType": "branch"
         },
         {
-            "matchPackageNames": ["@apify/*", "@crawlee/*", "apify-client", "apify", "crawlee", "got-scraping"],
+            "matchPackageNames": ["@apify/*", "@crawlee/*", "apify", "apify-client", "apify-shared", "apify-fingerprint-datapoints", "crawlee", "got-scraping"],
             "minimumReleaseAge": "0 days"
         }
     ],
