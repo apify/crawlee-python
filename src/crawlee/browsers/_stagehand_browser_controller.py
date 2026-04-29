@@ -9,7 +9,7 @@ from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
 from crawlee.browsers._browser_controller import BrowserController
-from crawlee.browsers._types import StagehandPage
+from crawlee.browsers._stagehand_types import StagehandPage
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -17,7 +17,8 @@ if TYPE_CHECKING:
     from playwright.async_api import Browser, BrowserContext, Playwright
     from stagehand import AsyncSession, AsyncStagehand
 
-    from crawlee.browsers._types import BrowserType, StagehandOptions
+    from crawlee.browsers._stagehand_types import StagehandOptions
+    from crawlee.browsers._types import BrowserType
     from crawlee.proxy_configuration import ProxyInfo
 
 

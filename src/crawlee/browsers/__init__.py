@@ -1,7 +1,7 @@
 from crawlee._utils.try_import import install_import_hook as _install_import_hook
 from crawlee._utils.try_import import try_import as _try_import
 
-from ._types import BrowserType, CrawleePage, StagehandOptions, StagehandPage
+from ._types import BrowserType, CrawleePage
 
 _install_import_hook(__name__)
 
@@ -21,6 +21,8 @@ with _try_import(__name__, 'StagehandBrowserController'):
     from ._stagehand_browser_controller import StagehandBrowserController
 with _try_import(__name__, 'StagehandBrowserPlugin'):
     from ._stagehand_browser_plugin import StagehandBrowserPlugin
+with _try_import(__name__, 'StagehandOptions', 'StagehandPage'):
+    from ._stagehand_types import StagehandOptions, StagehandPage
 
 
 __all__ = [

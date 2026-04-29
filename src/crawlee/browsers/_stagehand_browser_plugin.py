@@ -13,7 +13,7 @@ from crawlee._utils.docs import docs_group
 
 from ._browser_plugin import BrowserPlugin
 from ._stagehand_browser_controller import StagehandBrowserController
-from ._types import StagehandOptions
+from ._stagehand_types import StagehandOptions
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -95,11 +95,11 @@ class StagehandBrowserPlugin(BrowserPlugin):
             'local_headless': self._browser_launch_options['headless'],
             'local_ready_timeout_s': self.stagehand_options.local_ready_timeout_s,
         }
-
-        self._stagehand_init_params['model_api_key'] = self.stagehand_options.api_key
+        if self.stagehand_options.model_api_key is not None:
+            self._stagehand_init_params['model_api_key'] = self.stagehand_options.model_api_key
 
         if not is_local:
-            self._stagehand_init_params['browserbase_api_key'] = self.stagehand_options.api_key
+            self._stagehand_init_params['browserbase_api_key'] = self.stagehand_options.browserbase_api_key
             self._stagehand_init_params['browserbase_project_id'] = self.stagehand_options.project_id
 
         self._stagehand_client: AsyncStagehand | None = None

@@ -63,7 +63,7 @@ class StagehandCrawler(
     import asyncio
     from crawlee.crawlers import StagehandCrawler
     from crawlee.crawlers._stagehand import StagehandCrawlingContext
-    from crawlee.browsers._types import StagehandOptions
+    from crawlee.browsers import StagehandOptions
 
     crawler = StagehandCrawler(
         stagehand_options=StagehandOptions(

@@ -275,7 +275,10 @@ class PlaywrightCrawler(
         response: Response | None = None,
     ) -> PlaywrightPreNavCrawlingContext | PlaywrightPostNavCrawlingContext | PlaywrightCrawlingContext:
         """Build the crawling context by adding Playwright-specific properties."""
+        # Order is important, as all context subclasses each other,
+        # so the most specific context should be checked first.
         match context:
+            # Create the final crawling context from `PostNavCrawlingContext`
             case self._POST_NAV_CONTEXT_CLASS():
                 extract_links = self._create_extract_links_function(context)
                 return self._CRAWLING_CONTEXT_CLASS(
@@ -297,6 +300,7 @@ class PlaywrightCrawler(
                     enqueue_links=self._create_enqueue_links_function(context, extract_links),
                     block_requests=context.block_requests,
                 )
+            # Create the post-navigation context from `PreNavCrawlingContext`
             case self._PRE_NAV_CONTEXT_CLASS():
                 if response is None:
                     raise ValueError('Response must be provided for post-navigation context.')
@@ -317,6 +321,7 @@ class PlaywrightCrawler(
                     goto_options=context.goto_options,
                     response=response,
                 )
+            # Create the pre-navigation context from `BasicCrawlingContext`
             case BasicCrawlingContext():
                 if page is None:
                     raise ValueError('Page must be provided for pre-navigation context.')
