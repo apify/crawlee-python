@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 
 - Add `use` to `Router` for middleware support with pre-handler execution ([#1857](https://github.com/apify/crawlee-python/pull/1857)) ([23d7d6c](https://github.com/apify/crawlee-python/commit/23d7d6c5865a05b75bc6c68490e3382d876cde64)) by [@Mantisus](https://github.com/Mantisus), closes [#1742](https://github.com/apify/crawlee-python/issues/1742)
 
+### 🐛 Bug Fixes
+
+- Reject non-http(s) URL schemes in HTTP clients ([#1862](https://github.com/apify/crawlee-python/pull/1862)) ([ac66b2a](https://github.com/apify/crawlee-python/commit/ac66b2a4851a11db3a5943d85f7091f39b1053f4)) by [@vdusek](https://github.com/vdusek)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [1.6.3](https://github.com/apify/crawlee-python/releases/tag/v1.6.3) (2026-04-27)
