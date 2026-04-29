@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from curl_cffi import CurlHttpVersion
+from pydantic import ValidationError
 
 from crawlee import Request
 from crawlee.errors import ProxyError
@@ -251,3 +252,14 @@ async def test_compressed_chunked_stream(http_client: HttpClient, server_url: UR
             content_body += chunk
 
     assert content_body == HELLO_WORLD * 1000
+
+
+async def test_send_request_rejects_non_http_scheme(http_client: HttpClient) -> None:
+    with pytest.raises(ValidationError):
+        await http_client.send_request('gopher://127.0.0.1:6379/_PING')
+
+
+async def test_stream_rejects_non_http_scheme(http_client: HttpClient) -> None:
+    with pytest.raises(ValidationError):
+        async with http_client.stream('gopher://127.0.0.1:6379/_PING'):
+            pass
