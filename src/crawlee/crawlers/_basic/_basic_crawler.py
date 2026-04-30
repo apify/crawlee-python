@@ -204,6 +204,12 @@ class _BasicCrawlerOptions(TypedDict):
     """If set to `True`, the crawler will automatically try to fetch the robots.txt file for each domain,
     and skip those that are not allowed. This also prevents disallowed URLs to be added via `EnqueueLinksFunction`."""
 
+    send_request_enqueue_strategy: NotRequired[EnqueueStrategy]
+    """Strategy applied by `BasicCrawlingContext.send_request` to validate the target URL against the current request's
+    URL. Defaults to `'all'`, which preserves the historical behaviour of allowing arbitrary URLs. Set to e.g.
+    `'same-hostname'` to restrict `send_request` to the same host as the current request, for example when handlers
+    pass URLs extracted from page content to `send_request` directly."""
+
     status_message_logging_interval: NotRequired[timedelta]
     """Interval for logging the crawler status messages."""
 
@@ -299,6 +305,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         configure_logging: bool = True,
         statistics_log_format: Literal['table', 'inline'] = 'table',
         respect_robots_txt_file: bool = False,
+        send_request_enqueue_strategy: EnqueueStrategy = 'all',
         status_message_logging_interval: timedelta = timedelta(seconds=10),
         status_message_callback: Callable[[StatisticsState, StatisticsState | None, str], Awaitable[str | None]]
         | None = None,
@@ -352,6 +359,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             respect_robots_txt_file: If set to `True`, the crawler will automatically try to fetch the robots.txt file
                 for each domain, and skip those that are not allowed. This also prevents disallowed URLs to be added
                 via `EnqueueLinksFunction`
+            send_request_enqueue_strategy: Strategy applied by `BasicCrawlingContext.send_request` to validate the
+                target URL against the current request's URL (`loaded_url` if available, otherwise `url`). Defaults
+                to `'all'`, preserving the historical behaviour of allowing arbitrary URLs. Set to e.g.
+                `'same-hostname'` when handlers extract URLs from page content and pass them straight to
+                `send_request`, to keep cross-host fetches intentional.
             status_message_logging_interval: Interval for logging the crawler status messages.
             status_message_callback: Allows overriding the default status message. The default status message is
                 provided in the parameters. Returning `None` suppresses the status message.
@@ -432,6 +444,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._max_session_rotations = max_session_rotations
         self._max_crawl_depth = max_crawl_depth
         self._respect_robots_txt_file = respect_robots_txt_file
+        self._send_request_enqueue_strategy = send_request_enqueue_strategy
 
         # Timeouts
         self._request_handler_timeout = request_handler_timeout
@@ -1275,7 +1288,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self,
         session: Session | None,
         proxy_info: ProxyInfo | None,
+        request: Request,
     ) -> SendRequestFunction:
+        strategy = self._send_request_enqueue_strategy
+        origin_url = request.loaded_url or request.url
+        origin_parsed = urlparse(origin_url) if strategy != 'all' else None
+
         async def send_request(
             url: str,
             *,
@@ -1283,6 +1301,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             payload: HttpPayload | None = None,
             headers: HttpHeaders | dict[str, str] | None = None,
         ) -> HttpResponse:
+            if origin_parsed is not None and not self._check_enqueue_strategy(
+                strategy,
+                target_url=urlparse(url),
+                origin_url=origin_parsed,
+            ):
+                raise ValueError(
+                    f'send_request() refusing to fetch {url!r}: does not match enqueue strategy '
+                    f'{strategy!r} relative to {origin_url!r}.'
+                )
             return await self._http_client.send_request(
                 url=url,
                 method=method,
@@ -1428,7 +1455,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request=result.request,
             session=session,
             proxy_info=proxy_info,
-            send_request=self._prepare_send_request_function(session, proxy_info),
+            send_request=self._prepare_send_request_function(session, proxy_info, request),
             add_requests=result.add_requests,
             push_data=result.push_data,
             get_key_value_store=result.get_key_value_store,

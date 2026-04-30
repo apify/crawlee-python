@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock, Mock, call, patch
 
 import pytest
 
-from crawlee import ConcurrencySettings, Glob, service_locator
+from crawlee import ConcurrencySettings, EnqueueStrategy, Glob, service_locator
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpMethod
 from crawlee._utils.robots import RobotsTxtFile
@@ -338,6 +338,43 @@ async def test_handles_error_in_failed_request_handler() -> None:
 
     with pytest.raises(UserDefinedErrorHandlerError):
         await crawler.run(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
+
+
+@pytest.mark.parametrize(
+    ('strategy', 'target_path', 'should_succeed'),
+    [
+        pytest.param('all', 'get', True, id='default-all-allows-same-host'),
+        pytest.param('same-hostname', 'get', True, id='same-hostname-allows-same-host'),
+        pytest.param('same-hostname', 'http://other.test/payload', False, id='same-hostname-rejects-cross-host'),
+    ],
+)
+async def test_send_request_enqueue_strategy(
+    server_url: URL, strategy: EnqueueStrategy, target_path: str, *, should_succeed: bool
+) -> None:
+    bodies: list[bytes] = []
+    errors: list[Exception] = []
+
+    crawler = BasicCrawler(max_request_retries=1, send_request_enqueue_strategy=strategy)
+    target_url = target_path if target_path.startswith('http') else str(server_url / target_path)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        try:
+            response = await context.send_request(target_url)
+        except ValueError as exc:
+            errors.append(exc)
+        else:
+            bodies.append(await response.read())
+
+    await crawler.run([str(server_url / 'a/page')])
+
+    if should_succeed:
+        assert bodies, 'expected the handler to receive a response'
+        assert not errors
+    else:
+        assert errors, 'expected send_request to refuse the target URL'
+        assert strategy in str(errors[0])
+        assert target_url in str(errors[0])
 
 
 @pytest.mark.parametrize(
