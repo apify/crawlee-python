@@ -1,9 +1,19 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 from pydantic import ValidationError
 
-from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute, validate_http_url
+from crawlee._utils.urls import (
+    convert_to_absolute_url,
+    is_url_absolute,
+    matches_enqueue_strategy,
+    validate_http_url,
+)
+
+if TYPE_CHECKING:
+    from crawlee._types import EnqueueStrategy
 
 
 def test_is_url_absolute() -> None:
@@ -55,3 +65,30 @@ def test_validate_http_url() -> None:
 def test_validate_http_url_rejects_non_http_scheme(invalid_url: str) -> None:
     with pytest.raises(ValidationError):
         validate_http_url(invalid_url)
+
+
+@pytest.mark.parametrize(
+    ('strategy', 'origin', 'target', 'expected'),
+    [
+        # 'all' lets everything through, even with empty/cross-host targets
+        ('all', 'https://example.com/', 'https://other.test/', True),
+        ('all', 'https://example.com/', 'gopher://internal:6379/_PING', True),
+        # 'same-hostname' is exact host equality
+        ('same-hostname', 'https://example.com/a', 'https://example.com/b', True),
+        ('same-hostname', 'https://example.com/', 'https://www.example.com/', False),
+        ('same-hostname', 'https://example.com/', 'https://other.test/', False),
+        # 'same-domain' allows subdomains under the same registrable domain
+        ('same-domain', 'https://example.com/', 'https://www.example.com/', True),
+        ('same-domain', 'https://example.com/', 'https://api.example.com/', True),
+        ('same-domain', 'https://example.com/', 'https://other.test/', False),
+        # 'same-origin' requires scheme + host + port match
+        ('same-origin', 'https://example.com/', 'https://example.com/path', True),
+        ('same-origin', 'https://example.com/', 'http://example.com/', False),
+        ('same-origin', 'https://example.com/', 'https://example.com:8443/', False),
+        # missing hostname rejects everything except 'all'
+        ('same-hostname', 'https://example.com/', 'not-a-url', False),
+        ('same-domain', 'not-a-url', 'https://example.com/', False),
+    ],
+)
+def test_matches_enqueue_strategy(strategy: EnqueueStrategy, origin: str, target: str, *, expected: bool) -> None:
+    assert matches_enqueue_strategy(strategy, target_url=target, origin_url=origin) is expected

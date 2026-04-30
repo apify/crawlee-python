@@ -5,6 +5,7 @@ from collections import deque
 from contextlib import suppress
 from logging import getLogger
 from typing import TYPE_CHECKING, Annotated, Any
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import override
@@ -14,6 +15,7 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.globs import Glob
 from crawlee._utils.recoverable_state import RecoverableState
 from crawlee._utils.sitemap import NestedSitemap, ParseSitemapOptions, SitemapSource, SitemapUrl, parse_sitemap
+from crawlee._utils.urls import matches_enqueue_strategy
 from crawlee.request_loaders._request_loader import RequestLoader
 
 if TYPE_CHECKING:
@@ -22,6 +24,7 @@ if TYPE_CHECKING:
     from types import TracebackType
 
     from crawlee import RequestTransformAction
+    from crawlee._types import EnqueueStrategy
     from crawlee.http_clients import HttpClient
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.storage_clients.models import ProcessedRequest
@@ -111,6 +114,7 @@ class SitemapRequestLoader(RequestLoader):
         proxy_info: ProxyInfo | None = None,
         include: list[re.Pattern[Any] | Glob] | None = None,
         exclude: list[re.Pattern[Any] | Glob] | None = None,
+        enqueue_strategy: EnqueueStrategy = 'same-hostname',
         max_buffer_size: int = 200,
         persist_state_key: str | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
@@ -122,6 +126,10 @@ class SitemapRequestLoader(RequestLoader):
             proxy_info: Optional proxy to use for fetching sitemaps.
             include: List of glob or regex patterns to include URLs.
             exclude: List of glob or regex patterns to exclude URLs.
+            enqueue_strategy: Strategy used to decide which sitemap-derived URLs (both nested-sitemap entries and
+                URL entries) are kept relative to the parent sitemap URL. Defaults to `'same-hostname'`, matching
+                the sitemap protocol's same-host expectation and the `enqueue_links` default; pass `'all'` to
+                disable filtering.
             max_buffer_size: Maximum number of URLs to buffer in memory.
             http_client: the instance of `HttpClient` to use for fetching sitemaps.
             persist_state_key: A key for persisting the loader's state in the KeyValueStore.
@@ -135,6 +143,7 @@ class SitemapRequestLoader(RequestLoader):
         self._sitemap_urls = sitemap_urls
         self._include = include
         self._exclude = exclude
+        self._enqueue_strategy = enqueue_strategy
         self._proxy_info = proxy_info
         self._max_buffer_size = max_buffer_size
         self._transform_request_function = transform_request_function
@@ -235,6 +244,9 @@ class SitemapRequestLoader(RequestLoader):
                     state.in_progress_sitemap_url = sitemap_url
 
                 parse_options = ParseSitemapOptions(max_depth=0, emit_nested_sitemaps=True, sitemap_retries=3)
+                # Parse the parent sitemap URL once per outer iteration; `matches_enqueue_strategy` is called per
+                # entry below, and re-parsing the same string thousands of times for large sitemaps is wasteful.
+                parsed_sitemap_url = urlparse(sitemap_url)
 
                 async for item in parse_sitemap(
                     [SitemapSource(type='url', url=sitemap_url)],
@@ -245,6 +257,14 @@ class SitemapRequestLoader(RequestLoader):
                     if isinstance(item, NestedSitemap):
                         # Add nested sitemap to queue
                         if item.loc not in state.pending_sitemap_urls and item.loc not in state.processed_sitemap_urls:
+                            if not matches_enqueue_strategy(
+                                self._enqueue_strategy, target_url=item.loc, origin_url=parsed_sitemap_url
+                            ):
+                                logger.warning(
+                                    f'Skipping nested sitemap {item.loc!r}: does not match enqueue strategy '
+                                    f'{self._enqueue_strategy!r} relative to {sitemap_url!r}.'
+                                )
+                                continue
                             state.pending_sitemap_urls.append(item.loc)
                         continue
 
@@ -259,6 +279,15 @@ class SitemapRequestLoader(RequestLoader):
 
                         # Check if URL should be included
                         if not self._check_url_patterns(url, self._include, self._exclude):
+                            continue
+
+                        if not matches_enqueue_strategy(
+                            self._enqueue_strategy, target_url=url, origin_url=parsed_sitemap_url
+                        ):
+                            logger.warning(
+                                f'Skipping sitemap URL {url!r}: does not match enqueue strategy '
+                                f'{self._enqueue_strategy!r} relative to {sitemap_url!r}.'
+                            )
                             continue
 
                         # Check if we have capacity in the queue
@@ -326,7 +355,7 @@ class SitemapRequestLoader(RequestLoader):
                     continue
 
                 url = state.url_queue.popleft()
-                request_option = RequestOptions(url=url)
+                request_option = RequestOptions(url=url, enqueue_strategy=self._enqueue_strategy)
 
                 if len(state.url_queue) < self._max_buffer_size:
                     self._queue_has_capacity.set()

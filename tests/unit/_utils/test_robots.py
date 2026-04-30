@@ -11,8 +11,10 @@ if TYPE_CHECKING:
 
 
 async def test_generation_robots_txt_url(server_url: URL, http_client: HttpClient) -> None:
+    """`RobotsTxtFile.find` constructs the correct /robots.txt URL and successfully parses the response."""
     robots_file = await RobotsTxtFile.find(str(server_url), http_client)
-    assert len(robots_file.get_sitemaps()) > 0
+    # The fixture's robots.txt disallows /deny_all/ — proves the file was fetched and parsed.
+    assert not robots_file.is_allowed(str(server_url / 'deny_all/page.html'))
 
 
 async def test_allow_disallow_robots_txt(server_url: URL, http_client: HttpClient) -> None:
@@ -24,9 +26,33 @@ async def test_allow_disallow_robots_txt(server_url: URL, http_client: HttpClien
 
 
 async def test_extract_sitemaps_urls(server_url: URL, http_client: HttpClient) -> None:
+    """Cross-host sitemap entries are dropped from the test fixture's robots.txt."""
     robots = await RobotsTxtFile.find(str(server_url), http_client)
-    assert len(robots.get_sitemaps()) == 2
-    assert set(robots.get_sitemaps()) == {'http://not-exists.com/sitemap_1.xml', 'http://not-exists.com/sitemap_2.xml'}
+    # The fixture lists `http://not-exists.com/sitemap_*.xml`, which is cross-host relative to `server_url` and
+    # therefore filtered out per the robots.txt specification.
+    assert robots.get_sitemaps() == []
+
+
+async def test_extract_same_host_sitemaps_urls() -> None:
+    """Sitemap entries on the same host as the robots.txt are returned."""
+    content = 'User-agent: *\nSitemap: http://example.com/sitemap_1.xml\nSitemap: http://example.com/sitemap_2.xml\n'
+    robots = await RobotsTxtFile.from_content('http://example.com/robots.txt', content)
+    assert set(robots.get_sitemaps()) == {
+        'http://example.com/sitemap_1.xml',
+        'http://example.com/sitemap_2.xml',
+    }
+
+
+async def test_extract_sitemaps_urls_filters_cross_host() -> None:
+    """Cross-host `Sitemap:` directives in robots.txt are silently filtered."""
+    content = (
+        'User-agent: *\n'
+        'Sitemap: http://example.com/legit.xml\n'
+        'Sitemap: http://other.test/payload.xml\n'
+        'Sitemap: gopher://internal:6379/_PING\n'
+    )
+    robots = await RobotsTxtFile.from_content('http://example.com/robots.txt', content)
+    assert robots.get_sitemaps() == ['http://example.com/legit.xml']
 
 
 async def test_parse_from_content() -> None:

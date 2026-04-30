@@ -6,7 +6,6 @@ import functools
 import logging
 import signal
 import sys
-import tempfile
 import threading
 import traceback
 from asyncio import CancelledError
@@ -21,8 +20,7 @@ from urllib.parse import ParseResult, urlparse
 from weakref import WeakKeyDictionary
 
 from cachetools import LRUCache
-from tldextract import TLDExtract
-from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
+from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack
 from yarl import URL
 
 from crawlee import EnqueueStrategy, Glob, RequestTransformAction, service_locator
@@ -48,7 +46,7 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.file import atomic_write, export_csv_to_stream, export_json_to_stream
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.robots import RobotsTxtFile
-from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
+from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute, matches_enqueue_strategy
 from crawlee._utils.wait import wait_for
 from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
 from crawlee.errors import (
@@ -485,7 +483,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # Internal, not explicitly configurable components
         self._robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
         self._robots_txt_lock = asyncio.Lock()
-        self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
         self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
@@ -1095,32 +1092,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         origin_url: ParseResult,
     ) -> bool:
         """Check if a URL matches the enqueue_strategy."""
-        if strategy == 'all':
-            return True
-
-        if origin_url.hostname is None or target_url.hostname is None:
+        if strategy != 'all' and (origin_url.hostname is None or target_url.hostname is None):
             self.log.debug(
                 f'Skipping enqueue: Missing hostname in origin_url = {origin_url.geturl()} or '
                 f'target_url = {target_url.geturl()}'
             )
-            return False
 
-        if strategy == 'same-hostname':
-            return target_url.hostname == origin_url.hostname
-
-        if strategy == 'same-domain':
-            origin_domain = self._tld_extractor.extract_str(origin_url.hostname).top_domain_under_public_suffix
-            target_domain = self._tld_extractor.extract_str(target_url.hostname).top_domain_under_public_suffix
-            return origin_domain == target_domain
-
-        if strategy == 'same-origin':
-            return (
-                target_url.hostname == origin_url.hostname
-                and target_url.scheme == origin_url.scheme
-                and target_url.port == origin_url.port
-            )
-
-        assert_never(strategy)
+        return matches_enqueue_strategy(strategy, target_url=target_url, origin_url=origin_url)
 
     def _check_url_patterns(
         self,

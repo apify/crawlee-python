@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from logging import getLogger
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 from protego import Protego
 from yarl import URL
 
 from crawlee._utils.sitemap import Sitemap
+from crawlee._utils.urls import matches_enqueue_strategy
 from crawlee._utils.web import is_status_code_client_error
 
 if TYPE_CHECKING:
@@ -90,8 +92,23 @@ class RobotsTxtFile:
         return bool(self._robots.can_fetch(str(check_url), user_agent))
 
     def get_sitemaps(self) -> list[str]:
-        """Get the list of sitemaps urls from the robots.txt file."""
-        return list(self._robots.sitemaps)
+        """Get the list of same-host sitemap URLs from the robots.txt file.
+
+        Sitemap entries pointing to a different host than the robots.txt file are filtered out, as required by the
+        robots.txt specification.
+        """
+        origin_url = str(self._original_url)
+        parsed_origin = urlparse(origin_url)
+        same_host_sitemaps: list[str] = []
+        for sitemap_url in self._robots.sitemaps:
+            if matches_enqueue_strategy('same-hostname', target_url=sitemap_url, origin_url=parsed_origin):
+                same_host_sitemaps.append(sitemap_url)
+            else:
+                logger.warning(
+                    f'Skipping sitemap {sitemap_url!r} listed in robots.txt at {origin_url!r}: '
+                    f'cross-host sitemap entries are not allowed by the robots.txt specification.'
+                )
+        return same_host_sitemaps
 
     def get_crawl_delay(self, user_agent: str = '*') -> int | None:
         """Get the crawl delay for the given user agent.
