@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from logging import getLogger
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse
 
 from protego import Protego
 from yarl import URL
@@ -97,15 +96,13 @@ class RobotsTxtFile:
         Sitemap entries pointing to a different host than the robots.txt file are filtered out, as required by the
         robots.txt specification.
         """
-        origin_url = str(self._original_url)
-        parsed_origin = urlparse(origin_url)
         same_host_sitemaps: list[str] = []
         for sitemap_url in self._robots.sitemaps:
-            if matches_enqueue_strategy('same-hostname', target_url=sitemap_url, origin_url=parsed_origin):
+            if matches_enqueue_strategy('same-hostname', target_url=sitemap_url, origin_url=self._original_url):
                 same_host_sitemaps.append(sitemap_url)
             else:
                 logger.warning(
-                    f'Skipping sitemap {sitemap_url!r} listed in robots.txt at {origin_url!r}: '
+                    f'Skipping sitemap {sitemap_url!r} listed in robots.txt at {str(self._original_url)!r}: '
                     f'cross-host sitemap entries are not allowed by the robots.txt specification.'
                 )
         return same_host_sitemaps

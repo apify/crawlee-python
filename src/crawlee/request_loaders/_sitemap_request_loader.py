@@ -5,10 +5,10 @@ from collections import deque
 from contextlib import suppress
 from logging import getLogger
 from typing import TYPE_CHECKING, Annotated, Any
-from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import override
+from yarl import URL
 
 from crawlee import Request, RequestOptions
 from crawlee._utils.docs import docs_group
@@ -246,7 +246,7 @@ class SitemapRequestLoader(RequestLoader):
                 parse_options = ParseSitemapOptions(max_depth=0, emit_nested_sitemaps=True, sitemap_retries=3)
                 # Parse the parent sitemap URL once per outer iteration; `matches_enqueue_strategy` is called per
                 # entry below, and re-parsing the same string thousands of times for large sitemaps is wasteful.
-                parsed_sitemap_url = urlparse(sitemap_url)
+                parsed_sitemap_url = URL(sitemap_url)
 
                 async for item in parse_sitemap(
                     [SitemapSource(type='url', url=sitemap_url)],
