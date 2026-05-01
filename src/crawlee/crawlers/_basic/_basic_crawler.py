@@ -17,7 +17,6 @@ from functools import partial
 from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, cast
-from urllib.parse import ParseResult, urlparse
 from weakref import WeakKeyDictionary
 
 from cachetools import LRUCache
@@ -994,8 +993,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """
         if context.request.loaded_url is not None and not self._check_enqueue_strategy(
             context.request.enqueue_strategy,
-            origin_url=urlparse(context.request.url),
-            target_url=urlparse(context.request.loaded_url),
+            origin_url=URL(context.request.url),
+            target_url=URL(context.request.loaded_url),
         ):
             raise ContextPipelineInterruptedError(
                 f'Skipping URL {context.request.loaded_url} (redirected from {context.request.url})'
@@ -1066,10 +1065,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     ) -> Iterator[TRequestIterator]:
         """Filter requests based on the enqueue strategy and URL patterns."""
         limit = kwargs.get('limit')
-        parsed_origin_url = urlparse(origin_url)
+        parsed_origin_url = URL(origin_url)
         strategy = kwargs.get('strategy', 'all')
 
-        if strategy == 'all' and not parsed_origin_url.hostname:
+        if strategy == 'all' and not parsed_origin_url.host:
             self.log.warning(f'Skipping enqueue: Missing hostname in origin_url = {origin_url}.')
             return
 
@@ -1083,9 +1082,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 target_url = request.url
             else:
                 target_url = request
-            parsed_target_url = urlparse(target_url)
+            parsed_target_url = URL(target_url)
 
-            if warning_flag and strategy != 'all' and not parsed_target_url.hostname:
+            if warning_flag and strategy != 'all' and not parsed_target_url.host:
                 self.log.warning(f'Skipping enqueue url: Missing hostname in target_url = {target_url}.')
                 warning_flag = False
 
@@ -1103,31 +1102,30 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self,
         strategy: EnqueueStrategy,
         *,
-        target_url: ParseResult,
-        origin_url: ParseResult,
+        target_url: URL,
+        origin_url: URL,
     ) -> bool:
         """Check if a URL matches the enqueue_strategy."""
         if strategy == 'all':
             return True
 
-        if origin_url.hostname is None or target_url.hostname is None:
+        if origin_url.host is None or target_url.host is None:
             self.log.debug(
-                f'Skipping enqueue: Missing hostname in origin_url = {origin_url.geturl()} or '
-                f'target_url = {target_url.geturl()}'
+                f'Skipping enqueue: Missing hostname in origin_url = {origin_url} or target_url = {target_url}'
             )
             return False
 
         if strategy == 'same-hostname':
-            return target_url.hostname == origin_url.hostname
+            return target_url.host == origin_url.host
 
         if strategy == 'same-domain':
-            origin_domain = self._tld_extractor.extract_str(origin_url.hostname).top_domain_under_public_suffix
-            target_domain = self._tld_extractor.extract_str(target_url.hostname).top_domain_under_public_suffix
+            origin_domain = self._tld_extractor.extract_str(origin_url.host).top_domain_under_public_suffix
+            target_domain = self._tld_extractor.extract_str(target_url.host).top_domain_under_public_suffix
             return origin_domain == target_domain
 
         if strategy == 'same-origin':
             return (
-                target_url.hostname == origin_url.hostname
+                target_url.host == origin_url.host
                 and target_url.scheme == origin_url.scheme
                 and target_url.port == origin_url.port
             )
@@ -1292,7 +1290,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     ) -> SendRequestFunction:
         strategy = self._send_request_enqueue_strategy
         origin_url = request.loaded_url or request.url
-        origin_parsed = urlparse(origin_url) if strategy != 'all' else None
+        origin_parsed = URL(origin_url) if strategy != 'all' else None
 
         async def send_request(
             url: str,
@@ -1303,7 +1301,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         ) -> HttpResponse:
             if origin_parsed is not None and not self._check_enqueue_strategy(
                 strategy,
-                target_url=urlparse(url),
+                target_url=URL(url),
                 origin_url=origin_parsed,
             ):
                 raise ValueError(
