@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Literal
 
 from playwright.async_api import Page
 
+from crawlee._utils.docs import docs_group
+
 if TYPE_CHECKING:
     from stagehand import AsyncSession
     from stagehand.types.session_act_params import SessionActParams
@@ -19,6 +21,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
+@docs_group('Browser management')
 class StagehandOptions:
     """Configuration options for Stagehand AI-powered browser automation.
 
@@ -66,6 +69,7 @@ class StagehandOptions:
     """Maximum time to wait for the local Stagehand browser to be ready, in seconds."""
 
 
+@docs_group('Browser management')
 class StagehandPage(Page):
     """A Playwright `Page` enhanced with Stagehand AI methods.
 
