@@ -15,6 +15,8 @@ from crawlee.proxy_configuration import ProxyInfo
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+    from yarl import URL
+
 
 @pytest.fixture
 async def playwright() -> AsyncGenerator[Playwright, None]:
@@ -259,7 +261,7 @@ async def test_session_start_params_browserbase(
         await controller.close()
 
     call_kwargs = stagehand_client_mock.sessions.start.call_args.kwargs
-    assert call_kwargs['browser'] == {'type': 'browserbase'}
+    assert call_kwargs['browser'] == {'type': 'browserbase', 'launch_options': {}}
     assert 'browserbase_session_create_params' not in call_kwargs
 
 
@@ -337,3 +339,15 @@ async def test_proxy_set_browserbase(
     assert browserbase_proxy_options['proxies'][0]['server'] == 'http://proxy.example.com:8080'
     assert browserbase_proxy_options['proxies'][0]['username'] == 'user'
     assert browserbase_proxy_options['proxies'][0]['password'] == 'pass'
+
+
+async def test_fingerprint_headers_set_on_new_page(controller: StagehandBrowserController, server_url: URL) -> None:
+    page = await controller.new_page()
+
+    response = await page.goto(str(server_url / 'headers'))
+
+    assert response is not None
+
+    response_json = await response.json()
+
+    assert 'Headless' not in response_json['user-agent']

@@ -38,11 +38,11 @@ class StagehandCrawler(
 
     `StagehandCrawler` builds on top of `PlaywrightCrawler`, inheriting all of its features.
     It uses `StagehandBrowserPlugin` to manage Stagehand sessions. Stagehand creates and manages
-    the browser instance — either locally via a bundled Chromium binary, or remotely via Browserbase
-    cloud — and Playwright connects to it via the Chrome DevTools Protocol (CDP).
+    the browser instance - either locally via a bundled Chromium binary, or remotely via Browserbase
+    cloud - and Playwright connects to it via the Chrome DevTools Protocol (CDP).
 
     Because Stagehand relies on CDP, only Chromium is supported. Not all Playwright browser and
-    context configuration options are available — browser settings are limited to the subset accepted
+    context configuration options are available - browser settings are limited to the subset accepted
     by Stagehand's ``BrowserLaunchOptions`` (such as ``headless``, ``args``, ``viewport``, ``proxy``,
     ``locale``, and ``executable_path``). Features like fingerprint generation and incognito pages
     are not supported.
@@ -50,10 +50,10 @@ class StagehandCrawler(
     Each page in the crawling context is a `StagehandPage`, which extends the standard Playwright
     `Page` with the following AI methods:
 
-    - `page.act(**kwargs)` — perform an action on the page using natural language
-    - `page.extract(**kwargs)` — extract structured data from the page with AI
-    - `page.observe(**kwargs)` — get AI-suggested actions available on the page
-    - `page.execute(**kwargs)` — run an autonomous multi-step agent
+    - `page.act(**kwargs)` - perform an action on the page using natural language
+    - `page.extract(**kwargs)` - extract structured data from the page with AI
+    - `page.observe(**kwargs)` - get AI-suggested actions available on the page
+    - `page.execute(**kwargs)` - run an autonomous multi-step agent
 
     Stagehand configuration (model, API key, environment) is provided via `stagehand_options`.
     By default, the crawler runs locally using the `openai/gpt-4.1-mini` model.
@@ -62,8 +62,7 @@ class StagehandCrawler(
 
     ```python
     import asyncio
-    from crawlee.crawlers import StagehandCrawler
-    from crawlee.crawlers._stagehand import StagehandCrawlingContext
+    from crawlee.crawlers import StagehandCrawler, StagehandCrawlingContext
     from crawlee.browsers import StagehandOptions
 
     crawler = StagehandCrawler(
@@ -127,7 +126,7 @@ class StagehandCrawler(
                 effect on the first page; subsequent pages reuse the existing session context.
                 Cannot be specified if `browser_pool` is provided.
             goto_options: Additional options passed to Stagehand's `Page.goto()`. The `timeout`
-                option is not supported — use `navigation_timeout` instead.
+                option is not supported - use `navigation_timeout` instead.
             navigation_timeout: Timeout for the navigation phase (from opening the page to calling
                 the request handler). Defaults to one minute.
             max_open_pages_per_browser: Maximum number of pages open per browser instance.

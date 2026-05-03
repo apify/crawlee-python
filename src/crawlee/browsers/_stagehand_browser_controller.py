@@ -10,6 +10,8 @@ from typing_extensions import override
 from crawlee._utils.docs import docs_group
 from crawlee.browsers._browser_controller import BrowserController
 from crawlee.browsers._stagehand_types import StagehandPage
+from crawlee.fingerprint_suite import HeaderGenerator
+from crawlee.fingerprint_suite._header_generator import fingerprint_browser_type_from_playwright_browser_type
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -36,6 +38,7 @@ class StagehandBrowserController(BrowserController):
     """
 
     AUTOMATION_LIBRARY = 'stagehand'
+    _DEFAULT_HEADER_GENERATOR = HeaderGenerator()
 
     def __init__(
         self,
@@ -44,6 +47,7 @@ class StagehandBrowserController(BrowserController):
         stagehand_client: AsyncStagehand,
         stagehand_options: StagehandOptions,
         max_open_pages_per_browser: int = 20,
+        header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
     ) -> None:
         """Initialize a new instance.
 
@@ -51,18 +55,21 @@ class StagehandBrowserController(BrowserController):
             playwright: Active Playwright instance used to connect to the browser via CDP.
             stagehand_client: Active Stagehand REST client used to start and end sessions.
             stagehand_options: Stagehand-specific configuration (model, env, self-heal, etc.).
-            browser_launch_options: Browser options built by the plugin.
             max_open_pages_per_browser: Maximum number of pages that can be open at the same time.
+            header_generator: An optional `HeaderGenerator` instance used to generate and manage HTTP headers for
+                requests made by the browser. By default, a predefined header generator is used. Set to `None` to
+                disable automatic header modifications.
         """
         self._playwright = playwright
         self._stagehand_client = stagehand_client
         self._stagehand_options = stagehand_options
         self._max_open_pages_per_browser = max_open_pages_per_browser
+        self._header_generator = header_generator
 
         self._session: AsyncSession | None = None
         self._browser: Browser | None = None
         self._browser_context: BrowserContext | None = None
-        self._session_init_lock = Lock()
+        self._context_creation_lock = Lock()
 
         self._pages = list[StagehandPage]()
         self._total_opened_pages = 0
@@ -102,7 +109,7 @@ class StagehandBrowserController(BrowserController):
     @property
     @override
     def is_browser_connected(self) -> bool:
-        # Session not yet started — controller is available for new pages.
+        # Session not yet started - controller is available for new pages.
         return self._browser is None or self._browser.is_connected()
 
     @property
@@ -138,7 +145,13 @@ class StagehandBrowserController(BrowserController):
         try:
             # Lazily start a Stagehand session on the first page request, passing proxy and context options
             # at that point.
-            await self._ensure_session(browser_new_context_options, proxy_info)
+            if not self._browser_context:
+                async with self._context_creation_lock:
+                    if not self._browser_context:
+                        self._browser_context = await self._create_browser_context(
+                            browser_new_context_options=browser_new_context_options,
+                            proxy_info=proxy_info,
+                        )
 
             if self._browser is None or self._session is None or self._browser_context is None:
                 raise RuntimeError('Failed to initialize the browser session.')
@@ -171,68 +184,107 @@ class StagehandBrowserController(BrowserController):
         if self._browser is not None and self._browser.is_connected():
             await self._browser.close()
 
+        self._session = None
+        self._browser_context = None
+
     def _on_page_close(self, page: StagehandPage) -> None:
         self._pages.remove(page)
 
-    async def _ensure_session(
+    def _get_extra_http_headers(
+        self,
+        extra_http_headers: Mapping[str, str] | None = None,
+    ) -> dict[str, str]:
+        if extra_http_headers:
+            return dict(extra_http_headers)
+
+        if self._header_generator:
+            generated_headers = self._header_generator.get_specific_headers(
+                header_names={
+                    'Accept',
+                    'Accept-Language',
+                    'User-Agent',
+                    'sec-ch-ua',
+                    'sec-ch-ua-mobile',
+                    'sec-ch-ua-platform',
+                },
+                browser_type=fingerprint_browser_type_from_playwright_browser_type(self.browser_type),
+            )
+        else:
+            generated_headers = {}
+
+        return dict(generated_headers)
+
+    def _build_session_start_params(
+        self,
+        browser_new_context_options: dict[str, Any],
+        proxy_info: ProxyInfo | None = None,
+    ) -> dict[str, Any]:
+        session_start_params: dict[str, Any] = {
+            'model_name': self._stagehand_options.model,
+            'verbose': self._stagehand_options.verbose,
+            'self_heal': self._stagehand_options.self_heal,
+        }
+        launch_options = dict(browser_new_context_options)
+
+        if self._stagehand_options.dom_settle_timeout_ms is not None:
+            session_start_params['dom_settle_timeout_ms'] = self._stagehand_options.dom_settle_timeout_ms
+
+        if self._stagehand_options.system_prompt is not None:
+            session_start_params['system_prompt'] = self._stagehand_options.system_prompt
+
+        if self._stagehand_options.env == 'LOCAL':
+            if proxy_info:
+                launch_options['proxy'] = {
+                    'server': f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
+                    'username': proxy_info.username or '',
+                    'password': proxy_info.password or '',
+                }
+            session_start_params['browser'] = {'type': 'local', 'launch_options': launch_options}
+        else:
+            session_start_params['browser'] = {'type': 'browserbase', 'launch_options': launch_options}
+            if proxy_info:
+                session_start_params['browserbase_session_create_params'] = {
+                    'proxies': [
+                        {
+                            'type': 'external',
+                            'server': f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
+                            'username': proxy_info.username or '',
+                            'password': proxy_info.password or '',
+                        }
+                    ]
+                }
+
+        return session_start_params
+
+    async def _create_browser_context(
         self,
         browser_new_context_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
-    ) -> None:
+    ) -> BrowserContext:
+        browser_new_context_options = dict(browser_new_context_options) if browser_new_context_options else {}
 
-        if self._session is not None:
-            return
+        extra_http_headers = self._get_extra_http_headers(browser_new_context_options.pop('extra_http_headers', None))
 
-        async with self._session_init_lock:
-            # Double-check if the session was created while waiting for the lock.
-            if self._session is not None:
-                return
+        session_start_params = self._build_session_start_params(
+            browser_new_context_options=browser_new_context_options,
+            proxy_info=proxy_info,
+        )
 
-            browser_new_context_options = dict(browser_new_context_options) if browser_new_context_options else {}
+        session: AsyncSession = await self._stagehand_client.sessions.start(**session_start_params)
 
-            # Parameters for sessions.start() — AI model settings from stagehand_options.
-            session_start_params: dict[str, Any] = {
-                'model_name': self._stagehand_options.model,
-                'verbose': self._stagehand_options.verbose,
-                'self_heal': self._stagehand_options.self_heal,
-            }
-            if self._stagehand_options.dom_settle_timeout_ms is not None:
-                session_start_params['dom_settle_timeout_ms'] = self._stagehand_options.dom_settle_timeout_ms
+        cdp_url = session.data.cdp_url
+        if not cdp_url:
+            raise RuntimeError(
+                f'No cdp_url returned from Stagehand (env={self._stagehand_options.env!r}). '
+                'Cannot connect Playwright to the browser.'
+            )
 
-            if self._stagehand_options.system_prompt is not None:
-                session_start_params['system_prompt'] = self._stagehand_options.system_prompt
+        self._browser = await self._playwright.chromium.connect_over_cdp(cdp_url)
 
-            if self._stagehand_options.env == 'LOCAL':
-                if proxy_info:
-                    browser_new_context_options['proxy'] = {
-                        'server': f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
-                        'username': proxy_info.username or '',
-                        'password': proxy_info.password or '',
-                    }
-                session_start_params['browser'] = {'type': 'local', 'launch_options': browser_new_context_options}
-            else:
-                session_start_params['browser'] = {'type': 'browserbase'}
-                if proxy_info:
-                    session_start_params['browserbase_session_create_params'] = {
-                        'proxies': [
-                            {
-                                'type': 'external',
-                                'server': f'{proxy_info.scheme}://{proxy_info.hostname}:{proxy_info.port}',
-                                'username': proxy_info.username or '',
-                                'password': proxy_info.password or '',
-                            }
-                        ]
-                    }
+        context = self._browser.contexts[0]
 
-            session: AsyncSession = await self._stagehand_client.sessions.start(**session_start_params)
+        await context.set_extra_http_headers(extra_http_headers)
 
-            cdp_url = session.data.cdp_url
-            if not cdp_url:
-                raise RuntimeError(
-                    f'No cdp_url returned from Stagehand (env={self._stagehand_options.env!r}). '
-                    'Cannot connect Playwright to the browser.'
-                )
+        self._session = session
 
-            self._browser = await self._playwright.chromium.connect_over_cdp(cdp_url)
-            self._browser_context = self._browser.contexts[0]
-            self._session = session
+        return context

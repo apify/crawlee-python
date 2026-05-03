@@ -80,6 +80,8 @@ sql_postgres = [
 stagehand = [
     "stagehand>=3.19.0",
     "playwright>=1.27.0",
+    "apify_fingerprint_datapoints>=0.0.2",
+    "browserforge>=1.2.3",
 ]
 sql_sqlite = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
