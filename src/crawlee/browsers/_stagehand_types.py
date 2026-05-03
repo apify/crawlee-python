@@ -79,7 +79,7 @@ class StagehandPage(Page):
         self._session = session
 
     async def act(self, **kwargs: Unpack[SessionActParams]) -> SessionActResponse:
-        """Perform an action on the page using natural language.
+        """Perform an action on the page using natural language. Argument `page` is automatically set.
 
         Args:
             **kwargs: Parameters passed to ``AsyncSession.act()``.
@@ -92,7 +92,7 @@ class StagehandPage(Page):
         return await self._session.act(page=self, **kwargs)
 
     async def observe(self, **kwargs: Unpack[SessionObserveParams]) -> SessionObserveResponse:
-        """Observe the page and get AI-suggested actions.
+        """Observe the page and get AI-suggested actions. Argument `page` is automatically set.
 
         Args:
             **kwargs: Parameters passed to ``AsyncSession.observe()``.
@@ -104,7 +104,7 @@ class StagehandPage(Page):
         return await self._session.observe(page=self, **kwargs)
 
     async def extract(self, **kwargs: Unpack[SessionExtractParams]) -> SessionExtractResponse:
-        """Extract structured data from the page using natural language.
+        """Extract structured data from the page using natural language. Argument `page` is automatically set.
 
         Args:
             **kwargs: Parameters passed to ``AsyncSession.extract()``.
@@ -116,7 +116,7 @@ class StagehandPage(Page):
         return await self._session.extract(page=self, **kwargs)
 
     async def execute(self, **kwargs: Unpack[SessionExecuteParams]) -> SessionExecuteResponse:
-        """Execute arbitrary code on the page via natural language instructions.
+        """Execute arbitrary code on the page via natural language instructions. Argument `page` is automatically set.
 
         Args:
             **kwargs: Parameters passed to ``AsyncSession.execute()``.

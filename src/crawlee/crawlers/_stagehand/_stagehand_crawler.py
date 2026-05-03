@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from crawlee._utils.docs import docs_group
@@ -67,7 +68,7 @@ class StagehandCrawler(
 
     crawler = StagehandCrawler(
         stagehand_options=StagehandOptions(
-            api_key='sk-...',
+            model_api_key='sk-...',
             model='openai/gpt-4.1-mini',
         ),
     )
@@ -167,6 +168,8 @@ class StagehandCrawler(
                     )
                 ]
             )
+
+        kwargs.setdefault('_logger', logging.getLogger(__name__))
 
         super().__init__(
             browser_pool=browser_pool,

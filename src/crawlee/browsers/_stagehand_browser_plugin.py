@@ -71,9 +71,9 @@ class StagehandBrowserPlugin(BrowserPlugin):
         config = service_locator.get_configuration()
 
         self._max_open_pages_per_browser = max_open_pages_per_browser
-        self.stagehand_options = stagehand_options or StagehandOptions()
+        self._stagehand_options = stagehand_options or StagehandOptions()
 
-        is_local = self.stagehand_options.env == 'LOCAL'
+        is_local = self._stagehand_options.env == 'LOCAL'
 
         # browser_launch_options take priority over browser_new_context_options for shared keys.
         self._browser_launch_options: dict[str, Any] = {
@@ -93,14 +93,14 @@ class StagehandBrowserPlugin(BrowserPlugin):
         self._stagehand_init_params: dict[str, Any] = {
             'server': 'local' if is_local else 'remote',
             'local_headless': self._browser_launch_options['headless'],
-            'local_ready_timeout_s': self.stagehand_options.local_ready_timeout_s,
+            'local_ready_timeout_s': self._stagehand_options.local_ready_timeout_s,
         }
-        if self.stagehand_options.model_api_key is not None:
-            self._stagehand_init_params['model_api_key'] = self.stagehand_options.model_api_key
+        if self._stagehand_options.model_api_key is not None:
+            self._stagehand_init_params['model_api_key'] = self._stagehand_options.model_api_key
 
         if not is_local:
-            self._stagehand_init_params['browserbase_api_key'] = self.stagehand_options.browserbase_api_key
-            self._stagehand_init_params['browserbase_project_id'] = self.stagehand_options.project_id
+            self._stagehand_init_params['browserbase_api_key'] = self._stagehand_options.browserbase_api_key
+            self._stagehand_init_params['browserbase_project_id'] = self._stagehand_options.project_id
 
         self._stagehand_client: AsyncStagehand | None = None
         self._playwright_context_manager = async_playwright()
@@ -145,6 +145,11 @@ class StagehandBrowserPlugin(BrowserPlugin):
     def max_open_pages_per_browser(self) -> int:
         return self._max_open_pages_per_browser
 
+    @property
+    def stagehand_options(self) -> StagehandOptions:
+        """Return the Stagehand-specific configuration options."""
+        return self._stagehand_options
+
     @override
     async def __aenter__(self) -> StagehandBrowserPlugin:
         if self._active:
@@ -153,7 +158,7 @@ class StagehandBrowserPlugin(BrowserPlugin):
         self._active = True
         self._playwright = await self._playwright_context_manager.__aenter__()
 
-        if self.stagehand_options.env == 'LOCAL':
+        if self._stagehand_options.env == 'LOCAL':
             if 'executable_path' not in self._browser_launch_options:
                 chrome_path = self._playwright.chromium.executable_path
                 self._browser_launch_options['executable_path'] = chrome_path
@@ -195,6 +200,6 @@ class StagehandBrowserPlugin(BrowserPlugin):
         return StagehandBrowserController(
             playwright=self._playwright,
             stagehand_client=self._stagehand_client,
-            stagehand_options=self.stagehand_options,
+            stagehand_options=self._stagehand_options,
             max_open_pages_per_browser=self._max_open_pages_per_browser,
         )

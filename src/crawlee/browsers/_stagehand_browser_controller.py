@@ -179,9 +179,12 @@ class StagehandBrowserController(BrowserController):
         browser_new_context_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> None:
+
         if self._session is not None:
             return
+
         async with self._session_init_lock:
+            # Double-check if the session was created while waiting for the lock.
             if self._session is not None:
                 return
 
@@ -231,7 +234,5 @@ class StagehandBrowserController(BrowserController):
                 )
 
             self._browser = await self._playwright.chromium.connect_over_cdp(cdp_url)
-            self._browser_context = (
-                self._browser.contexts[0] if self._browser.contexts else await self._browser.new_context()
-            )
+            self._browser_context = self._browser.contexts[0]
             self._session = session
