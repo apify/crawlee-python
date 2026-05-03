@@ -22,7 +22,7 @@ from cachetools import LRUCache
 from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack
 from yarl import URL
 
-from crawlee import EnqueueStrategy, Glob, RequestTransformAction, service_locator
+from crawlee import Glob, RequestTransformAction, service_locator
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
 from crawlee._log_config import configure_logger, get_configured_log_level, string_to_log_level
 from crawlee._request import Request, RequestOptions, RequestState
@@ -976,7 +976,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Filter out links that redirect outside of the crawled domain.
         """
-        if context.request.loaded_url is not None and not self._check_enqueue_strategy(
+        if context.request.loaded_url is not None and not matches_enqueue_strategy(
             context.request.enqueue_strategy,
             origin_url=URL(context.request.url),
             target_url=URL(context.request.loaded_url),
@@ -1073,7 +1073,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 self.log.warning(f'Skipping enqueue url: Missing hostname in target_url = {target_url}.')
                 warning_flag = False
 
-            if self._check_enqueue_strategy(
+            if matches_enqueue_strategy(
                 strategy, target_url=parsed_target_url, origin_url=parsed_origin_url
             ) and self._check_url_patterns(target_url, kwargs.get('include'), kwargs.get('exclude')):
                 yield request
@@ -1082,21 +1082,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     limit -= 1
                     if limit <= 0:
                         break
-
-    def _check_enqueue_strategy(
-        self,
-        strategy: EnqueueStrategy,
-        *,
-        target_url: URL,
-        origin_url: URL,
-    ) -> bool:
-        """Check if a URL matches the enqueue_strategy."""
-        if strategy != 'all' and (origin_url.host is None or target_url.host is None):
-            self.log.debug(
-                f'Skipping enqueue: Missing hostname in origin_url = {origin_url!s} or target_url = {target_url!s}'
-            )
-
-        return matches_enqueue_strategy(strategy, target_url=target_url, origin_url=origin_url)
 
     def _check_url_patterns(
         self,
