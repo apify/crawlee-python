@@ -91,11 +91,7 @@ class RobotsTxtFile:
         return bool(self._robots.can_fetch(str(check_url), user_agent))
 
     def get_sitemaps(self) -> list[str]:
-        """Get the list of same-host sitemap URLs from the robots.txt file.
-
-        Sitemap entries pointing to a different host than the robots.txt file are filtered out, as required by the
-        robots.txt specification.
-        """
+        """Get the list of same-host sitemap URLs from the robots.txt file."""
         same_host_sitemaps: list[str] = []
         for sitemap_url in self._robots.sitemaps:
             if matches_enqueue_strategy('same-hostname', target_url=sitemap_url, origin_url=self._original_url):
