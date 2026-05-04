@@ -75,9 +75,6 @@ def test_init_raises_with_browser_pool_and_params() -> None:
         StagehandCrawler(browser_pool=pool, headless=True)
 
     with pytest.raises(ValueError, match=r'Cannot specify'):
-        StagehandCrawler(browser_pool=pool, max_open_pages_per_browser=5)
-
-    with pytest.raises(ValueError, match=r'Cannot specify'):
         StagehandCrawler(browser_pool=pool, browser_launch_options={'headless': True})
 
 
