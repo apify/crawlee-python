@@ -4,7 +4,6 @@ import asyncio
 import logging
 import warnings
 from datetime import timedelta
-from functools import partial
 from typing import TYPE_CHECKING, Any, Generic, Literal
 
 import playwright.async_api
@@ -32,7 +31,7 @@ from ._playwright_crawling_context import PlaywrightCrawlingContext
 from ._playwright_http_client import PlaywrightHttpClient, browser_page_context
 from ._playwright_post_nav_crawling_context import PlaywrightPostNavCrawlingContext
 from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
-from ._types import GotoOptions
+from ._types import BlockRequestsFunction, GotoOptions
 from ._utils import block_requests, infinite_scroll
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=PlaywrightCrawlingContext)
@@ -251,7 +250,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             log=context.log,
             register_deferred_cleanup=context.register_deferred_cleanup,
             page=crawlee_page.page,
-            block_requests=partial(block_requests, page=crawlee_page.page),
+            block_requests=self._make_block_requests(crawlee_page.page),
             goto_options=GotoOptions(**self._goto_options),
         )
 
@@ -535,7 +534,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             infinite_scroll=lambda: infinite_scroll(context.page),
             extract_links=extract_links,
             enqueue_links=self._create_enqueue_links_function(context, extract_links),
-            block_requests=partial(block_requests, page=context.page),
+            block_requests=self._make_block_requests(context.page),
         )
 
         if context.session:
@@ -557,6 +556,18 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             hook: A coroutine function to be called after each navigation.
         """
         self._post_navigation_hooks.append(hook)
+
+    @staticmethod
+    def _make_block_requests(page: Page) -> BlockRequestsFunction:
+        """Build a `BlockRequestsFunction` bound to the given page."""
+
+        async def _bound_block_requests(
+            url_patterns: list[str] | None = None,
+            extra_url_patterns: list[str] | None = None,
+        ) -> None:
+            await block_requests(page, url_patterns=url_patterns, extra_url_patterns=extra_url_patterns)
+
+        return _bound_block_requests
 
     async def _get_cookies(self, page: Page) -> list[PlaywrightCookieParam]:
         """Get the cookies from the page."""

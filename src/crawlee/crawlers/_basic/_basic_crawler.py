@@ -35,6 +35,7 @@ from crawlee._types import (
     EnqueueLinksKwargs,
     ExportDataCsvKwargs,
     ExportDataJsonKwargs,
+    ExportDataKwargs,
     GetKeyValueStoreFromRequestHandlerFunction,
     HttpHeaders,
     HttpPayload,
@@ -896,7 +897,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
-        **additional_kwargs: Unpack[ExportDataJsonKwargs | ExportDataCsvKwargs],
+        **additional_kwargs: Unpack[ExportDataKwargs],
     ) -> None:
         """Export all items from a Dataset to a JSON or CSV file.
 
