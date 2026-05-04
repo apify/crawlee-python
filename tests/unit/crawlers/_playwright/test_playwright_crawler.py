@@ -365,10 +365,12 @@ async def test_proxy_set() -> None:
 async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) -> None:
     sessions_ids: list[str] = []
     sessions: dict[str, Session] = {}
-    sessions_cookies: dict[str, dict[str, str]] = {}
     response_cookies: dict[str, dict[str, str]] = {}
 
-    async with BrowserPool(plugins=[PlaywrightBrowserPlugin(use_incognito_pages=use_incognito_pages)]) as browser_pool:
+    async with BrowserPool(
+        plugins=[PlaywrightBrowserPlugin(use_incognito_pages=use_incognito_pages)],
+        browser_inactive_threshold=timedelta(minutes=10),
+    ) as browser_pool:
         crawler = PlaywrightCrawler(
             session_pool=SessionPool(max_pool_size=1),
             concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
