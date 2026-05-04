@@ -45,7 +45,13 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.file import atomic_write, export_csv_to_stream, export_json_to_stream
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.robots import RobotsTxtFile
-from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute, matches_enqueue_strategy
+from crawlee._utils.urls import (
+    UNSUPPORTED_SCHEME_MESSAGE,
+    convert_to_absolute_url,
+    is_supported_url_scheme,
+    is_url_absolute,
+    matches_enqueue_strategy,
+)
 from crawlee._utils.wait import wait_for
 from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
 from crawlee.errors import (
@@ -974,16 +980,23 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def _check_url_after_redirects(self, context: TCrawlingContext) -> AsyncGenerator[TCrawlingContext, None]:
         """Ensure that the `loaded_url` still matches the enqueue strategy after redirects.
 
-        Filter out links that redirect outside of the crawled domain.
+        Filter out links that redirect outside of the crawled domain or to unsupported URL schemes.
         """
-        if context.request.loaded_url is not None and not matches_enqueue_strategy(
-            strategy=context.request.enqueue_strategy,
-            origin_url=URL(context.request.url),
-            target_url=URL(context.request.loaded_url),
-        ):
-            raise ContextPipelineInterruptedError(
-                f'Skipping URL {context.request.loaded_url} (redirected from {context.request.url})'
-            )
+        if context.request.loaded_url is not None:
+            if not is_supported_url_scheme(context.request.loaded_url):
+                raise ContextPipelineInterruptedError(
+                    f'Skipping URL {context.request.loaded_url} (redirected from {context.request.url}): '
+                    f'{UNSUPPORTED_SCHEME_MESSAGE}'
+                )
+
+            if not matches_enqueue_strategy(
+                strategy=context.request.enqueue_strategy,
+                origin_url=URL(context.request.url),
+                target_url=URL(context.request.loaded_url),
+            ):
+                raise ContextPipelineInterruptedError(
+                    f'Skipping URL {context.request.loaded_url} (redirected from {context.request.url})'
+                )
 
         yield context
 
@@ -1057,8 +1070,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             self.log.warning(f'Skipping enqueue: Missing hostname in origin_url = {origin_url}.')
             return
 
-        # Emit a `warning` message to the log, only once per call
-        warning_flag = True
+        # Each warning is emitted at most once per call.
+        host_warned = False
+        scheme_warned = False
 
         for request in request_iterator:
             if isinstance(request, Request):
@@ -1069,9 +1083,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 target_url = request
             parsed_target_url = URL(target_url)
 
-            if warning_flag and strategy != 'all' and not parsed_target_url.host:
+            if not is_supported_url_scheme(parsed_target_url):
+                if not scheme_warned:
+                    self.log.warning(f'Skipping enqueue url {target_url!r}: {UNSUPPORTED_SCHEME_MESSAGE}')
+                    scheme_warned = True
+                continue
+
+            if not host_warned and strategy != 'all' and not parsed_target_url.host:
                 self.log.warning(f'Skipping enqueue url: Missing hostname in target_url = {target_url}.')
-                warning_flag = False
+                host_warned = True
 
             if matches_enqueue_strategy(
                 strategy=strategy,

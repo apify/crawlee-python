@@ -19,6 +19,9 @@ if TYPE_CHECKING:
 _ALLOWED_SCHEMES: frozenset[str] = frozenset({'http', 'https'})
 """URL schemes Crawlee accepts for fetching and enqueuing."""
 
+UNSUPPORTED_SCHEME_MESSAGE = 'unsupported URL scheme (only http and https are allowed).'
+"""Reusable suffix for log messages explaining why a non-`http(s)` URL was rejected."""
+
 _HTTP_URL_ADAPTER: TypeAdapter[AnyHttpUrl] = TypeAdapter(AnyHttpUrl)
 """Pydantic validator for HTTP and HTTPS URLs."""
 
@@ -66,6 +69,11 @@ def validate_http_url(value: str | None) -> str | None:
     return value
 
 
+def is_supported_url_scheme(url: str | URL) -> bool:
+    """Return whether `url` uses a scheme Crawlee accepts (http or https)."""
+    return _to_url(url).scheme in _ALLOWED_SCHEMES
+
+
 def matches_enqueue_strategy(
     strategy: EnqueueStrategy,
     *,
@@ -74,7 +82,9 @@ def matches_enqueue_strategy(
 ) -> bool:
     """Check whether `target_url` matches `origin_url` under the given enqueue strategy.
 
-    Targets with non-http(s) schemes are always rejected, including under `strategy='all'`.
+    This function checks only the strategy relationship between the two URLs. Callers must
+    independently reject unsupported schemes via `is_supported_url_scheme` — `matches_enqueue_strategy`
+    does not look at the scheme.
 
     Args:
         strategy: The enqueue strategy to apply.
@@ -84,11 +94,8 @@ def matches_enqueue_strategy(
     Returns:
         `True` if `target_url` is allowed under `strategy` relative to `origin_url`, `False` otherwise.
     """
-    target = URL(target_url) if isinstance(target_url, str) else target_url
-    origin = URL(origin_url) if isinstance(origin_url, str) else origin_url
-
-    if target.scheme not in _ALLOWED_SCHEMES:
-        return False
+    target = _to_url(target_url)
+    origin = _to_url(origin_url)
 
     if strategy == 'all':
         return True
@@ -106,6 +113,10 @@ def matches_enqueue_strategy(
         return target.host == origin.host and target.scheme == origin.scheme and target.port == origin.port
 
     assert_never(strategy)
+
+
+def _to_url(value: str | URL) -> URL:
+    return URL(value) if isinstance(value, str) else value
 
 
 @lru_cache(maxsize=1)
