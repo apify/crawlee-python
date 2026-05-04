@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
+
+from pydantic import Field
+from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 if TYPE_CHECKING:
     from crawlee._utils.byte_size import ByteSize
-
 
 SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD = 0.97
 
@@ -167,3 +169,10 @@ class ClientSnapshot:
 
 
 Snapshot = MemorySnapshot | CpuSnapshot | EventLoopSnapshot | ClientSnapshot
+
+
+@pydantic_dataclass
+class Ratio:
+    """Represents ratio of memory."""
+
+    value: Annotated[float, Field(gt=0.0, le=1.0)]

@@ -74,8 +74,8 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
 
         # Reset global class variables to ensure test isolation.
         KeyValueStore._autosaved_values = {}
-        Statistics._Statistics__next_id = 0  # type:ignore[attr-defined] # Mangled attribute
-        BasicCrawler._BasicCrawler__next_id = 0  # type:ignore[attr-defined] # Mangled attribute
+        Statistics._Statistics__next_id = 0  # ty:ignore[unresolved-attribute] # Mangled attribute
+        BasicCrawler._BasicCrawler__next_id = 0  # ty:ignore[unresolved-attribute] # Mangled attribute
 
     return _prepare_test_env
 
@@ -208,9 +208,10 @@ def redirect_server_url(redirect_http_server: TestServer) -> URL:
 )
 async def http_client(request: pytest.FixtureRequest) -> AsyncGenerator[HttpClient, None]:
     class_client: type[HttpClient]
+    kwargs: dict[str, Any]
     if request.param == 'curl':
         class_client = CurlImpersonateHttpClient
-        kwargs: dict[str, Any] = {'http_version': CurlHttpVersion.V1_1}
+        kwargs = {'http_version': CurlHttpVersion.V1_1}
     elif request.param == 'impit':
         class_client = ImpitHttpClient
         kwargs = {'http3': False}

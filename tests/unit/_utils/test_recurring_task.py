@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock
 import pytest
 
 from crawlee._utils.recurring_task import RecurringTask
-from tests.unit.utils import run_alone_on_mac
 
 
 @pytest.fixture
@@ -42,12 +41,12 @@ async def test_start_and_stop(function: AsyncMock, delay: timedelta) -> None:
     assert rt.task.done()
 
 
-@run_alone_on_mac
+@pytest.mark.run_alone
 async def test_execution(function: AsyncMock, delay: timedelta) -> None:
     task = RecurringTask(function, delay)
 
     task.start()
-    await asyncio.sleep(0.1)  # Wait enough for the task to execute a few times
+    await asyncio.sleep(0.2)  # Wait enough for the task to execute a few times
     await task.stop()
 
     assert isinstance(task.func, AsyncMock)  # To let type checker know that the function is a mock

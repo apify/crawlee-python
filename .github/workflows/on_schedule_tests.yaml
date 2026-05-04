@@ -12,6 +12,9 @@ concurrency:
   group: scheduled-tests
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 env:
   NODE_VERSION: 22
   PYTHON_VERSION: 3.14
@@ -24,8 +27,8 @@ jobs:
       fail-fast: false
       max-parallel: 12
       matrix:
-        crawler-type: ["playwright_camoufox", "playwright", "parsel", "beautifulsoup"]
-        http-client: [ "httpx", "curl_impersonate"]
+        crawler-type: ["playwright_camoufox", "playwright_chrome", "playwright_firefox", "playwright_webkit", "playwright", "parsel", "beautifulsoup"]
+        http-client: ["httpx", "curl_impersonate"]
         package-manager: ["pip", "uv", "poetry"]
 
     runs-on: "ubuntu-latest"
@@ -64,3 +67,60 @@ jobs:
         run: uv run poe e2e-templates-tests -m "${{ matrix.http-client }} and ${{ matrix.crawler-type }} and ${{ matrix.package-manager }}"
         env:
           APIFY_TEST_USER_API_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
+
+  # Send a Slack notification to #tooling-team-python when scheduled e2e tests fail.
+  # Skipped on workflow_dispatch (manual runs) so that ad-hoc triggers don't spam the channel.
+  notify_on_failure:
+    name: Notify Slack on failure
+    needs: end_to_end_tests
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Build Slack payload
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          HEADING: ':red_circle: Scheduled e2e tests failed'
+        run: |
+          failed_jobs=$(gh api \
+            "repos/${REPO}/actions/runs/${RUN_ID}/attempts/${RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.conclusion == "failure") | "• \(.name)"] | join("\n")')
+          jq -n \
+            --arg repo "${REPO}" \
+            --arg url "${WORKFLOW_URL}" \
+            --arg heading "${HEADING}" \
+            --arg failed "${failed_jobs}" \
+            '{
+              text: "\($heading) in \($repo)",
+              blocks: [
+                {
+                  type: "header",
+                  text: { type: "plain_text", text: $heading, emoji: true }
+                },
+                {
+                  type: "section",
+                  fields: [
+                    { type: "mrkdwn", text: "*Repository:*\n\($repo)" },
+                    { type: "mrkdwn", text: "*Workflow run:*\n<\($url)|View on GitHub>" }
+                  ]
+                },
+                {
+                  type: "section",
+                  text: { type: "mrkdwn", text: "*Failed jobs:*\n\($failed)" }
+                }
+              ]
+            }' > slack-payload.json
+
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v3.0.2
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload-file-path: slack-payload.json

@@ -13,7 +13,8 @@ extend-exclude = [
     "*.lock",
     "*.min.js",
     "*.min.css",
-    "CHANGELOG.md",
+    "**/CHANGELOG.md",
+    "**/changelog.md",
 ]
 
 [default.extend-identifiers]
@@ -25,3 +26,4 @@ asend = "asend" # Python async generator method
 # Add project-specific words that should not be treated as typos
 mke = "mke" # Sennheiser MKE product name
 consts = "consts"  # Common abbreviation for "constants"
+certifi = "certifi" # Python package name

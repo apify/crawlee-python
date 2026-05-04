@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
-import bisect
+import functools
+from bisect import insort
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, TypeVar, cast
 
 from crawlee import service_locator
-from crawlee._autoscaling._types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Snapshot
+from crawlee._autoscaling._types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Ratio, Snapshot
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
-from crawlee._utils.system import MemoryInfo, get_memory_info
+from crawlee._utils.system import MemoryInfo, MemoryUsageInfo, get_memory_info
 from crawlee.events._types import Event, EventSystemInfoData
 
 if TYPE_CHECKING:
@@ -26,12 +27,18 @@ logger = getLogger(__name__)
 T = TypeVar('T', bound=Snapshot)
 
 
+@functools.lru_cache
+def _warn_once(warning_message: str) -> None:
+    """Log a warning message only once."""
+    logger.warning(warning_message)
+
+
 class SortedSnapshotList(list[T]):
     """A list that maintains sorted order by `created_at` attribute for snapshot objects."""
 
     def add(self, item: T) -> None:
         """Add an item to the list maintaining sorted order by `created_at` using binary search."""
-        bisect.insort(self, item, key=lambda item: item.created_at)
+        insort(self, item, key=lambda item: item.created_at)
 
 
 @docs_group('Autoscaling')
@@ -69,7 +76,7 @@ class Snapshotter:
         max_used_memory_ratio: float,
         max_event_loop_delay: timedelta,
         max_client_errors: int,
-        max_memory_size: ByteSize,
+        max_memory_size: ByteSize | Ratio,
     ) -> None:
         """Initialize a new instance.
 
@@ -85,7 +92,9 @@ class Snapshotter:
                 value, the event loop is considered overloaded.
             max_client_errors: Sets the maximum number of client errors (HTTP 429). When the number of client errors
                 is higher than the provided number, the client is considered overloaded.
-            max_memory_size: Sets the maximum amount of system memory to be used by the `AutoscaledPool`.
+            max_memory_size: Sets the maximum amount of system memory to be used by the `AutoscaledPool`. When of type
+                `ByteSize` then it is used as fixed memory size. When of type `Ratio` then it allows for dynamic memory
+                scaling based on the available system memory.
         """
         self._max_used_cpu_ratio = max_used_cpu_ratio
         self._max_used_memory_ratio = max_used_memory_ratio
@@ -121,7 +130,7 @@ class Snapshotter:
         max_memory_size = (
             ByteSize.from_mb(config.memory_mbytes)
             if config.memory_mbytes
-            else ByteSize(int(get_memory_info().total_size.bytes * config.available_memory_ratio))
+            else Ratio(value=config.available_memory_ratio)
         )
 
         return cls(
@@ -252,11 +261,13 @@ class Snapshotter:
         latest_time = snapshots[-1].created_at
         return [snapshot for snapshot in snapshots if latest_time - snapshot.created_at <= duration]
 
-    def _snapshot_cpu(self, event_data: EventSystemInfoData) -> None:
+    async def _snapshot_cpu(self, event_data: EventSystemInfoData) -> None:
         """Capture a snapshot of the current CPU usage.
 
         This method does not perform CPU usage measurement. Instead, it just reads the data received through
         the `event_data` parameter, which is expected to be supplied by the event manager.
+        Must be `async` to ensure it is not scheduled to be run in own thread by the event manager, which could cause
+        race conditions in snapshots manipulation(sorting and pruning).
 
         Args:
             event_data: System info data from which CPU usage is read.
@@ -268,43 +279,79 @@ class Snapshotter:
         )
 
         snapshots = cast('list[Snapshot]', self._cpu_snapshots)
-        self._prune_snapshots(snapshots, event_data.cpu_info.created_at)
         self._cpu_snapshots.add(snapshot)
+        self._prune_snapshots(snapshots, self._cpu_snapshots[-1].created_at)
 
-    def _snapshot_memory(self, event_data: EventSystemInfoData) -> None:
+    async def _snapshot_memory(self, event_data: EventSystemInfoData) -> None:
         """Capture a snapshot of the current memory usage.
 
         This method does not perform memory usage measurement. Instead, it just reads the data received through
         the `event_data` parameter, which is expected to be supplied by the event manager.
+        Must be `async` to ensure it is not scheduled to be run in own thread by the event manager, which could cause
+        race conditions in snapshots manipulation(sorting and pruning).
 
         Args:
             event_data: System info data from which memory usage is read.
         """
+        match event_data.memory_info, self._max_memory_size:
+            case MemoryInfo() as memory_info, Ratio() as ratio:
+                max_memory_size = memory_info.total_size * ratio.value
+                system_wide_used_size = memory_info.system_wide_used_size
+                system_wide_memory_size = memory_info.total_size
+
+            case MemoryUsageInfo(), Ratio() as ratio:
+                # This is just hypothetical case, that will most likely not happen in practice.
+                # `LocalEventManager` should always provide `MemoryInfo` in the event data.
+                # When running on Apify, `self._max_memory_size` is always `ByteSize`, not `Ratio`.
+                _warn_once(
+                    'It is recommended that a custom implementation of `LocalEventManager` emits `SYSTEM_INFO` events '
+                    'with `MemoryInfo` and not just `MemoryUsageInfo`.'
+                )
+                max_memory_size = get_memory_info().total_size * ratio.value
+                system_wide_used_size = None
+                system_wide_memory_size = None
+
+            case MemoryInfo() as memory_info, ByteSize() as byte_size:
+                max_memory_size = byte_size
+                system_wide_used_size = memory_info.system_wide_used_size
+                system_wide_memory_size = memory_info.total_size
+
+            case MemoryUsageInfo(), ByteSize() as byte_size:
+                max_memory_size = byte_size
+                system_wide_used_size = None
+                system_wide_memory_size = None
+
+            case _, _:
+                raise NotImplementedError('Unsupported combination of memory info and max memory size types.')
+
         snapshot = MemorySnapshot(
             current_size=event_data.memory_info.current_size,
-            max_memory_size=self._max_memory_size,
+            max_memory_size=max_memory_size,
             max_used_memory_ratio=self._max_used_memory_ratio,
             created_at=event_data.memory_info.created_at,
-            system_wide_used_size=None,
-            system_wide_memory_size=None,
+            system_wide_used_size=system_wide_used_size,
+            system_wide_memory_size=system_wide_memory_size,
         )
 
-        if isinstance(memory_info := event_data.memory_info, MemoryInfo):
-            snapshot.system_wide_used_size = memory_info.system_wide_used_size
-            snapshot.system_wide_memory_size = memory_info.total_size
-
         snapshots = cast('list[Snapshot]', self._memory_snapshots)
-        self._prune_snapshots(snapshots, snapshot.created_at)
         self._memory_snapshots.add(snapshot)
-        self._evaluate_memory_load(event_data.memory_info.current_size, event_data.memory_info.created_at)
+        self._prune_snapshots(snapshots, self._memory_snapshots[-1].created_at)
 
-    def _snapshot_event_loop(self) -> None:
+        self._evaluate_memory_load(
+            event_data.memory_info.current_size,
+            event_data.memory_info.created_at,
+            max_memory_size=max_memory_size,
+        )
+
+    async def _snapshot_event_loop(self) -> None:
         """Capture a snapshot of the current event loop usage.
 
         This method evaluates the event loop's latency by comparing the expected time between snapshots to the actual
         time elapsed since the last snapshot. The delay in the snapshot reflects the time deviation due to event loop
         overhead - it's calculated by subtracting the expected interval between snapshots from the actual time elapsed
         since the last snapshot. If there's no previous snapshot, the delay is considered zero.
+        Must be `async` to ensure it is not scheduled to be run in own thread by the event manager, which could cause
+        race conditions in snapshots manipulation(sorting and pruning).
         """
         snapshot = EventLoopSnapshot(max_delay=self._max_event_loop_delay, delay=timedelta(seconds=0))
         previous_snapshot = self._event_loop_snapshots[-1] if self._event_loop_snapshots else None
@@ -314,14 +361,16 @@ class Snapshotter:
             snapshot.delay = event_loop_delay
 
         snapshots = cast('list[Snapshot]', self._event_loop_snapshots)
-        self._prune_snapshots(snapshots, snapshot.created_at)
         self._event_loop_snapshots.add(snapshot)
+        self._prune_snapshots(snapshots, self._event_loop_snapshots[-1].created_at)
 
-    def _snapshot_client(self) -> None:
+    async def _snapshot_client(self) -> None:
         """Capture a snapshot of the current API state by checking for rate limit errors (HTTP 429).
 
         Only errors produced by a 2nd retry of the API call are considered for snapshotting since earlier errors may
         just be caused by a random spike in the number of requests and do not necessarily signify API overloading.
+        Must be `async` to ensure it is not scheduled to be run in own thread by the event manager, which could cause
+        race conditions in snapshots manipulation(sorting and pruning).
         """
         client = service_locator.get_storage_client()
 
@@ -336,8 +385,8 @@ class Snapshotter:
         )
 
         snapshots = cast('list[Snapshot]', self._client_snapshots)
-        self._prune_snapshots(snapshots, snapshot.created_at)
         self._client_snapshots.add(snapshot)
+        self._prune_snapshots(snapshots, self._client_snapshots[-1].created_at)
 
     def _prune_snapshots(self, snapshots: list[Snapshot], now: datetime) -> None:
         """Remove snapshots that are older than the `self._snapshot_history`.
@@ -364,27 +413,30 @@ class Snapshotter:
         else:
             snapshots.clear()
 
-    def _evaluate_memory_load(self, current_memory_usage_size: ByteSize, snapshot_timestamp: datetime) -> None:
+    def _evaluate_memory_load(
+        self, current_memory_usage_size: ByteSize, snapshot_timestamp: datetime, max_memory_size: ByteSize
+    ) -> None:
         """Evaluate and logs critical memory load conditions based on the system information.
 
         Args:
             current_memory_usage_size: The current memory usage.
             snapshot_timestamp: The time at which the memory snapshot was taken.
+            max_memory_size: The maximum memory size to be used for evaluation.
         """
         # Check if the warning has been logged recently to avoid spamming
         if snapshot_timestamp < self._timestamp_of_last_memory_warning + self._MEMORY_WARNING_COOLDOWN_PERIOD:
             return
 
-        threshold_memory_size = self._max_used_memory_ratio * self._max_memory_size
-        buffer_memory_size = self._max_memory_size * (1 - self._max_used_memory_ratio) * self._RESERVE_MEMORY_RATIO
+        threshold_memory_size = self._max_used_memory_ratio * max_memory_size
+        buffer_memory_size = max_memory_size * (1 - self._max_used_memory_ratio) * self._RESERVE_MEMORY_RATIO
         overload_memory_threshold_size = threshold_memory_size + buffer_memory_size
 
         # Log a warning if current memory usage exceeds the critical overload threshold
         if current_memory_usage_size > overload_memory_threshold_size:
-            memory_usage_percentage = round((current_memory_usage_size.bytes / self._max_memory_size.bytes) * 100)
+            memory_usage_percentage = round((current_memory_usage_size.bytes / max_memory_size.bytes) * 100)
             logger.warning(
                 f'Memory is critically overloaded. Using {current_memory_usage_size} of '
-                f'{self._max_memory_size} ({memory_usage_percentage}%). '
+                f'{max_memory_size} ({memory_usage_percentage}%). '
                 'Consider increasing available memory.'
             )
             self._timestamp_of_last_memory_warning = snapshot_timestamp

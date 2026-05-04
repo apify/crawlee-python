@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Literal
 
 from bs4 import BeautifulSoup, Tag
@@ -23,11 +24,12 @@ class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup, Tag]):
 
     @override
     async def parse(self, response: HttpResponse) -> BeautifulSoup:
-        return BeautifulSoup(await response.read(), features=self._parser)
+        body = await response.read()
+        return await asyncio.to_thread(BeautifulSoup, body, features=self._parser)
 
     @override
     async def parse_text(self, text: str) -> BeautifulSoup:
-        return BeautifulSoup(text, features=self._parser)
+        return await asyncio.to_thread(BeautifulSoup, text, features=self._parser)
 
     @override
     def is_matching_selector(self, parsed_content: Tag, selector: str) -> bool:
@@ -38,11 +40,11 @@ class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup, Tag]):
         return tuple(match for match in parsed_content.select(selector))
 
     @override
-    def find_links(self, parsed_content: Tag, selector: str) -> Iterable[str]:
+    def find_links(self, parsed_content: Tag, selector: str, attribute: str) -> Iterable[str]:
         link: Tag
         urls: list[str] = []
         for link in parsed_content.select(selector):
-            url = link.attrs.get('href')
+            url = link.attrs.get(attribute)
             if url:
                 urls.append(url.strip())
         return urls

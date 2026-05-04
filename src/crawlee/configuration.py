@@ -177,11 +177,14 @@ class Configuration(BaseSettings):
             validation_alias=AliasChoices(
                 'apify_available_memory_ratio',
                 'crawlee_available_memory_ratio',
-            )
+            ),
+            gt=0.0,
+            le=1.0,
         ),
     ] = 0.25
     """The maximum proportion of system memory to use. If `memory_mbytes` is not provided, this ratio is used to
-    calculate the maximum memory. This option is utilized by the `Snapshotter`."""
+    calculate the maximum memory. This option is utilized by the `Snapshotter` and supports the dynamic system memory
+    scaling."""
 
     storage_dir: Annotated[
         str,

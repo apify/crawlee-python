@@ -49,7 +49,7 @@ class RequestManagerTandem(RequestManager):
         return (await self._read_only_loader.is_finished()) and (await self._read_write_manager.is_finished())
 
     @override
-    async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest:
+    async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest | None:
         return await self._read_write_manager.add_request(request, forefront=forefront)
 
     @override
@@ -89,9 +89,12 @@ class RequestManagerTandem(RequestManager):
                 'Adding request from the RequestLoader to the RequestManager failed, the request has been dropped',
                 extra={'url': request.url, 'unique_key': request.unique_key},
             )
-            return None
 
-        await self._read_only_loader.mark_request_as_handled(request)
+            return None
+        finally:
+            # Mark it as processed so that the `request` doesn't get stuck in the `in_progress` status
+            # in `RequestLoader`
+            await self._read_only_loader.mark_request_as_handled(request)
 
         return await self._read_write_manager.fetch_next_request()
 

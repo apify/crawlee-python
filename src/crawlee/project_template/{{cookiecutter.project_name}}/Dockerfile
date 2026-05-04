@@ -4,8 +4,13 @@
 # % if cookiecutter.crawler_type == 'playwright'
 FROM apify/actor-python-playwright:3.13
 # % elif cookiecutter.crawler_type == 'playwright-camoufox'
-# Currently camoufox has issues installing on Python 3.13
-FROM apify/actor-python-playwright:3.12
+FROM apify/actor-python-playwright-camoufox:3.13
+# % elif cookiecutter.crawler_type == 'playwright-chrome'
+FROM apify/actor-python-playwright-chrome:3.13
+# % elif cookiecutter.crawler_type == 'playwright-firefox'
+FROM apify/actor-python-playwright-firefox:3.13
+# % elif cookiecutter.crawler_type == 'playwright-webkit'
+FROM apify/actor-python-playwright-webkit:3.13
 # % else
 FROM apify/actor-python:3.13
 # % endif

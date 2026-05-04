@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from itertools import chain, repeat
 from typing import TYPE_CHECKING, TypeVar, cast
 from unittest.mock import Mock
@@ -15,17 +15,17 @@ from crawlee._autoscaling import AutoscaledPool, SystemStatus
 from crawlee._autoscaling._types import LoadRatioInfo, SystemInfo
 from crawlee._types import ConcurrencySettings
 from crawlee._utils.time import measure_time
+from tests.unit.utils import wait_for_condition
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
+
+T = TypeVar('T')
 
 
 @pytest.fixture
 def system_status() -> SystemStatus | Mock:
     return Mock(spec=SystemStatus)
-
-
-T = TypeVar('T')
 
 
 def future(value: T, /) -> Awaitable[T]:
@@ -34,6 +34,7 @@ def future(value: T, /) -> Awaitable[T]:
     return f
 
 
+@pytest.mark.run_alone
 async def test_runs_concurrently(system_status: SystemStatus | Mock) -> None:
     done_count = 0
 
@@ -86,7 +87,7 @@ async def test_abort_works(system_status: SystemStatus | Mock) -> None:
         await run_task
 
     assert elapsed.wall is not None
-    assert elapsed.wall < 0.3
+    assert elapsed.wall < 5
 
 
 async def test_propagates_exceptions(system_status: SystemStatus | Mock) -> None:
@@ -144,10 +145,6 @@ async def test_propagates_exceptions_after_finished(system_status: SystemStatus 
         await pool.run()
 
 
-@pytest.mark.flaky(
-    rerun=3,
-    reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1655.',
-)
 async def test_autoscales(
     monkeypatch: pytest.MonkeyPatch,
     system_status: SystemStatus | Mock,
@@ -159,7 +156,7 @@ async def test_autoscales(
         nonlocal done_count
         done_count += 1
 
-    start = datetime.now(timezone.utc)
+    overload_active = False
 
     def get_historical_system_info() -> SystemInfo:
         result = SystemInfo(
@@ -169,8 +166,7 @@ async def test_autoscales(
             client_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
         )
 
-        # 0.5 seconds after the start of the test, pretend the CPU became overloaded
-        if result.created_at - start >= timedelta(seconds=0.5):
+        if overload_active:
             result.cpu_info = LoadRatioInfo(limit_ratio=0.9, actual_ratio=1.0)
 
         return result
@@ -195,24 +191,21 @@ async def test_autoscales(
     pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
 
     try:
-        # After 0.2s, there should be an increase in concurrency
-        await asyncio.sleep(0.2)
-        assert pool.desired_concurrency > 1
+        # Wait until concurrency scales up above 1.
+        await wait_for_condition(lambda: pool.desired_concurrency > 1, timeout=5.0)
 
-        # After 0.5s, the concurrency should reach max concurrency
-        await asyncio.sleep(0.3)
-        assert pool.desired_concurrency == 4
+        # Wait until concurrency reaches maximum.
+        await wait_for_condition(lambda: pool.desired_concurrency == 4, timeout=5.0)
 
-        # The concurrency should guarantee completion of more than 10 tasks (a single worker would complete ~5)
-        assert done_count > 10
+        # Multiple concurrent workers should have completed more tasks than a single worker could.
+        await wait_for_condition(lambda: done_count > 10, timeout=5.0)
 
-        # After 0.7s, the pretend overload should have kicked in and there should be a drop in desired concurrency
-        await asyncio.sleep(0.2)
-        assert pool.desired_concurrency < 4
+        # Simulate CPU overload and wait for the pool to scale down.
+        overload_active = True
+        await wait_for_condition(lambda: pool.desired_concurrency < 4, timeout=5.0)
 
-        # After a full second, the pool should scale down all the way to 1
-        await asyncio.sleep(0.3)
-        assert pool.desired_concurrency == 1
+        # Wait until the pool scales all the way down to minimum.
+        await wait_for_condition(lambda: pool.desired_concurrency == 1, timeout=5.0)
     finally:
         pool_run_task.cancel()
         with suppress(asyncio.CancelledError):

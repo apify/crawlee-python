@@ -136,7 +136,7 @@ The <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> is
 The `SitemapRequestLoader` is designed specifically for sitemaps that follow the standard Sitemaps protocol. HTML pages containing links are not supported by this loader - those should be handled by regular crawlers using the `enqueue_links` functionality.
 :::
 
-The loader supports filtering URLs using glob patterns and regular expressions, allowing you to include or exclude specific types of URLs. The <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> provides streaming processing of sitemaps, ensuring efficient memory usage without loading the entire sitemap into memory.
+The loader supports filtering URLs using glob patterns and regular expressions, allowing you to include or exclude specific types of URLs. By default, the loader also keeps only URLs whose host matches their parent sitemap (`enqueue_strategy='same-hostname'`), matching the `enqueue_links` default. Pass `enqueue_strategy='all'` to disable this filter, or `'same-domain'` / `'same-origin'` for other scopes. The <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> provides streaming processing of sitemaps, ensuring efficient memory usage without loading the entire sitemap into memory.
 
 <RunnableCodeBlock className="language-python" language="python">
     {SitemapExample}

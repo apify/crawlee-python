@@ -798,9 +798,19 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             return None
 
     async def _discover_existing_requests(self) -> None:
-        """Discover and load existing requests into the state when opening an existing request queue."""
+        """Discover and load existing requests into the state when opening an existing request queue.
+
+        On recovery after a crash, any requests that were previously in-progress are reclaimed as pending,
+        since there is no active processing after a restart.
+        """
         request_files = await self._get_request_files(self.path_to_rq)
         state = self._state.current_value
+
+        if state.in_progress_requests:
+            logger.info(
+                f'Reclaiming {len(state.in_progress_requests)} in-progress request(s) from previous run.',
+            )
+            state.in_progress_requests.clear()
 
         for request_file in request_files:
             request = await self._parse_request_file(request_file)

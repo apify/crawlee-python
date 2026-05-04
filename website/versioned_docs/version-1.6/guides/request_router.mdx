@@ -1,0 +1,112 @@
+---
+id: request-router
+title: Request router
+description: Learn how to use the Router class to organize request handlers, error handlers, and pre-navigation hooks in Crawlee.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import BasicRequestHandlers from '!!raw-loader!roa-loader!./code_examples/request_router/basic_request_handlers.py';
+import SimpleDefaultHandler from '!!raw-loader!roa-loader!./code_examples/request_router/simple_default_handler.py';
+import CustomRouterDefaultOnly from '!!raw-loader!roa-loader!./code_examples/request_router/custom_router_default_only.py';
+import HttpPreNavigation from '!!raw-loader!roa-loader!./code_examples/request_router/http_pre_navigation.py';
+import ErrorHandler from '!!raw-loader!roa-loader!./code_examples/request_router/error_handler.py';
+import FailedRequestHandler from '!!raw-loader!roa-loader!./code_examples/request_router/failed_request_handler.py';
+import PlaywrightPreNavigation from '!!raw-loader!roa-loader!./code_examples/request_router/playwright_pre_navigation.py';
+import AdaptiveCrawlerHandlers from '!!raw-loader!roa-loader!./code_examples/request_router/adaptive_crawler_handlers.py';
+
+The <ApiLink to="class/Router">`Router`</ApiLink> class manages request flow and coordinates the execution of user-defined logic in Crawlee projects. It routes incoming requests to appropriate user-defined handlers based on labels, manages error scenarios, and provides hooks for pre-navigation execution. The <ApiLink to="class/Router">`Router`</ApiLink> serves as the orchestrator for all crawling operations, ensuring that each request is processed by the correct handler according to its type and label.
+
+## Request handlers
+
+Request handlers are user-defined functions that process individual requests and their corresponding responses. Each handler receives a crawling context as its primary argument, which provides access to the current request, response data, and utility methods for data extraction, link enqueuing, and storage operations. Handlers determine how different types of pages are processed and how data is extracted and stored.
+
+:::note
+
+The code examples in this guide use <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> for demonstration, but the <ApiLink to="class/Router">`Router`</ApiLink> works with all crawler types.
+
+:::
+
+### Built-in router
+
+Every crawler instance includes a built-in <ApiLink to="class/Router">`Router`</ApiLink> accessible through the `crawler.router` property. This approach simplifies initial setup and covers basic use cases where request routing requirements are straightforward.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {SimpleDefaultHandler}
+</RunnableCodeBlock>
+
+The default handler processes all requests that either lack a label or have a label for which no specific handler has been registered.
+
+### Custom router
+
+Applications requiring explicit control over router configuration or router reuse across multiple crawler instances can create custom <ApiLink to="class/Router">`Router`</ApiLink> instances. Custom routers provide complete control over request routing configuration and enable modular application architecture. Router instances can be configured independently and attached to your crawler instances as needed.
+
+You can also implement a custom request router class from scratch or by inheriting from <ApiLink to="class/Router">`Router`</ApiLink>. This allows you to define custom routing logic or manage request handlers in a different way.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {CustomRouterDefaultOnly}
+</RunnableCodeBlock>
+
+### Advanced routing by labels
+
+More complex crawling projects often require different processing logic for various page types. The router supports label-based routing, which allows registration of specialized handlers for specific content categories. This pattern enables clean separation of concerns and targeted processing logic for different URL patterns or content types.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {BasicRequestHandlers}
+</RunnableCodeBlock>
+
+## Error handlers
+
+Crawlee provides error handling mechanisms to manage request processing failures. It distinguishes between recoverable errors that may succeed on retry and permanent failures that require alternative handling strategies.
+
+### Error handler
+
+The error handler executes when exceptions occur during request processing, before any retry attempts. This handler receives the error context and can implement custom recovery logic, modify request parameters, or determine whether the request should be retried. Error handlers enable control over failure scenarios and allow applications to implement error recovery strategies.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {ErrorHandler}
+</RunnableCodeBlock>
+
+### Failed request handler
+
+The failed request handler executes when a request has exhausted all retry attempts and is considered permanently failed. This handler serves as the final opportunity to log failures, store failed requests for later analysis, create alternative requests, or implement fallback processing strategies.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {FailedRequestHandler}
+</RunnableCodeBlock>
+
+## Pre-navigation hooks
+
+Pre-navigation hooks execute before each request is processed, providing opportunities to configure request parameters, modify browser settings, or implement request-specific optimizations. You can use pre-navigation hooks for example for viewport configuration, resource blocking, timeout management, header customization, custom proxy rotation, and request interception.
+
+### HTTP crawler
+
+HTTP crawlers support pre-navigation hooks that execute before making HTTP requests. These hooks enable request modification, header configuration, and other HTTP-specific optimizations.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {HttpPreNavigation}
+</RunnableCodeBlock>
+
+### Playwright crawler
+
+Playwright crawlers provide extensive pre-navigation capabilities that allow browser page configuration before navigation. These hooks can modify browser behavior and configure page settings.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {PlaywrightPreNavigation}
+</RunnableCodeBlock>
+
+### Adaptive Playwright crawler
+
+The <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> implements a dual-hook system with common hooks that execute for all requests and Playwright-specific hooks that execute only when browser automation is required. This is perfect for projects that need both static and dynamic content handling.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {AdaptiveCrawlerHandlers}
+</RunnableCodeBlock>
+
+## Conclusion
+
+This guide introduced you to the <ApiLink to="class/Router">`Router`</ApiLink> class and how to organize your crawling logic. You learned how to use built-in and custom routers, implement request handlers with label-based routing, handle errors with error and failed request handlers, and configure pre-navigation hooks for different crawler types.
+
+If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!

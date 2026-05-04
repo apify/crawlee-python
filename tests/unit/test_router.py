@@ -23,6 +23,7 @@ class MockContext(BasicCrawlingContext):
             use_state=AsyncMock(),
             get_key_value_store=AsyncMock(),
             log=logging.getLogger(),
+            register_deferred_cleanup=lambda _: None,
         )
 
 
@@ -115,3 +116,114 @@ async def test_router_multi_labelled_handler() -> None:
     await router(MockContext(label='B'))
     mock_handler.assert_called_with('B')
     assert mock_handler.call_count == 2
+
+
+async def test_router_use_middleware() -> None:
+    router = Router[MockContext]()
+    mock_middleware = Mock()
+    mock_default_handler = Mock()
+
+    @router.use
+    async def middleware_1(_context: MockContext) -> None:
+        mock_middleware(call='middleware_1')
+
+    @router.use
+    async def middleware_2(_context: MockContext) -> None:
+        mock_middleware(call='middleware_2')
+
+    @router.default_handler
+    async def default_handler(_context: MockContext) -> None:
+        mock_default_handler()
+
+    await router(MockContext(label=None))
+
+    assert mock_middleware.call_count == 2
+    mock_middleware.assert_any_call(call='middleware_1')
+    mock_middleware.assert_any_call(call='middleware_2')
+    mock_default_handler.assert_called_once()
+    # Check order of middleware execution
+    assert mock_middleware.call_args_list[0][1] == {'call': 'middleware_1'}
+    assert mock_middleware.call_args_list[1][1] == {'call': 'middleware_2'}
+
+
+async def test_router_use_middleware_with_label() -> None:
+    router = Router[MockContext]()
+    mock_middleware = Mock()
+    mock_handler = Mock()
+
+    @router.use
+    async def middleware_1(_context: MockContext) -> None:
+        mock_middleware(call='middleware_1')
+
+    @router.use
+    async def middleware_2(_context: MockContext) -> None:
+        mock_middleware(call='middleware_2')
+
+    @router.handler('A')
+    async def handler_a(_context: MockContext) -> None:
+        mock_handler(call='handler_a')
+
+    @router.default_handler
+    async def default_handler(_context: MockContext) -> None:
+        mock_handler(call='default_handler')
+
+    await router(MockContext(label='A'))
+    await router(MockContext(label=None))
+
+    assert mock_middleware.call_count == 4
+    assert mock_handler.call_count == 2
+
+    assert mock_middleware.call_args_list[0][1] == {'call': 'middleware_1'}
+    assert mock_middleware.call_args_list[1][1] == {'call': 'middleware_2'}
+    assert mock_handler.call_args_list[0][1] == {'call': 'handler_a'}
+    assert mock_middleware.call_args_list[2][1] == {'call': 'middleware_1'}
+    assert mock_middleware.call_args_list[3][1] == {'call': 'middleware_2'}
+    assert mock_handler.call_args_list[1][1] == {'call': 'default_handler'}
+
+
+async def test_router_middleware_order_execution() -> None:
+    router = Router[MockContext]()
+    mock_execution_order = Mock()
+
+    @router.use
+    async def middleware_1(_context: MockContext) -> None:
+        mock_execution_order(call='middleware_1')
+
+    @router.use
+    async def middleware_2(_context: MockContext) -> None:
+        mock_execution_order(call='middleware_2')
+
+    @router.default_handler
+    async def default_handler(_context: MockContext) -> None:
+        mock_execution_order(call='default_handler')
+
+    await router(MockContext(label=None))
+
+    assert mock_execution_order.call_count == 3
+    assert mock_execution_order.call_args_list[0][1] == {'call': 'middleware_1'}
+    assert mock_execution_order.call_args_list[1][1] == {'call': 'middleware_2'}
+    assert mock_execution_order.call_args_list[2][1] == {'call': 'default_handler'}
+
+
+async def test_router_middleware_exception_interrupts_chain() -> None:
+    router = Router[MockContext]()
+    mock_execution_order = Mock()
+
+    @router.use
+    async def middleware_1(_context: MockContext) -> None:
+        mock_execution_order(call='middleware_1')
+        raise ValueError('middleware error')
+
+    @router.use
+    async def middleware_2(_context: MockContext) -> None:
+        mock_execution_order(call='middleware_2')
+
+    @router.default_handler
+    async def default_handler(_context: MockContext) -> None:
+        mock_execution_order(call='default_handler')
+
+    with pytest.raises(ValueError, match='middleware error'):
+        await router(MockContext(label=None))
+
+    assert mock_execution_order.call_count == 1
+    assert mock_execution_order.call_args_list[0][1] == {'call': 'middleware_1'}

@@ -25,6 +25,9 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   code_checks:
     name: Code checks
@@ -51,6 +54,8 @@ jobs:
   changelog_update:
     name: Changelog update
     needs: [release_prepare]
+    permissions:
+      contents: write
     uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
     with:
       version_number: ${{ needs.release_prepare.outputs.version_number }}
@@ -61,6 +66,8 @@ jobs:
     name: GitHub release
     needs: [release_prepare, changelog_update]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -90,9 +97,33 @@ jobs:
           is_prerelease: ""
           version_number: ${{ needs.release_prepare.outputs.version_number }}
           ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
-      # Publishes the package to PyPI using PyPA official GitHub action with OIDC authentication.
+      # Publish the package to PyPI using PyPA official GitHub action with OIDC authentication.
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
 
       # TODO: add job for publish package to Conda
       # https://github.com/apify/crawlee-python/issues/104
+
+  version_docs:
+    name: Version docs
+    needs: [release_prepare, changelog_update, pypi_publish]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/manual_version_docs.yaml
+    with:
+      # Commit the version docs changes on top of the changelog commit.
+      ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
+    secrets: inherit
+
+  doc_release:
+    name: Doc release
+    needs: [changelog_update, pypi_publish, version_docs]
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/manual_release_docs.yaml
+    with:
+      # Use the commit with the version docs changes as the source for the release docs.
+      ref: ${{ needs.version_docs.outputs.version_docs_commitish }}
+    secrets: inherit

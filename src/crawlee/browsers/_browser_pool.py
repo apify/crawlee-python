@@ -19,7 +19,7 @@ from crawlee.browsers._playwright_browser_plugin import PlaywrightBrowserPlugin
 from crawlee.browsers._types import BrowserType, CrawleePage
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Awaitable, Callable, Mapping, Sequence
     from pathlib import Path
     from types import TracebackType
 
@@ -98,6 +98,13 @@ class BrowserPool:
         self._retire_browser_after_page_count = retire_browser_after_page_count
         self._pages = WeakValueDictionary[str, CrawleePage]()  # Track the pages in the pool
         self._plugins_cycle = itertools.cycle(self._plugins)  # Cycle through the plugins
+
+        self._pre_page_create_hooks: list[
+            Callable[[str, BrowserController, dict[str, Any], ProxyInfo | None], Awaitable[None]]
+        ] = []
+        self._post_page_create_hooks: list[Callable[[CrawleePage, BrowserController], Awaitable[None]]] = []
+        self._pre_page_close_hooks: list[Callable[[CrawleePage, BrowserController], Awaitable[None]]] = []
+        self._post_page_close_hooks: list[Callable[[str, BrowserController], Awaitable[None]]] = []
 
         # Flag to indicate the context state.
         self._active = False
@@ -301,9 +308,15 @@ class BrowserPool:
         try:
             if not browser_controller:
                 browser_controller = await asyncio.wait_for(self._launch_new_browser(plugin), timeout)
+            browser_new_context_options = dict(plugin.browser_new_context_options)
+
+            await self._execute_hooks(
+                self._pre_page_create_hooks, page_id, browser_controller, browser_new_context_options, proxy_info
+            )
+
             page = await asyncio.wait_for(
                 browser_controller.new_page(
-                    browser_new_context_options=plugin.browser_new_context_options,
+                    browser_new_context_options=browser_new_context_options,
                     proxy_info=proxy_info,
                 ),
                 timeout,
@@ -319,6 +332,11 @@ class BrowserPool:
         crawlee_page = CrawleePage(id=page_id, page=page, browser_type=plugin.browser_type)
         self._pages[page_id] = crawlee_page
         self._total_pages_count += 1
+
+        await self._execute_hooks(self._post_page_create_hooks, crawlee_page, browser_controller)
+
+        self._override_page_close(crawlee_page, browser_controller)
+
         return crawlee_page
 
     def _pick_browser_with_free_capacity(
@@ -346,14 +364,84 @@ class BrowserPool:
 
     def _identify_inactive_browsers(self) -> None:
         """Identify inactive browsers and move them to the inactive list if their idle time exceeds the threshold."""
-        for browser in self._active_browsers:
+        for browser in list(self._active_browsers):
             if browser.idle_time >= self._browser_inactive_threshold:
                 self._active_browsers.remove(browser)
                 self._inactive_browsers.append(browser)
 
     async def _close_inactive_browsers(self) -> None:
         """Close the browsers that have no active pages and have been idle for a certain period."""
-        for browser in self._inactive_browsers:
+        for browser in list(self._inactive_browsers):
             if not browser.pages:
                 await browser.close()
                 self._inactive_browsers.remove(browser)
+
+    async def _execute_hooks(self, hooks: list[Callable[..., Awaitable[None]]], *args: Any) -> None:
+        """Execute the provided hooks with the given arguments."""
+        for hook in hooks:
+            await hook(*args)
+
+    def _override_page_close(self, crawlee_page: CrawleePage, browser_controller: BrowserController) -> None:
+        """Override the page's close method to execute pre and post close hooks."""
+        if self._pre_page_close_hooks or self._post_page_close_hooks:
+            original_close = crawlee_page.page.close
+
+            async def close_with_hooks(*args: Any, **kwargs: Any) -> None:
+                try:
+                    await self._execute_hooks(self._pre_page_close_hooks, crawlee_page, browser_controller)
+                finally:
+                    await original_close(*args, **kwargs)
+                await self._execute_hooks(self._post_page_close_hooks, crawlee_page.id, browser_controller)
+
+            crawlee_page.page.close: Callable[..., Awaitable[None]] = close_with_hooks
+
+    def pre_page_create_hook(
+        self, hook: Callable[[str, BrowserController, dict[str, Any], ProxyInfo | None], Awaitable[None]]
+    ) -> Callable[[str, BrowserController, dict[str, Any], ProxyInfo | None], Awaitable[None]]:
+        """Register a hook to be called just before a new page is created.
+
+        The hook receives the page ID, `BrowserController`, `browser_new_context_options`, and `ProxyInfo`.
+        Note that depending on the `BrowserController` implementation, `browser_new_context_options` may not
+        apply to every page individually. For example, `PlaywrightBrowserController` with
+        ``use_incognito_pages=False`` shares a single context across all pages, so the options are applied
+        only when the context is first created.
+        """
+        self._pre_page_create_hooks.append(hook)
+
+        return hook
+
+    def post_page_create_hook(
+        self, hook: Callable[[CrawleePage, BrowserController], Awaitable[None]]
+    ) -> Callable[[CrawleePage, BrowserController], Awaitable[None]]:
+        """Register a hook to be called right after a new page is created.
+
+        The hook receives the newly created `CrawleePage` and the `BrowserController`. Use it to apply
+        changes to all pages, such as injecting scripts or configuring request interception.
+        """
+        self._post_page_create_hooks.append(hook)
+
+        return hook
+
+    def pre_page_close_hook(
+        self, hook: Callable[[CrawleePage, BrowserController], Awaitable[None]]
+    ) -> Callable[[CrawleePage, BrowserController], Awaitable[None]]:
+        """Register a hook to be called just before a page is closed.
+
+        The hook receives the `CrawleePage` and the `BrowserController`. Use it to collect last-second data,
+        such as taking a screenshot or saving page state before the page is destroyed.
+        """
+        self._pre_page_close_hooks.append(hook)
+
+        return hook
+
+    def post_page_close_hook(
+        self, hook: Callable[[str, BrowserController], Awaitable[None]]
+    ) -> Callable[[str, BrowserController], Awaitable[None]]:
+        """Register a hook to be called right after a page is closed.
+
+        The hook receives the page ID and the `BrowserController`. Use it for cleanup or logging
+        after a page's lifecycle ends.
+        """
+        self._post_page_close_hooks.append(hook)
+
+        return hook

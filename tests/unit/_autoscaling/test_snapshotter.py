@@ -1,19 +1,28 @@
 from __future__ import annotations
 
 import asyncio
+import time
+from bisect import insort
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, cast
+from math import floor
+from typing import TYPE_CHECKING, Any, cast
+from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
 
 from crawlee import service_locator
 from crawlee._autoscaling import Snapshotter
-from crawlee._autoscaling._types import ClientSnapshot, CpuSnapshot, MemorySnapshot
+from crawlee._autoscaling._types import (
+    SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD,
+    ClientSnapshot,
+    CpuSnapshot,
+    MemorySnapshot,
+)
 from crawlee._autoscaling.snapshotter import SortedSnapshotList
 from crawlee._utils.byte_size import ByteSize
-from crawlee._utils.system import CpuInfo, MemoryInfo
+from crawlee._utils.system import CpuInfo, MemoryInfo, get_memory_info
 from crawlee.configuration import Configuration
 from crawlee.events import LocalEventManager
 from crawlee.events._types import Event, EventSystemInfoData
@@ -146,6 +155,7 @@ def test_snapshot_client_overloaded() -> None:
     assert ClientSnapshot(error_count=7, new_error_count=3, max_error_count=2).is_overloaded
 
 
+@pytest.mark.run_alone
 async def test_get_cpu_sample(
     snapshotter: Snapshotter, event_manager: LocalEventManager, default_memory_info: MemoryInfo
 ) -> None:
@@ -221,17 +231,23 @@ async def test_snapshot_pruning_removes_outdated_records(
     # Create timestamps for testing
     now = datetime.now(timezone.utc)
 
-    events_data = [
-        EventSystemInfoData(
-            cpu_info=CpuInfo(used_ratio=0.5, created_at=now - timedelta(hours=delta)),
-            memory_info=default_memory_info,
-        )
-        for delta in [5, 3, 2, 0]
-    ]
+    def randomly_delayed_insort(*args: Any, **kwargs: Any) -> None:
+        """Sort with injected delay to provoke otherwise hard to reproduce race condition."""
+        time.sleep(0.05)
+        return insort(*args, **kwargs)
 
-    for event_data in events_data:
-        event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_data)
-    await event_manager.wait_for_all_listeners_to_complete()
+    with mock.patch('crawlee._autoscaling.snapshotter.insort', side_effect=randomly_delayed_insort):
+        events_data = [
+            EventSystemInfoData(
+                cpu_info=CpuInfo(used_ratio=0.5, created_at=now - timedelta(hours=delta)),
+                memory_info=default_memory_info,
+            )
+            for delta in [0, 3, 2, 5]  # Out of order timestamps. Snapshotter can not rely on natural ordering.
+        ]
+
+        for event_data in events_data:
+            event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_data)
+        await event_manager.wait_for_all_listeners_to_complete()
 
     cpu_snapshots = cast('list[CpuSnapshot]', snapshotter.get_cpu_sample())
 
@@ -369,3 +385,63 @@ def test_sorted_snapshot_list_add_maintains_order() -> None:
             prev_time = sorted_list[i - 1].created_at
             curr_time = snapshot.created_at
             assert prev_time <= curr_time, f'Items at indices {i - 1} and {i} are not in chronological order'
+
+
+@pytest.mark.parametrize('dynamic_memory', [True, False])
+async def test_dynamic_memory(
+    *,
+    default_cpu_info: CpuInfo,
+    event_manager: LocalEventManager,
+    dynamic_memory: bool,
+) -> None:
+    """Test dynamic memory scaling scenario where the system-wide memory can change.
+
+    Create two memory snapshots. They have same memory usage, but different available memory.
+    First snapshot is created with insufficient memory, so it is overloaded.
+    Second snapshot is created with sufficient memory.
+
+    Based on the Snapshotter configuration, it will either take into account the increased available memory or not.
+    """
+    _initial_memory_info = get_memory_info()
+    ratio_just_below_system_wide_overload = 0.99 * SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD
+
+    memory_mbytes = 0 if dynamic_memory else floor(_initial_memory_info.total_size.to_mb())
+
+    service_locator.set_event_manager(event_manager)
+
+    async with Snapshotter.from_config(
+        Configuration(memory_mbytes=memory_mbytes, available_memory_ratio=ratio_just_below_system_wide_overload)
+    ) as snapshotter:
+        # Default state, memory usage exactly at the overload threshold -> overloaded, but not system-wide overloaded
+        memory_infos = [
+            # Overloaded sample
+            MemoryInfo(
+                total_size=_initial_memory_info.total_size,
+                current_size=_initial_memory_info.total_size * ratio_just_below_system_wide_overload,
+                system_wide_used_size=_initial_memory_info.total_size * ratio_just_below_system_wide_overload,
+            ),
+            # Same as first sample, with twice as memory available in the system
+            MemoryInfo(
+                total_size=_initial_memory_info.total_size * 2,  # Simulate increased total memory
+                current_size=_initial_memory_info.total_size * ratio_just_below_system_wide_overload,
+                system_wide_used_size=_initial_memory_info.total_size * ratio_just_below_system_wide_overload,
+            ),
+        ]
+
+        for memory_info in memory_infos:
+            event_manager.emit(
+                event=Event.SYSTEM_INFO,
+                event_data=EventSystemInfoData(
+                    cpu_info=default_cpu_info,
+                    memory_info=memory_info,
+                ),
+            )
+
+        await event_manager.wait_for_all_listeners_to_complete()
+
+        memory_samples = snapshotter.get_memory_sample()
+        assert len(memory_samples) == 2
+        # First sample will be overloaded.
+        assert memory_samples[0].is_overloaded
+        # Second sample can reflect the increased available memory based on the configuration used to create Snapshotter
+        assert memory_samples[1].is_overloaded == (not dynamic_memory)

@@ -4,9 +4,11 @@ import json
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
+from redis.exceptions import RedisError
 from typing_extensions import override
 
 from crawlee._utils.file import infer_mime_type
+from crawlee._utils.retry import retry_on_error
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
@@ -100,14 +102,17 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             instance_kwargs={},
         )
 
+    @retry_on_error(RedisError)
     @override
     async def get_metadata(self) -> KeyValueStoreMetadata:
         return await self._get_metadata(KeyValueStoreMetadata)
 
+    @retry_on_error(RedisError)
     @override
     async def drop(self) -> None:
         await self._drop(extra_keys=[self._items_key, self._metadata_items_key])
 
+    @retry_on_error(RedisError)
     @override
     async def purge(self) -> None:
         await self._purge(
@@ -115,6 +120,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             metadata_kwargs=MetadataUpdateParams(update_accessed_at=True, update_modified_at=True),
         )
 
+    @retry_on_error(RedisError)
     @override
     async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
         # Special handling for None values
@@ -141,7 +147,6 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             content_type=content_type,
             size=size,
         )
-
         async with self._get_pipeline() as pipe:
             # redis-py typing issue
             await await_redis_response(pipe.hset(self._items_key, key, value_bytes))  # ty: ignore[invalid-argument-type]
@@ -155,6 +160,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             )
             await self._update_metadata(pipe, **MetadataUpdateParams(update_accessed_at=True, update_modified_at=True))
 
+    @retry_on_error(RedisError)
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
         serialized_metadata_item = await await_redis_response(self._redis.hget(self._metadata_items_key, key))
@@ -200,6 +206,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
 
         return KeyValueStoreRecord(value=value, **metadata_item.model_dump())
 
+    @retry_on_error(RedisError)
     @override
     async def delete_value(self, *, key: str) -> None:
         async with self._get_pipeline() as pipe:
@@ -223,7 +230,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             raise TypeError('The items data was received in an incorrect format.')
 
         # Get all keys, sorted alphabetically
-        keys = sorted(items_data.keys())  # ty: ignore[invalid-argument-type]
+        keys = sorted(items_data.keys())
 
         # Apply exclusive_start_key filter if provided
         if exclusive_start_key is not None:
@@ -251,6 +258,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
     async def get_public_url(self, *, key: str) -> str:
         raise NotImplementedError('Public URLs are not supported for memory key-value stores.')
 
+    @retry_on_error(RedisError)
     @override
     async def record_exists(self, *, key: str) -> bool:
         async with self._get_pipeline(with_execute=False) as pipe:

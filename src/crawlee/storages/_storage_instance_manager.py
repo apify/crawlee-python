@@ -46,20 +46,20 @@ class _StorageCache:
         storage_type = type(storage_instance)
 
         # Remove from ID cache
-        for additional_key in self.by_id[storage_type][storage_instance.id]:
-            del self.by_id[storage_type][storage_instance.id][additional_key]
-            break
+        for additional_key, cached in list(self.by_id[storage_type][storage_instance.id].items()):
+            if cached is storage_instance:
+                del self.by_id[storage_type][storage_instance.id][additional_key]
 
         # Remove from name cache or alias cache. It can never be in both.
         if storage_instance.name is not None:
-            for additional_key in self.by_name[storage_type][storage_instance.name]:
-                del self.by_name[storage_type][storage_instance.name][additional_key]
-                break
+            for additional_key, cached in list(self.by_name[storage_type][storage_instance.name].items()):
+                if cached is storage_instance:
+                    del self.by_name[storage_type][storage_instance.name][additional_key]
         else:
             for alias_key in self.by_alias[storage_type]:
-                for additional_key in self.by_alias[storage_type][alias_key]:
-                    del self.by_alias[storage_type][alias_key][additional_key]
-                    break
+                for additional_key, cached in list(self.by_alias[storage_type][alias_key].items()):
+                    if cached is storage_instance:
+                        del self.by_alias[storage_type][alias_key][additional_key]
 
 
 ClientOpenerCoro = Coroutine[None, None, DatasetClient | KeyValueStoreClient | RequestQueueClient]
@@ -117,8 +117,7 @@ class StorageInstanceManager:
             # Validate input parameters.
             raise_if_too_many_kwargs(id=id, name=name, alias=alias)
 
-            # Auto-set alias='default' when no parameters are specified.
-            # Default unnamed storage is equal to alias=default unnamed storage.
+            # Auto-set alias='__default__' when no parameters are specified.
             if not any([name, alias, id]):
                 alias = self._DEFAULT_STORAGE_ALIAS
 
@@ -168,7 +167,7 @@ class StorageInstanceManager:
 
                 metadata = await client.get_metadata()
 
-                instance = cls(client, metadata.id, metadata.name)  # type: ignore[call-arg]
+                instance = cls(client, metadata.id, metadata.name)  # ty: ignore[too-many-positional-arguments]
                 instance_name = getattr(instance, 'name', None)
 
                 # Cache the instance.

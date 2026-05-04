@@ -41,31 +41,19 @@ class ErrorTracker:
             raise ValueError('`show_error_message` must be `True` if `show_full_message` is set to `True`')
         self.show_full_message = show_full_message
         self._errors: ErrorFilenameGroups = defaultdict(lambda: defaultdict(Counter))
-        self._early_reported_errors = set[int]()
 
     async def add(
         self,
         error: Exception,
         *,
         context: BasicCrawlingContext | None = None,
-        early: bool = False,
     ) -> None:
         """Add an error in the statistics.
 
         Args:
             error: Error to be added to statistics.
             context: Context used to collect error snapshot.
-            early: Flag indicating that the error is added earlier than usual to have access to resources that will be
-             closed before normal error collection. This prevents double reporting during normal error collection.
         """
-        if id(error) in self._early_reported_errors:
-            # Error had to be collected earlier before relevant resources are closed.
-            self._early_reported_errors.remove(id(error))
-            return
-
-        if early:
-            self._early_reported_errors.add(id(error))
-
         error_group_name = error.__class__.__name__ if self.show_error_name else None
         error_group_message = self._get_error_message(error)
         new_error_group_message = ''  # In case of wildcard similarity match

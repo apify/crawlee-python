@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "crawlee"
-version = "1.3.2"
+version = "1.6.4"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = { file = "LICENSE" }
@@ -81,6 +81,11 @@ sql_sqlite = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
     "aiosqlite>=0.21.0",
 ]
+sql_mysql = [
+    "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
+    "aiomysql>=0.3.2",
+    "cryptography>=46.0.5",
+]
 redis = ["redis[hiredis] >= 7.0.0"]
 
 [project.scripts]
@@ -98,6 +103,11 @@ crawlee = "crawlee._cli:cli"
 
 [dependency-groups]
 dev = [
+    # TODO: Remove this constraint once pydoc-markdown updates its dependencies.
+    # Package pydoc-markdown is unmaintained and pins old docspec-python with vulnerable black.
+    # See https://github.com/apify/apify-client-python/pull/582/ for more details.
+    # We explicitly constrain black>=24.3.0 to override the transitive dependency.
+    "black>=24.3.0",
     "anyio<5.0.0",
     "apify_client", # For e2e tests.
     "build<2.0.0", # For e2e tests.
@@ -130,6 +140,9 @@ packages = ["src/crawlee"]
 [tool.ruff]
 line-length = 120
 include = ["src/**/*.py", "tests/**/*.py", "docs/**/*.py", "website/**/*.py"]
+exclude = [
+    "website/versioned_docs/**",
+]
 extend-exclude = ["src/crawlee/project_template"]
 
 [tool.ruff.lint]
@@ -241,7 +254,11 @@ include = ["src", "tests", "scripts", "docs", "website"]
 exclude = [
     "src/crawlee/project_template",
     "docs/guides/code_examples/storage_clients/custom_storage_client_example.py",
+    "website/versioned_docs",
 ]
+
+[tool.ty.rules]
+unused-ignore-comment = "error"
 
 [[tool.ty.overrides]]
 include = [
@@ -258,9 +275,20 @@ exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "assert_never()"]
 [tool.ipdb]
 context = 7
 
+[tool.uv]
+# Minimal defense against supply-chain attacks.
+exclude-newer = "24 hours"
+
+[tool.uv.exclude-newer-package]
+# Allow internal Apify packages to install immediately.
+apify-client = false
+apify-shared = false
+apify_fingerprint_datapoints = false
+crawlee = false
+
 # Run tasks with: uv run poe <task>
 [tool.poe.tasks]
-clean = "rm -rf .coverage .pytest_cache .ruff_cache .ty_cache .uv-cache build coverage-unit.xml dist htmlcov website/.docusaurus website/.yarn website/module_shortcuts.json website/node_modules "
+clean = "rm -rf .coverage .pytest_cache .ruff_cache .ty_cache .uv-cache build coverage-unit.xml dist htmlcov website/.docusaurus website/module_shortcuts.json website/node_modules "
 install-sync = "uv sync --all-extras"
 build = "uv build --verbose"
 publish-to-pypi = "uv publish --verbose --token ${APIFY_PYPI_TOKEN_CRAWLEE}"
@@ -312,10 +340,14 @@ uv run pytest \
     tests/e2e/project_template
 """
 
+[tool.poe.tasks.update-docs-theme]
+shell = "pnpm update @apify/docs-theme"
+cwd = "website"
+
 [tool.poe.tasks.build-docs]
-shell = "./build_api_reference.sh && corepack enable && yarn && yarn build"
+shell = "./build_api_reference.sh && pnpm install && uv run pnpm build"
 cwd = "website"
 
 [tool.poe.tasks.run-docs]
-shell = "./build_api_reference.sh && corepack enable && yarn && yarn start"
+shell = "./build_api_reference.sh && pnpm install && uv run pnpm start"
 cwd = "website"
