@@ -9,13 +9,13 @@ from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from stagehand import AsyncSession
-    from stagehand.types.session_act_params import SessionActParams
+    from stagehand.types.session_act_params import SessionActParamsNonStreaming
     from stagehand.types.session_act_response import SessionActResponse
-    from stagehand.types.session_execute_params import SessionExecuteParams
+    from stagehand.types.session_execute_params import SessionExecuteParamsNonStreaming
     from stagehand.types.session_execute_response import SessionExecuteResponse
-    from stagehand.types.session_extract_params import SessionExtractParams
+    from stagehand.types.session_extract_params import SessionExtractParamsNonStreaming
     from stagehand.types.session_extract_response import SessionExtractResponse
-    from stagehand.types.session_observe_params import SessionObserveParams
+    from stagehand.types.session_observe_params import SessionObserveParamsNonStreaming
     from stagehand.types.session_observe_response import SessionObserveResponse
     from typing_extensions import Unpack
 
@@ -82,20 +82,20 @@ class StagehandPage(Page):
         super().__init__(page._impl_obj)  # noqa: SLF001
         self._session = session
 
-    async def act(self, **kwargs: Unpack[SessionActParams]) -> SessionActResponse:
+    async def act(self, **kwargs: Unpack[SessionActParamsNonStreaming]) -> SessionActResponse:
         """Perform an action on the page using natural language. Argument `page` is automatically set.
 
         Args:
             **kwargs: Parameters passed to ``AsyncSession.act()``.
-                The most common is ``instruction`` — a natural language description
-                of the action to perform, e.g. ``instruction='click the login button'``.
+                The most common is ``input`` — a natural language instruction string or
+                ``ActionParam`` object, e.g. ``input='click the login button'``.
 
         Returns:
             The action result from Stagehand.
         """
         return await self._session.act(page=self, **kwargs)
 
-    async def observe(self, **kwargs: Unpack[SessionObserveParams]) -> SessionObserveResponse:
+    async def observe(self, **kwargs: Unpack[SessionObserveParamsNonStreaming]) -> SessionObserveResponse:
         """Observe the page and get AI-suggested actions. Argument `page` is automatically set.
 
         Args:
@@ -107,7 +107,7 @@ class StagehandPage(Page):
         """
         return await self._session.observe(page=self, **kwargs)
 
-    async def extract(self, **kwargs: Unpack[SessionExtractParams]) -> SessionExtractResponse:
+    async def extract(self, **kwargs: Unpack[SessionExtractParamsNonStreaming]) -> SessionExtractResponse:
         """Extract structured data from the page using natural language. Argument `page` is automatically set.
 
         Args:
@@ -119,14 +119,22 @@ class StagehandPage(Page):
         """
         return await self._session.extract(page=self, **kwargs)
 
-    async def execute(self, **kwargs: Unpack[SessionExecuteParams]) -> SessionExecuteResponse:
-        """Execute arbitrary code on the page via natural language instructions. Argument `page` is automatically set.
+    async def execute(self, **kwargs: Unpack[SessionExecuteParamsNonStreaming]) -> SessionExecuteResponse:
+        """Run an autonomous multi-step AI agent on the page. Argument `page` is automatically set.
 
         Args:
             **kwargs: Parameters passed to ``AsyncSession.execute()``.
-                Common parameters: ``instruction`` describing the code to execute.
+                Required parameters:
+
+                - ``agent_config`` — agent behaviour settings (pass ``{}`` for defaults).
+                Supports keys: ``model``, ``mode`` (``'dom'``/``'hybrid'``/``'cua'``),
+                ``system_prompt``, and others.
+                - ``execute_options`` — execution options dict with a required
+                ``instruction`` key: a natural language description of the multi-step
+                task to perform, e.g.
+                ``execute_options={'instruction': 'find the login form and sign in'}``.
 
         Returns:
-            The result of the executed code.
+            The result of the agent execution.
         """
         return await self._session.execute(page=self, **kwargs)

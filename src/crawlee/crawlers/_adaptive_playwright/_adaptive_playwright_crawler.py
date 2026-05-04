@@ -352,7 +352,7 @@ class AdaptivePlaywrightCrawler(
                 )
                 await self.router(adaptive_crawling_context)
 
-            return self._static_context_pipeline(context_linked_to_result, from_static_pipeline_to_top_router)  # ty: ignore[invalid-argument-type]
+            return self._static_context_pipeline(context_linked_to_result, from_static_pipeline_to_top_router)
 
         if rendering_type == 'client only':
 
@@ -362,7 +362,7 @@ class AdaptivePlaywrightCrawler(
                 )
                 await self.router(adaptive_crawling_context)
 
-            return self._pw_context_pipeline(context_linked_to_result, from_pw_pipeline_to_top_router)  # ty: ignore[invalid-argument-type]
+            return self._pw_context_pipeline(context_linked_to_result, from_pw_pipeline_to_top_router)
 
         raise RuntimeError(
             f'Not a valid rendering type. Must be one of the following: {", ".join(get_args(RenderingType))}'

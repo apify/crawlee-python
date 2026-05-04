@@ -19,7 +19,7 @@ async def main() -> None:
         context.log.info(f'Processing {context.request.url} ...')
 
         # Dismiss overlays or interact with the page using natural language.
-        await context.page.act(instruction='Click the accept cookies button if present')
+        await context.page.act(input='Click the accept cookies button if present')
 
         # Extract data from the page using AI.
         extracted = await context.page.extract(

@@ -64,7 +64,7 @@ Stagehand-specific settings are provided via <ApiLink to="class/StagehandOptions
 Use `act()` to interact with the page using a natural language instruction:
 
 ```python
-await context.page.act(instruction='Click the "Sign in" button')
+await context.page.act(input='Click the "Sign in" button')
 ```
 
 ### `extract` - structured data extraction
@@ -101,8 +101,10 @@ Use `execute()` for longer autonomous tasks that span multiple interactions:
 
 ```python
 result = await context.page.execute(
-    instruction='Search for "web scraping" and return the titles of the first five results',
-)
+    agent_config={},
+    execute_options={
+        'instruction': 'Search for "web scraping" and return the titles of the first five results',
+    })
 ```
 
 ## Browserbase integration

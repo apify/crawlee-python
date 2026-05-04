@@ -139,16 +139,21 @@ async def test_stagehand_page_ai_methods_delegate_to_session(
 ) -> None:
     @patched_crawler.router.default_handler
     async def handler(context: StagehandCrawlingContext) -> None:
-        await context.page.act(instruction='click button')
+        await context.page.act(input='click button')
         await context.page.extract(instruction='get title')
         await context.page.observe(instruction='find links')
-        await context.page.execute(instruction='run script')
+        await context.page.execute(agent_config={}, execute_options={'instruction': 'run script'})
 
     await patched_crawler.run([str(server_url)])
 
-    for method_name in ('act', 'extract', 'observe', 'execute'):
+    for method_name, argument in (
+        ('act', 'input'),
+        ('extract', 'instruction'),
+        ('observe', 'instruction'),
+        ('execute', 'execute_options'),
+    ):
         method_mock = getattr(stagehand_session_mock, method_name)
         method_mock.assert_awaited_once()
         assert isinstance(method_mock.call_args.kwargs['page'], StagehandPage)
 
-        assert 'instruction' in method_mock.call_args.kwargs
+        assert argument in method_mock.call_args.kwargs

@@ -5,7 +5,7 @@ import logging
 import warnings
 from datetime import timedelta
 from functools import partial
-from typing import TYPE_CHECKING, Any, Generic, Literal, overload
+from typing import TYPE_CHECKING, Any, Generic, Literal, cast, overload
 
 import playwright.async_api
 from more_itertools import partition
@@ -32,7 +32,7 @@ from ._playwright_crawling_context import PlaywrightCrawlingContext
 from ._playwright_http_client import PlaywrightHttpClient, browser_page_context
 from ._playwright_post_nav_crawling_context import PlaywrightPostNavCrawlingContext
 from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
-from ._types import GotoOptions
+from ._types import BlockRequestsFunction, GotoOptions
 from ._utils import block_requests, infinite_scroll
 
 if TYPE_CHECKING:
@@ -338,7 +338,7 @@ class PlaywrightCrawler(
                     log=context.log,
                     register_deferred_cleanup=context.register_deferred_cleanup,
                     page=page,
-                    block_requests=partial(block_requests, page=page),
+                    block_requests=cast('BlockRequestsFunction', partial(block_requests, page=page)),
                     goto_options=GotoOptions(**self._goto_options),
                 )
             case _:

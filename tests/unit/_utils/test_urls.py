@@ -39,6 +39,19 @@ def test_validate_http_url() -> None:
     valid_url = 'https://example.com'
     assert validate_http_url(valid_url) == valid_url
 
-    invalid_url = 'htp://invalid-url'
+
+@pytest.mark.parametrize(
+    'invalid_url',
+    [
+        'htp://invalid-url',
+        'gopher://127.0.0.1:6379/_PING',
+        'file:///etc/passwd',
+        'dict://127.0.0.1:11211/stat',
+        'ftp://example.com/secret.txt',
+        'javascript:alert(1)',
+        'example.com/path',
+    ],
+)
+def test_validate_http_url_rejects_non_http_scheme(invalid_url: str) -> None:
     with pytest.raises(ValidationError):
         validate_http_url(invalid_url)

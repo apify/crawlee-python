@@ -78,7 +78,7 @@ class StagehandCrawler(
         context.log.info(f'Processing {context.request.url} ...')
 
         # Use standard Playwright methods alongside AI methods.
-        await context.page.act(instruction='Click the accept cookies button if present')
+        await context.page.act(input='Click the accept cookies button if present')
 
         data = await context.page.extract(instruction='Get the article title and author')
 
