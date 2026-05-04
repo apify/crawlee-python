@@ -6,7 +6,6 @@ import functools
 import logging
 import signal
 import sys
-import tempfile
 import threading
 import traceback
 from asyncio import CancelledError
@@ -17,15 +16,13 @@ from functools import partial
 from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, cast
-from urllib.parse import ParseResult, urlparse
 from weakref import WeakKeyDictionary
 
 from cachetools import LRUCache
-from tldextract import TLDExtract
-from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
+from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack
 from yarl import URL
 
-from crawlee import EnqueueStrategy, Glob, RequestTransformAction, service_locator
+from crawlee import Glob, RequestTransformAction, service_locator
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
 from crawlee._log_config import configure_logger, get_configured_log_level, string_to_log_level
 from crawlee._request import Request, RequestOptions, RequestState
@@ -48,7 +45,7 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.file import atomic_write, export_csv_to_stream, export_json_to_stream
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.robots import RobotsTxtFile
-from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
+from crawlee._utils.urls import UNSUPPORTED_SCHEME_MESSAGE, convert_to_absolute_url, filter_url, is_url_absolute
 from crawlee._utils.wait import wait_for
 from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
 from crawlee.errors import (
@@ -485,7 +482,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # Internal, not explicitly configurable components
         self._robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
         self._robots_txt_lock = asyncio.Lock()
-        self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
         self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
@@ -978,16 +974,18 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def _check_url_after_redirects(self, context: TCrawlingContext) -> AsyncGenerator[TCrawlingContext, None]:
         """Ensure that the `loaded_url` still matches the enqueue strategy after redirects.
 
-        Filter out links that redirect outside of the crawled domain.
+        Filter out links that redirect outside of the crawled domain or to unsupported URL schemes.
         """
-        if context.request.loaded_url is not None and not self._check_enqueue_strategy(
-            context.request.enqueue_strategy,
-            origin_url=urlparse(context.request.url),
-            target_url=urlparse(context.request.loaded_url),
-        ):
-            raise ContextPipelineInterruptedError(
-                f'Skipping URL {context.request.loaded_url} (redirected from {context.request.url})'
+        if context.request.loaded_url is not None:
+            ok, reason = filter_url(
+                target=context.request.loaded_url,
+                strategy=context.request.enqueue_strategy,
+                origin=context.request.url,
             )
+            if not ok:
+                raise ContextPipelineInterruptedError(
+                    f'Skipping URL {context.request.loaded_url} (redirected from {context.request.url}): {reason}'
+                )
 
         yield context
 
@@ -1054,15 +1052,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     ) -> Iterator[TRequestIterator]:
         """Filter requests based on the enqueue strategy and URL patterns."""
         limit = kwargs.get('limit')
-        parsed_origin_url = urlparse(origin_url)
+        parsed_origin_url = URL(origin_url)
         strategy = kwargs.get('strategy', 'all')
 
-        if strategy == 'all' and not parsed_origin_url.hostname:
+        if strategy == 'all' and not parsed_origin_url.host:
             self.log.warning(f'Skipping enqueue: Missing hostname in origin_url = {origin_url}.')
             return
 
-        # Emit a `warning` message to the log, only once per call
-        warning_flag = True
+        # Each warning is emitted at most once per call.
+        host_warned = False
+        scheme_warned = False
 
         for request in request_iterator:
             if isinstance(request, Request):
@@ -1071,56 +1070,28 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 target_url = request.url
             else:
                 target_url = request
-            parsed_target_url = urlparse(target_url)
+            parsed_target_url = URL(target_url)
 
-            if warning_flag and strategy != 'all' and not parsed_target_url.hostname:
-                self.log.warning(f'Skipping enqueue url: Missing hostname in target_url = {target_url}.')
-                warning_flag = False
+            ok, reason = filter_url(target=parsed_target_url, strategy=strategy, origin=parsed_origin_url)
+            if not ok:
+                # Strategy mismatches are expected (most extracted links are external) so stay silent.
+                # Scheme rejections and missing hostnames signal a misconfiguration upstream, so warn.
+                if reason == UNSUPPORTED_SCHEME_MESSAGE:
+                    if not scheme_warned:
+                        self.log.warning(f'Skipping enqueue url {target_url!r}: {reason}')
+                        scheme_warned = True
+                elif not parsed_target_url.host and not host_warned:
+                    self.log.warning(f'Skipping enqueue url: Missing hostname in target_url = {target_url}.')
+                    host_warned = True
+                continue
 
-            if self._check_enqueue_strategy(
-                strategy, target_url=parsed_target_url, origin_url=parsed_origin_url
-            ) and self._check_url_patterns(target_url, kwargs.get('include'), kwargs.get('exclude')):
+            if self._check_url_patterns(target_url, kwargs.get('include'), kwargs.get('exclude')):
                 yield request
 
                 if limit is not None:
                     limit -= 1
                     if limit <= 0:
                         break
-
-    def _check_enqueue_strategy(
-        self,
-        strategy: EnqueueStrategy,
-        *,
-        target_url: ParseResult,
-        origin_url: ParseResult,
-    ) -> bool:
-        """Check if a URL matches the enqueue_strategy."""
-        if strategy == 'all':
-            return True
-
-        if origin_url.hostname is None or target_url.hostname is None:
-            self.log.debug(
-                f'Skipping enqueue: Missing hostname in origin_url = {origin_url.geturl()} or '
-                f'target_url = {target_url.geturl()}'
-            )
-            return False
-
-        if strategy == 'same-hostname':
-            return target_url.hostname == origin_url.hostname
-
-        if strategy == 'same-domain':
-            origin_domain = self._tld_extractor.extract_str(origin_url.hostname).top_domain_under_public_suffix
-            target_domain = self._tld_extractor.extract_str(target_url.hostname).top_domain_under_public_suffix
-            return origin_domain == target_domain
-
-        if strategy == 'same-origin':
-            return (
-                target_url.hostname == origin_url.hostname
-                and target_url.scheme == origin_url.scheme
-                and target_url.port == origin_url.port
-            )
-
-        assert_never(strategy)
 
     def _check_url_patterns(
         self,
