@@ -46,18 +46,6 @@ class RobotsTxtFile:
         return cls(url, robots)
 
     @classmethod
-    async def find(cls, url: str, http_client: HttpClient, proxy_info: ProxyInfo | None = None) -> Self:
-        """Determine the location of a robots.txt file for a URL and fetch it.
-
-        Args:
-            url: The URL whose domain will be used to find the corresponding robots.txt file.
-            http_client: Optional `ProxyInfo` to be used when fetching the robots.txt file. If None, no proxy is used.
-            proxy_info: The `HttpClient` instance used to perform the network request for fetching the robots.txt file.
-        """
-        robots_url = URL(url).with_path('/robots.txt')
-        return await cls.load(str(robots_url), http_client, proxy_info)
-
-    @classmethod
     async def load(cls, url: str, http_client: HttpClient, proxy_info: ProxyInfo | None = None) -> Self:
         """Load the robots.txt file for a given URL.
 
@@ -82,6 +70,18 @@ class RobotsTxtFile:
             robots = Protego.parse('User-agent: *\nAllow: /')
 
         return cls(url, robots, http_client=http_client, proxy_info=proxy_info)
+
+    @classmethod
+    async def find(cls, url: str, http_client: HttpClient, proxy_info: ProxyInfo | None = None) -> Self:
+        """Determine the location of a robots.txt file for a URL and fetch it.
+
+        Args:
+            url: The URL whose domain will be used to find the corresponding robots.txt file.
+            http_client: Optional `ProxyInfo` to be used when fetching the robots.txt file. If None, no proxy is used.
+            proxy_info: The `HttpClient` instance used to perform the network request for fetching the robots.txt file.
+        """
+        robots_url = URL(url).with_path('/robots.txt')
+        return await cls.load(str(robots_url), http_client, proxy_info)
 
     def is_allowed(self, url: str, user_agent: str = '*') -> bool:
         """Check if the given URL is allowed for the given user agent.

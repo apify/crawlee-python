@@ -168,6 +168,106 @@ class SitemapRequestLoader(RequestLoader):
         # Start background loading
         self._loading_task = asyncio.create_task(self._load_sitemaps())
 
+    async def __aenter__(self) -> SitemapRequestLoader:
+        """Enter the context manager."""
+        await self.start()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
+        """Exit the context manager."""
+        await self.close()
+
+    @override
+    async def get_total_count(self) -> int:
+        """Return the total number of URLs found so far."""
+        state = await self._get_state()
+        return state.total_count
+
+    @override
+    async def get_handled_count(self) -> int:
+        """Return the number of URLs that have been handled."""
+        state = await self._get_state()
+        return state.handled_count
+
+    @override
+    async def is_empty(self) -> bool:
+        """Check if there are no more URLs to process."""
+        state = await self._get_state()
+        return not state.url_queue
+
+    @override
+    async def is_finished(self) -> bool:
+        """Check if all URLs have been processed."""
+        state = await self._get_state()
+        return not state.url_queue and len(state.in_progress) == 0 and self._loading_task.done()
+
+    @override
+    async def fetch_next_request(self) -> Request | None:
+        """Fetch the next request to process."""
+        while not (await self.is_finished()):
+            state = await self._get_state()
+            if not state.url_queue:
+                await asyncio.sleep(0.1)
+                continue
+
+            async with self._queue_lock:
+                # Double-check if the queue is still not empty after acquiring the lock
+                if not state.url_queue:
+                    continue
+
+                url = state.url_queue.popleft()
+                request_option = RequestOptions(url=url, enqueue_strategy=self._enqueue_strategy)
+
+                if len(state.url_queue) < self._max_buffer_size:
+                    self._queue_has_capacity.set()
+
+                if self._transform_request_function:
+                    transform_request_option = self._transform_request_function(request_option)
+                    if transform_request_option == 'skip':
+                        state.total_count -= 1
+                        continue
+                    if transform_request_option != 'unchanged':
+                        request_option = transform_request_option
+
+                request = Request.from_url(**request_option)
+                state.in_progress.add(request.url)
+
+            return request
+
+        return None
+
+    @override
+    async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
+        """Mark a request as successfully handled."""
+        state = await self._get_state()
+        if request.url in state.in_progress:
+            state.in_progress.remove(request.url)
+            state.handled_count += 1
+        return None
+
+    async def start(self) -> None:
+        """Start the sitemap loading process."""
+        if self._loading_task and not self._loading_task.done():
+            return
+        self._loading_task = asyncio.create_task(self._load_sitemaps())
+
+    async def abort_loading(self) -> None:
+        """Abort the sitemap loading process."""
+        if self._loading_task and not self._loading_task.done():
+            self._loading_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await self._loading_task
+
+    async def close(self) -> None:
+        """Close the request loader."""
+        await self.abort_loading()
+        await self._state.teardown()
+
     async def _get_state(self) -> SitemapRequestLoaderState:
         """Initialize and return the current state."""
         if self._state.is_initialized:
@@ -310,100 +410,3 @@ class SitemapRequestLoader(RequestLoader):
         except Exception:
             logger.exception('Error loading sitemaps')
             raise
-
-    @override
-    async def get_total_count(self) -> int:
-        """Return the total number of URLs found so far."""
-        state = await self._get_state()
-        return state.total_count
-
-    @override
-    async def get_handled_count(self) -> int:
-        """Return the number of URLs that have been handled."""
-        state = await self._get_state()
-        return state.handled_count
-
-    @override
-    async def is_empty(self) -> bool:
-        """Check if there are no more URLs to process."""
-        state = await self._get_state()
-        return not state.url_queue
-
-    @override
-    async def is_finished(self) -> bool:
-        """Check if all URLs have been processed."""
-        state = await self._get_state()
-        return not state.url_queue and len(state.in_progress) == 0 and self._loading_task.done()
-
-    @override
-    async def fetch_next_request(self) -> Request | None:
-        """Fetch the next request to process."""
-        while not (await self.is_finished()):
-            state = await self._get_state()
-            if not state.url_queue:
-                await asyncio.sleep(0.1)
-                continue
-
-            async with self._queue_lock:
-                # Double-check if the queue is still not empty after acquiring the lock
-                if not state.url_queue:
-                    continue
-
-                url = state.url_queue.popleft()
-                request_option = RequestOptions(url=url, enqueue_strategy=self._enqueue_strategy)
-
-                if len(state.url_queue) < self._max_buffer_size:
-                    self._queue_has_capacity.set()
-
-                if self._transform_request_function:
-                    transform_request_option = self._transform_request_function(request_option)
-                    if transform_request_option == 'skip':
-                        state.total_count -= 1
-                        continue
-                    if transform_request_option != 'unchanged':
-                        request_option = transform_request_option
-
-                request = Request.from_url(**request_option)
-                state.in_progress.add(request.url)
-
-            return request
-
-        return None
-
-    @override
-    async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
-        """Mark a request as successfully handled."""
-        state = await self._get_state()
-        if request.url in state.in_progress:
-            state.in_progress.remove(request.url)
-            state.handled_count += 1
-        return None
-
-    async def abort_loading(self) -> None:
-        """Abort the sitemap loading process."""
-        if self._loading_task and not self._loading_task.done():
-            self._loading_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await self._loading_task
-
-    async def start(self) -> None:
-        """Start the sitemap loading process."""
-        if self._loading_task and not self._loading_task.done():
-            return
-        self._loading_task = asyncio.create_task(self._load_sitemaps())
-
-    async def close(self) -> None:
-        """Close the request loader."""
-        await self.abort_loading()
-        await self._state.teardown()
-
-    async def __aenter__(self) -> SitemapRequestLoader:
-        """Enter the context manager."""
-        await self.start()
-        return self
-
-    async def __aexit__(
-        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, exc_traceback: TracebackType | None
-    ) -> None:
-        """Exit the context manager."""
-        await self.close()
