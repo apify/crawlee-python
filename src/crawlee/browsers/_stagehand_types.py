@@ -74,8 +74,8 @@ class StagehandPage(Page):
     """A Playwright `Page` enhanced with Stagehand AI methods.
 
     Wraps a Playwright `Page` and an `AsyncSession`, proxying all standard Playwright
-    methods transparently while adding `act()`, `extract()`, and `observe()` AI operations
-    bound to the current page.
+    methods transparently while adding `act()`, `extract()`, `observe()`, and `execute()`
+    AI operations bound to the current page.
     """
 
     def __init__(self, page: Page, session: AsyncSession) -> None:
