@@ -7,8 +7,8 @@ from pydantic import ValidationError
 
 from crawlee._utils.urls import (
     convert_to_absolute_url,
+    filter_url,
     is_url_absolute,
-    matches_enqueue_strategy,
     validate_http_url,
 )
 
@@ -70,23 +70,22 @@ def test_validate_http_url_rejects_non_http_scheme(invalid_url: str) -> None:
 @pytest.mark.parametrize(
     ('strategy', 'origin', 'target', 'expected'),
     [
-        # 'all' lets every URL through — scheme filtering is the caller's responsibility
+        # 'all' lets http(s) through across hosts, but rejects non-http(s) schemes
         ('all', 'https://example.com/', 'https://other.test/', True),
-        ('all', 'https://example.com/', 'gopher://internal:6379/_PING', True),
-        ('all', 'https://example.com/', 'mailto:foo@bar.com', True),
-        ('all', 'https://example.com/', 'javascript:alert(1)', True),
-        ('all', 'https://example.com/', 'ftp://example.com/', True),
+        ('all', 'https://example.com/', 'gopher://internal:6379/_PING', False),
+        ('all', 'https://example.com/', 'mailto:foo@bar.com', False),
+        ('all', 'https://example.com/', 'javascript:alert(1)', False),
+        ('all', 'https://example.com/', 'ftp://example.com/', False),
         # 'same-hostname' is exact host equality
         ('same-hostname', 'https://example.com/a', 'https://example.com/b', True),
         ('same-hostname', 'https://example.com/', 'https://www.example.com/', False),
         ('same-hostname', 'https://example.com/', 'https://other.test/', False),
         ('same-hostname', 'https://example.com/', 'mailto:foo@example.com', False),
-        # 'same-domain' allows subdomains under the same registrable domain;
-        # scheme is ignored — caller filters non-http(s) targets separately
+        # 'same-domain' allows subdomains under the same registrable domain
         ('same-domain', 'https://example.com/', 'https://www.example.com/', True),
         ('same-domain', 'https://example.com/', 'https://api.example.com/', True),
         ('same-domain', 'https://example.com/', 'https://other.test/', False),
-        ('same-domain', 'https://example.com/', 'ftp://www.example.com/', True),
+        ('same-domain', 'https://example.com/', 'ftp://www.example.com/', False),
         # 'same-origin' requires scheme + host + port match
         ('same-origin', 'https://example.com/', 'https://example.com/path', True),
         ('same-origin', 'https://example.com/', 'http://example.com/', False),
@@ -96,5 +95,7 @@ def test_validate_http_url_rejects_non_http_scheme(invalid_url: str) -> None:
         ('same-domain', 'not-a-url', 'https://example.com/', False),
     ],
 )
-def test_matches_enqueue_strategy(strategy: EnqueueStrategy, origin: str, target: str, *, expected: bool) -> None:
-    assert matches_enqueue_strategy(strategy, target_url=target, origin_url=origin) is expected
+def test_filter_url(strategy: EnqueueStrategy, origin: str, target: str, *, expected: bool) -> None:
+    ok, reason = filter_url(target=target, strategy=strategy, origin=origin)
+    assert ok is expected
+    assert (reason is None) is expected

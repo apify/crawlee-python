@@ -7,7 +7,7 @@ from protego import Protego
 from yarl import URL
 
 from crawlee._utils.sitemap import Sitemap
-from crawlee._utils.urls import UNSUPPORTED_SCHEME_MESSAGE, is_supported_url_scheme, matches_enqueue_strategy
+from crawlee._utils.urls import filter_url
 from crawlee._utils.web import is_status_code_client_error
 
 if TYPE_CHECKING:
@@ -106,24 +106,12 @@ class RobotsTxtFile:
         """
         sitemaps: list[str] = []
         for sitemap_url in self._robots.sitemaps:
-            if not is_supported_url_scheme(sitemap_url):
+            ok, reason = filter_url(target=sitemap_url, strategy=enqueue_strategy, origin=self._original_url)
+            if not ok:
                 logger.warning(
-                    f'Skipping sitemap {sitemap_url!r} listed in robots.txt at {str(self._original_url)!r}: '
-                    f'{UNSUPPORTED_SCHEME_MESSAGE}'
+                    f'Skipping sitemap {sitemap_url!r} listed in robots.txt at {str(self._original_url)!r}: {reason}.'
                 )
                 continue
-
-            if not matches_enqueue_strategy(
-                strategy=enqueue_strategy,
-                target_url=sitemap_url,
-                origin_url=self._original_url,
-            ):
-                logger.warning(
-                    f'Skipping sitemap {sitemap_url!r} listed in robots.txt at {str(self._original_url)!r}: '
-                    f'does not match enqueue strategy {enqueue_strategy!r}.'
-                )
-                continue
-
             sitemaps.append(sitemap_url)
         return sitemaps
 

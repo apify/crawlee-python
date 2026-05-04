@@ -69,48 +69,69 @@ def validate_http_url(value: str | None) -> str | None:
     return value
 
 
-def is_supported_url_scheme(url: str | URL) -> bool:
+def filter_url(
+    *,
+    target: str | URL,
+    strategy: EnqueueStrategy,
+    origin: str | URL,
+) -> tuple[bool, str | None]:
+    """Check whether `target` is eligible to be enqueued under `strategy` relative to `origin`.
+
+    Combines the two checks every enqueue site needs: the URL must use a supported scheme
+    (`http` or `https`), and it must match `strategy` relative to `origin`. Callers that need to
+    distinguish a scheme rejection from a strategy mismatch (for different log levels or dedup)
+    can compare the returned reason against `UNSUPPORTED_SCHEME_MESSAGE`.
+
+    Args:
+        target: The URL being evaluated.
+        strategy: The enqueue strategy to apply.
+        origin: The reference URL the target is compared against.
+
+    Returns:
+        `(True, None)` if `target` is eligible. Otherwise `(False, reason)` where `reason` is
+        a human-readable rejection message suitable for log output.
+    """
+    target_url = _to_url(target)
+
+    if not _is_supported_url_scheme(target_url):
+        return False, UNSUPPORTED_SCHEME_MESSAGE
+
+    if not _matches_enqueue_strategy(strategy, target_url=target_url, origin_url=_to_url(origin)):
+        return False, f'does not match enqueue strategy {strategy!r}'
+
+    return True, None
+
+
+def _is_supported_url_scheme(url: str | URL) -> bool:
     """Return whether `url` uses a scheme Crawlee accepts (http or https)."""
     return _to_url(url).scheme in _ALLOWED_SCHEMES
 
 
-def matches_enqueue_strategy(
+def _matches_enqueue_strategy(
     strategy: EnqueueStrategy,
     *,
-    target_url: str | URL,
-    origin_url: str | URL,
+    target_url: URL,
+    origin_url: URL,
 ) -> bool:
-    """Check whether `target_url` matches `origin_url` under the given enqueue strategy.
-
-    This function checks only the strategy relationship between the two URLs. Callers must
-    independently reject unsupported schemes via `is_supported_url_scheme` — `matches_enqueue_strategy`
-    does not look at the scheme.
-
-    Args:
-        strategy: The enqueue strategy to apply.
-        target_url: The URL to be evaluated.
-        origin_url: The reference URL the target is compared against.
-
-    Returns:
-        `True` if `target_url` is allowed under `strategy` relative to `origin_url`, `False` otherwise.
-    """
-    target = _to_url(target_url)
-    origin = _to_url(origin_url)
-
+    """Check whether `target_url` matches `origin_url` under `strategy`. Scheme is not considered."""
     if strategy == 'all':
         return True
 
-    if origin.host is None or target.host is None:
+    if origin_url.host is None or target_url.host is None:
         return False
 
     if strategy == 'same-hostname':
-        return target.host == origin.host
+        return target_url.host == origin_url.host
 
     if strategy == 'same-domain':
-        return _domain_under_public_suffix(origin.host) == _domain_under_public_suffix(target.host)
+        return _domain_under_public_suffix(origin_url.host) == _domain_under_public_suffix(target_url.host)
 
     if strategy == 'same-origin':
-        return target.host == origin.host and target.scheme == origin.scheme and target.port == origin.port
+        return (
+            target_url.host == origin_url.host
+            and target_url.scheme == origin_url.scheme
+            and target_url.port == origin_url.port
+        )
 
     assert_never(strategy)
 

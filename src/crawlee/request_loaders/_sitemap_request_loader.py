@@ -15,7 +15,7 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.globs import Glob
 from crawlee._utils.recoverable_state import RecoverableState
 from crawlee._utils.sitemap import NestedSitemap, ParseSitemapOptions, SitemapSource, SitemapUrl, parse_sitemap
-from crawlee._utils.urls import UNSUPPORTED_SCHEME_MESSAGE, is_supported_url_scheme, matches_enqueue_strategy
+from crawlee._utils.urls import filter_url
 from crawlee.request_loaders._request_loader import RequestLoader
 
 if TYPE_CHECKING:
@@ -200,19 +200,12 @@ class SitemapRequestLoader(RequestLoader):
 
             return self._state.current_value
 
-    def _passes_filters(self, target: str, parent: URL, parent_url: str, kind: str) -> bool:
-        """Filter `target` by URL scheme first, then by enqueue strategy, logging the reason if rejected."""
-        if not is_supported_url_scheme(target):
-            logger.warning(f'Skipping {kind} {target!r}: {UNSUPPORTED_SCHEME_MESSAGE}')
+    def _passes_filters(self, target: str, parent: URL, kind: str) -> bool:
+        """Filter `target` by URL scheme and enqueue strategy, logging the reason if rejected."""
+        ok, reason = filter_url(target=target, strategy=self._enqueue_strategy, origin=parent)
+        if not ok:
+            logger.warning(f'Skipping {kind} {target!r} (parent {str(parent)!r}): {reason}.')
             return False
-
-        if not matches_enqueue_strategy(strategy=self._enqueue_strategy, target_url=target, origin_url=parent):
-            logger.warning(
-                f'Skipping {kind} {target!r}: does not match enqueue strategy '
-                f'{self._enqueue_strategy!r} relative to {parent_url!r}.'
-            )
-            return False
-
         return True
 
     def _check_url_patterns(
@@ -271,7 +264,7 @@ class SitemapRequestLoader(RequestLoader):
                     if isinstance(item, NestedSitemap):
                         # Add nested sitemap to queue
                         if item.loc not in state.pending_sitemap_urls and item.loc not in state.processed_sitemap_urls:
-                            if not self._passes_filters(item.loc, parsed_sitemap_url, sitemap_url, 'nested sitemap'):
+                            if not self._passes_filters(item.loc, parsed_sitemap_url, 'nested sitemap'):
                                 continue
                             state.pending_sitemap_urls.append(item.loc)
                         continue
@@ -289,7 +282,7 @@ class SitemapRequestLoader(RequestLoader):
                         if not self._check_url_patterns(url, self._include, self._exclude):
                             continue
 
-                        if not self._passes_filters(url, parsed_sitemap_url, sitemap_url, 'sitemap URL'):
+                        if not self._passes_filters(url, parsed_sitemap_url, 'sitemap URL'):
                             continue
 
                         # Check if we have capacity in the queue
