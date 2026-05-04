@@ -398,3 +398,25 @@ async def test_sitemap_loader_strategy_all_disables_filtering(server_url: URL, h
             await loader.mark_request_as_handled(request)
 
     assert fetched == [cross_host_url]
+
+
+async def test_sitemap_loader_drops_non_http_scheme_under_strategy_all(
+    server_url: URL, http_client: HttpClient
+) -> None:
+    """Even with `enqueue_strategy='all'`, sitemap entries with non-http(s) schemes are dropped."""
+    http_url = 'http://other.test/page'
+    sitemap_content = _make_urlset(
+        [http_url, 'mailto:foo@bar.com', 'javascript:alert(1)', 'ftp://example.com/file.txt']
+    )
+    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(sitemap_content.encode()))
+
+    loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, enqueue_strategy='all')
+
+    fetched: list[str] = []
+    while not await loader.is_finished():
+        request = await loader.fetch_next_request()
+        if request is not None:
+            fetched.append(request.url)
+            await loader.mark_request_as_handled(request)
+
+    assert fetched == [http_url]

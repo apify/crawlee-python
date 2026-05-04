@@ -26,33 +26,49 @@ async def test_allow_disallow_robots_txt(server_url: URL, http_client: HttpClien
 
 
 async def test_extract_sitemaps_urls(server_url: URL, http_client: HttpClient) -> None:
-    """Cross-host sitemap entries are dropped from the test fixture's robots.txt."""
+    """Cross-host sitemap entries are dropped under the `'same-hostname'` enqueue strategy."""
     robots = await RobotsTxtFile.find(str(server_url), http_client)
-    # The fixture lists `http://not-exists.com/sitemap_*.xml`, which is cross-host relative to `server_url` and
-    # therefore filtered out per the robots.txt specification.
-    assert robots.get_sitemaps() == []
+    # The fixture lists `http://not-exists.com/sitemap_*.xml`, which is cross-host relative to `server_url`.
+    assert robots.get_sitemaps(enqueue_strategy='same-hostname') == []
 
 
 async def test_extract_same_host_sitemaps_urls() -> None:
     """Sitemap entries on the same host as the robots.txt are returned."""
     content = 'User-agent: *\nSitemap: http://example.com/sitemap_1.xml\nSitemap: http://example.com/sitemap_2.xml\n'
     robots = await RobotsTxtFile.from_content('http://example.com/robots.txt', content)
-    assert set(robots.get_sitemaps()) == {
+    assert set(robots.get_sitemaps(enqueue_strategy='same-hostname')) == {
         'http://example.com/sitemap_1.xml',
         'http://example.com/sitemap_2.xml',
     }
 
 
-async def test_extract_sitemaps_urls_filters_cross_host() -> None:
-    """Cross-host `Sitemap:` directives in robots.txt are silently filtered."""
+async def test_extract_sitemaps_urls_filters_cross_host_and_non_http() -> None:
+    """Cross-host and non-http(s) `Sitemap:` directives in robots.txt are silently filtered."""
     content = (
         'User-agent: *\n'
         'Sitemap: http://example.com/legit.xml\n'
         'Sitemap: http://other.test/payload.xml\n'
         'Sitemap: gopher://internal:6379/_PING\n'
+        'Sitemap: ftp://example.com/payload.xml\n'
     )
     robots = await RobotsTxtFile.from_content('http://example.com/robots.txt', content)
-    assert robots.get_sitemaps() == ['http://example.com/legit.xml']
+    assert robots.get_sitemaps(enqueue_strategy='same-hostname') == ['http://example.com/legit.xml']
+
+
+async def test_get_sitemaps_with_strategy_all_returns_cross_host() -> None:
+    """`enqueue_strategy='all'` disables host filtering but still rejects non-http(s) schemes."""
+    content = (
+        'User-agent: *\n'
+        'Sitemap: http://example.com/legit.xml\n'
+        'Sitemap: http://other.test/payload.xml\n'
+        'Sitemap: gopher://internal:6379/_PING\n'
+        'Sitemap: ftp://example.com/payload.xml\n'
+    )
+    robots = await RobotsTxtFile.from_content('http://example.com/robots.txt', content)
+    assert set(robots.get_sitemaps(enqueue_strategy='all')) == {
+        'http://example.com/legit.xml',
+        'http://other.test/payload.xml',
+    }
 
 
 async def test_parse_from_content() -> None:

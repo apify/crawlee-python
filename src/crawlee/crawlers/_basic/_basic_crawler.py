@@ -977,7 +977,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Filter out links that redirect outside of the crawled domain.
         """
         if context.request.loaded_url is not None and not matches_enqueue_strategy(
-            context.request.enqueue_strategy,
+            strategy=context.request.enqueue_strategy,
             origin_url=URL(context.request.url),
             target_url=URL(context.request.loaded_url),
         ):
@@ -1074,7 +1074,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 warning_flag = False
 
             if matches_enqueue_strategy(
-                strategy, target_url=parsed_target_url, origin_url=parsed_origin_url
+                strategy=strategy,
+                target_url=parsed_target_url,
+                origin_url=parsed_origin_url,
             ) and self._check_url_patterns(target_url, kwargs.get('include'), kwargs.get('exclude')):
                 yield request
 

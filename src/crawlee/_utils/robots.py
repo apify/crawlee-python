@@ -13,6 +13,7 @@ from crawlee._utils.web import is_status_code_client_error
 if TYPE_CHECKING:
     from typing_extensions import Self
 
+    from crawlee._types import EnqueueStrategy
     from crawlee.http_clients import HttpClient
     from crawlee.proxy_configuration import ProxyInfo
 
@@ -22,7 +23,11 @@ logger = getLogger(__name__)
 
 class RobotsTxtFile:
     def __init__(
-        self, url: str, robots: Protego, http_client: HttpClient | None = None, proxy_info: ProxyInfo | None = None
+        self,
+        url: str,
+        robots: Protego,
+        http_client: HttpClient | None = None,
+        proxy_info: ProxyInfo | None = None,
     ) -> None:
         self._robots = robots
         self._original_url = URL(url).origin()
@@ -90,18 +95,29 @@ class RobotsTxtFile:
             return True
         return bool(self._robots.can_fetch(str(check_url), user_agent))
 
-    def get_sitemaps(self) -> list[str]:
-        """Get the list of same-host sitemap URLs from the robots.txt file."""
-        same_host_sitemaps: list[str] = []
+    def get_sitemaps(self, *, enqueue_strategy: EnqueueStrategy) -> list[str]:
+        """Get the list of sitemap URLs from the robots.txt file, filtered by enqueue strategy.
+
+        Args:
+            enqueue_strategy: Strategy used to filter sitemap entries relative to the robots.txt URL's host.
+                Pass `'same-hostname'` to match the sitemap protocol's same-host expectation, or `'all'` to
+                disable host filtering. Regardless of the strategy, entries with non-`http(s)` schemes are
+                always filtered out.
+        """
+        sitemaps: list[str] = []
         for sitemap_url in self._robots.sitemaps:
-            if matches_enqueue_strategy('same-hostname', target_url=sitemap_url, origin_url=self._original_url):
-                same_host_sitemaps.append(sitemap_url)
+            if matches_enqueue_strategy(
+                strategy=enqueue_strategy,
+                target_url=sitemap_url,
+                origin_url=self._original_url,
+            ):
+                sitemaps.append(sitemap_url)
             else:
                 logger.warning(
                     f'Skipping sitemap {sitemap_url!r} listed in robots.txt at {str(self._original_url)!r}: '
-                    f'cross-host sitemap entries are not allowed by the robots.txt specification.'
+                    f'does not match enqueue strategy {enqueue_strategy!r}.'
                 )
-        return same_host_sitemaps
+        return sitemaps
 
     def get_crawl_delay(self, user_agent: str = '*') -> int | None:
         """Get the crawl delay for the given user agent.
@@ -113,15 +129,23 @@ class RobotsTxtFile:
         crawl_delay = self._robots.crawl_delay(user_agent)
         return int(crawl_delay) if crawl_delay is not None else None
 
-    async def parse_sitemaps(self) -> Sitemap:
-        """Parse the sitemaps from the robots.txt file and return a `Sitemap` instance."""
-        sitemaps = self.get_sitemaps()
+    async def parse_sitemaps(self, *, enqueue_strategy: EnqueueStrategy) -> Sitemap:
+        """Parse the sitemaps from the robots.txt file and return a `Sitemap` instance.
+
+        Args:
+            enqueue_strategy: Forwarded to `get_sitemaps`; see that method for details.
+        """
+        sitemaps = self.get_sitemaps(enqueue_strategy=enqueue_strategy)
         if not self._http_client:
             raise ValueError('HTTP client is required to parse sitemaps.')
 
         return await Sitemap.load(sitemaps, self._http_client, self._proxy_info)
 
-    async def parse_urls_from_sitemaps(self) -> list[str]:
-        """Parse the sitemaps in the robots.txt file and return a list URLs."""
-        sitemap = await self.parse_sitemaps()
+    async def parse_urls_from_sitemaps(self, *, enqueue_strategy: EnqueueStrategy) -> list[str]:
+        """Parse the sitemaps in the robots.txt file and return a list URLs.
+
+        Args:
+            enqueue_strategy: Forwarded to `get_sitemaps`; see that method for details.
+        """
+        sitemap = await self.parse_sitemaps(enqueue_strategy=enqueue_strategy)
         return sitemap.urls

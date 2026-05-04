@@ -129,7 +129,8 @@ class SitemapRequestLoader(RequestLoader):
             enqueue_strategy: Strategy used to decide which sitemap-derived URLs (both nested-sitemap entries and
                 URL entries) are kept relative to the parent sitemap URL. Defaults to `'same-hostname'`, matching
                 the sitemap protocol's same-host expectation and the `enqueue_links` default; pass `'all'` to
-                disable filtering.
+                disable filtering. Note: regardless of `enqueue_strategy`, entries with non-`http(s)` schemes are
+                always filtered out.
             max_buffer_size: Maximum number of URLs to buffer in memory.
             http_client: the instance of `HttpClient` to use for fetching sitemaps.
             persist_state_key: A key for persisting the loader's state in the KeyValueStore.
@@ -199,6 +200,18 @@ class SitemapRequestLoader(RequestLoader):
 
             return self._state.current_value
 
+    def _passes_strategy_filter(self, target: str, parent: URL, parent_url: str, kind: str) -> bool:
+        """Check whether `target` matches the loader's enqueue strategy relative to `parent`, logging if not."""
+        if matches_enqueue_strategy(strategy=self._enqueue_strategy, target_url=target, origin_url=parent):
+            return True
+
+        logger.warning(
+            f'Skipping {kind} {target!r}: does not match enqueue strategy '
+            f'{self._enqueue_strategy!r} relative to {parent_url!r}.'
+        )
+
+        return False
+
     def _check_url_patterns(
         self,
         target_url: str,
@@ -244,8 +257,6 @@ class SitemapRequestLoader(RequestLoader):
                     state.in_progress_sitemap_url = sitemap_url
 
                 parse_options = ParseSitemapOptions(max_depth=0, emit_nested_sitemaps=True, sitemap_retries=3)
-                # Parse the parent sitemap URL once per outer iteration; `matches_enqueue_strategy` is called per
-                # entry below, and re-parsing the same string thousands of times for large sitemaps is wasteful.
                 parsed_sitemap_url = URL(sitemap_url)
 
                 async for item in parse_sitemap(
@@ -257,13 +268,9 @@ class SitemapRequestLoader(RequestLoader):
                     if isinstance(item, NestedSitemap):
                         # Add nested sitemap to queue
                         if item.loc not in state.pending_sitemap_urls and item.loc not in state.processed_sitemap_urls:
-                            if not matches_enqueue_strategy(
-                                self._enqueue_strategy, target_url=item.loc, origin_url=parsed_sitemap_url
+                            if not self._passes_strategy_filter(
+                                item.loc, parsed_sitemap_url, sitemap_url, 'nested sitemap'
                             ):
-                                logger.warning(
-                                    f'Skipping nested sitemap {item.loc!r}: does not match enqueue strategy '
-                                    f'{self._enqueue_strategy!r} relative to {sitemap_url!r}.'
-                                )
                                 continue
                             state.pending_sitemap_urls.append(item.loc)
                         continue
@@ -281,13 +288,7 @@ class SitemapRequestLoader(RequestLoader):
                         if not self._check_url_patterns(url, self._include, self._exclude):
                             continue
 
-                        if not matches_enqueue_strategy(
-                            self._enqueue_strategy, target_url=url, origin_url=parsed_sitemap_url
-                        ):
-                            logger.warning(
-                                f'Skipping sitemap URL {url!r}: does not match enqueue strategy '
-                                f'{self._enqueue_strategy!r} relative to {sitemap_url!r}.'
-                            )
+                        if not self._passes_strategy_filter(url, parsed_sitemap_url, sitemap_url, 'sitemap URL'):
                             continue
 
                         # Check if we have capacity in the queue
