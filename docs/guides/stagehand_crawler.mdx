@@ -117,7 +117,12 @@ Browserbase credentials (`browserbase_api_key`, `project_id`) can also be provid
 
 ## Browser configuration limitations
 
-Because Stagehand manages the browser session internally via CDP, only Chromium is supported. Browser settings are limited to the subset accepted by Stagehand's `BrowserLaunchOptions` - `headless`, `args`, `viewport`, `proxy`, `locale`, `executable_path`, and a few others. Features like fingerprint generation and incognito pages are not supported.
+Because Stagehand manages the browser session internally via CDP, only Chromium is supported.
+Browser settings are limited to the subset accepted by Stagehand's `BrowserLaunchOptions` -
+`headless`, `args`, `viewport`, `proxy`, `locale`, `executable_path`, and a few others.
+Features like full browser fingerprinting (canvas, WebGL, screen properties) and incognito
+pages are not supported. Fingerprint-consistent HTTP headers (`User-Agent`, `Accept`, `sec-ch-ua`)
+are still injected automatically.
 
 ## Conclusion
 

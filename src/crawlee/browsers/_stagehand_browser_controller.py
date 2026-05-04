@@ -126,8 +126,8 @@ class StagehandBrowserController(BrowserController):
         """Create a new page in the Stagehand-managed browser.
 
         On the first call, starts the Stagehand session with the provided options. On subsequent
-        calls, ``browser_new_context_options`` are ignored with a warning because the browser
-        context cannot be reconfigured once the session is running.
+        calls, ``browser_new_context_options`` and ``proxy_info`` are ignored because the session
+        context cannot be reconfigured once it is running.
 
         Args:
             browser_new_context_options: Options merged on top of the plugin's launch options
@@ -173,19 +173,21 @@ class StagehandBrowserController(BrowserController):
         if self.pages_count > 0 and not force:
             raise ValueError('Cannot close the browser while there are open pages.')
 
-        if self._session is None:
+        if self._session is None and self._browser is None:
             return
 
         try:
-            await self._session.end()
-        except Exception:
-            logger.warning('Failed to end Stagehand session gracefully.', exc_info=True)
+            if self._session is not None:
+                try:
+                    await self._session.end()
+                except Exception:
+                    logger.warning('Failed to end Stagehand session gracefully.', exc_info=True)
 
-        if self._browser is not None and self._browser.is_connected():
-            await self._browser.close()
-
-        self._session = None
-        self._browser_context = None
+            if self._browser is not None and self._browser.is_connected():
+                await self._browser.close()
+        finally:
+            self._session = None
+            self._browser_context = None
 
     def _on_page_close(self, page: StagehandPage) -> None:
         self._pages.remove(page)
@@ -194,7 +196,7 @@ class StagehandBrowserController(BrowserController):
         self,
         extra_http_headers: Mapping[str, str] | None = None,
     ) -> dict[str, str]:
-        if extra_http_headers:
+        if extra_http_headers is not None:
             return dict(extra_http_headers)
 
         if self._header_generator:

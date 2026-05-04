@@ -44,8 +44,9 @@ class StagehandCrawler(
     Because Stagehand relies on CDP, only Chromium is supported. Not all Playwright browser and
     context configuration options are available - browser settings are limited to the subset accepted
     by Stagehand's ``BrowserLaunchOptions`` (such as ``headless``, ``args``, ``viewport``, ``proxy``,
-    ``locale``, and ``executable_path``). Features like fingerprint generation and incognito pages
-    are not supported.
+    ``locale``, and ``executable_path``). Full browser fingerprinting (canvas, WebGL, screen
+    properties) and incognito pages are not supported; fingerprint-consistent HTTP headers
+    (``User-Agent``, ``Accept``, ``sec-ch-ua``) are still injected automatically.
 
     Each page in the crawling context is a `StagehandPage`, which extends the standard Playwright
     `Page` with the following AI methods:
@@ -102,7 +103,6 @@ class StagehandCrawler(
         browser_new_context_options: dict[str, Any] | None = None,
         goto_options: GotoOptions | None = None,
         navigation_timeout: timedelta | None = None,
-        max_open_pages_per_browser: int | None = None,
         **kwargs: Unpack[BasicCrawlerOptions[StagehandCrawlingContext, StatisticsState]],
     ) -> None:
         """Initialize a new instance.
@@ -129,8 +129,6 @@ class StagehandCrawler(
                 option is not supported - use `navigation_timeout` instead.
             navigation_timeout: Timeout for the navigation phase (from opening the page to calling
                 the request handler). Defaults to one minute.
-            max_open_pages_per_browser: Maximum number of pages open per browser instance.
-                Cannot be specified if `browser_pool` is provided.
             kwargs: Additional keyword arguments forwarded to `BasicCrawler`.
         """
         if browser_pool is not None:
@@ -143,13 +141,11 @@ class StagehandCrawler(
                     headless,
                     browser_launch_options,
                     browser_new_context_options,
-                    max_open_pages_per_browser,
                 )
             ):
                 raise ValueError(
                     'Cannot specify `stagehand_options`, `user_data_dir`, `headless`, '
-                    '`browser_launch_options`, `browser_new_context_options` or '
-                    '`max_open_pages_per_browser` when `browser_pool` is provided.'
+                    '`browser_launch_options`, `browser_new_context_options` when `browser_pool` is provided.'
                 )
         else:
             launch_options = dict(browser_launch_options or {})
@@ -163,7 +159,6 @@ class StagehandCrawler(
                         user_data_dir=user_data_dir,
                         browser_launch_options=launch_options or None,
                         browser_new_context_options=browser_new_context_options,
-                        max_open_pages_per_browser=max_open_pages_per_browser or 20,
                     )
                 ]
             )
