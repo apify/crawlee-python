@@ -27,9 +27,7 @@ from crawlee.crawlers import (
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
     AdaptivePlaywrightCrawlerStatisticState,
 )
-from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
-    AdaptiveContextError,
-)
+from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import AdaptiveContextError
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storage_clients import SqlStorageClient

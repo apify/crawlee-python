@@ -4,7 +4,8 @@ import asyncio
 import logging
 import warnings
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Generic, Literal
+from functools import partial
+from typing import TYPE_CHECKING, Any, Generic, Literal, cast
 
 import playwright.async_api
 from more_itertools import partition
@@ -250,7 +251,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             log=context.log,
             register_deferred_cleanup=context.register_deferred_cleanup,
             page=crawlee_page.page,
-            block_requests=self._make_block_requests(crawlee_page.page),
+            block_requests=cast('BlockRequestsFunction', partial(block_requests, page=crawlee_page.page)),
             goto_options=GotoOptions(**self._goto_options),
         )
 
@@ -534,7 +535,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             infinite_scroll=lambda: infinite_scroll(context.page),
             extract_links=extract_links,
             enqueue_links=self._create_enqueue_links_function(context, extract_links),
-            block_requests=self._make_block_requests(context.page),
+            block_requests=cast('BlockRequestsFunction', partial(block_requests, page=context.page)),
         )
 
         if context.session:
@@ -556,18 +557,6 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             hook: A coroutine function to be called after each navigation.
         """
         self._post_navigation_hooks.append(hook)
-
-    @staticmethod
-    def _make_block_requests(page: Page) -> BlockRequestsFunction:
-        """Build a `BlockRequestsFunction` bound to the given page."""
-
-        async def _bound_block_requests(
-            url_patterns: list[str] | None = None,
-            extra_url_patterns: list[str] | None = None,
-        ) -> None:
-            await block_requests(page, url_patterns=url_patterns, extra_url_patterns=extra_url_patterns)
-
-        return _bound_block_requests
 
     async def _get_cookies(self, page: Page) -> list[PlaywrightCookieParam]:
         """Get the cookies from the page."""
