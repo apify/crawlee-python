@@ -55,6 +55,11 @@ jobs:
       - name: Install Python dependencies
         run: uv run poe install-dev
 
+      - name: Install pnpm and website dependencies
+        uses: apify/workflows/pnpm-install@main
+        with:
+          working-directory: website
+
       - name: Build Docusaurus docs
         run: uv run poe build-docs
         env:
