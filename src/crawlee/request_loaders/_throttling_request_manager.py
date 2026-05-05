@@ -11,8 +11,7 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
-from urllib.parse import urlparse
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from typing_extensions import override
 
@@ -30,6 +29,8 @@ from crawlee._service_locator import ServiceLocator
 from crawlee._service_locator import service_locator as global_service_locator
 
 logger = getLogger(__name__)
+
+TRequestManager = TypeVar('TRequestManager', bound=RequestManager)
 
 
 @dataclass
@@ -50,7 +51,7 @@ class _DomainState:
 
 
 @docs_group('Request loaders')
-class ThrottlingRequestManager(RequestManager):
+class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     """A request manager that wraps another and enforces per-domain delays.
 
     Requests for explicitly configured domains are routed into dedicated sub-queues
@@ -67,6 +68,10 @@ class ThrottlingRequestManager(RequestManager):
     - HTTP 429 responses (via `record_domain_delay`)
     - robots.txt crawl-delay directives (via `set_crawl_delay`)
 
+    The class is generic over the wrapped manager type; the `request_manager_opener`
+    callback must return an instance of the same `RequestManager` subclass as `inner`,
+    so that `recreate_purged` reconstructs the throttler with the same backing store.
+
     Example:
         ```python
         from crawlee.storages import RequestQueue
@@ -76,6 +81,7 @@ class ThrottlingRequestManager(RequestManager):
         throttler = ThrottlingRequestManager(
             queue,
             domains=['api.example.com', 'slow-site.org'],
+            request_manager_opener=RequestQueue.open,
         )
         crawler = BasicCrawler(request_manager=throttler)
         ```
@@ -83,13 +89,13 @@ class ThrottlingRequestManager(RequestManager):
 
     def __init__(
         self,
-        inner: RequestManager,
+        inner: TRequestManager,
         *,
         domains: Sequence[str],
+        request_manager_opener: Callable[..., Coroutine[Any, Any, TRequestManager]],
         service_locator: ServiceLocator | None = None,
         base_delay: timedelta = timedelta(seconds=2),
         max_delay: timedelta = timedelta(seconds=60),
-        request_manager_opener: Callable[..., Coroutine[Any, Any, RequestManager]] | None = None,
     ) -> None:
         """Initialize the throttling manager.
 
@@ -98,20 +104,21 @@ class ThrottlingRequestManager(RequestManager):
                 Requests for non-throttled domains are stored here.
             domains: Explicit list of domain hostnames to throttle. Only requests
                 matching these domains will be routed to per-domain sub-queues.
+            request_manager_opener: Async callable used to create a fresh inner
+                request manager during ``recreate_purged``. Must return the same
+                concrete subclass as `inner` (e.g. ``RequestQueue.open`` when
+                `inner` is a ``RequestQueue``).
             service_locator: Service locator for creating sub-queues. If not
                 provided, defaults to the global service locator, ensuring
                 consistency with the crawler's storage backend.
             base_delay: Initial delay after the first 429 response from a domain.
             max_delay: Maximum delay between requests to a rate-limited domain.
-            request_manager_opener: Async callable used to create a fresh inner
-                request manager during ``recreate_purged``. Defaults to
-                ``RequestQueue.open``.
         """
-        self._inner = inner
+        self._inner: TRequestManager = inner
         self._service_locator = service_locator if service_locator is not None else global_service_locator
         self._base_delay = base_delay
         self._max_delay = max_delay
-        self._request_manager_opener = request_manager_opener or RequestQueue.open
+        self._request_manager_opener = request_manager_opener
         self._domain_states: dict[str, _DomainState] = {d: _DomainState(domain=d) for d in domains}
         self._sub_queues: dict[str, RequestQueue] = {}
 
@@ -247,7 +254,7 @@ class ThrottlingRequestManager(RequestManager):
         if state.crawl_delay is not None:
             state.throttled_until = datetime.now(timezone.utc) + state.crawl_delay
 
-    async def recreate_purged(self) -> ThrottlingRequestManager:
+    async def recreate_purged(self) -> ThrottlingRequestManager[TRequestManager]:
         """Drop all queues and return a fresh ThrottlingRequestManager with the same configuration.
 
         This is used during crawler purge to reconstruct the throttler with empty
@@ -263,10 +270,10 @@ class ThrottlingRequestManager(RequestManager):
         return ThrottlingRequestManager(
             inner,
             domains=list(self._domain_states.keys()),
+            request_manager_opener=self._request_manager_opener,
             service_locator=self._service_locator,
             base_delay=self._base_delay,
             max_delay=self._max_delay,
-            request_manager_opener=self._request_manager_opener,
         )
 
     @override

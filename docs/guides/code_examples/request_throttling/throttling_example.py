@@ -14,6 +14,7 @@ async def main() -> None:
     throttler = ThrottlingRequestManager(
         queue,
         domains=['api.example.com', 'slow-site.org'],
+        request_manager_opener=RequestQueue.open,
     )
 
     # Pass the throttler as the crawler's request manager.
