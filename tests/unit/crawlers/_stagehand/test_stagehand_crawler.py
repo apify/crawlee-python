@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from playwright.async_api import async_playwright
+from playwright.async_api import Page, async_playwright
 from stagehand import AsyncSession, AsyncStagehand
 
 from crawlee.browsers import (
@@ -154,6 +154,7 @@ async def test_stagehand_page_ai_methods_delegate_to_session(
     ):
         method_mock = getattr(stagehand_session_mock, method_name)
         method_mock.assert_awaited_once()
-        assert isinstance(method_mock.call_args.kwargs['page'], StagehandPage)
+
+        assert isinstance(method_mock.call_args.kwargs['page'], Page)
 
         assert argument in method_mock.call_args.kwargs

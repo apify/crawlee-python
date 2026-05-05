@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from playwright.async_api import Page
 
@@ -73,68 +73,68 @@ class StagehandOptions:
 class StagehandPage(Page):
     """A Playwright `Page` enhanced with Stagehand AI methods.
 
-    Wraps a Playwright `Page` and an `AsyncSession`, proxying all standard Playwright
-    methods transparently while adding `act()`, `extract()`, `observe()`, and `execute()`
-    AI operations bound to the current page.
+    Wraps a Playwright `Page` and an `AsyncSession`, proxying all standard Playwright methods transparently while adding
+    `act()`, `extract()`, `observe()`, and `execute()` AI operations bound to the current page.
     """
 
     def __init__(self, page: Page, session: AsyncSession) -> None:
-        super().__init__(page._impl_obj)  # noqa: SLF001
+        # super().__init__() skipped - Page attribute access delegates to self._page via __getattr__.
+        self._page = page
         self._session = session
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._page, name)
 
     async def act(self, **kwargs: Unpack[SessionActParamsNonStreaming]) -> SessionActResponse:
         """Perform an action on the page using natural language. Argument `page` is automatically set.
 
         Args:
-            **kwargs: Parameters passed to ``AsyncSession.act()``.
-                The most common is ``input`` — a natural language instruction string or
-                ``ActionParam`` object, e.g. ``input='click the login button'``.
+            **kwargs: Parameters passed to `AsyncSession.act()`.
+                The most common is `input` — a natural language instruction string or `ActionParam` object, e.g.
+                `input='click the login button'`.
 
         Returns:
             The action result from Stagehand.
         """
-        return await self._session.act(page=self, **kwargs)
+        return await self._session.act(page=self._page, **kwargs)
 
     async def observe(self, **kwargs: Unpack[SessionObserveParamsNonStreaming]) -> SessionObserveResponse:
         """Observe the page and get AI-suggested actions. Argument `page` is automatically set.
 
         Args:
-            **kwargs: Parameters passed to ``AsyncSession.observe()``.
-                Optionally pass ``instruction`` to narrow the observation scope.
+            **kwargs: Parameters passed to `AsyncSession.observe()`.
+                Optionally pass `instruction` to narrow the observation scope.
 
         Returns:
             Observation result with suggested actions.
         """
-        return await self._session.observe(page=self, **kwargs)
+        return await self._session.observe(page=self._page, **kwargs)
 
     async def extract(self, **kwargs: Unpack[SessionExtractParamsNonStreaming]) -> SessionExtractResponse:
         """Extract structured data from the page using natural language. Argument `page` is automatically set.
 
         Args:
-            **kwargs: Parameters passed to ``AsyncSession.extract()``.
-                Common parameters: ``instruction`` and ``schema`` (JSON Schema dict).
+            **kwargs: Parameters passed to `AsyncSession.extract()`.
+                Common parameters: `instruction` and `schema` (JSON Schema dict).
 
         Returns:
             Extracted data matching the requested schema.
         """
-        return await self._session.extract(page=self, **kwargs)
+        return await self._session.extract(page=self._page, **kwargs)
 
     async def execute(self, **kwargs: Unpack[SessionExecuteParamsNonStreaming]) -> SessionExecuteResponse:
         """Run an autonomous multi-step AI agent on the page. Argument `page` is automatically set.
 
         Args:
-            **kwargs: Parameters passed to ``AsyncSession.execute()``.
+            **kwargs: Parameters passed to `AsyncSession.execute()`.
                 Required parameters:
-
-                - ``agent_config`` — agent behaviour settings (pass ``{}`` for defaults).
-                Supports keys: ``model``, ``mode`` (``'dom'``/``'hybrid'``/``'cua'``),
-                ``system_prompt``, and others.
-                - ``execute_options`` — execution options dict with a required
-                ``instruction`` key: a natural language description of the multi-step
-                task to perform, e.g.
-                ``execute_options={'instruction': 'find the login form and sign in'}``.
+                - `agent_config` — agent behaviour settings (pass `{}` for defaults).
+                Supports keys: `model`, `mode` (`'dom'`/`'hybrid'`/`'cua'`), `system_prompt`, and others.
+                - `execute_options` — execution options dict with a required `instruction` key: a natural language
+                description of the multi-step task to perform, e.g.
+                `execute_options={'instruction': 'find the login form and sign in'}`.
 
         Returns:
             The result of the agent execution.
         """
-        return await self._session.execute(page=self, **kwargs)
+        return await self._session.execute(page=self._page, **kwargs)

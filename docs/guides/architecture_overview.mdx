@@ -82,19 +82,10 @@ You can learn more about HTTP crawlers in the [HTTP crawlers guide](./http-crawl
 
 ### Browser crawlers
 
-Browser crawlers use a real browser to render pages, enabling scraping of sites that require
-JavaScript. They manage browser instances, pages, and context lifecycles. Crawlee provides
-two browser crawlers:
+Browser crawlers use a real browser to render pages, enabling scraping of sites that require JavaScript. They manage browser instances, pages, and context lifecycles. Crawlee provides two browser crawlers:
 
-- <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> utilizes the
-  [Playwright](https://playwright.dev/) library and provides a high-level API for controlling
-  and navigating browsers. You can learn more about it in the
-  [Playwright crawler guide](./playwright-crawler).
-- <ApiLink to="class/StagehandCrawler">`StagehandCrawler`</ApiLink> extends
-  `PlaywrightCrawler` with AI-powered browser automation via
-  [Stagehand](https://github.com/browserbase/stagehand). It adds natural-language methods
-  (`act`, `extract`, `observe`, `execute`) directly on the page object. You can learn more
-  about it in the [Stagehand crawler guide](./stagehand-crawler).
+- <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> utilizes the [Playwright](https://playwright.dev/) library and provides a high-level API for controlling and navigating browsers. You can learn more about it in the [Playwright crawler guide](./playwright-crawler).
+- <ApiLink to="class/StagehandCrawler">`StagehandCrawler`</ApiLink> extends `PlaywrightCrawler` with AI-powered browser automation via [Stagehand](https://github.com/browserbase/stagehand). It adds natural-language methods (`act`, `extract`, `observe`, `execute`) directly on the page object. You can learn more about it in the [Stagehand crawler guide](./stagehand-crawler).
 
 ### Adaptive crawler
 
@@ -181,12 +172,9 @@ They have a similar inheritance structure as the crawlers, with the base class b
 - <ApiLink to="class/PlaywrightCrawlingContext">`PlaywrightCrawlingContext`</ApiLink> for Playwright crawlers.
 - <ApiLink to="class/AdaptivePlaywrightPreNavCrawlingContext">`AdaptivePlaywrightPreNavCrawlingContext`</ApiLink> for Adaptive Playwright crawlers before the page is navigated.
 - <ApiLink to="class/AdaptivePlaywrightCrawlingContext">`AdaptivePlaywrightCrawlingContext`</ApiLink> for Adaptive Playwright crawlers.
-- <ApiLink to="class/StagehandPreNavCrawlingContext">`StagehandPreNavCrawlingContext`</ApiLink>
-  for Stagehand crawlers before the page is navigated.
-- <ApiLink to="class/StagehandPostNavCrawlingContext">`StagehandPostNavCrawlingContext`</ApiLink>
-  for Stagehand crawlers after the page is navigated.
-- <ApiLink to="class/StagehandCrawlingContext">`StagehandCrawlingContext`</ApiLink>
-  for Stagehand crawlers.
+- <ApiLink to="class/StagehandPreNavCrawlingContext">`StagehandPreNavCrawlingContext`</ApiLink> for Stagehand crawlers before the page is navigated.
+- <ApiLink to="class/StagehandPostNavCrawlingContext">`StagehandPostNavCrawlingContext`</ApiLink> for Stagehand crawlers after the page is navigated.
+- <ApiLink to="class/StagehandCrawlingContext">`StagehandCrawlingContext`</ApiLink> for Stagehand crawlers.
 
 ## Storages
 

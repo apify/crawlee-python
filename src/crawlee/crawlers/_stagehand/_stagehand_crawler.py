@@ -36,20 +36,19 @@ class StagehandCrawler(
 ):
     """A web crawler that integrates Stagehand AI-powered browser automation with Crawlee.
 
-    `StagehandCrawler` builds on top of `PlaywrightCrawler`, inheriting all of its features.
-    It uses `StagehandBrowserPlugin` to manage Stagehand sessions. Stagehand creates and manages
-    the browser instance - either locally via a bundled Chromium binary, or remotely via Browserbase
-    cloud - and Playwright connects to it via the Chrome DevTools Protocol (CDP).
+    `StagehandCrawler` builds on top of `PlaywrightCrawler`, inheriting all of its features. It uses
+    `StagehandBrowserPlugin` to manage Stagehand sessions. Stagehand creates and manages the browser instance - either
+    locally via a bundled Chromium binary, or remotely via Browserbase cloud - and Playwright connects to it via
+    the Chrome DevTools Protocol (CDP).
 
-    Because Stagehand relies on CDP, only Chromium is supported. Not all Playwright browser and
-    context configuration options are available - browser settings are limited to the subset accepted
-    by Stagehand's ``BrowserLaunchOptions`` (such as ``headless``, ``args``, ``viewport``, ``proxy``,
-    ``locale``, and ``executable_path``). Full browser fingerprinting (canvas, WebGL, screen
-    properties) and incognito pages are not supported; fingerprint-consistent HTTP headers
-    (``User-Agent``, ``Accept``, ``sec-ch-ua``) are still injected automatically.
+    Because Stagehand relies on CDP, only Chromium is supported. Not all Playwright browser and context configuration
+    options are available - browser settings are limited to the subset accepted by Stagehand's `BrowserLaunchOptions`
+    (such as `headless`, `args`, `viewport`, `proxy`, `locale`, and `executable_path`). Full browser fingerprinting
+    (canvas, WebGL, screen properties) and incognito pages are not supported; fingerprint-consistent HTTP headers
+    (`User-Agent`, `Accept`, `sec-ch-ua`) are still injected automatically.
 
-    Each page in the crawling context is a `StagehandPage`, which extends the standard Playwright
-    `Page` with the following AI methods:
+    Each page in the crawling context is a `StagehandPage`, which extends the standard Playwright `Page` with the
+    following AI methods:
 
     - `page.act(**kwargs)` - perform an action on the page using natural language
     - `page.extract(**kwargs)` - extract structured data from the page with AI
@@ -110,25 +109,22 @@ class StagehandCrawler(
         Args:
             stagehand_options: Stagehand-specific configuration (model, API key, env, etc.).
                 Cannot be specified if `browser_pool` is provided.
-            browser_pool: A pre-configured `BrowserPool`. All plugins must be instances of
-                `StagehandBrowserPlugin`. If omitted, a pool is created automatically from the
-                other browser arguments.
-            user_data_dir: Path to a user data directory, which stores browser session data like
-                cookies and local storage. Cannot be specified if `browser_pool` is provided.
-            headless: Whether to run the browser in headless mode. Defaults to the value from
-                Crawlee's global `Configuration`. Cannot be specified if `browser_pool` is provided.
-            browser_launch_options: Keyword arguments for browser launch passed to Stagehand's
-                `BrowserLaunchOptions` (a subset of Playwright's launch options). Supported keys
-                include `args`, `executable_path`, `proxy`, `viewport`, `locale`, and others.
-                Cannot be specified if `browser_pool` is provided.
-            browser_new_context_options: Keyword arguments for browser context creation, merged
-                with `browser_launch_options`. Options that map to `BrowserLaunchOptions` take
-                effect on the first page; subsequent pages reuse the existing session context.
-                Cannot be specified if `browser_pool` is provided.
-            goto_options: Additional options passed to Stagehand's `Page.goto()`. The `timeout`
-                option is not supported - use `navigation_timeout` instead.
-            navigation_timeout: Timeout for the navigation phase (from opening the page to calling
-                the request handler). Defaults to one minute.
+            browser_pool: A pre-configured `BrowserPool`. All plugins must be instances of `StagehandBrowserPlugin`.
+                If omitted, a pool is created automatically from the other browser arguments.
+            user_data_dir: Path to a user data directory, which stores browser session data like cookies and
+                local storage. Cannot be specified if `browser_pool` is provided.
+            headless: Whether to run the browser in headless mode. Defaults to the value from Crawlee's
+                global `Configuration`. Cannot be specified if `browser_pool` is provided.
+            browser_launch_options: Keyword arguments for browser launch passed to Stagehand's `BrowserLaunchOptions`
+                (a subset of Playwright's launch options). Supported keys include `args`, `executable_path`, `proxy`,
+                `viewport`, `locale`, and others. Cannot be specified if `browser_pool` is provided.
+            browser_new_context_options: Keyword arguments for browser context creation, merged with
+                `browser_launch_options`. Options that map to `BrowserLaunchOptions` take effect on the first page;
+                subsequent pages reuse the existing session context. Cannot be specified if `browser_pool` is provided.
+            goto_options: Additional options passed to Stagehand's `Page.goto()`. The `timeout` option is not
+                supported - use `navigation_timeout` instead.
+            navigation_timeout: Timeout for the navigation phase (from opening the page to calling the request handler).
+            Defaults to one minute.
             kwargs: Additional keyword arguments forwarded to `BasicCrawler`.
         """
         if browser_pool is not None:
@@ -174,7 +170,14 @@ class StagehandCrawler(
 
     @staticmethod
     def _validate_browser_pool(pool: BrowserPool) -> None:
-        invalid = [p for p in pool.plugins if not isinstance(p, StagehandBrowserPlugin)]
+        invalid = next(
+            (
+                plugin
+                for plugin in pool.plugins
+                if plugin.AUTOMATION_LIBRARY != StagehandBrowserPlugin.AUTOMATION_LIBRARY
+            ),
+            None,
+        )
         if invalid:
             raise ValueError(
                 f'All BrowserPool plugins must be StagehandBrowserPlugin instances. Invalid plugins: {invalid}'

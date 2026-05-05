@@ -31,10 +31,9 @@ logger = getLogger(__name__)
 class StagehandBrowserController(BrowserController):
     """Controller for managing a Stagehand-controlled browser instance.
 
-    It creates and connects to the browser lazily on the first ``new_page`` call: Stagehand
-    starts a session, and Playwright then connects to it via CDP. All pages share a single
-    browser context, as Stagehand creates the browser and its context together during session
-    initialisation.
+    It creates and connects to the browser lazily on the first `new_page` call: Stagehand starts a session, and
+    Playwright then connects to it via CDP. All pages share a single browser context, as Stagehand creates the browser
+    and its context together during session initialisation.
     """
 
     AUTOMATION_LIBRARY = 'stagehand'
@@ -125,13 +124,13 @@ class StagehandBrowserController(BrowserController):
     ) -> StagehandPage:
         """Create a new page in the Stagehand-managed browser.
 
-        On the first call, starts the Stagehand session with the provided options. On subsequent
-        calls, ``browser_new_context_options`` and ``proxy_info`` are ignored because the session
-        context cannot be reconfigured once it is running.
+        On the first call, starts the Stagehand session with the provided options. On subsequent calls,
+        `browser_new_context_options` and `proxy_info` are ignored because the session context cannot be reconfigured
+        once it is running.
 
         Args:
-            browser_new_context_options: Options merged on top of the plugin's launch options
-                when creating the first session. Ignored if the session already exists.
+            browser_new_context_options: Options merged on top of the plugin's launch options when creating the
+                first session. Ignored if the session already exists.
             proxy_info: Proxy injected into the session on first creation.
 
         Raises:
@@ -277,8 +276,8 @@ class StagehandBrowserController(BrowserController):
         cdp_url = session.data.cdp_url
         if not cdp_url:
             raise RuntimeError(
-                f'No cdp_url returned from Stagehand (env={self._stagehand_options.env!r}). '
-                'Cannot connect Playwright to the browser.'
+                f'No cdp_url returned from Stagehand (env={self._stagehand_options.env!r}). Cannot connect Playwright '
+                'to the browser.'
             )
 
         self._browser = await self._playwright.chromium.connect_over_cdp(cdp_url)
