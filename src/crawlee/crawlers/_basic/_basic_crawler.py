@@ -703,9 +703,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if self._respect_robots_txt_file and not isinstance(self._request_manager, ThrottlingRequestManager):
             self._logger.warning(
                 'The `respect_robots_txt_file` option is enabled, but the crawler is not using '
-                '`ThrottlingRequestManager`. Crawl-delay directives from robots.txt will not be '
-                'enforced. To enable crawl-delay support, configure the crawler to use '
-                '`ThrottlingRequestManager` as the request manager.'
+                '`ThrottlingRequestManager`. Crawl-delay directives from robots.txt will not be enforced. To enable '
+                'crawl-delay support, configure the crawler to use `ThrottlingRequestManager` as the request manager.'
             )
 
         if self._has_finished_before:
@@ -1559,14 +1558,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     ) -> None:
         """Raise an exception if the given status code indicates the session is blocked.
 
-        If the status code is 429 (Too Many Requests), the domain is recorded as
-        rate-limited in the `ThrottlingRequestManager` for per-domain backoff.
+        If the status code is 429 (Too Many Requests), the domain is recorded as rate-limited in the
+        `ThrottlingRequestManager` for per-domain backoff.
 
         Args:
-            session: The session used for the request. If None, no check is performed.
+            session: The session used for the request. If `None`, no check is performed.
             status_code: The HTTP status code to check.
             request_url: The request URL, used for per-domain rate limit tracking.
-            retry_after_header: The value of the Retry-After response header, if present.
+            retry_after_header: The value of the `Retry-After` response header, if present.
 
         Raises:
             SessionError: If the status code indicates the session is blocked.

@@ -1,8 +1,7 @@
 """A request manager wrapper that enforces per-domain delays.
 
-Handles both HTTP 429 backoff and robots.txt crawl-delay at the scheduling layer,
-routing requests for explicitly configured domains into dedicated sub-queues and
-applying intelligent delay-aware scheduling.
+Handles both HTTP 429 backoff and robots.txt crawl-delay at the scheduling layer, routing requests for explicitly
+configured domains into dedicated sub-queues and applying intelligent delay-aware scheduling.
 """
 
 from __future__ import annotations
@@ -54,23 +53,21 @@ class _DomainState:
 class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     """A request manager that wraps another and enforces per-domain delays.
 
-    Requests for explicitly configured domains are routed into dedicated sub-queues
-    at insertion time — each request lives in exactly one queue, eliminating
-    duplication and simplifying deduplication.
+    Requests for explicitly configured domains are routed into dedicated sub-queues at insertion time — each
+    request lives in exactly one queue, eliminating duplication and simplifying deduplication.
 
-    When `fetch_next_request()` is called, it returns requests from the sub-queue
-    whose domain has been waiting the longest. If all configured domains are
-    throttled, it falls back to the inner queue for non-throttled domains. If the
-    inner queue is also empty and all sub-queues are throttled, it sleeps until the
-    earliest cooldown expires.
+    When `fetch_next_request()` is called, it returns requests from the sub-queue whose domain has been waiting
+    the longest. If all configured domains are throttled, it falls back to the inner queue for non-throttled
+    domains. If the inner queue is also empty and all sub-queues are throttled, it sleeps until the earliest
+    cooldown expires.
 
     Delay sources:
     - HTTP 429 responses (via `record_domain_delay`)
     - robots.txt crawl-delay directives (via `set_crawl_delay`)
 
-    The class is generic over the wrapped manager type; the `request_manager_opener`
-    callback must return an instance of the same `RequestManager` subclass as `inner`,
-    so that `recreate_purged` reconstructs the throttler with the same backing store.
+    The class is generic over the wrapped manager type; the `request_manager_opener` callback must return an
+    instance of the same `RequestManager` subclass as `inner`, so that `recreate_purged` reconstructs the
+    throttler with the same backing store.
 
     Example:
         ```python
@@ -100,17 +97,15 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """Initialize the throttling manager.
 
         Args:
-            inner: The underlying request manager to wrap (typically a RequestQueue).
-                Requests for non-throttled domains are stored here.
-            domains: Explicit list of domain hostnames to throttle. Only requests
-                matching these domains will be routed to per-domain sub-queues.
-            request_manager_opener: Async callable used to create a fresh inner
-                request manager during ``recreate_purged``. Must return the same
-                concrete subclass as `inner` (e.g. ``RequestQueue.open`` when
-                `inner` is a ``RequestQueue``).
-            service_locator: Service locator for creating sub-queues. If not
-                provided, defaults to the global service locator, ensuring
-                consistency with the crawler's storage backend.
+            inner: The underlying request manager to wrap (typically a `RequestQueue`). Requests for
+                non-throttled domains are stored here.
+            domains: Explicit list of domain hostnames to throttle. Only requests matching these domains will be
+                routed to per-domain sub-queues.
+            request_manager_opener: Async callable used to create a fresh inner request manager during
+                `recreate_purged`. Must return the same concrete subclass as `inner` (e.g. `RequestQueue.open`
+                when `inner` is a `RequestQueue`).
+            service_locator: Service locator for creating sub-queues. If not provided, defaults to the global
+                service locator, ensuring consistency with the crawler's storage backend.
             base_delay: Initial delay after the first 429 response from a domain.
             max_delay: Maximum delay between requests to a rate-limited domain.
         """
@@ -165,13 +160,13 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     def record_domain_delay(self, url: str, *, retry_after: timedelta | None = None) -> None:
         """Record a 429 Too Many Requests response for the domain of the given URL.
 
-        Increments the consecutive 429 count and calculates the next allowed
-        request time using exponential backoff or the Retry-After value.
+        Increments the consecutive 429 count and calculates the next allowed request time using exponential
+        backoff or the `Retry-After` value.
 
         Args:
             url: The URL that received a 429 response.
-            retry_after: Optional delay from the Retry-After header. If provided,
-                it takes priority over the calculated exponential backoff.
+            retry_after: Optional delay from the `Retry-After` header. If provided, it takes priority over the
+                calculated exponential backoff.
         """
         domain = self._extract_domain(url)
         if not domain:
@@ -255,10 +250,10 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             state.throttled_until = datetime.now(timezone.utc) + state.crawl_delay
 
     async def recreate_purged(self) -> ThrottlingRequestManager[TRequestManager]:
-        """Drop all queues and return a fresh ThrottlingRequestManager with the same configuration.
+        """Drop all queues and return a fresh `ThrottlingRequestManager` with the same configuration.
 
-        This is used during crawler purge to reconstruct the throttler with empty
-        queues while preserving domain configuration and service locator.
+        This is used during crawler purge to reconstruct the throttler with empty queues while preserving the
+        domain configuration and service locator.
         """
         await self.drop()
 
@@ -287,8 +282,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest | None:
         """Add a request, routing it to the appropriate queue.
 
-        Requests for explicitly configured domains are routed directly to their
-        per-domain sub-queue. All other requests go to the inner queue.
+        Requests for explicitly configured domains are routed directly to their per-domain sub-queue. All other
+        requests go to the inner queue.
         """
         url = self._get_url_from_request(request)
         domain = self._extract_domain(url)
@@ -402,11 +397,10 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     async def fetch_next_request(self) -> Request | None:
         """Fetch the next request, respecting per-domain delays.
 
-        Sub-queues are checked in order of longest-overdue domain first
-        (sorted by `throttled_until` ascending). If all configured domains are
-        throttled, falls back to the inner queue for non-throttled domains.
-        If the inner queue is also empty and all sub-queues are throttled,
-        sleeps until the earliest domain becomes available.
+        Sub-queues are checked in order of longest-overdue domain first (sorted by `throttled_until` ascending).
+        If all configured domains are throttled, falls back to the inner queue for non-throttled domains. If the
+        inner queue is also empty and all sub-queues are throttled, sleeps until the earliest domain becomes
+        available.
         """
         while True:
             # Collect unthrottled domains and sort by throttled_until (longest-overdue first).
