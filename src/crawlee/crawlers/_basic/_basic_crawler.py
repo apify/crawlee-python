@@ -484,6 +484,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # Internal, not explicitly configurable components
         self._robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
         self._robots_txt_lock = asyncio.Lock()
+        self._crawl_delay_configured_origins: set[str] = set()
         self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
@@ -1611,11 +1612,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if not robots_txt_file:
             return True
 
-        # Wire robots.txt crawl-delay into ThrottlingRequestManager
-        if isinstance(self._request_manager, ThrottlingRequestManager):
+        origin = str(URL(url).origin())
+        if origin not in self._crawl_delay_configured_origins and isinstance(
+            self._request_manager, ThrottlingRequestManager
+        ):
             crawl_delay = robots_txt_file.get_crawl_delay()
             if crawl_delay is not None:
                 self._request_manager.set_crawl_delay(url, crawl_delay)
+            self._crawl_delay_configured_origins.add(origin)
 
         return robots_txt_file.is_allowed(url)
 
