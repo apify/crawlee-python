@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Reject non-http(s) URL schemes in HTTP clients ([#1862](https://github.com/apify/crawlee-python/pull/1862)) ([ac66b2a](https://github.com/apify/crawlee-python/commit/ac66b2a4851a11db3a5943d85f7091f39b1053f4)) by [@vdusek](https://github.com/vdusek)
+- Filter sitemap-derived URLs by enqueue strategy ([#1864](https://github.com/apify/crawlee-python/pull/1864)) ([b3db0dc](https://github.com/apify/crawlee-python/commit/b3db0dccbcb679d9e67e7996a97ac2c6ed364456)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->

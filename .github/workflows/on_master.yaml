@@ -45,7 +45,7 @@ jobs:
     uses: ./.github/workflows/_tests.yaml
     secrets: inherit
 
-  release_prepare:
+  beta_release:
     # Run this only for "feat", "fix", "perf", "refactor" and "style" commits.
     if: >-
       startsWith(github.event.head_commit.message, 'feat') ||
@@ -53,63 +53,11 @@ jobs:
       startsWith(github.event.head_commit.message, 'perf') ||
       startsWith(github.event.head_commit.message, 'refactor') ||
       startsWith(github.event.head_commit.message, 'style')
-    name: Release prepare
+    name: Beta release
     needs: [code_checks, tests]
-    runs-on: ubuntu-latest
-    outputs:
-      version_number: ${{ steps.release_prepare.outputs.version_number }}
-      tag_name: ${{ steps.release_prepare.outputs.tag_name }}
-      changelog: ${{ steps.release_prepare.outputs.changelog }}
-    steps:
-      - uses: apify/workflows/git-cliff-release@main
-        id: release_prepare
-        name: Release prepare
-        with:
-          release_type: prerelease
-          existing_changelog_path: CHANGELOG.md
-
-  changelog_update:
-    name: Changelog update
-    needs: [release_prepare]
     permissions:
       contents: write
-    uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
-    with:
-      version_number: ${{ needs.release_prepare.outputs.version_number }}
-      changelog: ${{ needs.release_prepare.outputs.changelog }}
-    secrets: inherit
-
-  pypi_publish:
-    name: PyPI publish
-    needs: [release_prepare, changelog_update]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      id-token: write # Required for OIDC authentication.
-    environment:
-      name: pypi
-      url: https://pypi.org/project/crawlee
-    steps:
-      - name: Prepare distribution
-        uses: apify/workflows/prepare-pypi-distribution@main
-        with:
-          package_name: crawlee
-          is_prerelease: "yes"
-          version_number: ${{ needs.release_prepare.outputs.version_number }}
-          ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
-
-      - name: Publish package to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-
-  doc_release_post_publish:
-    name: Doc release post publish
-    needs: [changelog_update, pypi_publish]
-    permissions:
-      contents: write
-      pages: write
       id-token: write
-    uses: ./.github/workflows/manual_release_docs.yaml
-    with:
-      # Use the ref from the changelog update to include the updated changelog.
-      ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
+      pages: write
+    uses: ./.github/workflows/manual_release_beta.yaml
     secrets: inherit

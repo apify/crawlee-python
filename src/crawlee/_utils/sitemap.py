@@ -546,7 +546,7 @@ async def _discover_for_hostname(
 
     # Try getting sitemaps from robots.txt first
     robots = await RobotsTxtFile.find(url=hostname_urls[0], http_client=http_client, proxy_info=proxy_info)
-    for sitemap_url in robots.get_sitemaps():
+    for sitemap_url in robots.get_sitemaps(enqueue_strategy='same-hostname'):
         if _check_and_add(sitemap_url):
             yield sitemap_url
 
