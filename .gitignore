@@ -15,9 +15,9 @@
 .serena
 .windsurf
 .zed-ai
-AGENTS.md
-CLAUDE.md
-GEMINI.md
+AGENTS.local.md
+CLAUDE.local.md
+GEMINI.local.md
 
 # Cache
 __pycache__
@@ -63,10 +63,13 @@ Session.vim
 
 # Docs
 docs/changelog.md
+website/versioned_docs/*/changelog.md
+website/versioned_docs/*/pyproject.toml
 
 # Website build artifacts, node dependencies
 website/build
 website/node_modules
+website/yarn.lock
 website/.yarn
 website/.docusaurus
 website/api-typedoc-generated.json
@@ -74,7 +77,7 @@ website/apify-shared-docspec-dump.jsonl
 website/docspec-dump.jsonl
 website/module_shortcuts.json
 website/typedoc-types*
-# npm lockfile (we use yarn)
+# npm lockfile (we use pnpm)
 website/package-lock.json
 
 # Default directory for memory storage

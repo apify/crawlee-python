@@ -1,0 +1,221 @@
+---
+id: storages
+title: Storages
+description: How to work with storages in Crawlee, how to manage requests and how to store and retrieve scraping results.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import RqBasicExample from '!!raw-loader!roa-loader!./code_examples/storages/rq_basic_example.py';
+import RqWithCrawlerExample from '!!raw-loader!roa-loader!./code_examples/storages/rq_with_crawler_example.py';
+import RqWithCrawlerExplicitExample from '!!raw-loader!roa-loader!./code_examples/storages/rq_with_crawler_explicit_example.py';
+import RqHelperAddRequestsExample from '!!raw-loader!roa-loader!./code_examples/storages/helper_add_requests_example.py';
+import RqHelperEnqueueLinksExample from '!!raw-loader!roa-loader!./code_examples/storages/helper_enqueue_links_example.py';
+
+import DatasetBasicExample from '!!raw-loader!roa-loader!./code_examples/storages/dataset_basic_example.py';
+import DatasetWithCrawlerExample from '!!raw-loader!roa-loader!./code_examples/storages/dataset_with_crawler_example.py';
+import DatasetWithCrawerExplicitExample from '!!raw-loader!roa-loader!./code_examples/storages/dataset_with_crawler_explicit_example.py';
+
+import KvsBasicExample from '!!raw-loader!roa-loader!./code_examples/storages/kvs_basic_example.py';
+import KvsWithCrawlerExample from '!!raw-loader!roa-loader!./code_examples/storages/kvs_with_crawler_example.py';
+import KvsWithCrawlerExplicitExample from '!!raw-loader!roa-loader!./code_examples/storages/kvs_with_crawler_explicit_example.py';
+
+import CleaningDoNotPurgeExample from '!!raw-loader!roa-loader!./code_examples/storages/cleaning_do_not_purge_example.py';
+import CleaningPurgeExplicitlyExample from '!!raw-loader!roa-loader!./code_examples/storages/cleaning_purge_explicitly_example.py';
+
+Crawlee offers multiple storage types for managing and persisting your crawling data. Request-oriented storages, such as the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, help you store and deduplicate URLs, while result-oriented storages, like <ApiLink to="class/Dataset">`Dataset`</ApiLink> and <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, focus on storing and retrieving scraping results. This guide helps you choose the storage type that suits your needs.
+
+## Storage clients
+
+Storage clients in Crawlee are subclasses of <ApiLink to="class/StorageClient">`StorageClient`</ApiLink>. They handle interactions with different storage backends. For instance:
+
+- <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink>: Stores data in memory and persists it to the local file system.
+- [`ApifyStorageClient`](https://docs.apify.com/sdk/python/reference/class/ApifyStorageClient): Manages storage on the [Apify platform](https://apify.com). Apify storage client is implemented in the [Apify SDK](https://github.com/apify/apify-sdk-python).
+
+Each storage client is responsible for maintaining the storages in a specific environment. This abstraction makes it easier to switch between different environments, e.g. between local development and cloud production setup.
+
+### Memory storage client
+
+The <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> is the default and currently the only one storage client in Crawlee. It stores data in memory and persists it to the local file system. The data are stored in the following directory structure:
+
+```text
+{CRAWLEE_STORAGE_DIR}/{storage_type}/{STORAGE_ID}/
+```
+
+where:
+
+- `{CRAWLEE_STORAGE_DIR}`: The root directory for local storage, specified by the `CRAWLEE_STORAGE_DIR` environment variable (default: `./storage`).
+- `{storage_type}`: The type of storage (e.g., `datasets`, `key_value_stores`, `request_queues`).
+- `{STORAGE_ID}`: The ID of the specific storage instance (default: `default`).
+
+:::info NOTE
+The current <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> and its interface is quite old and not great. We plan to refactor it, together with the whole <ApiLink to="class/StorageClient">`StorageClient`</ApiLink> interface in the near future and it better and and easier to use. We also plan to introduce new storage clients for different storage backends - e.g. for [SQLite](https://sqlite.org/).
+:::
+
+You can override default storage IDs using these environment variables: `CRAWLEE_DEFAULT_DATASET_ID`, `CRAWLEE_DEFAULT_KEY_VALUE_STORE_ID`, or `CRAWLEE_DEFAULT_REQUEST_QUEUE_ID`.
+
+## Request queue
+
+The <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> is the primary storage for URLs in Crawlee, especially useful for deep crawling. It supports dynamic addition and removal of URLs, making it ideal for recursive tasks where URLs are discovered and added during the crawling process (e.g., following links across multiple pages). Each Crawlee project has a **default request queue**, which can be used to store URLs during a specific run. The <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> is highly useful for large-scale and complex crawls.
+
+By default, data are stored using the following path structure:
+
+```text
+{CRAWLEE_STORAGE_DIR}/request_queues/{QUEUE_ID}/{INDEX}.json
+```
+
+- `{CRAWLEE_STORAGE_DIR}`: The root directory for all storage data, specified by the environment variable.
+- `{QUEUE_ID}`: The ID of the request queue, "default" by default.
+- `{INDEX}`: Represents the zero-based index of the record within the queue.
+
+The following code demonstrates the usage of the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>:
+
+<Tabs groupId="request_queue">
+    <TabItem value="request_queue_basic_example" label="Basic usage" default>
+        <RunnableCodeBlock className="language-python" language="python">
+            {RqBasicExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="request_queue_with_crawler" label="Usage with Crawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {RqWithCrawlerExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="request_queue_with_crawler_explicit" label="Explicit usage with Crawler" default>
+        <RunnableCodeBlock className="language-python" language="python">
+            {RqWithCrawlerExplicitExample}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>
+
+### Request-related helpers
+
+Crawlee provides helper functions to simplify interactions with the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>:
+
+- The <ApiLink to="class/AddRequestsFunction">`add_requests`</ApiLink> function allows you to manually add specific URLs to the configured request storage. In this case, you must explicitly provide the URLs you want to be added to the request storage. If you need to specify further details of the request, such as a `label` or `user_data`, you have to pass instances of the <ApiLink to="class/Request">`Request`</ApiLink> class to the helper.
+- The <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> function is designed to discover new URLs in the current page and add them to the request storage. It can be used with default settings, requiring no arguments, or you can customize its behavior by specifying link element selectors, choosing different enqueue strategies, or applying include/exclude filters to control which URLs are added. See [Crawl website with relative links](../examples/crawl-website-with-relative-links) example for more details.
+
+<Tabs groupId="request_helpers">
+    <TabItem value="request_helper_add_requests" label="Add requests" default>
+        <RunnableCodeBlock className="language-python" language="python">
+            {RqHelperAddRequestsExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="request_helper_enqueue_links" label="Enqueue links">
+        <RunnableCodeBlock className="language-python" language="python">
+            {RqHelperEnqueueLinksExample}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>
+
+### Request manager
+
+The <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> implements the <ApiLink to="class/RequestManager">`RequestManager`</ApiLink> interface, offering a unified API for interacting with various request storage types. This provides a unified way to interact with different request storage types.
+
+If you need custom functionality, you can create your own request storage by subclassing the <ApiLink to="class/RequestManager">`RequestManager`</ApiLink> class and implementing its required methods.
+
+For a detailed explanation of the <ApiLink to="class/RequestManager">`RequestManager`</ApiLink> and other related components, refer to the [Request loaders guide](https://crawlee.dev/python/docs/guides/request-loaders).
+
+## Dataset
+
+The <ApiLink to="class/Dataset">`Dataset`</ApiLink> is designed for storing structured data, where each entry has a consistent set of attributes, such as products in an online store or real estate listings. Think of a <ApiLink to="class/Dataset">`Dataset`</ApiLink> as a table: each entry corresponds to a row, with attributes represented as columns. Datasets are append-only, allowing you to add new records but not modify or delete existing ones. Every Crawlee project run is associated with a default dataset, typically used to store results specific to that crawler execution. However, using this dataset is optional.
+
+By default, data are stored using the following path structure:
+
+```text
+{CRAWLEE_STORAGE_DIR}/datasets/{DATASET_ID}/{INDEX}.json
+```
+- `{CRAWLEE_STORAGE_DIR}`: The root directory for all storage data specified by the environment variable.
+- `{DATASET_ID}`: The dataset's ID, "default" by default.
+- `{INDEX}`: Represents the zero-based index of the record within the dataset.
+
+The following code demonstrates basic operations of the dataset:
+
+<Tabs groupId="dataset_storage">
+    <TabItem value="dataset_basic_example" label="Basic usage" default>
+        <RunnableCodeBlock className="language-python" language="python">
+            {DatasetBasicExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="dataset_with_crawler" label="Usage with Crawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {DatasetWithCrawlerExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="dataset_with_crawler_explicit" label="Explicit usage with Crawler" default>
+        <RunnableCodeBlock className="language-python" language="python">
+            {DatasetWithCrawerExplicitExample}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>
+
+### Dataset-related helpers
+
+Crawlee provides the following helper function to simplify interactions with the <ApiLink to="class/Dataset">`Dataset`</ApiLink>:
+
+- The <ApiLink to="class/PushDataFunction">`push_data`</ApiLink> function allows you to manually add data to the dataset. You can optionally specify the dataset ID or its name.
+
+## Key-value store
+
+The <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink> is designed to save and retrieve data records or files efficiently. Each record is uniquely identified by a key and is associated with a specific MIME type, making the <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink> ideal for tasks like saving web page screenshots, PDFs, or tracking the state of crawlers.
+
+By default, data are stored using the following path structure:
+
+```text
+{CRAWLEE_STORAGE_DIR}/key_value_stores/{STORE_ID}/{KEY}.{EXT}
+```
+- `{CRAWLEE_STORAGE_DIR}`: The root directory for all storage data specified by the environment variable.
+- `{STORE_ID}`: The KVS's ID, "default" by default.
+- `{KEY}`: The unique key for the record.
+- `{EXT}`: The file extension corresponding to the MIME type of the content.
+
+The following code demonstrates the usage of the <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>:
+
+<Tabs groupId="kv_storage">
+    <TabItem value="kvs_basic_example" label="Basic usage" default>
+        <RunnableCodeBlock className="language-python" language="python">
+            {KvsBasicExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="kvs_with_crawler" label="Usage with Crawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {KvsWithCrawlerExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="kvs_with_crawler_explicit" label="Explicit usage with Crawler" default>
+        <RunnableCodeBlock className="language-python" language="python">
+            {KvsWithCrawlerExplicitExample}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>
+
+To see a real-world example of how to get the input from the key-value store, see the [Screenshots](https://crawlee.dev/python/docs/examples/capture-screenshots-using-playwright) example.
+
+### Key-value store-related helpers
+
+Crawlee provides the following helper function to simplify interactions with the <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>:
+
+- The <ApiLink to="class/GetKeyValueStoreFunction">`get_key_value_store`</ApiLink> function retrieves the key-value store for the current crawler run. If the KVS does not exist, it will be created. You can also specify the KVS's ID or its name.
+
+## Cleaning up the storages
+
+Default storages are purged before the crawler starts, unless explicitly configured otherwise. For that case, see <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink>. This cleanup happens as soon as a storage is accessed, either when you open a storage (e.g. using <ApiLink to="class/RequestQueue#open">`RequestQueue.open`</ApiLink>, <ApiLink to="class/Dataset#open">`Dataset.open`</ApiLink>, <ApiLink to="class/KeyValueStore#open">`KeyValueStore.open`</ApiLink>) or when interacting with a storage through one of the helper functions (e.g. <ApiLink to="class/PushDataFunction">`push_data`</ApiLink>), which implicitly opens the result storage.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {CleaningDoNotPurgeExample}
+</RunnableCodeBlock>
+
+If you do not explicitly interact with storages in your code, the purging will occur automatically when the <ApiLink to="class/BasicCrawler#run">`BasicCrawler.run`</ApiLink> method is invoked.
+
+If you need to purge storages earlier, you can call <ApiLink to="class/MemoryStorageClient#purge_on_start">`MemoryStorageClient.purge_on_start`</ApiLink> directly if you are using the default storage client. This method triggers the purging process for the underlying storage implementation you are currently using.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {CleaningPurgeExplicitlyExample}
+</RunnableCodeBlock>
+
+## Conclusion
+
+This guide introduced you to the different storage types available in Crawlee and how to interact with them. You learned how to manage requests and store and retrieve scraping results using the `RequestQueue`, `Dataset`, and `KeyValueStore`. You also discovered how to use helper functions to simplify interactions with these storages. Finally, you learned how to clean up storages before starting a crawler run and how to purge them explicitly. If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!

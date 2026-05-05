@@ -11,9 +11,12 @@ with _try_import(__name__, 'PlaywrightCrawlingContext'):
     from ._playwright_crawling_context import PlaywrightCrawlingContext
 with _try_import(__name__, 'PlaywrightPreNavCrawlingContext'):
     from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
+with _try_import(__name__, 'PlaywrightPostNavCrawlingContext'):
+    from ._playwright_post_nav_crawling_context import PlaywrightPostNavCrawlingContext
 
 __all__ = [
     'PlaywrightCrawler',
     'PlaywrightCrawlingContext',
+    'PlaywrightPostNavCrawlingContext',
     'PlaywrightPreNavCrawlingContext',
 ]

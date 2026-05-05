@@ -14,14 +14,16 @@ from crawlee.storage_clients import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from fakeredis import FakeAsyncRedis
 
 
 @pytest.fixture(params=['memory', 'file_system', 'sql', 'redis'])
-def storage_client(
+async def storage_client(
     request: pytest.FixtureRequest,
     redis_client: FakeAsyncRedis,
-) -> StorageClient:
+) -> AsyncGenerator[StorageClient, None]:
     """Parameterized fixture to test with different storage clients."""
     storage_client: StorageClient
 
@@ -36,4 +38,7 @@ def storage_client(
     else:
         storage_client = FileSystemStorageClient()
     service_locator.set_storage_client(storage_client)
-    return storage_client
+    yield storage_client
+
+    if isinstance(storage_client, SqlStorageClient):
+        await storage_client.close()

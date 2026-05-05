@@ -1,0 +1,47 @@
+---
+id: crawl-specific-links-on-website
+title: Crawl specific links on website
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import BeautifulSoupExample from '!!raw-loader!roa-loader!./code_examples/crawl_specific_links_on_website_bs.py';
+import PlaywrightExample from '!!raw-loader!roa-loader!./code_examples/crawl_specific_links_on_website_pw.py';
+
+import BeautifulSoupExampleExtractAndAdd from '!!raw-loader!roa-loader!./code_examples/extract_and_add_specific_links_on_website_bs.py';
+import PlaywrightExampleExtractAndAdd from '!!raw-loader!roa-loader!./code_examples/extract_and_add_specific_links_on_website_pw.py';
+
+This example demonstrates how to crawl a website while targeting specific patterns of links. By utilizing the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> helper, you can pass `include` or `exclude` parameters to improve your crawling strategy. This approach ensures that only the links matching the specified patterns are added to the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>. Both `include` and `exclude` support lists of globs or regular expressions. This functionality is great for focusing on relevant sections of a website and avoiding scraping unnecessary or irrelevant content.
+
+<Tabs groupId="first-example">
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {BeautifulSoupExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {PlaywrightExample}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>
+
+## Even more control over the enqueued links
+
+<ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> is a convenience helper and internally it calls <ApiLink to="class/ExtractLinksFunction">`extract_links`</ApiLink> to find the links and <ApiLink to="class/AddRequestsFunction">`add_requests`</ApiLink> to add them to the queue. If you need some additional custom filtering of the extracted links before enqueuing them, then consider using <ApiLink to="class/ExtractLinksFunction">`extract_links`</ApiLink> and <ApiLink to="class/AddRequestsFunction">`add_requests`</ApiLink> instead of the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink>
+
+<Tabs groupId="second-example">
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {BeautifulSoupExampleExtractAndAdd}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {PlaywrightExampleExtractAndAdd}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>

@@ -20,9 +20,11 @@ from crawlee.crawlers import (
     AbstractHttpParser,
     BasicCrawler,
     BeautifulSoupParserType,
+    HttpCrawlingContext,
     ParsedHttpCrawlingContext,
     PlaywrightCrawler,
     PlaywrightCrawlingContext,
+    PlaywrightPostNavCrawlingContext,
     PlaywrightPreNavCrawlingContext,
 )
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
@@ -33,6 +35,7 @@ from crawlee.statistics import Statistics, StatisticsState
 from ._adaptive_playwright_crawler_statistics import AdaptivePlaywrightCrawlerStatisticState
 from ._adaptive_playwright_crawling_context import (
     AdaptivePlaywrightCrawlingContext,
+    AdaptivePlaywrightPostNavCrawlingContext,
     AdaptivePlaywrightPreNavCrawlingContext,
 )
 from ._rendering_type_predictor import DefaultRenderingTypePredictor, RenderingType, RenderingTypePredictor
@@ -196,6 +199,25 @@ class AdaptivePlaywrightCrawler(
         static_crawler.pre_navigation_hook(adaptive_pre_navigation_hook_static)
         playwright_crawler.pre_navigation_hook(adaptive_pre_navigation_hook_pw)
 
+        # Register post navigation hooks on sub crawlers
+        self._post_navigation_hooks = list[Callable[[AdaptivePlaywrightPostNavCrawlingContext], Awaitable[None]]]()
+        self._post_navigation_hooks_pw_only = list[
+            Callable[[AdaptivePlaywrightPostNavCrawlingContext], Awaitable[None]]
+        ]()
+
+        async def adaptive_post_navigation_hook_static(context: HttpCrawlingContext) -> None:
+            adaptive_context = await AdaptivePlaywrightPostNavCrawlingContext.from_post_navigation_context(context)
+            for hook in self._post_navigation_hooks:
+                await hook(adaptive_context)
+
+        async def adaptive_post_navigation_hook_pw(context: PlaywrightPostNavCrawlingContext) -> None:
+            adaptive_context = await AdaptivePlaywrightPostNavCrawlingContext.from_post_navigation_context(context)
+            for hook in self._post_navigation_hooks + self._post_navigation_hooks_pw_only:
+                await hook(adaptive_context)
+
+        static_crawler.post_navigation_hook(adaptive_post_navigation_hook_static)
+        playwright_crawler.post_navigation_hook(adaptive_post_navigation_hook_pw)
+
         self._additional_context_managers = [
             *self._additional_context_managers,
             self.rendering_type_predictor,
@@ -298,6 +320,7 @@ class AdaptivePlaywrightCrawler(
             get_key_value_store=result.get_key_value_store,
             use_state=use_state_function,
             log=context.log,
+            register_deferred_cleanup=context.register_deferred_cleanup,
         )
 
         try:
@@ -329,7 +352,7 @@ class AdaptivePlaywrightCrawler(
                 )
                 await self.router(adaptive_crawling_context)
 
-            return self._static_context_pipeline(context_linked_to_result, from_static_pipeline_to_top_router)  # ty: ignore[invalid-argument-type]
+            return self._static_context_pipeline(context_linked_to_result, from_static_pipeline_to_top_router)
 
         if rendering_type == 'client only':
 
@@ -339,7 +362,7 @@ class AdaptivePlaywrightCrawler(
                 )
                 await self.router(adaptive_crawling_context)
 
-            return self._pw_context_pipeline(context_linked_to_result, from_pw_pipeline_to_top_router)  # ty: ignore[invalid-argument-type]
+            return self._pw_context_pipeline(context_linked_to_result, from_pw_pipeline_to_top_router)
 
         raise RuntimeError(
             f'Not a valid rendering type. Must be one of the following: {", ".join(get_args(RenderingType))}'
@@ -429,6 +452,32 @@ class AdaptivePlaywrightCrawler(
                 self._pre_navigation_hooks_pw_only.append(hook)
             else:
                 self._pre_navigation_hooks.append(hook)
+
+        # No parameter in decorator. Execute directly.
+        if hook:
+            register_hooks(hook)
+
+        # Return parametrized decorator that will be executed through decorator syntax if called with parameter.
+        return register_hooks
+
+    def post_navigation_hook(
+        self,
+        hook: Callable[[AdaptivePlaywrightPostNavCrawlingContext], Awaitable[None]] | None = None,
+        *,
+        playwright_only: bool = False,
+    ) -> Callable[[Callable[[AdaptivePlaywrightPostNavCrawlingContext], Awaitable[None]]], None]:
+        """Post navigation hooks for adaptive crawler are delegated to sub crawlers.
+
+        Optionally parametrized decorator.
+        Hooks are wrapped in context that handles possibly missing `page` and `response` objects by raising
+        `AdaptiveContextError`.
+        """
+
+        def register_hooks(hook: Callable[[AdaptivePlaywrightPostNavCrawlingContext], Awaitable[None]]) -> None:
+            if playwright_only:
+                self._post_navigation_hooks_pw_only.append(hook)
+            else:
+                self._post_navigation_hooks.append(hook)
 
         # No parameter in decorator. Execute directly.
         if hook:

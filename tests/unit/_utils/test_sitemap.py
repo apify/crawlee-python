@@ -1,11 +1,13 @@
 import base64
 import gzip
 from datetime import datetime
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 from yarl import URL
 
-from crawlee._utils.sitemap import Sitemap, SitemapUrl, parse_sitemap
-from crawlee.http_clients._base import HttpClient
+from crawlee._utils.sitemap import Sitemap, SitemapUrl, discover_valid_sitemaps, parse_sitemap
+from crawlee.http_clients._base import HttpClient, HttpResponse
 
 BASIC_SITEMAP = """
 <?xml version="1.0" encoding="UTF-8"?>
@@ -44,6 +46,23 @@ BASIC_RESULTS = {
     'http://not-exists.com/catalog?item=74&desc=vacation_newfoundland',
     'http://not-exists.com/catalog?item=83&desc=vacation_usa',
 }
+
+
+def _make_mock_client(url_map: dict[str, tuple[int, bytes]]) -> AsyncMock:
+    async def send_request(url: str, **_kwargs: Any) -> HttpResponse:
+        status, body = 404, b''
+        for pattern, (s, b) in url_map.items():
+            if pattern in url:
+                status, body = s, b
+                break
+        response = MagicMock(spec=HttpResponse)
+        response.status_code = status
+        response.read = AsyncMock(return_value=body)
+        return response
+
+    client = AsyncMock(spec=HttpClient)
+    client.send_request.side_effect = send_request
+    return client
 
 
 def compress_gzip(data: str) -> bytes:
@@ -246,3 +265,84 @@ async def test_sitemap_from_string() -> None:
 
     assert len(sitemap.urls) == 5
     assert set(sitemap.urls) == BASIC_RESULTS
+
+
+async def test_discover_sitemap_from_robots_txt() -> None:
+    """Sitemap URL found in robots.txt is yielded."""
+    robots_content = b'User-agent: *\nSitemap: http://example.com/custom-sitemap.xml'
+    http_client = _make_mock_client({'robots.txt': (200, robots_content)})
+
+    urls = [url async for url in discover_valid_sitemaps(['http://example.com/page'], http_client=http_client)]
+
+    assert urls == ['http://example.com/custom-sitemap.xml']
+
+
+async def test_discover_sitemap_from_common_paths() -> None:
+    """Sitemap is found at common paths when robots.txt has none."""
+    http_client = _make_mock_client(
+        {'/sitemap.xml': (200, b''), '/sitemap.txt': (200, b''), '/sitemap_index.xml': (200, b'')}
+    )
+
+    urls = [url async for url in discover_valid_sitemaps(['http://example.com/page'], http_client=http_client)]
+
+    assert urls == [
+        'http://example.com/sitemap.xml',
+        'http://example.com/sitemap.txt',
+        'http://example.com/sitemap_index.xml',
+    ]
+
+
+async def test_discover_sitemap_from_input_url() -> None:
+    """Input URL that is already a sitemap is yielded directly without checking common paths."""
+    http_client = _make_mock_client({'/sitemap.txt': (200, b'')})
+
+    urls = [url async for url in discover_valid_sitemaps(['http://example.com/sitemap.xml'], http_client=http_client)]
+
+    assert urls == ['http://example.com/sitemap.xml']
+
+
+async def test_discover_sitemap_deduplication() -> None:
+    """Sitemap URL found in robots.txt is not yielded again from common paths check."""
+    robots_content = b'User-agent: *\nSitemap: http://example.com/sitemap.xml'
+    http_client = _make_mock_client(
+        {
+            'robots.txt': (200, robots_content),
+            '/sitemap.xml': (200, b''),
+        }
+    )
+
+    urls = [url async for url in discover_valid_sitemaps(['http://example.com/page'], http_client=http_client)]
+
+    assert urls == ['http://example.com/sitemap.xml']
+
+
+async def test_discover_sitemaps_multiple_domains() -> None:
+    """Sitemaps from multiple domains are all discovered."""
+    http_client = _make_mock_client(
+        {
+            'domain-a.com/sitemap.xml': (200, b''),
+            'domain-b.com/sitemap.xml': (200, b''),
+        }
+    )
+
+    urls = [
+        url
+        async for url in discover_valid_sitemaps(
+            ['http://domain-a.com/page', 'http://domain-b.com/page'],
+            http_client=http_client,
+        )
+    ]
+
+    assert set(urls) == {
+        'http://domain-a.com/sitemap.xml',
+        'http://domain-b.com/sitemap.xml',
+    }
+
+
+async def test_discover_sitemap_url_without_host_skipped() -> None:
+    """URLs without a host are skipped."""
+    http_client = _make_mock_client({})
+
+    urls = [url async for url in discover_valid_sitemaps(['not-a-valid-url'], http_client=http_client)]
+
+    assert urls == []

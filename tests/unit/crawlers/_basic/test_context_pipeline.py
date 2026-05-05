@@ -41,6 +41,7 @@ async def test_calls_consumer_without_middleware() -> None:
         use_state=AsyncMock(),
         get_key_value_store=AsyncMock(),
         log=logging.getLogger(),
+        register_deferred_cleanup=lambda _: None,
     )
 
     await pipeline(context, consumer)
@@ -68,6 +69,7 @@ async def test_calls_consumers_and_middlewares() -> None:
             use_state=AsyncMock(),
             get_key_value_store=AsyncMock(),
             log=logging.getLogger(),
+            register_deferred_cleanup=context.register_deferred_cleanup,
         )
         events.append('middleware_a_out')
 
@@ -85,6 +87,7 @@ async def test_calls_consumers_and_middlewares() -> None:
             use_state=AsyncMock(),
             get_key_value_store=AsyncMock(),
             log=logging.getLogger(),
+            register_deferred_cleanup=context.register_deferred_cleanup,
         )
         events.append('middleware_b_out')
 
@@ -100,6 +103,7 @@ async def test_calls_consumers_and_middlewares() -> None:
         use_state=AsyncMock(),
         get_key_value_store=AsyncMock(),
         log=logging.getLogger(),
+        register_deferred_cleanup=lambda _: None,
     )
     await pipeline(context, consumer)
 
@@ -126,6 +130,7 @@ async def test_wraps_consumer_errors() -> None:
         use_state=AsyncMock(),
         get_key_value_store=AsyncMock(),
         log=logging.getLogger(),
+        register_deferred_cleanup=lambda _: None,
     )
 
     with pytest.raises(RequestHandlerError):
@@ -155,6 +160,7 @@ async def test_handles_exceptions_in_middleware_initialization() -> None:
         use_state=AsyncMock(),
         get_key_value_store=AsyncMock(),
         log=logging.getLogger(),
+        register_deferred_cleanup=lambda _: None,
     )
 
     with pytest.raises(ContextPipelineInitializationError):
@@ -187,6 +193,7 @@ async def test_handles_exceptions_in_middleware_finalization() -> None:
         use_state=AsyncMock(),
         get_key_value_store=AsyncMock(),
         log=logging.getLogger(),
+        register_deferred_cleanup=lambda _: None,
     )
 
     with pytest.raises(ContextPipelineFinalizationError):

@@ -3,13 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, Protocol, TypedDict
 
+from playwright.async_api import APIResponse
+
 from crawlee import HttpHeaders
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from playwright.async_api import APIResponse, Response
+    from playwright.async_api import Response
     from typing_extensions import NotRequired, Self
 
 
@@ -56,6 +58,9 @@ class PlaywrightHttpResponse:
         # Used http protocol version cannot be obtained from `Response` and has to be passed as additional argument.
         http_version = protocol
         _content = await response.body()
+        # If not called then the body will stay in memory until the context closes.
+        if isinstance(response, APIResponse):
+            await response.dispose()
 
         return cls(http_version=http_version, status_code=status_code, headers=headers, _content=_content)
 

@@ -1,0 +1,50 @@
+---
+id: http-clients
+title: HTTP clients
+description: Crawlee supports multiple HTTP clients when making requests.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import BsCurlImpersonateExample from '!!raw-loader!roa-loader!./code_examples/http_clients/curl_impersonate_example.py';
+import BsHttpxExample from '!!raw-loader!roa-loader!./code_examples/http_clients/httpx_example.py';
+
+HTTP clients are utilized by the HTTP-based crawlers (e.g. <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>) to communicate with web servers. They use external HTTP libraries for communication, rather than a browser. Examples of such libraries include [httpx](https://pypi.org/project/httpx/), [aiohttp](https://pypi.org/project/aiohttp/) or [curl-cffi](https://pypi.org/project/curl-cffi/). After retrieving page content, an HTML parsing library is typically used to facilitate data extraction. Examples of such libraries are [beautifulsoup](https://pypi.org/project/beautifulsoup4/), [parsel](https://pypi.org/project/parsel/), [selectolax](https://pypi.org/project/selectolax/) or [pyquery](https://pypi.org/project/pyquery/). These crawlers are faster than browser-based crawlers but they cannot execute client-side JavaScript.
+
+## How to switch between HTTP clients
+
+In Crawlee we currently have two HTTP clients: <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>, which uses the `httpx` library, and <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, which uses the `curl-cffi` library. You can switch between them by setting the `http_client` parameter in the Crawler class. The default HTTP client is <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>. Below are examples of how to set the HTTP client for the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>.
+
+<Tabs>
+    <TabItem value="BeautifulSoupHttpxExample" label="BeautifulSoupCrawler with HTTPX">
+        <RunnableCodeBlock className="language-python" language="python">
+            {BsHttpxExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="BeautifulSoupCurlImpersonateExample" label="BeautifulSoupCrawler with Curl impersonate">
+        <RunnableCodeBlock className="language-python" language="python">
+            {BsCurlImpersonateExample}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>
+
+### Installation
+
+Since <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink> is the default HTTP client, you don't need to install additional packages to use it. If you want to use <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>, you need to install `crawlee` with the `curl-impersonate` extra.
+
+```sh
+python -m pip install 'crawlee[curl-impersonate]'
+```
+
+or install all available extras:
+
+```sh
+python -m pip install 'crawlee[all]'
+```
+
+## How HTTP clients work
+
+We provide an abstract base class, <ApiLink to="class/HttpClient">`HttpClient`</ApiLink>, which defines the necessary interface for all HTTP clients. HTTP clients are responsible for sending requests and receiving responses, as well as managing cookies, headers, and proxies. They provide methods that are called from crawlers. To implement your own HTTP client, inherit from the <ApiLink to="class/HttpClient">`HttpClient`</ApiLink> class and implement the required methods.

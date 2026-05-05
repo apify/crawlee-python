@@ -1,6 +1,6 @@
 from collections.abc import Awaitable
 from pathlib import Path
-from typing import TypeVar, overload
+from typing import TypeVar, cast, overload
 
 T = TypeVar('T')
 
@@ -13,7 +13,9 @@ async def await_redis_response(response: T) -> T: ...
 
 async def await_redis_response(response: Awaitable[T] | T) -> T:
     """Solve the problem of ambiguous typing for redis."""
-    return await response if isinstance(response, Awaitable) else response
+    if isinstance(response, Awaitable):
+        return cast('T', await response)
+    return response
 
 
 def read_lua_script(script_name: str) -> str:

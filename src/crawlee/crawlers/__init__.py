@@ -15,13 +15,25 @@ with _try_import(__name__, 'BeautifulSoupCrawler', 'BeautifulSoupCrawlingContext
 with _try_import(__name__, 'ParselCrawler', 'ParselCrawlingContext'):
     from ._parsel import ParselCrawler, ParselCrawlingContext
 
-with _try_import(__name__, 'PlaywrightCrawler', 'PlaywrightCrawlingContext', 'PlaywrightPreNavCrawlingContext'):
-    from ._playwright import PlaywrightCrawler, PlaywrightCrawlingContext, PlaywrightPreNavCrawlingContext
+with _try_import(
+    __name__,
+    'PlaywrightCrawler',
+    'PlaywrightCrawlingContext',
+    'PlaywrightPostNavCrawlingContext',
+    'PlaywrightPreNavCrawlingContext',
+):
+    from ._playwright import (
+        PlaywrightCrawler,
+        PlaywrightCrawlingContext,
+        PlaywrightPostNavCrawlingContext,
+        PlaywrightPreNavCrawlingContext,
+    )
 
 with _try_import(
     __name__,
     'AdaptivePlaywrightCrawler',
     'AdaptivePlaywrightCrawlingContext',
+    'AdaptivePlaywrightPostNavCrawlingContext',
     'AdaptivePlaywrightPreNavCrawlingContext',
     'AdaptivePlaywrightCrawlerStatisticState',
     'RenderingType',
@@ -32,6 +44,7 @@ with _try_import(
         AdaptivePlaywrightCrawler,
         AdaptivePlaywrightCrawlerStatisticState,
         AdaptivePlaywrightCrawlingContext,
+        AdaptivePlaywrightPostNavCrawlingContext,
         AdaptivePlaywrightPreNavCrawlingContext,
         RenderingType,
         RenderingTypePrediction,
@@ -45,6 +58,7 @@ __all__ = [
     'AdaptivePlaywrightCrawler',
     'AdaptivePlaywrightCrawlerStatisticState',
     'AdaptivePlaywrightCrawlingContext',
+    'AdaptivePlaywrightPostNavCrawlingContext',
     'AdaptivePlaywrightPreNavCrawlingContext',
     'BasicCrawler',
     'BasicCrawlerOptions',
@@ -62,6 +76,7 @@ __all__ = [
     'ParselCrawlingContext',
     'PlaywrightCrawler',
     'PlaywrightCrawlingContext',
+    'PlaywrightPostNavCrawlingContext',
     'PlaywrightPreNavCrawlingContext',
     'RenderingType',
     'RenderingTypePrediction',

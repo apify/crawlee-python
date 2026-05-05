@@ -9,11 +9,12 @@ import pytest
 from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import MemoryStorageClient, StorageClient
+from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, UnprocessedRequest
 from crawlee.storages import RequestQueue
 from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, Sequence
 
     from crawlee.storage_clients import StorageClient
 
@@ -125,6 +126,7 @@ async def test_add_request_string_url(rq: RequestQueue) -> None:
     result = await rq.add_request(url)
 
     # Verify request was added
+    assert result is not None
     assert result.unique_key is not None
     assert result.was_already_present is False
     assert result.was_already_handled is False
@@ -142,6 +144,7 @@ async def test_add_request_object(rq: RequestQueue) -> None:
     result = await rq.add_request(request)
 
     # Verify request was added
+    assert result is not None
     assert result.unique_key is not None
     assert result.was_already_present is False
     assert result.was_already_handled is False
@@ -158,10 +161,13 @@ async def test_add_duplicate_request(rq: RequestQueue) -> None:
     url = 'https://example.com'
     first_result = await rq.add_request(url)
 
+    assert first_result is not None
+
     # Add the same request again
     second_result = await rq.add_request(url)
 
     # Verify the second request was detected as duplicate
+    assert second_result is not None
     assert second_result.was_already_present is True
     assert second_result.unique_key == first_result.unique_key
 
@@ -254,6 +260,56 @@ async def test_add_requests_with_forefront(rq: RequestQueue) -> None:
     assert next_request.url == 'https://example.com/priority'
 
 
+@pytest.mark.parametrize('forefront', [True, False])
+async def test_add_requests_retry_preserves_forefront(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    forefront: bool,
+) -> None:
+    """Regression test: when ``add_batch_of_requests`` returns unprocessed requests, the retry must preserve the
+    original `forefront` value rather than silently falling back to the parameter default."""
+    rq = await RequestQueue.open(storage_client=MemoryStorageClient())
+    forefront_calls: list[bool] = []
+
+    async def patched_add_batch(
+        requests: Sequence[Request],
+        *,
+        forefront: bool = False,
+    ) -> AddRequestsResponse:
+        forefront_calls.append(forefront)
+        if len(forefront_calls) == 1:
+            return AddRequestsResponse(
+                processed_requests=[],
+                unprocessed_requests=[UnprocessedRequest(unique_key=r.unique_key, url=r.url) for r in requests],
+            )
+        return AddRequestsResponse(
+            processed_requests=[
+                ProcessedRequest(
+                    unique_key=r.unique_key,
+                    was_already_present=False,
+                    was_already_handled=False,
+                )
+                for r in requests
+            ],
+            unprocessed_requests=[],
+        )
+
+    monkeypatch.setattr(rq._client, 'add_batch_of_requests', patched_add_batch)
+
+    try:
+        await rq.add_requests(
+            ['https://example.com/a', 'https://example.com/b'],
+            forefront=forefront,
+            wait_time_between_batches=timedelta(seconds=0),
+        )
+    finally:
+        await rq.drop()
+
+    assert forefront_calls == [forefront, forefront], (
+        f'retry must propagate the original forefront={forefront} flag, got: {forefront_calls}'
+    )
+
+
 async def test_add_requests_mixed_forefront(rq: RequestQueue) -> None:
     """Test the ordering when adding requests with mixed forefront values."""
     # Add normal requests
@@ -336,7 +392,7 @@ async def test_fetch_next_request_and_mark_handled(rq: RequestQueue) -> None:
     assert metadata.pending_request_count == 0
 
     # Verify queue is empty
-    empty_request = await rq.fetch_next_request()
+    empty_request: Request | None = await rq.fetch_next_request()
     assert empty_request is None
 
 
@@ -344,6 +400,9 @@ async def test_get_request_by_id(rq: RequestQueue) -> None:
     """Test retrieving a request by its ID."""
     # Add a request
     added_result = await rq.add_request('https://example.com')
+
+    assert added_result is not None
+
     unique_key = added_result.unique_key
 
     # Retrieve the request by ID
@@ -351,6 +410,17 @@ async def test_get_request_by_id(rq: RequestQueue) -> None:
     assert retrieved_request is not None
     assert retrieved_request.unique_key == unique_key
     assert retrieved_request.url == 'https://example.com'
+
+
+async def test_handled_request_records_persistence(rq: RequestQueue) -> None:
+    request = Request.from_url('https://example.com/1')
+    await rq.add_request(request)
+    fetched_request = await rq.fetch_next_request()
+    assert isinstance(fetched_request, Request)
+    await rq.mark_request_as_handled(fetched_request)
+    fetched_request = await rq.get_request(request.unique_key)
+    assert isinstance(fetched_request, Request)
+    assert fetched_request.unique_key == request.unique_key
 
 
 async def test_get_non_existent_request(rq: RequestQueue) -> None:
@@ -791,6 +861,7 @@ async def test_alias_request_operations(
 
     for url in urls:
         result = await rq.add_request(url)
+        assert result is not None
         assert result.was_already_present is False
 
     # Test queue metadata

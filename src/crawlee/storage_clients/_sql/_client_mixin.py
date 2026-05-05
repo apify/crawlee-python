@@ -205,6 +205,7 @@ class SqlClientMixin(ABC):
                 except SQLAlchemyError as e:
                     logger.warning(f'Error occurred during session transaction: {e}')
                     await session.rollback()
+                    raise
             else:
                 yield session
 

@@ -161,7 +161,20 @@ class RequestQueue(Storage, RequestManager):
     ) -> ProcessedRequest | None:
         request = self._transform_request(request)
         response = await self._client.add_batch_of_requests([request], forefront=forefront)
-        return response.processed_requests[0]
+
+        if response.processed_requests:
+            return response.processed_requests[0]
+
+        if response.unprocessed_requests:
+            logger.warning(
+                f'Request {request.url} was not processed by storage client "{self._client.__class__.__name__}".'
+            )
+        else:
+            logger.warning(
+                f'Request {request.url} was not processed by storage client "{self._client.__class__.__name__}" '
+                'received empty response.'
+            )
+        return None
 
     @override
     async def add_requests(
@@ -335,7 +348,12 @@ class RequestQueue(Storage, RequestManager):
                 unprocessed_requests_unique_keys = {request.unique_key for request in response.unprocessed_requests}
                 retry_batch = [request for request in batch if request.unique_key in unprocessed_requests_unique_keys]
                 await asyncio.sleep((base_retry_wait * attempt).total_seconds())
-                await self._process_batch(retry_batch, base_retry_wait=base_retry_wait, attempt=attempt + 1)
+                await self._process_batch(
+                    retry_batch,
+                    base_retry_wait=base_retry_wait,
+                    attempt=attempt + 1,
+                    forefront=forefront,
+                )
 
         request_count = len(batch) - len(response.unprocessed_requests)
 

@@ -1,4 +1,4 @@
-import { useActiveDocContext, useLayoutDoc } from '@docusaurus/plugin-content-docs/client';
+import { useActiveDocContext, useDocsPreferredVersion, useLayoutDoc } from '@docusaurus/plugin-content-docs/client';
 import DefaultNavbarItem from '@theme/NavbarItem/DefaultNavbarItem';
 import DocSidebarNavbarItem from '@theme/NavbarItem/DocSidebarNavbarItem';
 import DocsVersionDropdownNavbarItem from '@theme/NavbarItem/DocsVersionDropdownNavbarItem';
@@ -9,8 +9,7 @@ import LocaleDropdownNavbarItem from '@theme/NavbarItem/LocaleDropdownNavbarItem
 import SearchNavbarItem from '@theme/NavbarItem/SearchNavbarItem';
 import React from 'react';
 
-// const versions = require('../../../versions.json');
-// const stable = versions[0];
+import { getApiPath } from './apiVersionUtils';
 
 function DocNavbarItem({
     docId,
@@ -35,46 +34,17 @@ function DocNavbarItem({
     );
 }
 
-function ApiNavbarItem(ctx) {
+function ApiNavbarItem({ to, ...props }) {
+    const { preferredVersion } = useDocsPreferredVersion();
+    const apiPath = preferredVersion ? getApiPath(preferredVersion) : 'api';
+
     return (
         <DefaultNavbarItem
             exact
-            {...ctx}
-            label={ctx.label}
-            to={`api/${ctx.to}`}
+            {...props}
+            to={to ? `${apiPath}/${to}` : apiPath}
         />
     );
-
-    // let version = {};
-    //
-    // try {
-    //     // eslint-disable-next-line react-hooks/rules-of-hooks
-    //     version = useDocsVersion();
-    // } catch {
-    //     version.version = stable;
-    // }
-    //
-    // const { siteConfig } = useDocusaurusContext();
-    //
-    // if (siteConfig.presets[0][1].docs.disableVersioning || version.version === stable) {
-    //     return (
-    //         <DefaultNavbarItem
-    //             exact
-    //             {...ctx}
-    //             label={ctx.label}
-    //             to={`api/${ctx.to}`}
-    //         />
-    //     );
-    // }
-    //
-    // return (
-    //     <DefaultNavbarItem
-    //         exact
-    //         {...ctx}
-    //         label={ctx.label}
-    //         to={`api/${version.version === 'current' ? 'next' : version.version}/${ctx.to}`}
-    //     />
-    // );
 }
 
 const ComponentTypes = {

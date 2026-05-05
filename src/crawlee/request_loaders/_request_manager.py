@@ -37,7 +37,7 @@ class RequestManager(RequestLoader, ABC):
                 of the manager.
 
         Returns:
-            Information about the request addition to the manager, or None if the request was not added.
+            Information about the request addition to the manager or None if the request was not added.
         """
 
     async def add_requests(
@@ -64,7 +64,7 @@ class RequestManager(RequestLoader, ABC):
         processed_requests = list[ProcessedRequest]()
         for request in requests:
             processed_request = await self.add_request(request, forefront=forefront)
-            if processed_request is not None:
+            if processed_request:
                 processed_requests.append(processed_request)
 
     @abstractmethod

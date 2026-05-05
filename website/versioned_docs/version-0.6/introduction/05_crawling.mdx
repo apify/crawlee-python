@@ -1,0 +1,50 @@
+---
+id: crawling
+title: Crawling
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import CrawlingListingExample from '!!raw-loader!roa-loader!./code_examples/05_crawling_listing.py';
+import CrawlingDetailExample from '!!raw-loader!roa-loader!./code_examples/05_crawling_detail.py';
+
+To crawl the whole [Warehouse store example](https://warehouse-theme-metal.myshopify.com/collections) and find all the data, you first need to visit all the pages with products - going through all categories available and also all the product detail pages.
+
+## Crawling the listing pages
+
+In previous lessons, you used the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> function like this:
+
+```python
+await enqueue_links()
+```
+
+While useful in that scenario, you need something different now. Instead of finding all the `<a href="..">` elements with links to the same hostname, you need to find only the specific ones that will take your crawler to the next page of results. Otherwise, the crawler will visit a lot of other pages that you're not interested in. Using the power of DevTools and yet another <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> parameter, this becomes fairly easy.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {CrawlingListingExample}
+</RunnableCodeBlock>
+
+The code should look pretty familiar to you. It's a very simple request handler where we log the currently processed URL to the console and enqueue more links. But there are also a few new, interesting additions. Let's break it down.
+
+### The `selector` parameter of `enqueue_links`
+
+When you previously used <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink>, you were not providing any `selector` parameter, and it was fine, because you wanted to use the default value, which is `a` - finds all `<a>` elements. But now, you need to be more specific. There are multiple `<a>` links on the `Categories` page, and you're only interested in those that will take your crawler to the available list of results. Using the DevTools, you'll find that you can select the links you need using the `.collection-block-item` selector, which selects all the elements that have the `class=collection-block-item` attribute.
+
+### The `label` of `enqueue_links`
+
+You will see `label` used often throughout Crawlee, as it's a convenient way of labelling a <ApiLink to="class/Request">`Request`</ApiLink> instance for quick identification later. You can access it with `request.label` and it's a `string`. You can name your requests any way you want. Here, we used the label `CATEGORY` to note that we're enqueueing pages that represent a category of products. The <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> function will add this label to all requests before enqueueing them to the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>. Why this is useful will become obvious in a minute.
+
+## Crawling the detail pages
+
+In a similar fashion, you need to collect all the URLs to the product detail pages, because only from there you can scrape all the data you need. The following code only repeats the concepts you already know for another set of links.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {CrawlingDetailExample}
+</RunnableCodeBlock>
+
+The crawling code is now complete. When you run the code, you'll see the crawler visit all the listing URLs and all the detail URLs.
+
+## Next steps
+
+This concludes the Crawling lesson, because you have taught the crawler to visit all the pages it needs. Let's continue with scraping data.

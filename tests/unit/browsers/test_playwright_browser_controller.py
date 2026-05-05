@@ -12,6 +12,7 @@ from crawlee.browsers import PlaywrightBrowserController, PlaywrightPersistentBr
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+    from pathlib import Path
 
     from yarl import URL
 
@@ -152,3 +153,19 @@ async def test_max_open_pages_limit_error_on_concurrent_creation(controller: Pla
     """Test that max open pages limit is respected during concurrent page creation."""
     with pytest.raises(ValueError, match=r'Cannot open more pages in this browser.'):
         await asyncio.gather(controller.new_page(), controller.new_page(), controller.new_page())
+
+
+async def test_browser_with_pre_existing_context(tmp_path: Path) -> None:
+    """Test that using `Browser` with pre-existing active context re-uses such context."""
+    async with async_playwright() as pw:
+        persistent_context = await pw.firefox.launch_persistent_context(
+            user_data_dir=str(tmp_path),
+            headless=True,
+        )
+        browser = persistent_context.browser
+        assert browser
+
+        controller = PlaywrightBrowserController(browser=browser)
+        page_1 = await controller.new_page()
+        page_2 = await controller.new_page()
+        assert page_1.context == page_2.context == persistent_context

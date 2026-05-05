@@ -1,7 +1,7 @@
 ---
 id: request-router
 title: Request router
-description: Learn how to use the Router class to organize request handlers, error handlers, and pre-navigation hooks in Crawlee.
+description: Learn how to use the Router class to organize request handlers, middleware, error handlers, and pre-navigation hooks in Crawlee.
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
@@ -16,6 +16,7 @@ import ErrorHandler from '!!raw-loader!roa-loader!./code_examples/request_router
 import FailedRequestHandler from '!!raw-loader!roa-loader!./code_examples/request_router/failed_request_handler.py';
 import PlaywrightPreNavigation from '!!raw-loader!roa-loader!./code_examples/request_router/playwright_pre_navigation.py';
 import AdaptiveCrawlerHandlers from '!!raw-loader!roa-loader!./code_examples/request_router/adaptive_crawler_handlers.py';
+import RouterMiddleware from '!!raw-loader!roa-loader!./code_examples/request_router/router_middleware.py';
 
 The <ApiLink to="class/Router">`Router`</ApiLink> class manages request flow and coordinates the execution of user-defined logic in Crawlee projects. It routes incoming requests to appropriate user-defined handlers based on labels, manages error scenarios, and provides hooks for pre-navigation execution. The <ApiLink to="class/Router">`Router`</ApiLink> serves as the orchestrator for all crawling operations, ensuring that each request is processed by the correct handler according to its type and label.
 
@@ -55,6 +56,14 @@ More complex crawling projects often require different processing logic for vari
 
 <RunnableCodeBlock className="language-python" language="python">
     {BasicRequestHandlers}
+</RunnableCodeBlock>
+
+## Middleware
+
+Middlewares are functions registered with <ApiLink to="class/Router#use">`router.use()`</ApiLink> that execute before the matched request handler on every request, regardless of the request label. Multiple middlewares can be registered and are executed sequentially in the order they were registered. If a middleware raises an exception, the execution chain is interrupted and the handler is not called.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {RouterMiddleware}
 </RunnableCodeBlock>
 
 ## Error handlers
@@ -107,6 +116,6 @@ The <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</A
 
 ## Conclusion
 
-This guide introduced you to the <ApiLink to="class/Router">`Router`</ApiLink> class and how to organize your crawling logic. You learned how to use built-in and custom routers, implement request handlers with label-based routing, handle errors with error and failed request handlers, and configure pre-navigation hooks for different crawler types.
+This guide introduced you to the <ApiLink to="class/Router">`Router`</ApiLink> class and how to organize your crawling logic. You learned how to use built-in and custom routers, implement request handlers with label-based routing, add middleware with <ApiLink to="class/Router#use">`router.use()`</ApiLink>, handle errors with error and failed request handlers, and configure pre-navigation hooks for different crawler types.
 
 If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!

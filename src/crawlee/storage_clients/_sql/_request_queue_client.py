@@ -8,13 +8,13 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import CursorResult, exists, func, or_, select, update
-from sqlalchemy import func as sql_func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only
 from typing_extensions import NotRequired, Self, override
 
 from crawlee import Request
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.retry import retry_on_error
 from crawlee.storage_clients._base import RequestQueueClient
 from crawlee.storage_clients.models import (
     AddRequestsResponse,
@@ -162,6 +162,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             },
         )
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def get_metadata(self) -> RequestQueueMetadata:
         # The database is a single place of truth
@@ -169,6 +170,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         self._had_multiple_clients = metadata.had_multiple_clients
         return metadata
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def drop(self) -> None:
         """Delete this request queue and all its records from the database.
@@ -179,6 +181,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
         self._pending_fetch_cache.clear()
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def purge(self) -> None:
         """Remove all items from this dataset while keeping the dataset structure.
@@ -391,6 +394,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             unprocessed_requests=unprocessed_requests,
         )
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def get_request(self, unique_key: str) -> Request | None:
         request_id = self._get_int_id_from_unique_key(unique_key)
@@ -410,6 +414,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
         return Request.model_validate_json(request_db.data)
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def fetch_next_request(self) -> Request | None:
         if self._pending_fetch_cache:
@@ -430,6 +435,8 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             .order_by(self._ITEM_TABLE.sequence_number.asc())
             .limit(self._MAX_BATCH_FETCH_SIZE)
         )
+
+        requests_db = None
 
         async with self.get_session(with_simple_commit=True) as session:
             # We use the `skip_locked` database mechanism to prevent the 'interception' of requests by another client
@@ -483,6 +490,9 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
             await self._add_buffer_record(session)
 
+        if not requests_db:
+            return None
+
         requests = [Request.model_validate_json(r.data) for r in requests_db if r.request_id in blocked_ids]
 
         if not requests:
@@ -492,6 +502,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
 
         return requests[0]
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         request_id = self._get_int_id_from_unique_key(request.unique_key)
@@ -523,6 +534,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             was_already_handled=True,
         )
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def reclaim_request(
         self,
@@ -580,6 +592,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
             was_already_handled=False,
         )
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def is_empty(self) -> bool:
         # Check in-memory cache for requests
@@ -778,22 +791,20 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
     @override
     async def _apply_buffer_updates(self, session: AsyncSession, max_buffer_id: int) -> None:
         aggregations: list[ColumnElement[Any]] = [
-            sql_func.max(self._BUFFER_TABLE.accessed_at).label('max_accessed_at'),
-            sql_func.max(self._BUFFER_TABLE.modified_at).label('max_modified_at'),
-            sql_func.sum(self._BUFFER_TABLE.delta_handled_count).label('delta_handled_count'),
-            sql_func.sum(self._BUFFER_TABLE.delta_pending_count).label('delta_pending_count'),
-            sql_func.sum(self._BUFFER_TABLE.delta_total_count).label('delta_total_count'),
+            func.max(self._BUFFER_TABLE.accessed_at).label('max_accessed_at'),
+            func.max(self._BUFFER_TABLE.modified_at).label('max_modified_at'),
+            func.sum(self._BUFFER_TABLE.delta_handled_count).label('delta_handled_count'),
+            func.sum(self._BUFFER_TABLE.delta_pending_count).label('delta_pending_count'),
+            func.sum(self._BUFFER_TABLE.delta_total_count).label('delta_total_count'),
         ]
 
         if not self._had_multiple_clients:
-            aggregations.append(
-                sql_func.count(sql_func.distinct(self._BUFFER_TABLE.client_id)).label('unique_clients_count')
-            )
+            aggregations.append(func.count(func.distinct(self._BUFFER_TABLE.client_id)).label('unique_clients_count'))
 
         if self._storage_client.get_dialect_name() == 'postgresql':
-            aggregations.append(sql_func.bool_or(self._BUFFER_TABLE.need_recalc).label('need_recalc'))
+            aggregations.append(func.bool_or(self._BUFFER_TABLE.need_recalc).label('need_recalc'))
         else:
-            aggregations.append(sql_func.max(self._BUFFER_TABLE.need_recalc).label('need_recalc'))
+            aggregations.append(func.max(self._BUFFER_TABLE.need_recalc).label('need_recalc'))
 
         aggregation_stmt = select(*aggregations).where(
             self._BUFFER_TABLE.storage_id == self._id, self._BUFFER_TABLE.id <= max_buffer_id

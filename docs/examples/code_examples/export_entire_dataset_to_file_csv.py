@@ -1,4 +1,5 @@
 import asyncio
+import csv
 
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
@@ -31,7 +32,7 @@ async def main() -> None:
 
     # Export the entire dataset to a CSV file.
     # Use semicolon as delimiter and always quote strings.
-    await crawler.export_data(path='results.csv', delimiter=';', quoting='all')
+    await crawler.export_data(path='results.csv', delimiter=';', quoting=csv.QUOTE_ALL)
 
 
 if __name__ == '__main__':

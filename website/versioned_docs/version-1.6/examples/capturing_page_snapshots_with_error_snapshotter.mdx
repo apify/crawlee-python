@@ -1,0 +1,27 @@
+---
+id: capturing-page-snapshots-with-error-snapshotter
+title: Capturing page snapshots with ErrorSnapshotter
+description: How to capture page snapshots on errors.
+---
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+import ApiLink from '@site/src/components/ApiLink';
+import ParselCrawlerWithErrorSnapshotter from '!!raw-loader!roa-loader!./code_examples/parsel_crawler_with_error_snapshotter.py';
+import PlaywrightCrawlerWithErrorSnapshotter from '!!raw-loader!roa-loader!./code_examples/playwright_crawler_with_error_snapshotter.py';
+
+
+This example demonstrates how to capture page snapshots on first occurrence of each unique error. The capturing happens automatically if you set `save_error_snapshots=True` in the crawler's <ApiLink to="class/Statistics">`Statistics`</ApiLink>. The error snapshot can contain `html` file and `jpeg` file that are created from the page where the unhandled exception was raised. Captured error snapshot files are saved to the default key-value store. Both <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> and [HTTP crawlers](../guides/http-crawlers) are capable of capturing the html file, but only <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> is able to capture page screenshot as well.
+
+<Tabs>
+    <TabItem value="ParselCrawler" label="ParselCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            { ParselCrawlerWithErrorSnapshotter }
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            { PlaywrightCrawlerWithErrorSnapshotter }
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>

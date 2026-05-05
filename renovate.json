@@ -1,10 +1,12 @@
 {
     "extends": ["config:base", ":semanticCommitTypeAll(chore)"],
-    "ignorePaths": ["docs/**", "src/crawlee/project_template/**"],
+    "ignorePaths": ["docs/**", "src/crawlee/project_template/**", "website/versioned_docs/**"],
     "pinVersions": false,
     "separateMajorMinor": false,
     "dependencyDashboard": false,
     "semanticCommits": "enabled",
+    "minimumReleaseAge": "1 day",
+    "internalChecksFilter": "strict",
     "lockFileMaintenance": {
         "enabled": true,
         "automerge": true,
@@ -19,6 +21,10 @@
             "groupSlug": "dev-dependencies",
             "automerge": true,
             "automergeType": "branch"
+        },
+        {
+            "matchPackageNames": ["@apify/*", "@crawlee/*", "apify", "apify-client", "apify-shared", "apify-fingerprint-datapoints", "crawlee", "got-scraping"],
+            "minimumReleaseAge": "0 days"
         }
     ],
     "schedule": ["before 7am every weekday"],

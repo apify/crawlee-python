@@ -1,6 +1,8 @@
 from crawlee._utils.try_import import install_import_hook as _install_import_hook
 from crawlee._utils.try_import import try_import as _try_import
 
+from ._types import BrowserType, CrawleePage
+
 _install_import_hook(__name__)
 
 
@@ -15,4 +17,12 @@ with _try_import(__name__, 'PlaywrightBrowserPlugin'):
 with _try_import(__name__, 'PlaywrightPersistentBrowser'):
     from ._playwright_browser import PlaywrightPersistentBrowser
 
-__all__ = ['BrowserPool', 'PlaywrightBrowserController', 'PlaywrightBrowserPlugin', 'PlaywrightPersistentBrowser']
+
+__all__ = [
+    'BrowserPool',
+    'BrowserType',
+    'CrawleePage',
+    'PlaywrightBrowserController',
+    'PlaywrightBrowserPlugin',
+    'PlaywrightPersistentBrowser',
+]

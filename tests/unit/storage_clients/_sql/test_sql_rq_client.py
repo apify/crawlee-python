@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import inspect, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from crawlee import Request
@@ -233,3 +235,45 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
         assert {request1.url, request2.url} == {'https://example.com/1', 'https://example.com/2'}
 
         await reopened_client.drop()
+
+
+async def test_error_handling_on_get_metadata_failure(rq_client: SqlRequestQueueClient) -> None:
+    """Test that get_metadata properly handles SQL errors and retries."""
+    with patch(
+        'crawlee.storage_clients._sql._request_queue_client.SqlRequestQueueClient.get_session',
+    ) as mock_get_session:
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.execute = AsyncMock(side_effect=SQLAlchemyError('db error'))
+        mock_get_session.return_value = mock_session
+
+        with (
+            patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
+            pytest.raises(SQLAlchemyError),
+        ):
+            await rq_client.get_metadata()
+
+    # Verify that retry logic was attempted
+    assert mock_sleep.call_count == 2  # Assuming default max_attempts=3
+
+
+async def test_get_metadata_does_not_retry_on_unexpected_exception(rq_client: SqlRequestQueueClient) -> None:
+    """Test that get_metadata does not retry on unexpected exceptions."""
+    with patch(
+        'crawlee.storage_clients._sql._request_queue_client.SqlRequestQueueClient.get_session',
+    ) as mock_get_session:
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.execute = AsyncMock(side_effect=ValueError('unexpected error'))
+        mock_get_session.return_value = mock_session
+
+        with (
+            patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
+            pytest.raises(ValueError, match='unexpected error'),
+        ):
+            await rq_client.get_metadata()
+
+    # Verify that retry logic was not attempted
+    assert mock_sleep.call_count == 0

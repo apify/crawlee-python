@@ -1,0 +1,15 @@
+---
+id: beautifulsoup-crawler
+title: BeautifulSoup crawler
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import BeautifulSoupExample from '!!raw-loader!roa-loader!./code_examples/beautifulsoup_crawler.py';
+
+This example demonstrates how to use <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> to crawl a list of URLs, load each URL using a plain HTTP request, parse the HTML using the [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library and extract some data from it - the page title and all `<h1>`, `<h2>` and `<h3>` tags. This setup is perfect for scraping specific elements from web pages. Thanks to the well-known BeautifulSoup, you can easily navigate the HTML structure and retrieve the data you need with minimal code. It also shows how you can add optional pre-navigation hook to the crawler. Pre-navigation hooks are user defined functions that execute before sending the request.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {BeautifulSoupExample}
+</RunnableCodeBlock>
