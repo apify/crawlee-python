@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 
 def parse_retry_after_header(value: str | None) -> timedelta | None:
@@ -31,6 +34,7 @@ def parse_retry_after_header(value: str | None) -> timedelta | None:
         delay = retry_date - datetime.now(retry_date.tzinfo or timezone.utc)
         if delay.total_seconds() > 0:
             return delay
+        logger.debug(f'Retry-After HTTP-date {value!r} is in the past; ignoring.')
     except (ValueError, TypeError):
         pass
 

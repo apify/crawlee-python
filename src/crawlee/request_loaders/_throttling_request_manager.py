@@ -58,7 +58,7 @@ class _DomainState:
     domain: str
     """The domain being tracked."""
 
-    throttled_until: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    throttled_until: datetime = field(default_factory=lambda: datetime.min.replace(tzinfo=timezone.utc))
     """Earliest time the next request to this domain is allowed."""
 
     consecutive_429_count: int = 0
@@ -91,8 +91,9 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
     Example:
         ```python
-        from crawlee.storages import RequestQueue
+        from crawlee.crawlers import BasicCrawler
         from crawlee.request_loaders import ThrottlingRequestManager
+        from crawlee.storages import RequestQueue
 
         queue = await RequestQueue.open()
         throttler = ThrottlingRequestManager(
@@ -136,7 +137,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         self._base_delay = base_delay
         self._max_delay = max_delay
         self._request_manager_opener = request_manager_opener
-        self._domain_states: dict[str, _DomainState] = {d.lower(): _DomainState(domain=d.lower()) for d in domains}
+        self._domain_states: dict[str, _DomainState] = {d.lower(): _DomainState(domain=d.lower()) for d in domains if d}
         self._sub_managers: dict[str, TRequestManager] = {}
         self._new_work_event = asyncio.Event()
         """Set whenever a request is added or reclaimed. Lets `fetch_next_request` wake from a throttle
@@ -238,6 +239,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             delay_seconds: The crawl-delay value in seconds.
         """
         state = self._get_domain_state(url)
+        # Why: the delay is locked once set so robots.txt re-fetches (e.g. after LRU eviction) can't change the
+        # in-flight dispatch cadence and cause oscillation mid-crawl.
         if state is None or state.crawl_delay is not None:
             return
 
@@ -368,7 +371,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         else:
             result = await self._inner.mark_request_as_handled(request)
 
-        self.record_success(request.url)
+        if state is not None:
+            self.record_success(request.url)
         return result
 
     @override
