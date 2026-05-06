@@ -25,7 +25,7 @@ async def main() -> None:
         context.log.info(f'Processing {context.request.url}')
 
     # Add requests. Listed domains are routed directly to their
-    # throttled sub-queues. Others go to the main queue.
+    # throttled sub-managers. Others go to the inner manager.
     await throttler.add_requests(
         [
             'https://api.example.com/data',

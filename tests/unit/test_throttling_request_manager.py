@@ -57,32 +57,32 @@ def _make_request(url: str) -> Request:
 # ── Request Routing Tests ─────────────────────────────────
 
 
-async def test_add_request_routes_listed_domain_to_sub_queue(
+async def test_add_request_routes_listed_domain_to_sub_manager(
     manager: ThrottlingRequestManager[RequestQueue],
     inner_queue: RequestQueue,
 ) -> None:
-    """Requests for listed domains should be routed to their sub-queue, not inner."""
+    """Requests for listed domains should be routed to their sub-manager, not inner."""
     request = _make_request(f'https://{THROTTLED_DOMAIN}/page1')
     await manager.add_request(request)
 
-    # Inner queue should be empty — the request went to a sub-queue.
+    # Inner manager should be empty — the request went to a sub-manager.
     assert await inner_queue.is_empty()
-    assert THROTTLED_DOMAIN in manager._sub_queues
+    assert THROTTLED_DOMAIN in manager._sub_managers
 
-    # The sub-queue should have the request.
-    assert await manager._sub_queues[THROTTLED_DOMAIN].get_total_count() == 1
+    # The sub-manager should have the request.
+    assert await manager._sub_managers[THROTTLED_DOMAIN].get_total_count() == 1
 
 
 async def test_add_request_routes_non_listed_domain_to_inner(
     manager: ThrottlingRequestManager[RequestQueue],
     inner_queue: RequestQueue,
 ) -> None:
-    """Requests for non-listed domains should go to the inner queue."""
+    """Requests for non-listed domains should go to the inner manager."""
     request = _make_request(f'https://{NON_THROTTLED_DOMAIN}/page1')
     await manager.add_request(request)
 
     assert not await inner_queue.is_empty()
-    assert NON_THROTTLED_DOMAIN not in manager._sub_queues
+    assert NON_THROTTLED_DOMAIN not in manager._sub_managers
 
 
 async def test_add_request_with_string_url(
@@ -92,8 +92,8 @@ async def test_add_request_with_string_url(
     url = f'https://{THROTTLED_DOMAIN}/page1'
     await manager.add_request(url)
 
-    assert THROTTLED_DOMAIN in manager._sub_queues
-    assert await manager._sub_queues[THROTTLED_DOMAIN].get_total_count() == 1
+    assert THROTTLED_DOMAIN in manager._sub_managers
+    assert await manager._sub_managers[THROTTLED_DOMAIN].get_total_count() == 1
 
 
 async def test_add_requests_routes_mixed_domains(
@@ -109,9 +109,9 @@ async def test_add_requests_routes_mixed_domains(
     # Inner gets the non-listed domain request.
     assert not await inner_queue.is_empty()
 
-    # Sub-queue gets the listed domain request.
-    assert THROTTLED_DOMAIN in manager._sub_queues
-    assert await manager._sub_queues[THROTTLED_DOMAIN].get_total_count() == 1
+    # Sub-manager gets the listed domain request.
+    assert THROTTLED_DOMAIN in manager._sub_managers
+    assert await manager._sub_managers[THROTTLED_DOMAIN].get_total_count() == 1
 
 
 # ── Core Throttling Tests ─────────────────────────────────
@@ -230,10 +230,10 @@ async def test_crawl_delay_throttles_after_dispatch(manager: ThrottlingRequestMa
 # ── Fetch Scheduling Tests ────────────────────────────
 
 
-async def test_fetch_from_unthrottled_sub_queue(
+async def test_fetch_from_unthrottled_sub_manager(
     manager: ThrottlingRequestManager[RequestQueue],
 ) -> None:
-    """fetch_next_request should return from an unthrottled sub-queue."""
+    """fetch_next_request should return from an unthrottled sub-manager."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     await manager.add_request(url)
 
@@ -246,7 +246,7 @@ async def test_fetch_from_unthrottled_sub_queue(
 async def test_fetch_falls_back_to_inner(
     manager: ThrottlingRequestManager[RequestQueue],
 ) -> None:
-    """When sub-queues are empty, should return from inner queue."""
+    """When sub-managers are empty, should return from inner manager."""
     url = f'https://{NON_THROTTLED_DOMAIN}/page1'
     await manager.add_request(url)
 
@@ -256,10 +256,10 @@ async def test_fetch_falls_back_to_inner(
     assert result.url == url
 
 
-async def test_fetch_skips_throttled_sub_queue(
+async def test_fetch_skips_throttled_sub_manager(
     manager: ThrottlingRequestManager[RequestQueue],
 ) -> None:
-    """Should skip throttled sub-queues and fall through to inner."""
+    """Should skip throttled sub-managers and fall through to inner."""
     # Add a request to the throttled domain and mark it as throttled.
     throttled_url = f'https://{THROTTLED_DOMAIN}/page1'
     free_url = f'https://{NON_THROTTLED_DOMAIN}/page1'
@@ -302,10 +302,10 @@ async def test_sleep_when_all_throttled(manager: ThrottlingRequestManager[Reques
 # ── Delegation Tests ────────────────────────────────────
 
 
-async def test_reclaim_request_routes_to_sub_queue(
+async def test_reclaim_request_routes_to_sub_manager(
     manager: ThrottlingRequestManager[RequestQueue],
 ) -> None:
-    """reclaim_request should route to sub-queue for listed domains."""
+    """reclaim_request should route to sub-manager for listed domains."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     await manager.add_request(url)
 
@@ -315,8 +315,8 @@ async def test_reclaim_request_routes_to_sub_queue(
 
     await manager.reclaim_request(request)
 
-    # Should be back in the sub-queue.
-    assert not await manager._sub_queues[THROTTLED_DOMAIN].is_empty()
+    # Should be back in the sub-manager.
+    assert not await manager._sub_managers[THROTTLED_DOMAIN].is_empty()
 
 
 async def test_reclaim_request_routes_to_inner(
@@ -332,14 +332,14 @@ async def test_reclaim_request_routes_to_inner(
 
     await manager.reclaim_request(request)
 
-    # Should be back in inner queue.
+    # Should be back in inner manager.
     assert not await inner_queue.is_empty()
 
 
-async def test_mark_request_as_handled_routes_to_sub_queue(
+async def test_mark_request_as_handled_routes_to_sub_manager(
     manager: ThrottlingRequestManager[RequestQueue],
 ) -> None:
-    """mark_request_as_handled should route to sub-queue for listed domains."""
+    """mark_request_as_handled should route to sub-manager for listed domains."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     await manager.add_request(url)
 
@@ -348,7 +348,7 @@ async def test_mark_request_as_handled_routes_to_sub_queue(
 
     await manager.mark_request_as_handled(request)
 
-    assert await manager._sub_queues[THROTTLED_DOMAIN].get_handled_count() == 1
+    assert await manager._sub_managers[THROTTLED_DOMAIN].get_handled_count() == 1
 
 
 async def test_mark_request_as_handled_routes_to_inner(
@@ -368,7 +368,7 @@ async def test_mark_request_as_handled_routes_to_inner(
 
 
 async def test_get_handled_count_aggregates(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """get_handled_count should sum inner and all sub-queues."""
+    """get_handled_count should sum inner and all sub-managers."""
     throttled_url = f'https://{THROTTLED_DOMAIN}/page1'
     free_url = f'https://{NON_THROTTLED_DOMAIN}/page1'
 
@@ -388,7 +388,7 @@ async def test_get_handled_count_aggregates(manager: ThrottlingRequestManager[Re
 
 
 async def test_get_total_count_aggregates(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """get_total_count should sum inner and all sub-queues."""
+    """get_total_count should sum inner and all sub-managers."""
     throttled_url = f'https://{THROTTLED_DOMAIN}/page1'
     free_url = f'https://{NON_THROTTLED_DOMAIN}/page1'
 
@@ -399,7 +399,7 @@ async def test_get_total_count_aggregates(manager: ThrottlingRequestManager[Requ
 
 
 async def test_is_empty_aggregates(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """is_empty should return False if any queue has requests."""
+    """is_empty should return False if any manager has requests."""
     assert await manager.is_empty() is True
 
     await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
@@ -407,7 +407,7 @@ async def test_is_empty_aggregates(manager: ThrottlingRequestManager[RequestQueu
 
 
 async def test_is_finished_aggregates(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """is_finished should return True only when all queues are finished."""
+    """is_finished should return True only when all managers are finished."""
     assert await manager.is_finished() is True
 
     url = f'https://{THROTTLED_DOMAIN}/page1'
@@ -424,14 +424,14 @@ async def test_is_finished_aggregates(manager: ThrottlingRequestManager[RequestQ
 async def test_drop_clears_all(
     manager: ThrottlingRequestManager[RequestQueue],
 ) -> None:
-    """drop should clear inner, all sub-queues."""
+    """drop should clear inner and all sub-managers."""
     await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
 
-    assert THROTTLED_DOMAIN in manager._sub_queues
+    assert THROTTLED_DOMAIN in manager._sub_managers
 
     await manager.drop()
 
-    assert len(manager._sub_queues) == 0
+    assert len(manager._sub_managers) == 0
 
 
 async def test_recreate_purged(
@@ -444,7 +444,7 @@ async def test_recreate_purged(
 
     # Same domains should be configured.
     assert THROTTLED_DOMAIN in new_manager._domain_states
-    # But queues should be empty.
+    # But managers should be empty.
     assert await new_manager.is_empty()
 
 

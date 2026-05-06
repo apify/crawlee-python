@@ -15,7 +15,7 @@ When crawling websites that enforce rate limits (HTTP 429) or specify `crawl-del
 
 The <ApiLink to="class/ThrottlingRequestManager">`ThrottlingRequestManager`</ApiLink> wraps a <ApiLink to="class/RequestManager">`RequestManager`</ApiLink> (typically a <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>) and manages per-domain throttling. You specify which domains to throttle at initialization, and the manager automatically:
 
-- **Routes requests** for listed domains into dedicated sub-queues at insertion time.
+- **Routes requests** for listed domains into dedicated sub-managers at insertion time.
 - **Enforces delays** from HTTP 429 responses (exponential backoff) and `robots.txt` crawl-delay directives.
 - **Schedules fairly** by fetching from the domain that has been waiting the longest.
 - **Sleeps intelligently** when all configured domains are throttled, instead of busy-waiting.
@@ -32,13 +32,13 @@ To use request throttling, create a <ApiLink to="class/ThrottlingRequestManager"
 
 ## How it works
 
-1. **Insertion-time routing**: When you add requests via `add_request` or `add_requests`, each request is checked against the configured domain list. Matching requests go directly into a per-domain sub-queue; all others go to the main queue. This eliminates request duplication entirely.
+1. **Insertion-time routing**: When you add requests via `add_request` or `add_requests`, each request is checked against the configured domain list. Matching requests go directly into a per-domain sub-manager; all others go to the inner manager. This eliminates request duplication entirely.
 
 2. **429 backoff**: When the crawler detects an HTTP 429 response, the `ThrottlingRequestManager` records an exponential backoff delay for that domain (starting at 2s, doubling up to 60s). If the response includes a `Retry-After` header, that value takes priority.
 
 3. **Crawl-delay**: If `robots.txt` specifies a `crawl-delay`, the manager enforces a minimum interval between requests to that domain.
 
-4. **Fair scheduling**: `fetch_next_request` sorts available sub-queues by how long each domain has been waiting, ensuring no domain is starved.
+4. **Fair scheduling**: `fetch_next_request` sorts available sub-managers by how long each domain has been waiting, ensuring no domain is starved.
 
 :::tip
 
