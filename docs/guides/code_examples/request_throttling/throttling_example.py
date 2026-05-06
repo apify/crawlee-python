@@ -9,8 +9,8 @@ async def main() -> None:
     # Open the default request queue.
     queue = await RequestQueue.open()
 
-    # Wrap it with ThrottlingRequestManager for specific domains.
-    # The throttler uses the same storage backend as the underlying queue.
+    # Wrap it with ThrottlingRequestManager for specific domains. The throttler uses the
+    # same storage backend as the underlying queue.
     throttler = ThrottlingRequestManager(
         queue,
         domains=['api.example.com', 'slow-site.org'],
@@ -24,8 +24,8 @@ async def main() -> None:
     async def handler(context: BasicCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url}')
 
-    # Add requests. Listed domains are routed directly to their
-    # throttled sub-managers. Others go to the inner manager.
+    # Add requests. Listed domains are routed directly to their throttled sub-managers.
+    # Others go to the inner manager.
     await throttler.add_requests(
         [
             'https://api.example.com/data',

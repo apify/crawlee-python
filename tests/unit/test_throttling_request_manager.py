@@ -246,7 +246,7 @@ async def test_crawl_delay_throttles_after_dispatch(manager: ThrottlingRequestMa
     url = f'https://{THROTTLED_DOMAIN}/page1'
     manager.set_crawl_delay(url, 5)
 
-    manager._mark_domain_dispatched(url)
+    manager._mark_domain_dispatched(THROTTLED_DOMAIN)
 
     assert manager._is_domain_throttled(THROTTLED_DOMAIN)
 

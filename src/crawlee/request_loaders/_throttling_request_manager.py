@@ -34,40 +34,6 @@ logger = getLogger(__name__)
 TRequestManager = TypeVar('TRequestManager', bound=RequestManager)
 
 
-class _RequestManagerOpener(Protocol[TRequestManager]):
-    """Callable that opens a `RequestManager` instance.
-
-    Matches the keyword-only signature shared by storage `open` classmethods such as `RequestQueue.open`.
-    `ThrottlingRequestManager` invokes the opener both during `recreate_purged` (for the inner manager) and at
-    sub-manager creation time, so the inner manager and every sub-manager share the same backing type.
-    """
-
-    async def __call__(
-        self,
-        *,
-        alias: str | None = ...,
-        storage_client: StorageClient | None = ...,
-        configuration: Configuration | None = ...,
-    ) -> TRequestManager: ...
-
-
-@dataclass
-class _DomainState:
-    """Tracks delay state for a single domain."""
-
-    domain: str
-    """The domain being tracked."""
-
-    throttled_until: datetime = field(default_factory=lambda: datetime.min.replace(tzinfo=timezone.utc))
-    """Earliest time the next request to this domain is allowed."""
-
-    consecutive_429_count: int = 0
-    """Number of consecutive 429 responses (for exponential backoff)."""
-
-    crawl_delay: timedelta | None = None
-    """Minimum interval between requests, used to push `throttled_until` on dispatch."""
-
-
 @docs_group('Request loaders')
 class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     """A request manager that wraps another and enforces per-domain delays.
@@ -118,8 +84,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """Initialize the throttling manager.
 
         Args:
-            inner: The underlying request manager to wrap (typically a `RequestQueue`). Requests for
-                non-throttled domains are stored here.
+            inner: The underlying request manager to wrap (typically a `RequestQueue`). Requests for non-throttled
+                domains are stored here.
             domains: Explicit list of domain hostnames to throttle. Only requests matching these domains will be routed
                 to per-domain sub-managers. Matching is case-insensitive (hostnames are lowercased) and exact: subdomain
                 wildcards such as `*.example.com` are not supported — list each subdomain explicitly if needed.
@@ -127,8 +93,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 recreate the inner manager during `recreate_purged`. Must accept `alias`, `storage_client`, and
                 `configuration` keyword arguments and return the same concrete subclass as `inner` (e.g.
                 `RequestQueue.open` when `inner` is a `RequestQueue`).
-            service_locator: Service locator for creating sub-managers. If not provided, defaults to the global
-                service locator, ensuring consistency with the crawler's storage backend.
+            service_locator: Service locator for creating sub-managers. If not provided, defaults to the global service
+                locator, ensuring consistency with the crawler's storage backend.
             base_delay: Initial delay after the first 429 response from a domain.
             max_delay: Maximum delay between requests to a rate-limited domain.
         """
@@ -143,146 +109,9 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """Set whenever a request is added or reclaimed. Lets `fetch_next_request` wake from a throttle
         wait early when fresh work appears, instead of sleeping for the full computed cooldown."""
 
-    @staticmethod
-    def _extract_domain(url: str) -> str:
-        """Extract the domain (hostname) from a URL."""
-        return URL(url).host or ''
-
-    @staticmethod
-    def _get_url_from_request(request: str | Request) -> str:
-        """Extract URL string from a request that may be a string or Request object."""
-        return request if isinstance(request, str) else request.url
-
-    def _get_domain_state(self, url: str) -> _DomainState | None:
-        """Look up the per-domain state for the given URL, if the domain is configured."""
-        domain = self._extract_domain(url)
-        return self._domain_states.get(domain) if domain else None
-
-    async def _get_or_create_sub_manager(self, domain: str) -> TRequestManager:
-        """Get or create a per-domain sub-manager using the configured `request_manager_opener`."""
-        if domain not in self._sub_managers:
-            self._sub_managers[domain] = await self._request_manager_opener(
-                alias=f'throttled-{domain}',
-                storage_client=self._service_locator.get_storage_client(),
-                configuration=self._service_locator.get_configuration(),
-            )
-        return self._sub_managers[domain]
-
-    def _is_domain_throttled(self, domain: str) -> bool:
-        """Check if a domain is currently throttled."""
-        state = self._domain_states.get(domain)
-        if state is None:
-            return False
-        return datetime.now(timezone.utc) < state.throttled_until
-
-    def _get_earliest_available_time(self) -> datetime:
-        """Get the earliest time any throttled domain becomes available."""
-        now = datetime.now(timezone.utc)
-        earliest = now + self._max_delay
-
-        for state in self._domain_states.values():
-            if now < state.throttled_until < earliest:
-                earliest = state.throttled_until
-
-        return earliest
-
-    def record_domain_delay(self, url: str, *, retry_after: timedelta | None = None) -> None:
-        """Record a 429 Too Many Requests response for the domain of the given URL.
-
-        Increments the consecutive 429 count and calculates the next allowed request time using exponential backoff or
-        the `Retry-After` value.
-
-        Args:
-            url: The URL that received a 429 response.
-            retry_after: Optional delay from the `Retry-After` header. If provided, it takes priority over the
-                calculated exponential backoff.
-        """
-        state = self._get_domain_state(url)
-        if state is None:
-            return
-
-        state.consecutive_429_count += 1
-        delay = retry_after if retry_after is not None else self._base_delay * (2 ** (state.consecutive_429_count - 1))
-        if delay > self._max_delay:
-            source = 'Retry-After header' if retry_after is not None else 'exponential backoff'
-            logger.warning(
-                f'Capping {source} delay of {delay.total_seconds():.1f}s for domain "{state.domain}" '
-                f'to max_delay ({self._max_delay.total_seconds():.1f}s); the domain may continue to rate-limit. '
-                f'Consider increasing max_delay if this recurs.'
-            )
-            delay = self._max_delay
-        state.throttled_until = datetime.now(timezone.utc) + delay
-
-        logger.info(
-            f'Rate limit (429) detected for domain "{state.domain}" '
-            f'(consecutive: {state.consecutive_429_count}, delay: {delay.total_seconds():.1f}s)'
-        )
-
-    def record_success(self, url: str) -> None:
-        """Record a successful request, resetting the backoff state for that domain.
-
-        Args:
-            url: The URL that received a successful response.
-        """
-        state = self._get_domain_state(url)
-        if state is not None and state.consecutive_429_count > 0:
-            logger.debug(f'Resetting rate limit state for domain "{state.domain}" after successful request')
-            state.consecutive_429_count = 0
-
-    def set_crawl_delay(self, url: str, delay_seconds: int) -> None:
-        """Set the robots.txt crawl-delay for a domain.
-
-        If the crawl-delay is already set for the domain, this is a no-op.
-
-        Args:
-            url: A URL from the domain to throttle.
-            delay_seconds: The crawl-delay value in seconds.
-        """
-        state = self._get_domain_state(url)
-        # Why: the delay is locked once set so robots.txt re-fetches (e.g. after LRU eviction) can't change the
-        # in-flight dispatch cadence and cause oscillation mid-crawl.
-        if state is None or state.crawl_delay is not None:
-            return
-
-        state.crawl_delay = timedelta(seconds=delay_seconds)
-        logger.debug(f'Set crawl-delay for domain "{state.domain}" to {delay_seconds}s')
-
-    def _mark_domain_dispatched(self, url: str) -> None:
-        """Record that a request to this domain was just dispatched.
-
-        If a crawl-delay is configured, push throttled_until forward by that amount.
-        """
-        state = self._get_domain_state(url)
-        if state is not None and state.crawl_delay is not None:
-            state.throttled_until = datetime.now(timezone.utc) + state.crawl_delay
-
-    async def recreate_purged(self) -> ThrottlingRequestManager[TRequestManager]:
-        """Drop all managers and return a fresh `ThrottlingRequestManager` with the same configuration.
-
-        This is used during crawler purge to reconstruct the throttler with empty managers while preserving the domain
-        configuration and service locator.
-        """
-        await self.drop()
-
-        inner = await self._request_manager_opener(
-            storage_client=self._service_locator.get_storage_client(),
-            configuration=self._service_locator.get_configuration(),
-        )
-
-        return ThrottlingRequestManager(
-            inner,
-            domains=list(self._domain_states.keys()),
-            request_manager_opener=self._request_manager_opener,
-            service_locator=self._service_locator,
-            base_delay=self._base_delay,
-            max_delay=self._max_delay,
-        )
-
     @override
     async def drop(self) -> None:
-        await self._inner.drop()
-        for sm in self._sub_managers.values():
-            await sm.drop()
+        await asyncio.gather(self._inner.drop(), *(sm.drop() for sm in self._sub_managers.values()))
         self._sub_managers.clear()
 
     @override
@@ -301,7 +130,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         else:
             result = await self._inner.add_request(request, forefront=forefront)
 
-        self._new_work_event.set()
+        self._signal_new_work()
         return result
 
     @override
@@ -350,62 +179,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             )
 
         if inner_requests or domain_requests:
-            self._new_work_event.set()
-
-    @override
-    async def reclaim_request(self, request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
-        domain = self._extract_domain(request.url)
-        if domain in self._domain_states and domain in self._sub_managers:
-            result = await self._sub_managers[domain].reclaim_request(request, forefront=forefront)
-        else:
-            result = await self._inner.reclaim_request(request, forefront=forefront)
-
-        self._new_work_event.set()
-        return result
-
-    @override
-    async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
-        state = self._get_domain_state(request.url)
-        if state is not None and state.domain in self._sub_managers:
-            result = await self._sub_managers[state.domain].mark_request_as_handled(request)
-        else:
-            result = await self._inner.mark_request_as_handled(request)
-
-        if state is not None:
-            self.record_success(request.url)
-        return result
-
-    @override
-    async def get_handled_count(self) -> int:
-        count = await self._inner.get_handled_count()
-        for sm in self._sub_managers.values():
-            count += await sm.get_handled_count()
-        return count
-
-    @override
-    async def get_total_count(self) -> int:
-        count = await self._inner.get_total_count()
-        for sm in self._sub_managers.values():
-            count += await sm.get_total_count()
-        return count
-
-    @override
-    async def is_empty(self) -> bool:
-        if not await self._inner.is_empty():
-            return False
-        for sm in self._sub_managers.values():
-            if not await sm.is_empty():
-                return False
-        return True
-
-    @override
-    async def is_finished(self) -> bool:
-        if not await self._inner.is_finished():
-            return False
-        for sm in self._sub_managers.values():
-            if not await sm.is_finished():
-                return False
-        return True
+            self._signal_new_work()
 
     @override
     async def fetch_next_request(self) -> Request | None:
@@ -422,11 +196,12 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             # throttle expires.
             self._new_work_event.clear()
 
+            now = datetime.now(timezone.utc)
             available_domains = sorted(
                 (
                     domain
-                    for domain in self._domain_states
-                    if domain in self._sub_managers and not self._is_domain_throttled(domain)
+                    for domain, state in self._domain_states.items()
+                    if domain in self._sub_managers and now >= state.throttled_until
                 ),
                 key=lambda d: self._domain_states[d].throttled_until,
             )
@@ -434,7 +209,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             for domain in available_domains:
                 req = await self._sub_managers[domain].fetch_next_request()
                 if req:
-                    self._mark_domain_dispatched(req.url)
+                    self._mark_domain_dispatched(domain)
                     return req
 
             request = await self._inner.fetch_next_request()
@@ -448,9 +223,9 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             if all(sub_managers_empty):
                 return None
 
-            earliest = self._get_earliest_available_time()
+            earliest = self._get_earliest_available_time(now)
             sleep_duration = max(
-                (earliest - datetime.now(timezone.utc)).total_seconds(),
+                (earliest - now).total_seconds(),
                 0.1,  # Avoid tight loops if a throttle expired during the previous iteration.
             )
             logger.debug(
@@ -458,6 +233,190 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 f'Waiting up to {sleep_duration:.1f}s for earliest domain to become available or new work.'
             )
             await self._wait_for_new_work_or_timeout(sleep_duration)
+
+    @override
+    async def reclaim_request(self, request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
+        manager = self._select_manager(request.url)
+        result = await manager.reclaim_request(request, forefront=forefront)
+        self._signal_new_work()
+        return result
+
+    @override
+    async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
+        manager = self._select_manager(request.url)
+        result = await manager.mark_request_as_handled(request)
+        self.record_success(request.url)
+        return result
+
+    @override
+    async def get_handled_count(self) -> int:
+        counts = await asyncio.gather(
+            self._inner.get_handled_count(), *(sm.get_handled_count() for sm in self._sub_managers.values())
+        )
+        return sum(counts)
+
+    @override
+    async def get_total_count(self) -> int:
+        counts = await asyncio.gather(
+            self._inner.get_total_count(), *(sm.get_total_count() for sm in self._sub_managers.values())
+        )
+        return sum(counts)
+
+    @override
+    async def is_empty(self) -> bool:
+        results = await asyncio.gather(self._inner.is_empty(), *(sm.is_empty() for sm in self._sub_managers.values()))
+        return all(results)
+
+    @override
+    async def is_finished(self) -> bool:
+        results = await asyncio.gather(
+            self._inner.is_finished(), *(sm.is_finished() for sm in self._sub_managers.values())
+        )
+        return all(results)
+
+    def record_domain_delay(self, url: str, *, retry_after: timedelta | None = None) -> None:
+        """Record a 429 Too Many Requests response for the domain of the given URL.
+
+        Increments the consecutive 429 count and calculates the next allowed request time using exponential backoff or
+        the `Retry-After` value.
+
+        Args:
+            url: The URL that received a 429 response.
+            retry_after: Optional delay from the `Retry-After` header. If provided, it takes priority over the
+                calculated exponential backoff.
+        """
+        state = self._get_domain_state(url)
+        if state is None:
+            return
+
+        state.consecutive_429_count += 1
+        delay = retry_after if retry_after is not None else self._base_delay * (2 ** (state.consecutive_429_count - 1))
+        if delay > self._max_delay:
+            source = 'Retry-After header' if retry_after is not None else 'exponential backoff'
+            logger.warning(
+                f'Capping {source} delay of {delay.total_seconds():.1f}s for domain "{state.domain}" '
+                f'to max_delay ({self._max_delay.total_seconds():.1f}s); the domain may continue to rate-limit. '
+                f'Consider increasing max_delay if this recurs.'
+            )
+            delay = self._max_delay
+        state.throttled_until = datetime.now(timezone.utc) + delay
+
+        logger.info(
+            f'Rate limit (429) detected for domain "{state.domain}" '
+            f'(consecutive: {state.consecutive_429_count}, delay: {delay.total_seconds():.1f}s)'
+        )
+
+    def record_success(self, url: str) -> None:
+        """Record a successful request, resetting the backoff state for that domain.
+
+        Args:
+            url: The URL that received a successful response.
+        """
+        state = self._get_domain_state(url)
+        if state is not None and state.consecutive_429_count > 0:
+            logger.debug(f'Resetting rate limit state for domain "{state.domain}" after successful request')
+            state.consecutive_429_count = 0
+
+    def set_crawl_delay(self, url: str, delay_seconds: int) -> None:
+        """Set the robots.txt crawl-delay for a domain.
+
+        The delay is locked once set so robots.txt re-fetches (e.g. after LRU eviction) can't change the in-flight
+        dispatch cadence and cause oscillation mid-crawl. Subsequent calls for the same domain are no-ops.
+
+        Args:
+            url: A URL from the domain to throttle.
+            delay_seconds: The crawl-delay value in seconds.
+        """
+        state = self._get_domain_state(url)
+        if state is None or state.crawl_delay is not None:
+            return
+
+        state.crawl_delay = timedelta(seconds=delay_seconds)
+        logger.debug(f'Set crawl-delay for domain "{state.domain}" to {delay_seconds}s')
+
+    async def recreate_purged(self) -> ThrottlingRequestManager[TRequestManager]:
+        """Drop all managers and return a fresh `ThrottlingRequestManager` with the same configuration.
+
+        This is used during crawler purge to reconstruct the throttler with empty managers while preserving the domain
+        configuration and service locator.
+        """
+        await self.drop()
+
+        inner = await self._request_manager_opener(
+            storage_client=self._service_locator.get_storage_client(),
+            configuration=self._service_locator.get_configuration(),
+        )
+
+        return ThrottlingRequestManager(
+            inner,
+            domains=list(self._domain_states.keys()),
+            request_manager_opener=self._request_manager_opener,
+            service_locator=self._service_locator,
+            base_delay=self._base_delay,
+            max_delay=self._max_delay,
+        )
+
+    @staticmethod
+    def _extract_domain(url: str) -> str:
+        """Extract the domain (hostname) from a URL."""
+        return URL(url).host or ''
+
+    @staticmethod
+    def _get_url_from_request(request: str | Request) -> str:
+        """Extract URL string from a request that may be a string or Request object."""
+        return request if isinstance(request, str) else request.url
+
+    def _get_domain_state(self, url: str) -> _DomainState | None:
+        """Look up the per-domain state for the given URL, if the domain is configured."""
+        domain = self._extract_domain(url)
+        return self._domain_states.get(domain) if domain else None
+
+    async def _get_or_create_sub_manager(self, domain: str) -> TRequestManager:
+        """Get or create a per-domain sub-manager using the configured `request_manager_opener`."""
+        if domain not in self._sub_managers:
+            self._sub_managers[domain] = await self._request_manager_opener(
+                alias=f'throttled-{domain}',
+                storage_client=self._service_locator.get_storage_client(),
+                configuration=self._service_locator.get_configuration(),
+            )
+        return self._sub_managers[domain]
+
+    def _is_domain_throttled(self, domain: str) -> bool:
+        """Check if a domain is currently throttled."""
+        state = self._domain_states.get(domain)
+        if state is None:
+            return False
+        return datetime.now(timezone.utc) < state.throttled_until
+
+    def _get_earliest_available_time(self, now: datetime) -> datetime:
+        """Get the earliest time any throttled domain becomes available."""
+        earliest = now + self._max_delay
+
+        for state in self._domain_states.values():
+            if now < state.throttled_until < earliest:
+                earliest = state.throttled_until
+
+        return earliest
+
+    def _mark_domain_dispatched(self, domain: str) -> None:
+        """Record that a request to this domain was just dispatched.
+
+        If a crawl-delay is configured, push throttled_until forward by that amount.
+        """
+        state = self._domain_states.get(domain)
+        if state is not None and state.crawl_delay is not None:
+            state.throttled_until = datetime.now(timezone.utc) + state.crawl_delay
+
+    def _signal_new_work(self) -> None:
+        """Wake `fetch_next_request` if it is sleeping inside a throttle wait."""
+        self._new_work_event.set()
+
+    def _select_manager(self, url: str) -> TRequestManager:
+        """Return the manager that owns the given URL — its sub-manager if one exists, otherwise the inner."""
+        domain = self._extract_domain(url)
+        if domain in self._sub_managers:
+            return self._sub_managers[domain]
+        return self._inner
 
     async def _wait_for_new_work_or_timeout(self, timeout: float) -> None:
         """Wait until new work is signaled or `timeout` seconds elapse, whichever comes first.
@@ -468,3 +427,37 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """
         with contextlib.suppress(asyncio.TimeoutError):
             await asyncio.wait_for(self._new_work_event.wait(), timeout=timeout)
+
+
+class _RequestManagerOpener(Protocol[TRequestManager]):
+    """Callable that opens a `RequestManager` instance.
+
+    Matches the keyword-only signature shared by storage `open` classmethods such as `RequestQueue.open`.
+    `ThrottlingRequestManager` invokes the opener both during `recreate_purged` (for the inner manager) and at
+    sub-manager creation time, so the inner manager and every sub-manager share the same backing type.
+    """
+
+    async def __call__(
+        self,
+        *,
+        alias: str | None = ...,
+        storage_client: StorageClient | None = ...,
+        configuration: Configuration | None = ...,
+    ) -> TRequestManager: ...
+
+
+@dataclass
+class _DomainState:
+    """Tracks delay state for a single domain."""
+
+    domain: str
+    """The domain being tracked."""
+
+    throttled_until: datetime = field(default_factory=lambda: datetime.min.replace(tzinfo=timezone.utc))
+    """Earliest time the next request to this domain is allowed."""
+
+    consecutive_429_count: int = 0
+    """Number of consecutive 429 responses (for exponential backoff)."""
+
+    crawl_delay: timedelta | None = None
+    """Minimum interval between requests, used to push `throttled_until` on dispatch."""
