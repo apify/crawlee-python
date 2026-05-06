@@ -45,9 +45,8 @@ jobs:
     uses: ./.github/workflows/_tests.yaml
     secrets: inherit
 
-  # The beta release jobs are intentionally inlined here (instead of calling
-  # `manual_release_beta.yaml` via `uses:`) because PyPI's Trusted Publishing
-  # does not currently support reusable workflows.
+  # The beta release jobs are intentionally inlined here (instead of calling `manual_release_beta.yaml` via `uses:`)
+  # because PyPI's Trusted Publishing does not currently support reusable workflows.
   # See: https://docs.pypi.org/trusted-publishers/troubleshooting/#reusable-workflows-on-github
   release_prepare:
     # Run this only for "feat", "fix", "perf", "refactor" and "style" commits.
