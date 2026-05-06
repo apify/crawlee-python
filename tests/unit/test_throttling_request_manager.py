@@ -142,9 +142,17 @@ async def test_add_requests_routes_mixed_domains(
 
 
 async def test_429_triggers_domain_delay(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """After record_domain_delay(), the domain should be throttled."""
-    manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/page1')
+    """After record_domain_delay(), the domain should be throttled and the call should report success."""
+    assert manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/page1') is True
     assert manager._is_domain_throttled(THROTTLED_DOMAIN)
+
+
+async def test_record_domain_delay_returns_false_for_unconfigured_domain(
+    manager: ThrottlingRequestManager[RequestQueue],
+) -> None:
+    """record_domain_delay should return False (no-op) when the URL's domain is not in the configured list."""
+    assert manager.record_domain_delay(f'https://{NON_THROTTLED_DOMAIN}/page1') is False
+    assert not manager._is_domain_throttled(NON_THROTTLED_DOMAIN)
 
 
 async def test_different_domains_independent(manager: ThrottlingRequestManager[RequestQueue]) -> None:

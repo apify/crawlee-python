@@ -283,7 +283,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         )
         return all(results)
 
-    def record_domain_delay(self, url: str, *, retry_after: timedelta | None = None) -> None:
+    def record_domain_delay(self, url: str, *, retry_after: timedelta | None = None) -> bool:
         """Record a 429 Too Many Requests response for the domain of the given URL.
 
         Increments the consecutive 429 count and calculates the next allowed request time using exponential backoff or
@@ -293,10 +293,14 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             url: The URL that received a 429 response.
             retry_after: Optional delay from the `Retry-After` header. If provided, it takes priority over the
                 calculated exponential backoff.
+
+        Returns:
+            True if the URL's domain is configured for throttling and the delay was applied; False if the domain is not
+            in the configured `domains` list, in which case the call is a no-op.
         """
         state = self._get_domain_state(url)
         if state is None:
-            return
+            return False
 
         state.consecutive_429_count += 1
         delay = retry_after if retry_after is not None else self._base_delay * (2 ** (state.consecutive_429_count - 1))
@@ -314,6 +318,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             f'Rate limit (429) detected for domain "{state.domain}" '
             f'(consecutive: {state.consecutive_429_count}, delay: {delay.total_seconds():.1f}s)'
         )
+        return True
 
     def record_success(self, url: str) -> None:
         """Record a successful request, resetting the backoff state for that domain.

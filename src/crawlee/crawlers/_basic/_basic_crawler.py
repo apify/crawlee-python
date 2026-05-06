@@ -1,4 +1,5 @@
 # Inspiration: https://github.com/apify/crawlee/blob/v3.7.3/packages/basic-crawler/src/internals/basic-crawler.ts
+
 from __future__ import annotations
 
 import asyncio
@@ -45,6 +46,7 @@ from crawlee._types import (
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import atomic_write, export_csv_to_stream, export_json_to_stream
 from crawlee._utils.http import parse_retry_after_header
+from crawlee._utils.log import LoggerOnce
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import UNSUPPORTED_SCHEME_MESSAGE, convert_to_absolute_url, filter_url, is_url_absolute
@@ -494,7 +496,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             run_task_function=self.__run_task_function,
         )
         self._crawler_state_rec_task = RecurringTask(
-            func=self._crawler_state_task, delay=status_message_logging_interval
+            func=self._crawler_state_task,
+            delay=status_message_logging_interval,
         )
         self._previous_crawler_state: TStatisticsState | None = None
 
@@ -502,10 +505,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._keep_alive = keep_alive
         self._running = False
         self._has_finished_before = False
-
         self._failed = False
-
         self._unexpected_stop = False
+        self._logger_once = LoggerOnce(self._logger)
 
     @property
     def log(self) -> logging.Logger:
@@ -1563,9 +1565,28 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Raises:
             SessionError: If the status code indicates the session is blocked.
         """
-        if status_code == HTTPStatus.TOO_MANY_REQUESTS and isinstance(self._request_manager, ThrottlingRequestManager):
-            retry_after = parse_retry_after_header(retry_after_header)
-            self._request_manager.record_domain_delay(request_url, retry_after=retry_after)
+        if status_code == HTTPStatus.TOO_MANY_REQUESTS:
+            if isinstance(self._request_manager, ThrottlingRequestManager):
+                retry_after = parse_retry_after_header(retry_after_header)
+                if not self._request_manager.record_domain_delay(request_url, retry_after=retry_after):
+                    domain = (URL(request_url).host or '').lower()
+                    if domain:
+                        self._logger_once.log(
+                            f'Received an HTTP 429 (Too Many Requests) response from domain "{domain}", but it is '
+                            f'not in the `ThrottlingRequestManager.domains` list. Per-domain backoff will not be '
+                            f'applied for this domain. Add it to `domains=` to enable throttling.',
+                            key=f'unconfigured_throttle_domain:{domain}',
+                            level=logging.WARNING,
+                        )
+            else:
+                self._logger_once.log(
+                    'Received an HTTP 429 (Too Many Requests) response, but the crawler is not using '
+                    '`ThrottlingRequestManager`. Per-domain backoff and `Retry-After` headers will not be honored. '
+                    'To enable per-domain rate limiting, configure the crawler to use `ThrottlingRequestManager` '
+                    'as the request manager.',
+                    key='no_throttling_manager_on_429',
+                    level=logging.WARNING,
+                )
 
         if session is not None and session.is_blocked_status_code(
             status_code=status_code,
