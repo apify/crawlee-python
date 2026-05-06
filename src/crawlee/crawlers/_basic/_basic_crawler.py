@@ -13,6 +13,7 @@ from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Seque
 from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
+from http import HTTPStatus
 from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, cast
@@ -484,7 +485,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # Internal, not explicitly configurable components
         self._robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
         self._robots_txt_lock = asyncio.Lock()
-        self._crawl_delay_configured_origins: set[str] = set()
         self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
@@ -1553,7 +1553,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         session: Session | None,
         status_code: int,
         *,
-        request_url: str = '',
+        request_url: str,
         retry_after_header: str | None = None,
     ) -> None:
         """Raise an exception if the given status code indicates the session is blocked.
@@ -1570,13 +1570,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Raises:
             SessionError: If the status code indicates the session is blocked.
         """
-        if status_code == 429 and request_url:  # noqa: PLR2004
+        if status_code == HTTPStatus.TOO_MANY_REQUESTS and isinstance(self._request_manager, ThrottlingRequestManager):
             retry_after = parse_retry_after_header(retry_after_header)
-
-            # _request_manager might not be initialized yet if called directly or early,
-            # but usually it's set in get_request_manager().
-            if isinstance(self._request_manager, ThrottlingRequestManager):
-                self._request_manager.record_domain_delay(request_url, retry_after=retry_after)
+            self._request_manager.record_domain_delay(request_url, retry_after=retry_after)
 
         if session is not None and session.is_blocked_status_code(
             status_code=status_code,
@@ -1611,14 +1607,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if not robots_txt_file:
             return True
 
-        origin = str(URL(url).origin())
-        if origin not in self._crawl_delay_configured_origins and isinstance(
-            self._request_manager, ThrottlingRequestManager
-        ):
+        if isinstance(self._request_manager, ThrottlingRequestManager):
             crawl_delay = robots_txt_file.get_crawl_delay()
             if crawl_delay is not None:
                 self._request_manager.set_crawl_delay(url, crawl_delay)
-            self._crawl_delay_configured_origins.add(origin)
 
         return robots_txt_file.is_allowed(url)
 

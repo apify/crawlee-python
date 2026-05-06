@@ -13,7 +13,10 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from typing_extensions import override
+from yarl import URL
 
+from crawlee._service_locator import ServiceLocator
+from crawlee._service_locator import service_locator as global_service_locator
 from crawlee._utils.docs import docs_group
 from crawlee.request_loaders._request_manager import RequestManager
 from crawlee.storages import RequestQueue
@@ -23,9 +26,6 @@ if TYPE_CHECKING:
 
     from crawlee._request import Request
     from crawlee.storage_clients.models import ProcessedRequest
-
-from crawlee._service_locator import ServiceLocator
-from crawlee._service_locator import service_locator as global_service_locator
 
 logger = getLogger(__name__)
 
@@ -120,14 +120,17 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     @staticmethod
     def _extract_domain(url: str) -> str:
         """Extract the domain (hostname) from a URL."""
-        parsed = urlparse(url)
-        return parsed.hostname or ''
+        return URL(url).host or ''
 
-    def _get_url_from_request(self, request: str | Request) -> str:
+    @staticmethod
+    def _get_url_from_request(request: str | Request) -> str:
         """Extract URL string from a request that may be a string or Request object."""
-        if isinstance(request, str):
-            return request
-        return request.url
+        return request if isinstance(request, str) else request.url
+
+    def _get_domain_state(self, url: str) -> _DomainState | None:
+        """Look up the per-domain state for the given URL, if the domain is configured."""
+        domain = self._extract_domain(url)
+        return self._domain_states.get(domain) if domain else None
 
     async def _get_or_create_sub_queue(self, domain: str) -> RequestQueue:
         """Get or create a per-domain sub-queue."""
@@ -149,10 +152,10 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     def _get_earliest_available_time(self) -> datetime:
         """Get the earliest time any throttled domain becomes available."""
         now = datetime.now(timezone.utc)
-        earliest = now + self._max_delay  # Fallback upper bound.
+        earliest = now + self._max_delay
 
         for state in self._domain_states.values():
-            if state.throttled_until > now and state.throttled_until < earliest:
+            if now < state.throttled_until < earliest:
                 earliest = state.throttled_until
 
         return earliest
@@ -168,27 +171,17 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             retry_after: Optional delay from the `Retry-After` header. If provided, it takes priority over the
                 calculated exponential backoff.
         """
-        domain = self._extract_domain(url)
-        if not domain:
-            return
-
-        state = self._domain_states.get(domain)
+        state = self._get_domain_state(url)
         if state is None:
             return
 
-        now = datetime.now(timezone.utc)
         state.consecutive_429_count += 1
-
-        # Calculate delay: use Retry-After if provided, otherwise exponential backoff.
         delay = retry_after if retry_after is not None else self._base_delay * (2 ** (state.consecutive_429_count - 1))
-
-        # Cap the delay.
         delay = min(delay, self._max_delay)
-
-        state.throttled_until = now + delay
+        state.throttled_until = datetime.now(timezone.utc) + delay
 
         logger.info(
-            f'Rate limit (429) detected for domain "{domain}" '
+            f'Rate limit (429) detected for domain "{state.domain}" '
             f'(consecutive: {state.consecutive_429_count}, delay: {delay.total_seconds():.1f}s)'
         )
 
@@ -198,14 +191,9 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         Args:
             url: The URL that received a successful response.
         """
-        domain = self._extract_domain(url)
-        if not domain:
-            return
-
-        state = self._domain_states.get(domain)
-
+        state = self._get_domain_state(url)
         if state is not None and state.consecutive_429_count > 0:
-            logger.debug(f'Resetting rate limit state for domain "{domain}" after successful request')
+            logger.debug(f'Resetting rate limit state for domain "{state.domain}" after successful request')
             state.consecutive_429_count = 0
 
     def set_crawl_delay(self, url: str, delay_seconds: int) -> None:
@@ -217,36 +205,20 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             url: A URL from the domain to throttle.
             delay_seconds: The crawl-delay value in seconds.
         """
-        domain = self._extract_domain(url)
-        if not domain:
-            return
-
-        state = self._domain_states.get(domain)
-        if state is None:
-            return
-
-        if state.crawl_delay is not None:
+        state = self._get_domain_state(url)
+        if state is None or state.crawl_delay is not None:
             return
 
         state.crawl_delay = timedelta(seconds=delay_seconds)
-
-        logger.debug(f'Set crawl-delay for domain "{domain}" to {delay_seconds}s')
+        logger.debug(f'Set crawl-delay for domain "{state.domain}" to {delay_seconds}s')
 
     def _mark_domain_dispatched(self, url: str) -> None:
         """Record that a request to this domain was just dispatched.
 
         If a crawl-delay is configured, push throttled_until forward by that amount.
         """
-        domain = self._extract_domain(url)
-        if not domain:
-            return
-
-        state = self._domain_states.get(domain)
-        if state is None:
-            return
-
-        # If crawl-delay is set, enforce minimum interval by pushing throttled_until.
-        if state.crawl_delay is not None:
+        state = self._get_domain_state(url)
+        if state is not None and state.crawl_delay is not None:
             state.throttled_until = datetime.now(timezone.utc) + state.crawl_delay
 
     async def recreate_purged(self) -> ThrottlingRequestManager[TRequestManager]:
@@ -318,7 +290,6 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             else:
                 inner_requests.append(request)
 
-        # Add non-throttled requests to inner queue.
         if inner_requests:
             await self._inner.add_requests(
                 inner_requests,
@@ -329,7 +300,6 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
             )
 
-        # Add throttled requests to their respective sub-queues.
         for domain, reqs in domain_requests.items():
             sq = await self._get_or_create_sub_queue(domain)
             await sq.add_requests(
@@ -350,15 +320,13 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
-        domain = self._extract_domain(request.url)
-        if domain in self._domain_states and domain in self._sub_queues:
-            result = await self._sub_queues[domain].mark_request_as_handled(request)
+        state = self._get_domain_state(request.url)
+        if state is not None and state.domain in self._sub_queues:
+            result = await self._sub_queues[state.domain].mark_request_as_handled(request)
         else:
             result = await self._inner.mark_request_as_handled(request)
 
-        # Reset rate limit backoff for this domain on success.
         self.record_success(request.url)
-
         return result
 
     @override
@@ -403,43 +371,36 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         available.
         """
         while True:
-            # Collect unthrottled domains and sort by throttled_until (longest-overdue first).
-            available_domains = [
-                domain
-                for domain in self._domain_states
-                if domain in self._sub_queues and not self._is_domain_throttled(domain)
-            ]
-            available_domains.sort(
+            available_domains = sorted(
+                (
+                    domain
+                    for domain in self._domain_states
+                    if domain in self._sub_queues and not self._is_domain_throttled(domain)
+                ),
                 key=lambda d: self._domain_states[d].throttled_until,
             )
 
             for domain in available_domains:
-                sq = self._sub_queues[domain]
-                req = await sq.fetch_next_request()
+                req = await self._sub_queues[domain].fetch_next_request()
                 if req:
                     self._mark_domain_dispatched(req.url)
                     return req
 
-            # Try fetching from the inner queue (non-throttled domains).
             request = await self._inner.fetch_next_request()
             if request is not None:
                 return request
 
-            # No requests in inner queue. Check if any sub-queues still have requests.
-            have_sq_requests = False
-            for sq in self._sub_queues.values():
-                if not await sq.is_empty():
-                    have_sq_requests = True
-                    break
-
-            if not have_sq_requests:
+            if not self._sub_queues:
                 return None
 
-            # Requests exist but all domains are throttled and inner is empty. Sleep and retry.
+            sub_queue_empty = await asyncio.gather(*(sq.is_empty() for sq in self._sub_queues.values()))
+            if all(sub_queue_empty):
+                return None
+
             earliest = self._get_earliest_available_time()
             sleep_duration = max(
                 (earliest - datetime.now(timezone.utc)).total_seconds(),
-                0.1,  # Minimum sleep to avoid tight loops.
+                0.1,  # Avoid tight loops if a throttle expired during the previous iteration.
             )
             logger.debug(
                 f'All configured domains are throttled and inner queue is empty. '

@@ -21,14 +21,10 @@ def parse_retry_after_header(value: str | None) -> timedelta | None:
     if not value:
         return None
 
-    # Try parsing as integer seconds first.
     try:
-        seconds = int(value)
-        return timedelta(seconds=seconds)
+        return timedelta(seconds=int(value))
     except ValueError:
         pass
-
-    # Try parsing as HTTP-date (e.g., "Wed, 21 Oct 2015 07:28:00 GMT").
 
     try:
         retry_date = parsedate_to_datetime(value)
