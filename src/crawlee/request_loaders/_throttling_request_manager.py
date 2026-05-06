@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Generic, Protocol, TypeVar
@@ -27,6 +27,9 @@ logger = getLogger(__name__)
 
 TRequestManager = TypeVar('TRequestManager', bound=RequestManager)
 
+_NEVER_THROTTLED = datetime.min.replace(tzinfo=timezone.utc)
+"""Sentinel `throttled_until` value meaning the domain has no active backoff."""
+
 
 @docs_group('Request loaders')
 class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
@@ -43,11 +46,10 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     - HTTP 429 responses (via `record_domain_delay`)
     - robots.txt crawl-delay directives (via `set_crawl_delay`)
 
-    The class is generic over the wrapped manager type. The `request_manager_opener` callback is used both to construct
-    per-domain sub-managers at insertion time and to recreate the inner manager during `recreate_purged`, so the inner
-    manager and every sub-manager share the same `RequestManager` subclass and backing store. The opener must accept
-    `alias`, `storage_client`, and `configuration` keyword arguments (as `RequestQueue.open` does) and return the same
-    concrete subclass as `inner`.
+    The class is generic over the wrapped manager type. The `request_manager_opener` callback is used to construct
+    per-domain sub-managers at insertion time, so every sub-manager shares the same `RequestManager` subclass and
+    backing store as `inner`. The opener must accept `alias`, `storage_client`, and `configuration` keyword arguments
+    (as `RequestQueue.open` does) and return the same concrete subclass as `inner`.
 
     ### Usage
 
@@ -84,10 +86,9 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             domains: Explicit list of domain hostnames to throttle. Only requests matching these domains will be routed
                 to per-domain sub-managers. Matching is case-insensitive (hostnames are lowercased) and exact: subdomain
                 wildcards such as `*.example.com` are not supported — list each subdomain explicitly if needed.
-            request_manager_opener: Async callable used to create per-domain sub-managers at insertion time and to
-                recreate the inner manager during `recreate_purged`. Must accept `alias`, `storage_client`, and
-                `configuration` keyword arguments and return the same concrete subclass as `inner` (e.g.
-                `RequestQueue.open` when `inner` is a `RequestQueue`).
+            request_manager_opener: Async callable used to create per-domain sub-managers at insertion time. Must
+                accept `alias`, `storage_client`, and `configuration` keyword arguments and return the same concrete
+                subclass as `inner` (e.g. `RequestQueue.open` when `inner` is a `RequestQueue`).
             service_locator: Service locator for creating sub-managers. If not provided, defaults to the global service
                 locator, ensuring consistency with the crawler's storage backend.
             base_delay: Initial delay after the first 429 response from a domain.
@@ -108,6 +109,19 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     async def drop(self) -> None:
         await asyncio.gather(self._inner.drop(), *(sm.drop() for sm in self._sub_managers.values()))
         self._sub_managers.clear()
+
+    @override
+    async def purge(self) -> None:
+        """Empty the inner manager and all sub-managers, and reset transient per-domain throttle state.
+
+        The configured domain list and any robots.txt-derived `crawl_delay` are preserved; only the dynamic backoff
+        state (consecutive 429 counter and `throttled_until`) is cleared. Sub-managers are kept around so they don't
+        need to be re-opened on the next request — they're just emptied.
+        """
+        await asyncio.gather(self._inner.purge(), *(sm.purge() for sm in self._sub_managers.values()))
+        for state in self._domain_states.values():
+            state.consecutive_429_count = 0
+            state.throttled_until = _NEVER_THROTTLED
 
     @override
     async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest | None:
@@ -329,28 +343,6 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         state.crawl_delay = timedelta(seconds=delay_seconds)
         logger.debug(f'Set crawl-delay for domain "{state.domain}" to {delay_seconds}s')
 
-    async def recreate_purged(self) -> ThrottlingRequestManager[TRequestManager]:
-        """Drop all managers and return a fresh `ThrottlingRequestManager` with the same configuration.
-
-        This is used during crawler purge to reconstruct the throttler with empty managers while preserving the domain
-        configuration and service locator.
-        """
-        await self.drop()
-
-        inner = await self._request_manager_opener(
-            storage_client=self._service_locator.get_storage_client(),
-            configuration=self._service_locator.get_configuration(),
-        )
-
-        return ThrottlingRequestManager(
-            inner,
-            domains=list(self._domain_states.keys()),
-            request_manager_opener=self._request_manager_opener,
-            service_locator=self._service_locator,
-            base_delay=self._base_delay,
-            max_delay=self._max_delay,
-        )
-
     @staticmethod
     def _extract_domain(url: str) -> str:
         """Extract the domain (hostname) from a URL."""
@@ -428,8 +420,8 @@ class _RequestManagerOpener(Protocol[TRequestManager]):
     """Callable that opens a `RequestManager` instance.
 
     Matches the keyword-only signature shared by storage `open` classmethods such as `RequestQueue.open`.
-    `ThrottlingRequestManager` invokes the opener both during `recreate_purged` (for the inner manager) and at
-    sub-manager creation time, so the inner manager and every sub-manager share the same backing type.
+    `ThrottlingRequestManager` invokes the opener at sub-manager creation time, so every sub-manager shares the same
+    backing type as `inner`.
     """
 
     async def __call__(
@@ -448,7 +440,7 @@ class _DomainState:
     domain: str
     """The domain being tracked."""
 
-    throttled_until: datetime = field(default_factory=lambda: datetime.min.replace(tzinfo=timezone.utc))
+    throttled_until: datetime = _NEVER_THROTTLED
     """Earliest time the next request to this domain is allowed."""
 
     consecutive_429_count: int = 0

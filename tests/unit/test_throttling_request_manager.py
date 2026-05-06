@@ -496,18 +496,27 @@ async def test_drop_clears_all(
     assert len(manager._sub_managers) == 0
 
 
-async def test_recreate_purged(
+async def test_purge_clears_requests_and_resets_throttle_state(
     manager: ThrottlingRequestManager[RequestQueue],
 ) -> None:
-    """recreate_purged should return a fresh manager with the same domain configuration."""
-    await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+    """purge should empty inner and sub-managers, reset transient backoff, and preserve domain configuration."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await manager.add_request(url)
+    manager.record_domain_delay(url)
 
-    new_manager = await manager.recreate_purged()
+    state = manager._domain_states[THROTTLED_DOMAIN]
+    assert state.consecutive_429_count == 1
+    assert manager._is_domain_throttled(THROTTLED_DOMAIN)
 
-    # Same domains should be configured.
-    assert THROTTLED_DOMAIN in new_manager._domain_states
-    # But managers should be empty.
-    assert await new_manager.is_empty()
+    await manager.purge()
+
+    # Domain configuration is preserved.
+    assert THROTTLED_DOMAIN in manager._domain_states
+    # Manager is empty.
+    assert await manager.is_empty()
+    # Transient backoff state is reset.
+    assert state.consecutive_429_count == 0
+    assert not manager._is_domain_throttled(THROTTLED_DOMAIN)
 
 
 # ── Utility Tests ──────────────────────────────────────
@@ -528,3 +537,26 @@ def test_parse_retry_after_integer_seconds() -> None:
 
 def test_parse_retry_after_invalid_value() -> None:
     assert parse_retry_after_header('not-a-date-or-number') is None
+
+
+def test_parse_retry_after_http_date_with_timezone() -> None:
+    """A future HTTP-date with explicit timezone should yield a positive delay."""
+    future = datetime.now(timezone.utc) + timedelta(seconds=120)
+    header = future.strftime('%a, %d %b %Y %H:%M:%S GMT')
+
+    result = parse_retry_after_header(header)
+
+    assert result is not None
+    assert timedelta(seconds=60) < result <= timedelta(seconds=121)
+
+
+def test_parse_retry_after_naive_http_date_treated_as_utc() -> None:
+    """A future HTTP-date without timezone info should be treated as UTC, not raise on subtraction."""
+    future = datetime.now(timezone.utc) + timedelta(seconds=120)
+    # Format without any timezone designator — `parsedate_to_datetime` returns a naive datetime here.
+    header = future.strftime('%a, %d %b %Y %H:%M:%S')
+
+    result = parse_retry_after_header(header)
+
+    assert result is not None
+    assert timedelta(seconds=60) < result <= timedelta(seconds=121)

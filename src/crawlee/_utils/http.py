@@ -31,7 +31,12 @@ def parse_retry_after_header(value: str | None) -> timedelta | None:
 
     try:
         retry_date = parsedate_to_datetime(value)
-        delay = retry_date - datetime.now(retry_date.tzinfo or timezone.utc)
+        # `parsedate_to_datetime` may return a naive datetime when the input has no timezone info.
+        # Treat such values as UTC — HTTP-dates are GMT per RFC 7231.
+        if retry_date.tzinfo is None:
+            retry_date = retry_date.replace(tzinfo=timezone.utc)
+
+        delay = retry_date - datetime.now(timezone.utc)
         if delay.total_seconds() > 0:
             return delay
         logger.debug(f'Retry-After HTTP-date {value!r} is in the past; ignoring.')
