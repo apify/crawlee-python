@@ -1,9 +1,3 @@
-"""A request manager wrapper that enforces per-domain delays.
-
-Handles both HTTP 429 backoff and robots.txt crawl-delay at the scheduling layer, routing requests for explicitly
-configured domains into dedicated sub-managers and applying intelligent delay-aware scheduling.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -55,20 +49,21 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     `alias`, `storage_client`, and `configuration` keyword arguments (as `RequestQueue.open` does) and return the same
     concrete subclass as `inner`.
 
-    Example:
-        ```python
-        from crawlee.crawlers import BasicCrawler
-        from crawlee.request_loaders import ThrottlingRequestManager
-        from crawlee.storages import RequestQueue
+    ### Usage
 
-        queue = await RequestQueue.open()
-        throttler = ThrottlingRequestManager(
-            queue,
-            domains=['api.example.com', 'slow-site.org'],
-            request_manager_opener=RequestQueue.open,
-        )
-        crawler = BasicCrawler(request_manager=throttler)
-        ```
+    ```python
+    from crawlee.crawlers import BasicCrawler
+    from crawlee.request_loaders import ThrottlingRequestManager
+    from crawlee.storages import RequestQueue
+
+    queue = await RequestQueue.open()
+    throttler = ThrottlingRequestManager(
+        inner=queue,
+        domains=['api.example.com', 'slow-site.org'],
+        request_manager_opener=RequestQueue.open,
+    )
+    crawler = BasicCrawler(request_manager=throttler)
+    ```
     """
 
     def __init__(
