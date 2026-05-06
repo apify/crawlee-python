@@ -97,6 +97,29 @@ async def test_add_request_with_string_url(
     assert await manager._sub_managers[THROTTLED_DOMAIN].get_total_count() == 1
 
 
+async def test_domain_matching_is_case_insensitive(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> None:
+    """Domains with mixed casing should match URLs whose hostnames yarl lowercases."""
+    manager = ThrottlingRequestManager(
+        inner_queue,
+        domains=['Example.COM'],
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+    await manager.add_request('https://EXAMPLE.com/page1')
+
+    assert await inner_queue.is_empty()
+    assert 'example.com' in manager._sub_managers
+    assert await manager._sub_managers['example.com'].get_total_count() == 1
+
+    # 429 bookkeeping must also flow through the lowercased state.
+    manager.record_domain_delay('https://Example.Com/page2')
+    assert manager._is_domain_throttled('example.com')
+
+
 async def test_add_requests_routes_mixed_domains(
     manager: ThrottlingRequestManager[RequestQueue],
     inner_queue: RequestQueue,
@@ -289,8 +312,8 @@ async def test_sleep_when_all_throttled(manager: ThrottlingRequestManager[Reques
     with patch(target, new_callable=AsyncMock) as mock_wait:
 
         async def wait_side_effect(*_args: Any, **_kwargs: Any) -> None:
-            # Set throttled_until firmly in the past so the next iteration reliably unblocks the domain
-            # regardless of clock resolution or scheduling jitter on slow CI runners.
+            # Set throttled_until firmly in the past so the next iteration reliably unblocks the domain regardless of
+            # clock resolution or scheduling jitter on slow CI runners.
             manager._domain_states[THROTTLED_DOMAIN].throttled_until = datetime.now(timezone.utc) - timedelta(seconds=1)
 
         mock_wait.side_effect = wait_side_effect
@@ -330,8 +353,8 @@ async def test_fetch_wakes_when_request_added_during_throttle_wait(
     await wait_entered.wait()
     await manager.add_request(free_url)
 
-    # If the wake-up signal works, fetch returns the freshly-added request well within the
-    # 2s wait_for budget; otherwise it would still be blocked on the 60s throttle.
+    # If the wake-up signal works, fetch returns the freshly-added request well within the 2s wait_for budget; otherwise
+    # it would still be blocked on the 60s throttle.
     result = await asyncio.wait_for(fetch_task, timeout=2.0)
 
     assert result is not None
