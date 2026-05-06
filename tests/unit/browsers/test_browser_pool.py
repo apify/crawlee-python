@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from yarl import URL
 
+    from crawlee.browsers._browser_plugin import BrowserPlugin
     from crawlee.proxy_configuration import ProxyInfo
 
 
@@ -309,10 +310,18 @@ async def test_post_page_close_hook() -> None:
     assert isinstance(controller, BrowserController)
 
 
-async def test_page_hooks_execution_order() -> None:
+async def test_hooks_execution_order() -> None:
     call_order: list[str] = []
 
     async with BrowserPool() as browser_pool:
+
+        @browser_pool.pre_launch_hook
+        async def pre_launch(_page_id: str, _plugin: BrowserPlugin) -> None:
+            call_order.append('pre_launch')
+
+        @browser_pool.post_launch_hook
+        async def post_launch(_page_id: str, _controller: BrowserController) -> None:
+            call_order.append('post_launch')
 
         @browser_pool.pre_page_create_hook
         async def pre_create(
@@ -338,7 +347,7 @@ async def test_page_hooks_execution_order() -> None:
         page = await browser_pool.new_page()
         await page.page.close()
 
-    assert call_order == ['pre_create', 'post_create', 'pre_close', 'post_close']
+    assert call_order == ['pre_launch', 'post_launch', 'pre_create', 'post_create', 'pre_close', 'post_close']
 
 
 async def test_multiple_hooks_all_called() -> None:
@@ -358,3 +367,76 @@ async def test_multiple_hooks_all_called() -> None:
         await page.page.close()
 
     assert call_order == ['first', 'second']
+
+
+async def test_pre_launch_hook_is_called() -> None:
+    call_mock = AsyncMock()
+
+    async with BrowserPool() as browser_pool:
+
+        @browser_pool.pre_launch_hook
+        async def hook(page_id: str, plugin: BrowserPlugin) -> None:
+            await call_mock(page_id, plugin)
+
+        test_page = await browser_pool.new_page()
+        await test_page.page.close()
+
+    call_mock.assert_awaited_once()
+    page_id, plugin = call_mock.call_args[0]
+
+    assert isinstance(page_id, str)
+    assert test_page.id == page_id
+    assert isinstance(plugin, PlaywrightBrowserPlugin)
+
+
+async def test_post_launch_hook_is_called() -> None:
+    call_mock = AsyncMock()
+
+    async with BrowserPool() as browser_pool:
+
+        @browser_pool.post_launch_hook
+        async def hook(page_id: str, controller: BrowserController) -> None:
+            await call_mock(page_id, controller)
+
+        test_page = await browser_pool.new_page()
+        await test_page.page.close()
+
+    call_mock.assert_awaited_once()
+    page_id, controller = call_mock.call_args[0]
+
+    assert isinstance(page_id, str)
+    assert test_page.id == page_id
+    assert isinstance(controller, BrowserController)
+
+
+async def test_post_launch_hook_error_closes_browser() -> None:
+    async with BrowserPool() as browser_pool:
+
+        @browser_pool.post_launch_hook
+        async def hook(_page_id: str, _controller: BrowserController) -> None:
+            raise ValueError('Hook failed')
+
+        with pytest.raises(ValueError, match='Hook failed'):
+            await browser_pool.new_page()
+
+        assert len(browser_pool.active_browsers) == 0
+        assert len(browser_pool.inactive_browsers) == 0
+
+
+async def test_launch_hooks_not_called_for_existing_browser() -> None:
+    launch_hook_calls = 0
+
+    async with BrowserPool() as browser_pool:
+
+        @browser_pool.pre_launch_hook
+        async def hook(_page_id: str, _plugin: BrowserPlugin) -> None:
+            nonlocal launch_hook_calls
+            launch_hook_calls += 1
+
+        page_1 = await browser_pool.new_page()
+        page_2 = await browser_pool.new_page()
+
+        await page_1.page.close()
+        await page_2.page.close()
+
+    assert launch_hook_calls == 1

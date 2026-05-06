@@ -99,6 +99,9 @@ class BrowserPool:
         self._pages = WeakValueDictionary[str, CrawleePage]()  # Track the pages in the pool
         self._plugins_cycle = itertools.cycle(self._plugins)  # Cycle through the plugins
 
+        # Hooks for custom behavior at different stages of the browser and page lifecycles.
+        self._pre_launch_hooks: list[Callable[[str, BrowserPlugin], Awaitable[None]]] = []
+        self._post_launch_hooks: list[Callable[[str, BrowserController], Awaitable[None]]] = []
         self._pre_page_create_hooks: list[
             Callable[[str, BrowserController, dict[str, Any], ProxyInfo | None], Awaitable[None]]
         ] = []
@@ -307,7 +310,7 @@ class BrowserPool:
 
         try:
             if not browser_controller:
-                browser_controller = await asyncio.wait_for(self._launch_new_browser(plugin), timeout)
+                browser_controller = await asyncio.wait_for(self._launch_new_browser(page_id, plugin), timeout)
             browser_new_context_options = dict(plugin.browser_new_context_options)
 
             await self._execute_hooks(
@@ -356,9 +359,17 @@ class BrowserPool:
             self._active_browsers.remove(browser)
             self._inactive_browsers.append(browser)
 
-    async def _launch_new_browser(self, plugin: BrowserPlugin) -> BrowserController:
+    async def _launch_new_browser(self, page_id: str, plugin: BrowserPlugin) -> BrowserController:
         """Launch a new browser instance using the specified plugin."""
+        await self._execute_hooks(self._pre_launch_hooks, page_id, plugin)
         browser = await plugin.new_browser()
+
+        try:
+            await self._execute_hooks(self._post_launch_hooks, page_id, browser)
+        except Exception:
+            await browser.close(force=True)
+            raise
+
         self._active_browsers.append(browser)
         return browser
 
@@ -394,6 +405,27 @@ class BrowserPool:
                 await self._execute_hooks(self._post_page_close_hooks, crawlee_page.id, browser_controller)
 
             crawlee_page.page.close: Callable[..., Awaitable[None]] = close_with_hooks
+
+    def pre_launch_hook(
+        self, hook: Callable[[str, BrowserPlugin], Awaitable[None]]
+    ) -> Callable[[str, BrowserPlugin], Awaitable[None]]:
+        """Register a hook to be called just before a new browser is launched.
+
+        The hook receives the page ID that triggered the launch and the `BrowserPlugin` being used.
+        Mutating `plugin.browser_launch_options` affects all future launches, not just the current one.
+        """
+        self._pre_launch_hooks.append(hook)
+        return hook
+
+    def post_launch_hook(
+        self, hook: Callable[[str, BrowserController], Awaitable[None]]
+    ) -> Callable[[str, BrowserController], Awaitable[None]]:
+        """Register a hook to be called right after a new browser is launched.
+
+        The hook receives the page ID that triggered the launch and the newly created `BrowserController`.
+        """
+        self._post_launch_hooks.append(hook)
+        return hook
 
     def pre_page_create_hook(
         self, hook: Callable[[str, BrowserController, dict[str, Any], ProxyInfo | None], Awaitable[None]]

@@ -11,6 +11,7 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 import MultipleLaunchExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler/multiple_launch_example.py';
 import BrowserConfigurationExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler/browser_configuration_example.py';
 import NavigationHooksExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler/navigation_hooks_example.py';
+import BrowserPoolLaunchHooksExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler/browser_pool_launch_hooks_example.py';
 import BrowserPoolPageHooksExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler/browser_pool_page_hooks_example.py';
 import PluginBrowserConfigExample from '!!raw-loader!./code_examples/playwright_crawler/plugin_browser_configuration_example.py';
 
@@ -57,6 +58,12 @@ You can also configure each plugin used by <ApiLink to="class/BrowserPool">`Brow
 
 For an example of how to implement a custom browser plugin, see the [Camoufox example](../examples/playwright-crawler-with-camoufox). [Camoufox](https://camoufox.com/) is a stealth browser plugin designed to reduce detection by anti-scraping measures and is fully compatible with <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.
 
+The <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> also exposes <ApiLink to="class/BrowserPool#pre_launch_hook">`pre_launch_hook`</ApiLink> and <ApiLink to="class/BrowserPool#post_launch_hook">`post_launch_hook`</ApiLink> - called once per browser instance, before and after it is launched. Use them for logging, metrics, or any setup at the browser level. Note that these hooks are not called when a new page is created in an already-running browser.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {BrowserPoolLaunchHooksExample}
+</RunnableCodeBlock>
+
 ## Page configuration with lifecycle page hooks
 
 For additional setup or event-driven actions around page creation and closure, the <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> exposes four lifecycle hooks: <ApiLink to="class/BrowserPool#pre_page_create_hook">`pre_page_create_hook`</ApiLink>, <ApiLink to="class/BrowserPool#post_page_create_hook">`post_page_create_hook`</ApiLink>, <ApiLink to="class/BrowserPool#pre_page_close_hook">`pre_page_close_hook`</ApiLink>, and <ApiLink to="class/BrowserPool#post_page_close_hook">`post_page_close_hook`</ApiLink>. To use them, create a `BrowserPool` instance and pass it to <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> via the `browser_pool` argument.
@@ -75,4 +82,4 @@ Navigation hooks allow for additional configuration at specific points during pa
 
 ## Conclusion
 
-This guide introduced the <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> and explained how to configure it using <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> and <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink>. You learned how to launch multiple browsers, configure browser and context settings, use <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> lifecycle page hooks, and apply navigation hooks. If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!
+This guide introduced the <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> and explained how to configure it using <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> and <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink>. You learned how to launch multiple browsers, configure browser and context settings, use <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> lifecycle hooks, and apply navigation hooks. If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!
