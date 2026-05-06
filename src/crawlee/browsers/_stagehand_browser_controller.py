@@ -108,7 +108,7 @@ class StagehandBrowserController(BrowserController):
     @property
     @override
     def is_browser_connected(self) -> bool:
-        # Session not yet started - controller is available for new pages.
+        # If browser not yet started - controller is available for new pages.
         return self._browser is None or self._browser.is_connected()
 
     @property
@@ -189,7 +189,8 @@ class StagehandBrowserController(BrowserController):
             self._browser_context = None
 
     def _on_page_close(self, page: StagehandPage) -> None:
-        self._pages.remove(page)
+        if page in self._pages:
+            self._pages.remove(page)
 
     def _get_extra_http_headers(
         self,
