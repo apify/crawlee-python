@@ -42,8 +42,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install dependencies
-        run: npm install -g apify-cli
+      - name: Install Apify CLI
+        uses: apify/setup-apify-cli-action@v1
+        with:
+          token: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v6
