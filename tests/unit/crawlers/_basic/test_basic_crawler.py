@@ -27,7 +27,7 @@ from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
 from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
-from crawlee.request_loaders import RequestList, RequestManagerTandem
+from crawlee.request_loaders import RequestList, RequestManagerTandem, ThrottlingRequestManager
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics, StatisticsState
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
@@ -2167,3 +2167,47 @@ async def test_global_and_local_event_manager_in_crawler_run() -> None:
     # After crawler is finished, both event managers should be inactive.
     assert local_event_manager.active is False
     assert global_event_manager.active is False
+
+
+async def test_warn_no_throttling_manager_once_on_429(caplog: pytest.LogCaptureFixture) -> None:
+    """A 429 from a crawler without ThrottlingRequestManager logs a recommendation, only once per instance."""
+    crawler = BasicCrawler(configure_logging=False)
+    with caplog.at_level(logging.WARNING, logger='crawlee'):
+        crawler._raise_for_session_blocked_status_code(session=None, status_code=429, request_url='https://a.test/')
+        crawler._raise_for_session_blocked_status_code(session=None, status_code=429, request_url='https://b.test/')
+
+    matching = [
+        r for r in caplog.records if 'ThrottlingRequestManager' in r.getMessage() and 'HTTP 429' in r.getMessage()
+    ]
+    assert len(matching) == 1
+
+
+async def test_warn_unconfigured_throttle_domain_once_per_domain(caplog: pytest.LogCaptureFixture) -> None:
+    """A 429 from a domain not in `ThrottlingRequestManager.domains` logs once per domain; repeats are suppressed."""
+    inner = await RequestQueue.open(name='test-inner-warn', storage_client=MemoryStorageClient())
+    throttler = ThrottlingRequestManager(
+        inner,
+        domains=['only-this.test'],
+        request_manager_opener=RequestQueue.open,
+    )
+    crawler = BasicCrawler(configure_logging=False, request_manager=throttler)
+
+    with caplog.at_level(logging.WARNING, logger='crawlee'):
+        crawler._raise_for_session_blocked_status_code(
+            session=None, status_code=429, request_url='https://A.example.com/page1'
+        )
+        crawler._raise_for_session_blocked_status_code(
+            session=None, status_code=429, request_url='https://a.example.com/page2'
+        )
+        crawler._raise_for_session_blocked_status_code(
+            session=None, status_code=429, request_url='https://other.example.com/page1'
+        )
+
+    matching = [
+        r
+        for r in caplog.records
+        if 'not in the' in r.getMessage() and 'ThrottlingRequestManager.domains' in r.getMessage()
+    ]
+    assert len(matching) == 2
+    assert any('a.example.com' in r.getMessage() for r in matching)
+    assert any('other.example.com' in r.getMessage() for r in matching)

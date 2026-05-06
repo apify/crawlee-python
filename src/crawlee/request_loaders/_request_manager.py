@@ -22,6 +22,12 @@ class RequestManager(RequestLoader, ABC):
     async def drop(self) -> None:
         """Remove persistent state either from the Apify Cloud storage or from the local database."""
 
+    async def purge(self) -> None:
+        """Remove all queued requests from this manager while keeping it usable.
+
+        Default implementation is a no-op. Subclasses with persistent state should override to clear it.
+        """
+
     @abstractmethod
     async def add_request(
         self,
