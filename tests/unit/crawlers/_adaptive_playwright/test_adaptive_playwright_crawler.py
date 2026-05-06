@@ -236,6 +236,11 @@ async def test_adaptive_crawling_parsel(test_urls: list[str]) -> None:
     assert static_handler_count == 1
 
 
+@pytest.mark.flaky(
+    rerun=3,
+    reason='Test is flaky on Windows when Playwright hits net::ERR_NO_BUFFER_SPACE and retries, '
+    'causing the pre-nav hook to fire one extra time.',
+)
 async def test_adaptive_crawling_pre_nav_change_to_context(test_urls: list[str]) -> None:
     """Tests that context can be modified in pre-navigation hooks."""
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
