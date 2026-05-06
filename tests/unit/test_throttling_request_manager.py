@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -276,27 +277,65 @@ async def test_fetch_skips_throttled_sub_manager(
 
 
 async def test_sleep_when_all_throttled(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """When all domains are throttled and inner is empty, should sleep and retry."""
+    """When all domains are throttled and inner is empty, should wait and retry."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     await manager.add_request(url)
 
     manager.record_domain_delay(url, retry_after=timedelta(seconds=10))
 
-    target = 'crawlee.request_loaders._throttling_request_manager.asyncio.sleep'
-    with patch(target, new_callable=AsyncMock) as mock_sleep:
+    target = (
+        'crawlee.request_loaders._throttling_request_manager.ThrottlingRequestManager._wait_for_new_work_or_timeout'
+    )
+    with patch(target, new_callable=AsyncMock) as mock_wait:
 
-        async def sleep_side_effect(*_args: Any, **_kwargs: Any) -> None:
+        async def wait_side_effect(*_args: Any, **_kwargs: Any) -> None:
             # Set throttled_until firmly in the past so the next iteration reliably unblocks the domain
             # regardless of clock resolution or scheduling jitter on slow CI runners.
             manager._domain_states[THROTTLED_DOMAIN].throttled_until = datetime.now(timezone.utc) - timedelta(seconds=1)
 
-        mock_sleep.side_effect = sleep_side_effect
+        mock_wait.side_effect = wait_side_effect
 
         result = await manager.fetch_next_request()
 
-        mock_sleep.assert_called()
+        mock_wait.assert_called()
         assert result is not None
         assert result.url == url
+
+
+async def test_fetch_wakes_when_request_added_during_throttle_wait(
+    manager: ThrottlingRequestManager[RequestQueue],
+) -> None:
+    """When all sub-managers are throttled and inner is empty, fetch should wake up immediately
+    when a new request is added rather than blocking until the throttle expires."""
+    # Throttle the only configured domain for a long time so a naive sleep would block here.
+    throttled_url = f'https://{THROTTLED_DOMAIN}/page1'
+    await manager.add_request(throttled_url)
+    manager.record_domain_delay(throttled_url, retry_after=timedelta(seconds=60))
+
+    free_url = f'https://{NON_THROTTLED_DOMAIN}/page1'
+
+    # Wrap the wait helper so we can synchronize with the moment fetch enters the wait state.
+    wait_entered = asyncio.Event()
+    original_wait = manager._wait_for_new_work_or_timeout
+
+    async def signaling_wait(timeout: float) -> None:
+        wait_entered.set()
+        await original_wait(timeout)
+
+    manager._wait_for_new_work_or_timeout = signaling_wait  # ty: ignore[invalid-assignment]
+
+    fetch_task = asyncio.create_task(manager.fetch_next_request())
+
+    # Wait until fetch is suspended inside the wait, then add fresh non-throttled work.
+    await wait_entered.wait()
+    await manager.add_request(free_url)
+
+    # If the wake-up signal works, fetch returns the freshly-added request well within the
+    # 2s wait_for budget; otherwise it would still be blocked on the 60s throttle.
+    result = await asyncio.wait_for(fetch_task, timeout=2.0)
+
+    assert result is not None
+    assert result.url == free_url
 
 
 # ── Delegation Tests ────────────────────────────────────

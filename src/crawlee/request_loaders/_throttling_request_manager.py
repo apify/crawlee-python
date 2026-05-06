@@ -7,6 +7,7 @@ configured domains into dedicated sub-managers and applying intelligent delay-aw
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
@@ -137,6 +138,9 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         self._request_manager_opener = request_manager_opener
         self._domain_states: dict[str, _DomainState] = {d: _DomainState(domain=d) for d in domains}
         self._sub_managers: dict[str, TRequestManager] = {}
+        self._new_work_event = asyncio.Event()
+        """Set whenever a request is added or reclaimed. Lets `fetch_next_request` wake from a throttle
+        wait early when fresh work appears, instead of sleeping for the full computed cooldown."""
 
     @staticmethod
     def _extract_domain(url: str) -> str:
@@ -290,9 +294,12 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         if domain in self._domain_states:
             sm = await self._get_or_create_sub_manager(domain)
-            return await sm.add_request(request, forefront=forefront)
+            result = await sm.add_request(request, forefront=forefront)
+        else:
+            result = await self._inner.add_request(request, forefront=forefront)
 
-        return await self._inner.add_request(request, forefront=forefront)
+        self._new_work_event.set()
+        return result
 
     @override
     async def add_requests(
@@ -339,12 +346,19 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
             )
 
+        if inner_requests or domain_requests:
+            self._new_work_event.set()
+
     @override
     async def reclaim_request(self, request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
         domain = self._extract_domain(request.url)
         if domain in self._domain_states and domain in self._sub_managers:
-            return await self._sub_managers[domain].reclaim_request(request, forefront=forefront)
-        return await self._inner.reclaim_request(request, forefront=forefront)
+            result = await self._sub_managers[domain].reclaim_request(request, forefront=forefront)
+        else:
+            result = await self._inner.reclaim_request(request, forefront=forefront)
+
+        self._new_work_event.set()
+        return result
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
@@ -395,10 +409,15 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         Sub-managers are checked in order of longest-overdue domain first (sorted by `throttled_until`
         ascending). If all configured domains are throttled, falls back to the inner manager for non-throttled
-        domains. If the inner manager is also empty and all sub-managers are throttled, sleeps until the
-        earliest domain becomes available.
+        domains. If the inner manager is also empty and all sub-managers are throttled, waits until either the
+        earliest domain becomes available or new work is added (whichever comes first).
         """
         while True:
+            # Clear the event before checking the queues. Any add/reclaim that races with this iteration
+            # will set the event again, so the wait at the end of the loop returns immediately rather
+            # than blocking until the throttle expires.
+            self._new_work_event.clear()
+
             available_domains = sorted(
                 (
                     domain
@@ -432,6 +451,16 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             )
             logger.debug(
                 f'All configured domains are throttled and inner manager is empty. '
-                f'Sleeping {sleep_duration:.1f}s until earliest domain is available.'
+                f'Waiting up to {sleep_duration:.1f}s for earliest domain to become available or new work.'
             )
-            await asyncio.sleep(sleep_duration)
+            await self._wait_for_new_work_or_timeout(sleep_duration)
+
+    async def _wait_for_new_work_or_timeout(self, timeout: float) -> None:
+        """Wait until new work is signaled or `timeout` seconds elapse, whichever comes first.
+
+        The signal is set by `add_request`, `add_requests`, and `reclaim_request`, allowing
+        `fetch_next_request` to wake up immediately when fresh work appears during a throttle wait
+        instead of sleeping for the full computed cooldown (up to `max_delay`).
+        """
+        with contextlib.suppress(asyncio.TimeoutError):
+            await asyncio.wait_for(self._new_work_event.wait(), timeout=timeout)
