@@ -173,6 +173,26 @@ async def test_retry_after_header_priority(manager: ThrottlingRequestManager[Req
     assert actual_delay <= timedelta(seconds=31)
 
 
+async def test_retry_after_exceeding_max_delay_logs_warning(
+    manager: ThrottlingRequestManager[RequestQueue],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A Retry-After value above max_delay should still be capped, but emit a warning."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+
+    with caplog.at_level('WARNING', logger='crawlee.request_loaders._throttling_request_manager'):
+        manager.record_domain_delay(url, retry_after=manager._max_delay + timedelta(seconds=240))
+
+    state = manager._domain_states[THROTTLED_DOMAIN]
+    actual_delay = state.throttled_until - datetime.now(timezone.utc)
+    assert actual_delay <= manager._max_delay + timedelta(seconds=1)
+
+    warnings = [r for r in caplog.records if r.levelname == 'WARNING']
+    assert len(warnings) == 1
+    assert 'Retry-After header' in warnings[0].message
+    assert THROTTLED_DOMAIN in warnings[0].message
+
+
 async def test_success_resets_backoff(manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """Successful request should reset the consecutive 429 count."""
     url = f'https://{THROTTLED_DOMAIN}/page1'

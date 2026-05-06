@@ -177,7 +177,14 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         state.consecutive_429_count += 1
         delay = retry_after if retry_after is not None else self._base_delay * (2 ** (state.consecutive_429_count - 1))
-        delay = min(delay, self._max_delay)
+        if delay > self._max_delay:
+            source = 'Retry-After header' if retry_after is not None else 'exponential backoff'
+            logger.warning(
+                f'Capping {source} delay of {delay.total_seconds():.1f}s for domain "{state.domain}" '
+                f'to max_delay ({self._max_delay.total_seconds():.1f}s); the domain may continue to rate-limit. '
+                f'Consider increasing max_delay if this recurs.'
+            )
+            delay = self._max_delay
         state.throttled_until = datetime.now(timezone.utc) + delay
 
         logger.info(
