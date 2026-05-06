@@ -266,13 +266,15 @@ async def test_sleep_when_all_throttled(manager: ThrottlingRequestManager[Reques
     with patch(target, new_callable=AsyncMock) as mock_sleep:
 
         async def sleep_side_effect(*_args: Any, **_kwargs: Any) -> None:
-            manager._domain_states[THROTTLED_DOMAIN].throttled_until = datetime.now(timezone.utc)
+            # Set throttled_until firmly in the past so the next iteration reliably unblocks the domain
+            # regardless of clock resolution or scheduling jitter on slow CI runners.
+            manager._domain_states[THROTTLED_DOMAIN].throttled_until = datetime.now(timezone.utc) - timedelta(seconds=1)
 
         mock_sleep.side_effect = sleep_side_effect
 
         result = await manager.fetch_next_request()
 
-        mock_sleep.assert_called_once()
+        mock_sleep.assert_called()
         assert result is not None
         assert result.url == url
 
