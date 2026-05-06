@@ -42,13 +42,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
       - name: Install Apify CLI
-        run: pnpm add -g apify-cli
+        uses: apify/setup-apify-cli-action@v1
+        with:
+          token: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v6
