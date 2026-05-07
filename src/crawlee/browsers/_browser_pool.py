@@ -366,8 +366,13 @@ class BrowserPool:
 
         try:
             await self._execute_hooks(self._post_launch_hooks, page_id, browser)
-        except Exception:
-            await browser.close(force=True)
+        except BaseException:
+            # Catch BaseException to also clean up on CancelledError raised by the outer
+            # asyncio.wait_for(operation_timeout) wrapping this call.
+            try:
+                await browser.close(force=True)
+            except Exception:
+                logger.exception('Failed to close browser after post_launch_hook error.')
             raise
 
         self._active_browsers.append(browser)
@@ -412,7 +417,7 @@ class BrowserPool:
         """Register a hook to be called just before a new browser is launched.
 
         The hook receives the page ID that triggered the launch and the `BrowserPlugin` being used.
-        Mutating `plugin.browser_launch_options` affects all future launches, not just the current one.
+        Use it for logging, metrics, or other side effects scoped to the browser launch.
         """
         self._pre_launch_hooks.append(hook)
         return hook

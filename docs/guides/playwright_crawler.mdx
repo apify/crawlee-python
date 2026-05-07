@@ -58,15 +58,21 @@ You can also configure each plugin used by <ApiLink to="class/BrowserPool">`Brow
 
 For an example of how to implement a custom browser plugin, see the [Camoufox example](../examples/playwright-crawler-with-camoufox). [Camoufox](https://camoufox.com/) is a stealth browser plugin designed to reduce detection by anti-scraping measures and is fully compatible with <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.
 
-The <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> also exposes <ApiLink to="class/BrowserPool#pre_launch_hook">`pre_launch_hook`</ApiLink> and <ApiLink to="class/BrowserPool#post_launch_hook">`post_launch_hook`</ApiLink> - called once per browser instance, before and after it is launched. Use them for logging, metrics, or any setup at the browser level. Note that these hooks are not called when a new page is created in an already-running browser.
+## Browser pool lifecycle hooks
+
+The <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> exposes lifecycle hooks for both browser launches and page creation/closure. To use them, create a `BrowserPool` instance and pass it to <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> via the `browser_pool` argument.
+
+### Browser launch hooks
+
+The <ApiLink to="class/BrowserPool#pre_launch_hook">`pre_launch_hook`</ApiLink> and <ApiLink to="class/BrowserPool#post_launch_hook">`post_launch_hook`</ApiLink> are called once per browser instance, before and after it is launched. Use them for logging, metrics, or any setup at the browser level. Note that these hooks are not called when a new page is created in an already-running browser.
 
 <RunnableCodeBlock className="language-python" language="python">
     {BrowserPoolLaunchHooksExample}
 </RunnableCodeBlock>
 
-## Page configuration with lifecycle page hooks
+### Page lifecycle hooks
 
-For additional setup or event-driven actions around page creation and closure, the <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> exposes four lifecycle hooks: <ApiLink to="class/BrowserPool#pre_page_create_hook">`pre_page_create_hook`</ApiLink>, <ApiLink to="class/BrowserPool#post_page_create_hook">`post_page_create_hook`</ApiLink>, <ApiLink to="class/BrowserPool#pre_page_close_hook">`pre_page_close_hook`</ApiLink>, and <ApiLink to="class/BrowserPool#post_page_close_hook">`post_page_close_hook`</ApiLink>. To use them, create a `BrowserPool` instance and pass it to <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> via the `browser_pool` argument.
+For additional setup or event-driven actions around page creation and closure, the <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> exposes four hooks: <ApiLink to="class/BrowserPool#pre_page_create_hook">`pre_page_create_hook`</ApiLink>, <ApiLink to="class/BrowserPool#post_page_create_hook">`post_page_create_hook`</ApiLink>, <ApiLink to="class/BrowserPool#pre_page_close_hook">`pre_page_close_hook`</ApiLink>, and <ApiLink to="class/BrowserPool#post_page_close_hook">`post_page_close_hook`</ApiLink>.
 
 <RunnableCodeBlock className="language-python" language="python">
     {BrowserPoolPageHooksExample}
