@@ -715,6 +715,50 @@ async def test_purge(
     await rq.drop()
 
 
+async def test_purge_falls_back_to_drop_when_not_implemented(
+    storage_client: StorageClient,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that `purge` falls back to drop+recreate when the underlying client raises `NotImplementedError`.
+
+    Some storage clients (e.g. the Apify platform client) do not support purging. In that case `purge` should
+    drop and recreate the queue instead of propagating the error, so that callers like `BasicCrawler` keep
+    working on repeated runs.
+    """
+    rq = await RequestQueue.open(
+        name='purge-fallback-test',
+        storage_client=storage_client,
+    )
+
+    await rq.add_requests(['https://example.com/1', 'https://example.com/2'])
+    metadata = await rq.get_metadata()
+    assert metadata.pending_request_count == 2
+
+    async def _raise_not_implemented(self: object) -> None:
+        raise NotImplementedError('Purge is not supported.')
+
+    monkeypatch.setattr(type(rq._client), 'purge', _raise_not_implemented)
+
+    with caplog.at_level('WARNING'):
+        await rq.purge()
+
+    assert any('does not support purging' in rec.message for rec in caplog.records)
+
+    # The queue should be empty and usable.
+    metadata = await rq.get_metadata()
+    assert metadata.pending_request_count == 0
+    assert metadata.total_request_count == 0
+    assert metadata.handled_request_count == 0
+
+    await rq.add_request('https://example.com/after-purge')
+    request = await rq.fetch_next_request()
+    assert request is not None
+    assert request.url == 'https://example.com/after-purge'
+
+    await rq.drop()
+
+
 async def test_open_with_alias(
     storage_client: StorageClient,
 ) -> None:

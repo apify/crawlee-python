@@ -150,7 +150,17 @@ class RequestQueue(Storage, RequestManager):
 
     @override
     async def purge(self) -> None:
-        await self._client.purge()
+        try:
+            await self._client.purge()
+        except NotImplementedError:
+            logger.warning(
+                f'Storage client "{type(self._client).__name__}" does not support purging the request queue. '
+                'Falling back to dropping and recreating it; the request queue ID may change.'
+            )
+            await self.drop()
+            new_rq = await RequestQueue.open(name=self._name)
+            self._client = new_rq._client  # noqa: SLF001
+            self._id = new_rq._id  # noqa: SLF001
 
     @override
     async def add_request(
