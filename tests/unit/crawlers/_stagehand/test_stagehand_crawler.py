@@ -137,14 +137,21 @@ async def test_stagehand_page_ai_methods_delegate_to_session(
     stagehand_session_mock: MagicMock,
     server_url: URL,
 ) -> None:
+    page_session_check_mock = AsyncMock()
+
     @patched_crawler.router.default_handler
     async def handler(context: StagehandCrawlingContext) -> None:
         await context.page.act(input='click button')
         await context.page.extract(instruction='get title')
         await context.page.observe(instruction='find links')
         await context.page.execute(agent_config={}, execute_options={'instruction': 'run script'})
+        await page_session_check_mock(context.page.stagehand_session)
 
     await patched_crawler.run([str(server_url)])
+
+    # Check that `context.page.stagehand_session` is correct Stagehand session created
+    # by the controller and passed to the page.
+    page_session_check_mock.assert_awaited_once_with(stagehand_session_mock)
 
     for method_name, argument in (
         ('act', 'input'),

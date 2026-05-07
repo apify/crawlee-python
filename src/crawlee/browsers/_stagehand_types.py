@@ -47,7 +47,7 @@ class StagehandOptions:
     """Browserbase project ID, required when `env='BROWSERBASE'`. If not provided, read from
     the `BROWSERBASE_PROJECT_ID` environment variable."""
 
-    model: str = 'openai/gpt-4.1-mini'
+    model: str = 'openai/gpt-5.4-nano'
     """The AI model to use for page operations."""
 
     verbose: Literal[0, 1, 2] = 0
@@ -84,6 +84,11 @@ class StagehandPage(Page):
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._page, name)
+
+    @property
+    def stagehand_session(self) -> AsyncSession:
+        """Provides access to the underlying Stagehand session."""
+        return self._session
 
     async def act(self, **kwargs: Unpack[SessionActParamsNonStreaming]) -> SessionActResponse:
         """Perform an action on the page using natural language. Argument `page` is automatically set.

@@ -9,7 +9,7 @@ async def main() -> None:
     crawler = StagehandCrawler(
         stagehand_options=StagehandOptions(
             model_api_key='your-openai-api-key',
-            model='openai/gpt-4.1-mini',
+            model='openai/gpt-5.4-nano',
         ),
         max_requests_per_crawl=5,
     )

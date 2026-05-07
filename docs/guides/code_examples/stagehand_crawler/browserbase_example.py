@@ -13,7 +13,7 @@ async def main() -> None:
             browserbase_api_key='your-browserbase-api-key',
             project_id='your-project-id',
             model_api_key='your-openai-api-key',
-            model='openai/gpt-4.1-mini',
+            model='openai/gpt-5.4-nano',
         ),
         max_requests_per_crawl=5,
     )

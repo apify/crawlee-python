@@ -185,6 +185,8 @@ class StagehandBrowserController(BrowserController):
             if self._browser is not None and self._browser.is_connected():
                 await self._browser.close()
         finally:
+            # `self._browser` is intentionally not reset, `None` means "not yet started" and
+            # `self._browser.is_connected() == False` means "closed" in `is_browser_connected` property.
             self._session = None
             self._browser_context = None
 

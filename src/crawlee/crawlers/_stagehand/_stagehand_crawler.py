@@ -56,7 +56,7 @@ class StagehandCrawler(
     - `page.execute(**kwargs)` - run an autonomous multi-step agent
 
     Stagehand configuration (model, API key, environment) is provided via `stagehand_options`.
-    By default, the crawler runs locally using the `openai/gpt-4.1-mini` model.
+    By default, the crawler runs locally using the `openai/gpt-5.4-nano` model.
 
     ### Usage
 
@@ -68,7 +68,7 @@ class StagehandCrawler(
     crawler = StagehandCrawler(
         stagehand_options=StagehandOptions(
             model_api_key='sk-...',
-            model='openai/gpt-4.1-mini',
+            model='openai/gpt-5.4-nano',
         ),
     )
 
