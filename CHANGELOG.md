@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Filter sitemap-derived URLs by enqueue strategy ([#1864](https://github.com/apify/crawlee-python/pull/1864)) ([b3db0dc](https://github.com/apify/crawlee-python/commit/b3db0dccbcb679d9e67e7996a97ac2c6ed364456)) by [@vdusek](https://github.com/vdusek)
 - Bump `BrowserPool` default `operation_timeout` to 60 seconds ([#1877](https://github.com/apify/crawlee-python/pull/1877)) ([38e7dd2](https://github.com/apify/crawlee-python/commit/38e7dd209ed332b55aff4da29859089e6e453d59)) by [@vdusek](https://github.com/vdusek)
 - **redis:** Prevent counter corruption from concurrent mark handled in Redis RQ ([#1878](https://github.com/apify/crawlee-python/pull/1878)) ([50d70f0](https://github.com/apify/crawlee-python/commit/50d70f06402e76e676dca45e333f0d7580d47add)) by [@Mantisus](https://github.com/Mantisus), closes [#1873](https://github.com/apify/crawlee-python/issues/1873)
+- Fall back to drop+recreate when `RequestQueue.purge` is unsupported ([#1883](https://github.com/apify/crawlee-python/pull/1883)) ([cd15dce](https://github.com/apify/crawlee-python/commit/cd15dce37cf0ca9419625339e60da54f76aead7b)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->
