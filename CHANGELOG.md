@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Add `use` to `Router` for middleware support with pre-handler execution ([#1857](https://github.com/apify/crawlee-python/pull/1857)) ([23d7d6c](https://github.com/apify/crawlee-python/commit/23d7d6c5865a05b75bc6c68490e3382d876cde64)) by [@Mantisus](https://github.com/Mantisus), closes [#1742](https://github.com/apify/crawlee-python/issues/1742)
 - Add opt-in per-domain request throttling for HTTP 429 backoff ([#1762](https://github.com/apify/crawlee-python/pull/1762)) ([c17f4d5](https://github.com/apify/crawlee-python/commit/c17f4d52883763519776d9296b71457b6d3063f0)) by [@MrAliHasan](https://github.com/MrAliHasan), closes [#1437](https://github.com/apify/crawlee-python/issues/1437)
+- Add pre&#x2F;post launch hooks to `BrowserPool` ([#1879](https://github.com/apify/crawlee-python/pull/1879)) ([00ffb7e](https://github.com/apify/crawlee-python/commit/00ffb7e52bed73bc4da7ea34102d589741a3fdf3)) by [@Mantisus](https://github.com/Mantisus), closes [#1741](https://github.com/apify/crawlee-python/issues/1741)
 
 ### 🐛 Bug Fixes
 
