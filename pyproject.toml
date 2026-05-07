@@ -50,7 +50,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-all = ["crawlee[adaptive-crawler,beautifulsoup,cli,curl-impersonate,httpx,parsel,playwright,otel,sql_sqlite,sql_postgres,redis]"]
+all = ["crawlee[adaptive-crawler,beautifulsoup,cli,curl-impersonate,httpx,parsel,playwright,otel,sql_sqlite,sql_postgres,stagehand,redis]"]
 adaptive-crawler = [
     "jaro-winkler>=2.0.3",
     "playwright>=1.27.0",
@@ -76,6 +76,12 @@ otel = [
 sql_postgres = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
     "asyncpg>=0.24.0"
+]
+stagehand = [
+    "stagehand>=3.19.5",
+    "playwright>=1.27.0",
+    "apify_fingerprint_datapoints>=0.0.2",
+    "browserforge>=1.2.3",
 ]
 sql_sqlite = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",

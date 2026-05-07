@@ -17,6 +17,13 @@ with _try_import(__name__, 'PlaywrightBrowserPlugin'):
 with _try_import(__name__, 'PlaywrightPersistentBrowser'):
     from ._playwright_browser import PlaywrightPersistentBrowser
 
+with _try_import(__name__, 'StagehandBrowserController'):
+    from ._stagehand_browser_controller import StagehandBrowserController
+with _try_import(__name__, 'StagehandBrowserPlugin'):
+    from ._stagehand_browser_plugin import StagehandBrowserPlugin
+with _try_import(__name__, 'StagehandOptions', 'StagehandPage'):
+    from ._stagehand_types import StagehandOptions, StagehandPage
+
 
 __all__ = [
     'BrowserPool',
@@ -25,4 +32,8 @@ __all__ = [
     'PlaywrightBrowserController',
     'PlaywrightBrowserPlugin',
     'PlaywrightPersistentBrowser',
+    'StagehandBrowserController',
+    'StagehandBrowserPlugin',
+    'StagehandOptions',
+    'StagehandPage',
 ]

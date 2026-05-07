@@ -35,14 +35,11 @@ from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContex
 from ._types import BlockRequestsFunction, GotoOptions
 from ._utils import block_requests, infinite_scroll
 
-TCrawlingContext = TypeVar('TCrawlingContext', bound=PlaywrightCrawlingContext)
-TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
-
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator, Mapping
     from pathlib import Path
 
-    from playwright.async_api import Page, Route
+    from playwright.async_api import Page, Response, Route
     from playwright.async_api import Request as PlaywrightRequest
     from typing_extensions import Unpack
 
@@ -57,8 +54,21 @@ if TYPE_CHECKING:
     from crawlee.browsers._types import BrowserType
 
 
+TPreNavContext = TypeVar(
+    'TPreNavContext', bound=PlaywrightPreNavCrawlingContext, default=PlaywrightPreNavCrawlingContext
+)
+TPostNavContext = TypeVar(
+    'TPostNavContext', bound=PlaywrightPostNavCrawlingContext, default=PlaywrightPostNavCrawlingContext
+)
+TCrawlingContext = TypeVar('TCrawlingContext', bound=PlaywrightCrawlingContext, default=PlaywrightCrawlingContext)
+TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
+
+
 @docs_group('Crawlers')
-class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]):
+class PlaywrightCrawler(
+    BasicCrawler[TCrawlingContext, StatisticsState],
+    Generic[TPreNavContext, TPostNavContext, TCrawlingContext],
+):
     """A web crawler that leverages the `Playwright` browser automation library.
 
     The `PlaywrightCrawler` builds on top of the `BasicCrawler`, which means it inherits all of its features.
@@ -98,6 +108,11 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
     ```
     """
 
+    # Define the context classes used in context factory.
+    _PRE_NAV_CONTEXT_CLASS = PlaywrightPreNavCrawlingContext
+    _POST_NAV_CONTEXT_CLASS = PlaywrightPostNavCrawlingContext
+    _CRAWLING_CONTEXT_CLASS = PlaywrightCrawlingContext
+
     def __init__(
         self,
         *,
@@ -111,7 +126,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         headless: bool | None = None,
         use_incognito_pages: bool | None = None,
         navigation_timeout: timedelta | None = None,
-        **kwargs: Unpack[BasicCrawlerOptions[PlaywrightCrawlingContext, StatisticsState]],
+        **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext, StatisticsState]],
     ) -> None:
         """Initialize a new instance.
 
@@ -203,8 +218,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         )
         kwargs['_additional_context_managers'] = [self._browser_pool]
         kwargs.setdefault('_logger', logging.getLogger(__name__))
-        self._pre_navigation_hooks: list[Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]] = []
-        self._post_navigation_hooks: list[Callable[[PlaywrightPostNavCrawlingContext], Awaitable[None]]] = []
+        self._pre_navigation_hooks: list[Callable[[TPreNavContext], Awaitable[None]]] = []
+        self._post_navigation_hooks: list[Callable[[TPostNavContext], Awaitable[None]]] = []
 
         kwargs['http_client'] = PlaywrightHttpClient() if not kwargs.get('http_client') else kwargs['http_client']
 
@@ -229,17 +244,65 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         finally:
             self._shared_navigation_timeouts.pop(request_id, None)
 
-    async def _open_page(
+    def _build_pre_nav_context(
         self,
         context: BasicCrawlingContext,
-    ) -> AsyncGenerator[PlaywrightPreNavCrawlingContext, None]:
-        if self._browser_pool is None:
-            raise ValueError('Browser pool is not initialized.')
+        page: Page,
+    ) -> TPreNavContext:
+        """Build the pre-navigation context by adding Playwright page."""
+        return cast(
+            'TPreNavContext',
+            self._PRE_NAV_CONTEXT_CLASS(
+                request=context.request,
+                session=context.session,
+                add_requests=context.add_requests,
+                send_request=context.send_request,
+                push_data=context.push_data,
+                use_state=context.use_state,
+                proxy_info=context.proxy_info,
+                get_key_value_store=context.get_key_value_store,
+                log=context.log,
+                register_deferred_cleanup=context.register_deferred_cleanup,
+                page=page,
+                block_requests=cast('BlockRequestsFunction', partial(block_requests, page=page)),
+                goto_options=GotoOptions(**self._goto_options),
+            ),
+        )
 
-        # Create a new browser page
-        crawlee_page = await self._browser_pool.new_page(proxy_info=context.proxy_info)
+    def _build_post_nav_context(
+        self,
+        context: TPreNavContext,
+        response: Response,
+    ) -> TPostNavContext:
+        """Build the post-navigation context by adding Playwright response."""
+        return cast(
+            'TPostNavContext',
+            self._POST_NAV_CONTEXT_CLASS(
+                request=context.request,
+                session=context.session,
+                add_requests=context.add_requests,
+                send_request=context.send_request,
+                push_data=context.push_data,
+                use_state=context.use_state,
+                proxy_info=context.proxy_info,
+                get_key_value_store=context.get_key_value_store,
+                log=context.log,
+                register_deferred_cleanup=context.register_deferred_cleanup,
+                page=context.page,
+                block_requests=context.block_requests,
+                goto_options=context.goto_options,
+                response=response,
+            ),
+        )
 
-        pre_navigation_context = PlaywrightPreNavCrawlingContext(
+    def _build_crawling_context(
+        self,
+        context: TPostNavContext,
+    ) -> TCrawlingContext:
+        """Build the final crawling context by adding Playwright-specific helper methods."""
+        extract_links = self._create_extract_links_function(context)
+
+        return self._CRAWLING_CONTEXT_CLASS(
             request=context.request,
             session=context.session,
             add_requests=context.add_requests,
@@ -250,10 +313,26 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
             get_key_value_store=context.get_key_value_store,
             log=context.log,
             register_deferred_cleanup=context.register_deferred_cleanup,
-            page=crawlee_page.page,
-            block_requests=cast('BlockRequestsFunction', partial(block_requests, page=crawlee_page.page)),
-            goto_options=GotoOptions(**self._goto_options),
+            page=context.page,
+            goto_options=context.goto_options,
+            response=context.response,
+            infinite_scroll=lambda: infinite_scroll(context.page),
+            extract_links=extract_links,
+            enqueue_links=self._create_enqueue_links_function(context, extract_links),
+            block_requests=context.block_requests,
         )
+
+    async def _open_page(
+        self,
+        context: BasicCrawlingContext,
+    ) -> AsyncGenerator[TPreNavContext, None]:
+        if self._browser_pool is None:
+            raise ValueError('Browser pool is not initialized.')
+
+        # Create a new browser page
+        crawlee_page = await self._browser_pool.new_page(proxy_info=context.proxy_info)
+
+        pre_navigation_context = self._build_pre_nav_context(context, page=crawlee_page.page)
 
         request_id = id(pre_navigation_context.request)
 
@@ -290,8 +369,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
     async def _navigate(
         self,
-        context: PlaywrightPreNavCrawlingContext,
-    ) -> AsyncGenerator[PlaywrightPostNavCrawlingContext, Exception | None]:
+        context: TPreNavContext,
+    ) -> AsyncGenerator[TPostNavContext, Exception | None]:
         """Execute an HTTP request utilizing the `BrowserPool` and the `Playwright` library.
 
         Args:
@@ -352,24 +431,9 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         # Set the loaded URL to the actual URL after redirection.
         context.request.loaded_url = context.page.url
 
-        yield PlaywrightPostNavCrawlingContext(
-            request=context.request,
-            session=context.session,
-            add_requests=context.add_requests,
-            send_request=context.send_request,
-            push_data=context.push_data,
-            use_state=context.use_state,
-            proxy_info=context.proxy_info,
-            get_key_value_store=context.get_key_value_store,
-            log=context.log,
-            register_deferred_cleanup=context.register_deferred_cleanup,
-            page=context.page,
-            block_requests=context.block_requests,
-            goto_options=context.goto_options,
-            response=response,
-        )
+        yield self._build_post_nav_context(context, response=response)
 
-    def _create_extract_links_function(self, context: PlaywrightPreNavCrawlingContext) -> ExtractLinksFunction:
+    def _create_extract_links_function(self, context: TPostNavContext) -> ExtractLinksFunction:
         """Create a callback function for extracting links from context.
 
         Args:
@@ -451,9 +515,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
         return extract_links
 
-    async def _handle_status_code_response(
-        self, context: PlaywrightPostNavCrawlingContext
-    ) -> AsyncGenerator[PlaywrightPostNavCrawlingContext, None]:
+    async def _handle_status_code_response(self, context: TPostNavContext) -> AsyncGenerator[TPostNavContext, None]:
         """Validate the HTTP status code and raise appropriate exceptions if needed.
 
         Args:
@@ -480,8 +542,8 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
     async def _handle_blocked_request_by_content(
         self,
-        context: PlaywrightPostNavCrawlingContext,
-    ) -> AsyncGenerator[PlaywrightPostNavCrawlingContext, None]:
+        context: TPostNavContext,
+    ) -> AsyncGenerator[TPostNavContext, None]:
         """Try to detect if the request is blocked based on the response content.
 
         Args:
@@ -507,9 +569,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
         yield context
 
-    async def _execute_post_navigation_hooks(
-        self, context: PlaywrightPostNavCrawlingContext
-    ) -> AsyncGenerator[PlaywrightPostNavCrawlingContext, None]:
+    async def _execute_post_navigation_hooks(self, context: TPostNavContext) -> AsyncGenerator[TPostNavContext, None]:
         request_id = id(context.request)
 
         for hook in self._post_navigation_hooks:
@@ -518,36 +578,14 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
 
         yield context
 
-    async def _create_crawling_context(
-        self, context: PlaywrightPostNavCrawlingContext
-    ) -> AsyncGenerator[PlaywrightCrawlingContext, None]:
-        extract_links = self._create_extract_links_function(context)
-
-        yield PlaywrightCrawlingContext(
-            request=context.request,
-            session=context.session,
-            add_requests=context.add_requests,
-            send_request=context.send_request,
-            push_data=context.push_data,
-            use_state=context.use_state,
-            proxy_info=context.proxy_info,
-            get_key_value_store=context.get_key_value_store,
-            log=context.log,
-            register_deferred_cleanup=context.register_deferred_cleanup,
-            page=context.page,
-            goto_options=context.goto_options,
-            response=context.response,
-            infinite_scroll=lambda: infinite_scroll(context.page),
-            extract_links=extract_links,
-            enqueue_links=self._create_enqueue_links_function(context, extract_links),
-            block_requests=cast('BlockRequestsFunction', partial(block_requests, page=context.page)),
-        )
+    async def _create_crawling_context(self, context: TPostNavContext) -> AsyncGenerator[TCrawlingContext, None]:
+        yield self._build_crawling_context(context)
 
         if context.session:
             pw_cookies = await self._get_cookies(context.page)
             context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
 
-    def pre_navigation_hook(self, hook: Callable[[PlaywrightPreNavCrawlingContext], Awaitable[None]]) -> None:
+    def pre_navigation_hook(self, hook: Callable[[TPreNavContext], Awaitable[None]]) -> None:
         """Register a hook to be called before each navigation.
 
         Args:
@@ -555,7 +593,7 @@ class PlaywrightCrawler(BasicCrawler[PlaywrightCrawlingContext, StatisticsState]
         """
         self._pre_navigation_hooks.append(hook)
 
-    def post_navigation_hook(self, hook: Callable[[PlaywrightPostNavCrawlingContext], Awaitable[None]]) -> None:
+    def post_navigation_hook(self, hook: Callable[[TPostNavContext], Awaitable[None]]) -> None:
         """Register a hook to be called after each navigation.
 
         Args:
