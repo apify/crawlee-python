@@ -153,12 +153,23 @@ class RequestQueue(Storage, RequestManager):
         try:
             await self._client.purge()
         except NotImplementedError:
+            client_name = type(self._client).__name__
+            if self._name is not None:
+                logger.warning(
+                    f'Storage client "{client_name}" does not support purging the request queue. '
+                    f'Skipping purge for named queue "{self._name}" to avoid destroying persistent data; '
+                    'the queue contents are left intact.'
+                )
+                return
             logger.warning(
-                f'Storage client "{type(self._client).__name__}" does not support purging the request queue. '
-                'Falling back to dropping and recreating it; the request queue ID may change.'
+                f'Storage client "{client_name}" does not support purging the request queue. '
+                'Falling back to dropping and recreating the unnamed queue; the request queue ID may change.'
             )
             await self.drop()
-            new_rq = await RequestQueue.open(name=self._name)
+            # Override `purge_on_start` so the storage client does not try to purge the freshly recreated
+            # (and necessarily empty) queue and re-raise the same `NotImplementedError`.
+            recreate_config = service_locator.get_configuration().model_copy(update={'purge_on_start': False})
+            new_rq = await RequestQueue.open(configuration=recreate_config)
             self._client = new_rq._client  # noqa: SLF001
             self._id = new_rq._id  # noqa: SLF001
 
