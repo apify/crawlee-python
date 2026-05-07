@@ -49,7 +49,7 @@ class BrowserPool:
         self,
         plugins: Sequence[BrowserPlugin] | None = None,
         *,
-        operation_timeout: timedelta = timedelta(seconds=15),
+        operation_timeout: timedelta = timedelta(seconds=60),
         browser_inactive_threshold: timedelta = timedelta(seconds=10),
         identify_inactive_browsers_interval: timedelta = timedelta(seconds=20),
         close_inactive_browsers_interval: timedelta = timedelta(seconds=30),
