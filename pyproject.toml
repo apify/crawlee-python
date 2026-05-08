@@ -337,6 +337,7 @@ uv run pytest \
 cmd = """
 uv run pytest \
     --numprocesses=${TESTS_CONCURRENCY:-auto} \
+    --basetemp=./.pytest-tmp \
     tests/e2e/project_template
 """
 
