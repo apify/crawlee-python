@@ -1,19 +1,20 @@
 # First, specify the base Docker image.
 # You can see the Docker images from Apify at https://hub.docker.com/r/apify/.
 # You can also use any other image from Docker Hub.
-# % if cookiecutter.crawler_type == 'playwright'
-FROM apify/actor-python-playwright:3.13
+# % if cookiecutter.crawler_type == 'playwright' or cookiecutter.crawler_type.startswith('adaptive-')
+# % set base_image = 'apify/actor-python-playwright:3.13'
 # % elif cookiecutter.crawler_type == 'playwright-camoufox'
-FROM apify/actor-python-playwright-camoufox:3.13
+# % set base_image = 'apify/actor-python-playwright-camoufox:3.13'
 # % elif cookiecutter.crawler_type == 'playwright-chrome'
-FROM apify/actor-python-playwright-chrome:3.13
+# % set base_image = 'apify/actor-python-playwright-chrome:3.13'
 # % elif cookiecutter.crawler_type == 'playwright-firefox'
-FROM apify/actor-python-playwright-firefox:3.13
+# % set base_image = 'apify/actor-python-playwright-firefox:3.13'
 # % elif cookiecutter.crawler_type == 'playwright-webkit'
-FROM apify/actor-python-playwright-webkit:3.13
+# % set base_image = 'apify/actor-python-playwright-webkit:3.13'
 # % else
-FROM apify/actor-python:3.13
+# % set base_image = 'apify/actor-python:3.13'
 # % endif
+FROM {{ base_image }}
 
 RUN apt update && apt install -yq git && rm -rf /var/lib/apt/lists/*
 

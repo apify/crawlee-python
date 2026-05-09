@@ -26,6 +26,9 @@ from tests.e2e.project_template.utils import patch_crawlee_version_in_project
         pytest.param('playwright', marks=pytest.mark.playwright),
         pytest.param('parsel', marks=pytest.mark.parsel),
         pytest.param('beautifulsoup', marks=pytest.mark.beautifulsoup),
+        pytest.param('http', marks=pytest.mark.http),
+        pytest.param('adaptive-beautifulsoup', marks=pytest.mark.adaptive_beautifulsoup),
+        pytest.param('adaptive-parsel', marks=pytest.mark.adaptive_parsel),
     ],
 )
 @pytest.mark.parametrize(

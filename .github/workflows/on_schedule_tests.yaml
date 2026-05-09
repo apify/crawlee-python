@@ -27,7 +27,7 @@ jobs:
       fail-fast: false
       max-parallel: 12
       matrix:
-        crawler-type: ["playwright_camoufox", "playwright_chrome", "playwright_firefox", "playwright_webkit", "playwright", "parsel", "beautifulsoup"]
+        crawler-type: ["playwright_camoufox", "playwright_chrome", "playwright_firefox", "playwright_webkit", "playwright", "parsel", "beautifulsoup", "http", "adaptive_beautifulsoup", "adaptive_parsel"]
         http-client: ["httpx", "curl_impersonate", "impit"]
         package-manager: ["pip", "uv", "poetry"]
 

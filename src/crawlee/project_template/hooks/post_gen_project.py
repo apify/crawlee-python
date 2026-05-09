@@ -12,7 +12,7 @@ subprocess.check_call(['poetry', 'install'])
 subprocess.check_call(['uv', 'sync'])
 # % endif
 
-# % if cookiecutter.crawler_type == 'playwright'
+# % if cookiecutter.crawler_type == 'playwright' or cookiecutter.crawler_type.startswith('adaptive-')
 manager = "{{ cookiecutter.package_manager }}"
 subprocess.check_call([manager, 'run', 'playwright', 'install'])
 # % endif
@@ -38,7 +38,7 @@ Path('requirements.txt').write_text(
     subprocess.check_output([str(path / 'pip'), 'freeze']).decode()
 )
 
-# % if cookiecutter.crawler_type == 'playwright'
+# % if cookiecutter.crawler_type == 'playwright' or cookiecutter.crawler_type.startswith('adaptive-')
 subprocess.check_call([str(path / 'playwright'), 'install'])
 # % endif
 # % endif
