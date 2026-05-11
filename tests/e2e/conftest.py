@@ -20,7 +20,6 @@ def pytest_configure(config: Config) -> None:
         'playwright_webkit',
         'parsel',
         'beautifulsoup',
-        'http',
         'adaptive_beautifulsoup',
         'adaptive_parsel',
         'uv',
