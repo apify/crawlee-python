@@ -143,6 +143,16 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/crawlee"]
 
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/crawlee",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "README.md",
+    "pyproject.toml",
+]
+
 [tool.ruff]
 line-length = 120
 include = ["src/**/*.py", "tests/**/*.py", "docs/**/*.py", "website/**/*.py"]
