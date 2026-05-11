@@ -109,8 +109,7 @@ async def test_static_crawler_actor_at_apify(
     client = ApifyClientAsync(token=os.getenv('APIFY_TEST_USER_API_TOKEN'))
     actor = client.actor(actor_id)
 
-    # Stagehand requires an OpenAI API key at runtime; the template ships a placeholder, so we only
-    # validate that the actor builds successfully and skip the actual run.
+    # The template ships a placeholder API key, so only validate the build and skip the run.
     if crawler_type == 'stagehand':
         try:
             assert build_process.returncode == 0

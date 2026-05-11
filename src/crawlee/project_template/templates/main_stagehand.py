@@ -13,6 +13,5 @@ crawler = StagehandCrawler(
     stagehand_options=StagehandOptions(
         model_api_key='<YOUR_OPENAI_API_KEY>',
     ),
-    {{ self.http_client_instantiation() }}
-)
+    {{ self.http_client_instantiation() }})
 # % endblock
