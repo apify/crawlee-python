@@ -22,6 +22,7 @@ def pytest_configure(config: Config) -> None:
         'beautifulsoup',
         'adaptive_beautifulsoup',
         'adaptive_parsel',
+        'stagehand',
         'uv',
         'poetry',
         'pip',

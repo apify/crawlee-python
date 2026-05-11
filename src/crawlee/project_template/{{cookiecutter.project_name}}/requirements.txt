@@ -5,6 +5,8 @@ camoufox[geoip]~=0.4.5
 # % set extras = ['adaptive-crawler', 'beautifulsoup', 'parsel']
 # % elif cookiecutter.crawler_type.startswith('playwright')
 # % set extras = ['playwright']
+# % elif cookiecutter.crawler_type == 'stagehand'
+# % set extras = ['stagehand']
 # % else
 # % set extras = [cookiecutter.crawler_type]
 # % endif

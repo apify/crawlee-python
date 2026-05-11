@@ -28,6 +28,7 @@ from tests.e2e.project_template.utils import patch_crawlee_version_in_project
         pytest.param('beautifulsoup', marks=pytest.mark.beautifulsoup),
         pytest.param('adaptive-beautifulsoup', marks=pytest.mark.adaptive_beautifulsoup),
         pytest.param('adaptive-parsel', marks=pytest.mark.adaptive_parsel),
+        pytest.param('stagehand', marks=pytest.mark.stagehand),
     ],
 )
 @pytest.mark.parametrize(
@@ -107,6 +108,15 @@ async def test_static_crawler_actor_at_apify(
 
     client = ApifyClientAsync(token=os.getenv('APIFY_TEST_USER_API_TOKEN'))
     actor = client.actor(actor_id)
+
+    # Stagehand requires an OpenAI API key at runtime; the template ships a placeholder, so we only
+    # validate that the actor builds successfully and skip the actual run.
+    if crawler_type == 'stagehand':
+        try:
+            assert build_process.returncode == 0
+        finally:
+            await actor.delete()
+        return
 
     # Run actor
     try:
