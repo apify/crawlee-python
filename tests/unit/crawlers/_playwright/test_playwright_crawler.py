@@ -1248,7 +1248,7 @@ def test_import_error_handled() -> None:
     }
     with mock.patch.dict('sys.modules', blocked):
         for mod_name in list(sys.modules):
-            if mod_name == 'crawlee.crawlers' or mod_name.startswith('crawlee.crawlers._playwright'):
+            if mod_name.startswith('crawlee.crawlers._playwright'):
                 sys.modules.pop(mod_name, None)
         with pytest.raises(ImportError):
-            from crawlee.crawlers import PlaywrightCrawler  # noqa: F401 PLC0415
+            from crawlee.crawlers._playwright import PlaywrightCrawler  # noqa: F401 PLC0415

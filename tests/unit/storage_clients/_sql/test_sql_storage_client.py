@@ -60,7 +60,7 @@ def test_import_error_handled() -> None:
     }
     with patch.dict('sys.modules', blocked):
         for mod_name in list(sys.modules):
-            if mod_name.startswith('crawlee.storage_clients._sql') or mod_name == 'crawlee.storage_clients':
+            if mod_name.startswith('crawlee.storage_clients._sql'):
                 sys.modules.pop(mod_name, None)
         with pytest.raises(ImportError):
-            from crawlee.storage_clients import SqlStorageClient  # noqa: F401 PLC0415
+            from crawlee.storage_clients._sql import SqlStorageClient  # noqa: F401 PLC0415

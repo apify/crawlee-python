@@ -115,8 +115,6 @@ def test_import_error_handled() -> None:
         if mod_name == 'opentelemetry' or mod_name.startswith('opentelemetry.')
     }
     with patch.dict('sys.modules', blocked):
-        for mod_name in list(sys.modules):
-            if mod_name.startswith('crawlee.otel'):
-                sys.modules.pop(mod_name, None)
+        sys.modules.pop('crawlee.otel.crawler_instrumentor', None)
         with pytest.raises(ImportError):
             from crawlee.otel.crawler_instrumentor import CrawlerInstrumentor  # noqa: F401 PLC0415

@@ -174,9 +174,7 @@ def test_import_error_handled() -> None:
     }
     with patch.dict('sys.modules', blocked):
         for mod_name in list(sys.modules):
-            if mod_name == 'crawlee.crawlers' or mod_name.startswith(
-                ('crawlee.crawlers._stagehand', 'crawlee.browsers._stagehand_browser_plugin')
-            ):
+            if mod_name.startswith(('crawlee.crawlers._stagehand', 'crawlee.browsers._stagehand_browser_plugin')):
                 sys.modules.pop(mod_name, None)
         with pytest.raises(ImportError):
-            from crawlee.crawlers import StagehandCrawler  # noqa: F401 PLC0415
+            from crawlee.crawlers._stagehand import StagehandCrawler  # noqa: F401 PLC0415
