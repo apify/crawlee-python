@@ -10,7 +10,7 @@ from crawlee.crawlers import StagehandCrawler
 # % block instantiation
 model_api_key = os.environ.get('OPENAI_API_KEY')
 if model_api_key is None:
-    raise RuntimeError('The OPENAI_API_KEY environment variable is not set.')
+    raise ValueError('The OPENAI_API_KEY environment variable is not set.')
 
 crawler = StagehandCrawler(
     request_handler=router,
