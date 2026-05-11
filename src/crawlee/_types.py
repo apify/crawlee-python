@@ -198,7 +198,7 @@ class PushDataKwargs(TypedDict):
 
 
 class PushDataFunctionCall(PushDataKwargs):
-    data: list[dict[str, Any]] | dict[str, Any]
+    data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]
     dataset_id: str | None
     dataset_name: str | None
     dataset_alias: str | None
@@ -300,7 +300,7 @@ class RequestHandlerRunResult:
 
     async def push_data(
         self,
-        data: list[dict[str, Any]] | dict[str, Any],
+        data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
@@ -392,7 +392,7 @@ class EnqueueLinksFunction(Protocol):
         selector: str | None = None,
         attribute: str | None = None,
         label: str | None = None,
-        user_data: dict[str, Any] | None = None,
+        user_data: dict[str, JsonSerializable] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         rq_id: str | None = None,
         rq_name: str | None = None,
@@ -417,7 +417,7 @@ class EnqueueLinksFunction(Protocol):
         selector: str | None = None,
         attribute: str | None = None,
         label: str | None = None,
-        user_data: dict[str, Any] | None = None,
+        user_data: dict[str, JsonSerializable] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         requests: Sequence[str | Request] | None = None,
         rq_id: str | None = None,
@@ -465,7 +465,7 @@ class ExtractLinksFunction(Protocol):
         selector: str = 'a',
         attribute: str = 'href',
         label: str | None = None,
-        user_data: dict[str, Any] | None = None,
+        user_data: dict[str, JsonSerializable] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, list[Request]]:
@@ -543,7 +543,7 @@ class PushDataFunction(Protocol):
 
     def __call__(
         self,
-        data: list[dict[str, Any]] | dict[str, Any],
+        data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,

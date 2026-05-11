@@ -4,10 +4,18 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
-    from typing import Any
+    from collections.abc import AsyncIterator, Mapping, Sequence
 
+    from typing_extensions import TypeIs
+
+    from crawlee._types import JsonSerializable
     from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
+
+
+def _is_list_of_items(
+    data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable],
+) -> TypeIs[Sequence[Mapping[str, JsonSerializable]]]:
+    return isinstance(data, list)
 
 
 class DatasetClient(ABC):
@@ -42,7 +50,7 @@ class DatasetClient(ABC):
         """
 
     @abstractmethod
-    async def push_data(self, data: list[Any] | dict[str, Any]) -> None:
+    async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
         """Push data to the dataset.
 
         The backend method for the `Dataset.push_data` call.
@@ -82,7 +90,7 @@ class DatasetClient(ABC):
         unwind: list[str] | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
-    ) -> AsyncIterator[dict[str, Any]]:
+    ) -> AsyncIterator[Mapping[str, JsonSerializable]]:
         """Iterate over the dataset items with filtering options.
 
         The backend method for the `Dataset.iterate_items` call.
@@ -91,3 +99,9 @@ class DatasetClient(ABC):
         raise NotImplementedError
         if False:
             yield {}
+
+    @staticmethod
+    def _is_list_of_items(
+        data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable],
+    ) -> TypeIs[Sequence[Mapping[str, JsonSerializable]]]:
+        return isinstance(data, list)

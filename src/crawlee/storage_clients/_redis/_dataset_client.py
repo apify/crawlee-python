@@ -14,10 +14,12 @@ from ._client_mixin import MetadataUpdateParams, RedisClientMixin
 from ._utils import await_redis_response
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Mapping, Sequence
 
     from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
+
+    from crawlee._types import JsonSerializable
 
 logger = getLogger(__name__)
 
@@ -126,8 +128,8 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
 
     @retry_on_error(RedisError)
     @override
-    async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
-        if isinstance(data, dict):
+    async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
+        if not self._is_list_of_items(data):
             data = [data]
 
         async with self._get_pipeline() as pipe:

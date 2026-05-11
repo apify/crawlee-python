@@ -956,7 +956,7 @@ requires-dist = [
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql-sqlite'", specifier = ">=2.0.0,<3.0.0" },
     { name = "tldextract", specifier = ">=5.1.0" },
     { name = "typer", marker = "extra == 'cli'", specifier = ">=0.12.0" },
-    { name = "typing-extensions", specifier = ">=4.1.0" },
+    { name = "typing-extensions", specifier = ">=4.10.0" },
     { name = "wrapt", marker = "extra == 'otel'", specifier = ">=1.17.0" },
     { name = "yarl", specifier = ">=1.18.0" },
 ]
