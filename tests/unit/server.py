@@ -541,7 +541,7 @@ class TestServer(Server):
 
 def serve_in_thread(server: TestServer) -> Iterator[TestServer]:
     """Run a server in a background thread and yield it."""
-    thread = threading.Thread(target=server.run)
+    thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
     try:
         while not server.started:
@@ -549,4 +549,9 @@ def serve_in_thread(server: TestServer) -> Iterator[TestServer]:
         yield server
     finally:
         server.should_exit = True
-        thread.join()
+        thread.join(timeout=10)
+        if thread.is_alive():
+            # Uvicorn occasionally ignores should_exit; force_exit aborts the
+            # asyncio loop so teardown cannot hang the suite indefinitely.
+            server.force_exit = True
+            thread.join(timeout=5)
