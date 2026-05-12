@@ -144,7 +144,7 @@ dev = [
 packages = ["src/crawlee"]
 
 [tool.hatch.build.targets.sdist]
-include = [
+only-include = [
     "src/crawlee",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
