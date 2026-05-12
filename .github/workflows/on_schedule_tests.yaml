@@ -69,6 +69,7 @@ jobs:
         run: uv run poe e2e-templates-tests -m "${{ matrix.http-client }} and ${{ matrix.crawler-type }} and ${{ matrix.package-manager }}"
         env:
           APIFY_TEST_USER_API_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   # Send a Slack notification to #tooling-team-python when scheduled e2e tests fail.
   # Skipped on workflow_dispatch (manual runs) so that ad-hoc triggers don't spam the channel.
