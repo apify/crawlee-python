@@ -25,6 +25,27 @@ jobs:
     name: Code checks
     uses: ./.github/workflows/_check_code.yaml
 
+  package_check:
+    name: Package check
+    uses: apify/workflows/.github/workflows/python_package_check.yaml@main
+    with:
+      package_name: crawlee
+      src_package_dir: src/crawlee
+      dist_dir: dist
+      python_version: "3.14"
+      extras: all
+      smoke_code: |
+        from crawlee.crawlers import (
+            HttpCrawler, BeautifulSoupCrawler, ParselCrawler,
+            PlaywrightCrawler, AdaptivePlaywrightCrawler,
+        )
+        from crawlee.storages import Dataset, KeyValueStore, RequestQueue
+        from crawlee.http_clients import HttpxHttpClient, ImpitHttpClient
+        from crawlee import Request
+        HttpCrawler()
+        BeautifulSoupCrawler()
+        ParselCrawler()
+
   tests:
     name: Tests
     uses: ./.github/workflows/_tests.yaml
