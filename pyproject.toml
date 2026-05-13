@@ -50,7 +50,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-all = ["crawlee[adaptive-crawler,beautifulsoup,cli,curl-impersonate,httpx,parsel,playwright,otel,sql_sqlite,sql_postgres,stagehand,redis]"]
+all = ["crawlee[adaptive-crawler,beautifulsoup,cli,curl-impersonate,httpx,parsel,playwright,otel,sql_sqlite,sql_postgres,sql_mysql,stagehand,redis]"]
 adaptive-crawler = [
     "jaro-winkler>=2.0.3",
     "playwright>=1.27.0",
