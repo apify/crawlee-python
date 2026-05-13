@@ -12,12 +12,6 @@ if TYPE_CHECKING:
     from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 
-def _is_list_of_items(
-    data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable],
-) -> TypeIs[Sequence[Mapping[str, JsonSerializable]]]:
-    return isinstance(data, list)
-
-
 class DatasetClient(ABC):
     """An abstract class for dataset storage clients.
 
