@@ -27,24 +27,38 @@ jobs:
 
   package_check:
     name: Package check
-    uses: apify/workflows/.github/workflows/python_package_check.yaml@main
-    with:
-      package_name: crawlee
-      src_package_dir: src/crawlee
-      dist_dir: dist
-      python_version: "3.14"
-      extras: all
-      smoke_code: |
-        from crawlee.crawlers import (
-            HttpCrawler, BeautifulSoupCrawler, ParselCrawler,
-            PlaywrightCrawler, AdaptivePlaywrightCrawler,
-        )
-        from crawlee.storages import Dataset, KeyValueStore, RequestQueue
-        from crawlee.http_clients import HttpxHttpClient, ImpitHttpClient
-        from crawlee import Request
-        HttpCrawler()
-        BeautifulSoupCrawler()
-        ParselCrawler()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up uv package manager
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.14"
+
+      - name: Build sdist and wheel
+        run: uv run poe build
+
+      - name: Verify built package
+        uses: apify/workflows/python-package-check@main
+        with:
+          package_name: crawlee
+          src_package_dir: src/crawlee
+          dist_dir: dist
+          python_version: "3.14"
+          extras: all
+          smoke_code: |
+            from crawlee.crawlers import (
+                HttpCrawler, BeautifulSoupCrawler, ParselCrawler,
+                PlaywrightCrawler, AdaptivePlaywrightCrawler,
+            )
+            from crawlee.storages import Dataset, KeyValueStore, RequestQueue
+            from crawlee.http_clients import HttpxHttpClient, ImpitHttpClient
+            from crawlee import Request
+            HttpCrawler()
+            BeautifulSoupCrawler()
+            ParselCrawler()
 
   tests:
     name: Tests
