@@ -6,15 +6,6 @@ on:
 
   # Runs when invoked by another workflow.
   workflow_call:
-    inputs:
-      ref:
-        description: Git ref to checkout.
-        required: true
-        type: string
-    outputs:
-      version_docs_commitish:
-        description: The commit SHA of the versioned docs commit.
-        value: ${{ jobs.version_docs.outputs.version_docs_commitish }}
 
 concurrency:
   group: version-docs
@@ -31,8 +22,6 @@ jobs:
   version_docs:
     name: Version docs
     runs-on: ubuntu-latest
-    outputs:
-      version_docs_commitish: ${{ steps.resolve_commitish.outputs.commitish }}
     permissions:
       contents: write
 
@@ -41,7 +30,6 @@ jobs:
         uses: actions/checkout@v6
         with:
           token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
-          ref: ${{ inputs.ref || github.event.repository.default_branch }}
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -104,20 +92,20 @@ jobs:
           uv run pnpm exec docusaurus docs:version "$MAJOR_MINOR_VERSION"
           uv run pnpm exec docusaurus api:version "$MAJOR_MINOR_VERSION"
 
-      - name: Commit and push versioned docs
-        id: commit_versioned_docs
-        uses: EndBug/add-and-commit@v10
-        with:
-          add: website/versioned_docs website/versioned_sidebars website/versions.json
-          message: "docs: Version docs for v${{ steps.snapshot.outputs.version }} [skip ci]"
-          default_author: github_actions
-          pull: '--rebase --autostash'
-          # `actions/checkout` detaches HEAD on SHA refs; EndBug needs a branch to push.
-          new_branch: ${{ github.event.repository.default_branch }}
-
-      - name: Resolve output commitish
-        id: resolve_commitish
-        env:
-          COMMIT_SHA: ${{ steps.commit_versioned_docs.outputs.commit_long_sha }}
+      - name: Stage versioned docs
+        id: stage
         run: |
-          echo "commitish=${COMMIT_SHA:-$(git rev-parse HEAD)}" >> "$GITHUB_OUTPUT"
+          git pull --rebase --autostash
+          git add website/versioned_docs website/versioned_sidebars website/versions.json
+          if git diff --cached --quiet; then
+            echo "has-changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push versioned docs
+        if: steps.stage.outputs.has-changes == 'true'
+        uses: apify/workflows/commit@v0.44.0
+        with:
+          commit-message: "docs: Version docs for v${{ steps.snapshot.outputs.version }} [skip ci]"
+          github-token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}

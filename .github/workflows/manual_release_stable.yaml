@@ -110,9 +110,6 @@ jobs:
     permissions:
       contents: write
     uses: ./.github/workflows/manual_version_docs.yaml
-    with:
-      # Commit the version docs changes on top of the changelog commit.
-      ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
     secrets: inherit
 
   doc_release:
@@ -123,7 +120,4 @@ jobs:
       pages: write
       id-token: write
     uses: ./.github/workflows/manual_release_docs.yaml
-    with:
-      # Use the commit with the version docs changes as the source for the release docs.
-      ref: ${{ needs.version_docs.outputs.version_docs_commitish }}
     secrets: inherit
