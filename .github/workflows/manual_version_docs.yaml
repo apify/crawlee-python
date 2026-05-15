@@ -92,20 +92,10 @@ jobs:
           uv run pnpm exec docusaurus docs:version "$MAJOR_MINOR_VERSION"
           uv run pnpm exec docusaurus api:version "$MAJOR_MINOR_VERSION"
 
-      - name: Stage versioned docs
-        id: stage
-        run: |
-          git pull --rebase --autostash
-          git add website/versioned_docs website/versioned_sidebars website/versions.json
-          if git diff --cached --quiet; then
-            echo "has-changes=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "has-changes=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Commit and push versioned docs
-        if: steps.stage.outputs.has-changes == 'true'
-        uses: apify/workflows/commit@v0.44.0
+        uses: apify/actions/signed-commit@v1.0.0
         with:
-          commit-message: "docs: Version docs for v${{ steps.snapshot.outputs.version }} [skip ci]"
+          message: "docs: Version docs for v${{ steps.snapshot.outputs.version }} [skip ci]"
+          add: 'website/versioned_docs website/versioned_sidebars website/versions.json'
+          pull: '--rebase --autostash'
           github-token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
