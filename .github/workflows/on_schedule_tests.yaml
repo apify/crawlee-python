@@ -91,9 +91,24 @@ jobs:
           WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           HEADING: ':red_circle: Scheduled e2e tests failed'
         run: |
-          failed_jobs=$(gh api \
-            "repos/${REPO}/actions/runs/${RUN_ID}/attempts/${RUN_ATTEMPT}/jobs?per_page=100" \
-            --jq '[.jobs[] | select(.conclusion == "failure") | "• \(.name)"] | join("\n")')
+          # Retry the API call to tolerate transient 5xx from GitHub.
+          max_attempts=5
+          fetched=0
+          for attempt in $(seq 1 "${max_attempts}"); do
+            if failed_jobs=$(gh api \
+              "repos/${REPO}/actions/runs/${RUN_ID}/attempts/${RUN_ATTEMPT}/jobs?per_page=100" \
+              --jq '[.jobs[] | select(.conclusion == "failure") | "• \(.name)"] | join("\n")'); then
+              fetched=1
+              break
+            fi
+            if [[ "${attempt}" -lt "${max_attempts}" ]]; then
+              sleep "$((attempt * 5))"
+            fi
+          done
+          if [[ "${fetched}" -eq 0 ]]; then
+            echo "Failed to fetch job list after ${max_attempts} attempts; sending notification without it." >&2
+            failed_jobs="(unable to fetch job list — see workflow run)"
+          fi
           jq -n \
             --arg repo "${REPO}" \
             --arg url "${WORKFLOW_URL}" \
