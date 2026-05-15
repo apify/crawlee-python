@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     import json
     import logging
     import re
-    from collections.abc import Awaitable, Coroutine, Sequence
+    from collections.abc import Awaitable, Coroutine, MutableMapping, Sequence
 
     from typing_extensions import NotRequired, Required, Self, Unpack
 
@@ -390,7 +390,7 @@ class EnqueueLinksFunction(Protocol):
         selector: str | None = None,
         attribute: str | None = None,
         label: str | None = None,
-        user_data: dict[str, JsonSerializable] | None = None,
+        user_data: Mapping[str, JsonSerializable] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         rq_id: str | None = None,
         rq_name: str | None = None,
@@ -415,7 +415,7 @@ class EnqueueLinksFunction(Protocol):
         selector: str | None = None,
         attribute: str | None = None,
         label: str | None = None,
-        user_data: dict[str, JsonSerializable] | None = None,
+        user_data: Mapping[str, JsonSerializable] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         requests: Sequence[str | Request] | None = None,
         rq_id: str | None = None,
@@ -463,7 +463,7 @@ class ExtractLinksFunction(Protocol):
         selector: str = 'a',
         attribute: str = 'href',
         label: str | None = None,
-        user_data: dict[str, JsonSerializable] | None = None,
+        user_data: Mapping[str, JsonSerializable] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, list[Request]]:
@@ -614,8 +614,8 @@ class UseStateFunction(Protocol):
 
     def __call__(
         self,
-        default_value: dict[str, JsonSerializable] | None = None,
-    ) -> Coroutine[None, None, dict[str, JsonSerializable]]:
+        default_value: MutableMapping[str, JsonSerializable] | None = None,
+    ) -> Coroutine[None, None, MutableMapping[str, JsonSerializable]]:
         """Call dunder method.
 
         Args:

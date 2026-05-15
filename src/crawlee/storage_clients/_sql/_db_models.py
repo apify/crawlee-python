@@ -189,7 +189,7 @@ class DatasetItemDb(Base):
     )
     """Foreign key to metadata dataset record."""
 
-    data: Mapped[list[dict[str, Any]] | dict[str, Any]] = mapped_column(JsonField, nullable=False)
+    data: Mapped[dict[str, Any]] = mapped_column(JsonField, nullable=False)
     """JSON serializable item data."""
 
     # Relationship back to parent dataset

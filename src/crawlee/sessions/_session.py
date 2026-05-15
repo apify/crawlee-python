@@ -65,7 +65,7 @@ class Session:
         """
         self._id = id or crypto_random_object_id(length=10)
         self._max_age = max_age
-        self._user_data: dict[str, JsonSerializable] = dict(user_data) if user_data is not None else {}
+        self._user_data: MutableMapping[str, JsonSerializable] = dict(user_data) if user_data is not None else {}
         self._max_error_score = max_error_score
         self._error_score_decrement = error_score_decrement
         self._created_at = created_at or datetime.now(timezone.utc)

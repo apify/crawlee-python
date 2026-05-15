@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Mapping, Sequence
+    from collections.abc import AsyncIterator, Mapping
 
     from typing_extensions import TypeIs
 
@@ -95,7 +96,7 @@ class DatasetClient(ABC):
             yield {}
 
     @staticmethod
-    def _is_list_of_items(
+    def _is_sequence_of_items(
         data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable],
     ) -> TypeIs[Sequence[Mapping[str, JsonSerializable]]]:
-        return isinstance(data, list)
+        return isinstance(data, Sequence)

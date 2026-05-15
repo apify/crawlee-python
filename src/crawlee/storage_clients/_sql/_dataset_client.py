@@ -147,7 +147,7 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
     @retry_on_error(SQLAlchemyError)
     @override
     async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
-        if not self._is_list_of_items(data):
+        if not self._is_sequence_of_items(data):
             data = [data]
 
         db_items = [{'dataset_id': self._id, 'data': item} for item in data]
@@ -219,7 +219,7 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
         unwind: list[str] | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
-    ) -> AsyncIterator[dict[str, Any]]:
+    ) -> AsyncIterator[Mapping[str, JsonSerializable]]:
         stmt = self._prepare_get_stmt(
             offset=offset,
             limit=limit,

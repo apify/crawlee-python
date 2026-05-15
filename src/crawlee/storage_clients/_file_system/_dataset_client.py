@@ -225,7 +225,7 @@ class FileSystemDatasetClient(DatasetClient):
     async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
         async with self._lock:
             new_item_count = self._metadata.item_count
-            if self._is_list_of_items(data):
+            if self._is_sequence_of_items(data):
                 for item in data:
                     new_item_count += 1
                     await self._push_item(item, new_item_count)
@@ -352,7 +352,7 @@ class FileSystemDatasetClient(DatasetClient):
         unwind: list[str] | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
-    ) -> AsyncIterator[dict[str, Any]]:
+    ) -> AsyncIterator[Mapping[str, JsonSerializable]]:
         # Check for unsupported arguments and log a warning if found.
         unsupported_args: dict[str, Any] = {
             'clean': clean,

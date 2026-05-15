@@ -129,7 +129,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
     @retry_on_error(RedisError)
     @override
     async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
-        if not self._is_list_of_items(data):
+        if not self._is_sequence_of_items(data):
             data = [data]
 
         async with self._get_pipeline() as pipe:
@@ -239,7 +239,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         unwind: list[str] | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
-    ) -> AsyncIterator[dict[str, Any]]:
+    ) -> AsyncIterator[Mapping[str, JsonSerializable]]:
         """Iterate over dataset items one by one.
 
         This method yields items individually instead of loading all items at once,
@@ -303,7 +303,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
                 if skip_empty and not item:
                     continue
 
-                yield cast('dict[str, Any]', item)
+                yield cast('Mapping[str, JsonSerializable]', item)
 
         async with self._get_pipeline() as pipe:
             await self._update_metadata(pipe, **_DatasetMetadataUpdateParams(update_accessed_at=True))
