@@ -915,7 +915,7 @@ async def test_adaptive_playwright_crawler_with_sql_storage(test_urls: list[str]
 
 
 @pytest.mark.parametrize(
-    ('optional_module_name'),
+    'optional_module_name',
     [
         pytest.param('playwright', id='playwright'),
         pytest.param('jaro', id='jaro'),

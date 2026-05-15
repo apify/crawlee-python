@@ -255,7 +255,7 @@ def test_create_existing_folder_interactive_multiple_attempts(
 
 
 @pytest.mark.parametrize(
-    ('optional_module_name'),
+    'optional_module_name',
     [
         pytest.param('cookiecutter', id='cookiecutter'),
         pytest.param('inquirer', id='inquirer'),
