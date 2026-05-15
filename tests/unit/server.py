@@ -506,8 +506,8 @@ class TestServer(Server):
     async def restart(self) -> None:
         """Request server restart and wait for it to complete.
 
-        This method can be called from a different thread than the one the server
-        is running on, and from a different async environment.
+        This method can be called from a different thread than the one the server is running on,
+        and from a different async environment.
         """
         self.started = False
         self.restart_requested.set()
@@ -532,7 +532,7 @@ class TestServer(Server):
     def run(self, sockets: list[socket] | None = None) -> None:
         """Run the server."""
         # Set the event loop policy in thread with server for Windows and Python 3.12+.
-        # This is necessary because there are problems with closing connections when using `ProactorEventLoop`
+        # This is necessary because there are problems with closing connections when using `ProactorEventLoop`.
         if sys.version_info >= (3, 12) and sys.platform == 'win32':
             return asyncio.run(self.serve(sockets=sockets), loop_factory=asyncio.SelectorEventLoop)
         super().run(sockets=sockets)
@@ -544,14 +544,22 @@ def serve_in_thread(server: TestServer) -> Iterator[TestServer]:
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
     try:
+        # Bound the startup wait: when uvicorn fails to bind (e.g. port collision under xdist), the worker thread
+        # exits without ever setting server.started, so an unbounded loop would hang until pytest-timeout kills
+        # the suite 30 minutes later.
+        deadline = time.monotonic() + 30
         while not server.started:
+            if not thread.is_alive():
+                raise RuntimeError('Test server thread exited before becoming ready (likely a bind failure).')
+            if time.monotonic() > deadline:
+                raise RuntimeError('Test server did not become ready within 30s.')
             time.sleep(1e-3)
         yield server
     finally:
         server.should_exit = True
         thread.join(timeout=10)
         if thread.is_alive():
-            # Uvicorn occasionally ignores should_exit; force_exit aborts the
-            # asyncio loop so teardown cannot hang the suite indefinitely.
+            # Uvicorn occasionally ignores should_exit; force_exit aborts the asyncio loop so teardown cannot hang
+            # the suite indefinitely.
             server.force_exit = True
             thread.join(timeout=5)
