@@ -25,9 +25,6 @@ jobs:
       pages: write
       id-token: write
     uses: ./.github/workflows/manual_release_docs.yaml
-    with:
-      # Use the same ref as the one that triggered the workflow.
-      ref: ${{ github.ref }}
     secrets: inherit
 
   code_checks:
