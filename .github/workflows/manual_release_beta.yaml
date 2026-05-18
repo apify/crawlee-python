@@ -61,7 +61,7 @@ jobs:
           ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
 
       - name: Verify built package
-        uses: apify/actions/python-package-check@feat/python-package-check-action
+        uses: apify/actions/python-package-check@main
         with:
           package_name: crawlee
           dist_dir: dist
