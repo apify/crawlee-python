@@ -27,7 +27,7 @@ jobs:
         run: uv run poe build
 
       - name: Verify built package
-        uses: apify/actions/python-package-check@main
+        uses: apify/actions/python-package-check@v1.1.0
         with:
           package_name: crawlee
           dist_dir: dist
