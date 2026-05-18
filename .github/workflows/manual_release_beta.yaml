@@ -2,7 +2,7 @@ name: Beta release
 
 on:
   # Runs when manually triggered from the GitHub UI, or dispatched from `on_master.yaml`
-  # via the `apify/workflows/execute-workflow` action for the automatic beta release on push to master.
+  # via the `apify/actions/execute-workflow` action for the automatic beta release on push to master.
   # Note: This workflow is intentionally NOT a reusable workflow (no `workflow_call`) because PyPI's
   # Trusted Publishing does not currently support reusable workflows.
   # See: https://docs.pypi.org/trusted-publishers/troubleshooting/#reusable-workflows-on-github
@@ -23,7 +23,7 @@ jobs:
       version_number: ${{ steps.release_prepare.outputs.version_number }}
       changelog: ${{ steps.release_prepare.outputs.changelog }}
     steps:
-      - uses: apify/workflows/git-cliff-release@main
+      - uses: apify/actions/git-cliff-release@v1.1.2
         id: release_prepare
         name: Release prepare
         with:
@@ -53,7 +53,7 @@ jobs:
       url: https://pypi.org/project/crawlee
     steps:
       - name: Prepare distribution
-        uses: apify/workflows/prepare-pypi-distribution@main
+        uses: apify/actions/prepare-pypi-distribution@v1.1.2
         with:
           package_name: crawlee
           is_prerelease: "yes"

@@ -56,7 +56,7 @@ jobs:
         run: uv run poe install-dev
 
       - name: Install pnpm and website dependencies
-        uses: apify/workflows/pnpm-install@main
+        uses: apify/actions/pnpm-install@v1.1.2
         with:
           working-directory: website
 
