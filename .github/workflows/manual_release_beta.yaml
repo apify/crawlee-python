@@ -60,6 +60,25 @@ jobs:
           version_number: ${{ needs.release_prepare.outputs.version_number }}
           ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
 
+      - name: Verify built package
+        uses: apify/actions/python-package-check@v1.1.0
+        with:
+          package_name: crawlee
+          dist_dir: dist
+          python_version: "3.14"
+          extras: all
+          smoke_code: |
+            from crawlee.crawlers import (
+                HttpCrawler, BeautifulSoupCrawler, ParselCrawler,
+                PlaywrightCrawler, AdaptivePlaywrightCrawler,
+            )
+            from crawlee.storages import Dataset, KeyValueStore, RequestQueue
+            from crawlee.http_clients import HttpxHttpClient, ImpitHttpClient
+            from crawlee import Request
+            HttpCrawler()
+            BeautifulSoupCrawler()
+            ParselCrawler()
+
       # Publish the package to PyPI using PyPA official GitHub action with OIDC authentication.
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

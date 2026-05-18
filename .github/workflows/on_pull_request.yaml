@@ -25,6 +25,10 @@ jobs:
     name: Code checks
     uses: ./.github/workflows/_check_code.yaml
 
+  package_check:
+    name: Package check
+    uses: ./.github/workflows/_check_package.yaml
+
   tests:
     name: Tests
     uses: ./.github/workflows/_tests.yaml
