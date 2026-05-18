@@ -23,7 +23,7 @@ jobs:
       version_number: ${{ steps.release_prepare.outputs.version_number }}
       changelog: ${{ steps.release_prepare.outputs.changelog }}
     steps:
-      - uses: apify/actions/git-cliff-release@v1.1.1
+      - uses: apify/actions/git-cliff-release@v1.1.2
         id: release_prepare
         name: Release prepare
         with:
@@ -53,7 +53,7 @@ jobs:
       url: https://pypi.org/project/crawlee
     steps:
       - name: Prepare distribution
-        uses: apify/actions/prepare-pypi-distribution@v1.1.1
+        uses: apify/actions/prepare-pypi-distribution@v1.1.2
         with:
           package_name: crawlee
           is_prerelease: "yes"
