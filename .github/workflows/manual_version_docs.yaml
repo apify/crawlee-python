@@ -93,7 +93,7 @@ jobs:
           uv run pnpm exec docusaurus api:version "$MAJOR_MINOR_VERSION"
 
       - name: Commit and push versioned docs
-        uses: apify/actions/signed-commit@v1.0.0
+        uses: apify/actions/signed-commit@v1.1.2
         with:
           message: "docs: Version docs for v${{ steps.snapshot.outputs.version }} [skip ci]"
           add: 'website/versioned_docs website/versioned_sidebars website/versions.json'
