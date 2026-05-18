@@ -1,8 +1,11 @@
 import io
 import json
 import re
+import sys
 from unittest import mock
+from unittest.mock import patch
 
+import pytest
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
@@ -103,3 +106,15 @@ async def test_crawler_instrumentor_capability(server_url: URL) -> None:
 
     # Check that trace_ids of unrelated traces are not the same.
     assert telemetry_data[0]['context']['trace_id'] != telemetry_data[-1]['context']['trace_id']
+
+
+def test_import_error_handled() -> None:
+    blocked = {
+        mod_name: None
+        for mod_name in sys.modules
+        if mod_name == 'opentelemetry' or mod_name.startswith('opentelemetry.')
+    }
+    with patch.dict('sys.modules', blocked):
+        sys.modules.pop('crawlee.otel.crawler_instrumentor', None)
+        with pytest.raises(ImportError):
+            from crawlee.otel.crawler_instrumentor import CrawlerInstrumentor  # noqa: F401 PLC0415

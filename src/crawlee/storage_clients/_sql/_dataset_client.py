@@ -17,11 +17,13 @@ from ._client_mixin import MetadataUpdateParams, SqlClientMixin
 from ._db_models import DatasetItemDb, DatasetMetadataBufferDb, DatasetMetadataDb
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Mapping, Sequence
 
     from sqlalchemy import Select
     from sqlalchemy.ext.asyncio import AsyncSession
     from typing_extensions import NotRequired
+
+    from crawlee._types import JsonSerializable
 
     from ._storage_client import SqlStorageClient
 
@@ -144,8 +146,8 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
 
     @retry_on_error(SQLAlchemyError)
     @override
-    async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
-        if not isinstance(data, list):
+    async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
+        if not self._is_sequence_of_items(data):
             data = [data]
 
         db_items = [{'dataset_id': self._id, 'data': item} for item in data]
@@ -217,7 +219,7 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
         unwind: list[str] | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
-    ) -> AsyncIterator[dict[str, Any]]:
+    ) -> AsyncIterator[Mapping[str, JsonSerializable]]:
         stmt = self._prepare_get_stmt(
             offset=offset,
             limit=limit,

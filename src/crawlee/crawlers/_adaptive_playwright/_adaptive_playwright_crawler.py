@@ -42,6 +42,7 @@ from ._rendering_type_predictor import DefaultRenderingTypePredictor, RenderingT
 from ._result_comparator import create_default_comparator
 
 if TYPE_CHECKING:
+    from collections.abc import MutableMapping
     from types import TracebackType
 
     from typing_extensions import Unpack
@@ -286,7 +287,7 @@ class AdaptivePlaywrightCrawler(
         self,
         rendering_type: RenderingType,
         context: BasicCrawlingContext,
-        state: dict[str, JsonSerializable] | None = None,
+        state: MutableMapping[str, JsonSerializable] | None = None,
     ) -> SubCrawlerRun:
         """Perform a one request crawl with specific context pipeline and return `SubCrawlerRun`.
 
@@ -297,8 +298,8 @@ class AdaptivePlaywrightCrawler(
         if state is not None:
 
             async def get_input_state(
-                default_value: dict[str, JsonSerializable] | None = None,  # noqa:ARG001  # Intentionally unused arguments. Closure, that generates same output regardless of inputs.
-            ) -> dict[str, JsonSerializable]:
+                default_value: MutableMapping[str, JsonSerializable] | None = None,  # noqa:ARG001  # Intentionally unused arguments. Closure, that generates same output regardless of inputs.
+            ) -> MutableMapping[str, JsonSerializable]:
                 return state
 
             use_state_function = get_input_state
@@ -411,8 +412,10 @@ class AdaptivePlaywrightCrawler(
             # avoid static crawl to modify the state.
             # (This static crawl is performed only to evaluate rendering type detection.)
             kvs = await context.get_key_value_store()
-            default_value = dict[str, JsonSerializable]()
-            old_state: dict[str, JsonSerializable] = await kvs.get_value(self._CRAWLEE_STATE_KEY, default_value)
+            default_value: MutableMapping[str, JsonSerializable] = {}
+            old_state: MutableMapping[str, JsonSerializable] = await kvs.get_value(
+                self._CRAWLEE_STATE_KEY, default_value
+            )
             old_state_copy = deepcopy(old_state)
 
         pw_run = await self._crawl_one('client only', context=context)

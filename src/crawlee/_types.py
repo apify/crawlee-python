@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     import json
     import logging
     import re
-    from collections.abc import Awaitable, Coroutine, Sequence
+    from collections.abc import Awaitable, Coroutine, MutableMapping, Sequence
 
     from typing_extensions import NotRequired, Required, Self, Unpack
 
@@ -27,9 +27,7 @@ if TYPE_CHECKING:
     from crawlee.storage_clients import StorageClient
     from crawlee.storages import KeyValueStore
 
-    # Workaround for https://github.com/pydantic/pydantic/issues/9445
-    J = TypeVar('J', bound='JsonSerializable')
-    JsonSerializable = list[J] | dict[str, J] | str | bool | int | float | None
+    JsonSerializable = dict[str, 'JsonSerializable'] | list['JsonSerializable'] | str | int | float | bool | None
 else:
     from pydantic import JsonValue as JsonSerializable
 
@@ -198,7 +196,7 @@ class PushDataKwargs(TypedDict):
 
 
 class PushDataFunctionCall(PushDataKwargs):
-    data: list[dict[str, Any]] | dict[str, Any]
+    data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]
     dataset_id: str | None
     dataset_name: str | None
     dataset_alias: str | None
@@ -300,7 +298,7 @@ class RequestHandlerRunResult:
 
     async def push_data(
         self,
-        data: list[dict[str, Any]] | dict[str, Any],
+        data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
@@ -392,7 +390,7 @@ class EnqueueLinksFunction(Protocol):
         selector: str | None = None,
         attribute: str | None = None,
         label: str | None = None,
-        user_data: dict[str, Any] | None = None,
+        user_data: Mapping[str, JsonSerializable] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         rq_id: str | None = None,
         rq_name: str | None = None,
@@ -417,7 +415,7 @@ class EnqueueLinksFunction(Protocol):
         selector: str | None = None,
         attribute: str | None = None,
         label: str | None = None,
-        user_data: dict[str, Any] | None = None,
+        user_data: Mapping[str, JsonSerializable] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         requests: Sequence[str | Request] | None = None,
         rq_id: str | None = None,
@@ -465,7 +463,7 @@ class ExtractLinksFunction(Protocol):
         selector: str = 'a',
         attribute: str = 'href',
         label: str | None = None,
-        user_data: dict[str, Any] | None = None,
+        user_data: Mapping[str, JsonSerializable] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
         **kwargs: Unpack[EnqueueLinksKwargs],
     ) -> Coroutine[None, None, list[Request]]:
@@ -543,7 +541,7 @@ class PushDataFunction(Protocol):
 
     def __call__(
         self,
-        data: list[dict[str, Any]] | dict[str, Any],
+        data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
@@ -616,8 +614,8 @@ class UseStateFunction(Protocol):
 
     def __call__(
         self,
-        default_value: dict[str, JsonSerializable] | None = None,
-    ) -> Coroutine[None, None, dict[str, JsonSerializable]]:
+        default_value: MutableMapping[str, JsonSerializable] | None = None,
+    ) -> Coroutine[None, None, MutableMapping[str, JsonSerializable]]:
         """Call dunder method.
 
         Args:

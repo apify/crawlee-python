@@ -14,10 +14,12 @@ from ._client_mixin import MetadataUpdateParams, RedisClientMixin
 from ._utils import await_redis_response
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Mapping, Sequence
 
     from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
+
+    from crawlee._types import JsonSerializable
 
 logger = getLogger(__name__)
 
@@ -126,8 +128,8 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
 
     @retry_on_error(RedisError)
     @override
-    async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
-        if isinstance(data, dict):
+    async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
+        if not self._is_sequence_of_items(data):
             data = [data]
 
         async with self._get_pipeline() as pipe:
@@ -237,7 +239,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         unwind: list[str] | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
-    ) -> AsyncIterator[dict[str, Any]]:
+    ) -> AsyncIterator[Mapping[str, JsonSerializable]]:
         """Iterate over dataset items one by one.
 
         This method yields items individually instead of loading all items at once,
@@ -301,7 +303,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
                 if skip_empty and not item:
                     continue
 
-                yield cast('dict[str, Any]', item)
+                yield cast('Mapping[str, JsonSerializable]', item)
 
         async with self._get_pipeline() as pipe:
             await self._update_metadata(pipe, **_DatasetMetadataUpdateParams(update_accessed_at=True))

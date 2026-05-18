@@ -1,18 +1,21 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
 from typing_extensions import Self, override
 
+from crawlee._types import JsonSerializable
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Sequence
+
 
 logger = getLogger(__name__)
 
@@ -41,7 +44,7 @@ class MemoryDatasetClient(DatasetClient):
         """
         self._metadata = metadata
 
-        self._records = list[dict[str, Any]]()
+        self._records = list[Mapping[str, JsonSerializable]]()
         """List to hold dataset items. Each item is a dictionary representing a record."""
 
     @override
@@ -113,11 +116,11 @@ class MemoryDatasetClient(DatasetClient):
         )
 
     @override
-    async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
+    async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
         metadata = await self.get_metadata()
         new_item_count = metadata.item_count
 
-        if isinstance(data, list):
+        if self._is_sequence_of_items(data):
             for item in data:
                 new_item_count += 1
                 await self._push_item(item)
@@ -203,7 +206,7 @@ class MemoryDatasetClient(DatasetClient):
         unwind: list[str] | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
-    ) -> AsyncIterator[dict[str, Any]]:
+    ) -> AsyncIterator[Mapping[str, JsonSerializable]]:
         # Check for unsupported arguments and log a warning if found
         unsupported_args: dict[str, Any] = {
             'clean': clean,
@@ -260,7 +263,7 @@ class MemoryDatasetClient(DatasetClient):
         if new_item_count is not None:
             self._metadata.item_count = new_item_count
 
-    async def _push_item(self, item: dict[str, Any]) -> None:
+    async def _push_item(self, item: Mapping[str, JsonSerializable]) -> None:
         """Push a single item to the dataset.
 
         Args:

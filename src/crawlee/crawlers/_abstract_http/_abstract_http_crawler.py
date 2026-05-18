@@ -4,7 +4,7 @@ import asyncio
 import logging
 from abc import ABC
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Generic
 
 from more_itertools import partition
 from pydantic import ValidationError
@@ -21,12 +21,12 @@ from crawlee.statistics import StatisticsState
 from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult, TSelectResult
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator
+    from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator, Mapping
 
     from typing_extensions import Unpack
 
     from crawlee import RequestTransformAction
-    from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, ExtractLinksFunction
+    from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, ExtractLinksFunction, JsonSerializable
 
     from ._abstract_http_parser import AbstractHttpParser
 
@@ -200,7 +200,7 @@ class AbstractHttpCrawler(
             selector: str = 'a',
             attribute: str = 'href',
             label: str | None = None,
-            user_data: dict[str, Any] | None = None,
+            user_data: Mapping[str, JsonSerializable] | None = None,
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],

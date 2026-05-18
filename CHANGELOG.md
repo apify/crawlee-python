@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Include `sql_mysql` in the `all` extra ([#1895](https://github.com/apify/crawlee-python/pull/1895)) ([4023314](https://github.com/apify/crawlee-python/commit/4023314132b8942519fdee3795107d2169179423)) by [@vdusek](https://github.com/vdusek)
+- Update `push_data` and `user_data` annotation  with `JsonSerializable` instead of `Any` ([#1889](https://github.com/apify/crawlee-python/pull/1889)) ([662b93b](https://github.com/apify/crawlee-python/commit/662b93b2e6764396ba885d7f1a57c0dba42369a1)) by [@Mantisus](https://github.com/Mantisus), closes [#1191](https://github.com/apify/crawlee-python/issues/1191)
 
 
 <!-- git-cliff-unreleased-end -->

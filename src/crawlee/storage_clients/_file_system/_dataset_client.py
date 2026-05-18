@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from logging import getLogger
 from pathlib import Path
@@ -12,6 +13,7 @@ from pydantic import ValidationError
 from typing_extensions import Self, override
 
 from crawlee._consts import METADATA_FILENAME
+from crawlee._types import JsonSerializable
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import atomic_write, json_dumps
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
@@ -19,7 +21,7 @@ from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Sequence
 
     from crawlee.configuration import Configuration
 
@@ -220,10 +222,10 @@ class FileSystemDatasetClient(DatasetClient):
             )
 
     @override
-    async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
+    async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
         async with self._lock:
             new_item_count = self._metadata.item_count
-            if isinstance(data, list):
+            if self._is_sequence_of_items(data):
                 for item in data:
                     new_item_count += 1
                     await self._push_item(item, new_item_count)
@@ -304,7 +306,7 @@ class FileSystemDatasetClient(DatasetClient):
             selected_files = selected_files[:limit]
 
         # Read and parse each data file.
-        items = list[dict[str, Any]]()
+        items = list[Mapping[str, JsonSerializable]]()
         for file_path in selected_files:
             try:
                 file_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
@@ -350,7 +352,7 @@ class FileSystemDatasetClient(DatasetClient):
         unwind: list[str] | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
-    ) -> AsyncIterator[dict[str, Any]]:
+    ) -> AsyncIterator[Mapping[str, JsonSerializable]]:
         # Check for unsupported arguments and log a warning if found.
         unsupported_args: dict[str, Any] = {
             'clean': clean,
@@ -441,7 +443,7 @@ class FileSystemDatasetClient(DatasetClient):
         data = await json_dumps(self._metadata.model_dump())
         await atomic_write(self.path_to_metadata, data)
 
-    async def _push_item(self, item: dict[str, Any], item_id: int) -> None:
+    async def _push_item(self, item: Mapping[str, JsonSerializable], item_id: int) -> None:
         """Push a single item to the dataset.
 
         This method writes the item as a JSON file with a zero-padded numeric filename

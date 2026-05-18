@@ -45,7 +45,7 @@ dependencies = [
     "pydantic>=2.11.0",
     "pyee>=9.0.0",
     "tldextract>=5.1.0",
-    "typing-extensions>=4.1.0",
+    "typing-extensions>=4.10.0",
     "yarl>=1.18.0",
 ]
 

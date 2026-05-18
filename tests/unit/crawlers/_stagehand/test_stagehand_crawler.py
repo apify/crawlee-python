@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -165,3 +166,15 @@ async def test_stagehand_page_ai_methods_delegate_to_session(
         assert isinstance(method_mock.call_args.kwargs['page'], Page)
 
         assert argument in method_mock.call_args.kwargs
+
+
+def test_import_error_handled() -> None:
+    blocked = {
+        mod_name: None for mod_name in sys.modules if mod_name == 'stagehand' or mod_name.startswith('stagehand.')
+    }
+    with patch.dict('sys.modules', blocked):
+        for mod_name in list(sys.modules):
+            if mod_name.startswith(('crawlee.crawlers._stagehand', 'crawlee.browsers._stagehand_browser_plugin')):
+                sys.modules.pop(mod_name, None)
+        with pytest.raises(ImportError):
+            from crawlee.crawlers._stagehand import StagehandCrawler  # noqa: F401 PLC0415

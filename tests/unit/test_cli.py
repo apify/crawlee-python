@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import os
-from unittest.mock import ANY, Mock
+import sys
+from unittest.mock import ANY, Mock, patch
 
 import pytest
 import readchar
@@ -251,3 +252,28 @@ def test_create_existing_folder_interactive_multiple_attempts(
             'install_project': True,
         },
     )
+
+
+@pytest.mark.parametrize(
+    'optional_module_name',
+    [
+        pytest.param('cookiecutter', id='cookiecutter'),
+        pytest.param('inquirer', id='inquirer'),
+        pytest.param('rich', id='rich'),
+        pytest.param('typer', id='typer'),
+    ],
+)
+def test_import_error_handled(optional_module_name: str) -> None:
+    # Block the package and all its submodules to prevent
+    # cached submodule entries from bypassing the blocked top-level package.
+    blocked = {
+        mod_name: None
+        for mod_name in sys.modules
+        if mod_name == optional_module_name or mod_name.startswith(f'{optional_module_name}.')
+    }
+
+    with patch.dict('sys.modules', blocked):
+        sys.modules.pop('crawlee._cli', None)
+
+        with pytest.raises(ImportError):
+            from crawlee._cli import cli  # noqa: F401 PLC0415

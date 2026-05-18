@@ -10,12 +10,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, overload
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Mapping
     from typing import Any, TextIO
 
     from typing_extensions import Unpack
 
-    from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs
+    from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs, JsonSerializable
 
 if sys.platform == 'win32':
 
@@ -150,7 +150,7 @@ async def atomic_write(
 
 
 async def export_json_to_stream(
-    iterator: AsyncIterator[dict[str, Any]],
+    iterator: AsyncIterator[Mapping[str, JsonSerializable]],
     dst: TextIO,
     **kwargs: Unpack[ExportDataJsonKwargs],
 ) -> None:
@@ -159,7 +159,7 @@ async def export_json_to_stream(
 
 
 async def export_csv_to_stream(
-    iterator: AsyncIterator[dict[str, Any]],
+    iterator: AsyncIterator[Mapping[str, JsonSerializable]],
     dst: TextIO,
     **kwargs: Unpack[ExportDataCsvKwargs],
 ) -> None:

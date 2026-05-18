@@ -50,6 +50,7 @@ if TYPE_CHECKING:
         HttpHeaders,
         HttpMethod,
         HttpPayload,
+        JsonSerializable,
     )
     from crawlee.browsers._types import BrowserType
 
@@ -448,7 +449,7 @@ class PlaywrightCrawler(
             selector: str = 'a',
             attribute: str = 'href',
             label: str | None = None,
-            user_data: dict | None = None,
+            user_data: Mapping[str, JsonSerializable] | None = None,
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             **kwargs: Unpack[EnqueueLinksKwargs],

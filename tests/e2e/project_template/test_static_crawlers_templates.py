@@ -109,17 +109,16 @@ async def test_static_crawler_actor_at_apify(
     client = ApifyClientAsync(token=os.getenv('APIFY_TEST_USER_API_TOKEN'))
     actor = client.actor(actor_id)
 
-    # The template ships a placeholder API key, so only validate the build and skip the run.
-    if crawler_type == 'stagehand':
-        try:
-            assert build_process.returncode == 0
-        finally:
-            await actor.delete()
-        return
-
     # Run actor
     try:
         assert build_process.returncode == 0
+
+        # Stagehand needs the model API key in `os.environ` at run time; register it as a secret env var
+        # on the deployed actor version so the platform injects it into the run.
+        if crawler_type == 'stagehand':
+            env_vars = actor.version('0.0').env_vars()
+            await env_vars.create(name='OPENAI_API_KEY', value=os.environ['OPENAI_API_KEY'], is_secret=True)
+
         started_run_data = await actor.start(memory_mbytes=8192)
         actor_run = client.run(started_run_data['id'])
 

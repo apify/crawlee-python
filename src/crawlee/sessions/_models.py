@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import MutableMapping
 from datetime import datetime, timedelta
 from typing import Annotated, Any
 
@@ -13,6 +14,8 @@ from pydantic import (
     computed_field,
 )
 
+from crawlee._types import JsonSerializable
+
 from ._cookies import CookieParam
 from ._session import Session
 
@@ -24,7 +27,7 @@ class SessionModel(BaseModel):
 
     id: Annotated[str, Field(alias='id')]
     max_age: Annotated[timedelta, Field(alias='maxAge')]
-    user_data: Annotated[dict, Field(alias='userData')]
+    user_data: Annotated[MutableMapping[str, JsonSerializable], Field(alias='userData')]
     max_error_score: Annotated[float, Field(alias='maxErrorScore')]
     error_score_decrement: Annotated[float, Field(alias='errorScoreDecrement')]
     created_at: Annotated[datetime, Field(alias='createdAt')]

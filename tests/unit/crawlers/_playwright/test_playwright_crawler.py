@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import sys
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Literal
 from unittest import mock
@@ -1239,3 +1240,15 @@ async def test_error_handler_can_access_page(server_url: URL) -> None:
 
     assert error_handler_calls == [HELLO_WORLD.decode(), HELLO_WORLD.decode()]
     assert failed_handler_calls == [HELLO_WORLD.decode()]
+
+
+def test_import_error_handled() -> None:
+    blocked = {
+        mod_name: None for mod_name in sys.modules if mod_name == 'playwright' or mod_name.startswith('playwright.')
+    }
+    with mock.patch.dict('sys.modules', blocked):
+        for mod_name in list(sys.modules):
+            if mod_name.startswith('crawlee.crawlers._playwright'):
+                sys.modules.pop(mod_name, None)
+        with pytest.raises(ImportError):
+            from crawlee.crawlers._playwright import PlaywrightCrawler  # noqa: F401 PLC0415

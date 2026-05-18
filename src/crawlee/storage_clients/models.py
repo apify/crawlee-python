@@ -6,9 +6,12 @@ from typing import TYPE_CHECKING, Annotated, Any, Generic
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 from typing_extensions import TypeVar
 
-from crawlee._types import HttpMethod
+from crawlee._types import HttpMethod, JsonSerializable
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import validate_http_url
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 KvsValueType = TypeVar('KvsValueType', default=Any)
 
@@ -129,7 +132,7 @@ class DatasetItemsListPage(BaseModel):
 
     # Workaround for Pydantic and type checkers when using Annotated with default_factory
     if TYPE_CHECKING:
-        items: list[dict] = []
+        items: Sequence[Mapping[str, JsonSerializable]] = []
         """The list of dataset items returned on this page."""
     else:
         items: Annotated[list[dict], Field(default_factory=list)]

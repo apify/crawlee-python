@@ -80,7 +80,7 @@ from ._logging_utils import (
 
 if TYPE_CHECKING:
     import re
-    from collections.abc import Iterator
+    from collections.abc import Iterator, Mapping, MutableMapping
     from contextlib import AbstractAsyncContextManager
 
     from crawlee._types import (
@@ -856,8 +856,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def use_state(
         self,
-        default_value: dict[str, JsonSerializable] | None = None,
-    ) -> dict[str, JsonSerializable]:
+        default_value: MutableMapping[str, JsonSerializable] | None = None,
+    ) -> MutableMapping[str, JsonSerializable]:
         kvs = await self.get_key_value_store()
         return await kvs.get_auto_saved_value(f'{self._CRAWLEE_STATE_KEY}_{self._id}', default_value)
 
@@ -941,7 +941,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def _push_data(
         self,
-        data: list[dict[str, Any]] | dict[str, Any],
+        data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
@@ -1015,7 +1015,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             selector: str | None = None,
             attribute: str | None = None,
             label: str | None = None,
-            user_data: dict[str, Any] | None = None,
+            user_data: Mapping[str, JsonSerializable] | None = None,
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             requests: Sequence[str | Request] | None = None,
