@@ -341,6 +341,10 @@ async def test_proxy_set_browserbase(
     assert browserbase_proxy_options['proxies'][0]['password'] == 'pass'
 
 
+@pytest.mark.flaky(
+    rerun=3,
+    reason='Test is flaky on Windows when Playwright hits net::ERR_NO_BUFFER_SPACE under xdist load.',
+)
 async def test_fingerprint_headers_set_on_new_page(controller: StagehandBrowserController, server_url: URL) -> None:
     page = await controller.new_page()
 
