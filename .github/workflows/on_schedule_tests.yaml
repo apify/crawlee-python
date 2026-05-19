@@ -4,9 +4,9 @@ on:
   # Runs when manually triggered from the GitHub UI.
   workflow_dispatch:
 
-  # Runs on a daily schedule at 06:00 UTC.
+  # Runs on weekdays at 01:00 UTC.
   schedule:
-    - cron: '0 6 * * *'
+    - cron: '0 1 * * 1-5'
 
 concurrency:
   group: scheduled-tests
@@ -71,7 +71,7 @@ jobs:
           APIFY_TEST_USER_API_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-  # Send a Slack notification to #tooling-team-python when scheduled e2e tests fail.
+  # Send a Slack notification to the team alerting channel when scheduled e2e tests fail.
   # Skipped on workflow_dispatch (manual runs) so that ad-hoc triggers don't spam the channel.
   notify_on_failure:
     name: Notify Slack on failure
