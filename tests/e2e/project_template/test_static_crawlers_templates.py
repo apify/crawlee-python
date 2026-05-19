@@ -116,12 +116,14 @@ async def test_static_crawler_actor_at_apify(
         # Stagehand needs the model API key in `os.environ` at run time. Env vars are baked into the
         # build at build creation time, so registering the env var on the version after `apify push`
         # is not enough — we must trigger a fresh build for the env var to be included.
+        build_number: str | None = None
         if crawler_type == 'stagehand':
             env_vars = actor.version('0.0').env_vars()
             await env_vars.create(name='OPENAI_API_KEY', value=os.environ['OPENAI_API_KEY'], is_secret=True)
-            await actor.build(version_number='0.0', wait_for_finish=600)
+            rebuild = await actor.build(version_number='0.0', wait_for_finish=600)
+            build_number = rebuild['buildNumber']
 
-        started_run_data = await actor.start(memory_mbytes=8192)
+        started_run_data = await actor.start(memory_mbytes=8192, build=build_number)
         actor_run = client.run(started_run_data['id'])
 
         finished_run_data = await actor_run.wait_for_finish()
