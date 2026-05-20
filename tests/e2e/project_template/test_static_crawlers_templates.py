@@ -108,7 +108,7 @@ async def test_static_crawler_actor_at_apify(
         # Prevent git from walking up into the surrounding project's .git/ when running under
         # a basetemp inside the repo (see --basetemp in the e2e-templates-tests poe task).
         env={**os.environ, 'GIT_CEILING_DIRECTORIES': str(tmp_path)},
-        timeout=600,
+        timeout=120,
     )
     # Get actor ID from build log
     actor_id_regexp = re.compile(r'https:\/\/console\.apify\.com\/actors\/(.*)#\/builds\/\d*\.\d*\.\d*')
