@@ -238,7 +238,7 @@ async def test_adaptive_crawling_parsel(test_urls: list[str]) -> None:
 
 
 @pytest.mark.flaky(
-    rerun=3,
+    reruns=3,
     reason='Test is flaky on Windows when Playwright hits net::ERR_NO_BUFFER_SPACE and retries, '
     'causing the pre-nav hook to fire one extra time.',
 )
@@ -637,7 +637,7 @@ async def test_adaptive_playwright_crawler_default_predictor(test_urls: list[str
 
 
 @pytest.mark.flaky(
-    rerun=3,
+    reruns=3,
     reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1650.',
 )
 async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[str]) -> None:
@@ -683,7 +683,7 @@ async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[st
 
 
 @pytest.mark.flaky(
-    rerun=3,
+    reruns=3,
     reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1650.',
 )
 async def test_adaptive_context_query_selector_parsel(test_urls: list[str]) -> None:

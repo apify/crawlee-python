@@ -47,6 +47,10 @@ from tests.e2e.project_template.utils import patch_crawlee_version_in_project
         pytest.param('poetry', marks=pytest.mark.poetry),
     ],
 )
+@pytest.mark.flaky(
+    reruns=3,
+    reason='`apify push` occasionally hangs against the Apify platform; retries cover transient CLI/network flakes.',
+)
 async def test_static_crawler_actor_at_apify(
     tmp_path: Path,
     crawlee_wheel_path: Path,
@@ -80,14 +84,21 @@ async def test_static_crawler_actor_at_apify(
     # Print apify version for debugging purposes in rare cases of CLI failures
     subprocess.run(['apify', '--version'], check=True)  # noqa: ASYNC221, S607
 
-    # Build actor using sequence of cli commands as the user would
+    # Build actor using sequence of cli commands as the user would.
     subprocess.run(  # noqa: ASYNC221, S603
         ['apify', 'login', '-t', os.environ['APIFY_TEST_USER_API_TOKEN']],  # noqa: S607
         capture_output=True,
         check=True,
         cwd=tmp_path / actor_name,
+        timeout=120,
     )
-    subprocess.run(['apify', 'init', '-y', actor_name], capture_output=True, check=True, cwd=tmp_path / actor_name)  # noqa: ASYNC221, S603, S607
+    subprocess.run(  # noqa: ASYNC221, S603
+        ['apify', 'init', '-y', actor_name],  # noqa: S607
+        capture_output=True,
+        check=True,
+        cwd=tmp_path / actor_name,
+        timeout=120,
+    )
 
     build_process = subprocess.run(  # noqa: ASYNC221
         ['apify', 'push'],  # noqa: S607
@@ -97,6 +108,7 @@ async def test_static_crawler_actor_at_apify(
         # Prevent git from walking up into the surrounding project's .git/ when running under
         # a basetemp inside the repo (see --basetemp in the e2e-templates-tests poe task).
         env={**os.environ, 'GIT_CEILING_DIRECTORIES': str(tmp_path)},
+        timeout=600,
     )
     # Get actor ID from build log
     actor_id_regexp = re.compile(r'https:\/\/console\.apify\.com\/actors\/(.*)#\/builds\/\d*\.\d*\.\d*')

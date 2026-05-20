@@ -74,7 +74,7 @@ async def test_multiple_plugins_new_page_creation(server_url: URL) -> None:
 
 
 @pytest.mark.flaky(
-    rerun=3,
+    reruns=3,
     reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1660.',
 )
 async def test_new_page_with_each_plugin(server_url: URL) -> None:
