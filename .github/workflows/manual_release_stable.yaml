@@ -130,6 +130,10 @@ jobs:
     permissions:
       contents: write
     uses: ./.github/workflows/manual_version_docs.yaml
+    with:
+      # Pass the bumped version explicitly — the job's checkout uses the dispatch ref (pre-bump),
+      # so `uv version --short` from pyproject.toml would return the old version.
+      version_number: ${{ needs.release_prepare.outputs.version_number }}
     secrets: inherit
 
   doc_release:
