@@ -3,9 +3,21 @@ name: Version docs
 on:
   # Runs when manually triggered from the GitHub UI.
   workflow_dispatch:
+    inputs:
+      version_number:
+        description: Version to snapshot (e.g. "1.0.0"). If empty, the current version in pyproject.toml is used.
+        required: false
+        type: string
+        default: ""
 
   # Runs when invoked by another workflow.
   workflow_call:
+    inputs:
+      version_number:
+        description: Version to snapshot (e.g. "1.0.0"). If empty, the current version in pyproject.toml is used.
+        required: false
+        type: string
+        default: ""
 
 concurrency:
   group: version-docs
@@ -56,11 +68,19 @@ jobs:
 
       - name: Snapshot the current version
         id: snapshot
+        env:
+          INPUT_VERSION: ${{ inputs.version_number }}
         run: |
           cd website
 
-          # Extract version from pyproject.toml.
-          FULL_VERSION="$(uv version --short)"
+          # Prefer the explicit input (passed by the release workflow after the version bump).
+          # Fall back to pyproject.toml only when run manually without an input — this avoids
+          # the stale-checkout pitfall where the bumped version isn't visible to this job.
+          if [[ -n "$INPUT_VERSION" ]]; then
+            FULL_VERSION="$INPUT_VERSION"
+          else
+            FULL_VERSION="$(uv version --short)"
+          fi
           MAJOR_MINOR_VERSION="$(echo "$FULL_VERSION" | cut -d. -f1-2)"
           MAJOR_VERSION="$(echo "$FULL_VERSION" | cut -d. -f1)"
           echo "version=$FULL_VERSION" >> "$GITHUB_OUTPUT"
