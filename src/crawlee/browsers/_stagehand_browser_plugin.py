@@ -88,6 +88,15 @@ class StagehandBrowserPlugin(BrowserPlugin):
         if user_data_dir is not None:
             self._browser_launch_options['user_data_dir'] = str(user_data_dir)
 
+        # Stagehand's BrowserLaunchOptions accept `chromium_sandbox` but the field is not propagated
+        # to the underlying Chromium launch, so containers running as root hit ECONNREFUSED on the CDP port.
+        # Inject `--no-sandbox` explicitly when the sandbox is disabled.
+        if not self._browser_launch_options['chromium_sandbox']:
+            args = list(self._browser_launch_options.get('args') or [])
+            if '--no-sandbox' not in args:
+                args.append('--no-sandbox')
+            self._browser_launch_options['args'] = args
+
         # Parameters for AsyncStagehand.
         self._stagehand_init_params: dict[str, Any] = {
             'server': 'local' if is_local else 'remote',
