@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Include `sql_mysql` in the `all` extra ([#1895](https://github.com/apify/crawlee-python/pull/1895)) ([4023314](https://github.com/apify/crawlee-python/commit/4023314132b8942519fdee3795107d2169179423)) by [@vdusek](https://github.com/vdusek)
 - Update `push_data` and `user_data` annotation  with `JsonSerializable` instead of `Any` ([#1889](https://github.com/apify/crawlee-python/pull/1889)) ([662b93b](https://github.com/apify/crawlee-python/commit/662b93b2e6764396ba885d7f1a57c0dba42369a1)) by [@Mantisus](https://github.com/Mantisus), closes [#1191](https://github.com/apify/crawlee-python/issues/1191)
+- **stagehand:** Inject `--no-sandbox` into Stagehand&#x27;s Chromium launch when sandbox is disabled ([#1906](https://github.com/apify/crawlee-python/pull/1906)) ([041b92a](https://github.com/apify/crawlee-python/commit/041b92a1cd671eabd7629dbcdba2d5cc30ff1837)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->
