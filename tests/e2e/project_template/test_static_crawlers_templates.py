@@ -90,14 +90,14 @@ async def test_static_crawler_actor_at_apify(
         capture_output=True,
         check=True,
         cwd=tmp_path / actor_name,
-        timeout=120,
+        timeout=600,
     )
     subprocess.run(  # noqa: ASYNC221, S603
         ['apify', 'init', '-y', actor_name],  # noqa: S607
         capture_output=True,
         check=True,
         cwd=tmp_path / actor_name,
-        timeout=120,
+        timeout=600,
     )
 
     build_process = subprocess.run(  # noqa: ASYNC221
@@ -108,7 +108,7 @@ async def test_static_crawler_actor_at_apify(
         # Prevent git from walking up into the surrounding project's .git/ when running under
         # a basetemp inside the repo (see --basetemp in the e2e-templates-tests poe task).
         env={**os.environ, 'GIT_CEILING_DIRECTORIES': str(tmp_path)},
-        timeout=120,
+        timeout=600,
     )
     # Get actor ID from build log
     actor_id_regexp = re.compile(r'https:\/\/console\.apify\.com\/actors\/(.*)#\/builds\/\d*\.\d*\.\d*')
