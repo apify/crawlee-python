@@ -132,8 +132,17 @@ async def test_static_crawler_actor_at_apify(
         if crawler_type == 'stagehand':
             env_vars = actor.version('0.0').env_vars()
             await env_vars.create(name='OPENAI_API_KEY', value=os.environ['OPENAI_API_KEY'], is_secret=True)
-            rebuild = await actor.build(version_number='0.0', wait_for_finish=600)
-            build_number = rebuild['buildNumber']
+            # `ActorClientAsync.build`'s `wait_for_finish` parameter is capped server-side at 60s,
+            # which is shorter than a stagehand build (playwright + browser deps). Trigger the build,
+            # then poll client-side via `BuildClientAsync.wait_for_finish` until it reaches a terminal
+            # status, and assert it succeeded before starting the run.
+            rebuild = await actor.build(version_number='0.0')
+            finished_build = await client.build(rebuild['id']).wait_for_finish(wait_secs=900)
+            assert finished_build is not None, 'Stagehand rebuild did not reach a terminal status within 900s.'
+            assert finished_build['status'] == 'SUCCEEDED', (
+                f'Stagehand rebuild did not succeed: status={finished_build["status"]!r}, build={finished_build}'
+            )
+            build_number = finished_build['buildNumber']
 
         started_run_data = await actor.start(memory_mbytes=8192, build=build_number)
         actor_run = client.run(started_run_data['id'])
