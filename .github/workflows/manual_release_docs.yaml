@@ -6,6 +6,12 @@ on:
 
   # Runs when invoked by another workflow.
   workflow_call:
+    inputs:
+      suppress_failure_notification:
+        description: 'When true, skips the Slack alert on failure (the caller will send its own).'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -79,3 +85,19 @@ jobs:
           echo "✅ CloudFront cache invalidation workflow triggered successfully"
         env:
           GITHUB_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+
+  # Send a Slack notification to the team alerting channel when there is a failure.
+  # Also alerts on cancellation (e.g., the `github-pages` deployment was rejected by a reviewer).
+  # Skipped when the workflow is invoked from a parent that sends its own alert (to avoid duplicates).
+  notify_on_failure:
+    name: Notify Slack on failure
+    needs: release_docs
+    if: (failure() || cancelled()) && !inputs.suppress_failure_notification
+    permissions:
+      contents: read
+      actions: read # Required for `gh api ...actions/runs/.../jobs` inside the reusable workflow.
+    uses: ./.github/workflows/_notify_slack_on_failure.yaml
+    with:
+      heading: ':red_circle: Docs release failed'
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

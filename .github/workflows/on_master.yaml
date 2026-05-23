@@ -25,6 +25,9 @@ jobs:
       pages: write
       id-token: write
     uses: ./.github/workflows/manual_release_docs.yaml
+    with:
+      # This workflow has its own notify_on_failure; suppress the nested one to avoid duplicate alerts.
+      suppress_failure_notification: true
     secrets: inherit
 
   code_checks:
@@ -59,3 +62,20 @@ jobs:
         uses: apify/actions/execute-workflow@v1.1.2
         with:
           workflow: manual_release_beta.yaml
+
+  # Send a Slack notification to the team alerting channel when there is a failure.
+  # Note: `beta_release` is a fire-and-forget dispatcher (it only kicks off `manual_release_beta.yaml`
+  # via execute-workflow). Failures inside the dispatched beta run are caught by that workflow's own
+  # `notify_on_failure`, not by this one.
+  notify_on_failure:
+    name: Notify Slack on failure
+    needs: [doc_checks, doc_release, code_checks, tests, beta_release]
+    if: failure()
+    permissions:
+      contents: read
+      actions: read # Required for `gh api ...actions/runs/.../jobs` inside the reusable workflow.
+    uses: ./.github/workflows/_notify_slack_on_failure.yaml
+    with:
+      heading: ':red_circle: Master CI failed'
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

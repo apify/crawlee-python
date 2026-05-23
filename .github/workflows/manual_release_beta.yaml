@@ -91,4 +91,22 @@ jobs:
       pages: write
       id-token: write
     uses: ./.github/workflows/manual_release_docs.yaml
+    with:
+      # This workflow has its own notify_on_failure; suppress the nested one to avoid duplicate alerts.
+      suppress_failure_notification: true
     secrets: inherit
+
+  # Send a Slack notification to the team alerting channel when there is a failure.
+  # Also alerts on cancellation (e.g., env-gated `pypi_publish` rejected by a reviewer or timed out).
+  notify_on_failure:
+    name: Notify Slack on failure
+    needs: [release_prepare, changelog_update, pypi_publish, doc_release_post_publish]
+    if: failure() || cancelled()
+    permissions:
+      contents: read
+      actions: read # Required for `gh api ...actions/runs/.../jobs` inside the reusable workflow.
+    uses: ./.github/workflows/_notify_slack_on_failure.yaml
+    with:
+      heading: ':red_circle: Beta release failed'
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
