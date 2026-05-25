@@ -138,6 +138,7 @@ jobs:
     needs: [release_prepare, changelog_update, pypi_publish]
     permissions:
       contents: write
+      checks: read
     uses: ./.github/workflows/manual_version_docs.yaml
     with:
       # Pass the bumped version explicitly — the job's checkout uses the dispatch ref (pre-bump),
@@ -152,5 +153,6 @@ jobs:
       contents: write
       pages: write
       id-token: write
+      checks: read
     uses: ./.github/workflows/manual_release_docs.yaml
     secrets: inherit
