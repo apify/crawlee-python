@@ -54,18 +54,11 @@ COPY pyproject.toml uv.lock ./
 RUN echo "Python version:" \
     && python --version \
     && echo "Installing dependencies:" \
+    && uv sync --frozen --no-install-project --no-editable -q --no-dev --inexact \
     && PLAYWRIGHT_BASE_VERSION=$(cat /tmp/.base-playwright-version 2>/dev/null || echo "") \
     && if [ -n "$PLAYWRIGHT_BASE_VERSION" ]; then \
-        echo "Playwright $PLAYWRIGHT_BASE_VERSION pre-installed in base image; excluding from uv sync" \
-        && uv sync --frozen --no-install-project --no-editable -q --no-dev --inexact --no-install-package playwright \
-        && CURRENT_PLAYWRIGHT_VERSION=$(playwright --version 2>/dev/null | cut -d ' ' -f 2) \
-        && if [ "$CURRENT_PLAYWRIGHT_VERSION" != "$PLAYWRIGHT_BASE_VERSION" ]; then \
-            echo "Pinning playwright back to $PLAYWRIGHT_BASE_VERSION (was $CURRENT_PLAYWRIGHT_VERSION) to match shipped browsers" \
-            && uv pip install --reinstall --no-deps "playwright==$PLAYWRIGHT_BASE_VERSION"; \
-        fi; \
-    else \
-        echo "Playwright not found in base image, installing all dependencies as resolved in the lockfile" \
-        && uv sync --frozen --no-install-project --no-editable -q --no-dev --inexact; \
+        echo "Pinning playwright to $PLAYWRIGHT_BASE_VERSION to match the browser binaries shipped in the base image" \
+        && uv pip install --reinstall --no-deps "playwright==$PLAYWRIGHT_BASE_VERSION"; \
     fi \
     && rm -f /tmp/.base-playwright-version \
     && echo "All installed Python packages:" \
