@@ -18,14 +18,13 @@ permissions:
 jobs:
   wait_for_checks:
     # Gate the release on the `Checks` workflow already succeeding on this commit (run by `on_master.yaml`).
-    # TODO: pin to a tag after apify/workflows#238 is merged.
     name: Wait for required checks
     runs-on: ubuntu-latest
     permissions:
       checks: read
     steps:
       - name: Wait for checks
-        uses: apify/actions/wait-for-checks@main
+        uses: apify/actions/wait-for-checks@v1.2.0
         with:
           ref: ${{ github.sha }}
           check-regexp: '^Checks'

@@ -40,10 +40,10 @@ jobs:
 
     steps:
       # Gate manual dispatches on the `Checks` workflow already succeeding on this commit (run by `on_master.yaml`);
-      # skipped when called from another workflow. TODO: pin to a tag after apify/workflows#238 is merged.
+      # skipped when called from another workflow.
       - name: Wait for checks
         if: github.event_name == 'workflow_dispatch'
-        uses: apify/actions/wait-for-checks@main
+        uses: apify/actions/wait-for-checks@v1.2.0
         with:
           ref: ${{ github.sha }}
           check-regexp: '^Checks'
