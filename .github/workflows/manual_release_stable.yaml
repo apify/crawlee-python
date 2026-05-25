@@ -29,13 +29,23 @@ permissions:
   contents: read
 
 jobs:
-  code_checks:
-    name: Code checks
-    uses: ./.github/workflows/_check_code.yaml
+  wait_for_checks:
+    # Gate the release on the `Checks` workflow already succeeding on this commit (run by `on_master.yaml`).
+    # TODO: pin to a tag after apify/workflows#238 is merged.
+    name: Wait for required checks
+    runs-on: ubuntu-latest
+    permissions:
+      checks: read
+    steps:
+      - name: Wait for checks
+        uses: apify/workflows/wait-for-checks@wait-for-checks-action
+        with:
+          ref: ${{ github.sha }}
+          check-regexp: '^Checks'
 
   release_prepare:
     name: Release prepare
-    needs: [code_checks]
+    needs: [wait_for_checks]
     runs-on: ubuntu-latest
     outputs:
       version_number: ${{ steps.release_prepare.outputs.version_number }}
