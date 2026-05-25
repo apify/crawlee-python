@@ -25,7 +25,7 @@ jobs:
       checks: read
     steps:
       - name: Wait for checks
-        uses: apify/workflows/wait-for-checks@wait-for-checks-action
+        uses: apify/actions/wait-for-checks@main
         with:
           ref: ${{ github.sha }}
           check-regexp: '^Checks'

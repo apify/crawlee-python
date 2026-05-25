@@ -43,7 +43,7 @@ jobs:
       # skipped when called from another workflow. TODO: pin to a tag after apify/workflows#238 is merged.
       - name: Wait for checks
         if: github.event_name == 'workflow_dispatch'
-        uses: apify/workflows/wait-for-checks@wait-for-checks-action
+        uses: apify/actions/wait-for-checks@main
         with:
           ref: ${{ github.sha }}
           check-regexp: '^Checks'
