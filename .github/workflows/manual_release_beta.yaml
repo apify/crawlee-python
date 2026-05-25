@@ -104,5 +104,6 @@ jobs:
       contents: write
       pages: write
       id-token: write
+      checks: read
     uses: ./.github/workflows/manual_release_docs.yaml
     secrets: inherit
