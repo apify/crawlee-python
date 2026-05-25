@@ -11,31 +11,24 @@ permissions:
   contents: read
 
 jobs:
-  doc_checks:
-    name: Doc checks
-    uses: ./.github/workflows/_check_docs.yaml
+  checks:
+    name: Checks
+    uses: ./.github/workflows/_checks.yaml
+    with:
+      # Skip the test suite for docs-only commits — they don't change runtime behavior.
+      run_tests: ${{ !startsWith(github.event.head_commit.message, 'docs') }}
+    secrets: inherit
 
   doc_release:
     # Skip this for non-"docs" commits.
     if: startsWith(github.event.head_commit.message, 'docs')
     name: Doc release
-    needs: [doc_checks]
+    needs: [checks]
     permissions:
       contents: write
       pages: write
       id-token: write
     uses: ./.github/workflows/manual_release_docs.yaml
-    secrets: inherit
-
-  code_checks:
-    name: Code checks
-    uses: ./.github/workflows/_check_code.yaml
-
-  tests:
-    # Skip this for "docs" commits.
-    if: "!startsWith(github.event.head_commit.message, 'docs')"
-    name: Tests
-    uses: ./.github/workflows/_tests.yaml
     secrets: inherit
 
   # The beta release is dispatched as a separate workflow run (instead of calling `manual_release_beta.yaml` via `uses:`)
@@ -50,7 +43,7 @@ jobs:
       startsWith(github.event.head_commit.message, 'refactor') ||
       startsWith(github.event.head_commit.message, 'style')
     name: Beta release
-    needs: [code_checks, tests]
+    needs: [checks]
     runs-on: ubuntu-latest
     permissions:
       actions: write # Required by execute-workflow.
