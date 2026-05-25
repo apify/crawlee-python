@@ -54,7 +54,7 @@ COPY pyproject.toml uv.lock ./
 RUN echo "Python version:" \
     && python --version \
     && echo "Installing dependencies:" \
-    && uv sync --frozen --no-install-project --no-editable -q --no-dev --inexact \
+    && uv sync --frozen --no-install-project --no-editable --quiet --no-dev --inexact \
     && PLAYWRIGHT_BASE_VERSION=$(cat /tmp/.base-playwright-version 2>/dev/null || echo "") \
     && if [ -n "$PLAYWRIGHT_BASE_VERSION" ]; then \
         echo "Pinning playwright to $PLAYWRIGHT_BASE_VERSION to match the browser binaries shipped in the base image" \
