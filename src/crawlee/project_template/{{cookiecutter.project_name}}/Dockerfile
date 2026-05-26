@@ -41,8 +41,11 @@ RUN echo "Python version:" \
  && echo "All installed Python packages:" \
  && pip freeze
 # % elif cookiecutter.package_manager == 'uv'
-RUN pip install -U pip setuptools \
-    && pip install 'uv<1'
+COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /uvx /bin/
+
+# Snapshot the base image's playwright version before uv sync so we can pin to it later
+# and stay aligned with the browser binaries baked into /pw-browsers.
+RUN hash playwright 2>/dev/null && playwright --version | cut -d ' ' -f 2 > /tmp/.base-playwright-version || true
 
 ENV UV_PROJECT_ENVIRONMENT="/usr/local"
 
@@ -51,15 +54,13 @@ COPY pyproject.toml uv.lock ./
 RUN echo "Python version:" \
     && python --version \
     && echo "Installing dependencies:" \
-    # Check if playwright is already installed
-    && PLAYWRIGHT_INSTALLED=$(pip freeze | grep -q playwright && echo "true" || echo "false") \
-    && if [ "$PLAYWRIGHT_INSTALLED" = "true" ]; then \
-        echo "Playwright already installed, excluding from uv sync" \
-        && uv sync --frozen --no-install-project --no-editable -q --no-dev --inexact --no-install-package playwright; \
-    else \
-        echo "Playwright not found, installing all dependencies" \
-        && uv sync --frozen --no-install-project --no-editable -q --no-dev --inexact; \
+    && uv sync --frozen --no-install-project --no-editable --quiet --no-dev --inexact \
+    && PLAYWRIGHT_BASE_VERSION=$(cat /tmp/.base-playwright-version 2>/dev/null || echo "") \
+    && if [ -n "$PLAYWRIGHT_BASE_VERSION" ]; then \
+        echo "Pinning playwright to $PLAYWRIGHT_BASE_VERSION to match the browser binaries shipped in the base image" \
+        && uv pip install --reinstall --no-deps "playwright==$PLAYWRIGHT_BASE_VERSION"; \
     fi \
+    && rm -f /tmp/.base-playwright-version \
     && echo "All installed Python packages:" \
     && pip freeze
 # % elif cookiecutter.package_manager == 'pip'
