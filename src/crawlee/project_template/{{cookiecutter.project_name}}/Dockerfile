@@ -41,11 +41,11 @@ RUN echo "Python version:" \
  && echo "All installed Python packages:" \
  && pip freeze
 # % elif cookiecutter.package_manager == 'uv'
-# Snapshot the base image's playwright version before COPY/uv sync so we can pin to it later
+COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /uvx /bin/
+
+# Snapshot the base image's playwright version before uv sync so we can pin to it later
 # and stay aligned with the browser binaries baked into /pw-browsers.
-RUN pip install -U pip setuptools \
-    && pip install 'uv<1' \
-    && (hash playwright 2>/dev/null && playwright --version | cut -d ' ' -f 2 > /tmp/.base-playwright-version || true)
+RUN hash playwright 2>/dev/null && playwright --version | cut -d ' ' -f 2 > /tmp/.base-playwright-version || true
 
 ENV UV_PROJECT_ENVIRONMENT="/usr/local"
 
