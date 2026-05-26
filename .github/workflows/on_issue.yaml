@@ -27,17 +27,3 @@ jobs:
               repo: context.repo.repo,
               labels: ["t-tooling"]
             })
-
-  # Send a Slack notification to the team alerting channel when there is a failure.
-  notify_on_failure:
-    name: Notify Slack on failure
-    needs: label_issues
-    if: failure()
-    permissions:
-      contents: read
-      actions: read # Required for `gh api ...actions/runs/.../jobs` inside the reusable workflow.
-    uses: ./.github/workflows/_notify_slack_on_failure.yaml
-    with:
-      heading: ':red_circle: Issue labeling failed'
-    secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
