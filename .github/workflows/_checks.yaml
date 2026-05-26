@@ -1,16 +1,9 @@
 name: Checks
 
 on:
-  # Runs when manually triggered from the GitHub UI.
-  workflow_dispatch:
-    inputs:
-      run_tests:
-        description: Whether to run the unit test suite.
-        required: false
-        type: boolean
-        default: true
-
-  # Runs when invoked by another workflow.
+  # Runs when invoked by another workflow. For manual runs, dispatch `CI (master)` instead — that wraps this
+  # workflow via `uses:`, so the resulting check-run names get the `Checks /` prefix that the manual release
+  # workflows look for via `wait-for-checks`.
   workflow_call:
     inputs:
       run_tests:

@@ -7,6 +7,16 @@ on:
     tags-ignore:
       - "**" # Ignore all tags to avoid duplicate executions triggered by tag pushes.
 
+  # Allow re-running the Checks manually. Release jobs below are gated on `github.event_name == 'push'`
+  # so they never fire on manual dispatch.
+  workflow_dispatch:
+    inputs:
+      run_tests:
+        description: Whether to run the unit test suite.
+        required: false
+        type: boolean
+        default: true
+
 permissions:
   contents: read
 
@@ -15,13 +25,14 @@ jobs:
     name: Checks
     uses: ./.github/workflows/_checks.yaml
     with:
-      # Skip the test suite for docs-only commits — they don't change runtime behavior.
-      run_tests: ${{ !startsWith(github.event.head_commit.message, 'docs') }}
+      # On push: skip the test suite for docs-only commits — they don't change runtime behavior.
+      # On manual dispatch: honor the input.
+      run_tests: ${{ github.event_name == 'push' && !startsWith(github.event.head_commit.message, 'docs') || github.event_name == 'workflow_dispatch' && inputs.run_tests }}
     secrets: inherit
 
   doc_release:
-    # Skip this for non-"docs" commits.
-    if: startsWith(github.event.head_commit.message, 'docs')
+    # Only on push, and only for "docs" commits.
+    if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'docs')
     name: Doc release
     needs: [checks]
     permissions:
@@ -36,13 +47,15 @@ jobs:
   # because PyPI's Trusted Publishing does not currently support reusable workflows.
   # See: https://docs.pypi.org/trusted-publishers/troubleshooting/#reusable-workflows-on-github
   beta_release:
-    # Run this only for "feat", "fix", "perf", "refactor" and "style" commits.
+    # Only on push, and only for "feat", "fix", "perf", "refactor" and "style" commits.
     if: >-
-      startsWith(github.event.head_commit.message, 'feat') ||
-      startsWith(github.event.head_commit.message, 'fix') ||
-      startsWith(github.event.head_commit.message, 'perf') ||
-      startsWith(github.event.head_commit.message, 'refactor') ||
-      startsWith(github.event.head_commit.message, 'style')
+      github.event_name == 'push' && (
+        startsWith(github.event.head_commit.message, 'feat') ||
+        startsWith(github.event.head_commit.message, 'fix') ||
+        startsWith(github.event.head_commit.message, 'perf') ||
+        startsWith(github.event.head_commit.message, 'refactor') ||
+        startsWith(github.event.head_commit.message, 'style')
+      )
     name: Beta release
     needs: [checks]
     runs-on: ubuntu-latest
