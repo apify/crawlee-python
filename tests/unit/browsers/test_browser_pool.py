@@ -138,6 +138,10 @@ async def test_new_page_with_invalid_plugin() -> None:
             await browser_pool.new_page(browser_plugin=plugin_2)
 
 
+@pytest.mark.flaky(
+    reruns=3,
+    reason='Test is flaky on Windows when Playwright hits net::ERR_NO_BUFFER_SPACE under xdist load.',
+)
 async def test_resource_management(server_url: URL) -> None:
     playwright_plugin = PlaywrightBrowserPlugin(browser_type='chromium')
 
