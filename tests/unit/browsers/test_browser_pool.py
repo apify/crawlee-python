@@ -143,7 +143,8 @@ async def test_resource_management(server_url: URL) -> None:
 
     async with BrowserPool([playwright_plugin]) as browser_pool:
         page = await browser_pool.new_page()
-        await page.page.goto(str(server_url))
+        # Use a generous navigation timeout to avoid flakes on slow Windows CI runners.
+        await page.page.goto(str(server_url), timeout=60_000)
         assert page.page.url == str(server_url)
         assert '<html' in await page.page.content()  # there is some HTML content
         assert browser_pool.total_pages_count == 1
