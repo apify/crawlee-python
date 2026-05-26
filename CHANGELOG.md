@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.7.1 - **not yet released**
+## [1.7.1](https://github.com/apify/crawlee-python/releases/tag/v1.7.1) (2026-05-26)
 
 ### 🐛 Bug Fixes
 
@@ -13,7 +12,6 @@ All notable changes to this project will be documented in this file.
 - **templates:** Pin playwright to base image version in `uv` Dockerfile template ([#1904](https://github.com/apify/crawlee-python/pull/1904)) ([8d902c9](https://github.com/apify/crawlee-python/commit/8d902c94a5564eae4aaf8ece594f817c0da7257f)) by [@vdusek](https://github.com/vdusek)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.7.0](https://github.com/apify/crawlee-python/releases/tag/v1.7.0) (2026-05-12)
 
 ### 🚀 Features
