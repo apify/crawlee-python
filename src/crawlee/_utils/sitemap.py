@@ -18,6 +18,7 @@ from xml.sax.handler import ContentHandler
 from typing_extensions import NotRequired, override
 from yarl import URL
 
+from crawlee._utils.urls import filter_url
 from crawlee._utils.web import is_status_code_successful
 from crawlee.errors import ProxyError
 
@@ -25,6 +26,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
     from xml.sax.xmlreader import AttributesImpl
 
+    from crawlee import EnqueueStrategy
     from crawlee.http_clients import HttpClient
     from crawlee.proxy_configuration import ProxyInfo
 
@@ -55,6 +57,7 @@ class ParseSitemapOptions(TypedDict, total=False):
     emit_nested_sitemaps: bool
     max_depth: int
     sitemap_retries: int
+    enqueue_strategy: EnqueueStrategy
     timeout: timedelta | None
 
 
@@ -230,6 +233,7 @@ async def _process_sitemap_item(
     sources: list[SitemapSource],
     *,
     emit_nested_sitemaps: bool,
+    enqueue_strategy: EnqueueStrategy,
 ) -> AsyncGenerator[SitemapUrl | NestedSitemap | None, None]:
     """Process a sitemap item and yield appropriate results."""
     item_copy = item.copy()  # Work with a copy to avoid modifying the original
@@ -242,7 +246,12 @@ async def _process_sitemap_item(
     # Handle sitemap URL references (nested sitemaps)
     if item_type == 'sitemap_url' and 'url' in item_copy:
         sitemap_url = item_copy['url']
-        if sitemap_url and sitemap_url not in visited_sitemap_urls:
+        parent_url = source.get('url')
+        if sitemap_url and sitemap_url not in visited_sitemap_urls and parent_url:
+            ok, reason = filter_url(target=sitemap_url, strategy=enqueue_strategy, origin=parent_url)
+            if not ok:
+                logger.warning(f'Skipping nested sitemap {sitemap_url!r} (parent {parent_url!r}): {reason}.')
+                return
             # Add to processing queue
             sources.append(SitemapSource(type='url', url=sitemap_url, depth=depth + 1))
 
@@ -255,9 +264,17 @@ async def _process_sitemap_item(
         # Determine the origin sitemap URL for tracking purposes
         origin_url = _get_origin_url(source)
 
+        loc = item_copy['loc']
+        parent_url = source.get('url')
+        if parent_url and loc:
+            ok, reason = filter_url(target=loc, strategy=enqueue_strategy, origin=parent_url)
+            if not ok:
+                logger.warning(f'Skipping sitemap URL {loc!r} (parent {parent_url!r}): {reason}.')
+                return
+
         # Create and yield the sitemap URL object
         yield SitemapUrl(
-            loc=item_copy['loc'],
+            loc=loc,
             lastmod=item_copy.get('lastmod'),
             changefreq=item_copy.get('changefreq'),
             priority=item_copy.get('priority'),
@@ -272,6 +289,7 @@ async def _process_raw_source(
     sources: list[SitemapSource],
     *,
     emit_nested_sitemaps: bool,
+    enqueue_strategy: EnqueueStrategy,
 ) -> AsyncGenerator[SitemapUrl | NestedSitemap, None]:
     """Process a raw content sitemap source."""
     if 'content' not in source:
@@ -285,7 +303,13 @@ async def _process_raw_source(
         # Process the content
         async for item in parser.process_chunk(content):
             async for result in _process_sitemap_item(
-                item, source, depth, visited_sitemap_urls, sources, emit_nested_sitemaps=emit_nested_sitemaps
+                item,
+                source,
+                depth,
+                visited_sitemap_urls,
+                sources,
+                emit_nested_sitemaps=emit_nested_sitemaps,
+                enqueue_strategy=enqueue_strategy,
             ):
                 if result:
                     yield result
@@ -293,7 +317,13 @@ async def _process_raw_source(
         # Process any remaining content
         async for item in parser.flush():
             async for result in _process_sitemap_item(
-                item, source, depth, visited_sitemap_urls, sources, emit_nested_sitemaps=emit_nested_sitemaps
+                item,
+                source,
+                depth,
+                visited_sitemap_urls,
+                sources,
+                emit_nested_sitemaps=emit_nested_sitemaps,
+                enqueue_strategy=enqueue_strategy,
             ):
                 if result:
                     yield result
@@ -314,6 +344,7 @@ async def _fetch_and_process_sitemap(
     proxy_info: ProxyInfo | None = None,
     timeout: timedelta | None = None,
     emit_nested_sitemaps: bool,
+    enqueue_strategy: EnqueueStrategy,
 ) -> AsyncGenerator[SitemapUrl | NestedSitemap, None]:
     """Fetch a sitemap from a URL and process its content."""
     if 'url' not in source:
@@ -354,6 +385,7 @@ async def _fetch_and_process_sitemap(
                                 visited_sitemap_urls,
                                 sources,
                                 emit_nested_sitemaps=emit_nested_sitemaps,
+                                enqueue_strategy=enqueue_strategy,
                             ):
                                 if result:
                                     yield result
@@ -367,6 +399,7 @@ async def _fetch_and_process_sitemap(
                             visited_sitemap_urls,
                             sources,
                             emit_nested_sitemaps=emit_nested_sitemaps,
+                            enqueue_strategy=enqueue_strategy,
                         ):
                             if result:
                                 yield result
@@ -445,6 +478,7 @@ async def parse_sitemap(
     max_depth = options.get('max_depth', float('inf'))
     sitemap_retries = options.get('sitemap_retries', 3)
     timeout = options.get('timeout', timedelta(seconds=30))
+    enqueue_strategy = options.get('enqueue_strategy', 'same-hostname')
 
     # Setup working state
     sources = list(initial_sources)
@@ -463,7 +497,12 @@ async def parse_sitemap(
         # Process based on source type
         if source['type'] == 'raw':
             async for result in _process_raw_source(
-                source, depth, visited_sitemap_urls, sources, emit_nested_sitemaps=emit_nested_sitemaps
+                source,
+                depth,
+                visited_sitemap_urls,
+                sources,
+                emit_nested_sitemaps=emit_nested_sitemaps,
+                enqueue_strategy=enqueue_strategy,
             ):
                 yield result
 
@@ -482,6 +521,7 @@ async def parse_sitemap(
                 sources,
                 sitemap_retries,
                 emit_nested_sitemaps=emit_nested_sitemaps,
+                enqueue_strategy=enqueue_strategy,
                 proxy_info=proxy_info,
                 timeout=timeout,
             ):
