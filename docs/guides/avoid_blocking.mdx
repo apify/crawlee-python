@@ -11,6 +11,7 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 import PlaywrightDefaultFingerprintGenerator from '!!raw-loader!roa-loader!./code_examples/avoid_blocking/playwright_with_fingerprint_generator.py';
 import PlaywrightWithCamoufox from '!!raw-loader!roa-loader!../examples/code_examples/playwright_crawler_with_camoufox.py';
 import PlaywrightWithCloakBrowser from '!!raw-loader!roa-loader!./code_examples/avoid_blocking/playwright_with_cloakbrowser.py';
+import PlaywrightWithInvisibleFirefox from '!!raw-loader!roa-loader!./code_examples/avoid_blocking/playwright_with_invisible_firefox.py';
 
 import PlaywrightDefaultFingerprintGeneratorWithArgs from '!!raw-loader!./code_examples/avoid_blocking/default_fingerprint_generator_with_args.py';
 
@@ -48,6 +49,14 @@ For sites with aggressive anti-bot protection, [CloakBrowser](https://github.com
 
 <RunnableCodeBlock className="language-python" language="python">
     {PlaywrightWithCloakBrowser}
+</RunnableCodeBlock>
+
+## Using Invisible Firefox
+
+For sites that flag Chromium UA by default, the Firefox-side equivalent of the CloakBrowser approach is [invisible_playwright](https://github.com/feder-cr/invisible_playwright), which drives a patched Firefox 150 binary with fingerprints modified at the C++ source code level (no JavaScript shims). Install it separately with `pip install invisible_playwright`. The example below mirrors the CloakBrowser pattern: the plugin calls `ensure_binary()` to download and cache the patched Firefox on first run, then launches it via the standard Playwright Firefox interface with the stealth prefs applied.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {PlaywrightWithInvisibleFirefox}
 </RunnableCodeBlock>
 
 **Related links**
