@@ -58,7 +58,7 @@ RUN echo "Python version:" \
     && PLAYWRIGHT_BASE_VERSION=$(cat /tmp/.base-playwright-version 2>/dev/null || echo "") \
     && if [ -n "$PLAYWRIGHT_BASE_VERSION" ]; then \
         echo "Pinning playwright to $PLAYWRIGHT_BASE_VERSION to match the browser binaries shipped in the base image" \
-        && uv pip install --reinstall --no-deps "playwright==$PLAYWRIGHT_BASE_VERSION"; \
+        && uv pip install --system --reinstall --no-deps "playwright==$PLAYWRIGHT_BASE_VERSION"; \
     fi \
     && rm -f /tmp/.base-playwright-version \
     && echo "All installed Python packages:" \
