@@ -1,6 +1,6 @@
 ---
-id: secure-scraping
-title: Secure scraping
+id: security-of-web-scraping
+title: Security of web scraping
 description: Understand the security risks of running web crawlers and the controls Crawlee applies by default.
 ---
 
@@ -15,7 +15,7 @@ This guide covers common threats a crawler can encounter and how to handle each 
 Because the target decides what your crawler receives, a malicious or compromised site can try to:
 
 - **Steer your crawler to URLs you never intended to visit** - other hosts, or internal services that are not reachable from the public internet.
-- **Reach non-HTTP destinations** through schemes like `file://`, `gopher://`, `ftp://`, or `dict://`, to read local files or talk to services such as Redis.
+- **Reach non-HTTP destinations** through schemes like `file://`, `gopher://`, `ftp://`, or `dict://`, to read local files or reach internal network services.
 - **Exhaust your resources** with a crawler trap, an oversized response, or a decompression bomb.
 - **Run code in your browser** - a page's JavaScript executes in the browser your crawler drives.
 - **Smuggle a payload through the data you extract**, which turns dangerous only when your own code passes it on to SQL, a shell, an HTML page, or an LLM prompt.
@@ -112,7 +112,7 @@ The crawler is the component most exposed to untrusted code, so treat it as the 
 
 Isolation also changes the calculus for the application-level controls: inside a dedicated, egress-restricted environment the blast radius of an SSRF is contained, so widening the scope with `strategy='all'` or accepting arbitrary URLs is far less risky than it would be on a shared host.
 
-## Running on the Apify platform
+### Running on the Apify platform
 
 Building and maintaining isolated, egress-controlled runtimes is ongoing work. The [Apify platform](https://apify.com) runs each Actor (your crawler) in its own isolated container, without access to other users' data or to your internal network, which gives you most of the isolation above out of the box. See the [Deploy on Apify](../deployment/apify-platform) guide to run your Crawlee crawler there.
 
