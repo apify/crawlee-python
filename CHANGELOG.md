@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.7.2 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **templates:** Install pinned playwright into system env in uv Dockerfile ([#1922](https://github.com/apify/crawlee-python/pull/1922)) ([0fd0f3a](https://github.com/apify/crawlee-python/commit/0fd0f3a2529a875a7525599472029b0e99f18858)) by [@vdusek](https://github.com/vdusek)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.7.1](https://github.com/apify/crawlee-python/releases/tag/v1.7.1) (2026-05-26)
 
 ### 🐛 Bug Fixes
