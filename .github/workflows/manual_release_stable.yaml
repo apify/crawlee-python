@@ -144,6 +144,8 @@ jobs:
       # Pass the bumped version explicitly — the job's checkout uses the dispatch ref (pre-bump),
       # so `uv version --short` from pyproject.toml would return the old version.
       version_number: ${{ needs.release_prepare.outputs.version_number }}
+      # This workflow has its own notify_on_failure; suppress the nested one to avoid duplicate alerts.
+      suppress_failure_notification: true
     secrets: inherit
 
   doc_release:
@@ -155,4 +157,23 @@ jobs:
       id-token: write
       checks: read
     uses: ./.github/workflows/manual_release_docs.yaml
+    with:
+      # This workflow has its own notify_on_failure; suppress the nested one to avoid duplicate alerts.
+      suppress_failure_notification: true
     secrets: inherit
+
+  # Send a Slack notification to the team alerting channel when there is a failure.
+  # Also alerts on cancellation (e.g., env-gated `pypi_publish` / `github-pages` rejected by a reviewer
+  # or the approval timed out).
+  notify_on_failure:
+    name: Notify Slack on failure
+    needs: [code_checks, release_prepare, changelog_update, github_release, pypi_publish, version_docs, doc_release]
+    if: failure() || cancelled()
+    permissions:
+      contents: read
+      actions: read # Required for `gh api ...actions/runs/.../jobs` inside the reusable workflow.
+    uses: ./.github/workflows/_notify_slack_on_failure.yaml
+    with:
+      heading: ':red_circle: Stable release failed'
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -71,74 +71,16 @@ jobs:
           APIFY_TEST_USER_API_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-  # Send a Slack notification to the team alerting channel when scheduled e2e tests fail.
-  # Skipped on workflow_dispatch (manual runs) so that ad-hoc triggers don't spam the channel.
+  # Send a Slack notification to the team alerting channel when there is a failure.
   notify_on_failure:
     name: Notify Slack on failure
     needs: end_to_end_tests
-    if: failure() && github.event_name == 'schedule'
-    runs-on: ubuntu-latest
+    if: failure()
     permissions:
       contents: read
-      actions: read
-
-    steps:
-      - name: Build Slack payload
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          RUN_ID: ${{ github.run_id }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
-          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          HEADING: ':red_circle: Scheduled e2e tests failed'
-        run: |
-          # Retry the API call to tolerate transient 5xx from GitHub.
-          max_attempts=5
-          fetched=0
-          for attempt in $(seq 1 "${max_attempts}"); do
-            if failed_jobs=$(gh api \
-              "repos/${REPO}/actions/runs/${RUN_ID}/attempts/${RUN_ATTEMPT}/jobs?per_page=100" \
-              --jq '[.jobs[] | select(.conclusion == "failure") | "• \(.name)"] | join("\n")'); then
-              fetched=1
-              break
-            fi
-            if [[ "${attempt}" -lt "${max_attempts}" ]]; then
-              sleep "$((attempt * 5))"
-            fi
-          done
-          if [[ "${fetched}" -eq 0 ]]; then
-            echo "Failed to fetch job list after ${max_attempts} attempts; sending notification without it." >&2
-            failed_jobs="(unable to fetch job list — see workflow run)"
-          fi
-          jq -n \
-            --arg repo "${REPO}" \
-            --arg url "${WORKFLOW_URL}" \
-            --arg heading "${HEADING}" \
-            --arg failed "${failed_jobs}" \
-            '{
-              text: "\($heading) in \($repo)",
-              blocks: [
-                {
-                  type: "header",
-                  text: { type: "plain_text", text: $heading, emoji: true }
-                },
-                {
-                  type: "section",
-                  fields: [
-                    { type: "mrkdwn", text: "*Repository:*\n\($repo)" },
-                    { type: "mrkdwn", text: "*Workflow run:*\n<\($url)|View on GitHub>" }
-                  ]
-                },
-                {
-                  type: "section",
-                  text: { type: "mrkdwn", text: "*Failed jobs:*\n\($failed)" }
-                }
-              ]
-            }' > slack-payload.json
-
-      - name: Send Slack notification
-        uses: slackapi/slack-github-action@v3.0.2
-        with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload-file-path: slack-payload.json
+      actions: read # Required for `gh api ...actions/runs/.../jobs` inside the reusable workflow.
+    uses: ./.github/workflows/_notify_slack_on_failure.yaml
+    with:
+      heading: ':red_circle: Scheduled e2e tests failed'
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

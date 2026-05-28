@@ -1,0 +1,111 @@
+name: Notify Slack on failure
+
+on:
+  # Runs when invoked by another workflow.
+  workflow_call:
+    inputs:
+      heading:
+        description: 'Slack message heading (e.g. ":red_circle: Master CI failed").'
+        required: true
+        type: string
+    secrets:
+      SLACK_WEBHOOK_URL:
+        description: 'Incoming webhook URL for the team alerting channel.'
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  notify:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Build Slack payload
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          HEADING: ${{ inputs.heading }}
+        run: |
+          set -uo pipefail
+
+          gh_out=$(mktemp)
+          gh_err=$(mktemp)
+          trap 'rm -f "${gh_out}" "${gh_err}"' EXIT
+
+          # Retry the API call to tolerate transient 5xx from GitHub.
+          # `--paginate` handles runs with more than 100 jobs (e.g., large matrix in scheduled e2e tests).
+          max_attempts=5
+          fetched=0
+          for attempt in $(seq 1 "${max_attempts}"); do
+            if gh api --paginate \
+              "repos/${REPO}/actions/runs/${RUN_ID}/attempts/${RUN_ATTEMPT}/jobs?per_page=100" \
+              > "${gh_out}" 2> "${gh_err}"; then
+              fetched=1
+              break
+            fi
+            echo "Attempt ${attempt}/${max_attempts} failed:" >&2
+            cat "${gh_err}" >&2
+            if [[ "${attempt}" -lt "${max_attempts}" ]]; then
+              sleep "$((attempt * 5))"
+            fi
+          done
+
+          if [[ "${fetched}" -eq 0 ]]; then
+            echo "Failed to fetch job list after ${max_attempts} attempts; sending notification without it." >&2
+            failed_jobs="(unable to fetch job list — see workflow run)"
+          else
+            # `failure()` and `cancelled()` upstream can be triggered by any of these conclusions, so include them all.
+            # Truncate to MAX_JOBS bullets to stay under Slack's 3000-char limit per section text block.
+            max_jobs=20
+            if ! failed_jobs=$(jq -s -r \
+              --argjson max "${max_jobs}" \
+              '[.[].jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "cancelled") | "• \(.name) (\(.conclusion))"]
+                | if length == 0 then
+                    "(no failed/timed_out/cancelled jobs in this run — see workflow run)"
+                  elif length > $max then
+                    (.[0:$max] + ["_... and \(length - $max) more_"]) | join("\n")
+                  else
+                    join("\n")
+                  end' "${gh_out}"); then
+              echo "Failed to parse job list JSON; sending notification without it." >&2
+              failed_jobs="(unable to parse job list — see workflow run)"
+            fi
+          fi
+          jq -n \
+            --arg repo "${REPO}" \
+            --arg url "${WORKFLOW_URL}" \
+            --arg heading "${HEADING}" \
+            --arg failed "${failed_jobs}" \
+            '{
+              text: "\($heading) in \($repo)",
+              blocks: [
+                {
+                  type: "header",
+                  text: { type: "plain_text", text: $heading, emoji: true }
+                },
+                {
+                  type: "section",
+                  fields: [
+                    { type: "mrkdwn", text: "*Repository:*\n\($repo)" },
+                    { type: "mrkdwn", text: "*Workflow run:*\n<\($url)|View on GitHub>" }
+                  ]
+                },
+                {
+                  type: "section",
+                  text: { type: "mrkdwn", text: "*Failed jobs:*\n\($failed)" }
+                }
+              ]
+            }' > slack-payload.json
+
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v3.0.2
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload-file-path: slack-payload.json
