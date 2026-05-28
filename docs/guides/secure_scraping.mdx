@@ -24,12 +24,6 @@ The target is not the only untrusted party: a proxy you route requests through c
 
 The first two items above are the building blocks of a [server-side request forgery (SSRF)](https://owasp.org/www-community/attacks/Server_Side_Request_Forgery) attack: the attacker does not target your crawler directly - they use it as a *confused deputy* to reach things on your network that they cannot reach themselves.
 
-:::info
-
-Crawlee for Python had this SSRF gap in its sitemap and `robots.txt` handling before version 1.7.0, fixed in [#1862](https://github.com/apify/crawlee-python/pull/1862) and [#1864](https://github.com/apify/crawlee-python/pull/1864). See the advisory [GHSA-3r75-xc34-5f44](https://github.com/apify/crawlee-python/security/advisories/GHSA-3r75-xc34-5f44).
-
-:::
-
 ## Keeping the crawl in scope
 
 Several of these threats come down to where your crawler is allowed to send requests. A hostile page, sitemap, or redirect can try to point it somewhere you never intended - another site, an internal service, or a non-HTTP protocol - which is the SSRF case from above. Crawlee's defaults are built to keep a crawl on the targets you actually chose.
