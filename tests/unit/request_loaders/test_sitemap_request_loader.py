@@ -1,4 +1,3 @@
-import asyncio
 import base64
 import gzip
 from typing import TYPE_CHECKING
@@ -10,6 +9,7 @@ from crawlee import RequestOptions, RequestTransformAction
 from crawlee.http_clients._base import HttpClient
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
 from crawlee.storages import KeyValueStore
+from tests.unit.utils import poll_until_condition
 
 if TYPE_CHECKING:
     from crawlee._types import JsonSerializable
@@ -91,9 +91,7 @@ async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL, h
 
     assert await sitemap_loader.is_empty()
 
-    await asyncio.sleep(0.1)
-
-    assert await sitemap_loader.is_finished()
+    assert await poll_until_condition(sitemap_loader.is_finished)
 
 
 async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -> None:
@@ -139,18 +137,14 @@ async def test_create_persist_state_for_sitemap_loading(
 async def test_data_persistence_for_sitemap_loading(
     server_url: URL, http_client: HttpClient, key_value_store: KeyValueStore
 ) -> None:
-    async def wait_for_sitemap_loader_not_empty(sitemap_loader: SitemapRequestLoader) -> None:
-        while await sitemap_loader.is_empty() and not await sitemap_loader.is_finished():  # noqa: ASYNC110
-            await asyncio.sleep(0.1)
-
     sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
     persist_key = 'data_persist_state'
     sitemap_loader = SitemapRequestLoader(
         [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, enqueue_strategy='all'
     )
 
-    # Give time to load
-    await asyncio.wait_for(wait_for_sitemap_loader_not_empty(sitemap_loader), timeout=10)
+    # Give time to load.
+    await poll_until_condition(sitemap_loader.is_empty, lambda is_empty: not is_empty, timeout=10)
 
     await sitemap_loader.close()
 
