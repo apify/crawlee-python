@@ -206,6 +206,18 @@ class AbstractHttpCrawler(
             **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> list[Request]:
             requests = list[Request]()
+            skipped = list[Request]()
+
+            def create_request(request_options: RequestOptions) -> Request | None:
+                try:
+                    return Request.from_url(**request_options)
+                except ValidationError as exc:
+                    context.log.debug(
+                        f'Skipping URL "{request_options["url"]}" due to invalid format: {exc}. '
+                        'This may be caused by a malformed URL or unsupported URL scheme. '
+                        'Please ensure the URL is correct and retry.'
+                    )
+                    return None
 
             base_user_data = user_data or {}
 
@@ -226,11 +238,19 @@ class AbstractHttpCrawler(
                 else context.request.loaded_url or context.request.url
             )
             links_iterator = to_absolute_url_iterator(base_url, links_iterator, logger=context.log)
+            skipped_iterator = iter([])
 
             if robots_txt_file:
-                skipped, links_iterator = partition(robots_txt_file.is_allowed, links_iterator)
-            else:
-                skipped = iter([])
+                skipped_iterator, links_iterator = partition(robots_txt_file.is_allowed, links_iterator)
+
+            for url in skipped_iterator:
+                request_options = RequestOptions(
+                    url=url, user_data={**base_user_data}, label=label, enqueue_strategy=strategy
+                )
+                request = create_request(request_options)
+
+                if request is not None:
+                    skipped.append(request)
 
             for url in self._enqueue_links_filter_iterator(links_iterator, context.request.url, **kwargs):
                 request_options = RequestOptions(
@@ -244,17 +264,10 @@ class AbstractHttpCrawler(
                     if transform_request_options != 'unchanged':
                         request_options = transform_request_options
 
-                try:
-                    request = Request.from_url(**request_options)
-                except ValidationError as exc:
-                    context.log.debug(
-                        f'Skipping URL "{url}" due to invalid format: {exc}. '
-                        'This may be caused by a malformed URL or unsupported URL scheme. '
-                        'Please ensure the URL is correct and retry.'
-                    )
-                    continue
+                request = create_request(request_options)
 
-                requests.append(request)
+                if request is not None:
+                    requests.append(request)
 
             skipped_tasks = [
                 asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped

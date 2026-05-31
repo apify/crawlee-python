@@ -110,7 +110,7 @@ T = TypeVar('T')
 
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Request | None]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
-SkippedRequestCallback = Callable[[str, SkippedReason], Awaitable[None]]
+SkippedRequestCallback = Callable[[Request, SkippedReason], Awaitable[None]]
 
 
 class _BasicCrawlerOptions(TypedDict):
@@ -1210,17 +1210,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
 
     async def _handle_skipped_request(
-        self, request: Request | str, reason: SkippedReason, *, need_mark: bool = False
+        self, request: Request, reason: SkippedReason, *, need_mark: bool = False
     ) -> None:
         if need_mark and isinstance(request, Request):
             request.state = RequestState.SKIPPED
             await self._mark_request_as_handled(request)
 
-        url = request.url if isinstance(request, Request) else request
-
         if self._on_skipped_request:
             try:
-                await self._on_skipped_request(url, reason)
+                await self._on_skipped_request(request, reason)
             except Exception as e:
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined skipped request callback') from e
 
