@@ -2,9 +2,11 @@ minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
   - "@apify/*"
   - "@crawlee/*"
+  # Renovate security update: axios@1.16.0
+  - axios@1.16.0
 
 nodeLinker: hoisted
 linkWorkspacePackages: true
 preferWorkspacePackages: true
 publicHoistPattern:
-    - "*"
+  - "*"
