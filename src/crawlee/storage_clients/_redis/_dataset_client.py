@@ -185,6 +185,8 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         match (desc, offset, limit):
             case (True, 0, int()):
                 json_path += f'[-{limit}:]'
+            case (True, 0, None):
+                json_path += '[:]'
             case (True, int(), None):
                 json_path += f'[:-{offset}]'
             case (True, int(), int()):

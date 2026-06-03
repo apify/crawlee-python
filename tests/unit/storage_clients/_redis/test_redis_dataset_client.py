@@ -148,6 +148,17 @@ async def test_metadata_record_updates(dataset_client: RedisDatasetClient) -> No
     assert metadata.accessed_at > accessed_after_get
 
 
+async def test_get_data_descending_with_unlimited_limit(dataset_client: RedisDatasetClient) -> None:
+    """Test that get_data with desc=True and limit=None returns all items in reverse order."""
+    items = [{'id': 1}, {'id': 2}, {'id': 3}]
+    await dataset_client.push_data(items)
+
+    result = await dataset_client.get_data(desc=True, limit=None)
+
+    assert result.count == 3
+    assert result.items == [{'id': 3}, {'id': 2}, {'id': 1}]
+
+
 async def test_error_handling_on_push_failure(dataset_client: RedisDatasetClient) -> None:
     """Test that push_data properly handles Redis errors and retries."""
     mock_pipe = MagicMock()
