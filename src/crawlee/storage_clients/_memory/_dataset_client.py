@@ -171,16 +171,16 @@ class MemoryDatasetClient(DatasetClient):
         total = len(self._records)
         items = self._records.copy()
 
-        # Apply skip_empty filter if requested
-        if skip_empty:
-            items = [item for item in items if item]
-
         # Apply sorting
         if desc:
             items = list(reversed(items))
 
         # Apply pagination
         sliced_items = items[offset : (offset + limit) if limit is not None else total]
+
+        # Apply skip_empty filter if requested
+        if skip_empty:
+            sliced_items = [item for item in sliced_items if item]
 
         await self._update_metadata(update_accessed_at=True)
 
