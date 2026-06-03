@@ -133,7 +133,7 @@ dev = [
     "setuptools", # setuptools are used by pytest, but not explicitly required
     "ty~=0.0.0",
     "types-beautifulsoup4<5.0.0",
-    "types-cachetools<7.0.0",
+    "types-cachetools<7.0.1",
     "types-colorama<1.0.0",
     "types-psutil<8.0.0",
     "types-python-dateutil<3.0.0",
