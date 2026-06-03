@@ -1,13 +1,18 @@
 import base64
 import gzip
+from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from yarl import URL
 
 from crawlee._utils.sitemap import Sitemap, SitemapUrl, discover_valid_sitemaps, parse_sitemap
 from crawlee.http_clients._base import HttpClient, HttpResponse
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 BASIC_SITEMAP = """
 <?xml version="1.0" encoding="UTF-8"?>
@@ -63,6 +68,30 @@ def _make_mock_client(url_map: dict[str, tuple[int, bytes]]) -> AsyncMock:
     client = AsyncMock(spec=HttpClient)
     client.send_request.side_effect = send_request
     return client
+
+
+def _make_flaky_stream_client(body: bytes, *, fail_times: int) -> tuple[AsyncMock, list[int]]:
+    """Create a mock client whose `stream` fails with a network error for the first `fail_times` calls."""
+    attempts: list[int] = []
+
+    @asynccontextmanager
+    async def stream(_url: str, **_kwargs: Any) -> 'AsyncIterator[HttpResponse]':
+        attempt = len(attempts) + 1
+        attempts.append(attempt)
+        if attempt <= fail_times:
+            raise ConnectionError(f'Network error on attempt {attempt}')
+
+        async def read_stream() -> 'AsyncIterator[bytes]':
+            yield body
+
+        response = MagicMock(spec=HttpResponse)
+        response.headers = {'content-type': 'application/xml; charset=utf-8'}
+        response.read_stream = read_stream
+        yield cast('HttpResponse', response)
+
+    client = AsyncMock(spec=HttpClient)
+    client.stream = stream
+    return client, attempts
 
 
 def compress_gzip(data: str) -> bytes:
@@ -265,6 +294,30 @@ async def test_sitemap_from_string() -> None:
 
     assert len(sitemap.urls) == 5
     assert set(sitemap.urls) == BASIC_RESULTS
+
+
+async def test_sitemap_fetch_retries_on_transient_error() -> None:
+    """Transient fetch errors are retried up to `sitemap_retries` times before giving up."""
+    client, attempts = _make_flaky_stream_client(BASIC_SITEMAP.encode(), fail_times=2)
+
+    items = [
+        item async for item in parse_sitemap([{'type': 'url', 'url': 'http://not-exists.com/sitemap.xml'}], client)
+    ]
+
+    assert len(attempts) == 3
+    assert {item.loc for item in items} == BASIC_RESULTS
+
+
+async def test_sitemap_fetch_raises_after_retries_exhausted() -> None:
+    """A persistent fetch error is raised to the caller once all retries are exhausted."""
+    client, attempts = _make_flaky_stream_client(BASIC_SITEMAP.encode(), fail_times=10)
+
+    with pytest.raises(ConnectionError):
+        _ = [
+            item async for item in parse_sitemap([{'type': 'url', 'url': 'http://not-exists.com/sitemap.xml'}], client)
+        ]
+
+    assert len(attempts) == 3
 
 
 async def test_discover_sitemap_from_robots_txt() -> None:

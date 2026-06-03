@@ -321,9 +321,9 @@ async def _fetch_and_process_sitemap(
 
     sitemap_url = source['url']
 
-    try:
-        while retries_left > 0:
-            retries_left -= 1
+    while retries_left > 0:
+        retries_left -= 1
+        try:
             async with http_client.stream(
                 sitemap_url, method='GET', headers=SITEMAP_HEADERS, proxy_info=proxy_info, timeout=timeout
             ) as response:
@@ -372,12 +372,15 @@ async def _fetch_and_process_sitemap(
                                 yield result
                 finally:
                     parser.close()
-                break
+            break
 
-    except Exception as e:
-        if retries_left > 0:
-            logger.warning(f'Error fetching sitemap {sitemap_url}: {e}. Retries left: {retries_left}')
-            await asyncio.sleep(1)  # Brief pause before retry
+        except Exception as e:
+            if retries_left > 0:
+                logger.warning(f'Error fetching sitemap {sitemap_url}: {e}. Retries left: {retries_left}')
+                await asyncio.sleep(1)  # Brief pause before retry
+            else:
+                logger.exception(f'Failed to fetch sitemap {sitemap_url}, no retries left.')
+                raise
 
 
 class Sitemap:
