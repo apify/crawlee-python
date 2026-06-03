@@ -997,7 +997,7 @@ dev = [
     { name = "setuptools" },
     { name = "ty", specifier = "~=0.0.0" },
     { name = "types-beautifulsoup4", specifier = "<5.0.0" },
-    { name = "types-cachetools", specifier = "<7.0.1" },
+    { name = "types-cachetools", specifier = "<8.0.0" },
     { name = "types-colorama", specifier = "<1.0.0" },
     { name = "types-psutil", specifier = "<8.0.0" },
     { name = "types-python-dateutil", specifier = "<3.0.0" },
