@@ -18,6 +18,10 @@ on:
         required: false
         type: string
         default: ""
+    outputs:
+      commit_sha:
+        description: Full SHA of the versioned-docs commit that was pushed (falls back to HEAD if nothing was committed).
+        value: ${{ jobs.version_docs.outputs.commit_sha }}
 
 concurrency:
   group: version-docs
@@ -37,6 +41,8 @@ jobs:
     permissions:
       contents: write
       checks: read
+    outputs:
+      commit_sha: ${{ steps.commit.outputs.commit_long_sha }}
 
     steps:
       # Gate manual dispatches on the `Checks` workflow already succeeding on this commit (run by `on_master.yaml`);
@@ -123,6 +129,7 @@ jobs:
           uv run pnpm exec docusaurus api:version "$MAJOR_MINOR_VERSION"
 
       - name: Commit and push versioned docs
+        id: commit
         uses: apify/actions/signed-commit@v1.2.0
         with:
           message: "docs: Version docs for v${{ steps.snapshot.outputs.version }} [skip ci]"
