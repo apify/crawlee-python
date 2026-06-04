@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - **templates:** Install pinned playwright into system env in uv Dockerfile ([#1922](https://github.com/apify/crawlee-python/pull/1922)) ([0fd0f3a](https://github.com/apify/crawlee-python/commit/0fd0f3a2529a875a7525599472029b0e99f18858)) by [@vdusek](https://github.com/vdusek)
+- **memory-storage:** Avoid duplicate processed requests in memory request queue client ([#1941](https://github.com/apify/crawlee-python/pull/1941)) ([d343d0e](https://github.com/apify/crawlee-python/commit/d343d0e905e9622bd65652a272f269a7a37b00c6)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->
