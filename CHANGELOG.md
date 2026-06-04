@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.7.2 - **not yet released**
+## [1.7.2](https://github.com/apify/crawlee-python/releases/tag/v1.7.2) (2026-06-04)
 
 ### 🐛 Bug Fixes
 
@@ -14,7 +13,6 @@ All notable changes to this project will be documented in this file.
 - Reset private state correctly in sitemap parsers ([#1938](https://github.com/apify/crawlee-python/pull/1938)) ([7db517a](https://github.com/apify/crawlee-python/commit/7db517a00c3e0a756a869aceff312f6e17f8e52d)) by [@vdusek](https://github.com/vdusek)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.7.1](https://github.com/apify/crawlee-python/releases/tag/v1.7.1) (2026-05-26)
 
 ### 🐛 Bug Fixes
