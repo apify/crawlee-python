@@ -1,0 +1,123 @@
+---
+id: security-of-web-scraping
+title: Security of web scraping
+description: Understand the security risks of running web crawlers and the controls Crawlee applies by default.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+
+A web crawler fetches data from sources you don't control. The pages, links, sitemaps, and HTTP responses it consumes are all decided by the target site. If you drive a real browser, so is the JavaScript it runs. That target may be compromised or hostile by design, so treat everything a crawl returns as untrusted input.
+
+This guide walks through the common threats a crawler can encounter, how to handle each, and the Crawlee defaults that already mitigate some of them.
+
+## Threats
+
+A hostile or compromised site decides what your crawler receives, so it can try to:
+
+- Steer your crawler to URLs you never intended to visit, like other hosts or internal services that aren't reachable from the public internet.
+- Reach non-HTTP destinations through schemes like `file://`, `gopher://`, `ftp://`, or `dict://`, to read local files or reach internal network services.
+- Exhaust your resources with a crawler trap, an oversized response, or a decompression bomb.
+- Run code in your browser, since a real browser executes the page's JavaScript.
+- Smuggle a payload through the data you extract. The payload only turns dangerous when your own code passes it on to SQL, a shell, an HTML page, or an LLM prompt.
+
+The target isn't the only untrusted party. A proxy you route requests through can also read and tamper with the crawler's traffic.
+
+Those first two are the building blocks of a [server-side request forgery (SSRF)](https://owasp.org/www-community/attacks/Server_Side_Request_Forgery) attack. The attacker doesn't target your crawler directly. They use it as a *confused deputy* to reach things on your network they can't reach themselves.
+
+## Keeping the crawl in scope
+
+A hostile page, sitemap, or redirect can try to steer your crawler somewhere you never intended, like another site, an internal service, or a non-HTTP protocol. Crawlee's defaults are built to keep a crawl on the targets you actually chose.
+
+### Safe defaults
+
+All built-in HTTP clients (<ApiLink to="class/ImpitHttpClient">`ImpitHttpClient`</ApiLink>, <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>, and <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>) validate the URL scheme before a request is sent. Only `http` and `https` pass. Schemes like `file://`, `gopher://`, `ftp://`, or `javascript:` are rejected. An untrusted source can't smuggle a non-HTTP scheme through to the transport layer.
+
+When following links from a page, <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> keeps only those on the same hostname by default. Links to any other host are filtered out. Note that `same-hostname` doesn't include subdomains, so `example.com` won't match `api.example.com`. Crawlee also re-checks the host a request finally lands on, so a redirect that ends on a different host is rejected. The client still walks the whole chain to get there, though, so an intermediate hop to an internal address is fetched along the way.
+
+```python
+# Default: only same-hostname links are enqueued.
+await context.enqueue_links()
+
+# Follow every link, regardless of host.
+await context.enqueue_links(strategy='all')
+```
+
+The same rules apply to URLs read by a <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> and to `Sitemap:` directives in `robots.txt`. A target can't seed your queue with off-host URLs that way either. Following `robots.txt` rules is itself opt-in: <ApiLink to="class/BasicCrawlerOptions#respect_robots_txt_file">`respect_robots_txt_file`</ApiLink> is `False` by default. The [respecting robots.txt example](../examples/respect-robots-txt-file) shows how to turn it on.
+
+### Widening the scope
+
+Many legitimate crawls need a broader scope: passing `strategy='all'`, accepting a list of arbitrary user-supplied start URLs, or following cross-host links. That's a valid choice, but Crawlee can't guarantee the crawl stays on hosts you trust anymore. Validating destinations becomes your responsibility. Allow-list hosts before adding requests, and lean on network isolation.
+
+## Crawlers exposed as a service
+
+A crawler can run as a web service, taking a URL from an incoming request and returning the crawl result to whoever asked. The [Running in a web server](./running-in-web-server) example shows the pattern. That setup hands an untrusted party the worst combination: they choose the target URL and they read the response. No foothold, no access to your storage, just a direct SSRF read. Point the crawler at the cloud metadata service and the response can carry the machine's own temporary credentials. An unauthenticated admin panel, a database on `localhost`, or an internal health endpoint can be read back the same way.
+
+If only your crawler's storage sees the response, the same request is a *blind* SSRF. It's still exploitable through write-style vectors like `gopher://` to Redis, just not as a direct read. Don't rely on that distinction. If your crawler accepts URLs from untrusted callers:
+
+- Allow-list the hosts you're willing to fetch and reject everything else before it reaches the queue. That's necessary, but it isn't sufficient on its own. Crawlee doesn't block internal addresses itself, and a normal-looking name can resolve to one. The client also follows redirect chains while only the final host gets re-checked. An intermediate redirect to a loopback, private, or link-local address triggers a real request to that internal address.
+- Block egress to those internal ranges at the network level. That, not the host check, is the real protection.
+- Treat every fetch as fully readable by an attacker whenever the caller sees the response.
+
+## Resource exhaustion
+
+A hostile site can try to use up your CPU, memory, or queue rather than read anything:
+
+- A *crawler trap* is a maze of randomly generated URLs linking to more generated pages. It's built to keep a crawler running forever and grow its queue without bound. Bound how far link-following goes with <ApiLink to="class/BasicCrawlerOptions#max_crawl_depth">`max_crawl_depth`</ApiLink>, and cap a whole run with <ApiLink to="class/BasicCrawlerOptions#max_requests_per_crawl">`max_requests_per_crawl`</ApiLink>. Both are unlimited by default, so set them yourself.
+- A single *oversized or slow response* can tie up a worker or blow up memory. Both the fetch and the handler are capped at 60 seconds by default. <ApiLink to="class/HttpCrawlerOptions#navigation_timeout">`navigation_timeout`</ApiLink> covers the fetch and is passed straight to the HTTP client. <ApiLink to="class/BasicCrawlerOptions#request_handler_timeout">`request_handler_timeout`</ApiLink> covers the handler. Raise them if a legitimate target needs longer, but keep the cap as tight as your workload allows.
+- A *decompression bomb* is an archive that expands to gigabytes when unpacked. If your crawler downloads and extracts archives, cap the output stream during extraction. The declared size is part of the attack and easy to forge.
+
+## Untrusted content
+
+Whatever a crawler extracts is attacker-controlled. It turns dangerous when your own code passes it on to a database, a shell, a page, or a model without escaping or validating it first.
+
+- SQL injection: never put a scraped value into a query without parameterizing or escaping it first.
+- Command injection: don't pass scraped data to anything that executes it, like a `subprocess` call made with `shell=True`.
+- Stored XSS: escape scraped content before rendering it in any page or dashboard you display or republish.
+- Prompt injection: if scraped text reaches a language model, it can carry instructions that hijack the model. In an agentic crawler where the model decides what to fetch or do next, this becomes a control-flow hijack. The page can steer the crawler to attacker-chosen URLs, reintroducing the SSRF risks. It can also quietly corrupt the data the model extracts. Keep the actions and URLs the model can choose on a strict allow-list, and keep secrets out of any prompt that also carries scraped text.
+
+It's the same rule in every case. Treat an extracted value as untrusted until you've validated or escaped it for its destination.
+
+## Untrusted proxies
+
+Crawlers route requests through [proxies](./proxy-management) to rotate IPs and avoid blocking. A proxy sees and can alter every request and response that passes through it, so a free, unknown, or compromised proxy is a man-in-the-middle. It can log the URLs and data you send, read and modify responses, and capture access credentials like login submissions, API keys, `Authorization` headers, and session cookies. An attacker who collects those can reuse them to take over the accounts behind them.
+
+The built-in HTTP clients verify TLS certificates by default. Keeping that on and keeping traffic on HTTPS stops a proxy from reading or rewriting payloads, though it still sees the destination host through SNI and `CONNECT`. Prefer proxy providers you trust. Don't send credentials or secrets through a proxy you don't control. Don't disable certificate verification just to make an untrusted proxy work.
+
+## Browser-based scraping
+
+A real browser driven by <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> executes the page's JavaScript, loads its subresources, and runs a large, complex native codebase. That's a far bigger attack surface than an HTTP client. A malicious page can attempt browser exploits, abuse a misconfigured automation setup, or just consume large amounts of CPU and memory. Treat any environment that runs browsers as one that runs untrusted code.
+
+- Keep Playwright and its bundled browsers up to date so known vulnerabilities are patched.
+- Keep the browser's built-in sandbox enabled. It's a real security boundary, and Crawlee leaves it on by default. Avoid setting <ApiLink to="class/Configuration#disable_browser_sandbox">`disable_browser_sandbox`</ApiLink> unless the surrounding container already provides equivalent isolation.
+- Don't run browser crawlers on a host that also holds secrets or has access to sensitive systems.
+- Isolate browser-based crawlers especially carefully.
+
+## Isolating the crawler
+
+Crawlee doesn't block requests to private, loopback, or link-local addresses. The `same-hostname` defaults stop a public target from pivoting your crawl onto `http://localhost`, `http://10.0.0.5`, or a cloud metadata endpoint like `http://169.254.169.254`. But if you widen the scope or pass such URLs yourself, Crawlee will fetch them. Scheme and host filtering are application-level controls, not a substitute for network-level isolation.
+
+Doing that filtering in the application is deceptively hard. The internal IPv4 ranges to cover are `127.0.0.0/8` (loopback), `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` (private), and `169.254.0.0/16` (link-local). IPv6 adds `::1`, `fe80::/10`, `fc00::/7`, and the IPv4-mapped `::ffff:0:0/96` to the same list.
+
+An attacker can slip past a naive host or IP check in many ways. Encoded addresses like `http://2130706433` and `http://0x7f.0.0.1` reach `127.0.0.1`, and `http://0` resolves to `0.0.0.0`. IPv4-mapped forms like `::ffff:127.0.0.1` cover the same trick over IPv6. Wildcard-DNS names work too. An attacker-controlled DNS record can resolve a normal-looking name straight to an internal IP. DNS rebinding can flip the name to an internal address between your validation and the actual connection.
+
+A network-level egress block sidesteps all of it. It filters the real destination IP at connection time instead of parsing the URL.
+
+For anything beyond a fully trusted list of targets, run your crawler where it can't reach things it shouldn't:
+
+- Run in a container or VM dedicated to crawling, separate from your application and data tiers.
+- Restrict egress with a firewall or network policy so the crawler can reach the public internet but not internal services or the cloud metadata endpoint.
+- Don't co-locate crawlers with critical infrastructure, credentials, or databases.
+
+The crawler is the component most exposed to untrusted code, so treat it as the most likely thing to get compromised. A single browser exploit then reaches whatever the crawler can reach: secrets in its environment, a database on `localhost`, any internal service sharing its network. Network isolation is also the backstop when a crawler is exposed as a service. Even if an attacker submits an internal URL, an egress-restricted crawler can't reach it.
+
+Isolation also changes the calculus for the application-level controls. Inside a dedicated, egress-restricted environment, the blast radius of an SSRF is contained. Widening the scope with `strategy='all'` or accepting arbitrary URLs is far less risky than it would be on a shared host.
+
+### Running on the Apify platform
+
+Building and maintaining isolated, egress-controlled runtimes is ongoing work. The [Apify platform](https://apify.com) runs each Actor (your crawler) in its own isolated container, without access to other users' data or to your internal network. That gives you container isolation and controlled egress out of the box. See the [Deploy on Apify](../deployment/apify-platform) guide to run your Crawlee crawler there.
+
+## Conclusion
+
+Scraping means consuming untrusted input. By default Crawlee accepts only `http`/`https` URLs and keeps enqueuing, sitemaps, and `robots.txt` on the same hostname, so a crawl stays where you aimed it. Widening the scope is fine, but it moves destination validation to you. A crawler exposed as a service hands an attacker a direct SSRF read, so allow-list its targets. Bound the work with crawl-depth, request, and handler limits. Validate the data you extract before it reaches SQL, a shell, a page, or a model. Route traffic only through proxies you trust. Treat any browser as running untrusted code. Above all, use network isolation as the backstop that contains what application-level filters can't.
+
+If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy (and safe) scraping!
