@@ -122,7 +122,7 @@ class _XMLSaxSitemapHandler(ContentHandler):
             elif name == 'changefreq' and text in VALID_CHANGE_FREQS:
                 self._current_url['changefreq'] = text
 
-            self.current_tag = None
+            self._current_tag = None
 
         if name == 'url' and 'loc' in self._current_url:
             self.items.append({'type': 'url', **self._current_url})
@@ -156,7 +156,7 @@ class _TxtSitemapParser:
             url = self._buffer.strip()
             if url:
                 yield {'type': 'url', 'loc': url}
-            self.buffer = ''
+            self._buffer = ''
 
     def close(self) -> None:
         """Clean up resources."""

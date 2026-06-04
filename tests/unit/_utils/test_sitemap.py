@@ -6,7 +6,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 from yarl import URL
 
-from crawlee._utils.sitemap import ParseSitemapOptions, Sitemap, SitemapUrl, discover_valid_sitemaps, parse_sitemap
+from crawlee._utils.sitemap import (
+    ParseSitemapOptions,
+    Sitemap,
+    SitemapUrl,
+    _TxtSitemapParser,
+    _XMLSaxSitemapHandler,
+    discover_valid_sitemaps,
+    parse_sitemap,
+)
 from crawlee.http_clients._base import HttpClient, HttpResponse
 
 BASIC_SITEMAP = """
@@ -345,6 +353,32 @@ async def test_discover_sitemaps_multiple_domains() -> None:
         'http://domain-a.com/sitemap.xml',
         'http://domain-b.com/sitemap.xml',
     }
+
+
+def test_xml_handler_resets_current_tag_on_end_element() -> None:
+    """Closing a tracked tag resets the handler's current tag so stray text between elements is ignored."""
+    handler = _XMLSaxSitemapHandler()
+    handler.startElement('urlset', MagicMock())
+    handler.startElement('url', MagicMock())
+    handler.startElement('loc', MagicMock())
+    handler.characters('https://example.com/')
+    handler.endElement('loc')
+
+    assert handler._current_tag is None
+
+    # Stray text between elements must not be buffered.
+    handler.characters('   stray text   ')
+    assert handler._buffer == 'https://example.com/'
+
+
+async def test_txt_parser_flush_clears_buffer() -> None:
+    """Feeding more data after flush() must not concatenate the previously flushed URL."""
+    parser = _TxtSitemapParser()
+    items = [item async for item in parser.process_chunk('https://a.com/\nhttps://b.com/')]
+    items += [item async for item in parser.flush()]
+    items += [item async for item in parser.process_chunk('https://c.com/\n')]
+
+    assert [item['loc'] for item in items] == ['https://a.com/', 'https://b.com/', 'https://c.com/']
 
 
 async def test_discover_sitemap_url_without_host_skipped() -> None:
