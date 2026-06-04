@@ -81,7 +81,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.release_prepare.outputs.tag_name }}
           name: ${{ needs.release_prepare.outputs.version_number }}
@@ -155,4 +155,10 @@ jobs:
       id-token: write
       checks: read
     uses: ./.github/workflows/manual_release_docs.yaml
+    with:
+      # Build from the up-to-date branch tip, not the workflow-dispatch ref. The default checkout
+      # pins to the dispatch commit (pre-bump), which predates the changelog finalization and the
+      # version snapshot pushed earlier in this run — so the docs would be redeployed from stale
+      # content (e.g. the changelog stuck at "not yet released").
+      ref: ${{ github.ref_name }}
     secrets: inherit

@@ -15,7 +15,7 @@ from crawlee._autoscaling import AutoscaledPool, SystemStatus
 from crawlee._autoscaling._types import LoadRatioInfo, SystemInfo
 from crawlee._types import ConcurrencySettings
 from crawlee._utils.time import measure_time
-from tests.unit.utils import wait_for_condition
+from tests.unit.utils import poll_until_condition
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
@@ -192,20 +192,20 @@ async def test_autoscales(
 
     try:
         # Wait until concurrency scales up above 1.
-        await wait_for_condition(lambda: pool.desired_concurrency > 1, timeout=5.0)
+        assert await poll_until_condition(lambda: pool.desired_concurrency > 1, timeout=5.0)
 
         # Wait until concurrency reaches maximum.
-        await wait_for_condition(lambda: pool.desired_concurrency == 4, timeout=5.0)
+        assert await poll_until_condition(lambda: pool.desired_concurrency == 4, timeout=5.0)
 
         # Multiple concurrent workers should have completed more tasks than a single worker could.
-        await wait_for_condition(lambda: done_count > 10, timeout=5.0)
+        assert await poll_until_condition(lambda: done_count > 10, timeout=5.0)
 
         # Simulate CPU overload and wait for the pool to scale down.
         overload_active = True
-        await wait_for_condition(lambda: pool.desired_concurrency < 4, timeout=5.0)
+        assert await poll_until_condition(lambda: pool.desired_concurrency < 4, timeout=5.0)
 
         # Wait until the pool scales all the way down to minimum.
-        await wait_for_condition(lambda: pool.desired_concurrency == 1, timeout=5.0)
+        assert await poll_until_condition(lambda: pool.desired_concurrency == 1, timeout=5.0)
     finally:
         pool_run_task.cancel()
         with suppress(asyncio.CancelledError):

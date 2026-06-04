@@ -32,6 +32,7 @@ from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics, StatisticsState
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
+from tests.unit.utils import poll_until_condition
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -1988,17 +1989,13 @@ async def test_crawler_intermediate_statistics() -> None:
     crawler = BasicCrawler()
     check_time = timedelta(seconds=0.1)
 
-    async def wait_for_statistics_initialization() -> None:
-        while not crawler.statistics.active:  # noqa: ASYNC110 # It is ok for tests.
-            await asyncio.sleep(0.1)
-
     @crawler.router.default_handler
     async def handler(_: BasicCrawlingContext) -> None:
         await asyncio.sleep(check_time.total_seconds() * 5)
 
     # Start crawler and wait until statistics are initialized.
     crawler_task = asyncio.create_task(crawler.run(['https://a.placeholder.com']))
-    await wait_for_statistics_initialization()
+    assert await poll_until_condition(lambda: crawler.statistics.active)
 
     # Wait some time and check that runtime is updated.
     await asyncio.sleep(check_time.total_seconds())

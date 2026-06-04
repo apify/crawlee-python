@@ -122,7 +122,7 @@ class _XMLSaxSitemapHandler(ContentHandler):
             elif name == 'changefreq' and text in VALID_CHANGE_FREQS:
                 self._current_url['changefreq'] = text
 
-            self.current_tag = None
+            self._current_tag = None
 
         if name == 'url' and 'loc' in self._current_url:
             self.items.append({'type': 'url', **self._current_url})
@@ -156,7 +156,7 @@ class _TxtSitemapParser:
             url = self._buffer.strip()
             if url:
                 yield {'type': 'url', 'loc': url}
-            self.buffer = ''
+            self._buffer = ''
 
     def close(self) -> None:
         """Clean up resources."""
@@ -440,17 +440,11 @@ async def parse_sitemap(
     up to the specified maximum depth.
     """
     # Set default options
-    default_timeout = timedelta(seconds=30)
-    if options:
-        emit_nested_sitemaps = options['emit_nested_sitemaps']
-        max_depth = options['max_depth']
-        sitemap_retries = options['sitemap_retries']
-        timeout = options.get('timeout', default_timeout)
-    else:
-        emit_nested_sitemaps = False
-        max_depth = float('inf')
-        sitemap_retries = 3
-        timeout = default_timeout
+    options = options or {}
+    emit_nested_sitemaps = options.get('emit_nested_sitemaps', False)
+    max_depth = options.get('max_depth', float('inf'))
+    sitemap_retries = options.get('sitemap_retries', 3)
+    timeout = options.get('timeout', timedelta(seconds=30))
 
     # Setup working state
     sources = list(initial_sources)

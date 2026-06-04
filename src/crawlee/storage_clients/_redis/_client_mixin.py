@@ -220,8 +220,8 @@ class RedisClientMixin:
     async def _drop(self, extra_keys: list[str]) -> None:
         async with self._get_pipeline() as pipe:
             await pipe.delete(self.metadata_key)
-            await pipe.delete(f'{self._MAIN_KEY}:id_to_name', self._storage_id)
-            await pipe.delete(f'{self._MAIN_KEY}:name_to_id', self._storage_name)
+            await await_redis_response(pipe.hdel(f'{self._MAIN_KEY}:id_to_name', self._storage_id))
+            await await_redis_response(pipe.hdel(f'{self._MAIN_KEY}:name_to_id', self._storage_name))
             await pipe.delete(f'{self._MAIN_KEY}:{self._storage_name}:created_signal')
             for key in extra_keys:
                 await pipe.delete(key)
