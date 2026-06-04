@@ -12,6 +12,7 @@ from crawlee.storage_clients import MemoryStorageClient, StorageClient
 from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, UnprocessedRequest
 from crawlee.storages import RequestQueue
 from crawlee.storages._storage_instance_manager import StorageInstanceManager
+from tests.unit.utils import poll_until_condition
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Sequence
@@ -516,9 +517,8 @@ async def test_add_requests_wait_for_all(
         # Immediately after adding, the total count may be less than 15 due to background processing
         assert await rq.get_total_count() <= 15
 
-        # Wait for background tasks to complete
-        while await rq.get_total_count() < 15:  # noqa: ASYNC110
-            await asyncio.sleep(0.1)
+        # Wait for background tasks to complete.
+        await poll_until_condition(rq.get_total_count, lambda count: count >= 15)
 
     # Verify all requests were added
     assert await rq.get_total_count() == 15
@@ -542,8 +542,8 @@ async def test_is_finished(rq: RequestQueue) -> None:
     # Queue shouldn't be finished while background tasks are running
     assert await rq.is_finished() is False
 
-    # Wait for background tasks to finish
-    await asyncio.sleep(0.2)
+    # Wait for the background add task to finish.
+    await poll_until_condition(lambda: not rq._add_requests_tasks)
 
     # Process all requests
     while True:
