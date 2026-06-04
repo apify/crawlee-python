@@ -113,6 +113,31 @@ async def test_drop_removes_records(dataset_client: RedisDatasetClient) -> None:
     assert items_after_drop is None
 
 
+async def test_drop_preserves_sibling_index_entries(
+    dataset_client: RedisDatasetClient,
+    redis_client: FakeAsyncRedis,
+) -> None:
+    """Test that dropping a dataset does not wipe the shared index entries of other datasets."""
+    storage_client = RedisStorageClient(redis=redis_client)
+    sibling_client = await storage_client.create_dataset_client(name='sibling_dataset')
+    sibling_metadata = await sibling_client.get_metadata()
+
+    await dataset_client.drop()
+
+    # The sibling's entries in the shared id_to_name and name_to_id hashes must remain intact.
+    sibling_name = await await_redis_response(redis_client.hget('datasets:id_to_name', sibling_metadata.id))
+    sibling_id = await await_redis_response(redis_client.hget('datasets:name_to_id', 'sibling_dataset'))
+
+    assert sibling_name is not None
+    assert (sibling_name.decode() if isinstance(sibling_name, bytes) else sibling_name) == 'sibling_dataset'
+    assert sibling_id is not None
+    assert (sibling_id.decode() if isinstance(sibling_id, bytes) else sibling_id) == sibling_metadata.id
+
+    # Opening the sibling by ID must still work.
+    reopened = await storage_client.create_dataset_client(id=sibling_metadata.id)
+    assert (await reopened.get_metadata()).id == sibling_metadata.id
+
+
 async def test_metadata_record_updates(dataset_client: RedisDatasetClient) -> None:
     """Test that metadata record is updated correctly after operations."""
     # Record initial timestamps
