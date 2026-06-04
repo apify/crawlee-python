@@ -8,6 +8,9 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - **templates:** Install pinned playwright into system env in uv Dockerfile ([#1922](https://github.com/apify/crawlee-python/pull/1922)) ([0fd0f3a](https://github.com/apify/crawlee-python/commit/0fd0f3a2529a875a7525599472029b0e99f18858)) by [@vdusek](https://github.com/vdusek)
+- **memory-storage:** Avoid duplicate processed requests in memory request queue client ([#1941](https://github.com/apify/crawlee-python/pull/1941)) ([d343d0e](https://github.com/apify/crawlee-python/commit/d343d0e905e9622bd65652a272f269a7a37b00c6)) by [@vdusek](https://github.com/vdusek)
+- **redis:** Preserve shared Redis index hashes when dropping a storage ([#1942](https://github.com/apify/crawlee-python/pull/1942)) ([4729dd1](https://github.com/apify/crawlee-python/commit/4729dd16f10557b3e2226fcf6c49918fadb7bdf6)) by [@vdusek](https://github.com/vdusek)
+- Do not raise KeyError in parse_sitemap when partial options are provided ([#1940](https://github.com/apify/crawlee-python/pull/1940)) ([8ab3f95](https://github.com/apify/crawlee-python/commit/8ab3f95c862ae7b5258409457303aa94837d2e0d)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->

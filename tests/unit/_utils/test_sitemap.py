@@ -1,12 +1,13 @@
 import base64
 import gzip
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 from yarl import URL
 
 from crawlee._utils.sitemap import (
+    ParseSitemapOptions,
     Sitemap,
     SitemapUrl,
     _TxtSitemapParser,
@@ -272,6 +273,14 @@ async def test_sitemap_from_string() -> None:
 
     assert len(sitemap.urls) == 5
     assert set(sitemap.urls) == BASIC_RESULTS
+
+
+async def test_parse_sitemap_with_partial_options() -> None:
+    """Test that missing keys in partial `ParseSitemapOptions` fall back to defaults."""
+    options = ParseSitemapOptions(timeout=timedelta(seconds=10))
+    items = [item async for item in parse_sitemap([{'type': 'raw', 'content': BASIC_SITEMAP}], options=options)]
+
+    assert {item.loc for item in items} == BASIC_RESULTS
 
 
 async def test_discover_sitemap_from_robots_txt() -> None:
