@@ -235,6 +235,17 @@ async def test_get_data_descending_order(dataset: Dataset) -> None:
     assert result.items[-1]['id'] == 1
 
 
+async def test_get_data_descending_with_unlimited_limit(dataset: Dataset) -> None:
+    """Test that get_data with desc=True and limit=None returns all items in reverse order."""
+    items = [{'id': i} for i in range(1, 4)]  # 3 items
+    await dataset.push_data(items)
+
+    result = await dataset.get_data(desc=True, limit=None)
+
+    assert result.count == 3
+    assert result.items == [{'id': 3}, {'id': 2}, {'id': 1}]
+
+
 async def test_get_data_skip_empty(dataset: Dataset) -> None:
     """Test getting data with skip_empty option filters out empty items."""
     # Add some items including an empty one
