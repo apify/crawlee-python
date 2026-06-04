@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.7.3 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **memory-storage:** Apply skip_empty after pagination in MemoryDatasetClient.get_data ([#1937](https://github.com/apify/crawlee-python/pull/1937)) ([7e807aa](https://github.com/apify/crawlee-python/commit/7e807aa168929a474e793d6de443359090daf923)) by [@vdusek](https://github.com/vdusek)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.7.2](https://github.com/apify/crawlee-python/releases/tag/v1.7.2) (2026-06-04)
 
 ### 🐛 Bug Fixes
