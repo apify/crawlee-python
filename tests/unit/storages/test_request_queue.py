@@ -1471,6 +1471,8 @@ async def test_name_default_not_allowed(storage_client: StorageClient) -> None:
         pytest.param('name with spaces', False, id='spaces'),
         pytest.param('-test', False, id='dashes start'),
         pytest.param('test-', False, id='dashes end'),
+        pytest.param('../outside', False, id='parent-ref'),
+        pytest.param('with/slash', False, id='slash'),
     ],
 )
 async def test_validate_name(storage_client: StorageClient, name: str, *, is_valid: bool) -> None:
@@ -1483,6 +1485,31 @@ async def test_validate_name(storage_client: StorageClient, name: str, *, is_val
     else:
         with pytest.raises(ValueError, match=rf'Invalid storage name "{name}".*'):
             await RequestQueue.open(name=name, storage_client=storage_client)
+
+
+@pytest.mark.parametrize(
+    ('alias', 'is_valid'),
+    [
+        pytest.param('valid-alias', True, id='dashes'),
+        pytest.param('alias_with_underscores', True, id='underscores'),
+        pytest.param('alias.with.dots', True, id='dots'),
+        pytest.param('CamelCaseAlias', True, id='mixed-case'),
+        pytest.param('../outside', False, id='parent-ref'),
+        pytest.param('..', False, id='bare-parent'),
+        pytest.param('.', False, id='bare-current'),
+        pytest.param('nested/alias', False, id='slash'),
+        pytest.param('back\\slash', False, id='backslash'),
+    ],
+)
+async def test_validate_alias(storage_client: StorageClient, alias: str, *, is_valid: bool) -> None:
+    """Test alias validation logic, including rejection of values that would resolve outside the storage dir."""
+    if is_valid:
+        # Should not raise.
+        rq = await RequestQueue.open(alias=alias, storage_client=storage_client)
+        await rq.drop()
+    else:
+        with pytest.raises(ValueError, match=r'Invalid storage alias'):
+            await RequestQueue.open(alias=alias, storage_client=storage_client)
 
 
 async def test_reclaim_request_with_change_state(rq: RequestQueue) -> None:

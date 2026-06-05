@@ -1080,6 +1080,8 @@ async def test_name_default_not_allowed(storage_client: StorageClient) -> None:
         pytest.param('name with spaces', False, id='spaces'),
         pytest.param('-test', False, id='dashes start'),
         pytest.param('test-', False, id='dashes end'),
+        pytest.param('../outside', False, id='parent-ref'),
+        pytest.param('with/slash', False, id='slash'),
     ],
 )
 async def test_validate_name(storage_client: StorageClient, name: str, *, is_valid: bool) -> None:
