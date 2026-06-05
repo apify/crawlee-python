@@ -1,5 +1,5 @@
 {
-    "name": "crawlee-python-website",
+    "name": "crawlee",
     "private": true,
     "scripts": {
         "examples": "docusaurus-examples",
