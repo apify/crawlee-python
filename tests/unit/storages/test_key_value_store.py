@@ -1095,6 +1095,31 @@ async def test_validate_name(storage_client: StorageClient, name: str, *, is_val
 
 
 @pytest.mark.parametrize(
+    ('alias', 'is_valid'),
+    [
+        pytest.param('valid-alias', True, id='dashes'),
+        pytest.param('alias_with_underscores', True, id='underscores'),
+        pytest.param('alias.with.dots', True, id='dots'),
+        pytest.param('CamelCaseAlias', True, id='mixed-case'),
+        pytest.param('../outside', False, id='parent-ref'),
+        pytest.param('..', False, id='bare-parent'),
+        pytest.param('.', False, id='bare-current'),
+        pytest.param('nested/alias', False, id='slash'),
+        pytest.param('back\\slash', False, id='backslash'),
+    ],
+)
+async def test_validate_alias(storage_client: StorageClient, alias: str, *, is_valid: bool) -> None:
+    """Test alias validation logic, including rejection of values that would resolve outside the storage dir."""
+    if is_valid:
+        # Should not raise.
+        kvs = await KeyValueStore.open(alias=alias, storage_client=storage_client)
+        await kvs.drop()
+    else:
+        with pytest.raises(ValueError, match=r'Invalid storage alias'):
+            await KeyValueStore.open(alias=alias, storage_client=storage_client)
+
+
+@pytest.mark.parametrize(
     'tested_storage_client_class',
     [
         pytest.param(MemoryStorageClient, id='tested=MemoryStorageClient'),
