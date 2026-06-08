@@ -9,7 +9,6 @@ import pytest
 from crawlee.browsers import BrowserPool, PlaywrightBrowserPlugin
 from crawlee.browsers._browser_controller import BrowserController
 from crawlee.browsers._types import CrawleePage
-from tests.unit.utils import run_alone_on_mac
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -103,9 +102,11 @@ async def test_new_page_with_each_plugin(server_url: URL) -> None:
         assert browser_pool.total_pages_count == 2
 
 
-@run_alone_on_mac
+@pytest.mark.run_alone
 async def test_with_default_plugin_constructor(server_url: URL) -> None:
-    # Use a generous operation timeout so that Firefox has enough time to launch on slow Windows CI.
+    # Launching a real Firefox browser is resource-heavy and flakes under xdist parallelism (it can time out
+    # even with a generous operation timeout when several workers compete for the runner). Run it alone and
+    # keep a generous operation timeout so that Firefox has enough time to launch on slow CI.
     async with BrowserPool.with_default_plugin(
         headless=True, browser_type='firefox', operation_timeout=timedelta(seconds=60)
     ) as browser_pool:

@@ -1993,9 +1993,10 @@ async def test_crawler_intermediate_statistics() -> None:
     async def handler(_: BasicCrawlingContext) -> None:
         await asyncio.sleep(check_time.total_seconds() * 5)
 
-    # Start crawler and wait until statistics are initialized.
+    # Start crawler and wait until statistics are initialized. Use a generous timeout so that crawler startup
+    # has enough time to reach the active state on slow CI runners under xdist load.
     crawler_task = asyncio.create_task(crawler.run(['https://a.placeholder.com']))
-    assert await poll_until_condition(lambda: crawler.statistics.active)
+    assert await poll_until_condition(lambda: crawler.statistics.active, timeout=30)
 
     # Wait some time and check that runtime is updated.
     await asyncio.sleep(check_time.total_seconds())
