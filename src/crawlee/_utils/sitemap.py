@@ -252,6 +252,7 @@ async def _process_sitemap_item(
             if not ok:
                 logger.warning(f'Skipping nested sitemap {sitemap_url!r} (parent {parent_url!r}): {reason}.')
                 return
+
             # Add to processing queue
             sources.append(SitemapSource(type='url', url=sitemap_url, depth=depth + 1))
 
