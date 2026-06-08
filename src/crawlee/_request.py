@@ -61,8 +61,7 @@ class CrawleeRequestData(BaseModel):
     crawl_depth: int = 0
     """The depth of the request in the crawl tree."""
 
-    # Serialized with a snake_case key, so it keeps an explicit alias that overrides the camelCase generator.
-    session_id: Annotated[str | None, Field(alias='session_id')] = None
+    session_id: str | None = None
     """ID of a session to which the request is bound."""
 
 

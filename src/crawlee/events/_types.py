@@ -85,9 +85,7 @@ class EventExitData(BaseModel):
 class EventCrawlerStatusData(BaseModel):
     """Data for the crawler status event."""
 
-    # This event is only emitted and consumed in-process, and its fields keep their snake_case keys, so the
-    # camelCase alias generator is intentionally not applied here.
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, alias_generator=to_camel)
 
     message: str
     """A message describing the current status of the crawler."""
