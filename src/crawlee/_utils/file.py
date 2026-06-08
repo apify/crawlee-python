@@ -63,9 +63,9 @@ else:
 def validate_subdirectory(base_dir: Path, subdirectory: str) -> Path:
     """Resolve a storage subdirectory inside a base directory.
 
-    Joins `subdirectory` onto `base_dir` and verifies that the result stays inside `base_dir`, so a storage
-    name or alias always maps to a directory under the storage directory rather than somewhere else (e.g. a
-    value containing `..` or an absolute path).
+    Joins `subdirectory` onto `base_dir` and verifies that the result is a direct child of `base_dir`, so a
+    storage name or alias always maps to a single subdirectory under the storage directory rather than a nested
+    path (e.g. `nested/inside`) or somewhere else entirely (e.g. a value containing `..` or an absolute path).
 
     Args:
         base_dir: The base storage directory (e.g. the `key_value_stores` directory).
@@ -75,17 +75,19 @@ def validate_subdirectory(base_dir: Path, subdirectory: str) -> Path:
         The validated full path to the storage subdirectory.
 
     Raises:
-        ValueError: If the resolved path would fall outside `base_dir`.
+        ValueError: If the resolved path is not a direct child of `base_dir`.
     """
     # Normalize lexically (no filesystem access), so symlinks are not followed and the check is deterministic.
     base_resolved = Path(os.path.normpath(base_dir))
     target_resolved = Path(os.path.normpath(base_dir / subdirectory))
 
-    # The target must be strictly inside the base directory - reject parent references and absolute paths.
-    if target_resolved == base_resolved or base_resolved not in target_resolved.parents:
+    # The target must be a direct child of the base directory, so it maps to a single subdirectory - reject path
+    # separators, parent directory references ("..") and absolute paths.
+    if target_resolved.parent != base_resolved:
         raise ValueError(
-            f'Invalid storage name or alias "{subdirectory}". It must not contain path separators, parent '
-            f'directory references ("..") or absolute paths that resolve outside the storage directory.'
+            f'Invalid storage name or alias "{subdirectory}". It must map to a single subdirectory under the '
+            f'storage directory and must not contain path separators, parent directory references ("..") or '
+            f'absolute paths.'
         )
 
     return target_resolved

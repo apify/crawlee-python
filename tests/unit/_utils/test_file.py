@@ -29,14 +29,13 @@ async def test_json_dumps() -> None:
         pytest.param('store_with_underscores', id='underscores'),
         pytest.param('store.with.dots', id='dots'),
         pytest.param('__default__', id='reserved-default'),
-        pytest.param('nested/inside', id='nested-but-contained'),
     ],
 )
 def test_validate_subdirectory_accepts_safe_segments(tmp_path: Path, subdirectory: str) -> None:
     base_dir = tmp_path / 'key_value_stores'
     result = validate_subdirectory(base_dir, subdirectory)
-    # The resolved path must stay within the base directory.
-    assert result.parent == base_dir or base_dir in result.parents
+    # The resolved path must be a direct child of the base directory.
+    assert result.parent == base_dir
 
 
 @pytest.mark.parametrize(
@@ -49,6 +48,8 @@ def test_validate_subdirectory_accepts_safe_segments(tmp_path: Path, subdirector
         pytest.param('a/../../outside', id='mixed-parent-ref'),
         pytest.param('/etc/passwd', id='absolute-path'),
         pytest.param('', id='empty'),
+        pytest.param('nested/inside', id='nested-path'),
+        pytest.param('with/slash', id='with-slash'),
     ],
 )
 def test_validate_subdirectory_rejects_invalid_segments(tmp_path: Path, subdirectory: str) -> None:
