@@ -6,6 +6,7 @@ from enum import IntEnum
 from typing import TYPE_CHECKING, Annotated, Any, TypedDict, cast
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, PlainValidator, TypeAdapter
+from pydantic.alias_generators import to_camel
 from yarl import URL
 
 from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, JsonSerializable
@@ -34,31 +35,34 @@ class RequestState(IntEnum):
 class CrawleeRequestData(BaseModel):
     """Crawlee-specific configuration stored in the `user_data`."""
 
-    max_retries: Annotated[int | None, Field(alias='maxRetries', frozen=True)] = None
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, alias_generator=to_camel)
+
+    max_retries: Annotated[int | None, Field(frozen=True)] = None
     """Maximum number of retries for this request. Allows to override the global `max_request_retries` option of
     `BasicCrawler`."""
 
-    enqueue_strategy: Annotated[EnqueueStrategy | None, Field(alias='enqueueStrategy')] = None
+    enqueue_strategy: EnqueueStrategy | None = None
     """The strategy that was used for enqueuing the request."""
 
     state: RequestState = RequestState.UNPROCESSED
     """Describes the request's current lifecycle state."""
 
-    session_rotation_count: Annotated[int | None, Field(alias='sessionRotationCount')] = None
+    session_rotation_count: int | None = None
     """The number of finished session rotations for this request."""
 
-    skip_navigation: Annotated[bool, Field(alias='skipNavigation')] = False
+    skip_navigation: bool = False
 
-    last_proxy_tier: Annotated[int | None, Field(alias='lastProxyTier')] = None
+    last_proxy_tier: int | None = None
     """The last proxy tier used to process the request."""
 
-    forefront: Annotated[bool, Field()] = False
+    forefront: bool = False
     """Indicate whether the request should be enqueued at the front of the queue."""
 
-    crawl_depth: Annotated[int, Field(alias='crawlDepth')] = 0
+    crawl_depth: int = 0
     """The depth of the request in the crawl tree."""
 
-    session_id: Annotated[str | None, Field()] = None
+    # Serialized with a snake_case key, so it keeps an explicit alias that overrides the camelCase generator.
+    session_id: Annotated[str | None, Field(alias='session_id')] = None
     """ID of a session to which the request is bound."""
 
 
@@ -166,9 +170,9 @@ class Request(BaseModel):
     ```
     """
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, alias_generator=to_camel)
 
-    unique_key: Annotated[str, Field(alias='uniqueKey', frozen=True)]
+    unique_key: Annotated[str, Field(frozen=True)]
     """A unique key identifying the request. Two requests with the same `unique_key` are considered as pointing
     to the same URL.
 
@@ -212,7 +216,7 @@ class Request(BaseModel):
         # Internally, the model contains `UserData`, this is just for convenience
         user_data: Annotated[
             MutableMapping[str, JsonSerializable],
-            Field(alias='userData', default_factory=UserData),
+            Field(default_factory=UserData),
             PlainValidator(user_data_adapter.validate_python),
             PlainSerializer(
                 lambda instance: user_data_adapter.dump_python(
@@ -228,16 +232,16 @@ class Request(BaseModel):
         request's scope, keeping them accessible on retries, failures etc.
         """
 
-    retry_count: Annotated[int, Field(alias='retryCount')] = 0
+    retry_count: int = 0
     """Number of times the request has been retried."""
 
-    no_retry: Annotated[bool, Field(alias='noRetry')] = False
+    no_retry: bool = False
     """If set to `True`, the request will not be retried in case of failure."""
 
-    loaded_url: Annotated[str | None, BeforeValidator(validate_http_url), Field(alias='loadedUrl')] = None
+    loaded_url: Annotated[str | None, BeforeValidator(validate_http_url)] = None
     """URL of the web page that was loaded. This can differ from the original URL in case of redirects."""
 
-    handled_at: Annotated[datetime | None, Field(alias='handledAt')] = None
+    handled_at: datetime | None = None
     """Timestamp when the request was handled."""
 
     @classmethod
@@ -434,5 +438,5 @@ class Request(BaseModel):
 class RequestWithLock(Request):
     """A crawling request with information about locks."""
 
-    lock_expires_at: Annotated[datetime, Field(alias='lockExpiresAt')]
+    lock_expires_at: datetime
     """The timestamp when the lock expires."""

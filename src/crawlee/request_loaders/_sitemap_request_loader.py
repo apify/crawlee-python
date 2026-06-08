@@ -7,6 +7,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 from typing_extensions import override
 from yarl import URL
 
@@ -60,33 +61,34 @@ class SitemapRequestLoaderState(BaseModel):
     `in_progress` is cleared.
     """
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, alias_generator=to_camel)
 
-    url_queue: Annotated[deque[str], Field(alias='urlQueue')]
+    url_queue: deque[str]
     """Queue of URLs extracted from sitemaps and ready for processing."""
 
-    in_progress: Annotated[set[str], Field(alias='inProgress')] = set()
+    in_progress: set[str] = set()
     """Set of request URLs currently being processed."""
 
-    pending_sitemap_urls: Annotated[deque[str], Field(alias='pendingSitemapUrls')]
+    pending_sitemap_urls: deque[str]
     """Queue of sitemap URLs that need to be fetched and processed."""
 
-    in_progress_sitemap_url: Annotated[str | None, Field(alias='inProgressSitemapUrl')] = None
+    in_progress_sitemap_url: str | None = None
     """The sitemap URL currently being processed."""
 
-    current_sitemap_processed_urls: Annotated[set[str], Field(alias='currentSitemapProcessedUrls')] = set()
+    current_sitemap_processed_urls: set[str] = set()
     """URLs from the current sitemap that have been added to the queue."""
 
-    processed_sitemap_urls: Annotated[set[str], Field(alias='processedSitemapUrls')] = set()
+    processed_sitemap_urls: set[str] = set()
     """Set of processed sitemap URLs."""
 
+    # Serialized as `sitemapCompleted`, which `to_camel('completed')` would not produce, so keep an explicit alias.
     completed: Annotated[bool, Field(alias='sitemapCompleted')] = False
     """Whether all sitemaps have been fully processed."""
 
-    total_count: Annotated[int, Field(alias='totalCount')] = 0
+    total_count: int = 0
     """Total number of URLs found and added to the queue from all processed sitemaps."""
 
-    handled_count: Annotated[int, Field(alias='handledCount')] = 0
+    handled_count: int = 0
     """Number of URLs that have been successfully handled."""
 
 

@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Annotated, Any, Generic
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 from typing_extensions import TypeVar
 
 from crawlee._types import HttpMethod, JsonSerializable
@@ -23,21 +24,23 @@ class StorageMetadata(BaseModel):
     It contains common fields shared across all specific storage types.
     """
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, extra='allow', from_attributes=True)
+    model_config = ConfigDict(
+        validate_by_name=True, validate_by_alias=True, alias_generator=to_camel, extra='allow', from_attributes=True
+    )
 
-    id: Annotated[str, Field(alias='id')]
+    id: str
     """The unique identifier of the storage."""
 
-    name: Annotated[str | None, Field(alias='name', default=None)]
+    name: str | None = None
     """The name of the storage."""
 
-    accessed_at: Annotated[datetime, Field(alias='accessedAt')]
+    accessed_at: datetime
     """The timestamp when the storage was last accessed."""
 
-    created_at: Annotated[datetime, Field(alias='createdAt')]
+    created_at: datetime
     """The timestamp when the storage was created."""
 
-    modified_at: Annotated[datetime, Field(alias='modifiedAt')]
+    modified_at: datetime
     """The timestamp when the storage was last modified."""
 
 
@@ -45,9 +48,11 @@ class StorageMetadata(BaseModel):
 class DatasetMetadata(StorageMetadata):
     """Model for a dataset metadata."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, from_attributes=True)
+    model_config = ConfigDict(
+        validate_by_name=True, validate_by_alias=True, alias_generator=to_camel, from_attributes=True
+    )
 
-    item_count: Annotated[int, Field(alias='itemCount')]
+    item_count: int
     """The number of items in the dataset."""
 
 
@@ -55,25 +60,29 @@ class DatasetMetadata(StorageMetadata):
 class KeyValueStoreMetadata(StorageMetadata):
     """Model for a key-value store metadata."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, from_attributes=True)
+    model_config = ConfigDict(
+        validate_by_name=True, validate_by_alias=True, alias_generator=to_camel, from_attributes=True
+    )
 
 
 @docs_group('Storage data')
 class RequestQueueMetadata(StorageMetadata):
     """Model for a request queue metadata."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, from_attributes=True)
+    model_config = ConfigDict(
+        validate_by_name=True, validate_by_alias=True, alias_generator=to_camel, from_attributes=True
+    )
 
-    had_multiple_clients: Annotated[bool, Field(alias='hadMultipleClients')]
+    had_multiple_clients: bool
     """Indicates whether the queue has been accessed by multiple clients (consumers)."""
 
-    handled_request_count: Annotated[int, Field(alias='handledRequestCount')]
+    handled_request_count: int
     """The number of requests that have been handled from the queue."""
 
-    pending_request_count: Annotated[int, Field(alias='pendingRequestCount')]
+    pending_request_count: int
     """The number of requests that are still pending in the queue."""
 
-    total_request_count: Annotated[int, Field(alias='totalRequestCount')]
+    total_request_count: int
     """The total number of requests that have been added to the queue."""
 
 
@@ -81,21 +90,23 @@ class RequestQueueMetadata(StorageMetadata):
 class KeyValueStoreRecordMetadata(BaseModel):
     """Model for a key-value store record metadata."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, from_attributes=True)
+    model_config = ConfigDict(
+        validate_by_name=True, validate_by_alias=True, alias_generator=to_camel, from_attributes=True
+    )
 
-    key: Annotated[str, Field(alias='key')]
+    key: str
     """The key of the record.
 
     A unique identifier for the record in the key-value store.
     """
 
-    content_type: Annotated[str, Field(alias='contentType')]
+    content_type: str
     """The MIME type of the record.
 
     Describe the format and type of data stored in the record, following the MIME specification.
     """
 
-    size: Annotated[int | None, Field(alias='size', default=None)] = None
+    size: int | None = None
     """The size of the record in bytes."""
 
 
@@ -103,9 +114,11 @@ class KeyValueStoreRecordMetadata(BaseModel):
 class KeyValueStoreRecord(KeyValueStoreRecordMetadata, Generic[KvsValueType]):
     """Model for a key-value store record."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, from_attributes=True)
+    model_config = ConfigDict(
+        validate_by_name=True, validate_by_alias=True, alias_generator=to_camel, from_attributes=True
+    )
 
-    value: Annotated[KvsValueType, Field(alias='value')]
+    value: KvsValueType
     """The value of the record."""
 
 
@@ -113,7 +126,9 @@ class KeyValueStoreRecord(KeyValueStoreRecordMetadata, Generic[KvsValueType]):
 class DatasetItemsListPage(BaseModel):
     """Model for a single page of dataset items returned from a collection list method."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, from_attributes=True)
+    model_config = ConfigDict(
+        validate_by_name=True, validate_by_alias=True, alias_generator=to_camel, from_attributes=True
+    )
 
     count: Annotated[int, Field(default=0)]
     """The number of objects returned on this page."""
@@ -143,25 +158,29 @@ class DatasetItemsListPage(BaseModel):
 class ProcessedRequest(BaseModel):
     """Represents a processed request."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, from_attributes=True)
+    model_config = ConfigDict(
+        validate_by_name=True, validate_by_alias=True, alias_generator=to_camel, from_attributes=True
+    )
 
     id: Annotated[str | None, Field(alias='requestId', default=None)] = None
     """Internal representation of the request by the storage client. Only some clients use id."""
 
-    unique_key: Annotated[str, Field(alias='uniqueKey')]
-    was_already_present: Annotated[bool, Field(alias='wasAlreadyPresent')]
-    was_already_handled: Annotated[bool, Field(alias='wasAlreadyHandled')]
+    unique_key: str
+    was_already_present: bool
+    was_already_handled: bool
 
 
 @docs_group('Storage data')
 class UnprocessedRequest(BaseModel):
     """Represents an unprocessed request."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, from_attributes=True)
+    model_config = ConfigDict(
+        validate_by_name=True, validate_by_alias=True, alias_generator=to_camel, from_attributes=True
+    )
 
-    unique_key: Annotated[str, Field(alias='uniqueKey')]
-    url: Annotated[str, BeforeValidator(validate_http_url), Field()]
-    method: Annotated[HttpMethod | None, Field()] = None
+    unique_key: str
+    url: Annotated[str, BeforeValidator(validate_http_url)]
+    method: HttpMethod | None = None
 
 
 @docs_group('Storage data')
@@ -173,11 +192,13 @@ class AddRequestsResponse(BaseModel):
     encountered issues during processing.
     """
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, from_attributes=True)
+    model_config = ConfigDict(
+        validate_by_name=True, validate_by_alias=True, alias_generator=to_camel, from_attributes=True
+    )
 
-    processed_requests: Annotated[list[ProcessedRequest], Field(alias='processedRequests')]
+    processed_requests: list[ProcessedRequest]
     """Successfully processed requests, including information about whether they were
     already present in the queue and whether they had been handled previously."""
 
-    unprocessed_requests: Annotated[list[UnprocessedRequest], Field(alias='unprocessedRequests')]
+    unprocessed_requests: list[UnprocessedRequest]
     """Requests that could not be processed, typically due to validation errors or other issues."""

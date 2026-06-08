@@ -8,11 +8,11 @@ from pydantic import (
     BaseModel,
     BeforeValidator,
     ConfigDict,
-    Field,
     GetPydanticSchema,
     PlainSerializer,
     computed_field,
 )
+from pydantic.alias_generators import to_camel
 
 from crawlee._types import JsonSerializable
 
@@ -23,27 +23,27 @@ from ._session import Session
 class SessionModel(BaseModel):
     """Model for a Session object."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, alias_generator=to_camel)
 
-    id: Annotated[str, Field(alias='id')]
-    max_age: Annotated[timedelta, Field(alias='maxAge')]
-    user_data: Annotated[MutableMapping[str, JsonSerializable], Field(alias='userData')]
-    max_error_score: Annotated[float, Field(alias='maxErrorScore')]
-    error_score_decrement: Annotated[float, Field(alias='errorScoreDecrement')]
-    created_at: Annotated[datetime, Field(alias='createdAt')]
-    usage_count: Annotated[int, Field(alias='usageCount')]
-    max_usage_count: Annotated[int, Field(alias='maxUsageCount')]
-    error_score: Annotated[float, Field(alias='errorScore')]
-    cookies: Annotated[list[CookieParam], Field(alias='cookies')]
-    blocked_status_codes: Annotated[list[int], Field(alias='blockedStatusCodes')]
+    id: str
+    max_age: timedelta
+    user_data: MutableMapping[str, JsonSerializable]
+    max_error_score: float
+    error_score_decrement: float
+    created_at: datetime
+    usage_count: int
+    max_usage_count: int
+    error_score: float
+    cookies: list[CookieParam]
+    blocked_status_codes: list[int]
 
 
 class SessionPoolModel(BaseModel):
     """Model for a SessionPool object."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, alias_generator=to_camel)
 
-    max_pool_size: Annotated[int, Field(alias='maxPoolSize')]
+    max_pool_size: int
 
     sessions: Annotated[
         dict[
@@ -52,7 +52,6 @@ class SessionPoolModel(BaseModel):
                 Session, GetPydanticSchema(lambda _, handler: handler(Any))
             ],  # handler(Any) is fine - we validate manually in the BeforeValidator
         ],
-        Field(alias='sessions'),
         PlainSerializer(
             lambda value: [session.get_state().model_dump(by_alias=True) for session in value.values()],
             return_type=list,
@@ -66,19 +65,19 @@ class SessionPoolModel(BaseModel):
         ),
     ]
 
-    @computed_field(alias='sessionCount')
+    @computed_field
     @property
     def session_count(self) -> int:
         """Get the total number of sessions currently maintained in the pool."""
         return len(self.sessions)
 
-    @computed_field(alias='usableSessionCount')
+    @computed_field
     @property
     def usable_session_count(self) -> int:
         """Get the number of sessions that are currently usable."""
         return len([session for _, session in self.sessions.items() if session.is_usable])
 
-    @computed_field(alias='retiredSessionCount')
+    @computed_field
     @property
     def retired_session_count(self) -> int:
         """Get the number of sessions that are no longer usable."""

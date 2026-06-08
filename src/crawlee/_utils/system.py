@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import psutil
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
+from pydantic.alias_generators import to_camel
 
 from crawlee._utils.byte_size import ByteSize
 
@@ -36,9 +37,9 @@ else:
 class CpuInfo(BaseModel):
     """Information about the CPU usage."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, alias_generator=to_camel)
 
-    used_ratio: Annotated[float, Field(alias='usedRatio')]
+    used_ratio: float
     """The ratio of CPU currently in use, represented as a float between 0 and 1."""
 
     # Workaround for Pydantic and type checkers when using Annotated with default_factory
@@ -46,26 +47,19 @@ class CpuInfo(BaseModel):
         created_at: datetime = datetime.now(timezone.utc)
         """The time at which the measurement was taken."""
     else:
-        created_at: Annotated[
-            datetime,
-            Field(
-                alias='createdAt',
-                default_factory=lambda: datetime.now(timezone.utc),
-            ),
-        ]
+        created_at: Annotated[datetime, Field(default_factory=lambda: datetime.now(timezone.utc))]
         """The time at which the measurement was taken."""
 
 
 class MemoryUsageInfo(BaseModel):
     """Information about the memory usage."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, alias_generator=to_camel)
 
     current_size: Annotated[
         ByteSize,
         PlainValidator(ByteSize.validate),
         PlainSerializer(lambda size: size.bytes),
-        Field(alias='currentSize'),
     ]
     """Memory usage of the current Python process and its children."""
 
@@ -74,31 +68,22 @@ class MemoryUsageInfo(BaseModel):
         created_at: datetime = datetime.now(timezone.utc)
         """The time at which the measurement was taken."""
     else:
-        created_at: Annotated[
-            datetime,
-            Field(
-                alias='createdAt',
-                default_factory=lambda: datetime.now(timezone.utc),
-            ),
-        ]
+        created_at: Annotated[datetime, Field(default_factory=lambda: datetime.now(timezone.utc))]
         """The time at which the measurement was taken."""
 
 
 class MemoryInfo(MemoryUsageInfo):
     """Information about system memory."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, alias_generator=to_camel)
 
-    total_size: Annotated[
-        ByteSize, PlainValidator(ByteSize.validate), PlainSerializer(lambda size: size.bytes), Field(alias='totalSize')
-    ]
+    total_size: Annotated[ByteSize, PlainValidator(ByteSize.validate), PlainSerializer(lambda size: size.bytes)]
     """Total memory available in the system."""
 
     system_wide_used_size: Annotated[
         ByteSize,
         PlainValidator(ByteSize.validate),
         PlainSerializer(lambda size: size.bytes),
-        Field(alias='systemWideUsedSize'),
     ]
     """Total memory used by all processes system-wide (including non-crawlee processes)."""
 

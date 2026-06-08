@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Annotated, Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 from crawlee._utils.docs import docs_group
 from crawlee._utils.models import timedelta_secs
@@ -40,29 +41,26 @@ class Event(str, Enum):
 class EventPersistStateData(BaseModel):
     """Data for the persist state event."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, alias_generator=to_camel)
 
-    is_migrating: Annotated[bool, Field(alias='isMigrating')]
+    is_migrating: bool
 
 
 @docs_group('Event data')
 class EventSystemInfoData(BaseModel):
     """Data for the system info event."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, alias_generator=to_camel)
 
-    cpu_info: Annotated[CpuInfo, Field(alias='cpuInfo')]
-    memory_info: Annotated[
-        MemoryUsageInfo,
-        Field(alias='memoryInfo'),
-    ]
+    cpu_info: CpuInfo
+    memory_info: MemoryUsageInfo
 
 
 @docs_group('Event data')
 class EventMigratingData(BaseModel):
     """Data for the migrating event."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, alias_generator=to_camel)
 
     # The remaining time in seconds before the migration is forced and the process is killed
     # Optional because it's not present when the event handler is called manually
@@ -73,20 +71,22 @@ class EventMigratingData(BaseModel):
 class EventAbortingData(BaseModel):
     """Data for the aborting event."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, alias_generator=to_camel)
 
 
 @docs_group('Event data')
 class EventExitData(BaseModel):
     """Data for the exit event."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, alias_generator=to_camel)
 
 
 @docs_group('Event data')
 class EventCrawlerStatusData(BaseModel):
     """Data for the crawler status event."""
 
+    # This event is only emitted and consumed in-process, and its fields keep their snake_case keys, so the
+    # camelCase alias generator is intentionally not applied here.
     model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     message: str
