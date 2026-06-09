@@ -246,19 +246,19 @@ async def _process_sitemap_item(
     # Handle sitemap URL references (nested sitemaps)
     if item_type == 'sitemap_url' and 'url' in item_copy:
         sitemap_url = item_copy['url']
-        parent_url = source.get('url')
-        if sitemap_url and sitemap_url not in visited_sitemap_urls and parent_url:
-            ok, reason = filter_url(target=sitemap_url, strategy=enqueue_strategy, origin=parent_url)
-            if not ok:
-                logger.warning(f'Skipping nested sitemap {sitemap_url!r} (parent {parent_url!r}): {reason}.')
-                return
+        if sitemap_url and sitemap_url not in visited_sitemap_urls:
+            if parent_url := source.get('url'):
+                ok, reason = filter_url(target=sitemap_url, strategy=enqueue_strategy, origin=parent_url)
+                if not ok:
+                    logger.warning(f'Skipping nested sitemap {sitemap_url!r} (parent {parent_url!r}): {reason}.')
+                    return
 
             # Add to processing queue
             sources.append(SitemapSource(type='url', url=sitemap_url, depth=depth + 1))
 
             # Output the nested sitemap reference if requested
             if emit_nested_sitemaps:
-                yield NestedSitemap(loc=sitemap_url, origin_sitemap_url=None)
+                yield NestedSitemap(loc=sitemap_url, origin_sitemap_url=parent_url)
 
     # Handle individual URL entries
     elif item_type == 'url' and 'loc' in item_copy:
@@ -472,6 +472,9 @@ async def parse_sitemap(
     This function coordinates the process of fetching and parsing sitemaps,
     handling both URL-based and raw content sources. It follows nested sitemaps
     up to the specified maximum depth.
+
+    Default `ParseSitemapOptions.enqueue_strategy` is `same-hostname` which will skip cross-host URLs.
+    Use strategy `all` to process all links.
     """
     # Set default options
     options = options or {}

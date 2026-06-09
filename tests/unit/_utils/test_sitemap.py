@@ -88,7 +88,7 @@ async def test_sitemap(server_url: URL, http_client: HttpClient) -> None:
 
 async def test_sitemap_different_url(server_url: URL, http_client: HttpClient) -> None:
     """Test loading a basic sitemap when sitemap contains links to different url. Those should be ignored."""
-    different_url = 'https://other.com'
+    different_url = 'https://other.com/'
     sitemap_url = (server_url / 'sitemap.xml').with_query(
         base64=encode_base64(get_basic_sitemap(url=different_url).encode()), c_type='application/xml; charset=utf-8'
     )
@@ -99,7 +99,7 @@ async def test_sitemap_different_url(server_url: URL, http_client: HttpClient) -
 
 async def test_sitemap_different_url_allowed(server_url: URL, http_client: HttpClient) -> None:
     """Test loading a basic sitemap when sitemap contains links to different url, and it is explicitly allowed."""
-    different_url = 'https://other.com'
+    different_url = 'https://other.com/'
     sitemap_url = (server_url / 'sitemap.xml').with_query(
         base64=encode_base64(get_basic_sitemap(url=different_url).encode()), c_type='application/xml; charset=utf-8'
     )
@@ -429,3 +429,23 @@ async def test_discover_sitemap_url_without_host_skipped() -> None:
     urls = [url async for url in discover_valid_sitemaps(['not-a-valid-url'], http_client=http_client)]
 
     assert urls == []
+
+
+async def test_raw_sitemap_index_processes_nested_sitemaps() -> None:
+    """Test that nested sitemap respects source url."""
+    raw_index = f"""
+    <?xml version="1.0" encoding="UTF-8"?>
+    <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <sitemap>
+    <loc>{DEFAULT_URL}child-sitemap.xml</loc>
+    <lastmod>2004-12-23</lastmod>
+    </sitemap>
+    </sitemapindex>
+    """.strip()
+
+    # The child sitemap (same host as DEFAULT_URL) is fetched via the streaming client.
+    client, _ = _make_flaky_stream_client(get_basic_sitemap().encode(), fail_times=0)
+
+    items = [item async for item in parse_sitemap([{'type': 'raw', 'content': raw_index}], client)]
+
+    assert {item.loc for item in items} == get_basic_results()
