@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - **memory-storage:** Apply skip_empty after pagination in MemoryDatasetClient.get_data ([#1937](https://github.com/apify/crawlee-python/pull/1937)) ([7e807aa](https://github.com/apify/crawlee-python/commit/7e807aa168929a474e793d6de443359090daf923)) by [@vdusek](https://github.com/vdusek)
 - **redis:** Return all items from Redis dataset `get_data` with `desc=True` and `limit=None` ([#1939](https://github.com/apify/crawlee-python/pull/1939)) ([f7cde2e](https://github.com/apify/crawlee-python/commit/f7cde2e059bea8c9ecbd34db5da04611fca42a99)) by [@vdusek](https://github.com/vdusek)
 - Retry sitemap fetching on error and raise when retries are exhausted ([#1943](https://github.com/apify/crawlee-python/pull/1943)) ([76927d7](https://github.com/apify/crawlee-python/commit/76927d745944d88d106634bd05b6833f1c3a53e9)) by [@vdusek](https://github.com/vdusek)
+- Validate storage name and alias values ([#1950](https://github.com/apify/crawlee-python/pull/1950)) ([0cac092](https://github.com/apify/crawlee-python/commit/0cac092139b4cac608a1400eae5218002b82f4c3)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->
