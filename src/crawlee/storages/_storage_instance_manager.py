@@ -10,7 +10,7 @@ from weakref import WeakValueDictionary
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
 
-from ._utils import validate_storage_name
+from ._utils import validate_storage_alias, validate_storage_name
 
 if TYPE_CHECKING:
     from ._base import Storage
@@ -134,6 +134,10 @@ class StorageInstanceManager:
             # Validate storage name
             if name is not None:
                 validate_storage_name(name)
+
+            # Validate storage alias
+            if alias is not None:
+                validate_storage_alias(alias)
 
             # Acquire lock for this opener
             opener_lock_key = (cls, str(id or name or alias), storage_client_cache_key)

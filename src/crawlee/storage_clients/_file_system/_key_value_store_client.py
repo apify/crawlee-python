@@ -15,7 +15,7 @@ from typing_extensions import Self, override
 
 from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.file import atomic_write, infer_mime_type, json_dumps
+from crawlee._utils.file import atomic_write, infer_mime_type, json_dumps, validate_subdirectory
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
@@ -157,8 +157,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
         # Get a new instance by name or alias.
         else:
-            kvs_dir = Path(name) if name else Path(alias) if alias else Path('default')
-            path_to_kvs = kvs_base_path / kvs_dir
+            path_to_kvs = validate_subdirectory(kvs_base_path, name or alias or 'default')
             path_to_metadata = path_to_kvs / METADATA_FILENAME
 
             # If the key-value store directory exists, reconstruct the client from the metadata file.

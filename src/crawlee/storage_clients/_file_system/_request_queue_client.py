@@ -17,7 +17,7 @@ from typing_extensions import Self, override
 from crawlee import Request
 from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.file import atomic_write, json_dumps
+from crawlee._utils.file import atomic_write, json_dumps, validate_subdirectory
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee._utils.recoverable_state import RecoverableState
 from crawlee.storage_clients._base import RequestQueueClient
@@ -227,8 +227,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
         # Open an existing RQ by its name or alias, or create a new one if not found.
         else:
-            rq_dir = Path(name) if name else Path(alias) if alias else Path('default')
-            path_to_rq = rq_base_path / rq_dir
+            path_to_rq = validate_subdirectory(rq_base_path, name or alias or 'default')
             path_to_metadata = path_to_rq / METADATA_FILENAME
 
             # If the RQ directory exists, reconstruct the client from the metadata file.

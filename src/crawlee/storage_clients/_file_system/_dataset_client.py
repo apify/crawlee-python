@@ -15,7 +15,7 @@ from typing_extensions import Self, override
 from crawlee._consts import METADATA_FILENAME
 from crawlee._types import JsonSerializable
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.file import atomic_write, json_dumps
+from crawlee._utils.file import atomic_write, json_dumps, validate_subdirectory
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
@@ -159,8 +159,7 @@ class FileSystemDatasetClient(DatasetClient):
 
         # Get a new instance by name or alias.
         else:
-            dataset_dir = Path(name) if name else Path(alias) if alias else Path('default')
-            path_to_dataset = dataset_base_path / dataset_dir
+            path_to_dataset = validate_subdirectory(dataset_base_path, name or alias or 'default')
             path_to_metadata = path_to_dataset / METADATA_FILENAME
 
             # If the dataset directory exists, reconstruct the client from the metadata file.
