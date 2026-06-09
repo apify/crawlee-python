@@ -16,6 +16,7 @@ from crawlee._utils.time import SharedTimeout
 from crawlee._utils.urls import to_absolute_url_iterator
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import SessionError
+from crawlee.http_clients import ImpitHttpClient
 from crawlee.statistics import StatisticsState
 
 from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult, TSelectResult
@@ -72,8 +73,20 @@ class AbstractHttpCrawler(
         *,
         parser: AbstractHttpParser[TParseResult, TSelectResult],
         navigation_timeout: timedelta | None = None,
+        impersonate: bool = True,
         **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext, StatisticsState]],
     ) -> None:
+        """Initialize a new instance.
+
+        Args:
+            parser: An instance of `AbstractHttpParser` used for parsing HTTP responses.
+            navigation_timeout: Timeout for navigation (the process between sending a request and calling the request
+                handler)
+            impersonate: Whether the default HTTP client should impersonate a browser by sending browser-like
+                headers. This applies only to the default client. If you pass your own `http_client`, this flag
+                is ignored and you configure impersonation on that client directly.
+            kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
+        """
         self._parser = parser
         self._navigation_timeout = navigation_timeout or timedelta(minutes=1)
         self._pre_navigation_hooks: list[Callable[[BasicCrawlingContext], Awaitable[None]]] = []
@@ -85,6 +98,9 @@ class AbstractHttpCrawler(
                 'Please pass in a `_context_pipeline`. You should use the '
                 'AbstractHttpCrawler._create_static_content_crawler_pipeline() method to initialize it.'
             )
+
+        if impersonate is False and 'http_client' not in kwargs:
+            kwargs['http_client'] = ImpitHttpClient(browser=None)
 
         kwargs.setdefault('_logger', logging.getLogger(self.__class__.__name__))
         super().__init__(**kwargs)
