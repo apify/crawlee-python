@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import warnings
 from abc import ABC
 from datetime import timedelta
 from typing import TYPE_CHECKING, Generic
@@ -46,6 +47,12 @@ class HttpCrawlerOptions(
 
     navigation_timeout: NotRequired[timedelta | None]
     """Timeout for the HTTP request."""
+
+    impersonate: NotRequired[bool]
+    """Whether the default HTTP client should impersonate a browser by sending browser-like headers. This applies only
+        to the default client. If you pass your own `http_client`, this flag is ignored and you configure impersonation
+        on that client directly.
+    """
 
 
 @docs_group('Crawlers')
@@ -101,6 +108,15 @@ class AbstractHttpCrawler(
 
         if impersonate is False and 'http_client' not in kwargs:
             kwargs['http_client'] = ImpitHttpClient(browser=None)
+        elif impersonate is False and 'http_client' in kwargs:
+            warnings.warn(
+                (
+                    '`impersonate` option is ignored when custom `http_client` is provided. '
+                    'Please configure impersonation directly on the `http_client` instance.'
+                ),
+                category=UserWarning,
+                stacklevel=2,
+            )
 
         kwargs.setdefault('_logger', logging.getLogger(self.__class__.__name__))
         super().__init__(**kwargs)
