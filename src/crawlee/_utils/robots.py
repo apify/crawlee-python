@@ -135,7 +135,9 @@ class RobotsTxtFile:
         if not self._http_client:
             raise ValueError('HTTP client is required to parse sitemaps.')
 
-        return await Sitemap.load(sitemaps, self._http_client, self._proxy_info)
+        return await Sitemap.load(
+            sitemaps, self._http_client, self._proxy_info, parse_sitemap_options={'enqueue_strategy': enqueue_strategy}
+        )
 
     async def parse_urls_from_sitemaps(self, *, enqueue_strategy: EnqueueStrategy) -> list[str]:
         """Parse the sitemaps in the robots.txt file and return a list URLs.

@@ -352,7 +352,12 @@ class SitemapRequestLoader(RequestLoader):
                         continue
                     state.in_progress_sitemap_url = sitemap_url
 
-                parse_options = ParseSitemapOptions(max_depth=0, emit_nested_sitemaps=True, sitemap_retries=3)
+                parse_options = ParseSitemapOptions(
+                    max_depth=0,
+                    emit_nested_sitemaps=True,
+                    sitemap_retries=3,
+                    enqueue_strategy=self._enqueue_strategy,
+                )
                 parsed_sitemap_url = URL(sitemap_url)
 
                 async for item in parse_sitemap(
