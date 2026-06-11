@@ -2143,7 +2143,7 @@ async def test_global_and_local_event_manager_in_crawler_run() -> None:
 
     crawler = BasicCrawler(event_manager=local_event_manager)
 
-    handler_call = AsyncMock()
+    handler_call = Mock()
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:

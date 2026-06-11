@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import multiprocessing
 import os
 import warnings
 from typing import TYPE_CHECKING, Any, cast
@@ -27,6 +28,11 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee.http_clients._base import HttpClient
+
+# Use the `spawn` start method for all processes created in tests via `multiprocessing` (`proxy.py` acceptors,
+# `ProcessPoolExecutor` workers). The default `fork` method on Linux (Python <= 3.13) is unsafe in the multi-threaded
+# pytest process and emits a `DeprecationWarning` on Python 3.12+. Python 3.14 already defaults to a non-fork method.
+multiprocessing.set_start_method('spawn', force=True)
 
 
 @pytest.fixture(autouse=True)
