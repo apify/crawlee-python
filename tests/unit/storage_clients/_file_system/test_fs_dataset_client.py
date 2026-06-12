@@ -46,7 +46,7 @@ async def test_file_and_directory_creation(configuration: Configuration) -> None
         client_metadata = await client.get_metadata()
         assert metadata['id'] == client_metadata.id
         assert metadata['name'] == 'new-dataset'
-        assert metadata['item_count'] == 0
+        assert metadata['itemCount'] == 0
 
     await client.drop()
 
@@ -128,7 +128,7 @@ async def test_metadata_file_updates(dataset_client: FileSystemDatasetClient) ->
     # Verify metadata file is updated on disk
     with dataset_client.path_to_metadata.open() as f:
         metadata_json = json.load(f)
-        assert metadata_json['item_count'] == 1
+        assert metadata_json['itemCount'] == 1
 
 
 async def test_data_persistence_across_reopens() -> None:

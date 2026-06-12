@@ -67,7 +67,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     @override
     async def get_metadata(self) -> RequestQueueMetadata:
         raw = await self._native_client.get_metadata()
-        return RequestQueueMetadata(**raw)
+        return RequestQueueMetadata.model_validate(raw)
 
     @classmethod
     async def open(
@@ -146,7 +146,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         request_dicts = [json.loads(r.model_dump_json()) for r in requests]
 
         raw = await self._native_client.add_batch_of_requests(request_dicts, forefront=forefront)
-        return AddRequestsResponse(**raw)
+        return AddRequestsResponse.model_validate(raw)
 
     @override
     async def get_request(self, unique_key: str) -> Request | None:
@@ -174,7 +174,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         if raw is None:
             return None
 
-        return ProcessedRequest(**raw)
+        return ProcessedRequest.model_validate(raw)
 
     @override
     async def reclaim_request(
@@ -189,7 +189,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         if raw is None:
             return None
 
-        return ProcessedRequest(**raw)
+        return ProcessedRequest.model_validate(raw)
 
     @override
     async def is_empty(self) -> bool:

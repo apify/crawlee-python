@@ -80,7 +80,7 @@ async def test_value_file_creation_and_content(kvs_client: FileSystemKeyValueSto
     with key_metadata_path.open() as f:
         metadata = json.load(f)
         assert metadata['key'] == test_key
-        assert metadata['content_type'].startswith('text/plain')
+        assert metadata['contentType'].startswith('text/plain')
         assert metadata['size'] == len(test_value.encode('utf-8'))
 
 

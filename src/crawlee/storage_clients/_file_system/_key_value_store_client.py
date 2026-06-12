@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
 from crawlee_storage import FileSystemKeyValueStoreClient as NativeKeyValueStoreClient
 from typing_extensions import Self, override
 
+from crawlee._utils.file import infer_mime_type, json_dumps
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
@@ -63,7 +65,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
     @override
     async def get_metadata(self) -> KeyValueStoreMetadata:
         raw = await self._native_client.get_metadata()
-        return KeyValueStoreMetadata(**raw)
+        return KeyValueStoreMetadata.model_validate(raw)
 
     @classmethod
     async def open(
@@ -117,16 +119,56 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         if raw is None:
             return None
 
+        # The native client always returns the raw bytes; deserialize them back into a Python
+        # object according to the stored content type to match the framework contract.
+        content_type = raw['contentType']
+        value_bytes: bytes = raw['value']
+
+        if content_type == 'application/x-none':
+            value: Any = None
+        elif 'application/json' in content_type:
+            try:
+                value = json.loads(value_bytes.decode('utf-8'))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                logger.warning(f'Failed to decode JSON value for key "{key}"')
+                return None
+        elif content_type.startswith('text/'):
+            try:
+                value = value_bytes.decode('utf-8')
+            except UnicodeDecodeError:
+                logger.warning(f'Failed to decode text value for key "{key}"')
+                return None
+        else:
+            value = value_bytes
+
         return KeyValueStoreRecord(
             key=raw['key'],
-            value=raw['value'],
-            content_type=raw['content_type'],
+            value=value,
+            content_type=content_type,
             size=raw.get('size'),
         )
 
     @override
     async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
-        await self._native_client.set_value(key, value, content_type)
+        # The native client only accepts raw bytes plus a content type, so serialize the value
+        # here the same way the on-disk format expects.
+        if value is None:
+            content_type = 'application/x-none'  # Special content type to identify None values.
+            value_bytes = b''
+        else:
+            content_type = content_type or infer_mime_type(value)
+
+            if 'application/json' in content_type:
+                value_bytes = (await json_dumps(value)).encode('utf-8')
+            elif isinstance(value, str):
+                value_bytes = value.encode('utf-8')
+            elif isinstance(value, (bytes, bytearray)):
+                value_bytes = bytes(value)
+            else:
+                # Fallback: attempt to convert to string and encode.
+                value_bytes = str(value).encode('utf-8')
+
+        await self._native_client.set_value(key, value_bytes, content_type)
 
     @override
     async def delete_value(self, *, key: str) -> None:
@@ -143,7 +185,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             exclusive_start_key=exclusive_start_key,
             limit=limit,
         ):
-            yield KeyValueStoreRecordMetadata(**item)
+            yield KeyValueStoreRecordMetadata.model_validate(item)
 
     @override
     async def get_public_url(self, *, key: str) -> str:

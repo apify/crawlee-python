@@ -62,7 +62,7 @@ class FileSystemDatasetClient(DatasetClient):
     @override
     async def get_metadata(self) -> DatasetMetadata:
         raw = await self._native_client.get_metadata()
-        return DatasetMetadata(**raw)
+        return DatasetMetadata.model_validate(raw)
 
     @classmethod
     async def open(
@@ -153,7 +153,7 @@ class FileSystemDatasetClient(DatasetClient):
             desc=desc,
             skip_empty=skip_empty,
         )
-        return DatasetItemsListPage(**raw)
+        return DatasetItemsListPage.model_validate(raw)
 
     @override
     async def iterate_items(
