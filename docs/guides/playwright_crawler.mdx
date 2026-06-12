@@ -88,4 +88,18 @@ Navigation hooks allow for additional configuration at specific points during pa
 
 ## Conclusion
 
-This guide introduced the <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> and explained how to configure it using <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> and <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink>. You learned how to launch multiple browsers, configure browser and context settings, use <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> lifecycle hooks, and apply navigation hooks. If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!
+## Extending the browser plugin
+
+For full control over browser launching, you can subclass <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink> and override its `new_browser` method. This lets you integrate any Playwright-compatible browser backend — such as a custom Chromium build, a stealth browser, or a browser with a persistent profile.
+
+The overridden `new_browser` method must return a <ApiLink to="class/PlaywrightBrowserController">`PlaywrightBrowserController`</ApiLink> instance wrapping your custom browser. Pass your plugin to <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink>, which you then provide to <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> via the `browser_pool` argument.
+
+<CodeBlock className="language-python">
+    {ExtendingPluginExample}
+</CodeBlock>
+
+For a real-world example of a custom browser plugin, see the [Camoufox example](../examples/playwright-crawler-with-camoufox).
+
+:::note
+Third-party projects that provide alternative browser backends for Crawlee can link to this section as the canonical reference for plugin subclassing.
+:::
