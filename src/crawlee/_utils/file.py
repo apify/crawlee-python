@@ -10,12 +10,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, overload
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Mapping
     from typing import Any, TextIO
 
     from typing_extensions import Unpack
 
-    from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs
+    from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs, JsonSerializable
 
 if sys.platform == 'win32':
 
@@ -58,6 +58,39 @@ else:
         except Exception:
             Path(tmp_path).unlink(missing_ok=True)
             raise
+
+
+def validate_subdirectory(base_dir: Path, subdirectory: str) -> Path:
+    """Resolve a storage subdirectory inside a base directory.
+
+    Joins `subdirectory` onto `base_dir` and verifies that the result is a direct child of `base_dir`, so a
+    storage name or alias always maps to a single subdirectory under the storage directory rather than a nested
+    path (e.g. `nested/inside`) or somewhere else entirely (e.g. a value containing `..` or an absolute path).
+
+    Args:
+        base_dir: The base storage directory (e.g. the `key_value_stores` directory).
+        subdirectory: The storage name or alias to use as the subdirectory.
+
+    Returns:
+        The validated full path to the storage subdirectory.
+
+    Raises:
+        ValueError: If the resolved path is not a direct child of `base_dir`.
+    """
+    # Normalize lexically (no filesystem access), so symlinks are not followed and the check is deterministic.
+    base_resolved = Path(os.path.normpath(base_dir))
+    target_resolved = Path(os.path.normpath(base_dir / subdirectory))
+
+    # The target must be a direct child of the base directory, so it maps to a single subdirectory - reject path
+    # separators, parent directory references ("..") and absolute paths.
+    if target_resolved.parent != base_resolved:
+        raise ValueError(
+            f'Invalid storage name or alias "{subdirectory}". It must map to a single subdirectory under the '
+            f'storage directory and must not contain path separators, parent directory references ("..") or '
+            f'absolute paths.'
+        )
+
+    return target_resolved
 
 
 def infer_mime_type(value: Any) -> str:
@@ -150,7 +183,7 @@ async def atomic_write(
 
 
 async def export_json_to_stream(
-    iterator: AsyncIterator[dict[str, Any]],
+    iterator: AsyncIterator[Mapping[str, JsonSerializable]],
     dst: TextIO,
     **kwargs: Unpack[ExportDataJsonKwargs],
 ) -> None:
@@ -159,7 +192,7 @@ async def export_json_to_stream(
 
 
 async def export_csv_to_stream(
-    iterator: AsyncIterator[dict[str, Any]],
+    iterator: AsyncIterator[Mapping[str, JsonSerializable]],
     dst: TextIO,
     **kwargs: Unpack[ExportDataCsvKwargs],
 ) -> None:

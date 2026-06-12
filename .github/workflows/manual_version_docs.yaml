@@ -1,0 +1,131 @@
+name: Version docs
+
+on:
+  # Runs when manually triggered from the GitHub UI.
+  workflow_dispatch:
+    inputs:
+      version_number:
+        description: Version to snapshot (e.g. "1.0.0"). If empty, the current version in pyproject.toml is used.
+        required: false
+        type: string
+        default: ""
+
+  # Runs when invoked by another workflow.
+  workflow_call:
+    inputs:
+      version_number:
+        description: Version to snapshot (e.g. "1.0.0"). If empty, the current version in pyproject.toml is used.
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: version-docs
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+  PYTHON_VERSION: "3.14"
+
+jobs:
+  version_docs:
+    name: Version docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      checks: read
+
+    steps:
+      # Gate manual dispatches on the `Checks` workflow already succeeding on this commit (run by `on_master.yaml`);
+      # skipped when called from another workflow.
+      - name: Wait for checks
+        if: github.event_name == 'workflow_dispatch'
+        uses: apify/actions/wait-for-checks@v1.2.0
+        with:
+          ref: ${{ github.sha }}
+          check-regexp: '^Checks'
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up uv package manager
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies
+        run: uv run poe install-dev
+
+      - name: Install pnpm and website dependencies
+        uses: apify/actions/pnpm-install@v1.2.0
+        with:
+          working-directory: website
+
+      - name: Snapshot the current version
+        id: snapshot
+        env:
+          INPUT_VERSION: ${{ inputs.version_number }}
+        run: |
+          cd website
+
+          # Prefer the explicit input (passed by the release workflow after the version bump).
+          # Fall back to pyproject.toml only when run manually without an input — this avoids
+          # the stale-checkout pitfall where the bumped version isn't visible to this job.
+          if [[ -n "$INPUT_VERSION" ]]; then
+            FULL_VERSION="$INPUT_VERSION"
+          else
+            FULL_VERSION="$(uv version --short)"
+          fi
+          MAJOR_MINOR_VERSION="$(echo "$FULL_VERSION" | cut -d. -f1-2)"
+          MAJOR_VERSION="$(echo "$FULL_VERSION" | cut -d. -f1)"
+          echo "version=$FULL_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $FULL_VERSION, Major.Minor: $MAJOR_MINOR_VERSION, Major: $MAJOR_VERSION"
+
+          # Find the existing versions for this major in versions.json (if any).
+          if [[ -f versions.json ]]; then
+            OLD_VERSIONS="$(jq -r --arg major "$MAJOR_VERSION" '.[] | select(startswith($major + "."))' versions.json)"
+          else
+            OLD_VERSIONS=""
+            echo "[]" > versions.json
+          fi
+
+          # Remove all old versions for this major (if found).
+          if [[ -n "$OLD_VERSIONS" ]]; then
+            while IFS= read -r OLD_VERSION; do
+              [[ -z "$OLD_VERSION" ]] && continue
+              echo "Removing old version $OLD_VERSION for major $MAJOR_VERSION"
+              rm -rf "versioned_docs/version-${OLD_VERSION}"
+              rm -f "versioned_sidebars/version-${OLD_VERSION}-sidebars.json"
+            done <<< "$OLD_VERSIONS"
+            jq --arg major "$MAJOR_VERSION" 'map(select(startswith($major + ".") | not))' versions.json > tmp.json && mv tmp.json versions.json
+          else
+            echo "No existing versions found for major $MAJOR_VERSION, nothing to remove"
+          fi
+
+          # Build API reference and create Docusaurus version snapshots.
+          bash build_api_reference.sh
+          uv run pnpm exec docusaurus docs:version "$MAJOR_MINOR_VERSION"
+          uv run pnpm exec docusaurus api:version "$MAJOR_MINOR_VERSION"
+
+      - name: Commit and push versioned docs
+        uses: apify/actions/signed-commit@v1.2.0
+        with:
+          message: "docs: Version docs for v${{ steps.snapshot.outputs.version }} [skip ci]"
+          add: 'website/versioned_docs website/versioned_sidebars website/versions.json'
+          pull: '--rebase --autostash'
+          github-token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}

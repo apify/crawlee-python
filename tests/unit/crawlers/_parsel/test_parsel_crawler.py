@@ -218,23 +218,15 @@ async def test_handle_blocked_status_code(server_url: URL, http_client: HttpClie
     assert crawler._statistics.error_tracker.total == 1
 
 
-# TODO: Remove the skip mark when the test is fixed:
-# https://github.com/apify/crawlee-python/issues/838
-@pytest.mark.skip(reason='The test does not work with `crawlee._utils.try_import.ImportWrapper`.')
 def test_import_error_handled() -> None:
     # Simulate ImportError for parsel
     with mock.patch.dict('sys.modules', {'parsel': None}):
         # Invalidate ParselCrawler import
-        sys.modules.pop('crawlee.crawlers', None)
-        sys.modules.pop('crawlee.crawlers._parsel', None)
-        with pytest.raises(ImportError) as import_error:
+        for mod_name in list(sys.modules):
+            if mod_name == 'crawlee.crawlers' or mod_name.startswith('crawlee.crawlers._parsel'):
+                sys.modules.pop(mod_name, None)
+        with pytest.raises(ImportError):
             from crawlee.crawlers import ParselCrawler  # noqa: F401 PLC0415
-
-    # Check if the raised ImportError contains the expected message
-    assert str(import_error.value) == (
-        "To import this, you need to install the 'parsel' extra."
-        "For example, if you use pip, run `pip install 'crawlee[parsel]'`."
-    )
 
 
 async def test_json(server_url: URL, http_client: HttpClient) -> None:

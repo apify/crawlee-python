@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import json
 from logging import getLogger
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from crawlee_storage import FileSystemKeyValueStoreClient as NativeKeyValueStoreClient
 from typing_extensions import Self, override
 
-from crawlee._utils.file import infer_mime_type, json_dumps
+from crawlee._utils.file import infer_mime_type, json_dumps, validate_subdirectory
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-    from pathlib import Path
 
     from crawlee.configuration import Configuration
 
@@ -40,6 +40,9 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
     Backed by the native ``crawlee_storage`` Rust extension for performance.
     """
+
+    _STORAGE_SUBDIR = 'key_value_stores'
+    """The name of the subdirectory where key-value stores are stored under the storage directory."""
 
     def __init__(
         self,
@@ -95,6 +98,11 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
             ValueError: If a store with the specified ID is not found, if metadata is invalid,
                 or if both name and alias are provided.
         """
+        # Reject names/aliases that would escape the storage directory before handing off to the
+        # native client, which would otherwise create directories outside the intended location.
+        if (subdirectory := name or alias) is not None:
+            validate_subdirectory(Path(configuration.storage_dir) / cls._STORAGE_SUBDIR, subdirectory)
+
         native_client = await NativeKeyValueStoreClient.open(
             id=id,
             name=name,

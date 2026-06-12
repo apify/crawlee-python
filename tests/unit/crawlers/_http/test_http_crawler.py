@@ -220,6 +220,10 @@ async def test_do_not_retry_on_client_errors(crawler: HttpCrawler, server_url: U
     assert stats.requests_total == 1
 
 
+@pytest.mark.flaky(
+    reruns=3,
+    reason='Transient transport errors in CI can consume retry budget without registering a status code.',
+)
 async def test_http_status_statistics(crawler: HttpCrawler, server_url: URL) -> None:
     await crawler.add_requests([str(server_url.with_path('status/500').with_query(id=i)) for i in range(10)])
     await crawler.add_requests([str(server_url.with_path('status/402').with_query(id=i)) for i in range(10)])

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
+import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -49,3 +52,15 @@ async def test_sqlite_wal_mode_not_applied_with_custom_engine(tmp_path: Path) ->
         async with engine.begin() as conn:
             result = await conn.execute(text('PRAGMA journal_mode'))
             assert result.scalar() != 'wal'
+
+
+def test_import_error_handled() -> None:
+    blocked = {
+        mod_name: None for mod_name in sys.modules if mod_name == 'sqlalchemy' or mod_name.startswith('sqlalchemy.')
+    }
+    with patch.dict('sys.modules', blocked):
+        for mod_name in list(sys.modules):
+            if mod_name.startswith('crawlee.storage_clients._sql'):
+                sys.modules.pop(mod_name, None)
+        with pytest.raises(ImportError):
+            from crawlee.storage_clients._sql import SqlStorageClient  # noqa: F401 PLC0415

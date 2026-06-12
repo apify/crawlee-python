@@ -1,4 +1,5 @@
 # Inspiration: https://github.com/apify/crawlee/blob/v3.7.3/packages/basic-crawler/src/internals/basic-crawler.ts
+
 from __future__ import annotations
 
 import asyncio
@@ -6,7 +7,6 @@ import functools
 import logging
 import signal
 import sys
-import tempfile
 import threading
 import traceback
 from asyncio import CancelledError
@@ -14,18 +14,17 @@ from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Seque
 from contextlib import AsyncExitStack, suppress
 from datetime import timedelta
 from functools import partial
+from http import HTTPStatus
 from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, cast
-from urllib.parse import ParseResult, urlparse
 from weakref import WeakKeyDictionary
 
 from cachetools import LRUCache
-from tldextract import TLDExtract
-from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack, assert_never
+from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack
 from yarl import URL
 
-from crawlee import EnqueueStrategy, Glob, RequestTransformAction, service_locator
+from crawlee import Glob, RequestTransformAction, service_locator
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
 from crawlee._log_config import configure_logger, get_configured_log_level, string_to_log_level
 from crawlee._request import Request, RequestOptions, RequestState
@@ -35,6 +34,7 @@ from crawlee._types import (
     EnqueueLinksKwargs,
     ExportDataCsvKwargs,
     ExportDataJsonKwargs,
+    ExportDataKwargs,
     GetKeyValueStoreFromRequestHandlerFunction,
     HttpHeaders,
     HttpPayload,
@@ -45,9 +45,11 @@ from crawlee._types import (
 )
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import atomic_write, export_csv_to_stream, export_json_to_stream
+from crawlee._utils.http import parse_retry_after_header
+from crawlee._utils.log import LoggerOnce
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.robots import RobotsTxtFile
-from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute
+from crawlee._utils.urls import UNSUPPORTED_SCHEME_MESSAGE, convert_to_absolute_url, filter_url, is_url_absolute
 from crawlee._utils.wait import wait_for
 from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
 from crawlee.errors import (
@@ -63,6 +65,7 @@ from crawlee.errors import (
 )
 from crawlee.events._types import Event, EventCrawlerStatusData
 from crawlee.http_clients import ImpitHttpClient
+from crawlee.request_loaders import ThrottlingRequestManager
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics, StatisticsState
@@ -77,7 +80,7 @@ from ._logging_utils import (
 
 if TYPE_CHECKING:
     import re
-    from collections.abc import Iterator
+    from collections.abc import Iterator, Mapping, MutableMapping
     from contextlib import AbstractAsyncContextManager
 
     from crawlee._types import (
@@ -484,7 +487,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # Internal, not explicitly configurable components
         self._robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
         self._robots_txt_lock = asyncio.Lock()
-        self._tld_extractor = TLDExtract(cache_dir=tempfile.TemporaryDirectory().name)
         self._snapshotter = Snapshotter.from_config(config)
         self._autoscaled_pool = AutoscaledPool(
             system_status=SystemStatus(self._snapshotter),
@@ -494,7 +496,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             run_task_function=self.__run_task_function,
         )
         self._crawler_state_rec_task = RecurringTask(
-            func=self._crawler_state_task, delay=status_message_logging_interval
+            func=self._crawler_state_task,
+            delay=status_message_logging_interval,
         )
         self._previous_crawler_state: TStatisticsState | None = None
 
@@ -502,10 +505,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._keep_alive = keep_alive
         self._running = False
         self._has_finished_before = False
-
         self._failed = False
-
         self._unexpected_stop = False
+        self._logger_once = LoggerOnce(self._logger)
 
     @property
     def log(self) -> logging.Logger:
@@ -700,19 +702,22 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         self._running = True
 
+        if self._respect_robots_txt_file and not isinstance(self._request_manager, ThrottlingRequestManager):
+            self._logger.warning(
+                'The `respect_robots_txt_file` option is enabled, but the crawler is not using '
+                '`ThrottlingRequestManager`. Crawl-delay directives from robots.txt will not be enforced. To enable '
+                'crawl-delay support, configure the crawler to use `ThrottlingRequestManager` as the request manager.'
+            )
+
         if self._has_finished_before:
             await self._statistics.reset()
 
             if self._use_session_pool:
                 await self._session_pool.reset_store()
 
-            request_manager = await self.get_request_manager()
-            if purge_request_queue and isinstance(request_manager, RequestQueue):
-                await request_manager.drop()
-                self._request_manager = await RequestQueue.open(
-                    storage_client=self._service_locator.get_storage_client(),
-                    configuration=self._service_locator.get_configuration(),
-                )
+            if purge_request_queue:
+                request_manager = await self.get_request_manager()
+                await request_manager.purge()
 
         if requests is not None:
             await self.add_requests(requests)
@@ -851,8 +856,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def use_state(
         self,
-        default_value: dict[str, JsonSerializable] | None = None,
-    ) -> dict[str, JsonSerializable]:
+        default_value: MutableMapping[str, JsonSerializable] | None = None,
+    ) -> MutableMapping[str, JsonSerializable]:
         kvs = await self.get_key_value_store()
         return await kvs.get_auto_saved_value(f'{self._CRAWLEE_STATE_KEY}_{self._id}', default_value)
 
@@ -896,7 +901,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
-        **additional_kwargs: Unpack[ExportDataJsonKwargs | ExportDataCsvKwargs],
+        **additional_kwargs: Unpack[ExportDataKwargs],
     ) -> None:
         """Export all items from a Dataset to a JSON or CSV file.
 
@@ -936,7 +941,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def _push_data(
         self,
-        data: list[dict[str, Any]] | dict[str, Any],
+        data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable],
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
@@ -977,16 +982,18 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def _check_url_after_redirects(self, context: TCrawlingContext) -> AsyncGenerator[TCrawlingContext, None]:
         """Ensure that the `loaded_url` still matches the enqueue strategy after redirects.
 
-        Filter out links that redirect outside of the crawled domain.
+        Filter out links that redirect outside of the crawled domain or to unsupported URL schemes.
         """
-        if context.request.loaded_url is not None and not self._check_enqueue_strategy(
-            context.request.enqueue_strategy,
-            origin_url=urlparse(context.request.url),
-            target_url=urlparse(context.request.loaded_url),
-        ):
-            raise ContextPipelineInterruptedError(
-                f'Skipping URL {context.request.loaded_url} (redirected from {context.request.url})'
+        if context.request.loaded_url is not None:
+            ok, reason = filter_url(
+                target=context.request.loaded_url,
+                strategy=context.request.enqueue_strategy,
+                origin=context.request.url,
             )
+            if not ok:
+                raise ContextPipelineInterruptedError(
+                    f'Skipping URL {context.request.loaded_url} (redirected from {context.request.url}): {reason}'
+                )
 
         yield context
 
@@ -1008,7 +1015,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             selector: str | None = None,
             attribute: str | None = None,
             label: str | None = None,
-            user_data: dict[str, Any] | None = None,
+            user_data: Mapping[str, JsonSerializable] | None = None,
             transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction]
             | None = None,
             requests: Sequence[str | Request] | None = None,
@@ -1053,15 +1060,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     ) -> Iterator[TRequestIterator]:
         """Filter requests based on the enqueue strategy and URL patterns."""
         limit = kwargs.get('limit')
-        parsed_origin_url = urlparse(origin_url)
+        parsed_origin_url = URL(origin_url)
         strategy = kwargs.get('strategy', 'all')
 
-        if strategy == 'all' and not parsed_origin_url.hostname:
+        if strategy == 'all' and not parsed_origin_url.host:
             self.log.warning(f'Skipping enqueue: Missing hostname in origin_url = {origin_url}.')
             return
 
-        # Emit a `warning` message to the log, only once per call
-        warning_flag = True
+        # Each warning is emitted at most once per call.
+        host_warned = False
+        scheme_warned = False
 
         for request in request_iterator:
             if isinstance(request, Request):
@@ -1070,56 +1078,28 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 target_url = request.url
             else:
                 target_url = request
-            parsed_target_url = urlparse(target_url)
+            parsed_target_url = URL(target_url)
 
-            if warning_flag and strategy != 'all' and not parsed_target_url.hostname:
-                self.log.warning(f'Skipping enqueue url: Missing hostname in target_url = {target_url}.')
-                warning_flag = False
+            ok, reason = filter_url(target=parsed_target_url, strategy=strategy, origin=parsed_origin_url)
+            if not ok:
+                # Strategy mismatches are expected (most extracted links are external) so stay silent.
+                # Scheme rejections and missing hostnames signal a misconfiguration upstream, so warn.
+                if reason == UNSUPPORTED_SCHEME_MESSAGE:
+                    if not scheme_warned:
+                        self.log.warning(f'Skipping enqueue url {target_url!r}: {reason}')
+                        scheme_warned = True
+                elif not parsed_target_url.host and not host_warned:
+                    self.log.warning(f'Skipping enqueue url: Missing hostname in target_url = {target_url}.')
+                    host_warned = True
+                continue
 
-            if self._check_enqueue_strategy(
-                strategy, target_url=parsed_target_url, origin_url=parsed_origin_url
-            ) and self._check_url_patterns(target_url, kwargs.get('include'), kwargs.get('exclude')):
+            if self._check_url_patterns(target_url, kwargs.get('include'), kwargs.get('exclude')):
                 yield request
 
                 if limit is not None:
                     limit -= 1
                     if limit <= 0:
                         break
-
-    def _check_enqueue_strategy(
-        self,
-        strategy: EnqueueStrategy,
-        *,
-        target_url: ParseResult,
-        origin_url: ParseResult,
-    ) -> bool:
-        """Check if a URL matches the enqueue_strategy."""
-        if strategy == 'all':
-            return True
-
-        if origin_url.hostname is None or target_url.hostname is None:
-            self.log.debug(
-                f'Skipping enqueue: Missing hostname in origin_url = {origin_url.geturl()} or '
-                f'target_url = {target_url.geturl()}'
-            )
-            return False
-
-        if strategy == 'same-hostname':
-            return target_url.hostname == origin_url.hostname
-
-        if strategy == 'same-domain':
-            origin_domain = self._tld_extractor.extract_str(origin_url.hostname).top_domain_under_public_suffix
-            target_domain = self._tld_extractor.extract_str(target_url.hostname).top_domain_under_public_suffix
-            return origin_domain == target_domain
-
-        if strategy == 'same-origin':
-            return (
-                target_url.hostname == origin_url.hostname
-                and target_url.scheme == origin_url.scheme
-                and target_url.port == origin_url.port
-            )
-
-        assert_never(strategy)
 
     def _check_url_patterns(
         self,
@@ -1563,16 +1543,51 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if is_status_code_server_error(status_code) and not is_ignored_status:
             raise HttpStatusCodeError('Error status code returned', status_code)
 
-    def _raise_for_session_blocked_status_code(self, session: Session | None, status_code: int) -> None:
+    def _raise_for_session_blocked_status_code(
+        self,
+        session: Session | None,
+        status_code: int,
+        *,
+        request_url: str,
+        retry_after_header: str | None = None,
+    ) -> None:
         """Raise an exception if the given status code indicates the session is blocked.
 
+        If the status code is 429 (Too Many Requests), the domain is recorded as rate-limited in the
+        `ThrottlingRequestManager` for per-domain backoff.
+
         Args:
-            session: The session used for the request. If None, no check is performed.
+            session: The session used for the request. If `None`, no check is performed.
             status_code: The HTTP status code to check.
+            request_url: The request URL, used for per-domain rate limit tracking.
+            retry_after_header: The value of the `Retry-After` response header, if present.
 
         Raises:
             SessionError: If the status code indicates the session is blocked.
         """
+        if status_code == HTTPStatus.TOO_MANY_REQUESTS:
+            if isinstance(self._request_manager, ThrottlingRequestManager):
+                retry_after = parse_retry_after_header(retry_after_header)
+                if not self._request_manager.record_domain_delay(request_url, retry_after=retry_after):
+                    domain = (URL(request_url).host or '').lower()
+                    if domain:
+                        self._logger_once.log(
+                            f'Received an HTTP 429 (Too Many Requests) response from domain "{domain}", but it is '
+                            f'not in the `ThrottlingRequestManager.domains` list. Per-domain backoff will not be '
+                            f'applied for this domain. Add it to `domains=` to enable throttling.',
+                            key=f'unconfigured_throttle_domain:{domain}',
+                            level=logging.WARNING,
+                        )
+            else:
+                self._logger_once.log(
+                    'Received an HTTP 429 (Too Many Requests) response, but the crawler is not using '
+                    '`ThrottlingRequestManager`. Per-domain backoff and `Retry-After` headers will not be honored. '
+                    'To enable per-domain rate limiting, configure the crawler to use `ThrottlingRequestManager` '
+                    'as the request manager.',
+                    key='no_throttling_manager_on_429',
+                    level=logging.WARNING,
+                )
+
         if session is not None and session.is_blocked_status_code(
             status_code=status_code,
             ignore_http_error_status_codes=self._ignore_http_error_status_codes,
@@ -1603,7 +1618,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if not self._respect_robots_txt_file:
             return True
         robots_txt_file = await self._get_robots_txt_file_for_url(url)
-        return not robots_txt_file or robots_txt_file.is_allowed(url)
+        if not robots_txt_file:
+            return True
+
+        if isinstance(self._request_manager, ThrottlingRequestManager):
+            crawl_delay = robots_txt_file.get_crawl_delay()
+            if crawl_delay is not None:
+                self._request_manager.set_crawl_delay(url, crawl_delay)
+
+        return robots_txt_file.is_allowed(url)
 
     async def _get_robots_txt_file_for_url(self, url: str) -> RobotsTxtFile | None:
         """Get the RobotsTxtFile for a given URL.
@@ -1654,11 +1677,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         current_state = self.statistics.state
 
         if (
-            failed_requests := (
-                current_state.requests_failed - (self._previous_crawler_state or current_state).requests_failed
-            )
-            > 0
-        ):
+            failed_requests := current_state.requests_failed
+            - (self._previous_crawler_state or current_state).requests_failed
+        ) > 0:
             message = f'Experiencing problems, {failed_requests} failed requests since last status update.'
         else:
             request_manager = await self.get_request_manager()

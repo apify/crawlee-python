@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from redis.exceptions import RedisError
 
 from crawlee.storage_clients import RedisStorageClient
 from crawlee.storage_clients._redis._utils import await_redis_response
@@ -215,3 +217,43 @@ async def test_metadata_record_updates(kvs_client: RedisKeyValueStoreClient) -> 
     assert metadata.created_at == initial_created
     assert metadata.modified_at > initial_modified
     assert metadata.accessed_at > accessed_after_read
+
+
+async def test_error_handling_on_set_failure(kvs_client: RedisKeyValueStoreClient) -> None:
+    """Test that set_value properly handles Redis errors and retries."""
+    mock_pipe = MagicMock()
+    mock_pipe.execute = AsyncMock(side_effect=RedisError('connection lost'))
+
+    mock_pipeline_ctx = MagicMock()
+    mock_pipeline_ctx.__aenter__ = AsyncMock(return_value=mock_pipe)
+    mock_pipeline_ctx.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
+        patch.object(kvs_client.redis, 'pipeline', return_value=mock_pipeline_ctx),
+        pytest.raises(RedisError),
+    ):
+        await kvs_client.set_value(key='test', value='test-value')
+
+    # Verify that retry logic was attempted
+    assert mock_sleep.call_count == 2  # Assuming default max_attempts=3
+
+
+async def test_set_value_does_not_retry_on_unexpected_exception(kvs_client: RedisKeyValueStoreClient) -> None:
+    """Test that set_value does not retry on unexpected exceptions."""
+    mock_pipe = MagicMock()
+    mock_pipe.execute = AsyncMock(side_effect=ValueError('unexpected error'))
+
+    mock_pipeline_ctx = MagicMock()
+    mock_pipeline_ctx.__aenter__ = AsyncMock(return_value=mock_pipe)
+    mock_pipeline_ctx.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
+        patch.object(kvs_client.redis, 'pipeline', return_value=mock_pipeline_ctx),
+        pytest.raises(ValueError, match='unexpected error'),
+    ):
+        await kvs_client.set_value(key='test', value='test-value')
+
+    # Verify that retry logic was not attempted
+    assert mock_sleep.call_count == 0

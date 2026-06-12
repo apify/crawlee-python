@@ -190,14 +190,6 @@ class MemoryRequestQueueClient(RequestQueueClient):
                     # Add updated request back to queue.
                     self._pending_requests.appendleft(request)
 
-                processed_requests.append(
-                    ProcessedRequest(
-                        unique_key=request.unique_key,
-                        was_already_present=True,
-                        was_already_handled=False,
-                    )
-                )
-
             # Add the new request to the queue.
             else:
                 if forefront:

@@ -1,0 +1,97 @@
+name: Checks
+
+on:
+  # Runs when invoked by another workflow. For manual runs, dispatch `CI (master)` instead — that wraps this
+  # workflow via `uses:`, so the resulting check-run names get the `Checks /` prefix that the manual release
+  # workflows look for via `wait-for-checks`.
+  workflow_call:
+    inputs:
+      run_tests:
+        description: Whether to run the unit test suite.
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  actions_lint_check:
+    name: Actions lint check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Run actionlint
+        uses: rhysd/actionlint@v1.7.12
+
+  spell_check:
+    name: Spell check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Check spelling with typos
+        uses: crate-ci/typos@v1
+
+  lint_check:
+    name: Lint check
+    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
+    with:
+      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+
+  type_check:
+    name: Type check
+    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
+    with:
+      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+
+  unit_tests:
+    name: Unit tests
+    if: inputs.run_tests
+    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
+    secrets: inherit
+    with:
+      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+      operating_systems: '["ubuntu-latest", "windows-latest", "macos-latest"]'
+      python_version_for_codecov: "3.14"
+      operating_system_for_codecov: ubuntu-latest
+      tests_concurrency: "8"
+
+  package_check:
+    name: Package check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up uv package manager
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          python-version: "3.14"
+
+      - name: Build sdist and wheel
+        run: uv run poe build
+
+      - name: Verify built package
+        uses: apify/actions/python-package-check@v1.2.0
+        with:
+          package_name: crawlee
+          dist_dir: dist
+          python_version: "3.14"
+          extras: all
+          smoke_code: |
+            from crawlee.crawlers import (
+                HttpCrawler, BeautifulSoupCrawler, ParselCrawler,
+                PlaywrightCrawler, AdaptivePlaywrightCrawler,
+            )
+            from crawlee.storages import Dataset, KeyValueStore, RequestQueue
+            from crawlee.http_clients import HttpxHttpClient, ImpitHttpClient
+            from crawlee import Request
+            HttpCrawler()
+            BeautifulSoupCrawler()
+            ParselCrawler()
+
+  doc_check:
+    name: Doc check
+    uses: apify/workflows/.github/workflows/python_docs_check.yaml@main

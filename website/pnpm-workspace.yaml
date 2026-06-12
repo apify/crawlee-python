@@ -1,0 +1,17 @@
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - "@apify/*"
+  - "@crawlee/*"
+  # Renovate security update: axios@1.16.0
+  - axios@1.16.0
+
+nodeLinker: hoisted
+linkWorkspacePackages: true
+preferWorkspacePackages: true
+publicHoistPattern:
+  - "*"
+allowBuilds:
+  '@apify/ui-icons': true
+  '@swc/core': true
+  core-js: false
+  unrs-resolver: true

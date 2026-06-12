@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import functools
 from bisect import insort
 from datetime import datetime, timedelta, timezone
-from logging import getLogger
+from logging import WARNING, getLogger
 from typing import TYPE_CHECKING, TypeVar, cast
 
 from crawlee import service_locator
@@ -13,6 +12,7 @@ from crawlee._autoscaling._types import ClientSnapshot, CpuSnapshot, EventLoopSn
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
+from crawlee._utils.log import LoggerOnce
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.system import MemoryInfo, MemoryUsageInfo, get_memory_info
 from crawlee.events._types import Event, EventSystemInfoData
@@ -23,14 +23,9 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
 
 logger = getLogger(__name__)
+logger_once = LoggerOnce(logger)
 
 T = TypeVar('T', bound=Snapshot)
-
-
-@functools.lru_cache
-def _warn_once(warning_message: str) -> None:
-    """Log a warning message only once."""
-    logger.warning(warning_message)
 
 
 class SortedSnapshotList(list[T]):
@@ -303,9 +298,11 @@ class Snapshotter:
                 # This is just hypothetical case, that will most likely not happen in practice.
                 # `LocalEventManager` should always provide `MemoryInfo` in the event data.
                 # When running on Apify, `self._max_memory_size` is always `ByteSize`, not `Ratio`.
-                _warn_once(
+                logger_once.log(
                     'It is recommended that a custom implementation of `LocalEventManager` emits `SYSTEM_INFO` events '
-                    'with `MemoryInfo` and not just `MemoryUsageInfo`.'
+                    'with `MemoryInfo` and not just `MemoryUsageInfo`.',
+                    key='memory_usage_info_event',
+                    level=WARNING,
                 )
                 max_memory_size = get_memory_info().total_size * ratio.value
                 system_wide_used_size = None

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import MutableMapping  # noqa: TC003
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, overload
 
@@ -33,7 +33,7 @@ logger = getLogger(__name__)
 
 
 class AutosavedValue(RootModel):
-    root: dict[str, JsonSerializable]
+    root: MutableMapping[str, JsonSerializable]
 
 
 @docs_group('Storages')
@@ -262,8 +262,8 @@ class KeyValueStore(Storage):
     async def get_auto_saved_value(
         self,
         key: str,
-        default_value: dict[str, JsonSerializable] | None = None,
-    ) -> dict[str, JsonSerializable]:
+        default_value: MutableMapping[str, JsonSerializable] | None = None,
+    ) -> MutableMapping[str, JsonSerializable]:
         """Get a value from KVS that will be automatically saved on changes.
 
         Args:

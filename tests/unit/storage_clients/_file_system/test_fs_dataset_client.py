@@ -51,6 +51,33 @@ async def test_file_and_directory_creation(configuration: Configuration) -> None
     await client.drop()
 
 
+@pytest.mark.parametrize(
+    'invalid_value',
+    [
+        pytest.param('../outside', id='parent-ref'),
+        pytest.param('..', id='bare-parent'),
+        pytest.param('/abs/outside', id='absolute-path'),
+    ],
+)
+async def test_open_rejects_invalid_name_or_alias(
+    configuration: Configuration, tmp_path: Path, invalid_value: str
+) -> None:
+    """The low-level client must reject names/aliases that resolve outside the storage directory.
+
+    This covers direct usage of the storage client, which bypasses the high-level validation.
+    """
+    storage_client = FileSystemStorageClient()
+
+    with pytest.raises(ValueError, match='Invalid storage name or alias'):
+        await storage_client.create_dataset_client(alias=invalid_value, configuration=configuration)
+
+    with pytest.raises(ValueError, match='Invalid storage name or alias'):
+        await storage_client.create_dataset_client(name=invalid_value, configuration=configuration)
+
+    # Nothing should have been written outside the configured storage directory.
+    assert not (tmp_path / 'outside').exists()
+
+
 async def test_file_persistence_and_content_verification(dataset_client: FileSystemDatasetClient) -> None:
     """Test that data is properly persisted to files with correct content."""
     item = {'key': 'value', 'number': 42}

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator, MutableMapping
+from collections.abc import Iterator, Mapping, MutableMapping
 from datetime import datetime
 from enum import IntEnum
 from typing import TYPE_CHECKING, Annotated, Any, TypedDict, cast
@@ -135,7 +135,7 @@ class RequestOptions(TypedDict):
     keep_url_fragment: NotRequired[bool]
     use_extended_unique_key: NotRequired[bool]
     always_enqueue: NotRequired[bool]
-    user_data: NotRequired[dict[str, JsonSerializable]]
+    user_data: NotRequired[Mapping[str, JsonSerializable]]
     no_retry: NotRequired[bool]
     enqueue_strategy: NotRequired[EnqueueStrategy]
     max_retries: NotRequired[int | None]
@@ -200,7 +200,7 @@ class Request(BaseModel):
         headers: HttpHeaders = HttpHeaders()
         """HTTP request headers."""
 
-        user_data: dict[str, JsonSerializable] = {}
+        user_data: MutableMapping[str, JsonSerializable] = {}
         """Custom user data assigned to the request. Use this to save any request related data to the
         request's scope, keeping them accessible on retries, failures etc.
         """
@@ -209,8 +209,9 @@ class Request(BaseModel):
         headers: Annotated[HttpHeaders, Field(default_factory=HttpHeaders)]
         """HTTP request headers."""
 
+        # Internally, the model contains `UserData`, this is just for convenience
         user_data: Annotated[
-            dict[str, JsonSerializable],  # Internally, the model contains `UserData`, this is just for convenience
+            MutableMapping[str, JsonSerializable],
             Field(alias='userData', default_factory=UserData),
             PlainValidator(user_data_adapter.validate_python),
             PlainSerializer(

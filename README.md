@@ -16,8 +16,10 @@
 <p align="center">
   <a href="https://badge.fury.io/py/crawlee" rel="nofollow"><img src="https://badge.fury.io/py/crawlee.svg" alt="PyPI package version"></a>
   <a href="https://pypi.org/project/crawlee/" rel="nofollow"><img src="https://img.shields.io/pypi/dm/crawlee" alt="PyPI package downloads"></a>
+  <a href="https://pypi.org/project/crawlee/" rel="nofollow"><img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="PyPI Python version"></a>
+  <a href="https://github.com/apify/crawlee-python/actions/workflows/on_master.yaml"><img src="https://github.com/apify/crawlee-python/actions/workflows/on_master.yaml/badge.svg?branch=master" alt="Build status"></a>
   <a href="https://codecov.io/gh/apify/crawlee-python"><img src="https://codecov.io/gh/apify/crawlee-python/graph/badge.svg?token=cCju61iPQG" alt="Codecov report"></a>
-  <a href="https://pypi.org/project/crawlee/" rel="nofollow"><img src="https://img.shields.io/pypi/pyversions/crawlee" alt="PyPI Python version"></a>
+  <a href="https://github.com/apify/crawlee-python/blob/master/LICENSE"><img src="https://img.shields.io/pypi/l/crawlee" alt="License"></a>
   <a href="https://discord.gg/jyEM2PRvMU" rel="nofollow"><img src="https://img.shields.io/discord/801163717915574323?label=discord" alt="Chat on Discord"></a>
 </p>
 

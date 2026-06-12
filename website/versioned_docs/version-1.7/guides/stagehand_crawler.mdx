@@ -1,0 +1,126 @@
+---
+id: stagehand-crawler
+title: Stagehand crawler
+description: Learn how to use StagehandCrawler for AI-powered browser automation and data extraction.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import CodeBlock from '@theme/CodeBlock';
+
+import BasicExample from '!!raw-loader!./code_examples/stagehand_crawler/basic_example.py';
+import BrowserbaseExample from '!!raw-loader!./code_examples/stagehand_crawler/browserbase_example.py';
+
+A <ApiLink to="class/StagehandCrawler">`StagehandCrawler`</ApiLink> extends <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> with AI-powered browser automation via [Stagehand](https://www.browserbase.com/stagehand). Instead of writing CSS selectors or XPath expressions, you describe what you want in plain English and the AI model takes care of the rest.
+
+Each page in the crawling context is a <ApiLink to="class/StagehandPage">`StagehandPage`</ApiLink> - a drop-in replacement for the standard Playwright `Page` that adds four AI methods:
+
+- `page.act(**kwargs)` - perform an action using a natural language instruction
+- `page.extract(**kwargs)` - extract structured data from the page using AI
+- `page.observe(**kwargs)` - get a list of AI-suggested actions available on the page
+- `page.execute(**kwargs)` - run an autonomous multi-step agent on the page
+
+All standard Playwright methods remain available alongside these AI methods.
+
+## When to use StagehandCrawler
+
+Use <ApiLink to="class/StagehandCrawler">`StagehandCrawler`</ApiLink> when:
+
+- **Selectors are brittle or unknown** - the AI can locate elements by their visual role or label rather than a specific CSS class.
+- **Interactions are complex** - multi-step forms, dynamic menus, or context-dependent flows that are hard to script.
+- **Rapid prototyping** - you want to build a scraper quickly without spending time reverse-engineering the page structure.
+
+For straightforward scraping tasks where the page structure is stable and well-known, <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> is more efficient, read more in that [guide](./playwright-crawler).
+
+## Installation
+
+`StagehandCrawler` requires the `stagehand` optional dependency group:
+
+```bash
+pip install 'crawlee[stagehand]'
+```
+
+or with uv:
+
+```bash
+uv add 'crawlee[stagehand]'
+```
+
+## Basic usage
+
+The example below demonstrates the typical usage pattern: dismiss cookie banners with `act()` and extract structured data with `extract()`.
+
+<CodeBlock className="language-python">
+    {BasicExample}
+</CodeBlock>
+
+## StagehandOptions configuration
+
+Stagehand-specific settings are provided via <ApiLink to="class/StagehandOptions">`StagehandOptions`</ApiLink>. Pass the instance to the `stagehand_options` argument of <ApiLink to="class/StagehandCrawler">`StagehandCrawler`</ApiLink>.
+
+## AI page operations
+
+### `act` - perform actions
+
+Use `act()` to interact with the page using a natural language instruction:
+
+```python
+await context.page.act(input='Click the "Sign in" button')
+```
+
+### `extract` - structured data extraction
+
+Use `extract()` to pull structured data from the page. Pass a JSON Schema via schema to enforce the output shape:
+
+```python
+data = await context.page.extract(
+    instruction='Extract the top comment on this page',
+    schema={
+        'type': 'object',
+        'properties': {
+            'comment_text': {'type': 'string'},
+            'author': {'type': 'string'},
+        },
+        'required': ['comment_text'],
+    },
+)
+```
+
+### `observe` - inspect available actions
+
+Use `observe()` to get AI-suggested actions currently available on the page. Useful for debugging or building adaptive workflows:
+
+```python
+actions = await context.page.observe(
+    instruction='What actions are available in the navigation menu?'
+)
+```
+
+### `execute` - autonomous multi-step agent
+
+Use `execute()` for longer autonomous tasks that span multiple interactions:
+
+```python
+result = await context.page.execute(
+    agent_config={},
+    execute_options={
+        'instruction': 'Search for "web scraping" and return the titles of the first five results',
+    })
+```
+
+## Browserbase integration
+
+By default, Stagehand launches a local Chromium browser. To use [Browserbase](https://www.browserbase.com/) - a managed cloud browser service - set `env='BROWSERBASE'` in <ApiLink to="class/StagehandOptions">`StagehandOptions`</ApiLink> and supply the required credentials:
+
+<CodeBlock className="language-python">
+    {BrowserbaseExample}
+</CodeBlock>
+
+Browserbase credentials (`browserbase_api_key`, `project_id`) can also be provided via the `BROWSERBASE_API_KEY` and `BROWSERBASE_PROJECT_ID` environment variables.
+
+## Browser configuration limitations
+
+Because Stagehand manages the browser session internally via CDP, only Chromium is supported. Browser settings are limited to the subset accepted by Stagehand's `BrowserLaunchOptions` - `headless`, `args`, `viewport`, `proxy`, `locale`, `executable_path`, and a few others. Features like full browser fingerprinting (canvas, WebGL, screen properties) and incognito pages are not supported. Fingerprint-consistent HTTP headers (`User-Agent`, `Accept`, `sec-ch-ua`) are still injected automatically.
+
+## Conclusion
+
+This guide introduced <ApiLink to="class/StagehandCrawler">`StagehandCrawler`</ApiLink> and its AI page operations: `act()`, `extract()`, `observe()`, and `execute()`. You learned how to configure Stagehand via <ApiLink to="class/StagehandOptions">`StagehandOptions`</ApiLink> and switch to Browserbase for cloud browser execution. If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!

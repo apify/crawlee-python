@@ -20,5 +20,5 @@ def compute_short_hash(data: bytes, *, length: int = 8) -> str:
 
 def crypto_random_object_id(length: int = 17) -> str:
     """Generate a random object ID."""
-    chars = 'abcdefghijklmnopqrstuvwxyzABCEDFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
     return ''.join(secrets.choice(chars) for _ in range(length))

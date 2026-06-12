@@ -7,9 +7,11 @@ from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import CursorResult, delete, select
 from sqlalchemy import func as sql_func
+from sqlalchemy.exc import SQLAlchemyError
 from typing_extensions import Self, override
 
 from crawlee._utils.file import infer_mime_type
+from crawlee._utils.retry import retry_on_error
 from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import (
     KeyValueStoreMetadata,
@@ -117,11 +119,13 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
             extra_metadata_fields={},
         )
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def get_metadata(self) -> KeyValueStoreMetadata:
         # The database is a single place of truth
         return await self._get_metadata(KeyValueStoreMetadata)
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def drop(self) -> None:
         """Delete this key-value store and all its records from the database.
@@ -130,6 +134,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         """
         await self._drop()
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def purge(self) -> None:
         """Remove all items from this key-value store while keeping the key-value store structure.
@@ -139,6 +144,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         now = datetime.now(timezone.utc)
         await self._purge(metadata_kwargs=MetadataUpdateParams(accessed_at=now, modified_at=now))
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
         # Special handling for None values
@@ -180,6 +186,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
             await self._add_buffer_record(session, update_modified_at=True)
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
         # Query the record by key
@@ -226,6 +233,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
             size=record_db.size,
         )
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def delete_value(self, *, key: str) -> None:
         stmt = delete(self._ITEM_TABLE).where(
@@ -274,6 +282,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
             await self._add_buffer_record(session)
 
+    @retry_on_error(SQLAlchemyError)
     @override
     async def record_exists(self, *, key: str) -> bool:
         stmt = select(self._ITEM_TABLE.key).where(

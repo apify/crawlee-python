@@ -1,19 +1,20 @@
 # First, specify the base Docker image.
 # You can see the Docker images from Apify at https://hub.docker.com/r/apify/.
 # You can also use any other image from Docker Hub.
-# % if cookiecutter.crawler_type == 'playwright'
-FROM apify/actor-python-playwright:3.13
+# % if cookiecutter.crawler_type == 'playwright' or cookiecutter.crawler_type.startswith('adaptive-') or cookiecutter.crawler_type == 'stagehand'
+# % set base_image = 'apify/actor-python-playwright:3.13'
 # % elif cookiecutter.crawler_type == 'playwright-camoufox'
-FROM apify/actor-python-playwright-camoufox:3.13
+# % set base_image = 'apify/actor-python-playwright-camoufox:3.13'
 # % elif cookiecutter.crawler_type == 'playwright-chrome'
-FROM apify/actor-python-playwright-chrome:3.13
+# % set base_image = 'apify/actor-python-playwright-chrome:3.13'
 # % elif cookiecutter.crawler_type == 'playwright-firefox'
-FROM apify/actor-python-playwright-firefox:3.13
+# % set base_image = 'apify/actor-python-playwright-firefox:3.13'
 # % elif cookiecutter.crawler_type == 'playwright-webkit'
-FROM apify/actor-python-playwright-webkit:3.13
+# % set base_image = 'apify/actor-python-playwright-webkit:3.13'
 # % else
-FROM apify/actor-python:3.13
+# % set base_image = 'apify/actor-python:3.13'
 # % endif
+FROM {{ base_image }}
 
 RUN apt update && apt install -yq git && rm -rf /var/lib/apt/lists/*
 
@@ -40,8 +41,11 @@ RUN echo "Python version:" \
  && echo "All installed Python packages:" \
  && pip freeze
 # % elif cookiecutter.package_manager == 'uv'
-RUN pip install -U pip setuptools \
-    && pip install 'uv<1'
+COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /uvx /bin/
+
+# Snapshot the base image's playwright version before uv sync so we can pin to it later
+# and stay aligned with the browser binaries baked into /pw-browsers.
+RUN hash playwright 2>/dev/null && playwright --version | cut -d ' ' -f 2 > /tmp/.base-playwright-version || true
 
 ENV UV_PROJECT_ENVIRONMENT="/usr/local"
 
@@ -50,15 +54,13 @@ COPY pyproject.toml uv.lock ./
 RUN echo "Python version:" \
     && python --version \
     && echo "Installing dependencies:" \
-    # Check if playwright is already installed
-    && PLAYWRIGHT_INSTALLED=$(pip freeze | grep -q playwright && echo "true" || echo "false") \
-    && if [ "$PLAYWRIGHT_INSTALLED" = "true" ]; then \
-        echo "Playwright already installed, excluding from uv sync" \
-        && uv sync --frozen --no-install-project --no-editable -q --no-dev --inexact --no-install-package playwright; \
-    else \
-        echo "Playwright not found, installing all dependencies" \
-        && uv sync --frozen --no-install-project --no-editable -q --no-dev --inexact; \
+    && uv sync --frozen --no-install-project --no-editable --quiet --no-dev --inexact \
+    && PLAYWRIGHT_BASE_VERSION=$(cat /tmp/.base-playwright-version 2>/dev/null || echo "") \
+    && if [ -n "$PLAYWRIGHT_BASE_VERSION" ]; then \
+        echo "Pinning playwright to $PLAYWRIGHT_BASE_VERSION to match the browser binaries shipped in the base image" \
+        && uv pip install --system --reinstall --no-deps "playwright==$PLAYWRIGHT_BASE_VERSION"; \
     fi \
+    && rm -f /tmp/.base-playwright-version \
     && echo "All installed Python packages:" \
     && pip freeze
 # % elif cookiecutter.package_manager == 'pip'

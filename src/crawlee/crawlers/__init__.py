@@ -51,6 +51,20 @@ with _try_import(
         RenderingTypePredictor,
     )
 
+with _try_import(
+    __name__,
+    'StagehandCrawler',
+    'StagehandCrawlingContext',
+    'StagehandPostNavCrawlingContext',
+    'StagehandPreNavCrawlingContext',
+):
+    from ._stagehand import (
+        StagehandCrawler,
+        StagehandCrawlingContext,
+        StagehandPostNavCrawlingContext,
+        StagehandPreNavCrawlingContext,
+    )
+
 
 __all__ = [
     'AbstractHttpCrawler',
@@ -81,4 +95,8 @@ __all__ = [
     'RenderingType',
     'RenderingTypePrediction',
     'RenderingTypePredictor',
+    'StagehandCrawler',
+    'StagehandCrawlingContext',
+    'StagehandPostNavCrawlingContext',
+    'StagehandPreNavCrawlingContext',
 ]

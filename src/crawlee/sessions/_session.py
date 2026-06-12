@@ -11,8 +11,10 @@ from crawlee._utils.docs import docs_group
 from crawlee.sessions._cookies import CookieParam, SessionCookies
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping, MutableMapping
     from http.cookiejar import CookieJar
 
+    from crawlee._types import JsonSerializable
     from crawlee.sessions._models import SessionModel
 
 logger = getLogger(__name__)
@@ -36,7 +38,7 @@ class Session:
         *,
         id: str | None = None,
         max_age: timedelta = timedelta(minutes=50),
-        user_data: dict | None = None,
+        user_data: Mapping[str, JsonSerializable] | None = None,
         max_error_score: float = 3.0,
         error_score_decrement: float = 0.5,
         created_at: datetime | None = None,
@@ -63,7 +65,7 @@ class Session:
         """
         self._id = id or crypto_random_object_id(length=10)
         self._max_age = max_age
-        self._user_data = user_data or {}
+        self._user_data: MutableMapping[str, JsonSerializable] = dict(user_data) if user_data is not None else {}
         self._max_error_score = max_error_score
         self._error_score_decrement = error_score_decrement
         self._created_at = created_at or datetime.now(timezone.utc)
@@ -117,7 +119,7 @@ class Session:
         return self._id
 
     @property
-    def user_data(self) -> dict:
+    def user_data(self) -> MutableMapping[str, JsonSerializable]:
         """Get the user data."""
         return self._user_data
 

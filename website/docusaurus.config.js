@@ -46,7 +46,7 @@ module.exports = {
     ],
     githubHost: 'github.com',
     future: {
-        experimental_faster: true,
+        faster: true,
         v4: {
             removeLegacyPostBuildHeadAttribute: true,
             useCssCascadeLayers: false, // this breaks styles on homepage and link colors everywhere

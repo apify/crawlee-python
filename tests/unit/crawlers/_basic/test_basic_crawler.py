@@ -28,11 +28,12 @@ from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
 from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
-from crawlee.request_loaders import RequestList, RequestManagerTandem
+from crawlee.request_loaders import RequestList, RequestManagerTandem, ThrottlingRequestManager
 from crawlee.sessions import Session, SessionPool
-from crawlee.statistics import FinalStatistics
+from crawlee.statistics import FinalStatistics, StatisticsState
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
+from tests.unit.utils import poll_until_condition
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -41,7 +42,6 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee._types import JsonSerializable
-    from crawlee.statistics import StatisticsState
 
 
 async def test_processes_requests_from_explicit_queue() -> None:
@@ -1737,6 +1737,27 @@ async def test_status_message_emit() -> None:
     assert status_message_listener.called
 
 
+async def test_status_message_reports_failed_request_count() -> None:
+    """The 'Experiencing problems' status message reports the count of new failures since the last update."""
+    captured_messages: list[str] = []
+
+    async def status_callback(
+        state: StatisticsState, previous_state: StatisticsState | None, message: str
+    ) -> str | None:
+        captured_messages.append(message)
+        return None
+
+    crawler = BasicCrawler(status_message_callback=status_callback)
+    crawler._previous_crawler_state = StatisticsState(requests_failed=2)
+    crawler._statistics = Mock(state=StatisticsState(requests_failed=5))
+
+    async with service_locator.get_event_manager():
+        await crawler._crawler_state_task()
+
+    problem_messages = [m for m in captured_messages if m.startswith('Experiencing problems')]
+    assert problem_messages == ['Experiencing problems, 3 failed requests since last status update.']
+
+
 @pytest.mark.parametrize(
     ('queue_name', 'queue_alias', 'by_id'),
     [
@@ -1975,17 +1996,14 @@ async def test_crawler_intermediate_statistics() -> None:
     crawler = BasicCrawler()
     check_time = timedelta(seconds=0.1)
 
-    async def wait_for_statistics_initialization() -> None:
-        while not crawler.statistics.active:  # noqa: ASYNC110 # It is ok for tests.
-            await asyncio.sleep(0.1)
-
     @crawler.router.default_handler
     async def handler(_: BasicCrawlingContext) -> None:
         await asyncio.sleep(check_time.total_seconds() * 5)
 
-    # Start crawler and wait until statistics are initialized.
+    # Start crawler and wait until statistics are initialized. Use a generous timeout so that crawler startup
+    # has enough time to reach the active state on slow CI runners under xdist load.
     crawler_task = asyncio.create_task(crawler.run(['https://a.placeholder.com']))
-    await wait_for_statistics_initialization()
+    assert await poll_until_condition(lambda: crawler.statistics.active, timeout=30)
 
     # Wait some time and check that runtime is updated.
     await asyncio.sleep(check_time.total_seconds())
@@ -2154,3 +2172,47 @@ async def test_global_and_local_event_manager_in_crawler_run() -> None:
     # After crawler is finished, both event managers should be inactive.
     assert local_event_manager.active is False
     assert global_event_manager.active is False
+
+
+async def test_warn_no_throttling_manager_once_on_429(caplog: pytest.LogCaptureFixture) -> None:
+    """A 429 from a crawler without ThrottlingRequestManager logs a recommendation, only once per instance."""
+    crawler = BasicCrawler(configure_logging=False)
+    with caplog.at_level(logging.WARNING, logger='crawlee'):
+        crawler._raise_for_session_blocked_status_code(session=None, status_code=429, request_url='https://a.test/')
+        crawler._raise_for_session_blocked_status_code(session=None, status_code=429, request_url='https://b.test/')
+
+    matching = [
+        r for r in caplog.records if 'ThrottlingRequestManager' in r.getMessage() and 'HTTP 429' in r.getMessage()
+    ]
+    assert len(matching) == 1
+
+
+async def test_warn_unconfigured_throttle_domain_once_per_domain(caplog: pytest.LogCaptureFixture) -> None:
+    """A 429 from a domain not in `ThrottlingRequestManager.domains` logs once per domain; repeats are suppressed."""
+    inner = await RequestQueue.open(name='test-inner-warn', storage_client=MemoryStorageClient())
+    throttler = ThrottlingRequestManager(
+        inner,
+        domains=['only-this.test'],
+        request_manager_opener=RequestQueue.open,
+    )
+    crawler = BasicCrawler(configure_logging=False, request_manager=throttler)
+
+    with caplog.at_level(logging.WARNING, logger='crawlee'):
+        crawler._raise_for_session_blocked_status_code(
+            session=None, status_code=429, request_url='https://A.example.com/page1'
+        )
+        crawler._raise_for_session_blocked_status_code(
+            session=None, status_code=429, request_url='https://a.example.com/page2'
+        )
+        crawler._raise_for_session_blocked_status_code(
+            session=None, status_code=429, request_url='https://other.example.com/page1'
+        )
+
+    matching = [
+        r
+        for r in caplog.records
+        if 'not in the' in r.getMessage() and 'ThrottlingRequestManager.domains' in r.getMessage()
+    ]
+    assert len(matching) == 2
+    assert any('a.example.com' in r.getMessage() for r in matching)
+    assert any('other.example.com' in r.getMessage() for r in matching)

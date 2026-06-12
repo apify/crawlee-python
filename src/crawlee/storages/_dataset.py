@@ -15,12 +15,12 @@ from ._key_value_store import KeyValueStore
 from ._utils import validate_storage_name
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Mapping, Sequence
     from typing import Any, Literal
 
     from typing_extensions import Unpack
 
-    from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs
+    from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs, JsonSerializable
     from crawlee.configuration import Configuration
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients._base import DatasetClient
@@ -134,7 +134,7 @@ class Dataset(Storage):
     async def purge(self) -> None:
         await self._client.purge()
 
-    async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
+    async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
         """Store an object or an array of objects to the dataset.
 
         The size of the data is limited by the receiving API and therefore `push_data()` will only
@@ -210,7 +210,7 @@ class Dataset(Storage):
         unwind: list[str] | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
-    ) -> AsyncIterator[dict[str, Any]]:
+    ) -> AsyncIterator[Mapping[str, JsonSerializable]]:
         """Iterate over items in the dataset according to specified filters and sorting.
 
         This method allows for asynchronously iterating through dataset items while applying various filters such as
@@ -258,7 +258,7 @@ class Dataset(Storage):
         unwind: list[str] | None = None,
         skip_empty: bool = False,
         skip_hidden: bool = False,
-    ) -> list[dict[str, Any]]:
+    ) -> list[Mapping[str, JsonSerializable]]:
         """Retrieve a list of all items from the dataset according to specified filters and sorting.
 
         This method collects all dataset items into a list while applying various filters such as

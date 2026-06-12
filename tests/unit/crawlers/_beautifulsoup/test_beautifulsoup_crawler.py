@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from datetime import timedelta
 from typing import TYPE_CHECKING
 from unittest import mock
@@ -489,3 +490,14 @@ async def test_enqueue_links_with_limit(server_url: URL, http_client: HttpClient
         mock.call(str(server_url / 'page_3')),
     ]
     visit.assert_has_calls(expected_visit_calls, any_order=True)
+
+
+def test_import_error_handled() -> None:
+    # Simulate ImportError for BeautifulSoup
+    with mock.patch.dict('sys.modules', {'bs4': None}):
+        # Invalidate BeautifulSoupCrawler import
+        for mod_name in list(sys.modules):
+            if mod_name == 'crawlee.crawlers' or mod_name.startswith('crawlee.crawlers._beautifulsoup'):
+                sys.modules.pop(mod_name, None)
+        with pytest.raises(ImportError):
+            from crawlee.crawlers import BeautifulSoupCrawler  # noqa: F401 PLC0415

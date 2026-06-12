@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 from logging import getLogger
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from crawlee_storage import FileSystemDatasetClient as NativeDatasetClient
 from typing_extensions import Self, override
 
+from crawlee._utils.file import validate_subdirectory
 from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
-    from pathlib import Path
+    from collections.abc import AsyncIterator, Mapping, Sequence
 
+    from crawlee._types import JsonSerializable
     from crawlee.configuration import Configuration
 
 logger = getLogger(__name__)
@@ -37,6 +39,9 @@ class FileSystemDatasetClient(DatasetClient):
 
     Backed by the native ``crawlee_storage`` Rust extension for performance.
     """
+
+    _STORAGE_SUBDIR = 'datasets'
+    """The name of the subdirectory where datasets are stored under the storage directory."""
 
     def __init__(
         self,
@@ -92,6 +97,11 @@ class FileSystemDatasetClient(DatasetClient):
             ValueError: If a dataset with the specified ID is not found, if metadata is invalid,
                 or if both name and alias are provided.
         """
+        # Reject names/aliases that would escape the storage directory before handing off to the
+        # native client, which would otherwise create directories outside the intended location.
+        if (subdirectory := name or alias) is not None:
+            validate_subdirectory(Path(configuration.storage_dir) / cls._STORAGE_SUBDIR, subdirectory)
+
         native_client = await NativeDatasetClient.open(
             id=id,
             name=name,
@@ -110,7 +120,7 @@ class FileSystemDatasetClient(DatasetClient):
         await self._native_client.purge()
 
     @override
-    async def push_data(self, data: list[dict[str, Any]] | dict[str, Any]) -> None:
+    async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
         await self._native_client.push_data(data)
 
     @override

@@ -4,9 +4,9 @@ on:
   # Runs when manually triggered from the GitHub UI.
   workflow_dispatch:
 
-  # Runs on a daily schedule at 06:00 UTC.
+  # Runs on weekdays at 01:00 UTC.
   schedule:
-    - cron: '0 6 * * *'
+    - cron: '0 1 * * 1-5'
 
 concurrency:
   group: scheduled-tests
@@ -27,8 +27,8 @@ jobs:
       fail-fast: false
       max-parallel: 12
       matrix:
-        crawler-type: ["playwright_camoufox", "playwright_chrome", "playwright_firefox", "playwright_webkit", "playwright", "parsel", "beautifulsoup"]
-        http-client: ["httpx", "curl_impersonate"]
+        crawler-type: ["playwright_camoufox", "playwright_chrome", "playwright_firefox", "playwright_webkit", "playwright", "parsel", "beautifulsoup", "adaptive_beautifulsoup", "adaptive_parsel", "stagehand"]
+        http-client: ["httpx", "curl_impersonate", "impit"]
         package-manager: ["pip", "uv", "poetry"]
 
     runs-on: "ubuntu-latest"
@@ -42,8 +42,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install dependencies
-        run: npm install -g apify-cli
+      - name: Install Apify CLI
+        uses: apify/setup-apify-cli-action@v1.1.0
+        with:
+          token: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v6
@@ -55,7 +57,7 @@ jobs:
         run: pipx install poetry
 
       - name: Set up uv package manager
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v8.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -67,3 +69,76 @@ jobs:
         run: uv run poe e2e-templates-tests -m "${{ matrix.http-client }} and ${{ matrix.crawler-type }} and ${{ matrix.package-manager }}"
         env:
           APIFY_TEST_USER_API_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+  # Send a Slack notification to the team alerting channel when scheduled e2e tests fail.
+  # Skipped on workflow_dispatch (manual runs) so that ad-hoc triggers don't spam the channel.
+  notify_on_failure:
+    name: Notify Slack on failure
+    needs: end_to_end_tests
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Build Slack payload
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          HEADING: ':red_circle: Scheduled e2e tests failed'
+        run: |
+          # Retry the API call to tolerate transient 5xx from GitHub.
+          max_attempts=5
+          fetched=0
+          for attempt in $(seq 1 "${max_attempts}"); do
+            if failed_jobs=$(gh api \
+              "repos/${REPO}/actions/runs/${RUN_ID}/attempts/${RUN_ATTEMPT}/jobs?per_page=100" \
+              --jq '[.jobs[] | select(.conclusion == "failure") | "• \(.name)"] | join("\n")'); then
+              fetched=1
+              break
+            fi
+            if [[ "${attempt}" -lt "${max_attempts}" ]]; then
+              sleep "$((attempt * 5))"
+            fi
+          done
+          if [[ "${fetched}" -eq 0 ]]; then
+            echo "Failed to fetch job list after ${max_attempts} attempts; sending notification without it." >&2
+            failed_jobs="(unable to fetch job list — see workflow run)"
+          fi
+          jq -n \
+            --arg repo "${REPO}" \
+            --arg url "${WORKFLOW_URL}" \
+            --arg heading "${HEADING}" \
+            --arg failed "${failed_jobs}" \
+            '{
+              text: "\($heading) in \($repo)",
+              blocks: [
+                {
+                  type: "header",
+                  text: { type: "plain_text", text: $heading, emoji: true }
+                },
+                {
+                  type: "section",
+                  fields: [
+                    { type: "mrkdwn", text: "*Repository:*\n\($repo)" },
+                    { type: "mrkdwn", text: "*Workflow run:*\n<\($url)|View on GitHub>" }
+                  ]
+                },
+                {
+                  type: "section",
+                  text: { type: "mrkdwn", text: "*Failed jobs:*\n\($failed)" }
+                }
+              ]
+            }' > slack-payload.json
+
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v3.0.3
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload-file-path: slack-payload.json

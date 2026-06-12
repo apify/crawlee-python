@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from crawlee._types import HttpHeaders
+from crawlee._utils.urls import validate_http_url
 from crawlee.crawlers._playwright._types import PlaywrightHttpResponse
 from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
@@ -78,6 +79,8 @@ class PlaywrightHttpClient(HttpClient):
         # `proxy_info` are not used because `APIRequestContext` inherits the proxy from `BrowserContext`
         # TODO: Use `session` to restore all the fingerprint headers according to the `BrowserContext`, after resolved
         # https://github.com/apify/crawlee-python/issues/1055
+
+        validate_http_url(url)
 
         if isinstance(headers, dict) or headers is None:
             headers = HttpHeaders(headers or {})

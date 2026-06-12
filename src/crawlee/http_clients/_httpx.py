@@ -11,6 +11,7 @@ from typing_extensions import override
 from crawlee._types import HttpHeaders
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee._utils.docs import docs_group
+from crawlee._utils.urls import validate_http_url
 from crawlee.errors import ProxyError
 from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
@@ -192,6 +193,8 @@ class HttpxHttpClient(HttpClient):
         proxy_info: ProxyInfo | None = None,
         timeout: timedelta | None = None,
     ) -> HttpResponse:
+        validate_http_url(url)
+
         client = self._get_client(proxy_info.url if proxy_info else None)
 
         http_request = self._build_request(
@@ -228,6 +231,8 @@ class HttpxHttpClient(HttpClient):
         proxy_info: ProxyInfo | None = None,
         timeout: timedelta | None = None,
     ) -> AsyncGenerator[HttpResponse]:
+        validate_http_url(url)
+
         client = self._get_client(proxy_info.url if proxy_info else None)
 
         http_request = self._build_request(

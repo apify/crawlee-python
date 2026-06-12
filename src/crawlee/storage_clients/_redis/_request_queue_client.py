@@ -6,10 +6,12 @@ from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, Literal
 
+from redis.exceptions import RedisError
 from typing_extensions import NotRequired, override
 
 from crawlee import Request
 from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.retry import retry_on_error
 from crawlee.storage_clients._base import RequestQueueClient
 from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, RequestQueueMetadata
 
@@ -207,10 +209,12 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
             instance_kwargs={'dedup_strategy': dedup_strategy, 'bloom_error_rate': bloom_error_rate},
         )
 
+    @retry_on_error(RedisError)
     @override
     async def get_metadata(self) -> RequestQueueMetadata:
         return await self._get_metadata(RequestQueueMetadata)
 
+    @retry_on_error(RedisError)
     @override
     async def drop(self) -> None:
         if self._dedup_strategy == 'bloom':
@@ -222,6 +226,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         extra_keys.extend([self._queue_key, self._data_key, self._in_progress_key])
         await self._drop(extra_keys=extra_keys)
 
+    @retry_on_error(RedisError)
     @override
     async def purge(self) -> None:
         if self._dedup_strategy == 'bloom':
@@ -349,6 +354,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
             unprocessed_requests=[],
         )
 
+    @retry_on_error(RedisError)
     @override
     async def fetch_next_request(self) -> Request | None:
         if self._pending_fetch_cache:
@@ -377,6 +383,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
         return requests[0]
 
+    @retry_on_error(RedisError)
     @override
     async def get_request(self, unique_key: str) -> Request | None:
         request_data = await await_redis_response(self._redis.hget(self._data_key, unique_key))
@@ -386,11 +393,15 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
         return None
 
+    @retry_on_error(RedisError)
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
-        # Check if the request is in progress.
-        check_in_progress = await await_redis_response(self._redis.hexists(self._in_progress_key, request.unique_key))
-        if not check_in_progress:
+        # `hdel` is an atomic operation, so we can be sure that if it returns 1, the request was in progress and is now
+        # removed from `in_progress`.
+        deleted = await await_redis_response(self._redis.hdel(self._in_progress_key, request.unique_key))
+
+        # If not deleted, the request was not in progress.
+        if not deleted:
             logger.warning(f'Marking request {request.unique_key} as handled that is not in progress.')
             return None
 
@@ -398,32 +409,45 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         if request.handled_at is None:
             request.handled_at = datetime.now(timezone.utc)
 
-        async with self._get_pipeline() as pipe:
-            if self._dedup_strategy == 'default':
-                await await_redis_response(pipe.sadd(self._handled_set_key, request.unique_key))
-                await await_redis_response(pipe.srem(self._pending_set_key, request.unique_key))
-            elif self._dedup_strategy == 'bloom':
-                await await_redis_response(pipe.bf().add(self._handled_filter_key, request.unique_key))
+        try:
+            async with self._get_pipeline() as pipe:
+                if self._dedup_strategy == 'default':
+                    await await_redis_response(pipe.sadd(self._handled_set_key, request.unique_key))
+                    await await_redis_response(pipe.srem(self._pending_set_key, request.unique_key))
+                elif self._dedup_strategy == 'bloom':
+                    await await_redis_response(pipe.bf().add(self._handled_filter_key, request.unique_key))
 
-            await await_redis_response(pipe.hdel(self._in_progress_key, request.unique_key))
-            await await_redis_response(pipe.hset(self._data_key, request.unique_key, request.model_dump_json()))
+                await await_redis_response(pipe.hset(self._data_key, request.unique_key, request.model_dump_json()))
 
-            await self._update_metadata(
-                pipe,
-                **_QueueMetadataUpdateParams(
-                    update_accessed_at=True,
-                    update_modified_at=True,
-                    delta_handled_request_count=1,
-                    delta_pending_request_count=-1,
-                ),
+                await self._update_metadata(
+                    pipe,
+                    **_QueueMetadataUpdateParams(
+                        update_accessed_at=True,
+                        update_modified_at=True,
+                        delta_handled_request_count=1,
+                        delta_pending_request_count=-1,
+                    ),
+                )
+
+            return ProcessedRequest(
+                unique_key=request.unique_key,
+                was_already_present=True,
+                was_already_handled=True,
             )
+        except Exception:
+            blocked_until = int(datetime.now(tz=timezone.utc).timestamp() * 1000) + self._BLOCK_REQUEST_TIME
+            # If we fail to mark the request as handled after removing it from in_progress, we restore request in
+            # `in_progress` hash.
+            await await_redis_response(
+                self._redis.hset(
+                    self._in_progress_key,
+                    request.unique_key,
+                    json.dumps({'client_id': self.client_key, 'blocked_until_timestamp': blocked_until}),
+                )
+            )
+            raise
 
-        return ProcessedRequest(
-            unique_key=request.unique_key,
-            was_already_present=True,
-            was_already_handled=True,
-        )
-
+    @retry_on_error(RedisError)
     @override
     async def reclaim_request(
         self,
@@ -469,6 +493,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
             was_already_handled=False,
         )
 
+    @retry_on_error(RedisError)
     @override
     async def is_empty(self) -> bool:
         """Check if the queue is empty.

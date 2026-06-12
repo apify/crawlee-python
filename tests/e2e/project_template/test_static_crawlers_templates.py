@@ -26,6 +26,9 @@ from tests.e2e.project_template.utils import patch_crawlee_version_in_project
         pytest.param('playwright', marks=pytest.mark.playwright),
         pytest.param('parsel', marks=pytest.mark.parsel),
         pytest.param('beautifulsoup', marks=pytest.mark.beautifulsoup),
+        pytest.param('adaptive-beautifulsoup', marks=pytest.mark.adaptive_beautifulsoup),
+        pytest.param('adaptive-parsel', marks=pytest.mark.adaptive_parsel),
+        pytest.param('stagehand', marks=pytest.mark.stagehand),
     ],
 )
 @pytest.mark.parametrize(
@@ -43,6 +46,10 @@ from tests.e2e.project_template.utils import patch_crawlee_version_in_project
         pytest.param('uv', marks=pytest.mark.uv),
         pytest.param('poetry', marks=pytest.mark.poetry),
     ],
+)
+@pytest.mark.flaky(
+    reruns=3,
+    reason='`apify push` occasionally hangs against the Apify platform; retries cover transient CLI/network flakes.',
 )
 async def test_static_crawler_actor_at_apify(
     tmp_path: Path,
@@ -77,16 +84,32 @@ async def test_static_crawler_actor_at_apify(
     # Print apify version for debugging purposes in rare cases of CLI failures
     subprocess.run(['apify', '--version'], check=True)  # noqa: ASYNC221, S607
 
-    # Build actor using sequence of cli commands as the user would
+    # Build actor using sequence of cli commands as the user would.
     subprocess.run(  # noqa: ASYNC221, S603
         ['apify', 'login', '-t', os.environ['APIFY_TEST_USER_API_TOKEN']],  # noqa: S607
         capture_output=True,
         check=True,
         cwd=tmp_path / actor_name,
+        timeout=600,
     )
-    subprocess.run(['apify', 'init', '-y', actor_name], capture_output=True, check=True, cwd=tmp_path / actor_name)  # noqa: ASYNC221, S603, S607
+    subprocess.run(  # noqa: ASYNC221, S603
+        ['apify', 'init', '-y', actor_name],  # noqa: S607
+        capture_output=True,
+        check=True,
+        cwd=tmp_path / actor_name,
+        timeout=600,
+    )
 
-    build_process = subprocess.run(['apify', 'push'], capture_output=True, check=False, cwd=tmp_path / actor_name)  # noqa: ASYNC221, S607
+    build_process = subprocess.run(  # noqa: ASYNC221
+        ['apify', 'push'],  # noqa: S607
+        capture_output=True,
+        check=False,
+        cwd=tmp_path / actor_name,
+        # Prevent git from walking up into the surrounding project's .git/ when running under
+        # a basetemp inside the repo (see --basetemp in the e2e-templates-tests poe task).
+        env={**os.environ, 'GIT_CEILING_DIRECTORIES': str(tmp_path)},
+        timeout=600,
+    )
     # Get actor ID from build log
     actor_id_regexp = re.compile(r'https:\/\/console\.apify\.com\/actors\/(.*)#\/builds\/\d*\.\d*\.\d*')
 
@@ -101,7 +124,27 @@ async def test_static_crawler_actor_at_apify(
     # Run actor
     try:
         assert build_process.returncode == 0
-        started_run_data = await actor.start(memory_mbytes=8192)
+
+        # Stagehand needs the model API key in `os.environ` at run time. Env vars are baked into the
+        # build at build creation time, so registering the env var on the version after `apify push`
+        # is not enough — we must trigger a fresh build for the env var to be included.
+        build_number: str | None = None
+        if crawler_type == 'stagehand':
+            env_vars = actor.version('0.0').env_vars()
+            await env_vars.create(name='OPENAI_API_KEY', value=os.environ['OPENAI_API_KEY'], is_secret=True)
+            # `ActorClientAsync.build`'s `wait_for_finish` parameter is capped server-side at 60s,
+            # which is shorter than a stagehand build (playwright + browser deps). Trigger the build,
+            # then poll client-side via `BuildClientAsync.wait_for_finish` until it reaches a terminal
+            # status, and assert it succeeded before starting the run.
+            rebuild = await actor.build(version_number='0.0')
+            finished_build = await client.build(rebuild['id']).wait_for_finish(wait_secs=900)
+            assert finished_build is not None, 'Stagehand rebuild did not reach a terminal status within 900s.'
+            assert finished_build['status'] == 'SUCCEEDED', (
+                f'Stagehand rebuild did not succeed: status={finished_build["status"]!r}, build={finished_build}'
+            )
+            build_number = finished_build['buildNumber']
+
+        started_run_data = await actor.start(memory_mbytes=8192, build=build_number)
         actor_run = client.run(started_run_data['id'])
 
         finished_run_data = await actor_run.wait_for_finish()

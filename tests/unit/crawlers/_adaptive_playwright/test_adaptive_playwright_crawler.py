@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from dataclasses import dataclass
 from datetime import timedelta
 from itertools import cycle
@@ -27,9 +28,7 @@ from crawlee.crawlers import (
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
     AdaptivePlaywrightCrawlerStatisticState,
 )
-from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import (
-    AdaptiveContextError,
-)
+from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import AdaptiveContextError
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storage_clients import SqlStorageClient
@@ -87,7 +86,8 @@ class _SimpleRenderingTypePredictor(RenderingTypePredictor):
     ) -> None:
         super().__init__()
 
-        self._rendering_types = rendering_types or cycle(['static'])
+        default_rendering_types: list[RenderingType] = ['static']
+        self._rendering_types = rendering_types or cycle(default_rendering_types)
         self._detection_probability_recommendation = detection_probability_recommendation or cycle([1])
 
     @override
@@ -237,6 +237,11 @@ async def test_adaptive_crawling_parsel(test_urls: list[str]) -> None:
     assert static_handler_count == 1
 
 
+@pytest.mark.flaky(
+    reruns=3,
+    reason='Test is flaky on Windows when Playwright hits net::ERR_NO_BUFFER_SPACE and retries, '
+    'causing the pre-nav hook to fire one extra time.',
+)
 async def test_adaptive_crawling_pre_nav_change_to_context(test_urls: list[str]) -> None:
     """Tests that context can be modified in pre-navigation hooks."""
     static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
@@ -631,6 +636,10 @@ async def test_adaptive_playwright_crawler_default_predictor(test_urls: list[str
     mocked_browser_handler.assert_called_once_with()
 
 
+@pytest.mark.flaky(
+    reruns=3,
+    reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1650.',
+)
 async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[str]) -> None:
     """Test that `context.query_selector_one` works regardless of the crawl type for BeautifulSoup variant.
 
@@ -674,7 +683,7 @@ async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[st
 
 
 @pytest.mark.flaky(
-    rerun=3,
+    reruns=3,
     reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1650.',
 )
 async def test_adaptive_context_query_selector_parsel(test_urls: list[str]) -> None:
@@ -903,3 +912,29 @@ async def test_adaptive_playwright_crawler_with_sql_storage(test_urls: list[str]
         await crawler.run(test_urls[:1])
 
         mocked_handler.assert_called()
+
+
+@pytest.mark.parametrize(
+    'optional_module_name',
+    [
+        pytest.param('playwright', id='playwright'),
+        pytest.param('jaro', id='jaro'),
+        pytest.param('sklearn', id='sklearn'),
+    ],
+)
+def test_import_error_handled(optional_module_name: str) -> None:
+    # Block the package and all its cached submodules to prevent submodule cache entries
+    # from bypassing the blocked top-level package.
+    blocked = {
+        mod_name: None
+        for mod_name in sys.modules
+        if mod_name == optional_module_name or mod_name.startswith(f'{optional_module_name}.')
+    }
+
+    with patch.dict('sys.modules', blocked):
+        for mod_name in list(sys.modules):
+            if mod_name == 'crawlee.crawlers' or mod_name.startswith('crawlee.crawlers._adaptive_playwright'):
+                sys.modules.pop(mod_name, None)
+
+        with pytest.raises(ImportError):
+            from crawlee.crawlers import AdaptivePlaywrightCrawler  # noqa: F401 PLC0415

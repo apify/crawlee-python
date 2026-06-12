@@ -9,11 +9,13 @@ import pytest
 from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import MemoryStorageClient, StorageClient
+from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, UnprocessedRequest
 from crawlee.storages import RequestQueue
 from crawlee.storages._storage_instance_manager import StorageInstanceManager
+from tests.unit.utils import poll_until_condition
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, Sequence
 
     from crawlee.storage_clients import StorageClient
 
@@ -259,6 +261,56 @@ async def test_add_requests_with_forefront(rq: RequestQueue) -> None:
     assert next_request.url == 'https://example.com/priority'
 
 
+@pytest.mark.parametrize('forefront', [True, False])
+async def test_add_requests_retry_preserves_forefront(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    forefront: bool,
+) -> None:
+    """Regression test: when ``add_batch_of_requests`` returns unprocessed requests, the retry must preserve the
+    original `forefront` value rather than silently falling back to the parameter default."""
+    rq = await RequestQueue.open(storage_client=MemoryStorageClient())
+    forefront_calls: list[bool] = []
+
+    async def patched_add_batch(
+        requests: Sequence[Request],
+        *,
+        forefront: bool = False,
+    ) -> AddRequestsResponse:
+        forefront_calls.append(forefront)
+        if len(forefront_calls) == 1:
+            return AddRequestsResponse(
+                processed_requests=[],
+                unprocessed_requests=[UnprocessedRequest(unique_key=r.unique_key, url=r.url) for r in requests],
+            )
+        return AddRequestsResponse(
+            processed_requests=[
+                ProcessedRequest(
+                    unique_key=r.unique_key,
+                    was_already_present=False,
+                    was_already_handled=False,
+                )
+                for r in requests
+            ],
+            unprocessed_requests=[],
+        )
+
+    monkeypatch.setattr(rq._client, 'add_batch_of_requests', patched_add_batch)
+
+    try:
+        await rq.add_requests(
+            ['https://example.com/a', 'https://example.com/b'],
+            forefront=forefront,
+            wait_time_between_batches=timedelta(seconds=0),
+        )
+    finally:
+        await rq.drop()
+
+    assert forefront_calls == [forefront, forefront], (
+        f'retry must propagate the original forefront={forefront} flag, got: {forefront_calls}'
+    )
+
+
 async def test_add_requests_mixed_forefront(rq: RequestQueue) -> None:
     """Test the ordering when adding requests with mixed forefront values."""
     # Add normal requests
@@ -465,9 +517,8 @@ async def test_add_requests_wait_for_all(
         # Immediately after adding, the total count may be less than 15 due to background processing
         assert await rq.get_total_count() <= 15
 
-        # Wait for background tasks to complete
-        while await rq.get_total_count() < 15:  # noqa: ASYNC110
-            await asyncio.sleep(0.1)
+        # Wait for background tasks to complete.
+        await poll_until_condition(rq.get_total_count, lambda count: count >= 15)
 
     # Verify all requests were added
     assert await rq.get_total_count() == 15
@@ -491,8 +542,8 @@ async def test_is_finished(rq: RequestQueue) -> None:
     # Queue shouldn't be finished while background tasks are running
     assert await rq.is_finished() is False
 
-    # Wait for background tasks to finish
-    await asyncio.sleep(0.2)
+    # Wait for the background add task to finish.
+    await poll_until_condition(lambda: not rq._add_requests_tasks)
 
     # Process all requests
     while True:
@@ -661,6 +712,94 @@ async def test_purge(
     assert request.url == 'https://example.com/new-after-purge'
 
     # Clean up
+    await rq.drop()
+
+
+async def test_purge_falls_back_to_drop_for_unnamed_queue_when_not_implemented(
+    storage_client: StorageClient,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that `purge` falls back to drop+recreate for unnamed queues when the client raises `NotImplementedError`.
+
+    Some storage clients (e.g. the Apify platform client) do not support purging. For the default unnamed queue
+    used by `BasicCrawler`, `purge` should drop and recreate the queue so that callers keep working on repeated
+    runs. Named queues are handled separately to avoid destroying persistent data.
+    """
+    rq = await RequestQueue.open(storage_client=storage_client)
+    assert rq.name is None
+
+    await rq.add_requests(['https://example.com/1', 'https://example.com/2'])
+    metadata = await rq.get_metadata()
+    assert metadata.pending_request_count == 2
+
+    async def _raise_not_implemented(self: object) -> None:
+        raise NotImplementedError('Purge is not supported.')
+
+    monkeypatch.setattr(type(rq._client), 'purge', _raise_not_implemented)
+
+    with caplog.at_level('WARNING'):
+        await rq.purge()
+
+    assert any(
+        'does not support purging' in rec.message and 'dropping and recreating' in rec.message for rec in caplog.records
+    )
+
+    # The queue should be empty, usable, and backed by a fresh client (id may differ for backends that mint new ids).
+    metadata = await rq.get_metadata()
+    assert metadata.pending_request_count == 0
+    assert metadata.total_request_count == 0
+    assert metadata.handled_request_count == 0
+    assert rq.id is not None
+
+    await rq.add_request('https://example.com/after-purge')
+    request = await rq.fetch_next_request()
+    assert request is not None
+    assert request.url == 'https://example.com/after-purge'
+
+    await rq.drop()
+
+
+async def test_purge_skips_named_queue_when_not_implemented(
+    storage_client: StorageClient,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that `purge` is a logged no-op for named queues when the client raises `NotImplementedError`.
+
+    Named queues are considered persistent (e.g. shared across runs on the Apify platform), so falling back
+    to drop+recreate would silently destroy user data. Instead `purge` logs a warning and leaves the queue
+    intact.
+    """
+    rq = await RequestQueue.open(
+        name='purge-fallback-named-test',
+        storage_client=storage_client,
+    )
+    original_id = rq.id
+
+    await rq.add_requests(['https://example.com/1', 'https://example.com/2'])
+    metadata = await rq.get_metadata()
+    assert metadata.pending_request_count == 2
+
+    async def _raise_not_implemented(self: object) -> None:
+        raise NotImplementedError('Purge is not supported.')
+
+    monkeypatch.setattr(type(rq._client), 'purge', _raise_not_implemented)
+
+    with caplog.at_level('WARNING'):
+        await rq.purge()
+
+    assert any(
+        'does not support purging' in rec.message and 'Skipping purge for named queue' in rec.message
+        for rec in caplog.records
+    )
+
+    # Queue identity and contents must be preserved.
+    assert rq.id == original_id
+    metadata = await rq.get_metadata()
+    assert metadata.pending_request_count == 2
+    assert metadata.total_request_count == 2
+
     await rq.drop()
 
 
@@ -1332,6 +1471,8 @@ async def test_name_default_not_allowed(storage_client: StorageClient) -> None:
         pytest.param('name with spaces', False, id='spaces'),
         pytest.param('-test', False, id='dashes start'),
         pytest.param('test-', False, id='dashes end'),
+        pytest.param('../outside', False, id='parent-ref'),
+        pytest.param('with/slash', False, id='slash'),
     ],
 )
 async def test_validate_name(storage_client: StorageClient, name: str, *, is_valid: bool) -> None:
@@ -1344,6 +1485,31 @@ async def test_validate_name(storage_client: StorageClient, name: str, *, is_val
     else:
         with pytest.raises(ValueError, match=rf'Invalid storage name "{name}".*'):
             await RequestQueue.open(name=name, storage_client=storage_client)
+
+
+@pytest.mark.parametrize(
+    ('alias', 'is_valid'),
+    [
+        pytest.param('valid-alias', True, id='dashes'),
+        pytest.param('alias_with_underscores', True, id='underscores'),
+        pytest.param('alias.with.dots', True, id='dots'),
+        pytest.param('CamelCaseAlias', True, id='mixed-case'),
+        pytest.param('../outside', False, id='parent-ref'),
+        pytest.param('..', False, id='bare-parent'),
+        pytest.param('.', False, id='bare-current'),
+        pytest.param('nested/alias', False, id='slash'),
+        pytest.param('back\\slash', False, id='backslash'),
+    ],
+)
+async def test_validate_alias(storage_client: StorageClient, alias: str, *, is_valid: bool) -> None:
+    """Test alias validation logic, including rejection of values that would resolve outside the storage dir."""
+    if is_valid:
+        # Should not raise.
+        rq = await RequestQueue.open(alias=alias, storage_client=storage_client)
+        await rq.drop()
+    else:
+        with pytest.raises(ValueError, match=r'Invalid storage alias'):
+            await RequestQueue.open(alias=alias, storage_client=storage_client)
 
 
 async def test_reclaim_request_with_change_state(rq: RequestQueue) -> None:

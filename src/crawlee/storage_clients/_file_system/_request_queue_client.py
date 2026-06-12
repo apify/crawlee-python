@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 from logging import getLogger
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from crawlee_storage import FileSystemRequestQueueClient as NativeRequestQueueClient
 from typing_extensions import Self, override
 
 from crawlee import Request
+from crawlee._utils.file import validate_subdirectory
 from crawlee.events._types import Event, EventPersistStateData
 from crawlee.storage_clients._base import RequestQueueClient
 from crawlee.storage_clients.models import (
@@ -18,7 +20,6 @@ from crawlee.storage_clients.models import (
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from pathlib import Path
 
     from crawlee.configuration import Configuration
 
@@ -41,6 +42,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
     Backed by the native ``crawlee_storage`` Rust extension for performance.
     """
+
+    _STORAGE_SUBDIR = 'request_queues'
+    """The name of the subdirectory where request queues are stored under the storage directory."""
 
     def __init__(
         self,
@@ -100,6 +104,11 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             ValueError: If a queue with the specified ID is not found, if metadata is invalid,
                 or if both name and alias are provided.
         """
+        # Reject names/aliases that would escape the storage directory before handing off to the
+        # native client, which would otherwise create directories outside the intended location.
+        if (subdirectory := name or alias) is not None:
+            validate_subdirectory(Path(configuration.storage_dir) / cls._STORAGE_SUBDIR, subdirectory)
+
         native_client = await NativeRequestQueueClient.open(
             id=id,
             name=name,

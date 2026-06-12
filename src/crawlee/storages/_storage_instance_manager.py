@@ -10,7 +10,7 @@ from weakref import WeakValueDictionary
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
 
-from ._utils import validate_storage_name
+from ._utils import validate_storage_alias, validate_storage_name
 
 if TYPE_CHECKING:
     from ._base import Storage
@@ -46,20 +46,20 @@ class _StorageCache:
         storage_type = type(storage_instance)
 
         # Remove from ID cache
-        for additional_key in self.by_id[storage_type][storage_instance.id]:
-            del self.by_id[storage_type][storage_instance.id][additional_key]
-            break
+        for additional_key, cached in list(self.by_id[storage_type][storage_instance.id].items()):
+            if cached is storage_instance:
+                del self.by_id[storage_type][storage_instance.id][additional_key]
 
         # Remove from name cache or alias cache. It can never be in both.
         if storage_instance.name is not None:
-            for additional_key in self.by_name[storage_type][storage_instance.name]:
-                del self.by_name[storage_type][storage_instance.name][additional_key]
-                break
+            for additional_key, cached in list(self.by_name[storage_type][storage_instance.name].items()):
+                if cached is storage_instance:
+                    del self.by_name[storage_type][storage_instance.name][additional_key]
         else:
             for alias_key in self.by_alias[storage_type]:
-                for additional_key in self.by_alias[storage_type][alias_key]:
-                    del self.by_alias[storage_type][alias_key][additional_key]
-                    break
+                for additional_key, cached in list(self.by_alias[storage_type][alias_key].items()):
+                    if cached is storage_instance:
+                        del self.by_alias[storage_type][alias_key][additional_key]
 
 
 ClientOpenerCoro = Coroutine[None, None, DatasetClient | KeyValueStoreClient | RequestQueueClient]
@@ -134,6 +134,10 @@ class StorageInstanceManager:
             # Validate storage name
             if name is not None:
                 validate_storage_name(name)
+
+            # Validate storage alias
+            if alias is not None:
+                validate_storage_alias(alias)
 
             # Acquire lock for this opener
             opener_lock_key = (cls, str(id or name or alias), storage_client_cache_key)

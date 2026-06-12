@@ -150,7 +150,28 @@ class RequestQueue(Storage, RequestManager):
 
     @override
     async def purge(self) -> None:
-        await self._client.purge()
+        try:
+            await self._client.purge()
+        except NotImplementedError:
+            client_name = type(self._client).__name__
+            if self._name is not None:
+                logger.warning(
+                    f'Storage client "{client_name}" does not support purging the request queue. '
+                    f'Skipping purge for named queue "{self._name}" to avoid destroying persistent data; '
+                    'the queue contents are left intact.'
+                )
+                return
+            logger.warning(
+                f'Storage client "{client_name}" does not support purging the request queue. '
+                'Falling back to dropping and recreating the unnamed queue; the request queue ID may change.'
+            )
+            await self.drop()
+            # Override `purge_on_start` so the storage client does not try to purge the freshly recreated
+            # (and necessarily empty) queue and re-raise the same `NotImplementedError`.
+            recreate_config = service_locator.get_configuration().model_copy(update={'purge_on_start': False})
+            new_rq = await RequestQueue.open(configuration=recreate_config)
+            self._client = new_rq._client  # noqa: SLF001
+            self._id = new_rq._id  # noqa: SLF001
 
     @override
     async def add_request(
@@ -348,7 +369,12 @@ class RequestQueue(Storage, RequestManager):
                 unprocessed_requests_unique_keys = {request.unique_key for request in response.unprocessed_requests}
                 retry_batch = [request for request in batch if request.unique_key in unprocessed_requests_unique_keys]
                 await asyncio.sleep((base_retry_wait * attempt).total_seconds())
-                await self._process_batch(retry_batch, base_retry_wait=base_retry_wait, attempt=attempt + 1)
+                await self._process_batch(
+                    retry_batch,
+                    base_retry_wait=base_retry_wait,
+                    attempt=attempt + 1,
+                    forefront=forefront,
+                )
 
         request_count = len(batch) - len(response.unprocessed_requests)
 

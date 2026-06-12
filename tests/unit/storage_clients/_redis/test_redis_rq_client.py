@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from redis.exceptions import RedisError
 
 from crawlee import Request
 from crawlee.storage_clients import RedisStorageClient
@@ -250,3 +252,101 @@ async def test_deduplication(rq_client: RedisRequestQueueClient) -> None:
     # Verify no more requests are available
     request3 = await rq_client.fetch_next_request()
     assert request3 is None
+
+
+async def test_error_handling_on_get_metadata_failure(rq_client: RedisRequestQueueClient) -> None:
+    """Test that get_metadata properly handles Redis errors and retries."""
+    mock_pipe = MagicMock()
+    mock_pipe.execute = AsyncMock(side_effect=RedisError('connection lost'))
+
+    mock_pipeline_ctx = MagicMock()
+    mock_pipeline_ctx.__aenter__ = AsyncMock(return_value=mock_pipe)
+    mock_pipeline_ctx.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
+        patch.object(rq_client.redis, 'pipeline', return_value=mock_pipeline_ctx),
+        pytest.raises(RedisError),
+    ):
+        await rq_client.get_metadata()
+
+    # Verify that retry logic was attempted
+    assert mock_sleep.call_count == 2  # Assuming default max_attempts=3
+
+
+async def test_get_metadata_does_not_retry_on_unexpected_exception(rq_client: RedisRequestQueueClient) -> None:
+    """Test that get_metadata does not retry on unexpected exceptions."""
+    mock_pipe = MagicMock()
+    mock_pipe.execute = AsyncMock(side_effect=ValueError('unexpected error'))
+
+    mock_pipeline_ctx = MagicMock()
+    mock_pipeline_ctx.__aenter__ = AsyncMock(return_value=mock_pipe)
+    mock_pipeline_ctx.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
+        patch.object(rq_client.redis, 'pipeline', return_value=mock_pipeline_ctx),
+        pytest.raises(ValueError, match='unexpected error'),
+    ):
+        await rq_client.get_metadata()
+
+    # Verify that retry logic was not attempted
+    assert mock_sleep.call_count == 0
+
+
+async def test_mark_request_as_handled_concurrent_no_double_decrement(
+    rq_client: RedisRequestQueueClient,
+) -> None:
+    """Test that concurrent calls to mark_request_as_handled decrement pending_request_count exactly once."""
+    request = Request.from_url('https://example.com/concurrent')
+    await rq_client.add_batch_of_requests([request])
+
+    fetched = await rq_client.fetch_next_request()
+    assert fetched is not None
+
+    results = await asyncio.gather(
+        rq_client.mark_request_as_handled(fetched),
+        rq_client.mark_request_as_handled(fetched),
+        rq_client.mark_request_as_handled(fetched),
+        rq_client.mark_request_as_handled(fetched),
+        rq_client.mark_request_as_handled(fetched),
+    )
+
+    successful = [result for result in results if result is not None]
+    assert len(successful) == 1
+
+    metadata = await rq_client.get_metadata()
+    assert metadata.pending_request_count == 0
+    assert metadata.handled_request_count == 1
+
+
+async def test_mark_request_as_handled_restores_in_progress_on_pipeline_failure(
+    rq_client: RedisRequestQueueClient,
+) -> None:
+    """Test that 'request' is restored to 'in_progress' when the pipeline fails after 'hdel'."""
+    request = Request.from_url('https://example.com/restore')
+    await rq_client.add_batch_of_requests([request])
+
+    fetched = await rq_client.fetch_next_request()
+    assert fetched is not None
+
+    mock_pipe = MagicMock()
+    mock_pipe.execute = AsyncMock(side_effect=RedisError('connection lost'))
+
+    mock_pipeline_ctx = MagicMock()
+    mock_pipeline_ctx.__aenter__ = AsyncMock(return_value=mock_pipe)
+    mock_pipeline_ctx.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock),
+        patch.object(rq_client.redis, 'pipeline', return_value=mock_pipeline_ctx),
+        pytest.raises(RedisError),
+    ):
+        await rq_client.mark_request_as_handled(fetched)
+
+    in_progress = await await_redis_response(rq_client.redis.hexists(rq_client._in_progress_key, fetched.unique_key))
+    assert in_progress
+
+    metadata = await rq_client.get_metadata()
+    assert metadata.pending_request_count == 1
+    assert metadata.handled_request_count == 0

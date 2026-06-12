@@ -43,6 +43,23 @@ async def test_memory_specific_purge_behavior() -> None:
     assert await rq_client2.is_empty() is True
 
 
+async def test_add_existing_pending_request_returns_single_processed_request(
+    rq_client: MemoryRequestQueueClient,
+) -> None:
+    """Test that re-adding a pending (not handled) request yields exactly one `ProcessedRequest` entry."""
+    request = Request.from_url('https://example.com')
+    await rq_client.add_batch_of_requests([request])
+
+    # Re-add the same request while it is still pending (not handled, not in progress).
+    response = await rq_client.add_batch_of_requests([request])
+
+    assert len(response.processed_requests) == 1
+    processed_request = response.processed_requests[0]
+    assert processed_request.unique_key == request.unique_key
+    assert processed_request.was_already_present is True
+    assert processed_request.was_already_handled is False
+
+
 async def test_memory_metadata_updates(rq_client: MemoryRequestQueueClient) -> None:
     """Test that metadata timestamps are updated correctly in memory storage."""
     # Record initial timestamps
