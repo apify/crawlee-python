@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import sys
 from typing import TYPE_CHECKING
 from unittest import mock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -498,3 +500,32 @@ async def test_enqueue_links_with_limit(server_url: URL, http_client: HttpClient
         mock.call(str(server_url / 'page_3')),
     ]
     visit.assert_has_calls(expected_visit_calls, any_order=True)
+
+
+@pytest.mark.parametrize(
+    'impersonate',
+    [
+        pytest.param(False, id='impersonate_disabled'),
+        pytest.param(True, id='impersonate_enabled'),
+    ],
+)
+async def test_impersonate_option(server_url: URL, *, impersonate: bool) -> None:
+    crawler = ParselCrawler(impersonate=impersonate)
+
+    call_mock = AsyncMock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        await call_mock(json.loads(await context.http_response.read()))
+
+    await crawler.run([str(server_url / 'headers')])
+
+    call_mock.assert_called_once()
+    headers = call_mock.call_args[0][0]
+
+    if impersonate:
+        assert 'Mozilla' in headers.get('user-agent', '')
+        assert headers.get('priority', '') == 'u=0, i'
+    else:
+        assert headers.get('user-agent', '') == ''
+        assert headers.get('priority', '') == ''
