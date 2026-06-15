@@ -65,6 +65,36 @@ with _try_import(
         StagehandPreNavCrawlingContext,
     )
 
+with _try_import(
+    __name__,
+    'AiCleanHtmlDistiller',
+    'AiCrawler',
+    'AiCrawlingContext',
+    'AiDirectExtractor',
+    'AiHtmlDistiller',
+    'AiHtmlExtractor',
+    'AiSelectorExtractor',
+    'AiSkeletonDistiller',
+    'AiUsageStats',
+    'BaseAiHtmlDistiller',
+    'BaseAiHtmlExtractor',
+    'get_basic_ai_cleaner',
+):
+    from ._ai import (
+        AiCleanHtmlDistiller,
+        AiCrawler,
+        AiCrawlingContext,
+        AiDirectExtractor,
+        AiHtmlDistiller,
+        AiHtmlExtractor,
+        AiSelectorExtractor,
+        AiSkeletonDistiller,
+        AiUsageStats,
+        BaseAiHtmlDistiller,
+        BaseAiHtmlExtractor,
+        get_basic_ai_cleaner,
+    )
+
 
 __all__ = [
     'AbstractHttpCrawler',
@@ -74,6 +104,17 @@ __all__ = [
     'AdaptivePlaywrightCrawlingContext',
     'AdaptivePlaywrightPostNavCrawlingContext',
     'AdaptivePlaywrightPreNavCrawlingContext',
+    'AiCleanHtmlDistiller',
+    'AiCrawler',
+    'AiCrawlingContext',
+    'AiDirectExtractor',
+    'AiHtmlDistiller',
+    'AiHtmlExtractor',
+    'AiSelectorExtractor',
+    'AiSkeletonDistiller',
+    'AiUsageStats',
+    'BaseAiHtmlDistiller',
+    'BaseAiHtmlExtractor',
     'BasicCrawler',
     'BasicCrawlerOptions',
     'BasicCrawlingContext',
@@ -99,4 +140,5 @@ __all__ = [
     'StagehandCrawlingContext',
     'StagehandPostNavCrawlingContext',
     'StagehandPreNavCrawlingContext',
+    'get_basic_ai_cleaner',
 ]
