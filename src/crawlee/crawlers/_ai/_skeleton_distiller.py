@@ -209,7 +209,7 @@ class AiSkeletonDistiller(AiCleanHtmlDistiller):
             logger.warning(
                 f'Skeleton exceeds max_size even after tightening ({len(tighter_distilled_html)} > {self._max_size}). '
                 'The tail of the page is cut off and invisible to the LLM. '
-                'Raise `max_size`, `scope` the extraction, or set `max_json_len`.'
+                'Raise `max_size` or set `max_json_len`.'
             )
             return tighter_distilled_html[: self._max_size] + _TRUNCATION_MARKER
 

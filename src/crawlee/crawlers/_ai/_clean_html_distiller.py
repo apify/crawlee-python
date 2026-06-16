@@ -4,7 +4,6 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 import lxml.html
-from lxml import etree  # ty: ignore[unresolved-import]
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
@@ -196,7 +195,7 @@ class AiCleanHtmlDistiller(BaseAiHtmlDistiller):
                         else:
                             del elem.attrib[name]
                     elif len(value) > self._max_attr_len:
-                        elem.attrib[name] = value[: self._max_attr_len]
+                        elem.attrib[name] = f'{value[: self._max_attr_len]}{_TRUNCATION_MARKER}'
                 else:
                     del elem.attrib[name]
 
@@ -235,7 +234,7 @@ class AiCleanHtmlDistiller(BaseAiHtmlDistiller):
         Args:
             tree: The lxml tree.
         """
-        return etree.tostring(tree, encoding='unicode', pretty_print=self._pretty)
+        return lxml.html.tostring(tree, encoding='unicode', pretty_print=self._pretty)
 
     def _enforce_max_size(
         self,
@@ -253,7 +252,7 @@ class AiCleanHtmlDistiller(BaseAiHtmlDistiller):
             logger.warning(
                 f'{type(self).__name__} output exceeds max_size ({len(distilled_html)} > {self._max_size}). '
                 'The tail of the page is cut off and invisible to the LLM. '
-                'Raise `max_size`, `scope` the extraction, or set `max_json_len`.'
+                'Raise `max_size` or set `max_json_len`.'
             )
             return distilled_html[: self._max_size] + _TRUNCATION_MARKER
 

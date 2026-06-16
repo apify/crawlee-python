@@ -1,5 +1,5 @@
 # Marker for truncated values in distillate documents and prompt instructions.
-_TRUNCATION_MARKER = '…'
+_TRUNCATION_MARKER = '[...]'
 
 # Default prompt instructions for direct extraction from HTML.
 _DIRECT_INSTRUCTIONS = (

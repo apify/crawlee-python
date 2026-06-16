@@ -7,7 +7,7 @@ import types
 from collections import defaultdict
 from enum import Enum
 from logging import getLogger
-from typing import TYPE_CHECKING, Union, cast, get_args, get_origin
+from typing import TYPE_CHECKING, Literal, Union, cast, get_args, get_origin
 
 from cssselect import SelectorError
 from pydantic import BaseModel, Field, ValidationError
@@ -81,7 +81,7 @@ class _FieldKind(Enum):
     """A scalar value extracted by one leaf selector."""
 
     LIST_SCALAR = 'list_scalar'
-    """A list of scalars extracted by one leaf selector matching many nodes."""
+    """A list or set of scalars extracted by one leaf selector matching many nodes."""
 
     LIST_MODEL = 'list_model'
     """A list of items. Maps to a container selector plus relative sub-selectors."""
@@ -546,7 +546,7 @@ class AiSelectorExtractor(BaseAiHtmlExtractor):
         annotation = self._unwrap_optional(annotation)
         origin = get_origin(annotation)
 
-        if origin is list:
+        if origin in (list, set):
             args = get_args(annotation)
             item = self._unwrap_optional(args[0]) if args else str
             # `list[A | B]` is ambiguous: a match can't be tied to a specific union member, so treat it as unsupported.
@@ -554,13 +554,16 @@ class AiSelectorExtractor(BaseAiHtmlExtractor):
                 return _FieldKind.LIST_UNION, None
             if isinstance(item, type) and issubclass(item, BaseModel):
                 return _FieldKind.LIST_MODEL, item
-            if get_origin(item) is list:
+            if get_origin(item) in (list, set):
                 return _FieldKind.LIST_OF_LISTS, None
             return _FieldKind.LIST_SCALAR, None
         if isinstance(annotation, type) and issubclass(annotation, BaseModel):
             return _FieldKind.NESTED_MODEL, annotation
         if origin is dict:
             return _FieldKind.MAPPING, None
+        # A `Literal` constrains a value to a fixed set. It is extracted as a leaf string and validated by Pydantic.
+        if origin is Literal:
+            return _FieldKind.LEAF, None
         if origin is not None:
             return _FieldKind.UNSUPPORTED, None
         return _FieldKind.LEAF, None
