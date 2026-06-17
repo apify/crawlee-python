@@ -23,16 +23,21 @@ class _Article(BaseModel):
     title: str
 
 
-def test_requires_exactly_one_of_model_or_extractor() -> None:
-    with pytest.raises(ValueError, match='exactly one'):
-        AiCrawler()
-
-    with pytest.raises(ValueError, match='exactly one'):
+def test_rejects_model_and_extractor_together() -> None:
+    with pytest.raises(ValueError, match='at most one'):
         AiCrawler(model=TestModel(), extractor=AiDirectExtractor(TestModel()))
 
 
 def test_default_extractor_is_direct() -> None:
     assert isinstance(AiCrawler(model=TestModel()).extractor, AiDirectExtractor)
+
+
+def test_default_model_when_none_given(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The default model is an OpenAI one, whose client needs a key at construction.
+    monkeypatch.setenv('OPENAI_API_KEY', 'test-key')
+
+    # With neither model nor extractor, the crawler builds the default direct extractor.
+    assert isinstance(AiCrawler().extractor, AiDirectExtractor)
 
 
 def test_emits_experimental_warning() -> None:

@@ -29,6 +29,9 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
+# Default model
+_DEFAULT_AI_MODEL = 'openai:gpt-5.4-nano'
+
 
 @docs_group('Crawlers')
 class AiCrawler(AbstractHttpCrawler[AiCrawlingContext, Selector, Selector]):
@@ -86,20 +89,18 @@ class AiCrawler(AbstractHttpCrawler[AiCrawlingContext, Selector, Selector]):
             model: The model used for extraction, given to the default extractor (`AiDirectExtractor`). A
                 provider-prefixed name (e.g. `'openai:gpt-5.4-nano'`) or a Pydantic AI `Model` instance. When given
                 as a string, the provider reads credentials from its environment variable (e.g. `OPENAI_API_KEY`).
-                Pass a `Model` instance to supply them explicitly. Provide exactly one of `model` or `extractor`.
+                Pass a `Model` instance to supply them explicitly. Defaults to `'openai:gpt-5.4-nano'` when neither
+                `model` nor `extractor` is given. Provide at most one of `model` or `extractor`.
             extractor: A pre-configured `AiHtmlExtractor`, for full control over the distiller, instructions,
                 caching, usage limits, and model fallback. Pass an `AiSelectorExtractor` here for cached-selector
-                extraction. Provide exactly one of `model` or `extractor`.
+                extraction. Provide at most one of `model` or `extractor`.
             kwargs: Additional keyword arguments to pass to the underlying `AbstractHttpCrawler`.
         """
-        if (model is None) == (extractor is None):
-            raise ValueError('Provide exactly one of `model` or `extractor`.')
+        if model is not None and extractor is not None:
+            raise ValueError('Provide at most one of `model` or `extractor`.')
 
-        if extractor is None and model is not None:
-            extractor = AiDirectExtractor(model)
-
-        if not extractor:
-            raise ValueError('Extractor initialization failed; check the provided model or extractor configuration.')
+        if extractor is None:
+            extractor = AiDirectExtractor(model if model is not None else _DEFAULT_AI_MODEL)
 
         # Call the notification only once.
         warnings.warn(
