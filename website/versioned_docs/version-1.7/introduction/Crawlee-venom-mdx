@@ -1,0 +1,41 @@
+---
+id: logging-in-with-a-crawler
+title: Logging in with a crawler
+description: How to log in to websites with Crawlee.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import PlaywrightLogin from '!!raw-loader!roa-loader!./code_examples/login_crawler/playwright_login.py';
+import HttpLogin from '!!raw-loader!roa-loader!./code_examples/login_crawler/http_login.py';
+
+Many websites require authentication to access their content. This guide demonstrates how to implement login functionality using both <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> and <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink>.
+
+## Session management for authentication
+
+When implementing authentication, you'll typically want to maintain the same <ApiLink to="class/Session">`Session`</ApiLink> throughout your crawl to preserve login state. This requires proper configuration of the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink>. For more details, see our [session management guide](./session-management).
+
+If your use case requires multiple authenticated sessions with different credentials, you can:
+- Use the `new_session_function` parameter in <ApiLink to="class/SessionPool#__init__">`SessionPool`</ApiLink> to customize session creation.
+- Specify the `session_id` parameter in <ApiLink to="class/Request#from_url">`Request`</ApiLink> to bind specific requests to particular sessions.
+
+For this guide, we'll use [demoqa.com](https://demoqa.com/login), a testing site designed for automation practice that provides a login form and protected content.
+
+## Login with Playwright crawler
+
+The following example demonstrates how to authenticate on a website using <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, which provides browser automation capabilities for filling out logging forms.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {PlaywrightLogin}
+</RunnableCodeBlock>
+
+## Login with HTTP crawler
+
+You can also use <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> (or its more specific variants like <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> or <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>) to authenticate by sending a POST <ApiLink to="class/Request">`Request`</ApiLink> with your credentials directly to the authentication endpoint.
+
+HTTP-based authentication often varies significantly between websites. Using browser [DevTools](https://developer.chrome.com/docs/devtools/overview) to analyze the `Network` tab during manual login can help you understand the specific authentication flow, required headers, and body parameters for your target website.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {HttpLogin}
+</RunnableCodeBlock>
