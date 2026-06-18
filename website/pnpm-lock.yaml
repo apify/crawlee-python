@@ -94,8 +94,8 @@ importers:
         specifier: ^0.4.0
         version: 0.4.1(@typescript-eslint/eslint-plugin@8.58.1(@typescript-eslint/parser@8.58.1(eslint@10.2.0(jiti@1.21.7))(typescript@6.0.2))(eslint@10.2.0(jiti@1.21.7))(typescript@6.0.2))(@typescript-eslint/parser@8.58.1(eslint@10.2.0(jiti@1.21.7))(typescript@6.0.2))(eslint@10.2.0(jiti@1.21.7))(typescript@6.0.2)
       '@apify/tsconfig':
-        specifier: ^0.1.0
-        version: 0.1.1
+        specifier: ^0.2.0
+        version: 0.2.0
       '@apify/ui-icons':
         specifier: ^1.23.0
         version: 1.34.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -269,8 +269,8 @@ packages:
   '@apify/log@2.5.35':
     resolution: {integrity: sha512-dJM9RkA9yD7kew5oU3qxLaoB4hFHB7FF47TI0STJVmz0cUa8cXWer4DpJkvUA52lrVNQGsOurCo3kGQWzfg/9w==}
 
-  '@apify/tsconfig@0.1.1':
-    resolution: {integrity: sha512-cS7mwN2UW1UXcluGXRDHH0Vr2VsSLkw2DwLTwoSBkcJSe8fvCr3MPryTSq0uod4MashpMURxJ7CsLKxs82VmOQ==}
+  '@apify/tsconfig@0.2.0':
+    resolution: {integrity: sha512-0i6rF+hgXw6mQXhENYNTnP+Yo4WY38d698k/pk4rIpdCx/sSuEprR2N5WdtMaN628vCB+aZjff0jPN2EnQYtjQ==}
 
   '@apify/ui-icons@1.34.1':
     resolution: {integrity: sha512-R4katxq0cjcIWTKNJRCFaJcUPk224cjZZSalXyZX7s75CLXeAolqR/NoV+o6ClwVBlXHXCP/EsUZOHx80+5iRg==}
@@ -7672,7 +7672,7 @@ snapshots:
       '@apify/consts': 2.52.1
       ansi-colors: 4.1.3
 
-  '@apify/tsconfig@0.1.1': {}
+  '@apify/tsconfig@0.2.0': {}
 
   '@apify/ui-icons@1.34.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
@@ -9566,7 +9566,7 @@ snapshots:
 
   '@docusaurus/react-loadable@6.0.0(react@19.2.5)':
     dependencies:
-      '@types/react': 19.2.14
+      '@types/react': 19.2.17
       react: 19.2.5
 
   '@docusaurus/theme-classic@3.10.0(@docusaurus/faster@3.10.0(@docusaurus/types@3.10.0(@swc/core@1.15.24)(postcss@8.5.9)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(postcss@8.5.9))(@rspack/core@1.7.11)(@swc/core@1.15.24)(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@6.0.2)':
@@ -11036,7 +11036,7 @@ snapshots:
   '@types/react-router@5.1.20':
     dependencies:
       '@types/history': 4.7.11
-      '@types/react': 19.2.14
+      '@types/react': 19.2.17
 
   '@types/react@19.2.14':
     dependencies:
