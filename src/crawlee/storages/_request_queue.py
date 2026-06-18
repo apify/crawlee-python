@@ -182,16 +182,14 @@ class RequestQueue(Storage, RequestManager):
         forefront: bool = False,
     ) -> ProcessedRequest | None:
         request = self._transform_request(request)
-        # Route the single request through the same retry mechanism as `add_requests`, so that adding one
-        # request is just as durable as a batched add against best-effort backends that may return a request
-        # as unprocessed.
+        # Route through `_process_batch` so a single add retries unprocessed requests just like a batched one.
         response = await self._process_batch([request], base_retry_wait=timedelta(seconds=1), forefront=forefront)
 
         if response.processed_requests:
             return response.processed_requests[0]
 
-        # `_process_batch` already warns when requests remain unprocessed after the retries are exhausted, so
-        # only the empty-response case (neither processed nor unprocessed) needs a warning here.
+        # `_process_batch` already warns about requests left unprocessed after retries; only an empty response
+        # (neither processed nor unprocessed) is unexpected here.
         if not response.unprocessed_requests:
             logger.warning(
                 f'Request {request.url} was not processed by storage client '
@@ -358,8 +356,8 @@ class RequestQueue(Storage, RequestManager):
         """Process a batch of requests with automatic retry mechanism.
 
         Returns:
-            A response aggregating the requests processed across all attempts together with any that remained
-            unprocessed after the retries were exhausted.
+            A response aggregating all requests processed across attempts plus any still unprocessed once the
+            retries are exhausted.
         """
         max_attempts = 5
         response = await self._client.add_batch_of_requests(batch, forefront=forefront)
@@ -392,8 +390,7 @@ class RequestQueue(Storage, RequestManager):
             forefront=forefront,
         )
 
-        # Fold the retry outcome back in: requests processed on retry join this attempt's processed requests,
-        # and only those still unprocessed after the final attempt remain.
+        # Merge the retry outcome: processed requests accumulate, unprocessed is whatever the last attempt left.
         return AddRequestsResponse(
             processed_requests=[*response.processed_requests, *retry_response.processed_requests],
             unprocessed_requests=retry_response.unprocessed_requests,
