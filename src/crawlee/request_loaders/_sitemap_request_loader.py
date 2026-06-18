@@ -262,6 +262,8 @@ class SitemapRequestLoader(RequestLoader):
             self._loading_task.cancel()
             with suppress(asyncio.CancelledError):
                 await self._loading_task
+            # Let the streaming request shut down gracefully.
+            await asyncio.sleep(0)
 
     async def close(self) -> None:
         """Close the request loader."""
