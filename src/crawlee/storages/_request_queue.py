@@ -11,6 +11,7 @@ from crawlee import Request, service_locator
 from crawlee._utils.docs import docs_group
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.request_loaders import RequestManager
+from crawlee.storage_clients.models import AddRequestsResponse
 
 from ._base import Storage
 from ._utils import validate_storage_name
@@ -181,19 +182,20 @@ class RequestQueue(Storage, RequestManager):
         forefront: bool = False,
     ) -> ProcessedRequest | None:
         request = self._transform_request(request)
-        response = await self._client.add_batch_of_requests([request], forefront=forefront)
+        # Route the single request through the same retry mechanism as `add_requests`, so that adding one
+        # request is just as durable as a batched add against best-effort backends that may return a request
+        # as unprocessed.
+        response = await self._process_batch([request], base_retry_wait=timedelta(seconds=1), forefront=forefront)
 
         if response.processed_requests:
             return response.processed_requests[0]
 
-        if response.unprocessed_requests:
+        # `_process_batch` already warns when requests remain unprocessed after the retries are exhausted, so
+        # only the empty-response case (neither processed nor unprocessed) needs a warning here.
+        if not response.unprocessed_requests:
             logger.warning(
-                f'Request {request.url} was not processed by storage client "{self._client.__class__.__name__}".'
-            )
-        else:
-            logger.warning(
-                f'Request {request.url} was not processed by storage client "{self._client.__class__.__name__}" '
-                'received empty response.'
+                f'Request {request.url} was not processed by storage client '
+                f'"{self._client.__class__.__name__}" (received an empty response).'
             )
         return None
 
@@ -352,33 +354,47 @@ class RequestQueue(Storage, RequestManager):
         base_retry_wait: timedelta,
         attempt: int = 1,
         forefront: bool = False,
-    ) -> None:
-        """Process a batch of requests with automatic retry mechanism."""
+    ) -> AddRequestsResponse:
+        """Process a batch of requests with automatic retry mechanism.
+
+        Returns:
+            A response aggregating the requests processed across all attempts together with any that remained
+            unprocessed after the retries were exhausted.
+        """
         max_attempts = 5
         response = await self._client.add_batch_of_requests(batch, forefront=forefront)
 
-        if response.unprocessed_requests:
-            logger.debug(f'Following requests were not processed: {response.unprocessed_requests}.')
-            if attempt > max_attempts:
-                logger.warning(
-                    f'Following requests were not processed even after {max_attempts} attempts:\n'
-                    f'{response.unprocessed_requests}'
-                )
-            else:
-                logger.debug('Retry to add requests.')
-                unprocessed_requests_unique_keys = {request.unique_key for request in response.unprocessed_requests}
-                retry_batch = [request for request in batch if request.unique_key in unprocessed_requests_unique_keys]
-                await asyncio.sleep((base_retry_wait * attempt).total_seconds())
-                await self._process_batch(
-                    retry_batch,
-                    base_retry_wait=base_retry_wait,
-                    attempt=attempt + 1,
-                    forefront=forefront,
-                )
-
         request_count = len(batch) - len(response.unprocessed_requests)
-
         if request_count:
             logger.debug(
                 f'Added {request_count} requests to the queue. Processed requests: {response.processed_requests}'
             )
+
+        if not response.unprocessed_requests:
+            return response
+
+        logger.debug(f'Following requests were not processed: {response.unprocessed_requests}.')
+        if attempt > max_attempts:
+            logger.warning(
+                f'Following requests were not processed even after {max_attempts} attempts:\n'
+                f'{response.unprocessed_requests}'
+            )
+            return response
+
+        logger.debug('Retry to add requests.')
+        unprocessed_requests_unique_keys = {request.unique_key for request in response.unprocessed_requests}
+        retry_batch = [request for request in batch if request.unique_key in unprocessed_requests_unique_keys]
+        await asyncio.sleep((base_retry_wait * attempt).total_seconds())
+        retry_response = await self._process_batch(
+            retry_batch,
+            base_retry_wait=base_retry_wait,
+            attempt=attempt + 1,
+            forefront=forefront,
+        )
+
+        # Fold the retry outcome back in: requests processed on retry join this attempt's processed requests,
+        # and only those still unprocessed after the final attempt remain.
+        return AddRequestsResponse(
+            processed_requests=[*response.processed_requests, *retry_response.processed_requests],
+            unprocessed_requests=retry_response.unprocessed_requests,
+        )
