@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
-from contextlib import suppress
+from contextlib import aclosing, suppress
 from logging import getLogger
 from typing import TYPE_CHECKING, Annotated, Any
 
@@ -262,8 +262,6 @@ class SitemapRequestLoader(RequestLoader):
             self._loading_task.cancel()
             with suppress(asyncio.CancelledError):
                 await self._loading_task
-            # Let the streaming request shut down gracefully.
-            await asyncio.sleep(0)
 
     async def close(self) -> None:
         """Close the request loader."""
@@ -362,46 +360,52 @@ class SitemapRequestLoader(RequestLoader):
                 )
                 parsed_sitemap_url = URL(sitemap_url)
 
-                async for item in parse_sitemap(
-                    [SitemapSource(type='url', url=sitemap_url)],
-                    self._http_client,
-                    proxy_info=self._proxy_info,
-                    options=parse_options,
-                ):
-                    if isinstance(item, NestedSitemap):
-                        # Add nested sitemap to queue
-                        if item.loc not in state.pending_sitemap_urls and item.loc not in state.processed_sitemap_urls:
-                            if not self._passes_filters(item.loc, parsed_sitemap_url, 'nested sitemap'):
+                async with aclosing(
+                    parse_sitemap(
+                        [SitemapSource(type='url', url=sitemap_url)],
+                        self._http_client,
+                        proxy_info=self._proxy_info,
+                        options=parse_options,
+                    )
+                ) as sitemap_items:
+                    async for item in sitemap_items:
+                        if isinstance(item, NestedSitemap):
+                            # Add nested sitemap to queue
+                            if (
+                                item.loc not in state.pending_sitemap_urls
+                                and item.loc not in state.processed_sitemap_urls
+                            ):
+                                if not self._passes_filters(item.loc, parsed_sitemap_url, 'nested sitemap'):
+                                    continue
+                                state.pending_sitemap_urls.append(item.loc)
+                            continue
+
+                        if isinstance(item, SitemapUrl):
+                            url = item.loc
+
+                            state = await self._get_state()
+
+                            # Skip if already processed
+                            if url in state.current_sitemap_processed_urls:
                                 continue
-                            state.pending_sitemap_urls.append(item.loc)
-                        continue
 
-                    if isinstance(item, SitemapUrl):
-                        url = item.loc
+                            # Check if URL should be included
+                            if not self._check_url_patterns(url, self._include, self._exclude):
+                                continue
 
-                        state = await self._get_state()
+                            if not self._passes_filters(url, parsed_sitemap_url, 'sitemap URL'):
+                                continue
 
-                        # Skip if already processed
-                        if url in state.current_sitemap_processed_urls:
-                            continue
+                            # Check if we have capacity in the queue
+                            await self._queue_has_capacity.wait()
 
-                        # Check if URL should be included
-                        if not self._check_url_patterns(url, self._include, self._exclude):
-                            continue
-
-                        if not self._passes_filters(url, parsed_sitemap_url, 'sitemap URL'):
-                            continue
-
-                        # Check if we have capacity in the queue
-                        await self._queue_has_capacity.wait()
-
-                        async with self._queue_lock:
-                            state.url_queue.append(url)
-                            state.current_sitemap_processed_urls.add(url)
-                            state.total_count += 1
-                            if len(state.url_queue) >= self._max_buffer_size:
-                                # Notify that the queue is full
-                                self._queue_has_capacity.clear()
+                            async with self._queue_lock:
+                                state.url_queue.append(url)
+                                state.current_sitemap_processed_urls.add(url)
+                                state.total_count += 1
+                                if len(state.url_queue) >= self._max_buffer_size:
+                                    # Notify that the queue is full
+                                    self._queue_has_capacity.clear()
 
                 # Clear current sitemap after processing
                 state = await self._get_state()
