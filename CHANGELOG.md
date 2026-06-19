@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Validate storage name and alias values ([#1950](https://github.com/apify/crawlee-python/pull/1950)) ([0cac092](https://github.com/apify/crawlee-python/commit/0cac092139b4cac608a1400eae5218002b82f4c3)) by [@vdusek](https://github.com/vdusek)
 - Constrain default sitemap loading ([#1956](https://github.com/apify/crawlee-python/pull/1956)) ([3fd5ace](https://github.com/apify/crawlee-python/commit/3fd5ace7d37d9d71f32c6d29110ad67154f0ec23)) by [@Pijukatel](https://github.com/Pijukatel)
 - Remove extra sleep in `ImpitHttpClient.stream` ([#1980](https://github.com/apify/crawlee-python/pull/1980)) ([149a6aa](https://github.com/apify/crawlee-python/commit/149a6aa80de49e2de9988a89e42271181b6525c6)) by [@Mantisus](https://github.com/Mantisus)
+- Retry unprocessed requests in RequestQueue.add_request ([#1976](https://github.com/apify/crawlee-python/pull/1976)) ([cfee910](https://github.com/apify/crawlee-python/commit/cfee910b738b9c492124e1890113a923fc2ddf66)) by [@vdusek](https://github.com/vdusek), closes [#1975](https://github.com/apify/crawlee-python/issues/1975)
 
 
 <!-- git-cliff-unreleased-end -->
