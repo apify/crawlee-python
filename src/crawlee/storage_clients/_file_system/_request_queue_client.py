@@ -114,9 +114,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         self._request_cache_needs_refresh = True
         """Flag indicating whether the cache needs to be refreshed from filesystem."""
 
-        self._is_empty_cache: bool | None = None
-        """Cache for is_empty result: None means unknown, True/False is cached state."""
-
         self._state = recoverable_state
         """Recoverable state to maintain request ordering, in-progress status, and handled status."""
 
@@ -291,9 +288,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             self._request_cache.clear()
             self._request_cache_needs_refresh = True
 
-            # Invalidate is_empty cache.
-            self._is_empty_cache = None
-
     @override
     async def purge(self) -> None:
         async with self._lock:
@@ -315,9 +309,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 new_total_request_count=0,
             )
 
-            # Invalidate is_empty cache.
-            self._is_empty_cache = None
-
     @override
     async def add_batch_of_requests(
         self,
@@ -326,7 +317,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         forefront: bool = False,
     ) -> AddRequestsResponse:
         async with self._lock:
-            self._is_empty_cache = None
             new_total_request_count = self._metadata.total_request_count
             new_pending_request_count = self._metadata.pending_request_count
             processed_requests = list[ProcessedRequest]()
@@ -435,9 +425,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             if forefront:
                 self._request_cache_needs_refresh = True
 
-            # Invalidate is_empty cache.
-            self._is_empty_cache = None
-
             return AddRequestsResponse(
                 processed_requests=processed_requests,
                 unprocessed_requests=unprocessed_requests,
@@ -482,7 +469,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         async with self._lock:
-            self._is_empty_cache = None
             state = self._state.current_value
 
             # Check if the request is in progress.
@@ -530,7 +516,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         forefront: bool = False,
     ) -> ProcessedRequest | None:
         async with self._lock:
-            self._is_empty_cache = None
             state = self._state.current_value
 
             # Check if the request is in progress.
@@ -586,39 +571,23 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     @override
     async def is_empty(self) -> bool:
         async with self._lock:
-            # If we have a cached value, return it immediately.
-            if self._is_empty_cache is not None:
-                return self._is_empty_cache
-
-            state = self._state.current_value
-
-            # If there are in-progress requests, return False immediately.
-            if len(state.in_progress_requests) > 0:
-                self._is_empty_cache = False
-                return False
-
-            # If we have a cached requests, check them first (fast path).
-            if self._request_cache:
-                for req in self._request_cache:
-                    if req.unique_key not in state.handled_requests:
-                        self._is_empty_cache = False
-                        return False
-                self._is_empty_cache = True
-                return len(state.in_progress_requests) == 0
-
-            # Fallback: check state for unhandled requests.
             await self._update_metadata(update_accessed_at=True)
 
-            # Check if there are any requests that are not handled
-            all_requests = set(state.forefront_requests.keys()) | set(state.regular_requests.keys())
-            unhandled_requests = all_requests - state.handled_requests
+            # The queue is empty when nothing is available to fetch, i.e. every unhandled request is
+            # currently in progress.
+            return self._metadata.pending_request_count - len(self._state.current_value.in_progress_requests) <= 0
 
-            if unhandled_requests:
-                self._is_empty_cache = False
-                return False
+    @override
+    async def is_finished(self) -> bool:
+        # If anything is still available to fetch, the queue is not finished.
+        if not await self.is_empty():
+            return False
 
-            self._is_empty_cache = True
-            return True
+        async with self._lock:
+            await self._update_metadata(update_accessed_at=True)
+
+            # The queue is finished when there are no pending requests and no in-progress requests.
+            return self._metadata.pending_request_count == 0 and not self._state.current_value.in_progress_requests
 
     def _get_request_path(self, unique_key: str) -> Path:
         """Get the path to a specific request file.

@@ -124,8 +124,16 @@ class RequestQueueClient(ABC):
 
     @abstractmethod
     async def is_empty(self) -> bool:
-        """Check if the request queue is empty.
+        """Check if the request queue is empty. That means there are no requests available to fetch.
 
         Returns:
             True if the request queue is empty, False otherwise.
         """
+
+    async def is_finished(self) -> bool:
+        """Check if the request queue is finished. That means the queue is empty and no requests are being processed.
+
+        Returns:
+            True if the request queue is finished, False otherwise.
+        """
+        return await self.is_empty()
