@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Constrain default sitemap loading ([#1956](https://github.com/apify/crawlee-python/pull/1956)) ([3fd5ace](https://github.com/apify/crawlee-python/commit/3fd5ace7d37d9d71f32c6d29110ad67154f0ec23)) by [@Pijukatel](https://github.com/Pijukatel)
 - Remove extra sleep in `ImpitHttpClient.stream` ([#1980](https://github.com/apify/crawlee-python/pull/1980)) ([149a6aa](https://github.com/apify/crawlee-python/commit/149a6aa80de49e2de9988a89e42271181b6525c6)) by [@Mantisus](https://github.com/Mantisus)
 - Retry unprocessed requests in RequestQueue.add_request ([#1976](https://github.com/apify/crawlee-python/pull/1976)) ([cfee910](https://github.com/apify/crawlee-python/commit/cfee910b738b9c492124e1890113a923fc2ddf66)) by [@vdusek](https://github.com/vdusek), closes [#1975](https://github.com/apify/crawlee-python/issues/1975)
+- Gracefully close sitemap stream on `SitemapRequestLoader` abort ([#1979](https://github.com/apify/crawlee-python/pull/1979)) ([202726d](https://github.com/apify/crawlee-python/commit/202726d6853ec402ff970e99c708ba6b519160b4)) by [@Mantisus](https://github.com/Mantisus)
 
 
 <!-- git-cliff-unreleased-end -->
