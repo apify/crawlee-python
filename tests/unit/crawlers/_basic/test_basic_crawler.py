@@ -161,7 +161,7 @@ async def test_no_new_tasks_while_only_request_in_progress() -> None:
     ) as fetch_counter:
         await crawler.run(['https://a.placeholder.com'])
 
-        # `concurency` tasks can be scheduled if control was never yielded with `await` during task scheduling
+        # `concurrency` tasks can be scheduled if control was never yielded with `await` during task scheduling
         assert fetch_counter.call_count <= 4
 
 
