@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.7.3 - **not yet released**
+## [1.7.3](https://github.com/apify/crawlee-python/releases/tag/v1.7.3) (2026-06-22)
 
 ### 🐛 Bug Fixes
 
@@ -17,7 +16,6 @@ All notable changes to this project will be documented in this file.
 - Gracefully close sitemap stream on `SitemapRequestLoader` abort ([#1979](https://github.com/apify/crawlee-python/pull/1979)) ([202726d](https://github.com/apify/crawlee-python/commit/202726d6853ec402ff970e99c708ba6b519160b4)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.7.2](https://github.com/apify/crawlee-python/releases/tag/v1.7.2) (2026-06-04)
 
 ### 🐛 Bug Fixes
