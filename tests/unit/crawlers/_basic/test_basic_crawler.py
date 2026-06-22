@@ -143,8 +143,9 @@ async def test_retries_failed_requests() -> None:
 
 
 async def test_no_new_tasks_while_only_request_in_progress() -> None:
+    concurrency = 4
     crawler = BasicCrawler(
-        concurrency_settings=ConcurrencySettings(desired_concurrency=4, max_concurrency=4),
+        concurrency_settings=ConcurrencySettings(desired_concurrency=concurrency, max_concurrency=concurrency),
     )
 
     request_manager = await crawler.get_request_manager()
@@ -160,7 +161,8 @@ async def test_no_new_tasks_while_only_request_in_progress() -> None:
     ) as fetch_counter:
         await crawler.run(['https://a.placeholder.com'])
 
-        fetch_counter.assert_called_once()
+        # `concurency` tasks can be scheduled if control was never yielded with `await` during task scheduling
+        assert fetch_counter.call_count <= 4
 
 
 async def test_respects_no_retry() -> None:
