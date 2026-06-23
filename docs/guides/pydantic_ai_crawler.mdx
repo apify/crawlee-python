@@ -57,13 +57,11 @@ pip install 'crawlee[pydantic-ai]' 'pydantic-ai-slim[anthropic]'
 
 ## Basic usage
 
-Provide a `model` and call <ApiLink to="class/PydanticAiCrawlingContext#extract">`context.extract`</ApiLink> with a Pydantic model inside the handler. The example below extracts an article and pushes it to the dataset.
+Provide a `model` and call <ApiLink to="class/PydanticAiCrawlingContext#extract">`context.extract`</ApiLink> with a Pydantic model inside the handler. With only a `model`, the crawler wraps it in a <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink>, the default extractor, which sends each distilled page to the model in one call. The example below extracts an article and pushes it to the dataset.
 
 <CodeBlock className="language-python">
     {BasicExample}
 </CodeBlock>
-
-The `model` builds the crawler's default extractor, a <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink>. With neither `model` nor `extractor`, a default OpenAI model is used.
 
 The `model` argument accepts a provider-prefixed name or a Pydantic AI `Model` instance.
 
@@ -78,6 +76,8 @@ from pydantic_ai.providers.openai import OpenAIProvider
 model = OpenAIChatModel('gpt-5.4-nano', provider=OpenAIProvider(api_key='...'))
 crawler = PydanticAiCrawler(model=model)
 ```
+
+With neither a `model` nor an `extractor`, the crawler uses a default OpenAI model.
 
 ## Extractors
 
@@ -105,13 +105,23 @@ Use `additional_instructions` to focus the model on the data you want:
 
 It supports schemas built from scalar fields, lists of scalars, lists of items, and a single nested item, one level deep. For shapes it cannot serve (such as a `dict` field), set a `fallback` or use <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink>.
 
-Both extractors share two more knobs. `retries` caps how many times the model may fix output that fails schema validation (default 1 for <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink>, 3 for <ApiLink to="class/PydanticAiSelectorExtractor">`PydanticAiSelectorExtractor`</ApiLink>). `instructions` replaces the base task instructions entirely.
+The `fallback` is any extractor implementing <ApiLink to="class/PydanticAiHtmlExtractor">`PydanticAiHtmlExtractor`</ApiLink>. It can be a <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink> with its own settings, or another <ApiLink to="class/PydanticAiSelectorExtractor">`PydanticAiSelectorExtractor`</ApiLink> with a different model, distiller, or instructions. The argument takes a configured extractor rather than a boolean flag, since a fallback often needs fine-grained control. Without a `fallback`, a failed selector generation raises an `UnexpectedModelBehavior`, and a complex, unsupported schema raises a `ValueError`.
+
+Both extractors share two more knobs. `retries` caps how many times the model may fix output that fails validation (default 1 for <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink>, 3 for <ApiLink to="class/PydanticAiSelectorExtractor">`PydanticAiSelectorExtractor`</ApiLink>). `instructions` replaces the base task instructions entirely.
 
 ## Distillers
 
-A distiller reduces raw HTML to a compact representation the model reads cheaply. Each extractor uses one. Replace it with the extractor's `distiller` argument (the crawler itself has no `distiller` argument).
+A distiller reduces raw HTML to a compact representation the model reads cheaply. Each extractor uses one, set through its `distiller` argument (the crawler has no `distiller` argument).
 
-<ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink> defaults to a <ApiLink to="class/PydanticAiCleanHtmlDistiller">`PydanticAiCleanHtmlDistiller`</ApiLink>: cleaned, structure-preserving HTML that keeps the full page text. <ApiLink to="class/PydanticAiSelectorExtractor">`PydanticAiSelectorExtractor`</ApiLink> uses a <ApiLink to="class/PydanticAiSkeletonDistiller">`PydanticAiSkeletonDistiller`</ApiLink> internally to ask the model for selectors; you rarely set it yourself.
+Any distiller pairs with any extractor, which lets you balance extraction quality against token cost. A distiller that keeps more of the page helps the model read values or generate selectors, but costs more tokens. One that keeps only structure and attributes is cheaper, but drops the page text. Pick by your task and the strategy your extractor implements.
+
+### PydanticAiCleanHtmlDistiller
+
+<ApiLink to="class/PydanticAiCleanHtmlDistiller">`PydanticAiCleanHtmlDistiller`</ApiLink> produces cleaned, structure-preserving HTML and keeps the full page text. Scripts and styling are removed; tags, nesting, and data-bearing attributes (`href`, `class`, `datetime`, ...) stay. It is the default for <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink>, which reads the values straight from the document, so it fits pages where the data lives in the text.
+
+### PydanticAiSkeletonDistiller
+
+<ApiLink to="class/PydanticAiSkeletonDistiller">`PydanticAiSkeletonDistiller`</ApiLink> builds on the <ApiLink to="class/PydanticAiCleanHtmlDistiller">`PydanticAiCleanHtmlDistiller`</ApiLink>, then truncates text nodes to short samples and collapses runs of repeated siblings. The output shows the page structure rather than its content, which is what the model needs to write CSS selectors, and its smaller size costs fewer tokens. It is the default for <ApiLink to="class/PydanticAiSelectorExtractor">`PydanticAiSelectorExtractor`</ApiLink>.
 
 ### Custom distiller
 

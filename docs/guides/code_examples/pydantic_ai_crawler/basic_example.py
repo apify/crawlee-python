@@ -15,12 +15,14 @@ class Article(BaseModel):
 
 
 async def main() -> None:
+    # A `Model` instance sets the API key explicitly. A provider-prefixed string such as
+    # 'openai:gpt-5.4-nano' reads the key from the provider's env var like OPENAI_API_KEY.
     model = OpenAIChatModel(
         'gpt-5.4-nano',
-        # Set the provider with the API key explicitly.
         provider=OpenAIProvider(api_key='your-openai-api-key'),
     )
 
+    # With only `model`, the crawler uses a PydanticAiDirectExtractor by default.
     crawler = PydanticAiCrawler(model=model, max_requests_per_crawl=5)
 
     @crawler.router.default_handler
