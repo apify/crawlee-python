@@ -10,7 +10,7 @@ from typing_extensions import override
 from crawlee._utils.docs import docs_group
 
 from ._base_distiller import _WHITESPACE_RE
-from ._clean_html_distiller import AiCleanHtmlDistiller
+from ._clean_html_distiller import PydanticAiCleanHtmlDistiller
 from ._prompts import _SKELETON_PROMPT_NOTES, _TRUNCATION_MARKER
 
 if TYPE_CHECKING:
@@ -28,15 +28,15 @@ logger = getLogger(__name__)
 
 
 @docs_group('Other')
-class AiSkeletonDistiller(AiCleanHtmlDistiller):
+class PydanticAiSkeletonDistiller(PydanticAiCleanHtmlDistiller):
     """Distiller that produces a DOM skeleton used to ask an LLM for CSS selectors.
 
     The skeleton is built from the page by removing nodes, attributes, and class tokens, or by truncating text. It
     never renames or re-parents elements. So any selector the LLM builds from the skeleton also matches the
     original page.
 
-    This is the default distiller for `AiSelectorExtractor`. See `AiCleanHtmlDistiller` for the direct-extraction
-    variant that keeps the full page text.
+    This is the default distiller for `PydanticAiSelectorExtractor`. See `PydanticAiCleanHtmlDistiller` for the
+    direct-extraction variant that keeps the full page text.
 
     On top of the base cleaning:
 
@@ -54,9 +54,9 @@ class AiSkeletonDistiller(AiCleanHtmlDistiller):
     ### Usage
 
     ```python
-    from crawlee.crawlers import AiSkeletonDistiller
+    from crawlee.crawlers import PydanticAiSkeletonDistiller
 
-    distiller = AiSkeletonDistiller(max_text_len=80)
+    distiller = PydanticAiSkeletonDistiller(max_text_len=80)
     skeleton = distiller.distill('<html>...</html>')
     ```
     """
@@ -191,7 +191,7 @@ class AiSkeletonDistiller(AiCleanHtmlDistiller):
             return distilled_html
 
         # The skeleton is too big, re-distill with tighter settings.
-        tighter = AiSkeletonDistiller(
+        tighter = PydanticAiSkeletonDistiller(
             cleaner=self._cleaner,
             max_text_len=max(self._max_text_len // 2, 15),
             max_json_len=self._max_json_len,

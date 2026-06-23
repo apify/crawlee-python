@@ -8,9 +8,9 @@ from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
 
-from ._base_distiller import _WHITESPACE_RE, BaseAiHtmlDistiller
+from ._base_distiller import _WHITESPACE_RE, BasePydanticAiHtmlDistiller
 from ._prompts import _CLEAN_HTML_PROMPT_NOTES, _TRUNCATION_MARKER
-from ._utils import get_basic_ai_cleaner
+from ._utils import get_basic_http_cleaner
 
 if TYPE_CHECKING:
     from lxml.html import HtmlElement
@@ -46,7 +46,7 @@ logger = getLogger(__name__)
 
 
 @docs_group('Other')
-class AiCleanHtmlDistiller(BaseAiHtmlDistiller):
+class PydanticAiCleanHtmlDistiller(BasePydanticAiHtmlDistiller):
     """Distiller that produces cleaned, structure-preserving HTML for direct LLM extraction.
 
     The full page text survives, so the data to extract lives inside the produced document. Tags, nesting, and
@@ -55,15 +55,15 @@ class AiCleanHtmlDistiller(BaseAiHtmlDistiller):
     JSON scripts are kept in full by default. For sites where a JSON-LD or framework blob is itself the data, this
     is the cheapest path. Such blobs can reach hundreds of kilobytes, so set `max_json_len` for them.
 
-    This is the default distiller for `AiDirectExtractor`. See `AiSkeletonDistiller` for the selector-generation
-    variant.
+    This is the default distiller for `PydanticAiDirectExtractor`. See `PydanticAiSkeletonDistiller` for the
+    selector-generation variant.
 
     ### Usage
 
     ```python
-    from crawlee.crawlers import AiCleanHtmlDistiller
+    from crawlee.crawlers import PydanticAiCleanHtmlDistiller
 
-    distiller = AiCleanHtmlDistiller(max_json_len=5_000)
+    distiller = PydanticAiCleanHtmlDistiller(max_json_len=5_000)
     distilled_html = distiller.distill('<html>...</html>')
     ```
     """
@@ -94,7 +94,7 @@ class AiCleanHtmlDistiller(BaseAiHtmlDistiller):
             prompt_notes: Override for the default prompt notes. Pass `None` to send no notes to the LLM.
         """
         super().__init__(prompt_notes=prompt_notes)
-        self._cleaner = cleaner or get_basic_ai_cleaner()
+        self._cleaner = cleaner or get_basic_http_cleaner()
         self._max_classes = max_classes
         self._max_attr_len = max_attr_len
         self._max_json_len = max_json_len

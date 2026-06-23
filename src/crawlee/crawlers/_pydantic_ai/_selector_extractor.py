@@ -18,9 +18,9 @@ from pydantic_ai.usage import RunUsage
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recoverable_state import RecoverableState
 
-from ._base_extractor import BaseAiHtmlExtractor
+from ._base_extractor import BasePydanticAiHtmlExtractor
 from ._prompts import _SELECTOR_INSTRUCTIONS
-from ._skeleton_distiller import AiSkeletonDistiller
+from ._skeleton_distiller import PydanticAiSkeletonDistiller
 
 if TYPE_CHECKING:
     from typing import Any
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from pydantic_ai.models import Model
     from pydantic_ai.usage import UsageLimits
 
-    from ._types import AiHtmlDistiller, AiHtmlExtractor, AiUsageStats, TSchema
+    from ._types import PydanticAiHtmlDistiller, PydanticAiHtmlExtractor, PydanticAiUsageStats, TSchema
 
 logger = getLogger(__name__)
 
@@ -54,7 +54,7 @@ class FieldSelector(BaseModel):
 
 
 class SelectorMap(BaseModel):
-    """LLM output for `AiSelectorExtractor`. A tree of Parsel CSS selectors that mirrors the user schema."""
+    """LLM output for `PydanticAiSelectorExtractor`. A tree of Parsel CSS selectors that mirrors the user schema."""
 
     selectors: dict[str, FieldSelector] = Field(
         description=(
@@ -65,7 +65,7 @@ class SelectorMap(BaseModel):
 
 
 class SelectorCacheState(BaseModel):
-    """Persisted selector cache of one `AiSelectorExtractor`.
+    """Persisted selector cache of one `PydanticAiSelectorExtractor`.
 
     Each key is a `(schema, scope, cache_tag)` digest. Each value is the list
     of selector maps learned for that bucket, one per markup variant.
@@ -103,7 +103,7 @@ class _FieldKind(Enum):
 
 
 @docs_group('Other')
-class AiSelectorExtractor(BaseAiHtmlExtractor):
+class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
     """Extractor that learns reusable CSS selectors and reuses them for free.
 
     On each call it first tries the cached selector maps and extracts with no LLM call when one fits. On a miss it
@@ -116,8 +116,8 @@ class AiSelectorExtractor(BaseAiHtmlExtractor):
     With a `fallback` extractor, unsupported schemas and generation failures degrade to it. Infrastructure errors
     such as credentials, HTTP, and usage limits propagate.
 
-    See the `AiHtmlExtractor` protocol for the common extractor interface, and `AiDirectExtractor` for a per-page
-    variant with no selector cache.
+    See the `PydanticAiHtmlExtractor` protocol for the common extractor interface, and `PydanticAiDirectExtractor`
+    for a per-page variant with no selector cache.
 
     ### Usage
 
@@ -126,7 +126,7 @@ class AiSelectorExtractor(BaseAiHtmlExtractor):
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
-    from crawlee.crawlers import AiDirectExtractor, AiSelectorExtractor
+    from crawlee.crawlers import PydanticAiDirectExtractor, PydanticAiSelectorExtractor
 
 
     class Product(BaseModel):
@@ -135,7 +135,7 @@ class AiSelectorExtractor(BaseAiHtmlExtractor):
 
 
     model = OpenAIChatModel('gpt-5.4-nano', provider=OpenAIProvider(api_key='...'))
-    extractor = AiSelectorExtractor(model=model, fallback=AiDirectExtractor(model=model))
+    extractor = PydanticAiSelectorExtractor(model=model, fallback=PydanticAiDirectExtractor(model=model))
     product = await extractor.extract('<html>...</html>', Product, cache_tag='product')
     ```
     """
@@ -148,11 +148,11 @@ class AiSelectorExtractor(BaseAiHtmlExtractor):
         model: str | Model,
         *,
         kvs_cache_key: str | None = None,
-        distiller: AiHtmlDistiller | None = None,
+        distiller: PydanticAiHtmlDistiller | None = None,
         instructions: str = _SELECTOR_INSTRUCTIONS,
         retries: int = 3,
         max_variants: int = 5,
-        fallback: AiHtmlExtractor | None = None,
+        fallback: PydanticAiHtmlExtractor | None = None,
         usage_limits: UsageLimits | None = None,
         persistence: bool = True,
     ) -> None:
@@ -161,7 +161,7 @@ class AiSelectorExtractor(BaseAiHtmlExtractor):
         Args:
             model: A provider-prefixed name (e.g. `'openai:gpt-5.4-nano'`) or a pydantic-ai `Model`.
             kvs_cache_key: Name of the `KeyValueStore` record holding the selector cache. Defaults to `'AI-SELECTORS'`.
-            distiller: The HTML distiller shaping the LLM input. Defaults to `AiSkeletonDistiller`.
+            distiller: The HTML distiller shaping the LLM input. Defaults to `PydanticAiSkeletonDistiller`.
             instructions: Base selector-generation instructions. The distiller's prompt notes are appended
                 automatically.
             retries: How many times the model may fix failing selectors within one generation.
@@ -172,7 +172,7 @@ class AiSelectorExtractor(BaseAiHtmlExtractor):
         """
         super().__init__(
             model,
-            distiller=distiller or AiSkeletonDistiller(),
+            distiller=distiller or PydanticAiSkeletonDistiller(),
             instructions=instructions,
             usage_limits=usage_limits,
         )
@@ -192,7 +192,7 @@ class AiSelectorExtractor(BaseAiHtmlExtractor):
         self._init_lock = asyncio.Lock()
         self._active = False
 
-    def set_ai_usage(self, value: AiUsageStats) -> None:
+    def set_ai_usage(self, value: PydanticAiUsageStats) -> None:
         """Adopt `value` and re-share it with the fallback chain."""
         super().set_ai_usage(value)
         self._share_usage_with_fallback()
@@ -207,7 +207,7 @@ class AiSelectorExtractor(BaseAiHtmlExtractor):
         """Whether the extractor is in its async context-manager scope."""
         return self._active
 
-    async def __aenter__(self) -> AiSelectorExtractor:
+    async def __aenter__(self) -> PydanticAiSelectorExtractor:
         """Initialize the selector cache eagerly."""
         if self._active:
             raise RuntimeError(f'The {type(self).__name__} is already active.')
@@ -263,14 +263,14 @@ class AiSelectorExtractor(BaseAiHtmlExtractor):
                 )
                 return await self._delegate_to_fallback(selector, schema, additional_instructions)
             raise ValueError(
-                f'AiSelectorExtractor does not support this schema shape: {reason}. '
-                'Configure a fallback extractor or use AiDirectExtractor for it.'
+                f'PydanticAiSelectorExtractor does not support this schema shape: {reason}. '
+                'Configure a fallback extractor or use PydanticAiDirectExtractor for it.'
             )
 
         if not self._selector_cache.is_initialized:
             async with self._init_lock:
                 if not self._selector_cache.is_initialized:
-                    # Lazy init for standalone use. Under `AiCrawler` the context manager initializes it at startup.
+                    # Lazy init for standalone use. Under `PydanticAiCrawler` the context manager inits it at startup.
                     await self._selector_cache.initialize()
 
         cache_digest = self._build_cache_digest(schema, scope, cache_tag)

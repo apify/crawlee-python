@@ -6,7 +6,11 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.usage import UsageLimits
 
-from crawlee.crawlers import AiCrawler, AiCrawlingContext, AiDirectExtractor
+from crawlee.crawlers import (
+    PydanticAiCrawler,
+    PydanticAiCrawlingContext,
+    PydanticAiDirectExtractor,
+)
 
 # Stop the whole crawl once this many tokens have been spent.
 TOKEN_BUDGET = 50_000
@@ -24,9 +28,9 @@ async def main() -> None:
         'gpt-5.4-nano',
         provider=OpenAIProvider(api_key='your-openai-api-key'),
     )
-    crawler = AiCrawler(
+    crawler = PydanticAiCrawler(
         # Cap each extraction so an oversized page cannot consume LLM resources.
-        extractor=AiDirectExtractor(
+        extractor=PydanticAiDirectExtractor(
             model=model,
             usage_limits=UsageLimits(total_tokens_limit=10_000),
         ),
@@ -34,7 +38,7 @@ async def main() -> None:
     )
 
     @crawler.router.default_handler
-    async def handler(context: AiCrawlingContext) -> None:
+    async def handler(context: PydanticAiCrawlingContext) -> None:
         # Stop the crawl once the cumulative token budget is exhausted.
         if context.ai_usage.total_tokens > TOKEN_BUDGET:
             context.log.info('Token budget exhausted, stopping the crawler.')

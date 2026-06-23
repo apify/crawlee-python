@@ -19,15 +19,15 @@ _WHITESPACE_RE = re.compile(r'\s+')
 
 
 @docs_group('Other')
-class BaseAiHtmlDistiller(ABC):
+class BasePydanticAiHtmlDistiller(ABC):
     """Base class for the built-in HTML distillers.
 
     A distiller reduces raw HTML to a compact representation that an LLM can read cheaply. Subclasses implement
     `distill`. The base stores the prompt notes and returns them from `get_prompt_notes`. Override
     `get_prompt_notes` when the notes depend on several constructor arguments.
 
-    The public interface is the `AiHtmlDistiller` protocol. The concrete distillers are `AiCleanHtmlDistiller`
-    and `AiSkeletonDistiller`.
+    The public interface is the `PydanticAiHtmlDistiller` protocol. The concrete distillers are
+    `PydanticAiCleanHtmlDistiller` and `PydanticAiSkeletonDistiller`.
     """
 
     def __init__(self, *, prompt_notes: str | None = None) -> None:

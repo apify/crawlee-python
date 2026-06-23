@@ -1,0 +1,150 @@
+---
+id: pydantic-ai-crawler
+title: AI crawler
+description: Learn how to use PydanticAiCrawler to extract structured data from HTML pages with an LLM.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import CodeBlock from '@theme/CodeBlock';
+
+import BasicExample from '!!raw-loader!./code_examples/pydantic_ai_crawler/basic_example.py';
+import AdditionalInstructionsExample from '!!raw-loader!./code_examples/pydantic_ai_crawler/additional_instructions_example.py';
+import CustomDistillerExample from '!!raw-loader!./code_examples/pydantic_ai_crawler/custom_distiller_example.py';
+import SelectorExtractorExample from '!!raw-loader!./code_examples/pydantic_ai_crawler/selector_extractor_example.py';
+import UsageLimitExample from '!!raw-loader!./code_examples/pydantic_ai_crawler/usage_limit_example.py';
+
+A <ApiLink to="class/PydanticAiCrawler">`PydanticAiCrawler`</ApiLink> extracts structured data from a page with an LLM. It fetches each page over plain HTTP and parses it with Parsel, then exposes an <ApiLink to="class/ExtractFunction">`extract`</ApiLink> helper: pass a Pydantic model and get a validated instance back. Instead of writing CSS selectors for every field, you describe the data with a schema and the model fills it in.
+
+The model layer is [Pydantic AI](https://ai.pydantic.dev/), so any provider it supports (OpenAI, Anthropic, Gemini, Ollama, ...) works through the `model` argument. The context is a <ApiLink to="class/PydanticAiCrawlingContext">`PydanticAiCrawlingContext`</ApiLink>, which extends the <ApiLink to="class/ParselCrawlingContext">`ParselCrawlingContext`</ApiLink>, so the manual <ApiLink to="class/ParselCrawlingContext#selector">`selector`</ApiLink> and <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> stay available next to <ApiLink to="class/ExtractFunction">`extract`</ApiLink>.
+
+:::caution Experimental
+
+<ApiLink to="class/PydanticAiCrawler">`PydanticAiCrawler`</ApiLink> is experimental. Its public API may change in future releases.
+
+:::
+
+## When to use PydanticAiCrawler
+
+Use <ApiLink to="class/PydanticAiCrawler">`PydanticAiCrawler`</ApiLink> when:
+
+- Selectors are unknown or brittle. The model reads the content, so it tolerates markup that varies or changes.
+- One schema spans many layouts. A single Pydantic model fits differently structured pages, with no per-page selectors.
+- Rapid prototyping. You describe the data with a schema instead of writing selectors.
+
+For pages with a stable, known structure, a plain <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> or <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> is cheaper, since it runs no model calls.
+
+<ApiLink to="class/PydanticAiCrawler">`PydanticAiCrawler`</ApiLink> fetches pages over plain HTTP and does not render JavaScript. For pages that need a browser, or for complex multi-step interactions, use <ApiLink to="class/StagehandCrawler">`StagehandCrawler`</ApiLink>. See the [Stagehand crawler guide](./stagehand-crawler).
+
+## Installation
+
+<ApiLink to="class/PydanticAiCrawler">`PydanticAiCrawler`</ApiLink> requires the `pydantic-ai` optional dependency group:
+
+```bash
+pip install 'crawlee[pydantic-ai]'
+```
+
+or with uv:
+
+```bash
+uv add 'crawlee[pydantic-ai]'
+```
+
+The `pydantic-ai` extra installs the OpenAI integration by default. To use another provider, add the matching [pydantic-ai-slim](https://ai.pydantic.dev/install/#use-with-pydantic-ai-slim) extra. For example, for Anthropic:
+
+```bash
+pip install 'crawlee[pydantic-ai]' 'pydantic-ai-slim[anthropic]'
+```
+
+## Basic usage
+
+Provide a `model` and call <ApiLink to="class/PydanticAiCrawlingContext#extract">`context.extract`</ApiLink> with a Pydantic model inside the handler. The example below extracts an article and pushes it to the dataset.
+
+<CodeBlock className="language-python">
+    {BasicExample}
+</CodeBlock>
+
+The `model` builds the crawler's default extractor, a <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink>. With neither `model` nor `extractor`, a default OpenAI model is used.
+
+The `model` argument accepts a provider-prefixed name or a Pydantic AI `Model` instance.
+
+```python
+# A provider-prefixed name reads credentials from the provider's environment variable (e.g. OPENAI_API_KEY).
+crawler = PydanticAiCrawler(model='openai:gpt-5.4-nano')
+
+# A Model instance takes credentials explicitly.
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
+
+model = OpenAIChatModel('gpt-5.4-nano', provider=OpenAIProvider(api_key='...'))
+crawler = PydanticAiCrawler(model=model)
+```
+
+## Extractors
+
+An extractor turns a page into your schema. Extractors implement different strategies for working with the LLM, and each one uses a <ApiLink to="class/PydanticAiHtmlDistiller">`PydanticAiHtmlDistiller`</ApiLink> to shape the model's input. Crawlee ships two.
+
+### PydanticAiDirectExtractor
+
+<ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink> sends the distilled page to the model in one call. The schema is the model's output type. Pydantic AI validates the result; on a mismatch, it sends the error back to the model to fix, bounded by `retries`.
+
+It reads each page on its own, so extraction is accurate per page. It accepts schemas of any shape: nested models, lists, dictionaries, unions, and deep nesting. The cost is one model call per page, which scales poorly on a large site.
+
+Use `additional_instructions` to focus the model on the data you want:
+
+<CodeBlock className="language-python">
+    {AdditionalInstructionsExample}
+</CodeBlock>
+
+### PydanticAiSelectorExtractor
+
+<ApiLink to="class/PydanticAiSelectorExtractor">`PydanticAiSelectorExtractor`</ApiLink> asks the model for reusable CSS selectors on the first page of a route, caches them, and reuses them with no model call on later pages of the same layout, so it scales to large sites. When a page matches none of the cached selectors (a different markup variant), it generates and caches a new set, so one bucket can hold several variants. If selector generation fails, or the schema shape is unsupported, it degrades to the `fallback` extractor when one is set, and raises otherwise. Selectors are bucketed by `cache_tag`, which defaults to the request label, so each route keeps its own set. The cache is persisted to a <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, so a later run reuses selectors learned earlier.
+
+<CodeBlock className="language-python">
+    {SelectorExtractorExample}
+</CodeBlock>
+
+It supports schemas built from scalar fields, lists of scalars, lists of items, and a single nested item, one level deep. For shapes it cannot serve (such as a `dict` field), set a `fallback` or use <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink>.
+
+Both extractors share two more knobs. `retries` caps how many times the model may fix output that fails schema validation (default 1 for <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink>, 3 for <ApiLink to="class/PydanticAiSelectorExtractor">`PydanticAiSelectorExtractor`</ApiLink>). `instructions` replaces the base task instructions entirely.
+
+## Distillers
+
+A distiller reduces raw HTML to a compact representation the model reads cheaply. Each extractor uses one. Replace it with the extractor's `distiller` argument (the crawler itself has no `distiller` argument).
+
+<ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink> defaults to a <ApiLink to="class/PydanticAiCleanHtmlDistiller">`PydanticAiCleanHtmlDistiller`</ApiLink>: cleaned, structure-preserving HTML that keeps the full page text. <ApiLink to="class/PydanticAiSelectorExtractor">`PydanticAiSelectorExtractor`</ApiLink> uses a <ApiLink to="class/PydanticAiSkeletonDistiller">`PydanticAiSkeletonDistiller`</ApiLink> internally to ask the model for selectors; you rarely set it yourself.
+
+### Custom distiller
+
+Subclass <ApiLink to="class/BasePydanticAiHtmlDistiller">`BasePydanticAiHtmlDistiller`</ApiLink> and implement <ApiLink to="class/BasePydanticAiHtmlDistiller#distill">`distill`</ApiLink> to send a different representation. Set `prompt_notes` so the model knows the input format. The extractor appends the notes to its instructions.
+
+The example below converts the cleaned page to Markdown with [html-to-markdown](https://pypi.org/project/html-to-markdown/), an extra dependency:
+
+```bash
+pip install html-to-markdown
+```
+
+<CodeBlock className="language-python">
+    {CustomDistillerExample}
+</CodeBlock>
+
+## Extract options
+
+<ApiLink to="class/PydanticAiCrawlingContext#extract">`context.extract`</ApiLink> takes options alongside the schema:
+
+- `scope` - a CSS selector that restricts extraction to the first matching subtree (e.g. `main` or `article.post`). It saves tokens and keeps the model away from unrelated parts of the page.
+- `cache_tag` - the bucket for cached selectors. It defaults to the request label.
+- `additional_instructions` - extra instructions for this call, appended to the base instructions. With <ApiLink to="class/PydanticAiSelectorExtractor">`PydanticAiSelectorExtractor`</ApiLink> they steer the one-time selector generation, not each extraction, so use them to point the model at the right region.
+
+## Usage and cost
+
+Token usage accumulates on <ApiLink to="class/PydanticAiCrawlingContext#ai_usage">`context.ai_usage`</ApiLink>, and on <ApiLink to="class/PydanticAiCrawler#ai_usage">`crawler.ai_usage`</ApiLink> for the whole crawl. The accumulator is a <ApiLink to="class/PydanticAiUsageStats">`PydanticAiUsageStats`</ApiLink> with <ApiLink to="class/PydanticAiUsageStats#requests">`requests`</ApiLink>, <ApiLink to="class/PydanticAiUsageStats#input_tokens">`input_tokens`</ApiLink>, <ApiLink to="class/PydanticAiUsageStats#output_tokens">`output_tokens`</ApiLink>, and <ApiLink to="class/PydanticAiUsageStats#total_tokens">`total_tokens`</ApiLink>.
+
+To cap spend, pass `usage_limits` (a pydantic-ai `UsageLimits`) to an extractor. It applies to every model run, and <ApiLink to="class/ExtractFunction">`extract`</ApiLink> raises `UsageLimitExceeded` when a page needs more. The example below caps each extraction, logs and skips pages that exceed it, and stops the whole crawl once a token budget is spent.
+
+<CodeBlock className="language-python">
+    {UsageLimitExample}
+</CodeBlock>
+
+## Conclusion
+
+This guide introduced <ApiLink to="class/PydanticAiCrawler">`PydanticAiCrawler`</ApiLink> and its <ApiLink to="class/ExtractFunction">`extract`</ApiLink> helper, the <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink> and <ApiLink to="class/PydanticAiSelectorExtractor">`PydanticAiSelectorExtractor`</ApiLink> strategies, the built-in and custom distillers, the extract options, and how failures and cost are handled. If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!

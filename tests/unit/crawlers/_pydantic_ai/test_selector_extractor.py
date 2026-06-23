@@ -10,7 +10,7 @@ from pydantic_ai.messages import ModelResponse, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.test import TestModel
 
-from crawlee.crawlers import AiDirectExtractor, AiSelectorExtractor, AiUsageStats
+from crawlee.crawlers import PydanticAiDirectExtractor, PydanticAiSelectorExtractor, PydanticAiUsageStats
 
 if TYPE_CHECKING:
     from typing import Any
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from pydantic_ai.models import Model
     from pydantic_ai.models.function import AgentInfo
 
-    from crawlee.crawlers._ai._types import AiHtmlExtractor
+    from crawlee.crawlers._pydantic_ai._types import PydanticAiHtmlExtractor
 
 
 class _Item(BaseModel):
@@ -71,11 +71,11 @@ def _model(*plans: dict[str, Any]) -> FunctionModel:
 def _extractor(
     model: str | Model | None = None,
     *,
-    fallback: AiHtmlExtractor | None = None,
+    fallback: PydanticAiHtmlExtractor | None = None,
     retries: int = 3,
     max_variants: int = 5,
-) -> AiSelectorExtractor:
-    return AiSelectorExtractor(
+) -> PydanticAiSelectorExtractor:
+    return PydanticAiSelectorExtractor(
         model or TestModel(),
         persistence=False,
         fallback=fallback,
@@ -259,7 +259,7 @@ async def test_retries_with_invalid_data() -> None:
 
 
 async def test_unsupported_schema_delegates_to_fallback() -> None:
-    fallback = AiDirectExtractor(TestModel(custom_output_args={'data': {'k': 'v'}}))
+    fallback = PydanticAiDirectExtractor(TestModel(custom_output_args={'data': {'k': 'v'}}))
 
     result = await _extractor(fallback=fallback).extract('<div></div>', _Mapping)
 
@@ -269,7 +269,7 @@ async def test_unsupported_schema_delegates_to_fallback() -> None:
 async def test_generation_failure_delegates_to_fallback() -> None:
     # The selector matches nothing, so generation fails and the extractor degrades to the fallback.
     bad_plan = {'selectors': {'name': {'selector': '.absent::text'}}}
-    fallback = AiDirectExtractor(TestModel(custom_output_args={'name': 'from-fallback'}))
+    fallback = PydanticAiDirectExtractor(TestModel(custom_output_args={'name': 'from-fallback'}))
 
     result = await _extractor(_model(bad_plan), fallback=fallback, retries=0).extract(
         NAME_HTML, _Item, cache_tag='test'
@@ -291,16 +291,16 @@ async def test_scope_raises() -> None:
 
 
 async def test_fallback_shares_usage_accumulator() -> None:
-    fallback = AiDirectExtractor(TestModel())
+    fallback = PydanticAiDirectExtractor(TestModel())
     extractor = _extractor(fallback=fallback)
 
     assert fallback.ai_usage is extractor.ai_usage
 
 
 def test_set_ai_usage_reshares_with_fallback() -> None:
-    fallback = AiDirectExtractor(TestModel())
+    fallback = PydanticAiDirectExtractor(TestModel())
     extractor = _extractor(fallback=fallback)
-    new_usage = AiUsageStats()
+    new_usage = PydanticAiUsageStats()
 
     extractor.set_ai_usage(new_usage)
 
@@ -333,11 +333,11 @@ async def test_exit_without_enter_raises() -> None:
 
 
 async def test_cache_persists_across_instances() -> None:
-    async with AiSelectorExtractor(_model(NAME_SELECTORS), kvs_cache_key='shared-cache') as first:
+    async with PydanticAiSelectorExtractor(_model(NAME_SELECTORS), kvs_cache_key='shared-cache') as first:
         assert await first.extract(NAME_HTML, _Item, cache_tag='test') == _Item(name='X')
         assert first.ai_usage.requests == 1
 
     # A fresh instance loads the cache from the KeyValueStore and serves without calling the model.
-    async with AiSelectorExtractor(_model(NAME_SELECTORS), kvs_cache_key='shared-cache') as second:
+    async with PydanticAiSelectorExtractor(_model(NAME_SELECTORS), kvs_cache_key='shared-cache') as second:
         assert await second.extract(NAME_HTML, _Item, cache_tag='test') == _Item(name='X')
         assert second.ai_usage.requests == 0

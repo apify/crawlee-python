@@ -9,13 +9,13 @@ from crawlee.crawlers._parsel._parsel_crawling_context import ParselCrawlingCont
 if TYPE_CHECKING:
     from typing_extensions import Self
 
-    from ._types import AiUsageStats, ExtractFunction
+    from ._types import ExtractFunction, PydanticAiUsageStats
 
 
 @dataclass(frozen=True)
 @docs_group('Crawling contexts')
-class AiCrawlingContext(ParselCrawlingContext):
-    """The crawling context used by the `AiCrawler`.
+class PydanticAiCrawlingContext(ParselCrawlingContext):
+    """The crawling context used by the `PydanticAiCrawler`.
 
     It extends `ParselCrawlingContext`, so the full Parsel `selector` (and `enqueue_links`) remain available
     alongside the AI-powered `extract` helper. Handlers can mix cheap manual selectors with AI extraction on the
@@ -25,7 +25,7 @@ class AiCrawlingContext(ParselCrawlingContext):
     extract: ExtractFunction
     """Extract a structured Pydantic model from the page using the configured AI extractor."""
 
-    ai_usage: AiUsageStats
+    ai_usage: PydanticAiUsageStats
     """The cumulative token usage stats of the extractor across calls in this crawl."""
 
     @classmethod
@@ -34,7 +34,7 @@ class AiCrawlingContext(ParselCrawlingContext):
         context: ParselCrawlingContext,
         *,
         extract: ExtractFunction,
-        ai_usage: AiUsageStats,
+        ai_usage: PydanticAiUsageStats,
     ) -> Self:
         """Create a new context from an existing `ParselCrawlingContext`."""
         return cls(

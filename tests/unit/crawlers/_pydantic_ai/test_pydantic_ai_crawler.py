@@ -10,8 +10,13 @@ from pydantic import BaseModel
 from pydantic_ai.models.test import TestModel
 
 from crawlee import Request
-from crawlee.crawlers import AiCrawler, AiCrawlingContext, AiDirectExtractor, ParselCrawlingContext
-from crawlee.crawlers._ai._types import AiUsageStats
+from crawlee.crawlers import (
+    ParselCrawlingContext,
+    PydanticAiCrawler,
+    PydanticAiCrawlingContext,
+    PydanticAiDirectExtractor,
+)
+from crawlee.crawlers._pydantic_ai._types import PydanticAiUsageStats
 
 if TYPE_CHECKING:
     from yarl import URL
@@ -25,11 +30,11 @@ class _Article(BaseModel):
 
 def test_rejects_model_and_extractor_together() -> None:
     with pytest.raises(ValueError, match='at most one'):
-        AiCrawler(model=TestModel(), extractor=AiDirectExtractor(TestModel()))
+        PydanticAiCrawler(model=TestModel(), extractor=PydanticAiDirectExtractor(TestModel()))
 
 
 def test_default_extractor_is_direct() -> None:
-    assert isinstance(AiCrawler(model=TestModel()).extractor, AiDirectExtractor)
+    assert isinstance(PydanticAiCrawler(model=TestModel()).extractor, PydanticAiDirectExtractor)
 
 
 def test_default_model_when_none_given(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -37,28 +42,28 @@ def test_default_model_when_none_given(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv('OPENAI_API_KEY', 'test-key')
 
     # With neither model nor extractor, the crawler builds the default direct extractor.
-    assert isinstance(AiCrawler().extractor, AiDirectExtractor)
+    assert isinstance(PydanticAiCrawler().extractor, PydanticAiDirectExtractor)
 
 
 def test_emits_experimental_warning() -> None:
     with pytest.warns(UserWarning, match='experimental'):
-        AiCrawler(model=TestModel())
+        PydanticAiCrawler(model=TestModel())
 
 
 def test_exposes_extractor_and_usage() -> None:
-    extractor = AiDirectExtractor(TestModel())
-    crawler = AiCrawler(extractor=extractor)
+    extractor = PydanticAiDirectExtractor(TestModel())
+    crawler = PydanticAiCrawler(extractor=extractor)
 
     assert crawler.extractor is extractor
     assert crawler.ai_usage is extractor.ai_usage
 
 
 async def test_context_extract(server_url: URL, http_client: HttpClient) -> None:
-    crawler = AiCrawler(model=TestModel(custom_output_args={'title': 'Hello'}), http_client=http_client)
+    crawler = PydanticAiCrawler(model=TestModel(custom_output_args={'title': 'Hello'}), http_client=http_client)
     extracted = AsyncMock()
 
     @crawler.router.default_handler
-    async def request_handler(context: AiCrawlingContext) -> None:
+    async def request_handler(context: PydanticAiCrawlingContext) -> None:
         await extracted(await context.extract(_Article))
 
     await crawler.run([str(server_url / 'start_enqueue')])
@@ -68,7 +73,7 @@ async def test_context_extract(server_url: URL, http_client: HttpClient) -> None
 
 
 async def test_crawling_context_type(server_url: URL, http_client: HttpClient) -> None:
-    crawler = AiCrawler(model=TestModel(custom_output_args={'title': 'Hello'}), http_client=http_client)
+    crawler = PydanticAiCrawler(model=TestModel(custom_output_args={'title': 'Hello'}), http_client=http_client)
     handler = AsyncMock()
     crawler.router.default_handler(handler)
 
@@ -78,20 +83,20 @@ async def test_crawling_context_type(server_url: URL, http_client: HttpClient) -
     context = handler.call_args.args[0]
 
     # It extends the Parsel context, so the manual `selector` stays available next to the AI helpers.
-    assert isinstance(context, AiCrawlingContext)
+    assert isinstance(context, PydanticAiCrawlingContext)
     assert isinstance(context, ParselCrawlingContext)
     assert isinstance(context.selector, Selector)
-    assert isinstance(context.ai_usage, AiUsageStats)
+    assert isinstance(context.ai_usage, PydanticAiUsageStats)
 
 
 async def test_context_extractor_forwards_arguments(server_url: URL, http_client: HttpClient) -> None:
-    extractor = AiDirectExtractor(TestModel())
-    crawler = AiCrawler(extractor=extractor, http_client=http_client)
+    extractor = PydanticAiDirectExtractor(TestModel())
+    crawler = PydanticAiCrawler(extractor=extractor, http_client=http_client)
     extract_mock = AsyncMock(return_value=_Article(title='test'))
     seen_selector = AsyncMock()
 
     @crawler.router.default_handler
-    async def request_handler(context: AiCrawlingContext) -> None:
+    async def request_handler(context: PydanticAiCrawlingContext) -> None:
         await seen_selector(context.selector)
         await context.extract(_Article)  # cache_tag defaults to the request label
         await context.extract(_Article, cache_tag='explicit')  # an explicit tag overrides the default
@@ -115,7 +120,7 @@ def test_import_error_handled() -> None:
     blocked = {name: None for name in sys.modules if name == 'pydantic_ai' or name.startswith('pydantic_ai.')}
     with patch.dict('sys.modules', blocked):
         for name in list(sys.modules):
-            if name.startswith('crawlee.crawlers._ai'):
+            if name.startswith('crawlee.crawlers._pydantic_ai'):
                 sys.modules.pop(name, None)
         with pytest.raises(ImportError):
-            from crawlee.crawlers._ai import AiCrawler  # noqa: F401 PLC0415
+            from crawlee.crawlers._pydantic_ai import PydanticAiCrawler  # noqa: F401 PLC0415

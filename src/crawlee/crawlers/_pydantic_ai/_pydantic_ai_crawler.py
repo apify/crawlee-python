@@ -12,8 +12,8 @@ from crawlee.crawlers import AbstractHttpCrawler, HttpCrawlerOptions
 from crawlee.crawlers._parsel._parsel_crawling_context import ParselCrawlingContext
 from crawlee.crawlers._parsel._parsel_parser import ParselParser
 
-from ._ai_crawling_context import AiCrawlingContext
-from ._direct_extractor import AiDirectExtractor
+from ._direct_extractor import PydanticAiDirectExtractor
+from ._pydantic_ai_crawling_context import PydanticAiCrawlingContext
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from crawlee import Request
     from crawlee.crawlers._abstract_http import ParsedHttpCrawlingContext
 
-    from ._types import AiHtmlExtractor, AiUsageStats, ExtractFunction, TSchema
+    from ._types import ExtractFunction, PydanticAiHtmlExtractor, PydanticAiUsageStats, TSchema
 
 
 logger = getLogger(__name__)
@@ -34,16 +34,16 @@ _DEFAULT_AI_MODEL = 'openai:gpt-5.4-nano'
 
 
 @docs_group('Crawlers')
-class AiCrawler(AbstractHttpCrawler[AiCrawlingContext, Selector, Selector]):
+class PydanticAiCrawler(AbstractHttpCrawler[PydanticAiCrawlingContext, Selector, Selector]):
     """A web crawler that extracts structured data from pages using an AI model.
 
     Builds on `AbstractHttpCrawler` and parses responses with Parsel, so the request handler has both the usual
     Parsel `selector` and the AI-powered `extract` helper: pass a Pydantic model and get a validated instance back.
 
     The model layer is Pydantic AI, so any provider it supports (OpenAI, Anthropic, Gemini, Ollama, ...) works
-    through the `model` argument. The default extractor is an `AiDirectExtractor`: each page is distilled and sent
-    to the model in one call. For cached CSS-selector extraction at near-zero LLM cost, pass an `AiSelectorExtractor`
-    through the `extractor` argument.
+    through the `model` argument. The default extractor is a `PydanticAiDirectExtractor`: each page is distilled
+    and sent to the model in one call. For cached CSS-selector extraction at near-zero LLM cost, pass a
+    `PydanticAiSelectorExtractor` through the `extractor` argument.
 
     Warning:
         This is an experimental crawler. Its public API may change in future versions.
@@ -55,7 +55,7 @@ class AiCrawler(AbstractHttpCrawler[AiCrawlingContext, Selector, Selector]):
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
-    from crawlee.crawlers import AiCrawler, AiCrawlingContext
+    from crawlee.crawlers import PydanticAiCrawler, PydanticAiCrawlingContext
 
 
     class Article(BaseModel):
@@ -63,11 +63,11 @@ class AiCrawler(AbstractHttpCrawler[AiCrawlingContext, Selector, Selector]):
         author: str | None
 
 
-    crawler = AiCrawler(model=OpenAIChatModel('gpt-5.4-nano', provider=OpenAIProvider(api_key='...')))
+    crawler = PydanticAiCrawler(model=OpenAIChatModel('gpt-5.4-nano', provider=OpenAIProvider(api_key='...')))
 
 
     @crawler.router.default_handler
-    async def request_handler(context: AiCrawlingContext) -> None:
+    async def request_handler(context: PydanticAiCrawlingContext) -> None:
         article = await context.extract(Article)
         await context.push_data(article.model_dump())
 
@@ -80,31 +80,31 @@ class AiCrawler(AbstractHttpCrawler[AiCrawlingContext, Selector, Selector]):
         self,
         *,
         model: str | Model | None = None,
-        extractor: AiHtmlExtractor | None = None,
-        **kwargs: Unpack[HttpCrawlerOptions[AiCrawlingContext]],
+        extractor: PydanticAiHtmlExtractor | None = None,
+        **kwargs: Unpack[HttpCrawlerOptions[PydanticAiCrawlingContext]],
     ) -> None:
         """Initialize a new instance.
 
         Args:
-            model: The model used for extraction, given to the default extractor (`AiDirectExtractor`). A
+            model: The model used for extraction, given to the default extractor (`PydanticAiDirectExtractor`). A
                 provider-prefixed name (e.g. `'openai:gpt-5.4-nano'`) or a Pydantic AI `Model` instance. When given
                 as a string, the provider reads credentials from its environment variable (e.g. `OPENAI_API_KEY`).
                 Pass a `Model` instance to supply them explicitly. Defaults to `'openai:gpt-5.4-nano'` when neither
                 `model` nor `extractor` is given. Provide at most one of `model` or `extractor`.
-            extractor: A pre-configured `AiHtmlExtractor`, for full control over the distiller, instructions,
-                caching, usage limits, and model fallback. Pass an `AiSelectorExtractor` here for cached-selector
-                extraction. Provide at most one of `model` or `extractor`.
+            extractor: A pre-configured `PydanticAiHtmlExtractor`, for full control over the distiller, instructions,
+                caching, usage limits, and model fallback. Pass a `PydanticAiSelectorExtractor` here for
+                cached-selector extraction. Provide at most one of `model` or `extractor`.
             kwargs: Additional keyword arguments to pass to the underlying `AbstractHttpCrawler`.
         """
         if model is not None and extractor is not None:
             raise ValueError('Provide at most one of `model` or `extractor`.')
 
         if extractor is None:
-            extractor = AiDirectExtractor(model if model is not None else _DEFAULT_AI_MODEL)
+            extractor = PydanticAiDirectExtractor(model if model is not None else _DEFAULT_AI_MODEL)
 
         # Call the notification only once.
         warnings.warn(
-            'The AiCrawler is experimental and its public API may change in future releases.',
+            'The PydanticAiCrawler is experimental and its public API may change in future releases.',
             category=UserWarning,
             stacklevel=2,
         )
@@ -114,10 +114,10 @@ class AiCrawler(AbstractHttpCrawler[AiCrawlingContext, Selector, Selector]):
 
         async def final_step(
             context: ParsedHttpCrawlingContext[Selector],
-        ) -> AsyncGenerator[AiCrawlingContext, None]:
+        ) -> AsyncGenerator[PydanticAiCrawlingContext, None]:
             """Enhance `ParsedHttpCrawlingContext[Selector]` with the `extract` helper and `ai_usage`."""
             parsel_context = ParselCrawlingContext.from_parsed_http_crawling_context(context)
-            yield AiCrawlingContext.from_parsel_crawling_context(
+            yield PydanticAiCrawlingContext.from_parsel_crawling_context(
                 parsel_context,
                 extract=self._create_extract_function(parsel_context.selector, parsel_context.request),
                 ai_usage=self._ai_usage,
@@ -138,19 +138,19 @@ class AiCrawler(AbstractHttpCrawler[AiCrawlingContext, Selector, Selector]):
         )
 
     @property
-    def extractor(self) -> AiHtmlExtractor:
+    def extractor(self) -> PydanticAiHtmlExtractor:
         """The extractor used to turn pages into structured data."""
         return self._extractor
 
     @property
-    def ai_usage(self) -> AiUsageStats:
+    def ai_usage(self) -> PydanticAiUsageStats:
         """Accumulated token usage across extraction calls."""
         return self._ai_usage
 
     def _create_extract_function(self, selector: Selector, request: Request) -> ExtractFunction:
         """Build an `extract` helper bound to the page's parsed tree.
 
-        When the caller omits `cache_tag`, it defaults to `request.label` so an `AiSelectorExtractor` buckets
+        When the caller omits `cache_tag`, it defaults to `request.label` so a `PydanticAiSelectorExtractor` buckets
         selectors per route without extra wiring. An explicit `cache_tag` overrides this.
         """
 
@@ -161,7 +161,7 @@ class AiCrawler(AbstractHttpCrawler[AiCrawlingContext, Selector, Selector]):
             cache_tag: str | None = None,
             additional_instructions: str | None = None,
         ) -> TSchema:
-            # `AiHtmlExtractor.extract` accepts a Selector directly, so the already-parsed tree is handed over
+            # `PydanticAiHtmlExtractor.extract` accepts a Selector directly, so the already-parsed tree is handed over
             # without a serialize round trip.
             return await self._extractor.extract(
                 selector,

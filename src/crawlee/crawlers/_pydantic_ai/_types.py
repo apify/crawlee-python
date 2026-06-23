@@ -17,11 +17,11 @@ TSchema = TypeVar('TSchema', bound=BaseModel)
 
 
 @docs_group('Functions')
-class AiHtmlDistiller(Protocol):
+class PydanticAiHtmlDistiller(Protocol):
     """Interface for HTML distillers.
 
     A distiller reduces raw HTML to a compact representation that an LLM can read cheaply. The built-in
-    distillers are `AiCleanHtmlDistiller` and `AiSkeletonDistiller`.
+    distillers are `PydanticAiCleanHtmlDistiller` and `PydanticAiSkeletonDistiller`.
     """
 
     def distill(self, html: str) -> str:
@@ -33,7 +33,7 @@ class AiHtmlDistiller(Protocol):
 
 @docs_group('Other')
 @dataclass
-class AiUsageStats:
+class PydanticAiUsageStats:
     """A lightweight accumulator of token usage across extraction calls."""
 
     requests: int = 0
@@ -53,13 +53,13 @@ class AiUsageStats:
 
 
 @docs_group('Other')
-class AiHtmlExtractor(Protocol):
+class PydanticAiHtmlExtractor(Protocol):
     """Interface for HTML extractors.
 
     An extractor turns an HTML page into a validated Pydantic model using an LLM. The input format (cleaned HTML,
-    skeleton, Markdown, ...) is decided by the `AiHtmlDistiller` an implementation composes. The model and base
+    skeleton, Markdown, ...) is decided by the `PydanticAiHtmlDistiller` an implementation composes. The model and base
     instructions are set at construction. Each `extract` call runs one extraction. The built-in extractors are
-    `AiDirectExtractor` and `AiSelectorExtractor`.
+    `PydanticAiDirectExtractor` and `PydanticAiSelectorExtractor`.
     """
 
     async def extract(
@@ -89,14 +89,15 @@ class AiHtmlExtractor(Protocol):
         """
 
     @property
-    def ai_usage(self) -> AiUsageStats:
+    def ai_usage(self) -> PydanticAiUsageStats:
         """Accumulated token usage across extraction calls."""
 
-    def set_ai_usage(self, value: AiUsageStats) -> None:
+    def set_ai_usage(self, value: PydanticAiUsageStats) -> None:
         """Replace the usage accumulator with `value`.
 
-        Lets an external owner share one accumulator across a delegation chain. `AiSelectorExtractor` uses this to
-        fold its fallback's usage into one accumulator. Extractors with per-instance counters may make it a no-op.
+        Lets an external owner share one accumulator across a delegation chain. `PydanticAiSelectorExtractor` uses
+        this to fold its fallback's usage into one accumulator. Extractors with per-instance counters may make it
+        a no-op.
 
         Args:
             value: The accumulator to adopt.
@@ -105,7 +106,7 @@ class AiHtmlExtractor(Protocol):
 
 @docs_group('Functions')
 class ExtractFunction(Protocol):
-    """The `extract` helper exposed on `AiCrawlingContext`.
+    """The `extract` helper exposed on `PydanticAiCrawlingContext`.
 
     Binds the configured extractor to the current page, so a handler passes just the schema and the optional
     per-call knobs.

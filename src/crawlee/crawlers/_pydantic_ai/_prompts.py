@@ -29,7 +29,7 @@ _SELECTOR_INSTRUCTIONS = (
     'each ending with `::text` or `::attr(name)`.'
 )
 
-# Default prompt-notes for `AiCleanHtmlDistiller`.
+# Default prompt-notes for `PydanticAiCleanHtmlDistiller`.
 _CLEAN_HTML_PROMPT_NOTES = (
     'The document is distilled HTML. Scripts and styling are removed; tags, nesting, and data-bearing '
     'attributes (`href`, `src`, `id`, `class`, `data-*`, `aria-*`, `lang`, `datetime`, `content`) are '
@@ -37,7 +37,7 @@ _CLEAN_HTML_PROMPT_NOTES = (
     f'for the requested fields. Values ending with `{_TRUNCATION_MARKER}` are truncated.'
 )
 
-# Default prompt-notes for `AiSkeletonDistiller`.
+# Default prompt-notes for `PydanticAiSkeletonDistiller`.
 _SKELETON_PROMPT_NOTES = (
     'The document is a skeleton of an HTML page. Scripts and styling are removed; tags, nesting, and '
     'data-bearing attributes are preserved; JSON payloads are truncated to their key structure. Text is '

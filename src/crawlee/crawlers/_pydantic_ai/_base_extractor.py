@@ -8,32 +8,32 @@ from pydantic_ai.models import infer_model
 
 from crawlee._utils.docs import docs_group
 
-from ._types import AiUsageStats
+from ._types import PydanticAiUsageStats
 
 if TYPE_CHECKING:
     from pydantic_ai.models import Model
     from pydantic_ai.usage import UsageLimits
 
-    from ._types import AiHtmlDistiller, TSchema
+    from ._types import PydanticAiHtmlDistiller, TSchema
 
 
 @docs_group('Other')
-class BaseAiHtmlExtractor(ABC):
+class BasePydanticAiHtmlExtractor(ABC):
     """Base class for the built-in HTML extractors.
 
     An HTML extractor turns a page into a validated Pydantic model with the help of an LLM. This abstract base
     implements the parts the built-in extractors share: resolving the model, composing the task instructions with
     the distiller's prompt notes, and accumulating token usage.
 
-    The public interface is the `AiHtmlExtractor` protocol. The concrete extractors are `AiDirectExtractor` and
-    `AiSelectorExtractor`.
+    The public interface is the `PydanticAiHtmlExtractor` protocol. The concrete extractors are
+    `PydanticAiDirectExtractor` and `PydanticAiSelectorExtractor`.
     """
 
     def __init__(
         self,
         model: str | Model,
         *,
-        distiller: AiHtmlDistiller,
+        distiller: PydanticAiHtmlDistiller,
         instructions: str,
         usage_limits: UsageLimits | None,
     ) -> None:
@@ -51,14 +51,14 @@ class BaseAiHtmlExtractor(ABC):
         self._distiller = distiller
         self._base_instructions = self._compose_instructions(instructions, distiller)
         self._usage_limits = usage_limits
-        self._ai_usage = AiUsageStats()
+        self._ai_usage = PydanticAiUsageStats()
 
     @property
-    def ai_usage(self) -> AiUsageStats:
+    def ai_usage(self) -> PydanticAiUsageStats:
         """Accumulated token usage of this extractor's runs."""
         return self._ai_usage
 
-    def set_ai_usage(self, value: AiUsageStats) -> None:
+    def set_ai_usage(self, value: PydanticAiUsageStats) -> None:
         """Replace the usage accumulator with `value`.
 
         Lets an external owner share one accumulator across a delegation chain.
@@ -81,7 +81,7 @@ class BaseAiHtmlExtractor(ABC):
         """Extract a structured instance of `schema` from `content`."""
 
     @staticmethod
-    def _compose_instructions(instructions: str, distiller: AiHtmlDistiller) -> str:
+    def _compose_instructions(instructions: str, distiller: PydanticAiHtmlDistiller) -> str:
         """Append the distiller's input-format notes to the task instructions.
 
         Args:

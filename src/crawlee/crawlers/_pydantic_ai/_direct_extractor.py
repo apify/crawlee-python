@@ -9,27 +9,27 @@ from pydantic_ai.usage import RunUsage
 
 from crawlee._utils.docs import docs_group
 
-from ._base_extractor import BaseAiHtmlExtractor
-from ._clean_html_distiller import AiCleanHtmlDistiller
+from ._base_extractor import BasePydanticAiHtmlExtractor
+from ._clean_html_distiller import PydanticAiCleanHtmlDistiller
 from ._prompts import _DIRECT_INSTRUCTIONS
 
 if TYPE_CHECKING:
     from pydantic_ai.models import Model
     from pydantic_ai.usage import UsageLimits
 
-    from ._types import AiHtmlDistiller, TSchema
+    from ._types import PydanticAiHtmlDistiller, TSchema
 
 
 @docs_group('Other')
-class AiDirectExtractor(BaseAiHtmlExtractor):
+class PydanticAiDirectExtractor(BasePydanticAiHtmlExtractor):
     """Extractor that asks the LLM to read the page and return the data directly.
 
     The page is distilled to compact HTML and sent to the model in a single call. The user schema is the agent's
     output type, so pydantic-ai validates the result and feeds invalid output back to the model. This is the
     simplest extractor and works on any page, at the cost of one LLM call per page.
 
-    See the `AiHtmlExtractor` protocol for the common extractor interface, and `AiSelectorExtractor` for a variant
-    that learns reusable CSS selectors.
+    See the `PydanticAiHtmlExtractor` protocol for the common extractor interface, and `PydanticAiSelectorExtractor`
+    for a variant that learns reusable CSS selectors.
 
     ### Usage
 
@@ -38,7 +38,7 @@ class AiDirectExtractor(BaseAiHtmlExtractor):
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
-    from crawlee.crawlers import AiDirectExtractor
+    from crawlee.crawlers import PydanticAiDirectExtractor
 
 
     class Product(BaseModel):
@@ -47,7 +47,7 @@ class AiDirectExtractor(BaseAiHtmlExtractor):
 
 
     model = OpenAIChatModel('gpt-5.4-nano', provider=OpenAIProvider(api_key='...'))
-    extractor = AiDirectExtractor(model=model)
+    extractor = PydanticAiDirectExtractor(model=model)
     product = await extractor.extract('<html>...</html>', Product)
     ```
     """
@@ -56,7 +56,7 @@ class AiDirectExtractor(BaseAiHtmlExtractor):
         self,
         model: str | Model,
         *,
-        distiller: AiHtmlDistiller | None = None,
+        distiller: PydanticAiHtmlDistiller | None = None,
         instructions: str = _DIRECT_INSTRUCTIONS,
         retries: int = 1,
         usage_limits: UsageLimits | None = None,
@@ -65,7 +65,7 @@ class AiDirectExtractor(BaseAiHtmlExtractor):
 
         Args:
             model: A provider-prefixed name (e.g. `'openai:gpt-5.4-nano'`) or a pydantic-ai `Model`.
-            distiller: The HTML distiller shaping the LLM input. Defaults to `AiCleanHtmlDistiller`.
+            distiller: The HTML distiller shaping the LLM input. Defaults to `PydanticAiCleanHtmlDistiller`.
             instructions: Base task instructions. The distiller's prompt notes are appended automatically.
             retries: How many times the model may fix output that fails schema validation within one run (pydantic-ai
                 output retries).
@@ -73,7 +73,7 @@ class AiDirectExtractor(BaseAiHtmlExtractor):
         """
         super().__init__(
             model,
-            distiller=distiller or AiCleanHtmlDistiller(),
+            distiller=distiller or PydanticAiCleanHtmlDistiller(),
             instructions=instructions,
             usage_limits=usage_limits,
         )

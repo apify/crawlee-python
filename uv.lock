@@ -800,11 +800,6 @@ adaptive-crawler = [
     { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "scikit-learn", version = "1.8.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
-ai = [
-    { name = "lxml", extra = ["html-clean"] },
-    { name = "parsel" },
-    { name = "pydantic-ai-slim", extra = ["openai"] },
-]
 all = [
     { name = "aiomysql" },
     { name = "aiosqlite" },
@@ -872,6 +867,11 @@ playwright = [
     { name = "apify-fingerprint-datapoints" },
     { name = "browserforge" },
     { name = "playwright" },
+]
+pydantic-ai = [
+    { name = "lxml", extra = ["html-clean"] },
+    { name = "parsel" },
+    { name = "pydantic-ai-slim", extra = ["openai"] },
 ]
 redis = [
     { name = "redis", extra = ["hiredis"] },
@@ -943,7 +943,7 @@ requires-dist = [
     { name = "cachetools", specifier = ">=5.5.0" },
     { name = "colorama", specifier = ">=0.4.0" },
     { name = "cookiecutter", marker = "extra == 'cli'", specifier = ">=2.6.0" },
-    { name = "crawlee", extras = ["adaptive-crawler", "ai", "beautifulsoup", "cli", "curl-impersonate", "httpx", "parsel", "playwright", "otel", "sql-sqlite", "sql-postgres", "sql-mysql", "stagehand", "redis"], marker = "extra == 'all'" },
+    { name = "crawlee", extras = ["adaptive-crawler", "pydantic-ai", "beautifulsoup", "cli", "curl-impersonate", "httpx", "parsel", "playwright", "otel", "sql-sqlite", "sql-postgres", "sql-mysql", "stagehand", "redis"], marker = "extra == 'all'" },
     { name = "cryptography", marker = "extra == 'sql-mysql'", specifier = ">=46.0.5" },
     { name = "curl-cffi", marker = "extra == 'curl-impersonate'", specifier = ">=0.9.0" },
     { name = "html5lib", marker = "extra == 'beautifulsoup'", specifier = ">=1.0" },
@@ -951,7 +951,7 @@ requires-dist = [
     { name = "impit", specifier = ">=0.8.0" },
     { name = "inquirer", marker = "extra == 'cli'", specifier = ">=3.3.0" },
     { name = "jaro-winkler", marker = "extra == 'adaptive-crawler'", specifier = ">=2.0.3" },
-    { name = "lxml", extras = ["html-clean"], marker = "extra == 'ai'", specifier = ">=5.2.0" },
+    { name = "lxml", extras = ["html-clean"], marker = "extra == 'pydantic-ai'", specifier = ">=5.2.0" },
     { name = "more-itertools", specifier = ">=10.2.0" },
     { name = "opentelemetry-api", marker = "extra == 'otel'", specifier = ">=1.34.1" },
     { name = "opentelemetry-distro", extras = ["otlp"], marker = "extra == 'otel'", specifier = ">=0.54" },
@@ -959,15 +959,15 @@ requires-dist = [
     { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'otel'", specifier = ">=0.54" },
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.34.1" },
     { name = "opentelemetry-semantic-conventions", marker = "extra == 'otel'", specifier = ">=0.54" },
-    { name = "parsel", marker = "extra == 'ai'", specifier = ">=1.10.0" },
     { name = "parsel", marker = "extra == 'parsel'", specifier = ">=1.10.0" },
+    { name = "parsel", marker = "extra == 'pydantic-ai'", specifier = ">=1.10.0" },
     { name = "playwright", marker = "extra == 'adaptive-crawler'", specifier = ">=1.27.0" },
     { name = "playwright", marker = "extra == 'playwright'", specifier = ">=1.27.0" },
     { name = "playwright", marker = "extra == 'stagehand'", specifier = ">=1.27.0" },
     { name = "protego", specifier = ">=0.5.0" },
     { name = "psutil", specifier = ">=6.0.0" },
     { name = "pydantic", specifier = ">=2.11.0" },
-    { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'ai'", specifier = ">=1.106.0" },
+    { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'pydantic-ai'", specifier = ">=1.106.0" },
     { name = "pydantic-settings", specifier = ">=2.12.0" },
     { name = "pyee", specifier = ">=9.0.0" },
     { name = "redis", extras = ["hiredis"], marker = "extra == 'redis'", specifier = ">=7.0.0" },
@@ -983,7 +983,7 @@ requires-dist = [
     { name = "wrapt", marker = "extra == 'otel'", specifier = ">=1.17.0" },
     { name = "yarl", specifier = ">=1.18.0" },
 ]
-provides-extras = ["all", "adaptive-crawler", "beautifulsoup", "cli", "curl-impersonate", "httpx", "ai", "parsel", "playwright", "otel", "sql-postgres", "stagehand", "sql-sqlite", "sql-mysql", "redis"]
+provides-extras = ["all", "adaptive-crawler", "pydantic-ai", "beautifulsoup", "cli", "curl-impersonate", "httpx", "parsel", "playwright", "otel", "sql-postgres", "stagehand", "sql-sqlite", "sql-mysql", "redis"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -1,7 +1,7 @@
 from lxml_html_clean import Cleaner
 
 
-def get_basic_ai_cleaner(**kwargs: object) -> Cleaner:
+def get_basic_http_cleaner(**kwargs: object) -> Cleaner:
     """Build the default `lxml_html_clean.Cleaner` used by built-in distillers.
 
     Args:

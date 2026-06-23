@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
-from crawlee.crawlers import AiCrawler, AiCrawlingContext
+from crawlee.crawlers import PydanticAiCrawler, PydanticAiCrawlingContext
 
 
 class Post(BaseModel):
@@ -25,10 +25,10 @@ async def main() -> None:
         'gpt-5.4-nano',
         provider=OpenAIProvider(api_key='your-openai-api-key'),
     )
-    crawler = AiCrawler(model=model, max_requests_per_crawl=5)
+    crawler = PydanticAiCrawler(model=model, max_requests_per_crawl=5)
 
     @crawler.router.default_handler
-    async def handler(context: AiCrawlingContext) -> None:
+    async def handler(context: PydanticAiCrawlingContext) -> None:
         # The instruction narrows what the model returns from the page.
         posts = await context.extract(
             Posts,
