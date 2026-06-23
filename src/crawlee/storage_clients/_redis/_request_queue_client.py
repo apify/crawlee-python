@@ -512,11 +512,12 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     @retry_on_error(RedisError)
     @override
     async def is_finished(self) -> bool:
-        is_empty = await self.is_empty()
+
+        if not await self.is_empty():
+            return False
 
         metadata = await self.get_metadata()
-
-        return is_empty and metadata.pending_request_count == 0
+        return metadata.pending_request_count == 0
 
     async def _load_scripts(self) -> None:
         """Ensure Lua scripts are loaded in Redis."""

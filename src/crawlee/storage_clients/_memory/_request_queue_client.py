@@ -307,11 +307,6 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
     @override
     async def is_empty(self) -> bool:
-        """Check if the queue is empty.
-
-        Returns:
-            True if the queue is empty, False otherwise.
-        """
         await self._update_metadata(update_accessed_at=True)
 
         # Queue is empty if there are no pending requests.
@@ -319,11 +314,6 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
     @override
     async def is_finished(self) -> bool:
-        """Check if the queue is finished.
-
-        Returns:
-            True if the queue is finished, False otherwise.
-        """
         # Queue is finished if it is empty and there are no in-progress requests.
         return await self.is_empty() and len(self._in_progress_requests) == 0
 
