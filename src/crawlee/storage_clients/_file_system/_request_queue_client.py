@@ -606,7 +606,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             # Fallback: check state for unhandled requests.
             await self._update_metadata(update_accessed_at=True)
 
-            # Check pending requests is state.
+            # Check pending requests in state.
             queue_requests = (
                 set(state.forefront_requests.keys()) | set(state.regular_requests.keys())
             ) - state.in_progress_requests
