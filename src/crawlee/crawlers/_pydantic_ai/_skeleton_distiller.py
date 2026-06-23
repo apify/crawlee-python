@@ -90,6 +90,9 @@ class PydanticAiSkeletonDistiller(PydanticAiCleanHtmlDistiller):
             pretty: Whether to pretty-print the serialized HTML.
             prompt_notes: Override for the default prompt notes. Pass `None` to send no notes to the LLM.
         """
+        if keep_siblings < 1:
+            raise ValueError('keep_siblings must be at least 1, so each repeated run keeps one example.')
+
         super().__init__(
             cleaner=cleaner,
             max_classes=max_classes,
@@ -170,6 +173,10 @@ class PydanticAiSkeletonDistiller(PydanticAiCleanHtmlDistiller):
                     continue
 
                 saved, dropped = group[: self._keep_siblings], group[self._keep_siblings :]
+
+                # Need a kept sibling to anchor the marker on.
+                if not saved:
+                    continue
 
                 for elem in dropped:
                     parent.remove(elem)

@@ -3,7 +3,7 @@ from crawlee._utils.try_import import try_import as _try_import
 
 _install_import_hook(__name__)
 
-# The following imports are wrapped in try_import to handle optional dependencies (the `ai` extra),
+# The following imports are wrapped in try_import to handle optional dependencies (the `pydantic-ai` extra),
 # ensuring the module can still function even if these dependencies are missing.
 with _try_import(__name__, 'PydanticAiCrawler'):
     from ._pydantic_ai_crawler import PydanticAiCrawler

@@ -47,9 +47,9 @@ class PydanticAiUsageStats:
 
     def add(self, usage: RunUsage) -> None:
         """Accumulate the usage reported by a single run."""
-        self.requests += usage.requests
-        self.input_tokens += usage.input_tokens
-        self.output_tokens += usage.output_tokens
+        self.requests += usage.requests or 0
+        self.input_tokens += usage.input_tokens or 0
+        self.output_tokens += usage.output_tokens or 0
 
 
 @docs_group('Other')

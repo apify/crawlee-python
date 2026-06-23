@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import re
 import types
 from collections import defaultdict
 from enum import Enum
@@ -32,6 +33,9 @@ if TYPE_CHECKING:
     from ._types import PydanticAiHtmlDistiller, PydanticAiHtmlExtractor, PydanticAiUsageStats, TSchema
 
 logger = getLogger(__name__)
+
+# Matches a value pseudo-element (`::text` or `::attr(name)`) at the end of a selector.
+_LEAF_PSEUDO_RE = re.compile(r'::(?:text|attr\([^()]*\))\s*$')
 
 
 class FieldSelector(BaseModel):
@@ -170,6 +174,9 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
             usage_limits: Optional pydantic-ai `UsageLimits` applied to every generation run.
             persistence: Whether the selector cache is persisted. Disable for ephemeral runs or tests.
         """
+        if max_variants < 1:
+            raise ValueError('max_variants must be at least 1, so each bucket can keep one selector map.')
+
         super().__init__(
             model,
             distiller=distiller or PydanticAiSkeletonDistiller(),
@@ -212,9 +219,10 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
         if self._active:
             raise RuntimeError(f'The {type(self).__name__} is already active.')
 
-        self._active = True
         if not self._selector_cache.is_initialized:
             await self._selector_cache.initialize()
+
+        self._active = True
         return self
 
     async def __aexit__(self, exc_type: object, exc_value: object, exc_traceback: object) -> None:
@@ -261,7 +269,7 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
                     f'Schema {schema.__name__} is not supported by cached selectors ({reason}). '
                     f'Delegating to the fallback extractor.'
                 )
-                return await self._delegate_to_fallback(selector, schema, additional_instructions)
+                return await self._delegate_to_fallback(selector, schema, cache_tag, additional_instructions)
             raise ValueError(
                 f'PydanticAiSelectorExtractor does not support this schema shape: {reason}. '
                 'Configure a fallback extractor or use PydanticAiDirectExtractor for it.'
@@ -290,7 +298,7 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
                 selector_map = await self._generate_selectors(selector, schema, additional_instructions)
             except UnexpectedModelBehavior:
                 if self._fallback is not None:
-                    return await self._delegate_to_fallback(selector, schema, additional_instructions)
+                    return await self._delegate_to_fallback(selector, schema, cache_tag, additional_instructions)
                 raise
 
             variants.insert(0, selector_map)
@@ -304,6 +312,7 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
         self,
         selector: Selector,
         schema: type[TSchema],
+        cache_tag: str | None,
         additional_instructions: str | None,
     ) -> TSchema:
         if self._fallback is None:
@@ -312,6 +321,7 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
         return await self._fallback.extract(
             selector,
             schema,
+            cache_tag=cache_tag,
             additional_instructions=additional_instructions,
         )
 
@@ -383,7 +393,7 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
     @staticmethod
     def _is_leaf_selector_form(selector: str) -> bool:
         """Whether a selector targets a value (ends with `::text` or `::attr(...)`)."""
-        return selector.endswith('::text') or '::attr(' in selector
+        return _LEAF_PSEUDO_RE.search(selector) is not None
 
     def _check_selectors_compile_and_match(self, plan: SelectorMap, selector: Selector) -> None:
         """Raise `ModelRetry` on invalid CSS, wrong selector form, or no matches.
@@ -512,6 +522,7 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
         """
         return hashlib.sha256(
             json.dumps(schema.model_json_schema(), sort_keys=True).encode()
+            + b'\x00'
             + (scope or '').encode()
             + b'\x00'
             + (cache_tag or '').encode()
