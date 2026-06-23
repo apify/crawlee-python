@@ -311,6 +311,79 @@ async def test_add_requests_retry_preserves_forefront(
     )
 
 
+async def _no_sleep(_seconds: float) -> None:
+    """Drop-in replacement for `asyncio.sleep` that returns immediately, to keep retry tests fast."""
+
+
+async def test_add_request_retries_unprocessed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`add_request` must retry an unprocessed request (like `add_requests`) instead of silently dropping it."""
+    rq = await RequestQueue.open(storage_client=MemoryStorageClient())
+    monkeypatch.setattr('crawlee.storages._request_queue.asyncio.sleep', _no_sleep)
+    calls = 0
+
+    async def patched_add_batch(
+        requests: Sequence[Request],
+        *,
+        forefront: bool = False,  # noqa: ARG001
+    ) -> AddRequestsResponse:
+        nonlocal calls
+        calls += 1
+        # First attempt reports the request as unprocessed; the retry succeeds.
+        if calls == 1:
+            return AddRequestsResponse(
+                processed_requests=[],
+                unprocessed_requests=[UnprocessedRequest(unique_key=r.unique_key, url=r.url) for r in requests],
+            )
+        return AddRequestsResponse(
+            processed_requests=[
+                ProcessedRequest(unique_key=r.unique_key, was_already_present=False, was_already_handled=False)
+                for r in requests
+            ],
+            unprocessed_requests=[],
+        )
+
+    monkeypatch.setattr(rq._client, 'add_batch_of_requests', patched_add_batch)
+
+    try:
+        result = await rq.add_request('https://example.com/retry')
+    finally:
+        await rq.drop()
+
+    assert calls == 2, f'expected one retry after the unprocessed response, got {calls} calls'
+    assert result is not None
+    assert result.was_already_present is False
+
+
+async def test_add_request_returns_none_after_exhausting_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When a request stays unprocessed across all retries, `add_request` returns `None` rather than raising."""
+    rq = await RequestQueue.open(storage_client=MemoryStorageClient())
+    monkeypatch.setattr('crawlee.storages._request_queue.asyncio.sleep', _no_sleep)
+    calls = 0
+
+    async def patched_add_batch(
+        requests: Sequence[Request],
+        *,
+        forefront: bool = False,  # noqa: ARG001
+    ) -> AddRequestsResponse:
+        nonlocal calls
+        calls += 1
+        return AddRequestsResponse(
+            processed_requests=[],
+            unprocessed_requests=[UnprocessedRequest(unique_key=r.unique_key, url=r.url) for r in requests],
+        )
+
+    monkeypatch.setattr(rq._client, 'add_batch_of_requests', patched_add_batch)
+
+    try:
+        result = await rq.add_request('https://example.com/doomed')
+    finally:
+        await rq.drop()
+
+    assert result is None
+    # One initial attempt plus five retries; the mechanism stops once `attempt` exceeds `max_attempts`.
+    assert calls == 6, f'expected 6 attempts (1 initial + 5 retries), got {calls}'
+
+
 async def test_add_requests_mixed_forefront(rq: RequestQueue) -> None:
     """Test the ordering when adding requests with mixed forefront values."""
     # Add normal requests

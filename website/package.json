@@ -1,5 +1,5 @@
 {
-    "name": "crawlee-python-website",
+    "name": "crawlee",
     "private": true,
     "scripts": {
         "examples": "docusaurus-examples",
@@ -53,7 +53,7 @@
     },
     "devDependencies": {
         "@apify/eslint-config-ts": "^0.4.0",
-        "@apify/tsconfig": "^0.1.0",
+        "@apify/tsconfig": "^0.2.0",
         "@apify/ui-icons": "^1.23.0",
         "@docusaurus/module-type-aliases": "^3.9.2",
         "@docusaurus/types": "^3.9.2",
@@ -70,5 +70,5 @@
         "rimraf": "^6.0.0",
         "typescript": "^6.0.0"
     },
-    "packageManager": "pnpm@11.5.3"
+    "packageManager": "pnpm@11.8.0"
 }
