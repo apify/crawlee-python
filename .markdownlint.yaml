@@ -5,7 +5,8 @@ default: true
 # Prose is written one sentence per line, so line length is not enforced.
 line-length: false
 
-ul-style: dash
+ul-style:
+  style: dash
 
 # Nested unordered lists use 4-space indentation.
 ul-indent:

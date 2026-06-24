@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: 22
+  NODE_VERSION: 24
 
 jobs:
   actions_lint_check:
@@ -101,6 +101,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       # Doc images must be committed as optimized `.webp`. This fails when a PR adds raster
       # images in another format so they get converted via `pnpm opt:images` first.

@@ -120,7 +120,7 @@ uv run poe run-docs
 Markdown content (this guide, `README.md`, and the `docs/` folder) is checked with
 [markdownlint](https://github.com/DavidAnson/markdownlint). The Docusaurus website code is linted
 with [oxlint](https://oxc.rs/) and formatted with [oxfmt](https://oxc.rs/). All of them run in CI.
-To run them locally (requires Node.js and pnpm), from the `website/` directory:
+To run them locally (requires Node.js 22.12 or newer and pnpm), from the `website/` directory:
 
 ```sh
 pnpm lint          # lint Markdown and website code
