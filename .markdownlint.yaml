@@ -7,6 +7,10 @@ line-length: false
 
 ul-style: dash
 
+# Nested unordered lists use 4-space indentation.
+ul-indent:
+  indent: 4
+
 # Docs are MDX and embed JSX components.
 no-inline-html: false
 
