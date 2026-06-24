@@ -1,5 +1,6 @@
 {
     "printWidth": 120,
+    "singleQuote": true,
     "ignorePatterns": [
         "**/*.md",
         "**/*.mdx",
