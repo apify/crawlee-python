@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from logging import getLogger
 from typing import TYPE_CHECKING, cast
 
 from parsel import Selector
@@ -18,6 +19,9 @@ if TYPE_CHECKING:
     from pydantic_ai.usage import UsageLimits
 
     from ._types import PydanticAiHtmlDistiller, TSchema
+
+
+logger = getLogger(__name__)
 
 
 @docs_group('Other')
@@ -141,4 +145,8 @@ class PydanticAiDirectExtractor(BasePydanticAiHtmlExtractor):
         finally:
             self._ai_usage.add(run_usage)
 
+        logger.debug(
+            f'Direct extraction of {schema.__name__} used {run_usage.requests} request(s), '
+            f'{run_usage.input_tokens} input + {run_usage.output_tokens} output tokens.'
+        )
         return result.output

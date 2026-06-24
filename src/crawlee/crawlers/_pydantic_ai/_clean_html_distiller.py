@@ -116,7 +116,11 @@ class PydanticAiCleanHtmlDistiller(BasePydanticAiHtmlDistiller):
         self._reduce(tree)
         distilled_html = self._serialize(tree)
 
-        return self._enforce_max_size(distilled_html, html)
+        result = self._enforce_max_size(distilled_html, html)
+
+        logger.debug(f'{type(self).__name__} distilled {len(html)} chars to {len(result)} chars.')
+
+        return result
 
     def _parse_and_clean(self, html: str) -> HtmlElement:
         """Parse raw HTML and run the cleaning stage in place.

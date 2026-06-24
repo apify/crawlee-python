@@ -286,18 +286,25 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
 
         extracted = self._try_cached_variants(variants, selector, schema)
         if extracted is not None:
+            logger.debug(f'Cache hit for {schema.__name__} (tag={cache_tag!r}); extracted with no model call.')
             return extracted
 
         async with self._locks[cache_digest]:
             # A concurrent miss may have generated selectors while we waited for the lock, so check the cache again.
             extracted = self._try_cached_variants(variants, selector, schema)
             if extracted is not None:
+                logger.debug(f'Cache hit for {schema.__name__} (tag={cache_tag!r}) after waiting on the lock.')
                 return extracted
 
+            logger.debug(f'Cache miss for {schema.__name__} (tag={cache_tag!r}); generating selectors.')
             try:
                 selector_map = await self._generate_selectors(selector, schema, additional_instructions)
             except UnexpectedModelBehavior:
                 if self._fallback is not None:
+                    logger.info(
+                        f'Selector generation failed for {schema.__name__} (tag={cache_tag!r}). '
+                        'Delegating to the fallback extractor.'
+                    )
                     return await self._delegate_to_fallback(selector, schema, cache_tag, additional_instructions)
                 raise
 
@@ -306,6 +313,9 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
             # instead of updating the cache.
             del variants[self._max_variants :]
 
+            logger.debug(
+                f'Cached new selectors for {schema.__name__} (tag={cache_tag!r}); {len(variants)} variant(s) in bucket.'
+            )
             return self._apply_selectors(selector_map, selector, schema)
 
     async def _delegate_to_fallback(
@@ -381,6 +391,10 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
         finally:
             self._ai_usage.add(run_usage)
 
+        logger.debug(
+            f'Selector generation for {schema.__name__} used {run_usage.requests} request(s), '
+            f'{run_usage.input_tokens} input + {run_usage.output_tokens} output tokens.'
+        )
         return result.output
 
     @staticmethod

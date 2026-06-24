@@ -27,8 +27,6 @@ if TYPE_CHECKING:
     from ._types import ExtractFunction, PydanticAiHtmlExtractor, PydanticAiUsageStats, TSchema
 
 
-logger = getLogger(__name__)
-
 # Default model
 _DEFAULT_AI_MODEL = 'openai:gpt-5.4-nano'
 
@@ -123,6 +121,7 @@ class PydanticAiCrawler(AbstractHttpCrawler[PydanticAiCrawlingContext, Selector,
                 ai_usage=self._ai_usage,
             )
 
+        kwargs.setdefault('_logger', getLogger(__name__))
         kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline().compose(final_step)
 
         # If the extractor is an async context manager, add it to the crawler's additional context managers so it's
