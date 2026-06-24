@@ -115,6 +115,22 @@ To run the documentation locally, ensure you have `Node.js` 20+ installed, then 
 uv run poe run-docs
 ```
 
+### Linting the docs and website
+
+Markdown content (this guide, `README.md`, and the `docs/` folder) is checked with
+[markdownlint](https://github.com/DavidAnson/markdownlint). The Docusaurus website code is linted
+with [oxlint](https://oxc.rs/) and formatted with [oxfmt](https://oxc.rs/). All of them run in CI.
+To run them locally (requires Node.js and pnpm), from the `website/` directory:
+
+```sh
+pnpm lint          # lint Markdown and website code
+pnpm lint:fix      # auto-fix both
+pnpm format        # format the website code
+```
+
+Doc images are committed as optimized `.webp`. To convert a new image, run
+`pnpm opt:images <path-to-image>` from the `website/` directory.
+
 ## Commits
 
 We use [Conventional Commits](https://www.conventionalcommits.org/) format for commit messages. This convention is used to automatically determine version bumps during the release process.
@@ -146,25 +162,22 @@ Publishing new versions to [PyPI](https://pypi.org/project/crawlee) is automated
 
 1. **Do not do this unless absolutely necessary.** In all conceivable scenarios, you should use the `release` workflow instead.
 2. **Make sure you know what you're doing.**
+3. Update the version number by modifying the `version` field under `project` in `pyproject.toml`:
 
-3. Update the version number:
-
-- Modify the `version` field under `project` in `pyproject.toml`.
-
-```toml
-[project]
-name = "crawlee"
-version = "x.z.y"
-```
+    ```toml
+    [project]
+    name = "crawlee"
+    version = "x.z.y"
+    ```
 
 4. Build the package:
 
-```sh
-uv run poe build
-```
+    ```sh
+    uv run poe build
+    ```
 
 5. Upload to PyPI:
 
-```sh
-uv publish --token YOUR_API_TOKEN
-```
+    ```sh
+    uv publish --token YOUR_API_TOKEN
+    ```

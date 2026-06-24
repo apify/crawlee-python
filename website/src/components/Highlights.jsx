@@ -31,8 +31,9 @@ const FeatureList = [
         Svg: require('../../static/img/features/works-everywhere.svg').default,
         description: (
             <>
-                Switch your crawlers from HTTP to a <a href="https://crawlee.dev/python/api/class/PlaywrightCrawler">headless browser</a> in 3 lines of code.
-                Crawlee builds on top of <b>Playwright</b> and adds its own features. Chrome, Firefox and more.
+                Switch your crawlers from HTTP to a{' '}
+                <a href="https://crawlee.dev/python/api/class/PlaywrightCrawler">headless browser</a> in 3 lines of
+                code. Crawlee builds on top of <b>Playwright</b> and adds its own features. Chrome, Firefox and more.
             </>
         ),
 
@@ -44,9 +45,10 @@ const FeatureList = [
         Svg: require('../../static/img/features/auto-scaling.svg').default,
         description: (
             <>
-                Crawlee automatically manages concurrency based on <a href="https://crawlee.dev/python/api/class/AutoscaledPool">available system resources</a> and&nbsp;
-                <a href="https://crawlee.dev/python/api/class/ProxyConfiguration">smartly rotates proxies</a>.
-                Proxies that often time-out, return network errors or bad HTTP codes like 401 or 403 are discarded.
+                Crawlee automatically manages concurrency based on{' '}
+                <a href="https://crawlee.dev/python/api/class/AutoscaledPool">available system resources</a> and&nbsp;
+                <a href="https://crawlee.dev/python/api/class/ProxyConfiguration">smartly rotates proxies</a>. Proxies
+                that often time-out, return network errors or bad HTTP codes like 401 or 403 are discarded.
             </>
         ),
     },
@@ -78,9 +80,7 @@ function Feature({ Svg, title, description }) {
     return (
         <div className={clsx('col col--4')}>
             <div className="padding-horiz--md padding-bottom--md">
-                <div className={styles.featureIcon}>
-                    {Svg ? <Svg alt={title}/> : null}
-                </div>
+                <div className={styles.featureIcon}>{Svg ? <Svg alt={title} /> : null}</div>
                 <h3>{title}</h3>
                 <p>{description}</p>
             </div>

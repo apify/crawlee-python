@@ -22,6 +22,7 @@ To start the preconfigured Docker container, you can use the following command:
 ```bash
 docker run -d --name jaeger -e COLLECTOR_OTLP_ENABLED=true -p 16686:16686 -p 4317:4317 -p 4318:4318 jaegertracing/all-in-one:latest
 ```
+
 For more details about the Jaeger setup, see the [getting started](https://www.jaegertracing.io/docs/2.7/getting-started/) section in their documentation.
 You can see the Jaeger UI in your browser by navigating to http://localhost:16686
 

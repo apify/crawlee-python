@@ -38,6 +38,7 @@ CLI dependencies have been moved to optional dependencies. If you need the CLI, 
 ### Abstract base classes
 
 We decided to move away from [Hungarian notation](https://en.wikipedia.org/wiki/Hungarian_notation) and remove all the `Base` prefixes from the abstract classes. It includes the following public classes:
+
 - `BaseStorageClient` -> `StorageClient`
 - `BaseBrowserController` -> `BrowserController`
 - `BaseBrowserPlugin` -> `BrowserPlugin`
@@ -56,6 +57,7 @@ This section summarizes the breaking changes between v0.4.x and v0.5.0.
 - The affected classes include: `AbstractHttpCrawler`, `AbstractHttpParser`, `BasicCrawler`, `BasicCrawlerOptions`, `BasicCrawlingContext`, `BeautifulSoupCrawler`, `BeautifulSoupCrawlingContext`, `BeautifulSoupParserType`, `ContextPipeline`, `HttpCrawler`, `HttpCrawlerOptions`, `HttpCrawlingContext`, `HttpCrawlingResult`, `ParsedHttpCrawlingContext`, `ParselCrawler`, `ParselCrawlingContext`, `PlaywrightCrawler`, `PlaywrightCrawlingContext`, `PlaywrightPreNavCrawlingContext`.
 
 Example update:
+
 ```diff
 - from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 + from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
@@ -67,6 +69,7 @@ Example update:
 - The affected classes include: `MemoryStorageClient`, `BaseStorageClient`.
 
 Example update:
+
 ```diff
 - from crawlee.memory_storage_client import MemoryStorageClient
 + from crawlee.storage_clients import MemoryStorageClient
@@ -77,6 +80,7 @@ Example update:
 - The `CurlImpersonateHttpClient` changed its import location.
 
 Example update:
+
 ```diff
 - from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
 + from crawlee.http_clients import CurlImpersonateHttpClient
@@ -105,19 +109,19 @@ Example update:
 
 - The `request_provider` parameter of `BasicCrawler.__init__` has been renamed to `request_manager`
 - The `BasicCrawler.get_request_provider` method has been renamed to `BasicCrawler.get_request_manager` and it does not accept the `id` and `name` arguments anymore
-    - If using a specific request queue is desired, pass it as the `request_manager` on `BasicCrawler` creation
+  - If using a specific request queue is desired, pass it as the `request_manager` on `BasicCrawler` creation
 - The `RequestProvider` interface has been renamed to `RequestManager` and moved to the `crawlee.request_loaders` package
 - `RequestList` has been moved to the `crawlee.request_loaders` package
 - `RequestList` does not support `.drop()`, `.reclaim_request()`, `.add_request()` and `add_requests_batched()` anymore
-    - It implements the new `RequestLoader` interface instead of `RequestManager`
-    - `RequestManagerTandem` with a `RequestQueue` should be used to enable passing a `RequestList` (or any other `RequestLoader` implementation) as a `request_manager`, `await list.to_tandem()` can be used as a shortcut
+  - It implements the new `RequestLoader` interface instead of `RequestManager`
+  - `RequestManagerTandem` with a `RequestQueue` should be used to enable passing a `RequestList` (or any other `RequestLoader` implementation) as a `request_manager`, `await list.to_tandem()` can be used as a shortcut
 
 ### PlaywrightCrawler
 
 - The `PlaywrightPreNavigationContext` was renamed to `PlaywrightPreNavCrawlingContext`.
 - The input arguments in `PlaywrightCrawler.__init__` have been renamed:
-    - `browser_options` is now `browser_launch_options`,
-    - `page_options` is now `browser_new_context_options`.
+  - `browser_options` is now `browser_launch_options`,
+  - `page_options` is now `browser_new_context_options`.
 - These argument renaming changes have also been applied to `BrowserPool`, `PlaywrightBrowserPlugin`, and `PlaywrightBrowserController`.
 
 ## Upgrading to v0.4

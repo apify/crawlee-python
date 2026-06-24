@@ -116,6 +116,7 @@ Data is stored using the following directory structure:
 ```
 
 Where:
+
 - `{CRAWLEE_STORAGE_DIR}` - The root directory for local storage.
 - `{DATASET_NAME}`, `{KVS_NAME}`, `{RQ_NAME}` - The unique names for each storage instance (defaults to `"default"`).
 - Files are stored directly without additional metadata files for simpler structure.
@@ -262,6 +263,7 @@ SqlKeyValueStoreClient --> key_value_stores
 SqlKeyValueStoreClient --> key_value_store_records
 SqlKeyValueStoreClient --> key_value_store_metadata_buffer
 ```
+
 ```mermaid
 ---
 config:
@@ -539,6 +541,7 @@ Custom storage clients can implement any storage logic, such as connecting to a 
 ## Registering storage clients
 
 Storage clients can be registered in multiple ways:
+
 - **Globally** - Using the <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> or passing directly to the crawler.
 - **Per storage** - When opening a specific storage instance like <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, or <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>.
 

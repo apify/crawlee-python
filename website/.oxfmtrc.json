@@ -1,0 +1,19 @@
+{
+    "printWidth": 120,
+    "ignorePatterns": [
+        "**/*.md",
+        "**/*.mdx",
+        "**/*.json",
+        "**/*.jsonc",
+        "**/*.yaml",
+        "**/*.yml",
+        "**/*.css",
+        "**/*.scss",
+        "**/*.html",
+        "**/node_modules",
+        "build",
+        ".docusaurus",
+        "versioned_docs",
+        "versioned_sidebars"
+    ]
+}

@@ -17,6 +17,7 @@ Many websites require authentication to access their content. This guide demonst
 When implementing authentication, you'll typically want to maintain the same <ApiLink to="class/Session">`Session`</ApiLink> throughout your crawl to preserve login state. This requires proper configuration of the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink>. For more details, see our [session management guide](./session-management).
 
 If your use case requires multiple authenticated sessions with different credentials, you can:
+
 - Use the `new_session_function` parameter in <ApiLink to="class/SessionPool#__init__">`SessionPool`</ApiLink> to customize session creation.
 - Specify the `session_id` parameter in <ApiLink to="class/Request#from_url">`Request`</ApiLink> to bind specific requests to particular sessions.
 
