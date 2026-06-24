@@ -12,9 +12,9 @@ export default function Gradients() {
                     y2="34.5208"
                     gradientUnits="userSpaceOnUse"
                 >
-                    <stop offset="0%" stop-color="#9dceff" />
-                    <stop offset="70%" stop-color="#4584b6" />
-                    <stop offset="100%" stop-color="#4584b6" />
+                    <stop offset="0%" stopColor="#9dceff" />
+                    <stop offset="70%" stopColor="#4584b6" />
+                    <stop offset="100%" stopColor="#4584b6" />
                 </linearGradient>
                 <linearGradient
                     id="gradient-2"
@@ -24,7 +24,7 @@ export default function Gradients() {
                     y2="26.2295"
                     gradientUnits="userSpaceOnUse"
                 >
-                    <stop offset="0%" stop-color="#4584b6" />
+                    <stop offset="0%" stopColor="#4584b6" />
                 </linearGradient>
             </defs>
         </svg>
