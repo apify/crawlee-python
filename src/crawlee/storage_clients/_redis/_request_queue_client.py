@@ -512,7 +512,6 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     @retry_on_error(RedisError)
     @override
     async def is_finished(self) -> bool:
-
         if not await self.is_empty():
             return False
 

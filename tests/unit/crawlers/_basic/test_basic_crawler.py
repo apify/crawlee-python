@@ -143,6 +143,7 @@ async def test_retries_failed_requests() -> None:
 
 
 async def test_no_new_tasks_while_only_request_in_progress() -> None:
+    """No new tasks should be scheduled while queue is empty and only one request is in progress."""
     concurrency = 4
     crawler = BasicCrawler(
         concurrency_settings=ConcurrencySettings(desired_concurrency=concurrency, max_concurrency=concurrency),
