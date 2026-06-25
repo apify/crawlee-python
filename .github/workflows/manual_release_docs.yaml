@@ -43,7 +43,7 @@ jobs:
       # skipped when called from another workflow.
       - name: Wait for checks
         if: github.event_name == 'workflow_dispatch'
-        uses: apify/actions/wait-for-checks@v1.2.0
+        uses: apify/actions/wait-for-checks@v1.3.0
         with:
           ref: ${{ github.sha }}
           check-regexp: '^Checks'
@@ -73,7 +73,7 @@ jobs:
         run: uv run poe install-dev
 
       - name: Install pnpm and website dependencies
-        uses: apify/actions/pnpm-install@v1.2.0
+        uses: apify/actions/pnpm-install@v1.3.0
         with:
           working-directory: website
 
