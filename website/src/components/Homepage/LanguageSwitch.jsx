@@ -2,35 +2,31 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './LanguageSwitch.module.css';
 import clsx from 'clsx';
 
-export default function LanguageSwitch({
-    options = ['JavaScript', 'Python'],
-    defaultOption = 'JavaScript',
-    onChange,
-}) {
-    const [activeOption, setActiveOption] = useState(defaultOption)
-    const [backgroundStyle, setBackgroundStyle] = useState({})
-    const optionRefs = useRef < (HTMLButtonElement | null)[] > ([])
+export default function LanguageSwitch({ options = ['JavaScript', 'Python'], defaultOption = 'JavaScript', onChange }) {
+    const [activeOption, setActiveOption] = useState(defaultOption);
+    const [backgroundStyle, setBackgroundStyle] = useState({});
+    const optionRefs = useRef([]);
 
     const updateBackgroundStyle = useCallback(() => {
-        const activeIndex = options.indexOf(activeOption)
-        const activeElement = optionRefs.current[activeIndex]
+        const activeIndex = options.indexOf(activeOption);
+        const activeElement = optionRefs.current[activeIndex];
         if (activeElement) {
-            const { offsetLeft, offsetWidth } = activeElement
+            const { offsetLeft, offsetWidth } = activeElement;
             setBackgroundStyle({
                 transform: `translateX(${offsetLeft}px)`,
                 width: `${offsetWidth}px`,
-            })
+            });
         }
-    }, [activeOption, options])
+    }, [activeOption, options]);
 
     useEffect(() => {
-        updateBackgroundStyle()
-    }, [updateBackgroundStyle])
+        updateBackgroundStyle();
+    }, [updateBackgroundStyle]);
 
     const handleOptionClick = (option) => {
-        setActiveOption(option)
-        onChange?.(option)
-    }
+        setActiveOption(option);
+        onChange?.(option);
+    };
 
     return (
         <div className={styles.languageSwitch}>
@@ -46,5 +42,5 @@ export default function LanguageSwitch({
             ))}
             <div className={styles.switchBackground} style={backgroundStyle} />
         </div>
-    )
+    );
 }

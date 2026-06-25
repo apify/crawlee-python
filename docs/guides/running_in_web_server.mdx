@@ -26,11 +26,13 @@ This will be our core server setup:
 </CodeBlock>
 
 The server has two endpoints.
+
 - `/` - The index is just giving short description of the server with example link to the second endpoint.
 - `/scrape` - This is the endpoint that receives a `url` parameter and returns the page title scraped from the URL
 
 To run the example server, make sure that you have installed the [fastapi[standard]](https://fastapi.tiangolo.com/#installation) and from the directory where the example code is located you can use the following command:
-```
+
+```bash
 fastapi dev server.py
 ```
 
@@ -43,5 +45,6 @@ We will create a standard <ApiLink to="class/ParselCrawler">`ParselCrawler`</Api
 </CodeBlock>
 
 Crawler is defined inside of [Lifespan](https://fastapi.tiangolo.com/advanced/events/#lifespan) which is a FastAPI way to run some start up/ teardown code for the app. There are two objects that we want to save to the app state so that they can be accessed in any endpoint through `request.state`:
+
 - `crawler` holds instance of our crawler and allows the app to interact with it.
 - `requests_to_results` is dictionary that is used to temporarily register expected results for each request and populate them when they are made available by the crawler.

@@ -122,14 +122,10 @@ function OtherFeaturesSection() {
                             alt=""
                         />
                         <div className={styles.cardWithImageText}>
-                            <h3 className={styles.cardWithImageTitle}>
-                                Auto scaling
-                            </h3>
+                            <h3 className={styles.cardWithImageTitle}>Auto scaling</h3>
                             <div className={styles.cardWithImageDescription}>
-                                Crawlers automatically adjust concurrency based
-                                on available system resources. Avoid memory
-                                errors in small containers and run faster in
-                                large ones.
+                                Crawlers automatically adjust concurrency based on available system resources. Avoid
+                                memory errors in small containers and run faster in large ones.
                             </div>
                         </div>
                     </Link>
@@ -142,14 +138,11 @@ function OtherFeaturesSection() {
                             alt=""
                         />
                         <div className={styles.cardWithImageText}>
-                            <h3 className={styles.cardWithImageTitle}>
-                                Smart proxy rotation
-                            </h3>
+                            <h3 className={styles.cardWithImageTitle}>Smart proxy rotation</h3>
                             <div className={styles.cardWithImageDescription}>
-                                Crawlee uses a pool of sessions represented by
-                                different proxies to maintain the proxy
-                                performance and keep IPs healthy. Blocked
-                                proxies are removed from the pool automatically.
+                                Crawlee uses a pool of sessions represented by different proxies to maintain the proxy
+                                performance and keep IPs healthy. Blocked proxies are removed from the pool
+                                automatically.
                             </div>
                         </div>
                     </Link>
@@ -185,7 +178,6 @@ function OtherFeaturesSection() {
                             description:
                                 'Sitemaps, infinite scroll, contact extraction, large asset blocking and many more utils included.',
                             to: '/docs/guides/avoid-blocking',
-
                         },
                         {
                             icon: (
@@ -215,41 +207,32 @@ function DeployToCloudSection() {
             <div className={styles.deployToCloudLeftSide}>
                 <h2>Deploy to cloud </h2>
                 <div className={styles.deployToCloudDescription}>
-                    Crawlee, by Apify, works anywhere, but Apify offers the best
-                    experience. Easily turn your project into an{' '}
+                    Crawlee, by Apify, works anywhere, but Apify offers the best experience. Easily turn your project
+                    into an{' '}
                     <Link to="https://apify.com/actors" rel="dofollow">
                         Actor
                     </Link>
-                    —a serverless micro-app with built-in infra, proxies, and
-                    storage.
+                    —a serverless micro-app with built-in infra, proxies, and storage.
                 </div>
-                <Button
-                    withIcon
-                    to="https://docs.apify.com/platform/actors/development/deployment"
-                >
+                <Button withIcon to="https://docs.apify.com/platform/actors/development/deployment">
                     Deploy to Apify
                 </Button>
             </div>
             <div className={styles.deployToCloudRightSide}>
-                <div
-                    className={styles.dashedSeparatorVertical}
-                    id={styles.verticalStepLine}
-                />
+                <div className={styles.dashedSeparatorVertical} id={styles.verticalStepLine} />
                 <div className={styles.deployToCloudStep}>
                     <div className={styles.deployToCloudStepNumber}>
                         <div>1</div>
                     </div>
-                    <div className={styles.deployToCloudStepText}>
-                        Install Apify SDK and Apify CLI.
-                    </div>
+                    <div className={styles.deployToCloudStepText}>Install Apify SDK and Apify CLI.</div>
                 </div>
                 <div className={styles.deployToCloudStep}>
                     <div className={styles.deployToCloudStepNumber}>
                         <div>2</div>
                     </div>
                     <div className={styles.deployToCloudStepText}>
-                        Add <pre>Actor.init()</pre> to the beginning and{' '}
-                        <pre>Actor.exit()</pre> to the end of your code.
+                        Add <pre>Actor.init()</pre> to the beginning and <pre>Actor.exit()</pre> to the end of your
+                        code.
                     </div>
                 </div>
                 <div className={styles.deployToCloudStep}>
@@ -257,8 +240,7 @@ function DeployToCloudSection() {
                         <div>3</div>
                     </div>
                     <div className={styles.deployToCloudStepText}>
-                        Use the Apify CLI to push the code to the Apify
-                        platform.
+                        Use the Apify CLI to push the code to the Apify platform.
                     </div>
                 </div>
             </div>
@@ -345,10 +327,7 @@ export default function JavascriptHomepage() {
                 <CodeExampleSection />
                 <HomepageCliExample />
                 <div className={styles.dashedSeparator}>
-                    <div
-                        className={styles.dashedDecorativeCircle}
-                        id={styles.ctaDecorativeCircle}
-                    />
+                    <div className={styles.dashedDecorativeCircle} id={styles.ctaDecorativeCircle} />
                 </div>
                 <BenefitsSection />
                 <div className={styles.dashedSeparator} />

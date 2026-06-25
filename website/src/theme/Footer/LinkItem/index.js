@@ -18,12 +18,13 @@ export default function FooterLinkItem({ item }) {
             className={clsx('footer__link-item', className, styles.footerLink)}
             {...(href
                 ? {
-                    href: prependBaseUrlToHref ? normalizedHref : href,
-                }
+                      href: prependBaseUrlToHref ? normalizedHref : href,
+                  }
                 : {
-                    to: toUrl,
-                })}
-            {...props}>
+                      to: toUrl,
+                  })}
+            {...props}
+        >
             {label}
             {href && !isInternalUrl(href) && <ExternalLinkIcon className={styles.externalLinkIcon} />}
         </Link>
