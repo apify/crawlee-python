@@ -79,20 +79,17 @@ If a request behaves differently through Crawlee than through a minimal client, 
 
 ## Turning impersonation off
 
-The HTTP crawlers (<ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink>, <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>) take an `impersonate` flag. Set it to `False` to stop the default HTTP client from injecting browser-like headers:
+Impersonation is configured on the HTTP client. To turn it off, build the client without it and pass it to the crawler:
 
 ```python
 from crawlee.crawlers import HttpCrawler
 from crawlee.http_clients import ImpitHttpClient
 
-# Disable browser-like headers on the default client.
-crawler = HttpCrawler(impersonate=False)
-
-# The same result when you supply the client yourself.
+# Send plain requests with no browser-like headers.
 crawler = HttpCrawler(http_client=ImpitHttpClient(browser=None))
 ```
 
-The flag only configures the default client. If you pass your own `http_client`, it's ignored, and you turn impersonation off on that client directly. The option is named differently on each one:
+The opt-out is named differently on each client:
 
 - `ImpitHttpClient(browser=None)`
 - `HttpxHttpClient(header_generator=None)`
@@ -120,6 +117,6 @@ This is why `ImpitHttpClient` and `CurlImpersonateHttpClient` replicate the brow
 
 ## Conclusion
 
-Headers decide what a server sends back. Crawlee impersonates a browser by default, which keeps a crawl unblocked on normal pages but can break endpoints that expect different headers. Turn impersonation off with `impersonate=False` when you target such an endpoint, set custom headers on the client or per request, and reach for an impersonating client when the target fingerprints its traffic.
+Headers decide what a server sends back. Crawlee impersonates a browser by default, which keeps a crawl unblocked on normal pages but can break endpoints that expect different headers. Turn impersonation off by building the client without it when you target such an endpoint, set custom headers on the client or per request, and reach for an impersonating client when the target fingerprints its traffic.
 
 If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!
