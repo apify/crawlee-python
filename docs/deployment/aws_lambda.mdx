@@ -160,6 +160,7 @@ Create a repository `lambda/aws-playwright` in [Amazon Elastic Container Registr
 Navigate to the created repository and click the "View push commands" button. This will open a window with console commands for uploading the Docker image to your repository. Execute them.
 
 Example:
+
 ```bash
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin {user-specific-data}
 docker build --platform linux/amd64 --provenance=false -t lambda/aws-playwright .

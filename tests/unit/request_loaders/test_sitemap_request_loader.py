@@ -9,40 +9,10 @@ from crawlee import RequestOptions, RequestTransformAction
 from crawlee.http_clients._base import HttpClient
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
 from crawlee.storages import KeyValueStore
-from tests.unit.utils import poll_until_condition
+from tests.unit.utils import get_basic_results, get_basic_sitemap, poll_until_condition
 
 if TYPE_CHECKING:
     from crawlee._types import JsonSerializable
-
-BASIC_SITEMAP = """
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-<url>
-<loc>http://not-exists.com/</loc>
-<lastmod>2005-02-03</lastmod>
-<changefreq>monthly</changefreq>
-<priority>0.8</priority>
-</url>
-<url>
-<loc>http://not-exists.com/catalog?item=12&amp;desc=vacation_hawaii</loc>
-<changefreq>weekly</changefreq>
-</url>
-<url>
-<loc>http://not-exists.com/catalog?item=73&amp;desc=vacation_new_zealand</loc>
-<lastmod>2004-12-23</lastmod>
-<changefreq>weekly</changefreq>
-</url>
-<url>
-<loc>http://not-exists.com/catalog?item=74&amp;desc=vacation_newfoundland</loc>
-<lastmod>2004-12-23T18:00:15+00:00</lastmod>
-<priority>0.3</priority>
-</url>
-<url>
-<loc>http://not-exists.com/catalog?item=83&amp;desc=vacation_usa</loc>
-<lastmod>2004-11-23</lastmod>
-</url>
-</urlset>
-""".strip()
 
 
 def compress_gzip(data: str) -> bytes:
@@ -56,7 +26,9 @@ def encode_base64(data: bytes) -> str:
 
 
 async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> None:
-    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+    sitemap_url = (server_url / 'sitemap.xml').with_query(
+        base64=encode_base64(get_basic_sitemap(url=server_url).encode())
+    )
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, enqueue_strategy='all')
 
     while not await sitemap_loader.is_finished():
@@ -72,7 +44,9 @@ async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> No
 
 
 async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL, http_client: HttpClient) -> None:
-    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+    sitemap_url = (server_url / 'sitemap.xml').with_query(
+        base64=encode_base64(get_basic_sitemap(url=server_url).encode())
+    )
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, enqueue_strategy='all')
 
     items = []
@@ -95,7 +69,9 @@ async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL, h
 
 
 async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -> None:
-    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+    sitemap_url = (server_url / 'sitemap.xml').with_query(
+        base64=encode_base64(get_basic_sitemap(url=server_url).encode())
+    )
     sitemap_loader = SitemapRequestLoader(
         [str(sitemap_url)], max_buffer_size=2, http_client=http_client, enqueue_strategy='all'
     )
@@ -119,7 +95,9 @@ async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -
 async def test_create_persist_state_for_sitemap_loading(
     server_url: URL, http_client: HttpClient, key_value_store: KeyValueStore
 ) -> None:
-    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+    sitemap_url = (server_url / 'sitemap.xml').with_query(
+        base64=encode_base64(get_basic_sitemap(url=server_url).encode())
+    )
     persist_key = 'create_persist_state'
     sitemap_loader = SitemapRequestLoader(
         [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, enqueue_strategy='all'
@@ -137,7 +115,9 @@ async def test_create_persist_state_for_sitemap_loading(
 async def test_data_persistence_for_sitemap_loading(
     server_url: URL, http_client: HttpClient, key_value_store: KeyValueStore
 ) -> None:
-    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+    sitemap_url = (server_url / 'sitemap.xml').with_query(
+        base64=encode_base64(get_basic_sitemap(url=server_url).encode())
+    )
     persist_key = 'data_persist_state'
     sitemap_loader = SitemapRequestLoader(
         [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, enqueue_strategy='all'
@@ -159,7 +139,9 @@ async def test_data_persistence_for_sitemap_loading(
 async def test_recovery_data_persistence_for_sitemap_loading(
     server_url: URL, http_client: HttpClient, key_value_store: KeyValueStore
 ) -> None:
-    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+    sitemap_url = (server_url / 'sitemap.xml').with_query(
+        base64=encode_base64(get_basic_sitemap(url=server_url).encode())
+    )
     persist_key = 'recovery_persist_state'
     sitemap_loader = SitemapRequestLoader(
         [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, enqueue_strategy='all'
@@ -188,7 +170,9 @@ async def test_recovery_data_persistence_for_sitemap_loading(
 
 
 async def test_transform_request_function(server_url: URL, http_client: HttpClient) -> None:
-    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+    sitemap_url = (server_url / 'sitemap.xml').with_query(
+        base64=encode_base64(get_basic_sitemap(url=server_url).encode())
+    )
 
     def transform_request(request_options: RequestOptions) -> RequestOptions | RequestTransformAction:
         user_data: dict[str, JsonSerializable] = {'transformed': True}
@@ -215,17 +199,13 @@ async def test_transform_request_function(server_url: URL, http_client: HttpClie
             await sitemap_loader.mark_request_as_handled(request)
 
     assert len(extracted_urls) == 5
-    assert extracted_urls == {
-        'http://not-exists.com/',
-        'http://not-exists.com/catalog?item=12&desc=vacation_hawaii',
-        'http://not-exists.com/catalog?item=73&desc=vacation_new_zealand',
-        'http://not-exists.com/catalog?item=74&desc=vacation_newfoundland',
-        'http://not-exists.com/catalog?item=83&desc=vacation_usa',
-    }
+    assert extracted_urls == get_basic_results(server_url)
 
 
 async def test_transform_request_function_with_skip(server_url: URL, http_client: HttpClient) -> None:
-    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+    sitemap_url = (server_url / 'sitemap.xml').with_query(
+        base64=encode_base64(get_basic_sitemap(url=server_url).encode())
+    )
 
     def transform_request(_request_options: RequestOptions) -> RequestOptions | RequestTransformAction:
         return 'skip'
@@ -255,7 +235,9 @@ async def test_sitemap_loader_to_tandem(
     server_url: URL,
     http_client: HttpClient,
 ) -> None:
-    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+    sitemap_url = (server_url / 'sitemap.xml').with_query(
+        base64=encode_base64(get_basic_sitemap(url=server_url).encode())
+    )
 
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, enqueue_strategy='all')
     request_manager = await sitemap_loader.to_tandem()
@@ -277,7 +259,9 @@ async def test_sitemap_loader_to_tandem_with_request_dropped(
     server_url: URL,
     http_client: HttpClient,
 ) -> None:
-    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(BASIC_SITEMAP.encode()))
+    sitemap_url = (server_url / 'sitemap.xml').with_query(
+        base64=encode_base64(get_basic_sitemap(url=server_url).encode())
+    )
 
     sitemap_loader = SitemapRequestLoader(
         [str(sitemap_url)],

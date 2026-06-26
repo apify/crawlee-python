@@ -17,7 +17,7 @@ GCP Cloud Run allows you to deploy using Docker containers, giving you full cont
 
 ## Preparing the project
 
-We'll prepare our project using [Litestar](https://litestar.dev/) and the [Uvicorn](https://www.uvicorn.org/) web server. The HTTP server handler will wrap the crawler to communicate with clients. Because the Cloud Run platform sees only an opaque Docker container, we have to take care of this bit ourselves.
+We'll prepare our project using [Litestar](https://litestar.dev/) and the [Uvicorn](https://uvicorn.dev/) web server. The HTTP server handler will wrap the crawler to communicate with clients. Because the Cloud Run platform sees only an opaque Docker container, we have to take care of this bit ourselves.
 
 :::info
 

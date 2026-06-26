@@ -7,11 +7,7 @@ import IconDarkMode from './dark-mode-icon.svg';
 import IconLightMode from './light-mode-icon.svg';
 import styles from './styles.module.css';
 
-function ColorModeToggle({
-    className,
-    value,
-    onChange,
-}) {
+function ColorModeToggle({ className, value, onChange }) {
     const isBrowser = useIsBrowser();
     const title = translate(
         {
@@ -23,37 +19,29 @@ function ColorModeToggle({
             mode:
                 value === 'dark'
                     ? translate({
-                        message: 'dark mode',
-                        id: 'theme.colorToggle.ariaLabel.mode.dark',
-                        description: 'The name for the dark color mode',
-                    })
+                          message: 'dark mode',
+                          id: 'theme.colorToggle.ariaLabel.mode.dark',
+                          description: 'The name for the dark color mode',
+                      })
                     : translate({
-                        message: 'light mode',
-                        id: 'theme.colorToggle.ariaLabel.mode.light',
-                        description: 'The name for the light color mode',
-                    }),
+                          message: 'light mode',
+                          id: 'theme.colorToggle.ariaLabel.mode.light',
+                          description: 'The name for the light color mode',
+                      }),
         },
     );
     return (
         <div className={className}>
             <button
-                className={clsx(
-                    'clean-btn',
-                    styles.toggleButton,
-                    !isBrowser && styles.toggleButtonDisabled,
-                )}
+                className={clsx('clean-btn', styles.toggleButton, !isBrowser && styles.toggleButtonDisabled)}
                 type="button"
                 onClick={() => onChange(value === 'dark' ? 'light' : 'dark')}
                 disabled={!isBrowser}
                 title={title}
-                aria-label={title}>
-                <IconLightMode
-                    className={clsx(styles.toggleIcon, styles.lightToggleIcon)}
-
-                />
-                <IconDarkMode
-                    className={clsx(styles.toggleIcon, styles.darkToggleIcon)}
-                />
+                aria-label={title}
+            >
+                <IconLightMode className={clsx(styles.toggleIcon, styles.lightToggleIcon)} />
+                <IconDarkMode className={clsx(styles.toggleIcon, styles.darkToggleIcon)} />
                 <span />
             </button>
         </div>

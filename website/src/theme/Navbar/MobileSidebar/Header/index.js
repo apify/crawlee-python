@@ -1,5 +1,4 @@
 import Link from '@docusaurus/Link';
-import { useLocation } from '@docusaurus/router';
 import { useNavbarMobileSidebar } from '@docusaurus/theme-common/internal';
 import { translate } from '@docusaurus/Translate';
 import IconClose from '@theme/Icon/Close';
@@ -21,7 +20,8 @@ function CloseButton() {
                 description: 'The ARIA label for close button of mobile sidebar',
             })}
             className="clean-btn navbar-sidebar__close"
-            onClick={() => mobileSidebar.toggle()}>
+            onClick={() => mobileSidebar.toggle()}
+        >
             <IconClose color="var(--ifm-color-emphasis-600)" />
         </button>
     );
@@ -34,21 +34,21 @@ export default function NavbarMobileSidebarHeader() {
         <div className="navbar-sidebar__brand">
             <div className={styles.navbarHeader}>
                 <NavbarLogo />
-                <div className={clsx(styles.navbarButtonsWrapper, styles.navbarButtonsWrapperDesktop)} >
-                    <div onClick={closeSidebar} >
+                <div className={clsx(styles.navbarButtonsWrapper, styles.navbarButtonsWrapperDesktop)}>
+                    <div onClick={closeSidebar}>
                         <SearchBar />
                     </div>
-                    <Link className={styles.getStartedButton} to="/docs/quick-start" onClick={closeSidebar} >
+                    <Link className={styles.getStartedButton} to="/docs/quick-start" onClick={closeSidebar}>
                         Get started
                     </Link>
                 </div>
                 <CloseButton />
             </div>
-            <div className={clsx(styles.navbarButtonsWrapper, styles.navbarButtonsWrapperMobile)} >
+            <div className={clsx(styles.navbarButtonsWrapper, styles.navbarButtonsWrapperMobile)}>
                 <Link className={styles.getStartedButton} to="/docs/quick-start" onClick={closeSidebar}>
                     Get started
                 </Link>
-                <div onClick={closeSidebar} >
+                <div onClick={closeSidebar}>
                     <SearchBar />
                 </div>
             </div>

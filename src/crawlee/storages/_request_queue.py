@@ -11,6 +11,7 @@ from crawlee import Request, service_locator
 from crawlee._utils.docs import docs_group
 from crawlee._utils.wait import wait_for_all_tasks_for_finish
 from crawlee.request_loaders import RequestManager
+from crawlee.storage_clients.models import AddRequestsResponse
 
 from ._base import Storage
 from ._utils import validate_storage_name
@@ -181,19 +182,18 @@ class RequestQueue(Storage, RequestManager):
         forefront: bool = False,
     ) -> ProcessedRequest | None:
         request = self._transform_request(request)
-        response = await self._client.add_batch_of_requests([request], forefront=forefront)
+        # Route through `_process_batch` so a single add retries unprocessed requests just like a batched one.
+        response = await self._process_batch([request], base_retry_wait=timedelta(seconds=1), forefront=forefront)
 
         if response.processed_requests:
             return response.processed_requests[0]
 
-        if response.unprocessed_requests:
+        # `_process_batch` already warns about requests left unprocessed after retries; only an empty response
+        # (neither processed nor unprocessed) is unexpected here.
+        if not response.unprocessed_requests:
             logger.warning(
-                f'Request {request.url} was not processed by storage client "{self._client.__class__.__name__}".'
-            )
-        else:
-            logger.warning(
-                f'Request {request.url} was not processed by storage client "{self._client.__class__.__name__}" '
-                'received empty response.'
+                f'Request {request.url} was not processed by storage client '
+                f'"{self._client.__class__.__name__}" (received an empty response).'
             )
         return None
 
@@ -316,9 +316,9 @@ class RequestQueue(Storage, RequestManager):
     async def is_empty(self) -> bool:
         """Check if the request queue is empty.
 
-        An empty queue means that there are no requests currently in the queue, either pending or being processed.
-        However, this does not necessarily mean that the crawling operation is finished, as there still might be
-        tasks that could add additional requests to the queue.
+        An empty queue means that there are no requests currently available to fetch. However, this does not
+        necessarily mean that the crawling operation is finished, as there still might be requests being processed
+        or tasks that could add additional requests to the queue.
 
         Returns:
             True if the request queue is empty, False otherwise.
@@ -328,19 +328,18 @@ class RequestQueue(Storage, RequestManager):
     async def is_finished(self) -> bool:
         """Check if the request queue is finished.
 
-        A finished queue means that all requests in the queue have been processed (the queue is empty) and there
-        are no more tasks that could add additional requests to the queue. This is the definitive way to check
-        if a crawling operation is complete.
+        A finished queue means that all requests have been processed and there are no more tasks that could add
+        additional requests to the queue. This is the definitive way to check if a crawling operation is complete.
 
         Returns:
-            True if the request queue is finished (empty and no pending add operations), False otherwise.
+            True if the request queue is finished and no pending add operations, False otherwise.
         """
         if self._add_requests_tasks:
             logger.debug('Background add requests tasks are still in progress.')
             return False
 
-        if await self.is_empty():
-            logger.debug('The request queue is empty.')
+        if await self._client.is_finished():
+            logger.debug('The request queue is finished.')
             return True
 
         return False
@@ -352,33 +351,46 @@ class RequestQueue(Storage, RequestManager):
         base_retry_wait: timedelta,
         attempt: int = 1,
         forefront: bool = False,
-    ) -> None:
-        """Process a batch of requests with automatic retry mechanism."""
+    ) -> AddRequestsResponse:
+        """Process a batch of requests with automatic retry mechanism.
+
+        Returns:
+            A response aggregating all requests processed across attempts plus any still unprocessed once the
+            retries are exhausted.
+        """
         max_attempts = 5
         response = await self._client.add_batch_of_requests(batch, forefront=forefront)
 
-        if response.unprocessed_requests:
-            logger.debug(f'Following requests were not processed: {response.unprocessed_requests}.')
-            if attempt > max_attempts:
-                logger.warning(
-                    f'Following requests were not processed even after {max_attempts} attempts:\n'
-                    f'{response.unprocessed_requests}'
-                )
-            else:
-                logger.debug('Retry to add requests.')
-                unprocessed_requests_unique_keys = {request.unique_key for request in response.unprocessed_requests}
-                retry_batch = [request for request in batch if request.unique_key in unprocessed_requests_unique_keys]
-                await asyncio.sleep((base_retry_wait * attempt).total_seconds())
-                await self._process_batch(
-                    retry_batch,
-                    base_retry_wait=base_retry_wait,
-                    attempt=attempt + 1,
-                    forefront=forefront,
-                )
-
         request_count = len(batch) - len(response.unprocessed_requests)
-
         if request_count:
             logger.debug(
                 f'Added {request_count} requests to the queue. Processed requests: {response.processed_requests}'
             )
+
+        if not response.unprocessed_requests:
+            return response
+
+        logger.debug(f'Following requests were not processed: {response.unprocessed_requests}.')
+        if attempt > max_attempts:
+            logger.warning(
+                f'Following requests were not processed even after {max_attempts} attempts:\n'
+                f'{response.unprocessed_requests}'
+            )
+            return response
+
+        logger.debug('Retry to add requests.')
+        unprocessed_requests_unique_keys = {request.unique_key for request in response.unprocessed_requests}
+        retry_batch = [request for request in batch if request.unique_key in unprocessed_requests_unique_keys]
+        await asyncio.sleep((base_retry_wait * attempt).total_seconds())
+        retry_response = await self._process_batch(
+            retry_batch,
+            base_retry_wait=base_retry_wait,
+            attempt=attempt + 1,
+            forefront=forefront,
+        )
+
+        # Merge the retry outcome: processed requests accumulate, unprocessed is whatever the last attempt left.
+        return AddRequestsResponse(
+            processed_requests=[*response.processed_requests, *retry_response.processed_requests],
+            unprocessed_requests=retry_response.unprocessed_requests,
+        )

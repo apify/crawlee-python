@@ -595,8 +595,32 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
     @retry_on_error(SQLAlchemyError)
     @override
     async def is_empty(self) -> bool:
-        # Check in-memory cache for requests
+        # Requests buffered for fetching mean the queue is not empty.
         if self._pending_fetch_cache:
+            return False
+
+        now = datetime.now(timezone.utc)
+
+        # Check if there are any unhandled requests that are not blocked.
+        async with self.get_session(with_simple_commit=True) as session:
+            stmt = select(
+                exists().where(
+                    self._ITEM_TABLE.request_queue_id == self._id,
+                    self._ITEM_TABLE.is_handled == False,  # noqa: E712
+                    or_(self._ITEM_TABLE.time_blocked_until.is_(None), self._ITEM_TABLE.time_blocked_until < now),
+                )
+            )
+            result = await session.execute(stmt)
+
+            await self._add_buffer_record(session)
+
+            return not result.scalar()
+
+    @retry_on_error(SQLAlchemyError)
+    @override
+    async def is_finished(self) -> bool:
+        # If the queue is not empty, it is not finished
+        if not await self.is_empty():
             return False
 
         metadata = await self.get_metadata()
@@ -629,7 +653,8 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                 has_pending_buffer_updates = buffer_result.scalar()
 
                 await self._add_buffer_record(session)
-                # If there are no pending requests and no buffered updates, the queue is empty
+
+                # If there are no pending requests and no buffered updates, the queue is finished
                 return not has_pending_buffer_updates
 
             # There are pending requests (may be inaccurate), ensure recalculated metadata

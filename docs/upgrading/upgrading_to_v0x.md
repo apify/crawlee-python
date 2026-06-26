@@ -38,6 +38,7 @@ CLI dependencies have been moved to optional dependencies. If you need the CLI, 
 ### Abstract base classes
 
 We decided to move away from [Hungarian notation](https://en.wikipedia.org/wiki/Hungarian_notation) and remove all the `Base` prefixes from the abstract classes. It includes the following public classes:
+
 - `BaseStorageClient` -> `StorageClient`
 - `BaseBrowserController` -> `BrowserController`
 - `BaseBrowserPlugin` -> `BrowserPlugin`
@@ -56,6 +57,7 @@ This section summarizes the breaking changes between v0.4.x and v0.5.0.
 - The affected classes include: `AbstractHttpCrawler`, `AbstractHttpParser`, `BasicCrawler`, `BasicCrawlerOptions`, `BasicCrawlingContext`, `BeautifulSoupCrawler`, `BeautifulSoupCrawlingContext`, `BeautifulSoupParserType`, `ContextPipeline`, `HttpCrawler`, `HttpCrawlerOptions`, `HttpCrawlingContext`, `HttpCrawlingResult`, `ParsedHttpCrawlingContext`, `ParselCrawler`, `ParselCrawlingContext`, `PlaywrightCrawler`, `PlaywrightCrawlingContext`, `PlaywrightPreNavCrawlingContext`.
 
 Example update:
+
 ```diff
 - from crawlee.beautifulsoup_crawler import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 + from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
@@ -67,6 +69,7 @@ Example update:
 - The affected classes include: `MemoryStorageClient`, `BaseStorageClient`.
 
 Example update:
+
 ```diff
 - from crawlee.memory_storage_client import MemoryStorageClient
 + from crawlee.storage_clients import MemoryStorageClient
@@ -77,6 +80,7 @@ Example update:
 - The `CurlImpersonateHttpClient` changed its import location.
 
 Example update:
+
 ```diff
 - from crawlee.http_clients.curl_impersonate import CurlImpersonateHttpClient
 + from crawlee.http_clients import CurlImpersonateHttpClient

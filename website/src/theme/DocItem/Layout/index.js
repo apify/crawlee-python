@@ -18,17 +18,12 @@ import styles from './styles.module.css';
  * Decide if the toc should be rendered, on mobile or desktop viewports
  */
 function useDocTOC() {
-    const {
-        frontMatter,
-        toc,
-    } = useDoc();
+    const { frontMatter, toc } = useDoc();
     const windowSize = useWindowSize();
     const hidden = frontMatter.hide_table_of_contents;
     const canRender = !hidden && toc.length > 0;
-    const mobile = canRender ? <DocItemTOCMobile/> : undefined;
-    const desktop = canRender && (windowSize === 'desktop' || windowSize === 'ssr') ? (
-        <DocItemTOCDesktop/>
-    ) : undefined;
+    const mobile = canRender ? <DocItemTOCMobile /> : undefined;
+    const desktop = canRender && (windowSize === 'desktop' || windowSize === 'ssr') ? <DocItemTOCDesktop /> : undefined;
     return {
         hidden,
         mobile,
@@ -42,16 +37,16 @@ export default function DocItemLayout({ children }) {
     return (
         <div className="row">
             <div className={clsx('col', !docTOC.hidden && styles.docItemCol)}>
-                <DocVersionBanner/>
+                <DocVersionBanner />
                 <div className={styles.docItemContainer}>
                     <article>
-                        <DocBreadcrumbs/>
-                        <DocVersionBadge/>
+                        <DocBreadcrumbs />
+                        <DocVersionBadge />
                         {docTOC.mobile}
                         <DocItemContent>{children}</DocItemContent>
-                        <DocItemFooter/>
+                        <DocItemFooter />
                     </article>
-                    <DocItemPaginator/>
+                    <DocItemPaginator />
 
                     <Giscus
                         id="giscus-comments"

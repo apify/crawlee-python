@@ -34,7 +34,7 @@ HeaderGeneratorOptions(browsers=['safari'])
 
 ## New default HTTP client
 
-Crawlee v1.0 now uses `ImpitHttpClient` (based on [impit](https://apify.github.io/impit/) library) as the **default HTTP client**, replacing `HttpxHttpClient` (based on [httpx](https://www.python-httpx.org/) library).
+Crawlee v1.0 now uses `ImpitHttpClient` (based on [impit](https://github.com/apify/impit) library) as the **default HTTP client**, replacing `HttpxHttpClient` (based on [httpx](https://www.python-httpx.org/) library).
 
 If you want to keep using `HttpxHttpClient`, install Crawlee with `httpx` extra, e.g. using pip:
 
@@ -192,9 +192,11 @@ The interface for custom storage clients has been simplified:
 ## ServiceLocator changes
 
 ### ServiceLocator is stricter with registering services
+
 You can register the services just once, and you can no longer override already registered services.
 
 **Before (v0.6):**
+
 ```python
 from crawlee import service_locator
 from crawlee.storage_clients import MemoryStorageClient
@@ -202,6 +204,7 @@ from crawlee.storage_clients import MemoryStorageClient
 service_locator.set_storage_client(MemoryStorageClient())
 service_locator.set_storage_client(MemoryStorageClient())
 ```
+
 **Now (v1.0):**
 
 ```python
@@ -213,9 +216,11 @@ service_locator.set_storage_client(MemoryStorageClient())  # Raises an error
 ```
 
 ### BasicCrawler has its own instance of ServiceLocator to track its own services
+
 Explicitly passed services to the crawler can be different the global ones accessible in `crawlee.service_locator`. `BasicCrawler` no longer causes the global services in `service_locator` to be set to the crawler's explicitly passed services.
 
 **Before (v0.6):**
+
 ```python
 from crawlee import service_locator
 from crawlee.crawlers import BasicCrawler
@@ -230,6 +235,7 @@ async def main() -> None:
     assert service_locator.get_storage_client() is custom_storage_client
     assert await crawler.get_dataset() is await Dataset.open()
 ```
+
 **Now (v1.0):**
 
 ```python

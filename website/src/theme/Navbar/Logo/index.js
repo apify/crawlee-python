@@ -7,10 +7,12 @@ import React from 'react';
 
 import styles from './index.module.css';
 
-export default function LogoWrapper(props) {
+export default function LogoWrapper() {
     const ArrowsIcon = require('../../../../static/img/menu-arrows.svg').default;
     const CheckIcon = require('../../../../static/img/check.svg').default;
-    const { navbar: { logo } } = useThemeConfig();
+    const {
+        navbar: { logo },
+    } = useThemeConfig();
     const javascriptLogo = {
         light: useBaseUrl('img/crawlee-javascript-light.svg'),
         dark: useBaseUrl('img/crawlee-javascript-dark.svg'),
@@ -34,7 +36,7 @@ export default function LogoWrapper(props) {
                     <Link className={styles.menuItem} href="https://crawlee.dev/js" target="_self" rel="dofollow">
                         <ThemedImage sources={javascriptLogo} alt="Crawlee JavaScript" />
                     </Link>
-                    <Link className={styles.menuItem} to="/" >
+                    <Link className={styles.menuItem} to="/">
                         <ThemedImage sources={pythonLogo} alt="Crawlee Python" />
                         <CheckIcon />
                     </Link>
@@ -43,6 +45,6 @@ export default function LogoWrapper(props) {
                     </Link>
                 </div>
             </div>
-        </div >
+        </div>
     );
 }

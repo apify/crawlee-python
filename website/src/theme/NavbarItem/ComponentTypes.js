@@ -11,12 +11,7 @@ import React from 'react';
 
 import { getApiPath } from './apiVersionUtils';
 
-function DocNavbarItem({
-    docId,
-    label: staticLabel,
-    docsPluginId,
-    ...props
-}) {
+function DocNavbarItem({ docId, label: staticLabel, docsPluginId, ...props }) {
     const { activeDoc } = useActiveDocContext(docsPluginId);
     const doc = useLayoutDoc(docId, docsPluginId);
     // Draft items are not displayed in the navbar.
@@ -38,25 +33,19 @@ function ApiNavbarItem({ to, ...props }) {
     const { preferredVersion } = useDocsPreferredVersion();
     const apiPath = preferredVersion ? getApiPath(preferredVersion) : 'api';
 
-    return (
-        <DefaultNavbarItem
-            exact
-            {...props}
-            to={to ? `${apiPath}/${to}` : apiPath}
-        />
-    );
+    return <DefaultNavbarItem exact {...props} to={to ? `${apiPath}/${to}` : apiPath} />;
 }
 
 const ComponentTypes = {
-    'default': DefaultNavbarItem,
-    'localeDropdown': LocaleDropdownNavbarItem,
-    'search': SearchNavbarItem,
-    'dropdown': DropdownNavbarItem,
-    'html': HtmlNavbarItem,
+    default: DefaultNavbarItem,
+    localeDropdown: LocaleDropdownNavbarItem,
+    search: SearchNavbarItem,
+    dropdown: DropdownNavbarItem,
+    html: HtmlNavbarItem,
     'custom-api': ApiNavbarItem,
-    'doc': DocNavbarItem,
-    'docSidebar': DocSidebarNavbarItem,
-    'docsVersion': DocsVersionNavbarItem,
-    'docsVersionDropdown': DocsVersionDropdownNavbarItem,
+    doc: DocNavbarItem,
+    docSidebar: DocSidebarNavbarItem,
+    docsVersion: DocsVersionNavbarItem,
+    docsVersionDropdown: DocsVersionDropdownNavbarItem,
 };
 export default ComponentTypes;

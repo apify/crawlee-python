@@ -1,4 +1,4 @@
-const { parse } = require('url');
+const { parse } = require('node:url');
 
 const visit = import('unist-util-visit').then((m) => m.visit);
 
@@ -9,8 +9,7 @@ const internalUrls = ['crawlee.dev'];
  */
 function isInternal(href) {
     return internalUrls.some(
-        (internalUrl) => href.host === internalUrl
-            || (!href.protocol && !href.host && (href.pathname || href.hash)),
+        (internalUrl) => href.host === internalUrl || (!href.protocol && !href.host && (href.pathname || href.hash)),
     );
 }
 
@@ -20,11 +19,7 @@ function isInternal(href) {
 exports.externalLinkProcessor = () => {
     return async (tree) => {
         (await visit)(tree, 'element', (node) => {
-            if (
-                node.tagName === 'a'
-                && node.properties
-                && typeof node.properties.href === 'string'
-            ) {
+            if (node.tagName === 'a' && node.properties && typeof node.properties.href === 'string') {
                 const href = parse(node.properties.href);
 
                 if (!isInternal(href)) {

@@ -142,6 +142,30 @@ async def test_retries_failed_requests() -> None:
     ]
 
 
+async def test_no_new_tasks_while_only_request_in_progress() -> None:
+    """No new tasks should be scheduled while queue is empty and only one request is in progress."""
+    concurrency = 4
+    crawler = BasicCrawler(
+        concurrency_settings=ConcurrencySettings(desired_concurrency=concurrency, max_concurrency=concurrency),
+    )
+
+    request_manager = await crawler.get_request_manager()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await asyncio.sleep(0.2)
+
+    with patch.object(
+        request_manager,
+        'fetch_next_request',
+        wraps=request_manager.fetch_next_request,
+    ) as fetch_counter:
+        await crawler.run(['https://a.placeholder.com'])
+
+        # `concurrency` tasks can be scheduled if control was never yielded with `await` during task scheduling
+        assert 1 <= fetch_counter.call_count <= 4
+
+
 async def test_respects_no_retry() -> None:
     crawler = BasicCrawler(max_request_retries=2)
     calls = list[str]()
@@ -1883,10 +1907,16 @@ class _CrawlerInput:
 
 
 def _process_run_crawlers(crawler_inputs: list[_CrawlerInput], storage_dir: str) -> list[StatisticsState]:
-    return [
-        asyncio.run(_run_crawler(crawler_id=crawler_input.id, requests=crawler_input.requests, storage_dir=storage_dir))
-        for crawler_input in crawler_inputs
-    ]
+    states = list[StatisticsState]()
+    for crawler_input in crawler_inputs:
+        states.append(
+            asyncio.run(
+                _run_crawler(crawler_id=crawler_input.id, requests=crawler_input.requests, storage_dir=storage_dir)
+            )
+        )
+        # Each crawler runs in its own event loop. Drop the cached storage instances between runs.
+        service_locator.storage_instance_manager.clear_cache()
+    return states
 
 
 async def test_crawler_state_persistence(tmp_path: Path) -> None:

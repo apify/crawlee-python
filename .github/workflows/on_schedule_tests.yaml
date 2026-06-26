@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: 22
+  NODE_VERSION: 24
   PYTHON_VERSION: 3.14
   TESTS_CONCURRENCY: 1
 
@@ -35,7 +35,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup node
         uses: actions/setup-node@v6

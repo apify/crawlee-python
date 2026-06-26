@@ -33,6 +33,7 @@ Crawlee offers several storage types for managing and persisting your crawling d
 ## Overview
 
 Crawlee's storage system consists of two main layers:
+
 - **Storages** (<ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>): High-level interfaces for interacting with different storage types.
 - **Storage clients** (<ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink>, <ApiLink to="class/FileSystemStorageClient">`FileSystemStorageClient`</ApiLink>, etc.): Backend implementations that handle the actual data persistence and management.
 
@@ -210,6 +211,7 @@ By default, Crawlee cleans up all unnamed storages (including the default one) a
 ### When purging happens
 
 The cleanup occurs as soon as a storage is accessed:
+
 - When opening a storage explicitly (e.g., <ApiLink to="class/RequestQueue#open">`RequestQueue.open`</ApiLink>, <ApiLink to="class/Dataset#open">`Dataset.open`</ApiLink>, <ApiLink to="class/KeyValueStore#open">`KeyValueStore.open`</ApiLink>).
 - When using helper functions that implicitly open storages (e.g., <ApiLink to="class/PushDataFunction">`push_data`</ApiLink>).
 - Automatically when <ApiLink to="class/BasicCrawler#run">`BasicCrawler.run`</ApiLink> is invoked.
