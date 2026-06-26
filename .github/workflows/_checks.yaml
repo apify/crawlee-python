@@ -62,7 +62,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install pnpm and website dependencies
-        uses: apify/actions/pnpm-install@v1.2.0
+        uses: apify/actions/pnpm-install@v1.3.0
         with:
           working-directory: website
 
@@ -83,7 +83,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install pnpm and website dependencies
-        uses: apify/actions/pnpm-install@v1.2.0
+        uses: apify/actions/pnpm-install@v1.3.0
         with:
           working-directory: website
 
