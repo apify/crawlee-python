@@ -20,25 +20,25 @@ if TYPE_CHECKING:
 # Attributes that carry selector targets or semantic meaning for an LLM.
 _SEMANTIC_ATTRS = frozenset(
     {
+        'alt',
+        'aria-label',
         'class',
+        'content',
+        'datetime',
+        'for',
+        'href',
         'id',
         'itemprop',
         'itemtype',
-        'href',
-        'src',
-        'alt',
-        'title',
+        'lang',
         'name',
+        'placeholder',
         'property',
-        'content',
-        'datetime',
         'role',
+        'src',
+        'title',
         'type',
         'value',
-        'placeholder',
-        'aria-label',
-        'lang',
-        'for',
     }
 )
 
@@ -184,7 +184,7 @@ class PydanticAiCleanHtmlDistiller(BasePydanticAiHtmlDistiller):
                 continue
 
             for name in list(elem.attrib):
-                if name in _SEMANTIC_ATTRS or name.startswith(('data-', 'aria-')):
+                if name in _SEMANTIC_ATTRS or name.startswith(('aria-', 'data-')):
                     value = elem.attrib[name]
 
                     # Inline `data:` URIs (base64 images and the like) are pure noise for an LLM.

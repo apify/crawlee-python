@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 # Attributes that give an element an identity rather than mark it as one instance of a repeating pattern.
-_IDENTITY_ATTRS = ('name', 'property', 'itemprop', 'itemtype', 'role', 'type')
+_IDENTITY_ATTRS = ('itemprop', 'itemtype', 'name', 'property', 'role', 'type')
 
 # Tags that are never collapsed even when their signature repeats. `<br>` and `<hr>` are layout markers.
 _NEVER_COLLAPSE_TAGS = frozenset({'br', 'hr'})
