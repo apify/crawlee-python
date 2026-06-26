@@ -23,7 +23,7 @@ async function getHash(source) {
     }
 
     const memory = source.match(/playwright|puppeteer/i) ? 4096 : 1024;
-    const res = await (await fetch(signingUrl, {
+    const res = await fetch(signingUrl, {
         method: 'POST',
         body: JSON.stringify({
             input: JSON.stringify({ code: source }),
@@ -37,7 +37,7 @@ async function getHash(source) {
         headers: {
             'Content-Type': 'application/json; charset=utf-8',
         },
-    }));
+    });
 
     if (!res.ok) {
         console.error(`Signing failed: ${res.status} ${res.statusText}`, await res.text());

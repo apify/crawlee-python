@@ -12,14 +12,9 @@ export default function ThreeCardsWithIcon({ cards }) {
                     <>
                         <div className={styles.cardIcon}>{card.icon}</div>
                         <h3 className={styles.cardTitle}>{card.title}</h3>
-                        <p className={styles.cardDescription}>
-                            {card.description}
-                        </p>
+                        <p className={styles.cardDescription}>{card.description}</p>
                         {card.actionLink && (
-                            <Link
-                                to={card.actionLink.href}
-                                className={styles.cardAction}
-                            >
+                            <Link to={card.actionLink.href} className={styles.cardAction}>
                                 {card.actionLink.text}
                             </Link>
                         )}
@@ -28,14 +23,7 @@ export default function ThreeCardsWithIcon({ cards }) {
 
                 if (card.to) {
                     return (
-                        <Link
-                            className={clsx(
-                                styles.cardItem,
-                                styles.cardItemLink,
-                            )}
-                            to={card.to}
-                            key={index}
-                        >
+                        <Link className={clsx(styles.cardItem, styles.cardItemLink)} to={card.to} key={index}>
                             {content}
                         </Link>
                     );

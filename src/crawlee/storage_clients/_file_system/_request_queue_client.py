@@ -204,6 +204,13 @@ class FileSystemRequestQueueClient(RequestQueueClient):
     async def is_empty(self) -> bool:
         return await self._native_client.is_empty()
 
+    @override
+    async def is_finished(self) -> bool:
+        # The native `is_empty` reports only whether a request is available to fetch and does not count locked
+        # (in-progress) requests, so it cannot serve as a completion signal. The native `is_finished` is the
+        # strong predicate that also accounts for requests currently being processed.
+        return await self._native_client.is_finished()
+
     def _deregister_event_listener(self) -> None:
         """Remove the PERSIST_STATE event listener if it was registered."""
         if not self._event_listener_registered:

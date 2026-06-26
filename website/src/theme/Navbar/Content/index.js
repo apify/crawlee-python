@@ -1,9 +1,6 @@
 import Link from '@docusaurus/Link';
 import { useThemeConfig } from '@docusaurus/theme-common';
-import {
-    splitNavbarItems,
-    useNavbarMobileSidebar,
-} from '@docusaurus/theme-common/internal';
+import { splitNavbarItems, useNavbarMobileSidebar } from '@docusaurus/theme-common/internal';
 import NavbarLogo from '@theme/Navbar/Logo';
 import NavbarMobileSidebarToggle from '@theme/Navbar/MobileSidebar/Toggle';
 import NavbarSearch from '@theme/Navbar/Search';
@@ -52,18 +49,13 @@ export default function NavbarContent() {
             }
             right={
                 <>
-                    {rightItems?.length > 0 && (
-                        <NavbarItems items={rightItems} />
-                    )}
+                    {rightItems?.length > 0 && <NavbarItems items={rightItems} />}
                     {!searchBarItem && (
                         <NavbarSearch>
                             <SearchBar />
                         </NavbarSearch>
                     )}
-                    <Link
-                        className={styles.getStartedButton}
-                        to="/docs/quick-start"
-                    >
+                    <Link className={styles.getStartedButton} to="/docs/quick-start">
                         Get started
                     </Link>
                     {!mobileSidebar.disabled && <NavbarMobileSidebarToggle />}

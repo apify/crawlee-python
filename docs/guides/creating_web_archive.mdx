@@ -25,17 +25,20 @@ This approach expects that you have already created your crawler, and that you j
 
 Install [pywb](https://pypi.org/project/pywb/) which will allow you to use `wb-manager` and `wayback` commands.
 Create a new collection that will be used for this archiving session and start the wayback server:
+
 ```bash
 wb-manager init example-collection
 wayback --record --live -a --auto-interval 10 --proxy example-collection --proxy-record
 ```
+
 Instead of passing many configuration  arguments to `wayback` command, you can configure the server by adding configuration options to `config.yaml`. See the details in the [documentation](https://pywb.readthedocs.io/en/latest/manual/configuring.html#configuring-the-web-archive).
 
 ### Configure the crawler
 
 Now you should use this locally hosted server as a proxy in your crawler. There are two more steps before starting the crawler:
- - Make the crawler use the proxy server.
- - Deal with the [pywb Certificate Authority](https://pywb.readthedocs.io/en/latest/manual/configuring.html#https-proxy-and-pywb-certificate-authority).
+
+- Make the crawler use the proxy server.
+- Deal with the [pywb Certificate Authority](https://pywb.readthedocs.io/en/latest/manual/configuring.html#https-proxy-and-pywb-certificate-authority).
 
 For example, in <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, this is the simplest setup, which takes the shortcut and ignores the CA-related errors:
 

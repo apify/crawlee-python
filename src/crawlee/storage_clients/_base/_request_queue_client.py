@@ -124,8 +124,26 @@ class RequestQueueClient(ABC):
 
     @abstractmethod
     async def is_empty(self) -> bool:
-        """Check if the request queue is empty.
+        """Check if the request queue is empty. That means there are no requests available to fetch.
 
         Returns:
             True if the request queue is empty, False otherwise.
         """
+
+    async def is_finished(self) -> bool:
+        """Check if the request queue is finished.
+
+        A finished queue is empty and has no requests currently being processed.
+
+        Warning:
+            This default only checks `is_empty`, which reports whether requests are available to fetch, not
+            whether requests are still being processed. It can therefore return `True` while requests are in
+            progress. Subclasses that track in-progress requests should override this method; all built-in
+            clients already do.
+
+        Returns:
+            True if the request queue is finished, False otherwise.
+        """
+        # TODO: Make this method abstract.
+        # https://github.com/apify/crawlee-python/issues/1985
+        return await self.is_empty()

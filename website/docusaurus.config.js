@@ -40,10 +40,7 @@ module.exports = {
     trailingSlash: false,
     organizationName: 'apify',
     projectName: 'crawlee-python',
-    scripts: [
-        '/python/js/custom.js',
-        '/crawlee-python/js/custom.js',
-    ],
+    scripts: ['/python/js/custom.js', '/crawlee-python/js/custom.js'],
     githubHost: 'github.com',
     future: {
         faster: true,
@@ -81,9 +78,7 @@ module.exports = {
             onBrokenMarkdownLinks: 'throw',
         },
     },
-    themes: [
-        '@docusaurus/theme-mermaid',
-    ],
+    themes: ['@docusaurus/theme-mermaid'],
     presets: /** @type {import('@docusaurus/types').PresetConfig[]} */ ([
         [
             '@docusaurus/preset-classic',
@@ -202,7 +197,9 @@ module.exports = {
                 name: 'docusaurus-svgo',
                 configureWebpack(config) {
                     // find the svg rule
-                    const svgRule = config.module.rules.find((r) => typeof r === 'object' && r.test.toString() === '/\\.svg$/i');
+                    const svgRule = config.module.rules.find(
+                        (r) => typeof r === 'object' && r.test.toString() === '/\\.svg$/i',
+                    );
 
                     // find the svgr loader
                     const svgrLoader = svgRule?.oneOf?.[0];
@@ -271,154 +268,160 @@ module.exports = {
         ],
     ],
     themeConfig:
-    /** @type {import('@docusaurus/preset-classic').ThemeConfig} */ ({
-        docs: {
-            versionPersistence: 'localStorage',
-            sidebar: {
-                hideable: true,
+        /** @type {import('@docusaurus/preset-classic').ThemeConfig} */ ({
+            docs: {
+                versionPersistence: 'localStorage',
+                sidebar: {
+                    hideable: true,
+                },
             },
-        },
-        navbar: {
-            hideOnScroll: true,
-            logo: {
-                src: 'img/crawlee-python-light.svg',
-                srcDark: 'img/crawlee-python-dark.svg',
+            navbar: {
+                hideOnScroll: true,
+                logo: {
+                    src: 'img/crawlee-python-light.svg',
+                    srcDark: 'img/crawlee-python-dark.svg',
+                },
+                title: 'Crawlee for Python',
+                items: [
+                    {
+                        type: 'doc',
+                        docId: 'quick-start/quick-start',
+                        label: 'Docs',
+                        position: 'left',
+                    },
+                    {
+                        type: 'doc',
+                        docId: '/examples',
+                        label: 'Examples',
+                        position: 'left',
+                    },
+                    {
+                        type: 'custom-api',
+                        label: 'API',
+                        position: 'left',
+                        activeBaseRegex: 'api/(?!.*/changelog)',
+                    },
+                    {
+                        type: 'doc',
+                        label: 'Changelog',
+                        docId: 'changelog',
+                        className: 'changelog',
+                    },
+                    {
+                        href: 'https://crawlee.dev/blog',
+                        target: '_self',
+                        rel: 'dofollow',
+                        label: 'Blog',
+                        position: 'left',
+                    },
+                    {
+                        type: 'docsVersionDropdown',
+                        position: 'right',
+                        dropdownItemsBefore: [],
+                        dropdownItemsAfter: [],
+                    },
+                ],
             },
-            title: 'Crawlee for Python',
-            items: [
+            colorMode: {
+                defaultMode: 'light',
+                disableSwitch: false,
+                respectPrefersColorScheme: true,
+            },
+            prism: {
+                defaultLanguage: 'typescript',
+                theme: require('prism-react-renderer').themes.github,
+                darkTheme: require('prism-react-renderer').themes.dracula,
+                additionalLanguages: ['docker', 'log', 'bash', 'diff', 'json'],
+            },
+            metadata: [
+                // eslint-disable-next-line max-len
                 {
-                    type: 'doc',
-                    docId: 'quick-start/quick-start',
-                    label: 'Docs',
-                    position: 'left',
+                    name: 'description',
+                    content: `Crawlee helps you build and maintain your Python crawlers. It's open source and modern, with type hints for Python to help you catch bugs early.`,
                 },
+                // eslint-disable-next-line max-len
                 {
-                    type: 'doc',
-                    docId: '/examples',
-                    label: 'Examples',
-                    position: 'left',
-                },
-                {
-                    type: 'custom-api',
-                    label: 'API',
-                    position: 'left',
-                    activeBaseRegex: 'api/(?!.*/changelog)',
-                },
-                {
-                    type: 'doc',
-                    label: 'Changelog',
-                    docId: 'changelog',
-                    className: 'changelog',
-                },
-                {
-                    href: 'https://crawlee.dev/blog',
-                    target: '_self',
-                    rel: 'dofollow',
-                    label: 'Blog',
-                    position: 'left',
-                },
-                {
-                    type: 'docsVersionDropdown',
-                    position: 'right',
-                    dropdownItemsBefore: [],
-                    dropdownItemsAfter: [],
+                    name: 'og:description',
+                    content: `Crawlee helps you build and maintain your Python crawlers. It's open source and modern, with type hints for Python to help you catch bugs early.`,
                 },
             ],
-        },
-        colorMode: {
-            defaultMode: 'light',
-            disableSwitch: false,
-            respectPrefersColorScheme: true,
-        },
-        prism: {
-            defaultLanguage: 'typescript',
-            theme: require('prism-react-renderer').themes.github,
-            darkTheme: require('prism-react-renderer').themes.dracula,
-            additionalLanguages: ['docker', 'log', 'bash', 'diff', 'json'],
-        },
-        metadata: [
-            // eslint-disable-next-line max-len
-            { name: 'description', content: `Crawlee helps you build and maintain your Python crawlers. It's open source and modern, with type hints for Python to help you catch bugs early.` },
-            // eslint-disable-next-line max-len
-            { name: 'og:description', content: `Crawlee helps you build and maintain your Python crawlers. It's open source and modern, with type hints for Python to help you catch bugs early.` },
-        ],
-        image: 'img/crawlee-python-og.png',
-        footer: {
-            links: [
-                {
-                    title: 'Docs',
-                    items: [
-                        {
-                            label: 'Guides',
-                            to: 'docs/guides',
-                        },
-                        {
-                            label: 'Examples',
-                            to: 'docs/examples',
-                        },
-                        {
-                            label: 'API reference',
-                            to: 'api',
-                        },
-                        {
-                            label: 'Changelog',
-                            to: 'docs/changelog',
-                        },
-                    ],
-                },
-                {
-                    title: 'Product',
-                    items: [
-                        {
-                            label: 'Discord',
-                            href: 'https://discord.com/invite/jyEM2PRvMU',
-                        },
-                        {
-                            label: 'Stack Overflow',
-                            href: 'https://stackoverflow.com/questions/tagged/crawlee-python',
-                        },
-                        {
-                            label: 'Twitter',
-                            href: 'https://twitter.com/apify',
-                        },
-                        {
-                            label: 'YouTube',
-                            href: 'https://www.youtube.com/apify',
-                        },
-                    ],
-                },
-                {
-                    title: 'More',
-                    items: [
-                        {
-                            label: 'Apify platform',
-                            href: 'https://apify.com',
-                        },
-                        {
-                            label: 'Docusaurus',
-                            href: 'https://docusaurus.io',
-                        },
-                        {
-                            label: 'GitHub',
-                            href: 'https://github.com/apify/crawlee-python',
-                        },
-                    ],
-                },
-            ],
-        },
-        algolia: {
-            appId: '5JC94MPMLY',
-            apiKey: '878493fcd7001e3c179b6db6796a999b', // search only (public) API key
-            indexName: 'crawlee_python',
-            placeholder: 'Search documentation',
-            algoliaOptions: {
-                facetFilters: ['version:VERSION'],
+            image: 'img/crawlee-python-og.png',
+            footer: {
+                links: [
+                    {
+                        title: 'Docs',
+                        items: [
+                            {
+                                label: 'Guides',
+                                to: 'docs/guides',
+                            },
+                            {
+                                label: 'Examples',
+                                to: 'docs/examples',
+                            },
+                            {
+                                label: 'API reference',
+                                to: 'api',
+                            },
+                            {
+                                label: 'Changelog',
+                                to: 'docs/changelog',
+                            },
+                        ],
+                    },
+                    {
+                        title: 'Product',
+                        items: [
+                            {
+                                label: 'Discord',
+                                href: 'https://discord.com/invite/jyEM2PRvMU',
+                            },
+                            {
+                                label: 'Stack Overflow',
+                                href: 'https://stackoverflow.com/questions/tagged/crawlee-python',
+                            },
+                            {
+                                label: 'Twitter',
+                                href: 'https://twitter.com/apify',
+                            },
+                            {
+                                label: 'YouTube',
+                                href: 'https://www.youtube.com/apify',
+                            },
+                        ],
+                    },
+                    {
+                        title: 'More',
+                        items: [
+                            {
+                                label: 'Apify platform',
+                                href: 'https://apify.com',
+                            },
+                            {
+                                label: 'Docusaurus',
+                                href: 'https://docusaurus.io',
+                            },
+                            {
+                                label: 'GitHub',
+                                href: 'https://github.com/apify/crawlee-python',
+                            },
+                        ],
+                    },
+                ],
             },
-            translations: {
-                button: {
-                    buttonText: 'Search documentation...',
+            algolia: {
+                appId: '5JC94MPMLY',
+                apiKey: '878493fcd7001e3c179b6db6796a999b', // search only (public) API key
+                indexName: 'crawlee_python',
+                placeholder: 'Search documentation',
+                algoliaOptions: {
+                    facetFilters: ['version:VERSION'],
+                },
+                translations: {
+                    button: {
+                        buttonText: 'Search documentation...',
+                    },
                 },
             },
-        },
-    }),
+        }),
 };

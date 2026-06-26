@@ -316,9 +316,9 @@ class RequestQueue(Storage, RequestManager):
     async def is_empty(self) -> bool:
         """Check if the request queue is empty.
 
-        An empty queue means that there are no requests currently in the queue, either pending or being processed.
-        However, this does not necessarily mean that the crawling operation is finished, as there still might be
-        tasks that could add additional requests to the queue.
+        An empty queue means that there are no requests currently available to fetch. However, this does not
+        necessarily mean that the crawling operation is finished, as there still might be requests being processed
+        or tasks that could add additional requests to the queue.
 
         Returns:
             True if the request queue is empty, False otherwise.
@@ -328,19 +328,18 @@ class RequestQueue(Storage, RequestManager):
     async def is_finished(self) -> bool:
         """Check if the request queue is finished.
 
-        A finished queue means that all requests in the queue have been processed (the queue is empty) and there
-        are no more tasks that could add additional requests to the queue. This is the definitive way to check
-        if a crawling operation is complete.
+        A finished queue means that all requests have been processed and there are no more tasks that could add
+        additional requests to the queue. This is the definitive way to check if a crawling operation is complete.
 
         Returns:
-            True if the request queue is finished (empty and no pending add operations), False otherwise.
+            True if the request queue is finished and no pending add operations, False otherwise.
         """
         if self._add_requests_tasks:
             logger.debug('Background add requests tasks are still in progress.')
             return False
 
-        if await self.is_empty():
-            logger.debug('The request queue is empty.')
+        if await self._client.is_finished():
+            logger.debug('The request queue is finished.')
             return True
 
         return False

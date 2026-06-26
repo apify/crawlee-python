@@ -164,6 +164,7 @@ StagehandPostNavCrawlingContext --|> StagehandCrawlingContext
 ```
 
 They have a similar inheritance structure as the crawlers, with the base class being <ApiLink to="class/BasicCrawlingContext">`BasicCrawlingContext`</ApiLink>. The specific crawling contexts are:
+
 - <ApiLink to="class/HttpCrawlingContext">`HttpCrawlingContext`</ApiLink> for HTTP crawlers.
 - <ApiLink to="class/ParsedHttpCrawlingContext">`ParsedHttpCrawlingContext`</ApiLink> for HTTP crawlers with parsed responses.
 - <ApiLink to="class/ParselCrawlingContext">`ParselCrawlingContext`</ApiLink> for HTTP crawlers that use [Parsel](https://github.com/scrapy/parsel) for parsing.
@@ -286,6 +287,7 @@ The request <ApiLink to="class/Router">`Router`</ApiLink> is a central component
 Request handlers are user-defined functions that process requests and responses in Crawlee. They are the core of the crawling logic and are responsible for handling data extraction, processing, and storage. Each request handler receives a crawling context as an argument, which provides access to request data, response data, and other information related to the request. Request handlers can be registered with the <ApiLink to="class/Router">`Router`</ApiLink>.
 
 The request routing in Crawlee supports:
+
 - Default handlers - Fallback handlers for requests without specific labels.
 - Label-based routing - Handlers for specific request types based on labels.
 - Error handlers - Handle errors during request processing.

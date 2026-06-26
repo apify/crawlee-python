@@ -1,8 +1,30 @@
+# markdownlint config for the docs and top-level Markdown files.
+# Run via `pnpm lint:md` / `pnpm lint:md:fix` from the `website/` directory.
 default: true
-line-length:
-  line_length: 120
-MD007:
-  indent: 4
-MD004:
+
+# Prose is written one sentence per line, so line length is not enforced.
+line-length: false
+
+ul-style:
   style: dash
+
+# Nested unordered lists use 4-space indentation.
+ul-indent:
+  indent: 4
+
+# Docs are MDX and embed JSX components.
 no-inline-html: false
+
+# MDX pages set their title via front matter, so multiple/duplicate H1s are fine.
+single-title: false
+no-duplicate-heading:
+  siblings_only: true
+
+# Anchor links into other pages can't be validated locally.
+link-fragments: false
+
+no-bare-urls: false
+no-trailing-punctuation:
+  punctuation: ".,;:。，；:"
+no-multiple-blanks:
+  maximum: 2

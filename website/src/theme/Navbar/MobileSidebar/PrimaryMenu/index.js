@@ -14,12 +14,7 @@ export default function NavbarMobilePrimaryMenu() {
     return (
         <ul className="menu__list">
             {items.map((item, i) => (
-                <NavbarItem
-                    mobile
-                    {...item}
-                    onClick={() => mobileSidebar.toggle()}
-                    key={i}
-                />
+                <NavbarItem mobile {...item} onClick={() => mobileSidebar.toggle()} key={i} />
             ))}
         </ul>
     );

@@ -8,12 +8,7 @@ import Button from '../Button';
 import CopyButton from '../CopyButton';
 import styles from './LanguageInfoWidget.module.css';
 
-export default function LanguageInfoWidget({
-    language,
-    command,
-    to,
-    githubUrl,
-}) {
+export default function LanguageInfoWidget({ language, command, to, githubUrl }) {
     const { colorMode } = useColorMode();
     return (
         <div className={styles.languageGetStartedContainer}>
@@ -36,9 +31,7 @@ export default function LanguageInfoWidget({
                 />
             )}
             <div className={clsx(styles.buttonContainer)}>
-                <Button to={to}>
-                    {command ? 'Learn more' : 'Get started'}
-                </Button>
+                <Button to={to}>{command ? 'Learn more' : 'Get started'}</Button>
                 <GitHubButton
                     href={githubUrl}
                     data-color-scheme={colorMode}

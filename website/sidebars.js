@@ -57,15 +57,12 @@ module.exports = {
                 {
                     type: 'doc',
                     id: 'deployment/aws-lambda',
-                    label: 'Deploy on AWS Lambda'
+                    label: 'Deploy on AWS Lambda',
                 },
                 {
                     type: 'category',
                     label: 'Deploy to Google Cloud',
-                    items: [
-                        'deployment/gcp-cloud-run-functions',
-                        'deployment/gcp-cloud-run',
-                    ],
+                    items: ['deployment/gcp-cloud-run-functions', 'deployment/gcp-cloud-run'],
                 },
             ],
         },

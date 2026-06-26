@@ -40,17 +40,18 @@ function Footer() {
     }
 
     return (
-        <footer className={clsx(styles.footer, style)
-        } >
+        <footer className={clsx(styles.footer, style)}>
             <div className={styles.footerTop}>
                 <div className={styles.footerTopRow}>
                     <div className={styles.footerTopRowLeft}>
-                        <Link href="https://crawlee.dev" width="120" className={styles.footerLogo} target="_self" rel="dofollow">
-                            <ThemedImage
-                                width="120"
-                                alt="Docusaurus themed image"
-                                sources={logoSources}
-                            />
+                        <Link
+                            href="https://crawlee.dev"
+                            width="120"
+                            className={styles.footerLogo}
+                            target="_self"
+                            rel="dofollow"
+                        >
+                            <ThemedImage width="120" alt="Docusaurus themed image" sources={logoSources} />
                         </Link>
                         <NavbarColorModeToggle />
                     </div>
@@ -71,7 +72,7 @@ function Footer() {
                     <div>© {new Date().getFullYear()} Apify</div>
                 </div>
             </div>
-        </footer >
+        </footer>
     );
 }
 

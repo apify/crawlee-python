@@ -13,7 +13,7 @@ import CrawlerAsActorExample from '!!raw-loader!./code_examples/apify/crawler_as
 import ProxyExample from '!!raw-loader!./code_examples/apify/proxy_example.py';
 import ProxyAdvancedExample from '!!raw-loader!./code_examples/apify/proxy_advanced_example.py';
 
-Apify is a [platform](https://apify.com) built to serve large-scale and high-performance web scraping and automation needs. It provides easy access to [compute instances (Actors)](#what-is-an-actor), convenient request and result storages, [proxies](../guides/proxy-management), scheduling, webhooks and [more](https://docs.apify.com/), accessible through a [web interface](https://console.apify.com) or an [API](https://docs.apify.com/api).
+Apify is a [platform](https://apify.com) built to serve large-scale and high-performance web scraping and automation needs. It provides easy access to [compute instances (Actors)](#what-is-an-actor), convenient request and result storages, [proxies](../guides/proxy-management), scheduling, webhooks, and [more in the Apify documentation](https://docs.apify.com/), accessible through a [web interface](https://console.apify.com) or an [API](https://docs.apify.com/api).
 
 While we think that the Apify platform is super cool, and it's definitely worth signing up for a [free account](https://console.apify.com/sign-up), **Crawlee is and will always be open source**, runnable locally or on any cloud infrastructure.
 
@@ -25,7 +25,7 @@ We do not test Crawlee in other cloud environments such as Lambda or on specific
 
 ## Requirements
 
-To run your Crawlee code on Apify platform, you need an Apify account. If you don't have one yet, you can sign up [here](https://console.apify.com/sign-up).
+To run your Crawlee code on Apify platform, you need an Apify account. If you don't have one yet, you can [sign up](https://console.apify.com/sign-up).
 
 Additionally, you must have the [Apify CLI](https://docs.apify.com/cli/) installed on your computer. For installation instructions, refer to the [Installation guide](https://docs.apify.com/cli/docs/installation).
 
@@ -72,7 +72,7 @@ When you deploy your script to the Apify platform, it becomes an [Actor](https:/
 
 Actors can be shared in the [Apify Store](https://apify.com/store) so that other people can use them. But don't worry, if you share your Actor in the store and somebody uses it, it runs under their account, not yours.
 
-**Related links**
+### Related links
 
 - [Store of existing Actors](https://apify.com/store)
 - [Documentation](https://docs.apify.com/actors)
@@ -135,7 +135,8 @@ There are several things worth mentioning here.
 
 ### Helper functions for default Key-Value Store and Dataset
 
-To simplify access to the _default_ storages, instead of using the helper functions of respective storage classes, you could use:
+To simplify access to the *default* storages, instead of using the helper functions of respective storage classes, you could use:
+
 - [`Actor.set_value()`](https://docs.apify.com/sdk/python/reference/class/Actor#set_value), [`Actor.get_value()`](https://docs.apify.com/sdk/python/reference/class/Actor#get_value), [`Actor.get_input()`](https://docs.apify.com/sdk/python/reference/class/Actor#get_input) for [`Key-Value Store`](https://docs.apify.com/sdk/python/reference/class/KeyValueStore)
 - [`Actor.push_data()`](https://docs.apify.com/sdk/python/reference/class/Actor#push_data) for [`Dataset`](https://docs.apify.com/sdk/python/reference/class/Dataset)
 
@@ -150,6 +151,7 @@ If you don't plan to force usage of the platform storages when running the Actor
 :::
 
 {/*
+
 ### Getting public url of an item in the platform storage
 
 If you need to share a link to some file stored in a [Key-Value](https://docs.apify.com/sdk/python/reference/class/KeyValueStore) Store on Apify platform, you can use [`get_public_url()`](https://docs.apify.com/sdk/python/reference/class/KeyValueStore#get_public_url) method. It accepts only one parameter: `key` - the key of the item you want to share.
@@ -164,7 +166,7 @@ If you need to share a link to some file stored in a [Key-Value](https://docs.ap
 
 When the <ApiLink to="class/Dataset">`Dataset`</ApiLink> is stored on the [Apify platform](https://apify.com/actors), you can export its data to the following formats: HTML, JSON, CSV, Excel, XML and RSS. The datasets are displayed on the Actor run details page and in the [Storage](https://console.apify.com/storage) section in the Apify Console. The actual data is exported using the [Get dataset items](https://apify.com/docs/api/v2#/reference/datasets/item-collection/get-items) Apify API endpoint. This way you can easily share the crawling results.
 
-**Related links**
+### Related links
 
 - [Apify platform storage documentation](https://docs.apify.com/storage)
 - [View storage in Apify Console](https://console.apify.com/storage)
@@ -245,9 +247,10 @@ in the [proxy dashboard](https://console.apify.com/proxy).
 The [`ProxyConfiguration`](https://docs.apify.com/sdk/python/reference/class/ProxyConfiguration) class covers both Apify Proxy and custom proxy URLs so that you can easily switch between proxy providers. However, some features of the class are available only to Apify Proxy users, mainly because Apify Proxy is what one would call a super-proxy. It's not a single proxy server, but an API endpoint that allows connection through millions of different IP addresses. So the class essentially has two modes: Apify Proxy or Own (third party) proxy.
 
 The difference is easy to remember.
+
 - If you're using your own proxies - you should create a <ApiLink to="class/ProxyConfiguration">`ProxyConfiguration`</ApiLink> instance directly.
 - If you are planning to use Apify Proxy - you should create an instance using the [`Actor.create_proxy_configuration()`](https://docs.apify.com/sdk/python/reference/class/Actor#create_proxy_configuration) function. The `new_url_function` parameter enables the use of your custom proxy URLs, whereas all the other options are there to configure Apify Proxy.
 
-**Related links**
+### Related links
 
 - [Apify Proxy docs](https://docs.apify.com/proxy)
