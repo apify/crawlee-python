@@ -544,23 +544,33 @@ async def test_reclaim_request_with_forefront(rq: RequestQueue) -> None:
     assert next_request.url == 'https://example.com/first'
 
 
-async def test_is_empty(rq: RequestQueue) -> None:
-    """Test checking if a request queue is empty."""
-    # Initially the queue should be empty
+async def test_is_empty_and_is_finished(rq: RequestQueue) -> None:
+    """Test checking if a request queue is empty and finished."""
+    # Initially the queue should be empty and finished
     assert await rq.is_empty() is True
+    assert await rq.is_finished() is True
 
     # Add a request
     await rq.add_request('https://example.com')
     assert await rq.is_empty() is False
+    assert await rq.is_finished() is False
 
-    # Fetch and handle the request
+    # Fetch the request
     request = await rq.fetch_next_request()
 
     assert request is not None
+
+    # Queue is empty, because there is no request for fetching
+    assert await rq.is_empty() is True
+    # Queue is not finished, because there is a request being processed
+    assert await rq.is_finished() is False
+
+    # Mark the request as handled
     await rq.mark_request_as_handled(request)
 
-    # Queue should be empty again
+    # Queue should be empty and finished again
     assert await rq.is_empty() is True
+    assert await rq.is_finished() is True
 
 
 @pytest.mark.parametrize(

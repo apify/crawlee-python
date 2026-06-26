@@ -496,11 +496,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     @retry_on_error(RedisError)
     @override
     async def is_empty(self) -> bool:
-        """Check if the queue is empty.
-
-        Returns:
-            True if the queue is empty, False otherwise.
-        """
+        # Requests buffered for fetching mean the queue is not empty.
         if self._pending_fetch_cache:
             return False
 
@@ -509,8 +505,17 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
             await self._reclaim_stale_requests()
             self._next_reclaim_stale = datetime.now(tz=timezone.utc) + self._RECLAIM_INTERVAL
 
-        metadata = await self.get_metadata()
+        # Check if there are any requests in the queue.
+        requests_in_queue = await await_redis_response(self._redis.llen(self._queue_key))
+        return requests_in_queue == 0
 
+    @retry_on_error(RedisError)
+    @override
+    async def is_finished(self) -> bool:
+        if not await self.is_empty():
+            return False
+
+        metadata = await self.get_metadata()
         return metadata.pending_request_count == 0
 
     async def _load_scripts(self) -> None:
