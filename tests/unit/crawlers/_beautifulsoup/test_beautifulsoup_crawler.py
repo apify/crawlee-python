@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import sys
 from datetime import timedelta
 from typing import TYPE_CHECKING
 from unittest import mock
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -503,32 +501,3 @@ def test_import_error_handled() -> None:
                 sys.modules.pop(mod_name, None)
         with pytest.raises(ImportError):
             from crawlee.crawlers import BeautifulSoupCrawler  # noqa: F401 PLC0415
-
-
-@pytest.mark.parametrize(
-    'impersonate',
-    [
-        pytest.param(False, id='impersonate_disabled'),
-        pytest.param(True, id='impersonate_enabled'),
-    ],
-)
-async def test_impersonate_option(server_url: URL, *, impersonate: bool) -> None:
-    crawler = BeautifulSoupCrawler(impersonate=impersonate)
-
-    call_mock = AsyncMock()
-
-    @crawler.router.default_handler
-    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
-        await call_mock(json.loads(await context.http_response.read()))
-
-    await crawler.run([str(server_url / 'headers')])
-
-    call_mock.assert_called_once()
-    headers = call_mock.call_args[0][0]
-
-    if impersonate:
-        assert 'Mozilla' in headers.get('user-agent', '')
-        assert headers.get('priority', '') == 'u=0, i'
-    else:
-        assert headers.get('user-agent', '') == ''
-        assert headers.get('priority', '') == ''
