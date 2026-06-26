@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.7.4 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Add `is_finished` and correct `is_empty` semantics in `RequestQueueClient` ([#1982](https://github.com/apify/crawlee-python/pull/1982)) ([0ef1078](https://github.com/apify/crawlee-python/commit/0ef10780ce1db745dc4218ce52171a6dad61d015)) by [@Mantisus](https://github.com/Mantisus), closes [#1598](https://github.com/apify/crawlee-python/issues/1598), [#1966](https://github.com/apify/crawlee-python/issues/1966)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.7.3](https://github.com/apify/crawlee-python/releases/tag/v1.7.3) (2026-06-22)
 
 ### 🐛 Bug Fixes
