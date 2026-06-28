@@ -17,7 +17,7 @@ Headers are key-value metadata attached to a request. Some of them shape what yo
 
 ### Identity headers
 
-`User-Agent` identifies the client. Many sites serve different markup to a browser than to a crawler. Some reject requests whose `User-Agent` doesn't look like a real browser. It's one of the basic headers a server uses to identify the client, though not the only one.
+`User-Agent` identifies the client. Many sites serve different markup to a browser than to a crawler. Some reject requests whose `User-Agent` doesn't look like a real browser. It's one of the first signals a server reads, though not the only one.
 
 `Referer` says which page the request came from. Some sites gate content, images, or API responses behind an expected `Referer`. A direct request with no `Referer`, or the wrong one, gets a different answer than a click from inside the site.
 
@@ -29,7 +29,7 @@ These headers tell the server what the client can handle. The server uses them t
 
 `Accept-Language` lists the languages the client prefers, in priority order. It's a preference, not a switch. A server honors it only for content it actually serves in more than one language, and ignores it otherwise. Where it applies, it changes translated text, date and number formats, and sometimes currency. Set it to match the locale you expect, then confirm from the response that the server applied it.
 
-`Accept-Encoding` lists the compression formats the client accepts, such as `gzip`, `br`, or `zstd`. The server compresses the body to one of them. This matters for cost. Without compression the response body can be several times larger, and when you route traffic through a metered [proxy](./proxy-management) that extra volume is billed bandwidth. Crawlee's HTTP clients advertise the formats they support and decompress the response for you, so you receive the smaller body and read it as plain bytes.
+`Accept-Encoding` lists the compression formats the client accepts, such as `gzip`, `br`, or `zstd`. The server compresses the body to one of them. Compression matters for cost. Without compression the response body can be several times larger, and when you route traffic through a metered [proxy](./proxy-management) that extra volume is billed bandwidth. Crawlee's HTTP clients advertise the formats they support and decompress the response for you, so you receive the smaller body and read it as plain bytes.
 
 ### Request body
 
@@ -47,15 +47,15 @@ These headers tell the server what the client can handle. The server uses them t
 
 ### Client hints and fingerprinting headers
 
-`sec-ch-ua`, `sec-fetch-*`, and similar client hints describe the browser, its platform, and how the request was initiated. Real browsers send them. Most automated clients don't. Anti-bot systems read them to separate a browser from automated traffic.
+`sec-ch-ua` and similar client hints describe the browser and its platform. `sec-fetch-*` metadata headers describe how the request was initiated. Real browsers send them. Most automated clients don't. Anti-bot systems read them to separate a browser from automated traffic.
 
 ### Non-standard headers
 
-A server can read any header it wants, not only the standard ones. AJAX endpoints often expect `X-Requested-With: XMLHttpRequest`. A site can require a custom `X-Api-Key` or `X-CSRF-Token`. A mobile app's backend usually expects its own set, such as an app version in `X-App-Version`, a device id in `X-Device-Id`, or a token the app attaches itself. There is no fixed list. When a request works in a browser or an app but fails from a crawler, capture the full set of headers the original sends and look for one you're missing.
+A server can read any header it wants, not only the standard ones. AJAX endpoints often expect `X-Requested-With: XMLHttpRequest`. A site can require a custom `X-Api-Key` or `X-CSRF-Token`. A mobile app's backend usually expects its own set, such as an app version in `X-App-Version`, a device ID in `X-Device-Id`, or a token the app attaches itself. There is no fixed list. When a request works in a browser or an app but fails from a crawler, capture the full set of headers the original sends and look for one you're missing.
 
 ### Headers don't guarantee a result
 
-A header is a request, not a command. The server decides what to do with it. It can ignore a header entirely, so a value you set has no effect on the response. It can reject a value it doesn't accept and answer with an error. And some headers only take effect in combination with others. Setting a header is the first step. Confirm from the response that it did what you expected.
+A header is a request, not a command. The server decides what to do with it. A header it doesn't accept can be ignored, so the value you set has no effect on the response. Another can be rejected outright, and the response comes back as an error. Some headers only take effect in combination with others. Setting a header is the first step. Confirm from the response that it did what you expected.
 
 ## Default headers in Crawlee
 
@@ -107,7 +107,7 @@ The example below sets `X-Api-Key` on the client and `Accept` on one of two requ
 
 <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink> and <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink> take the same `headers` argument.
 
-Header names are case insensitive, and <ApiLink to="class/HttpHeaders">`HttpHeaders`</ApiLink> normalizes the casing for you, so `user-agent` and `User-Agent` refer to the same header.
+Header names are case-insensitive, and <ApiLink to="class/HttpHeaders">`HttpHeaders`</ApiLink> normalizes the casing for you, so `user-agent` and `User-Agent` refer to the same header.
 
 ## Header order and fingerprinting
 
