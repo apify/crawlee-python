@@ -9,13 +9,13 @@ async def main() -> None:
     # Set default headers on the client. They are sent on every request.
     http_client = ImpitHttpClient(headers={'X-Api-Key': 'secret'})
 
-    crawler = HttpCrawler(http_client=http_client)
+    crawler = HttpCrawler(http_client=http_client, max_requests_per_crawl=10)
 
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
         # `httpbin.org/headers` echoes the received request headers back.
         response = (await context.http_response.read()).decode()
-        context.log.info(response)
+        context.log.info(f'{context.request.unique_key}: {response}')
 
     # Add a header for this request only. It merges with the client defaults.
     request = Request.from_url(

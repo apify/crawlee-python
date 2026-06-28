@@ -17,7 +17,7 @@ Headers are key-value metadata attached to a request. Some of them shape what yo
 
 ### Identity headers
 
-`User-Agent` identifies the client. Many sites serve different markup to a browser than to a crawler. Some reject requests whose `User-Agent` doesn't look like a real browser. It is one of the basic headers a server uses to identify the client, though not the only one.
+`User-Agent` identifies the client. Many sites serve different markup to a browser than to a crawler. Some reject requests whose `User-Agent` doesn't look like a real browser. It's one of the basic headers a server uses to identify the client, though not the only one.
 
 `Referer` says which page the request came from. Some sites gate content, images, or API responses behind an expected `Referer`. A direct request with no `Referer`, or the wrong one, gets a different answer than a click from inside the site.
 
@@ -27,7 +27,7 @@ These headers tell the server what the client can handle. The server uses them t
 
 `Accept` lists the formats the client wants. The same endpoint can return HTML to one `Accept` and JSON to another. If you need data from an API, try setting it to `application/json` to get JSON instead of a rendered page.
 
-`Accept-Language` lists the languages the client prefers, in priority order. It is a preference, not a switch. A server honors it only for content it actually serves in more than one language, and ignores it otherwise. Where it applies, it changes translated text, date and number formats, and sometimes currency. Set it to match the locale you expect, then confirm from the response that the server applied it.
+`Accept-Language` lists the languages the client prefers, in priority order. It's a preference, not a switch. A server honors it only for content it actually serves in more than one language, and ignores it otherwise. Where it applies, it changes translated text, date and number formats, and sometimes currency. Set it to match the locale you expect, then confirm from the response that the server applied it.
 
 `Accept-Encoding` lists the compression formats the client accepts, such as `gzip`, `br`, or `zstd`. The server compresses the body to one of them. This matters for cost. Without compression the response body can be several times larger, and when you route traffic through a metered [proxy](./proxy-management) that extra volume is billed bandwidth. Crawlee's HTTP clients advertise the formats they support and decompress the response for you, so you receive the smaller body and read it as plain bytes.
 
@@ -113,7 +113,7 @@ Header names are case insensitive, and <ApiLink to="class/HttpHeaders">`HttpHead
 
 Anti-bot systems look at more than header values. They look at which headers are present, their casing, and the order they arrive in. Real browsers send a consistent, recognizable set. A request that has a browser `User-Agent` but the wrong header order, or missing client hints, still looks automated.
 
-This is why `ImpitHttpClient` and `CurlImpersonateHttpClient` replicate the browser at the transport layer rather than just attaching headers. Setting a browser `User-Agent` on a plain client is not enough to pass these checks. If a target uses fingerprinting, prefer an impersonating client over hand-set headers.
+This fingerprinting is why `ImpitHttpClient` and `CurlImpersonateHttpClient` replicate the browser at the transport layer rather than just attaching headers. Setting a browser `User-Agent` on a plain client isn't enough to pass these checks. If a target uses fingerprinting, prefer an impersonating client over hand-set headers.
 
 ## Conclusion
 
