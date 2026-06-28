@@ -543,6 +543,16 @@ def test_parse_retry_after_integer_seconds() -> None:
     assert result == timedelta(seconds=120)
 
 
+def test_parse_retry_after_zero_seconds() -> None:
+    """A delay of `0` ("retry immediately") is valid and must yield a zero delta, not None."""
+    assert parse_retry_after_header('0') == timedelta(0)
+
+
+def test_parse_retry_after_negative_seconds() -> None:
+    """`delay-seconds` is non-negative per RFC 7231; a malformed negative value must be ignored."""
+    assert parse_retry_after_header('-5') is None
+
+
 def test_parse_retry_after_invalid_value() -> None:
     assert parse_retry_after_header('not-a-date-or-number') is None
 

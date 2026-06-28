@@ -25,7 +25,11 @@ def parse_retry_after_header(value: str | None) -> timedelta | None:
         return None
 
     try:
-        return timedelta(seconds=int(value))
+        seconds = int(value)
+        # `delay-seconds` is a non-negative integer per RFC 7231; ignore malformed negative values,
+        # consistent with the HTTP-date branch below which also rejects non-positive delays.
+        if seconds >= 0:
+            return timedelta(seconds=seconds)
     except ValueError:
         pass
 
