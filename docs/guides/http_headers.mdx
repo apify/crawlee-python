@@ -59,7 +59,7 @@ A header is a request, not a command. The server decides what to do with it. It 
 
 ## Default headers in Crawlee
 
-All built-in HTTP clients impersonate a browser by default. Instead of a bare library `User-Agent` like `python-httpx/0.27`, they send a realistic set of browser-like headers: a browser `User-Agent`, an `Accept`, an `Accept-Language`, and client hints where the client supports them. This makes a crawl look like normal browser traffic and avoids the simplest forms of blocking.
+All built-in HTTP clients impersonate a browser by default. Instead of a bare library `User-Agent` like `python-httpx/0.27`, they send a realistic set of browser-like headers: a browser `User-Agent`, an `Accept`, an `Accept-Language`, and client hints where the client supports them. Such headers make a crawl look like normal browser traffic and avoid the simplest forms of blocking.
 
 Each client implements impersonation its own way:
 
