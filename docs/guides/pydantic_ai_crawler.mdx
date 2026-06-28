@@ -84,7 +84,7 @@ An extractor turns a page into your schema. Extractors implement different strat
 
 ### PydanticAiDirectExtractor
 
-<ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink> sends the distilled page to the model in one call. The schema is the model's output type. Pydantic AI validates the result; on a mismatch, it sends the error back to the model to fix, bounded by `retries`.
+<ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink> sends the distilled page to the model in one call. The schema is the model's output type. Pydantic AI validates the result. On a mismatch, it sends the error back to the model to fix, bounded by `retries`.
 
 It reads each page on its own, so extraction is accurate per page. It accepts schemas of any shape: nested models, lists, dictionaries, unions, and deep nesting. The cost is one model call per page, that scales poorly on a large site.
 
@@ -116,7 +116,7 @@ Any distiller pairs with any extractor, that lets you balance extraction quality
 
 ### PydanticAiCleanHtmlDistiller
 
-<ApiLink to="class/PydanticAiCleanHtmlDistiller">`PydanticAiCleanHtmlDistiller`</ApiLink> produces cleaned, structure-preserving HTML and keeps the full page text. Scripts and styling are removed; tags, nesting, and data-bearing attributes (`href`, `class`, `datetime`, ...) stay. It is the default for <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink>, that reads the values straight from the document, so it fits pages where the data lives in the text.
+<ApiLink to="class/PydanticAiCleanHtmlDistiller">`PydanticAiCleanHtmlDistiller`</ApiLink> produces cleaned, structure-preserving HTML and keeps the full page text. Scripts and styling are removed. Tags, nesting, and data-bearing attributes (`href`, `class`, `datetime`, ...) stay. It is the default for <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink>, that reads the values straight from the document, so it fits pages where the data lives in the text.
 
 ### PydanticAiSkeletonDistiller
 
