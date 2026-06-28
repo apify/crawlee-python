@@ -303,24 +303,27 @@ class PlaywrightCrawler(
         """Build the final crawling context by adding Playwright-specific helper methods."""
         extract_links = self._create_extract_links_function(context)
 
-        return self._CRAWLING_CONTEXT_CLASS(
-            request=context.request,
-            session=context.session,
-            add_requests=context.add_requests,
-            send_request=context.send_request,
-            push_data=context.push_data,
-            use_state=context.use_state,
-            proxy_info=context.proxy_info,
-            get_key_value_store=context.get_key_value_store,
-            log=context.log,
-            register_deferred_cleanup=context.register_deferred_cleanup,
-            page=context.page,
-            goto_options=context.goto_options,
-            response=context.response,
-            infinite_scroll=lambda: infinite_scroll(context.page),
-            extract_links=extract_links,
-            enqueue_links=self._create_enqueue_links_function(context, extract_links),
-            block_requests=context.block_requests,
+        return cast(
+            'TCrawlingContext',
+            self._CRAWLING_CONTEXT_CLASS(
+                request=context.request,
+                session=context.session,
+                add_requests=context.add_requests,
+                send_request=context.send_request,
+                push_data=context.push_data,
+                use_state=context.use_state,
+                proxy_info=context.proxy_info,
+                get_key_value_store=context.get_key_value_store,
+                log=context.log,
+                register_deferred_cleanup=context.register_deferred_cleanup,
+                page=context.page,
+                goto_options=context.goto_options,
+                response=context.response,
+                infinite_scroll=lambda: infinite_scroll(context.page),
+                extract_links=extract_links,
+                enqueue_links=self._create_enqueue_links_function(context, extract_links),
+                block_requests=context.block_requests,
+            ),
         )
 
     async def _open_page(
