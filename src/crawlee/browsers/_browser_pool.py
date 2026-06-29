@@ -409,7 +409,10 @@ class BrowserPool:
                     await original_close(*args, **kwargs)
                 await self._execute_hooks(self._post_page_close_hooks, crawlee_page.id, browser_controller)
 
-            crawlee_page.page.close: Callable[..., Awaitable[None]] = close_with_hooks
+            # `Page.close` is a regular method, so type checkers reject reassigning it directly.
+            # Install the hook-wrapped version through an untyped reference to the page.
+            page: Any = crawlee_page.page
+            page.close = close_with_hooks
 
     def pre_launch_hook(
         self, hook: Callable[[str, BrowserPlugin], Awaitable[None]]
