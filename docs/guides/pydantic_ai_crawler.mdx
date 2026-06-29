@@ -16,7 +16,7 @@ import UsageLimitExample from '!!raw-loader!./code_examples/pydantic_ai_crawler/
 
 A <ApiLink to="class/PydanticAiCrawler">`PydanticAiCrawler`</ApiLink> extracts structured data from a page with an LLM. It fetches each page over plain HTTP and parses it with Parsel, then exposes an <ApiLink to="class/ExtractFunction">`extract`</ApiLink> helper: pass a Pydantic model and get a validated instance back. Instead of writing CSS selectors for every field, you describe the data with a schema and the model fills it in.
 
-The model layer is [Pydantic AI](https://pydantic.dev/docs/ai/overview/), so any provider it supports (OpenAI, Anthropic, Gemini, Ollama, ...) works through the `model` argument. The context is a <ApiLink to="class/PydanticAiCrawlingContext">`PydanticAiCrawlingContext`</ApiLink>, that extends the <ApiLink to="class/ParselCrawlingContext">`ParselCrawlingContext`</ApiLink>, so the manual <ApiLink to="class/ParselCrawlingContext#selector">`selector`</ApiLink> and <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> stay available next to <ApiLink to="class/ExtractFunction">`extract`</ApiLink>.
+The model layer is [Pydantic AI](https://pydantic.dev/docs/ai/overview/), so any provider it supports (OpenAI, Anthropic, Gemini, Ollama, and more) works through the `model` argument. The context is a <ApiLink to="class/PydanticAiCrawlingContext">`PydanticAiCrawlingContext`</ApiLink>, that extends the <ApiLink to="class/ParselCrawlingContext">`ParselCrawlingContext`</ApiLink>, so the manual <ApiLink to="class/ParselCrawlingContext#selector">`selector`</ApiLink> and <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> stay available next to <ApiLink to="class/ExtractFunction">`extract`</ApiLink>.
 
 :::caution Experimental
 
@@ -58,7 +58,7 @@ pip install 'crawlee[pydantic-ai]' 'pydantic-ai-slim[anthropic]'
 
 ## Basic usage
 
-Provide a `model` and call <ApiLink to="class/PydanticAiCrawlingContext#extract">`context.extract`</ApiLink> with a Pydantic model inside the handler. With only a `model`, the crawler wraps it in a <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink>, the default extractor, that sends each distilled page to the model in one call. The example below extracts an article and pushes it to the dataset.
+Provide a `model` and call <ApiLink to="class/PydanticAiCrawlingContext#extract">`context.extract`</ApiLink> with a Pydantic model inside the handler. With only a `model`, the crawler wraps it in a <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink>, the default extractor, that sends each distilled page to the model in one call. The following example extracts an article and pushes it to the dataset.
 
 <CodeBlock className="language-python">
     {BasicExample}
@@ -88,7 +88,7 @@ An extractor turns a page into your schema. Extractors implement different strat
 
 It reads each page on its own, so extraction is accurate per page. It accepts schemas of any shape: nested models, lists, dictionaries, unions, and deep nesting. The cost is one model call per page, that scales poorly on a large site.
 
-Use `additional_instructions` to focus the model on the data you want:
+To focus the model on the data you want, use `additional_instructions`:
 
 <CodeBlock className="language-python">
     {AdditionalInstructionsExample}
@@ -126,7 +126,7 @@ Any distiller pairs with any extractor, that lets you balance extraction quality
 
 Subclass <ApiLink to="class/BasePydanticAiHtmlDistiller">`BasePydanticAiHtmlDistiller`</ApiLink> and implement <ApiLink to="class/BasePydanticAiHtmlDistiller#distill">`distill`</ApiLink> to send a different representation. Set `prompt_notes` so the model knows the input format. The extractor appends the notes to its instructions.
 
-The example below converts the cleaned page to Markdown with [html-to-markdown](https://pypi.org/project/html-to-markdown/), an extra dependency:
+The following example converts the cleaned page to Markdown with [html-to-markdown](https://pypi.org/project/html-to-markdown/), an extra dependency:
 
 ```bash
 pip install html-to-markdown
@@ -171,7 +171,7 @@ The errors point at the cause:
 - `ValueError` - the schema shape is unsupported by <ApiLink to="class/PydanticAiSelectorExtractor">`PydanticAiSelectorExtractor`</ApiLink>, or a `scope` matched nothing.
 - `UsageLimitExceeded` - a run hit the configured `usage_limits`.
 
-Of these, `UnexpectedModelBehavior`, `ModelHTTPError`, and `UsageLimitExceeded` come from the model run and share the base `AgentRunError`, so catch it to handle any model failure in one place. `ValueError` is raised by the extractor itself, around the schema or `scope`, not by the model.
+`UnexpectedModelBehavior`, `ModelHTTPError`, and `UsageLimitExceeded` come from the model run and share the base `AgentRunError`, so catch it to handle any model failure in one place. `ValueError` is raised by the extractor itself, around the schema or `scope`, not by the model.
 
 An extraction error is an ordinary request error, so Crawlee retries the request up to `max_request_retries` (3 by default), re-running the extraction and repeating its token cost. For errors that won't pass on retry, such as a wrong API key or an unsupported schema, the retries only waste effort, so catch them in the handler to skip the page, or set `abort_on_error=True` to stop the crawl.
 
