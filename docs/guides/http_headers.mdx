@@ -13,17 +13,17 @@ Every request a crawler sends includes [HTTP headers](https://developer.mozilla.
 
 ## What headers do
 
-Headers are key-value metadata attached to a request. Some of them shape what you get back. Others identify you or carry state. The ones that matter most for scraping are below.
+Headers are key-value metadata attached to a request. Some of them shape what you get back. Others identify you or carry state.
 
 ### Identity headers
 
-`User-Agent` identifies the client. Many sites serve different markup to a browser than to a crawler. Some reject requests whose `User-Agent` doesn't look like a real browser. It's one of the first signals a server reads, though not the only one.
+`User-Agent` identifies the client. Many sites serve different markup to a browser than to a crawler. Some reject requests whose `User-Agent` doesn't look like a real browser. It's one of the first signals a server reads.
 
 `Referer` says which page the request came from. Some sites gate content, images, or API responses behind an expected `Referer`. A direct request with no `Referer`, or the wrong one, gets a different answer than a click from inside the site.
 
 ### Content negotiation
 
-These headers tell the server what the client can handle. The server uses them to pick what to send.
+These headers tell the server what the client can handle and the server uses them to pick what to send:
 
 `Accept` lists the formats the client wants. The same endpoint can return HTML to one `Accept` and JSON to another. If you need data from an API, try setting it to `application/json` to get JSON instead of a rendered page.
 
