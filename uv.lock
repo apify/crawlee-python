@@ -967,7 +967,7 @@ requires-dist = [
     { name = "protego", specifier = ">=0.5.0" },
     { name = "psutil", specifier = ">=6.0.0" },
     { name = "pydantic", specifier = ">=2.11.0" },
-    { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'pydantic-ai'", specifier = ">=1.106.0" },
+    { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'pydantic-ai'", specifier = ">=2.0.0" },
     { name = "pydantic-settings", specifier = ">=2.12.0" },
     { name = "pyee", specifier = ">=9.0.0" },
     { name = "redis", extras = ["hiredis"], marker = "extra == 'redis'", specifier = ">=7.0.0" },
@@ -1247,7 +1247,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [
@@ -1841,7 +1841,7 @@ name = "jinxed"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ansicon", marker = "sys_platform == 'win32'" },
+    { name = "ansicon" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cb/eb/8821ce6e7386e96355f2c6be83944925b4a0870572896fd33a4e61b8aa5a/jinxed-2.0.0.tar.gz", hash = "sha256:64b960b8f8d9966e1b2e7cb57ea2b1aa0a8d7e68045b96dc7ef58201e43a1209", size = 127118, upload-time = "2026-05-08T21:25:25.917Z" }
 wheels = [
@@ -3152,7 +3152,7 @@ wheels = [
 
 [[package]]
 name = "pydantic-ai-slim"
-version = "1.106.0"
+version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "exceptiongroup", marker = "python_full_version < '3.11'" },
@@ -3164,9 +3164,9 @@ dependencies = [
     { name = "pydantic-graph" },
     { name = "typing-inspection" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2b/45/2afc9100a7c370d8ac37bdfccfb54f46fc99da3bdce63f07c32c37807ebc/pydantic_ai_slim-1.106.0.tar.gz", hash = "sha256:e265598c8ee0e903ebb02d0494bb232be4cc8aa463ba1a55aa743cf34135dacf", size = 773504, upload-time = "2026-06-05T01:29:09.129Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/81/5b/c930c2c645677d1069172a71be9a22ea37b2aa170dcf3c6051aa1c105e72/pydantic_ai_slim-2.0.0.tar.gz", hash = "sha256:056ea466d67b47a832736ac0f33172264b09da2110dbcce09d26b82772173218", size = 734369, upload-time = "2026-06-23T15:48:58.379Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/72/d9/a2785c576e3519a72a5bbc0e12027c542b265ef6eea1aa72b9c440ac2531/pydantic_ai_slim-1.106.0-py3-none-any.whl", hash = "sha256:0dd7a99ea3fa89b490098406c2240ba7d75c327eea094c3fd057dd7aa9f3d163", size = 957617, upload-time = "2026-06-05T01:28:59.979Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/e6/814efd5693a97589bfd15c51c9324f77758b82a04f172f3fec9723c7777b/pydantic_ai_slim-2.0.0-py3-none-any.whl", hash = "sha256:39979b459a7bc73ae5294c071a7e474f123858a9f7922e9cbb662018d6431198", size = 905291, upload-time = "2026-06-23T15:48:51.628Z" },
 ]
 
 [package.optional-dependencies]
@@ -3293,7 +3293,7 @@ wheels = [
 
 [[package]]
 name = "pydantic-graph"
-version = "1.106.0"
+version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -3301,9 +3301,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "typing-inspection" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/42/9b/dd6826cf21eedd96a7482302be51ba6087095acbe828362135de2a505092/pydantic_graph-1.106.0.tar.gz", hash = "sha256:55afa33df4f699ed5c1185f81b6a06e2161958f1aa0c20742b2dae5745e84cce", size = 62567, upload-time = "2026-06-05T01:29:11.833Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c7/9d/81b09921d360614f65bb2d4f936d5cae856b4ebe827fcf43ae7abb81383a/pydantic_graph-2.0.0.tar.gz", hash = "sha256:f0bffe84a46a5118bce0824de63d08f3f32ba4dfc1064674f449b07e15128287", size = 43054, upload-time = "2026-06-23T15:49:00.488Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9b/e9/0058f0b98f5992e715a0a50128f6c3cc7946cc242d471f6e850efdf03f0c/pydantic_graph-1.106.0-py3-none-any.whl", hash = "sha256:e6bb61aef0fdb49185a81142d311f94fc3315329345471d12cab85ab5845221f", size = 80099, upload-time = "2026-06-05T01:29:04.219Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/2c/ff64a971e26bb2d0d67a70ef436f2cfc778341a4cf89d5aca35cbc1f071c/pydantic_graph-2.0.0-py3-none-any.whl", hash = "sha256:36d69fa01cd316be8584b90eef58bd21675c11c0a081b500a5c4ebe9b68310a5", size = 50773, upload-time = "2026-06-23T15:48:54.562Z" },
 ]
 
 [[package]]
@@ -3858,10 +3858,10 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "joblib", marker = "python_full_version < '3.11'" },
-    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "threadpoolctl", marker = "python_full_version < '3.11'" },
+    { name = "joblib" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" } },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" } },
+    { name = "threadpoolctl" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/98/c2/a7855e41c9d285dfe86dc50b250978105dce513d6e459ea66a6aeb0e1e0c/scikit_learn-1.7.2.tar.gz", hash = "sha256:20e9e49ecd130598f1ca38a1d85090e1a600147b9c02fa6f15d69cb53d968fda", size = 7193136, upload-time = "2025-09-09T08:21:29.075Z" }
 wheels = [
@@ -3907,10 +3907,10 @@ resolution-markers = [
     "python_full_version >= '3.11' and python_full_version < '3.13'",
 ]
 dependencies = [
-    { name = "joblib", marker = "python_full_version >= '3.11'" },
-    { name = "numpy", version = "2.4.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "threadpoolctl", marker = "python_full_version >= '3.11'" },
+    { name = "joblib" },
+    { name = "numpy", version = "2.4.5", source = { registry = "https://pypi.org/simple" } },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" } },
+    { name = "threadpoolctl" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0e/d4/40988bf3b8e34feec1d0e6a051446b1f66225f8529b9309becaeef62b6c4/scikit_learn-1.8.0.tar.gz", hash = "sha256:9bccbb3b40e3de10351f8f5068e105d0f4083b1a65fa07b6634fbc401a6287fd", size = 7335585, upload-time = "2025-12-10T07:08:53.618Z" }
 wheels = [
@@ -3960,7 +3960,7 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" } },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0f/37/6964b830433e654ec7485e45a00fc9a27cf868d622838f6b6d9c5ec0d532/scipy-1.15.3.tar.gz", hash = "sha256:eae3cf522bc7df64b42cad3925c876e1b0b6c35c1337c93e12c0f366f55b0eaf", size = 59419214, upload-time = "2025-05-08T16:13:05.955Z" }
 wheels = [
@@ -4021,7 +4021,7 @@ resolution-markers = [
     "python_full_version >= '3.11' and python_full_version < '3.13'",
 ]
 dependencies = [
-    { name = "numpy", version = "2.4.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "numpy", version = "2.4.5", source = { registry = "https://pypi.org/simple" } },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/7a/97/5a3609c4f8d58b039179648e62dd220f89864f56f7357f5d4f45c29eb2cc/scipy-1.17.1.tar.gz", hash = "sha256:95d8e012d8cb8816c226aef832200b1d45109ed4464303e997c5b13122b297c0", size = 30573822, upload-time = "2026-02-23T00:26:24.851Z" }
 wheels = [

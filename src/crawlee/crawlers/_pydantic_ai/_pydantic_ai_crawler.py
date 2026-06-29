@@ -104,7 +104,7 @@ class PydanticAiCrawler(AbstractHttpCrawler[PydanticAiCrawlingContext, Selector,
         warnings.warn(
             'The PydanticAiCrawler is experimental and its public API may change in future releases.',
             category=UserWarning,
-            stacklevel=2,
+            stacklevel=1,
         )
 
         self._ai_usage = extractor.ai_usage
