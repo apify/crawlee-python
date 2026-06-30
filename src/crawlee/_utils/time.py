@@ -112,7 +112,7 @@ def format_duration(duration: timedelta | None) -> str:
     seconds = remaining_seconds % _SECONDS_PER_MINUTE
 
     result = f'{hours}h'
-    if minutes > 0:
+    if minutes > 0 or seconds > 0:
         result += f' {minutes}min'
     if seconds > 0:
         result += f' {seconds:.1f}s'
