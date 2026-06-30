@@ -55,6 +55,20 @@ def test_does_not_collapse_siblings_with_different_identity_attrs() -> None:
     )
 
 
+def test_does_not_collapse_siblings_with_different_ids() -> None:
+    items = ''.join(f'<li class="item" id="item-{index}">v</li>' for index in range(4))
+    distilled_html = PydanticAiSkeletonDistiller(keep_siblings=2).distill(f'<ul>{items}</ul>')
+
+    assert distilled_html == (
+        '<ul>'
+        '<li class="item" id="item-0">v</li>'
+        '<li class="item" id="item-1">v</li>'
+        '<li class="item" id="item-2">v</li>'
+        '<li class="item" id="item-3">v</li>'
+        '</ul>'
+    )
+
+
 def test_does_not_collapse_scripts() -> None:
     scripts = '<script type="application/json">{"a":1}</script>' * 4
     distilled_html = PydanticAiSkeletonDistiller(keep_siblings=2).distill(f'<div>{scripts}</div>')

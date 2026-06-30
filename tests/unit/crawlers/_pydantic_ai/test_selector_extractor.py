@@ -4,7 +4,7 @@ import asyncio
 from typing import TYPE_CHECKING, Literal
 
 import pytest
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, Field, create_model
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
@@ -33,6 +33,20 @@ class _Posts(BaseModel):
 class _Nested(BaseModel):
     title: str
     item: _Item | None = None
+
+
+class _WithDefault(BaseModel):
+    title: str
+    tag: str = 'default'
+
+
+class _NullableNote(BaseModel):
+    title: str
+    note: str | None
+
+
+class _Aliased(BaseModel):
+    name: str = Field(alias='display_name')
 
 
 class _Collections(BaseModel):
@@ -133,6 +147,13 @@ async def test_extracts_literal_field() -> None:
     assert result == _Status(status='in_stock')
 
 
+async def test_extracts_field_with_alias() -> None:
+    # The selector map is keyed by the field name, so by-name validation lets a schema with an alias accept it.
+    result = await _extractor(_model(NAME_SELECTORS)).extract(NAME_HTML, _Aliased)
+
+    assert result.name == 'X'
+
+
 async def test_reuses_cached_plan() -> None:
     extractor = _extractor(_model(NAME_SELECTORS))
 
@@ -171,6 +192,35 @@ async def test_cached_plan_for_optional_field() -> None:
 
     assert first_call == _Nested(title='T', item=_Item(name='X'))
     assert second_call == _Nested(title='T2', item=None)
+    assert extractor.ai_usage.requests == 1
+
+
+@pytest.mark.parametrize(
+    ('schema', 'expected'),
+    [
+        pytest.param(_WithDefault, _WithDefault(title='T', tag='default'), id='with-default'),
+        pytest.param(_NullableNote, _NullableNote(title='T', note=None), id='nullable'),
+    ],
+)
+async def test_omits_selector_for_optional_field(schema: type[BaseModel], expected: BaseModel) -> None:
+    plan = {'selectors': {'title': {'selector': 'h1::text'}}}
+    extractor = _extractor(_model(plan))
+
+    result = await extractor.extract('<div><h1>T</h1></div>', schema, cache_tag='test')
+
+    assert result == expected
+    assert extractor.ai_usage.requests == 1
+
+
+async def test_cache_key_ignores_field_description() -> None:
+    schema_a = create_model('_DescA', name=(str, Field(description='description')))
+    schema_b = create_model('_DescB', name=(str, Field(description='no description')))
+    extractor = _extractor(_model(NAME_SELECTORS))
+
+    await extractor.extract(NAME_HTML, schema_a, cache_tag='test')
+    await extractor.extract(NAME_HTML, schema_b, cache_tag='test')
+
+    # Same shape and tag, so the second extract reuses the cached plan with no model call.
     assert extractor.ai_usage.requests == 1
 
 
@@ -315,6 +365,15 @@ async def test_active_state() -> None:
     async with extractor:
         assert extractor.active is True
     assert extractor.active is False
+
+
+async def test_enter_propagates_to_fallback() -> None:
+    inner = _extractor()
+    outer = _extractor(fallback=inner)
+
+    async with outer:
+        assert inner.active is True
+    assert inner.active is False
 
 
 async def test_double_enter_raises() -> None:
