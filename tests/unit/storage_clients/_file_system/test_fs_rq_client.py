@@ -163,7 +163,7 @@ async def test_metadata_file_updates(rq_client: FileSystemRequestQueueClient) ->
     # Verify metadata file is updated on disk
     with rq_client.path_to_metadata.open() as f:
         metadata_json = json.load(f)
-        assert metadata_json['total_request_count'] == 1
+        assert metadata_json['totalRequestCount'] == 1
 
 
 async def test_data_persistence_across_reopens() -> None:
@@ -225,7 +225,7 @@ async def test_in_progress_requests_recovered_after_crash() -> None:
     assert fetched is not None
 
     # Persist state explicitly (simulating what happens periodically or at crash boundary).
-    await original_client._state.persist_state()
+    await original_client._native_client.persist_state()
 
     rq_id = (await original_client.get_metadata()).id
 
