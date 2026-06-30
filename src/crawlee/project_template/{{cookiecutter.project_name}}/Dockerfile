@@ -2,15 +2,15 @@
 # You can see the Docker images from Apify at https://hub.docker.com/r/apify/.
 # You can also use any other image from Docker Hub.
 # % if cookiecutter.crawler_type == 'playwright' or cookiecutter.crawler_type.startswith('adaptive-') or cookiecutter.crawler_type == 'stagehand'
-# % set base_image = 'apify/actor-python-playwright:3.13'
+# % set base_image = 'apify/actor-python-playwright:3.13-1.60.0'
 # % elif cookiecutter.crawler_type == 'playwright-camoufox'
-# % set base_image = 'apify/actor-python-playwright-camoufox:3.13'
+# % set base_image = 'apify/actor-python-playwright-camoufox:3.13-1.60.0'
 # % elif cookiecutter.crawler_type == 'playwright-chrome'
-# % set base_image = 'apify/actor-python-playwright-chrome:3.13'
+# % set base_image = 'apify/actor-python-playwright-chrome:3.13-1.60.0'
 # % elif cookiecutter.crawler_type == 'playwright-firefox'
-# % set base_image = 'apify/actor-python-playwright-firefox:3.13'
+# % set base_image = 'apify/actor-python-playwright-firefox:3.13-1.60.0'
 # % elif cookiecutter.crawler_type == 'playwright-webkit'
-# % set base_image = 'apify/actor-python-playwright-webkit:3.13'
+# % set base_image = 'apify/actor-python-playwright-webkit:3.13-1.60.0'
 # % else
 # % set base_image = 'apify/actor-python:3.13'
 # % endif
