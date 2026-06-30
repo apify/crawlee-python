@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Keep minutes segment in format_duration for sub-minute remainders ([#1994](https://github.com/apify/crawlee-python/pull/1994)) ([b322ace](https://github.com/apify/crawlee-python/commit/b322ace7845abd4bf73e0d732ce379e33d4f9d53)) by [@anxkhn](https://github.com/anxkhn)
 - **templates:** Use Playwright version locked base docker images ([#1997](https://github.com/apify/crawlee-python/pull/1997)) ([b5f0cb4](https://github.com/apify/crawlee-python/commit/b5f0cb4a8582cff97d008af35e3e63ebf3a6a8aa)) by [@Pijukatel](https://github.com/Pijukatel), closes [#295](https://github.com/apify/crawlee-python/issues/295)
 - Ignore negative Retry-After header instead of disabling 429 back-off ([#1995](https://github.com/apify/crawlee-python/pull/1995)) ([5027018](https://github.com/apify/crawlee-python/commit/50270188c60af0d1f228bcbc75c06ba32dc01534)) by [@anxkhn](https://github.com/anxkhn)
+- **sitemap:** Prevent sitemap parser from leaking metadata between &lt;url&gt; entries ([#1992](https://github.com/apify/crawlee-python/pull/1992)) ([a58687e](https://github.com/apify/crawlee-python/commit/a58687e3028010016880d46f61798b6002b23cbf)) by [@anxkhn](https://github.com/anxkhn)
 
 
 <!-- git-cliff-unreleased-end -->
