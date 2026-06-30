@@ -23,6 +23,12 @@ RUN pip install -U pip setuptools \
     && pip install 'poetry<3' \
     && poetry self add 'poetry-plugin-export'
 
+# Snapshot the base image's playwright version before installing dependencies so we can pin to it
+# later and stay aligned with the browser binaries baked into the base image. This must run before
+# any dependency install (the `hash` checks if playwright is installed; the file is empty for
+# non-playwright base images).
+RUN hash playwright 2>/dev/null && playwright --version | cut -d ' ' -f 2 > /tmp/.base-playwright-version || true
+
 # Second, copy just poetry.lock and pyproject.toml into the Actor image,
 # since those should be the only files that affects the dependency install in the next step,
 # in order to speed up the build
@@ -31,19 +37,17 @@ COPY pyproject.toml poetry.lock ./
 # Install the dependencies
 RUN echo "Python version:" \
  && python --version \
- # Snapshot the base image's playwright version before installing so we can pin to it later
- # and stay aligned with the browser binaries baked into the base image (the `hash` checks if
- # playwright is installed; it is empty for non-playwright base images).
- && PLAYWRIGHT_BASE_VERSION=$(hash playwright 2>/dev/null && (playwright --version | cut -d ' ' -f 2) || echo "") \
  && echo "Installing dependencies:" \
  # Export packages from poetry.lock and install everything using pip
  # (ignore dependency checks - the lockfile is correct, period)
  && poetry export -f requirements.txt --without-hashes | pip install -r /dev/stdin --no-dependencies \
  # Pin playwright to whatever is pre-installed in the base image so it matches the browser binaries.
+ && PLAYWRIGHT_BASE_VERSION=$(cat /tmp/.base-playwright-version 2>/dev/null || echo "") \
  && if [ -n "$PLAYWRIGHT_BASE_VERSION" ]; then \
         echo "Pinning playwright to $PLAYWRIGHT_BASE_VERSION to match the browser binaries shipped in the base image" \
         && pip install --no-deps --force-reinstall "playwright==$PLAYWRIGHT_BASE_VERSION"; \
     fi \
+ && rm -f /tmp/.base-playwright-version \
  && echo "All installed Python packages:" \
  && pip freeze
 # % elif cookiecutter.package_manager == 'uv'
@@ -72,6 +76,12 @@ RUN echo "Python version:" \
 # % elif cookiecutter.package_manager == 'pip'
 RUN pip install -U pip setuptools
 
+# Snapshot the base image's playwright version before installing dependencies so we can pin to it
+# later and stay aligned with the browser binaries baked into the base image. This must run before
+# any dependency install (the `hash` checks if playwright is installed; the file is empty for
+# non-playwright base images).
+RUN hash playwright 2>/dev/null && playwright --version | cut -d ' ' -f 2 > /tmp/.base-playwright-version || true
+
 # Second, copy just requirements.txt into the Actor image,
 # since it should be the only file that affects the dependency install in the next step,
 # in order to speed up the build
@@ -80,19 +90,17 @@ COPY requirements.txt ./
 # Install the dependencies
 RUN echo "Python version:" \
  && python --version \
- # Snapshot the base image's playwright version before installing so we can pin to it later
- # and stay aligned with the browser binaries baked into the base image (the `hash` checks if
- # playwright is installed; it is empty for non-playwright base images).
- && PLAYWRIGHT_BASE_VERSION=$(hash playwright 2>/dev/null && (playwright --version | cut -d ' ' -f 2) || echo "") \
  && echo "Installing dependencies:" \
  # Install everything using pip. Playwright is pulled in transitively via `crawlee[playwright]`
  # and is not pinned in requirements.txt, so pip resolves the latest release here.
  && pip install -r requirements.txt \
  # Pin playwright to whatever is pre-installed in the base image so it matches the browser binaries.
+ && PLAYWRIGHT_BASE_VERSION=$(cat /tmp/.base-playwright-version 2>/dev/null || echo "") \
  && if [ -n "$PLAYWRIGHT_BASE_VERSION" ]; then \
         echo "Pinning playwright to $PLAYWRIGHT_BASE_VERSION to match the browser binaries shipped in the base image" \
         && pip install --no-deps --force-reinstall "playwright==$PLAYWRIGHT_BASE_VERSION"; \
     fi \
+ && rm -f /tmp/.base-playwright-version \
  && echo "All installed Python packages:" \
  && pip freeze
 # % elif cookiecutter.package_manager == 'manual'
