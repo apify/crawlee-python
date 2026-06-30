@@ -4,7 +4,6 @@ import asyncio
 from logging import getLogger
 from typing import TYPE_CHECKING, cast
 
-from parsel import Selector
 from pydantic_ai import Agent
 from pydantic_ai.usage import RunUsage
 
@@ -15,6 +14,7 @@ from ._clean_html_distiller import PydanticAiCleanHtmlDistiller
 from ._prompts import _DIRECT_INSTRUCTIONS
 
 if TYPE_CHECKING:
+    from parsel import Selector
     from pydantic_ai.models import Model
     from pydantic_ai.usage import UsageLimits
 
@@ -105,7 +105,7 @@ class PydanticAiDirectExtractor(BasePydanticAiHtmlExtractor):
             # Scope resolution requires a parsed tree. Serializing the matched subtree also keeps the distiller input
             # minimal.
             content = self._resolve_scope(self._as_selector(content), scope)
-        html = content.get() if isinstance(content, Selector) else content
+        html = self._as_selector(content).get()
         return await self._run(html, schema, additional_instructions)
 
     async def _run(

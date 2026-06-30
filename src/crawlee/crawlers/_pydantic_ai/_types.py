@@ -127,7 +127,8 @@ class ExtractFunction(Protocol):
             scope: Optional CSS selector restricting extraction to the first matching subtree. Saves tokens and
                 prevents matches outside the region of interest.
             cache_tag: Optional tag used by caching extractors to bucket cached selectors per page kind. Defaults to
-                `context.request.label`.
+                `context.request.label`. Unlabeled requests share one bucket, which overflows fast when page kinds
+                differ.
             additional_instructions: Extra instructions appended to the base instructions for this call only (e.g.
                 'the price is the discounted one, not the list price'). Does not replace the base instructions.
         """

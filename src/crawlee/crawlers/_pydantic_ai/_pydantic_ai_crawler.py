@@ -94,12 +94,6 @@ class PydanticAiCrawler(AbstractHttpCrawler[PydanticAiCrawlingContext, Selector,
                 cached-selector extraction. Provide at most one of `model` or `extractor`.
             kwargs: Additional keyword arguments to pass to the underlying `AbstractHttpCrawler`.
         """
-        if model is not None and extractor is not None:
-            raise ValueError('Provide at most one of `model` or `extractor`.')
-
-        if extractor is None:
-            extractor = PydanticAiDirectExtractor(model if model is not None else _DEFAULT_AI_MODEL)
-
         # Call the notification only once.
         warnings.warn(
             'The PydanticAiCrawler is experimental and its public API may change in future releases.',
@@ -107,7 +101,12 @@ class PydanticAiCrawler(AbstractHttpCrawler[PydanticAiCrawlingContext, Selector,
             stacklevel=1,
         )
 
-        self._ai_usage = extractor.ai_usage
+        if model is not None and extractor is not None:
+            raise ValueError('Provide at most one of `model` or `extractor`.')
+
+        if extractor is None:
+            extractor = PydanticAiDirectExtractor(model if model is not None else _DEFAULT_AI_MODEL)
+
         self._extractor = extractor
 
         async def final_step(
@@ -118,7 +117,7 @@ class PydanticAiCrawler(AbstractHttpCrawler[PydanticAiCrawlingContext, Selector,
             yield PydanticAiCrawlingContext.from_parsel_crawling_context(
                 parsel_context,
                 extract=self._create_extract_function(parsel_context.selector, parsel_context.request),
-                ai_usage=self._ai_usage,
+                ai_usage=self._extractor.ai_usage,
             )
 
         kwargs.setdefault('_logger', getLogger(__name__))
@@ -144,7 +143,7 @@ class PydanticAiCrawler(AbstractHttpCrawler[PydanticAiCrawlingContext, Selector,
     @property
     def ai_usage(self) -> PydanticAiUsageStats:
         """Accumulated token usage across extraction calls."""
-        return self._ai_usage
+        return self._extractor.ai_usage
 
     def _create_extract_function(self, selector: Selector, request: Request) -> ExtractFunction:
         """Build an `extract` helper bound to the page's parsed tree.

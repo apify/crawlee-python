@@ -6,7 +6,9 @@ import json
 import re
 import types
 from collections import defaultdict
+from contextlib import AbstractAsyncContextManager
 from enum import Enum
+from functools import lru_cache
 from logging import getLogger
 from typing import TYPE_CHECKING, Literal, Union, cast, get_args, get_origin
 
@@ -24,9 +26,11 @@ from ._prompts import _SELECTOR_INSTRUCTIONS
 from ._skeleton_distiller import PydanticAiSkeletonDistiller
 
 if TYPE_CHECKING:
+    from types import TracebackType
     from typing import Any
 
     from parsel import Selector
+    from pydantic.fields import FieldInfo
     from pydantic_ai.models import Model
     from pydantic_ai.usage import UsageLimits
 
@@ -104,6 +108,142 @@ class _FieldKind(Enum):
 
     UNSUPPORTED = 'unsupported'
     """Unsupported: any other parametrized annotation (tuple, set, ...)."""
+
+
+@lru_cache(maxsize=128)
+def _unwrap_optional(annotation: Any) -> Any:
+    """Return `X` for `X | None`, the annotation unchanged otherwise."""
+    origin = get_origin(annotation)
+    if origin is Union or origin is types.UnionType:
+        args = [a for a in get_args(annotation) if a is not type(None)]
+        if len(args) == 1:
+            return args[0]
+    return annotation
+
+
+@lru_cache(maxsize=128)
+def _is_union(annotation: Any) -> bool:
+    """Return whether `annotation` is a non-Optional union."""
+    origin = get_origin(annotation)
+    return origin is Union or origin is types.UnionType
+
+
+@lru_cache(maxsize=128)
+def _is_nullable(annotation: Any) -> bool:
+    """Return whether `annotation` admits `None` (e.g. `X | None`)."""
+    origin = get_origin(annotation)
+    if origin is Union or origin is types.UnionType:
+        return any(arg is type(None) for arg in get_args(annotation))
+    return False
+
+
+def _field_is_optional(info: FieldInfo) -> bool:
+    """Return whether a field's selector may be omitted."""
+    return not info.is_required() or _is_nullable(info.annotation)
+
+
+@lru_cache(maxsize=128)
+def _classify_field(annotation: Any) -> tuple[_FieldKind, type[BaseModel] | None]:
+    """Classify a field annotation into its selector-mapping shape.
+
+    Single source of truth for the field-shape introspection shared by the capability gate, the prompt renderer
+    and the selector applier. Optional wrappers (`X | None`) are stripped first, so `str | None` is a leaf and
+    `list[Item] | None` is a list of models.
+
+    Args:
+        annotation: The raw field annotation, possibly `Optional`.
+    """
+    annotation = _unwrap_optional(annotation)
+    origin = get_origin(annotation)
+
+    if origin in (list, set):
+        args = get_args(annotation)
+        item = _unwrap_optional(args[0]) if args else str
+        # `list[A | B]` is ambiguous: a match can't be tied to a specific union member, so treat it as unsupported.
+        if _is_union(item):
+            return _FieldKind.LIST_UNION, None
+        if isinstance(item, type) and issubclass(item, BaseModel):
+            return _FieldKind.LIST_MODEL, item
+        if get_origin(item) in (list, set):
+            return _FieldKind.LIST_OF_LISTS, None
+        return _FieldKind.LIST_SCALAR, None
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return _FieldKind.NESTED_MODEL, annotation
+    if origin is dict:
+        return _FieldKind.MAPPING, None
+    # A `Literal` constrains a value to a fixed set. It is extracted as a leaf string and validated by Pydantic.
+    if origin is Literal:
+        return _FieldKind.LEAF, None
+    if origin is not None:
+        return _FieldKind.UNSUPPORTED, None
+    return _FieldKind.LEAF, None
+
+
+@lru_cache(maxsize=128)
+def _schema_shape(schema: type[BaseModel]) -> tuple[Any, ...]:
+    """Return the selector-relevant shape: `((name, kind, inner_shape_or_None), ...)` in declaration order."""
+    shape: list[Any] = []
+    for field_name, field_info in schema.model_fields.items():
+        kind, inner_model = _classify_field(field_info.annotation)
+        if inner_model is None:
+            shape.append((field_name, kind.value, None))
+            continue
+        inner_shape = tuple(
+            (inner_name, _classify_field(inner_info.annotation)[0].value)
+            for inner_name, inner_info in inner_model.model_fields.items()
+        )
+        shape.append((field_name, kind.value, inner_shape))
+    return tuple(shape)
+
+
+@lru_cache(maxsize=128)
+def _build_cache_digest(schema: type[BaseModel], scope: str | None, cache_tag: str | None) -> str:
+    """Build the digest identifying a `(schema, scope, cache_tag)` bucket.
+
+    Scope and tag are part of the identity. The same schema extracted from a different region or page kind gets
+    its own selector bucket.
+    """
+    return hashlib.sha256(
+        json.dumps(_schema_shape(schema)).encode()
+        + b'\x00'
+        + (scope or '').encode()
+        + b'\x00'
+        + (cache_tag or '').encode()
+    ).hexdigest()[:16]
+
+
+@lru_cache(maxsize=128)
+def _unsupported_schema_reason(schema: type[BaseModel], depth: int = 0) -> str | None:
+    """Return why `schema` cannot be served by cached selectors, or `None`.
+
+    Supported shapes are scalar leaves, lists of scalars, lists of models with leaf-only fields, and single
+    nested models with leaf-only fields. Run before generation to avoid spending LLM retries on an impossible
+    schema.
+
+    Args:
+        schema: The schema to check.
+        depth: Current recursion depth.
+    """
+    for name, info in schema.model_fields.items():
+        kind, model = _classify_field(info.annotation)
+
+        if kind is _FieldKind.LIST_UNION:
+            return f'field {name!r} is a list of a union type'
+        if kind is _FieldKind.LIST_OF_LISTS:
+            return f'field {name!r} is a list of lists'
+        if kind is _FieldKind.MAPPING:
+            return f'field {name!r} is a mapping'
+        if kind is _FieldKind.UNSUPPORTED:
+            return f'field {name!r} has an unsupported annotation {info.annotation!r}'
+
+        if kind in (_FieldKind.LIST_MODEL, _FieldKind.NESTED_MODEL) and model is not None:
+            if depth >= 1:
+                noun = 'item lists' if kind is _FieldKind.LIST_MODEL else 'models'
+                return f'field {name!r} nests {noun} deeper than one level'
+            reason = _unsupported_schema_reason(model, depth + 1)
+            if reason is not None:
+                return reason
+    return None
 
 
 @docs_group('Other')
@@ -215,23 +355,35 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
         return self._active
 
     async def __aenter__(self) -> PydanticAiSelectorExtractor:
-        """Initialize the selector cache eagerly."""
+        """Initialize the selector cache eagerly and enter the fallback chain."""
         if self._active:
             raise RuntimeError(f'The {type(self).__name__} is already active.')
 
         if not self._selector_cache.is_initialized:
             await self._selector_cache.initialize()
 
+        if isinstance(self._fallback, AbstractAsyncContextManager):
+            await self._fallback.__aenter__()
+
         self._active = True
         return self
 
-    async def __aexit__(self, exc_type: object, exc_value: object, exc_traceback: object) -> None:
-        """Persist the selector cache one final time and detach from events."""
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
+        """Persist the selector cache one final time, detach from events, and exit the fallback chain."""
         if not self._active:
             raise RuntimeError(f'The {type(self).__name__} is not active.')
 
-        await self._selector_cache.teardown()
-        self._active = False
+        try:
+            if isinstance(self._fallback, AbstractAsyncContextManager):
+                await self._fallback.__aexit__(exc_type, exc_value, exc_traceback)
+        finally:
+            await self._selector_cache.teardown()
+            self._active = False
 
     async def extract(
         self,
@@ -248,7 +400,8 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
             content: Raw HTML or a parsed Parsel `Selector`.
             schema: The Pydantic model describing the desired output.
             scope: Optional CSS selector restricting extraction to the first matching subtree.
-            cache_tag: Optional tag identifying the page kind. Selectors are cached per tag.
+            cache_tag: Optional tag identifying the page kind. Selectors are cached per `(schema, scope, cache_tag)`.
+                A shared tag (the `None` default) buckets unlike pages together, overflowing the cache fast.
             additional_instructions: Extra instructions appended for this call only.
 
         Raises:
@@ -262,7 +415,7 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
             selector = self._resolve_scope(selector, scope)
 
         # Reject unsupported schema shapes before any cache or LLM work.
-        reason = self._unsupported_schema_reason(schema)
+        reason = _unsupported_schema_reason(schema)
         if reason is not None:
             if self._fallback is not None:
                 logger.info(
@@ -281,7 +434,7 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
                     # Lazy init for standalone use. Under `PydanticAiCrawler` the context manager inits it at startup.
                     await self._selector_cache.initialize()
 
-        cache_digest = self._build_cache_digest(schema, scope, cache_tag)
+        cache_digest = _build_cache_digest(schema, scope, cache_tag)
         variants = self._selector_cache.current_value.selectors.setdefault(cache_digest, [])
 
         extracted = self._try_cached_variants(variants, selector, schema)
@@ -371,7 +524,7 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
         @agent.output_validator
         def _validate(plan: SelectorMap) -> SelectorMap:
             self._check_fields_covered(plan, schema)
-            self._check_selectors_compile_and_match(plan, selector)
+            self._check_selectors_compile_and_match(plan, selector, schema)
             self._check_apply_succeeds(plan, selector, schema)
             return plan
 
@@ -399,24 +552,29 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
 
     @staticmethod
     def _check_fields_covered(plan: SelectorMap, schema: type[BaseModel]) -> None:
-        """Raise `ModelRetry` when the plan misses required schema fields."""
-        missing = [name for name in schema.model_fields if name not in plan.selectors]
+        """Raise `ModelRetry` when the plan misses a required schema field."""
+        missing = [
+            name
+            for name, info in schema.model_fields.items()
+            if name not in plan.selectors and not _field_is_optional(info)
+        ]
         if missing:
-            raise ModelRetry(f'No selector provided for fields: {missing}')
+            raise ModelRetry(f'No selector provided for required fields: {missing}')
 
     @staticmethod
     def _is_leaf_selector_form(selector: str) -> bool:
         """Whether a selector targets a value (ends with `::text` or `::attr(...)`)."""
         return _LEAF_PSEUDO_RE.search(selector) is not None
 
-    def _check_selectors_compile_and_match(self, plan: SelectorMap, selector: Selector) -> None:
+    def _check_selectors_compile_and_match(
+        self, plan: SelectorMap, selector: Selector, schema: type[BaseModel]
+    ) -> None:
         """Raise `ModelRetry` on invalid CSS, wrong selector form, or no matches.
 
-        Generation-time strictness: a selector matching nothing yields `[]` for list fields and `None` for optional
-        ones. Both are schema-valid, so without this check a useless selector map would be accepted and cached,
-        silently returning empty data from then on. At apply time empty matches stay legal (other pages of the
-        template may genuinely lack the content).
+        A selector matching nothing is rejected here so a useless map is not cached. Optional fields are exempt:
+        their content may be genuinely absent, so a missing or empty match is allowed for them.
         """
+        optional = {name for name, info in schema.model_fields.items() if _field_is_optional(info)}
         empty: list[str] = []
         for name, field_selector in plan.selectors.items():
             is_container = field_selector.fields is not None
@@ -443,7 +601,8 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
                     'Use plain CSS ending with ::text or ::attr(...).'
                 ) from exc
             if not matched:
-                empty.append(name)
+                if name not in optional:
+                    empty.append(name)
                 continue
             # Check sub-selectors against the first matched item. Cheap, and turns a vague "field required" error
             # into a targeted "this relative selector matches nothing in an item".
@@ -492,7 +651,7 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
         schema: type[TSchema],
     ) -> TSchema:
         """Run `plan` against `selector` and build a validated `schema` instance."""
-        return schema.model_validate(self._apply_fields(plan.selectors, selector, schema))
+        return schema.model_validate(self._apply_fields(plan.selectors, selector, schema), by_name=True)
 
     def _apply_fields(
         self,
@@ -502,15 +661,17 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
     ) -> dict[str, Any]:
         """Apply one level of the selector tree relative to `scope`.
 
-        Item-group fields recurse. The container selector enumerates item elements. Sub-selectors run relative to
-        each item (native Parsel behavior of `element.css(...)`).
+        Item-group fields recurse. A field with no selector falls back to its default, or to `None` when nullable.
         """
         raw: dict[str, Any] = {}
         for name, info in schema.model_fields.items():
             field_selector = fields.get(name)
             if field_selector is None:
+                # No selector: fill None for a nullable field, otherwise leave it out so its default applies.
+                if info.is_required() and _is_nullable(info.annotation):
+                    raw[name] = None
                 continue
-            kind, inner = self._classify_field(info.annotation)
+            kind, inner = _classify_field(info.annotation)
 
             if kind is _FieldKind.LIST_MODEL and inner is not None:
                 raw[name] = [
@@ -519,111 +680,18 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
                 ]
             elif kind is _FieldKind.NESTED_MODEL and inner is not None:
                 matched = scope.css(field_selector.selector)
-                raw[name] = self._apply_fields(field_selector.fields or {}, matched[0], inner) if matched else None
+                if matched:
+                    raw[name] = self._apply_fields(field_selector.fields or {}, matched[0], inner)
+                elif _is_nullable(info.annotation):
+                    raw[name] = None  # nullable region absent on this page
+                else:
+                    raw[name] = {}  # required region absent: let the inner schema accept or reject `{}`
             elif kind is _FieldKind.LIST_SCALAR:
                 raw[name] = [value.strip() for value in scope.css(field_selector.selector).getall()]
             else:
                 value = scope.css(field_selector.selector).get()
                 raw[name] = value.strip() if isinstance(value, str) else value
         return raw
-
-    @staticmethod
-    def _build_cache_digest(schema: type[BaseModel], scope: str | None, cache_tag: str | None) -> str:
-        """Build the digest identifying a `(schema, scope, cache_tag)` bucket.
-
-        Scope and tag are part of the identity. The same schema extracted from a different region or page kind gets
-        its own selector bucket.
-        """
-        return hashlib.sha256(
-            json.dumps(schema.model_json_schema(), sort_keys=True).encode()
-            + b'\x00'
-            + (scope or '').encode()
-            + b'\x00'
-            + (cache_tag or '').encode()
-        ).hexdigest()[:16]
-
-    @staticmethod
-    def _unwrap_optional(annotation: Any) -> Any:
-        """Return `X` for `X | None`, the annotation unchanged otherwise."""
-        origin = get_origin(annotation)
-        if origin is Union or origin is types.UnionType:
-            args = [a for a in get_args(annotation) if a is not type(None)]
-            if len(args) == 1:
-                return args[0]
-        return annotation
-
-    @staticmethod
-    def _is_union(annotation: Any) -> bool:
-        """Return whether `annotation` is a non-Optional union."""
-        origin = get_origin(annotation)
-        return origin is Union or origin is types.UnionType
-
-    def _classify_field(self, annotation: Any) -> tuple[_FieldKind, type[BaseModel] | None]:
-        """Classify a field annotation into its selector-mapping shape.
-
-        Single source of truth for the field-shape introspection shared by the capability gate, the prompt renderer
-        and the selector applier. Optional wrappers (`X | None`) are stripped first, so `str | None` is a leaf and
-        `list[Item] | None` is a list of models.
-
-        Args:
-            annotation: The raw field annotation, possibly `Optional`.
-        """
-        annotation = self._unwrap_optional(annotation)
-        origin = get_origin(annotation)
-
-        if origin in (list, set):
-            args = get_args(annotation)
-            item = self._unwrap_optional(args[0]) if args else str
-            # `list[A | B]` is ambiguous: a match can't be tied to a specific union member, so treat it as unsupported.
-            if self._is_union(item):
-                return _FieldKind.LIST_UNION, None
-            if isinstance(item, type) and issubclass(item, BaseModel):
-                return _FieldKind.LIST_MODEL, item
-            if get_origin(item) in (list, set):
-                return _FieldKind.LIST_OF_LISTS, None
-            return _FieldKind.LIST_SCALAR, None
-        if isinstance(annotation, type) and issubclass(annotation, BaseModel):
-            return _FieldKind.NESTED_MODEL, annotation
-        if origin is dict:
-            return _FieldKind.MAPPING, None
-        # A `Literal` constrains a value to a fixed set. It is extracted as a leaf string and validated by Pydantic.
-        if origin is Literal:
-            return _FieldKind.LEAF, None
-        if origin is not None:
-            return _FieldKind.UNSUPPORTED, None
-        return _FieldKind.LEAF, None
-
-    def _unsupported_schema_reason(self, schema: type[BaseModel], *, depth: int = 0) -> str | None:
-        """Return why `schema` cannot be served by cached selectors, or `None`.
-
-        Supported shapes are scalar leaves, lists of scalars, lists of models with leaf-only fields, and single
-        nested models with leaf-only fields. Run before generation to avoid spending LLM retries on an impossible
-        schema.
-
-        Args:
-            schema: The schema to check.
-            depth: Current recursion depth.
-        """
-        for name, info in schema.model_fields.items():
-            kind, model = self._classify_field(info.annotation)
-
-            if kind is _FieldKind.LIST_UNION:
-                return f'field {name!r} is a list of a union type'
-            if kind is _FieldKind.LIST_OF_LISTS:
-                return f'field {name!r} is a list of lists'
-            if kind is _FieldKind.MAPPING:
-                return f'field {name!r} is a mapping'
-            if kind is _FieldKind.UNSUPPORTED:
-                return f'field {name!r} has an unsupported annotation {info.annotation!r}'
-
-            if kind in (_FieldKind.LIST_MODEL, _FieldKind.NESTED_MODEL) and model is not None:
-                if depth >= 1:
-                    noun = 'item lists' if kind is _FieldKind.LIST_MODEL else 'models'
-                    return f'field {name!r} nests {noun} deeper than one level'
-                reason = self._unsupported_schema_reason(model, depth=depth + 1)
-                if reason is not None:
-                    return reason
-        return None
 
     def _format_fields(self, schema: type[BaseModel]) -> str:
         """Render the schema fields as an indented text block for the prompt.
@@ -645,7 +713,7 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
             lines: list[str] = []
             for name, info in model.model_fields.items():
                 description = f': {info.description}' if info.description else ''
-                kind, inner = self._classify_field(info.annotation)
+                kind, inner = _classify_field(info.annotation)
                 if kind is _FieldKind.LIST_MODEL and inner is not None:
                     lines.append(f'{pad}- {name} (list of items, each with:){description}')
                     lines.extend(render(inner, indent + 1))
@@ -653,7 +721,7 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
                     lines.append(f'{pad}- {name} (item with:){description}')
                     lines.extend(render(inner, indent + 1))
                 else:
-                    annotation = self._unwrap_optional(info.annotation)
+                    annotation = _unwrap_optional(info.annotation)
                     type_name = annotation.__name__ if isinstance(annotation, type) else str(annotation)
                     lines.append(f'{pad}- {name} ({type_name}){description}')
             return lines

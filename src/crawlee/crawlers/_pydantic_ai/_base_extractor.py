@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from logging import getLogger
 from typing import TYPE_CHECKING
 
 from parsel import Selector
@@ -15,6 +16,9 @@ if TYPE_CHECKING:
     from pydantic_ai.usage import UsageLimits
 
     from ._types import PydanticAiHtmlDistiller, TSchema
+
+
+logger = getLogger(__name__)
 
 
 @docs_group('Other')
@@ -105,6 +109,10 @@ class BasePydanticAiHtmlExtractor(ABC):
         scoped = selector.css(scope)
         if not scoped:
             raise ValueError(f'Extraction scope {scope!r} matched nothing on the page.')
+        if len(scoped) > 1:
+            logger.warning(
+                f'Extraction scope {scope!r} matched {len(scoped)} elements on the page, using the first one.'
+            )
         return scoped[0]
 
     @staticmethod
