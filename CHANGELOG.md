@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Add `is_finished` and correct `is_empty` semantics in `RequestQueueClient` ([#1982](https://github.com/apify/crawlee-python/pull/1982)) ([0ef1078](https://github.com/apify/crawlee-python/commit/0ef10780ce1db745dc4218ce52171a6dad61d015)) by [@Mantisus](https://github.com/Mantisus), closes [#1598](https://github.com/apify/crawlee-python/issues/1598), [#1966](https://github.com/apify/crawlee-python/issues/1966)
+- Keep minutes segment in format_duration for sub-minute remainders ([#1994](https://github.com/apify/crawlee-python/pull/1994)) ([b322ace](https://github.com/apify/crawlee-python/commit/b322ace7845abd4bf73e0d732ce379e33d4f9d53)) by [@anxkhn](https://github.com/anxkhn)
 
 
 <!-- git-cliff-unreleased-end -->
