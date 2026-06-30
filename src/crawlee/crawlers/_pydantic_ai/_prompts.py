@@ -26,9 +26,8 @@ _SELECTOR_INSTRUCTIONS = (
     'use positional selectors such as `:nth-child` or ids of individual list items: pages vary between '
     'requests. For a field that is a list of items, provide a container selector matching every item element '
     '(no ::text/::attr on it) and sub-selectors for the item fields written RELATIVE to one item container, '
-    'each ending with `::text` or `::attr(name)`. Provide a selector for every field whose content appears on the '
-    'page. Omit the selector for an optional field (one that may be null or has a default) when its content is '
-    'absent from this page, rather than inventing a selector that matches nothing.'
+    'each ending with `::text` or `::attr(name)`. If a field has no matching content on the page, omit its selector '
+    'instead of inventing one that matches nothing.'
 )
 
 # Default prompt-notes for `PydanticAiCleanHtmlDistiller`.
