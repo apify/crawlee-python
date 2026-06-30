@@ -3,11 +3,15 @@ from __future__ import annotations
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+from pydantic import ValidationError
 from yarl import URL
 
 from crawlee._utils.crypto import compute_short_hash
 
 if TYPE_CHECKING:
+    from logging import Logger
+
+    from crawlee._request import Request, RequestOptions
     from crawlee._types import HttpHeaders, HttpMethod, HttpPayload
 
 logger = getLogger(__name__)
@@ -108,6 +112,34 @@ def compute_unique_key(
 
     # Return the normalized URL as the unique key.
     return normalized_url
+
+
+def create_request_from_options(request_options: RequestOptions, logger: Logger | None = None) -> Request | None:
+    """Build a `Request` from `RequestOptions`, returning `None` if the URL is invalid.
+
+    Shared by the crawlers' `extract_links` implementations to turn extracted URLs into `Request`
+    objects. A URL that fails validation (a malformed URL or an unsupported, non-`http(s)` scheme) is
+    logged at the debug level and skipped by returning `None`, rather than raising.
+
+    Args:
+        request_options: The options passed to `Request.from_url`.
+        logger: An optional logger used to report a skipped, invalid URL.
+
+    Returns:
+        The created `Request`, or `None` if the URL was invalid.
+    """
+    # Imported lazily to avoid a circular import (`crawlee._request` imports from this module).
+    from crawlee._request import Request  # noqa: PLC0415
+
+    try:
+        return Request.from_url(**request_options)
+    except ValidationError as exc:
+        if logger is not None:
+            logger.debug(
+                f'Skipping URL "{request_options["url"]}" due to invalid format: {exc}. '
+                'This may be caused by a malformed URL or an unsupported URL scheme.'
+            )
+        return None
 
 
 def _get_payload_hash(payload: HttpPayload | None) -> str:

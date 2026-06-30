@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import inspect
 import logging
 import signal
 import sys
@@ -17,7 +18,7 @@ from functools import partial
 from http import HTTPStatus
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, cast, get_type_hints
 from weakref import WeakKeyDictionary
 
 from cachetools import LRUCache
@@ -110,7 +111,35 @@ T = TypeVar('T')
 
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Request | None]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
-SkippedRequestCallback = Callable[[str, SkippedReason], Awaitable[None]]
+SkippedRequestCallback = (
+    Callable[[str, SkippedReason], Awaitable[None]] | Callable[[Request, SkippedReason], Awaitable[None]]
+)
+"""A skipped-request callback receives either the URL `str` or the full `Request`.
+
+For backward compatibility, callbacks whose first parameter is annotated as `str` (or is unannotated)
+receive `request.url`; callbacks that annotate it as `Request` receive the `Request` object. See
+`_skipped_request_callback_expects_request`.
+"""
+
+
+def _skipped_request_callback_expects_request(callback: Callable[..., Awaitable[None]]) -> bool:
+    """Whether a skipped-request callback wants the full `Request` rather than the URL string.
+
+    The first parameter's resolved type annotation decides: a callback annotating it as `Request`
+    receives the `Request` object, while a callback annotating it as `str` (or leaving it unannotated)
+    receives `request.url`, preserving the original `(url: str, reason)` signature. Anything that
+    cannot be introspected falls back to the backward-compatible `str` form.
+    """
+    try:
+        parameters = list(inspect.signature(callback).parameters.values())
+        type_hints = get_type_hints(callback)
+    except Exception:  # Any introspection failure falls back to the backward-compatible `str` form.
+        return False
+
+    if not parameters:
+        return False
+
+    return type_hints.get(parameters[0].name) is Request
 
 
 class _BasicCrawlerOptions(TypedDict):
@@ -417,6 +446,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._error_handler: ErrorHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._failed_request_handler: FailedRequestHandler[TCrawlingContext | BasicCrawlingContext] | None = None
         self._on_skipped_request: SkippedRequestCallback | None = None
+        self._on_skipped_request_expects_request = False
         self._abort_on_error = abort_on_error
 
         # Crawler callbacks
@@ -678,8 +708,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """Register a function to handle skipped requests.
 
         The skipped request handler is invoked when a request is skipped due to a collision or other reasons.
+
+        The callback receives either the request URL as a `str` or the full `Request` object, depending on
+        how its first parameter is annotated. Annotate it as `Request` to access request metadata such as
+        `user_data`; a `str` annotation (or no annotation) keeps the original URL-only behavior.
         """
         self._on_skipped_request = callback
+        self._on_skipped_request_expects_request = _skipped_request_callback_expects_request(callback)
         return callback
 
     async def run(
@@ -826,12 +861,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
             wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added.
         """
-        allowed_requests = []
-        skipped = []
+        allowed_requests: list[Request] = []
+        skipped: list[Request] = []
 
-        for request in requests:
-            check_url = request.url if isinstance(request, Request) else request
-            if await self._is_allowed_based_on_robots_txt_file(check_url):
+        for original in requests:
+            # Normalize `str` URLs to `Request` once, so robots-skipped items always reach the
+            # skipped-request callback as a `Request` (see `_handle_skipped_request`).
+            request = original if isinstance(original, Request) else Request.from_url(original)
+            if await self._is_allowed_based_on_robots_txt_file(request.url):
                 allowed_requests.append(request)
             else:
                 skipped.append(request)
@@ -1210,17 +1247,19 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
 
     async def _handle_skipped_request(
-        self, request: Request | str, reason: SkippedReason, *, need_mark: bool = False
+        self, request: Request, reason: SkippedReason, *, need_mark: bool = False
     ) -> None:
-        if need_mark and isinstance(request, Request):
+        if need_mark:
             request.state = RequestState.SKIPPED
             await self._mark_request_as_handled(request)
 
-        url = request.url if isinstance(request, Request) else request
-
-        if self._on_skipped_request:
+        if self._on_skipped_request is not None:
+            # Pass the full `Request` or just its URL, depending on how the callback annotated its first
+            # parameter (see `on_skipped_request`). The cast reflects that dual-dispatch contract.
+            callback = cast('Callable[[str | Request, SkippedReason], Awaitable[None]]', self._on_skipped_request)
+            argument: str | Request = request if self._on_skipped_request_expects_request else request.url
             try:
-                await self._on_skipped_request(url, reason)
+                await callback(argument, reason)
             except Exception as e:
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined skipped request callback') from e
 

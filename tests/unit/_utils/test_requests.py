@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
+
 import pytest
 
+from crawlee._request import RequestOptions
 from crawlee._types import HttpHeaders
-from crawlee._utils.requests import compute_unique_key, normalize_url
+from crawlee._utils.requests import compute_unique_key, create_request_from_options, normalize_url
 
 
 @pytest.mark.parametrize(
@@ -132,3 +135,24 @@ def test_compute_unique_key_with_whitespace_in_headers() -> None:
 
     uk_2 = compute_unique_key(url, headers=headers_with_whitespaces, use_extended_unique_key=True)
     assert uk_2 == expected_output
+
+
+def test_create_request_from_options_valid_url() -> None:
+    """A valid `http(s)` URL yields a `Request` carrying that URL."""
+    request = create_request_from_options(RequestOptions(url='https://crawlee.dev'))
+    assert request is not None
+    assert request.url == 'https://crawlee.dev'
+
+
+def test_create_request_from_options_invalid_url_returns_none() -> None:
+    """An unsupported, non-`http(s)` URL is dropped (returns `None`) instead of raising."""
+    assert create_request_from_options(RequestOptions(url='ftp://crawlee.dev')) is None
+
+
+def test_create_request_from_options_logs_invalid_url(caplog: pytest.LogCaptureFixture) -> None:
+    """When a logger is provided, an invalid URL is reported at the debug level."""
+    logger = logging.getLogger('test_create_request_from_options')
+    with caplog.at_level(logging.DEBUG, logger=logger.name):
+        assert create_request_from_options(RequestOptions(url='ftp://crawlee.dev'), logger) is None
+
+    assert any('ftp://crawlee.dev' in record.message for record in caplog.records)

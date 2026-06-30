@@ -7,11 +7,11 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Generic
 
 from more_itertools import partition
-from pydantic import ValidationError
 from typing_extensions import NotRequired, TypeVar
 
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._utils.docs import docs_group
+from crawlee._utils.requests import create_request_from_options
 from crawlee._utils.time import SharedTimeout
 from crawlee._utils.urls import to_absolute_url_iterator
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
@@ -206,6 +206,7 @@ class AbstractHttpCrawler(
             **kwargs: Unpack[EnqueueLinksKwargs],
         ) -> list[Request]:
             requests = list[Request]()
+            skipped = list[Request]()
 
             base_user_data = user_data or {}
 
@@ -213,6 +214,21 @@ class AbstractHttpCrawler(
 
             kwargs.setdefault('strategy', 'same-hostname')
             strategy = kwargs.get('strategy', 'same-hostname')
+
+            def to_request(url: str) -> Request | None:
+                """Build a `Request` from a single extracted URL, applying the user-provided transform."""
+                request_options = RequestOptions(
+                    url=url, user_data={**base_user_data}, label=label, enqueue_strategy=strategy
+                )
+
+                if transform_request_function:
+                    transform_request_options = transform_request_function(request_options)
+                    if transform_request_options == 'skip':
+                        return None
+                    if transform_request_options != 'unchanged':
+                        request_options = transform_request_options
+
+                return create_request_from_options(request_options, context.log)
 
             links_iterator: Iterator[str] = iter(
                 self._parser.find_links(parsed_content, selector=selector, attribute=attribute)
@@ -227,34 +243,19 @@ class AbstractHttpCrawler(
             )
             links_iterator = to_absolute_url_iterator(base_url, links_iterator, logger=context.log)
 
+            # Requests disallowed by robots.txt are reported to the skipped-request callback; the rest
+            # continue to the enqueue filter. Both paths go through `to_request` for consistent building.
             if robots_txt_file:
-                skipped, links_iterator = partition(robots_txt_file.is_allowed, links_iterator)
-            else:
-                skipped = iter([])
+                skipped_iterator, links_iterator = partition(robots_txt_file.is_allowed, links_iterator)
+                for url in skipped_iterator:
+                    request = to_request(url)
+                    if request is not None:
+                        skipped.append(request)
 
             for url in self._enqueue_links_filter_iterator(links_iterator, context.request.url, **kwargs):
-                request_options = RequestOptions(
-                    url=url, user_data={**base_user_data}, label=label, enqueue_strategy=strategy
-                )
-
-                if transform_request_function:
-                    transform_request_options = transform_request_function(request_options)
-                    if transform_request_options == 'skip':
-                        continue
-                    if transform_request_options != 'unchanged':
-                        request_options = transform_request_options
-
-                try:
-                    request = Request.from_url(**request_options)
-                except ValidationError as exc:
-                    context.log.debug(
-                        f'Skipping URL "{url}" due to invalid format: {exc}. '
-                        'This may be caused by a malformed URL or unsupported URL scheme. '
-                        'Please ensure the URL is correct and retry.'
-                    )
-                    continue
-
-                requests.append(request)
+                request = to_request(url)
+                if request is not None:
+                    requests.append(request)
 
             skipped_tasks = [
                 asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped
