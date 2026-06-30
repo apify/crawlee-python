@@ -31,13 +31,19 @@ COPY pyproject.toml poetry.lock ./
 # Install the dependencies
 RUN echo "Python version:" \
  && python --version \
+ # Snapshot the base image's playwright version before installing so we can pin to it later
+ # and stay aligned with the browser binaries baked into the base image (the `hash` checks if
+ # playwright is installed; it is empty for non-playwright base images).
+ && PLAYWRIGHT_BASE_VERSION=$(hash playwright 2>/dev/null && (playwright --version | cut -d ' ' -f 2) || echo "") \
  && echo "Installing dependencies:" \
- # Export packages from poetry.lock
- && poetry export -f requirements.txt --without-hashes | \
- # Replace playwright version so that it matches whatever is pre-installed in the image (the `hash` checks if playwright is installed)
-    sed "s/^playwright==\(.*\)/playwright==$(hash playwright 2>/dev/null && (playwright --version | cut -d ' ' -f 2) || echo '\1')/" | \
- # Install everything using pip (ignore dependency checks - the lockfile is correct, period)
-    pip install -r /dev/stdin --no-dependencies \
+ # Export packages from poetry.lock and install everything using pip
+ # (ignore dependency checks - the lockfile is correct, period)
+ && poetry export -f requirements.txt --without-hashes | pip install -r /dev/stdin --no-dependencies \
+ # Pin playwright to whatever is pre-installed in the base image so it matches the browser binaries.
+ && if [ -n "$PLAYWRIGHT_BASE_VERSION" ]; then \
+        echo "Pinning playwright to $PLAYWRIGHT_BASE_VERSION to match the browser binaries shipped in the base image" \
+        && pip install --no-deps --force-reinstall "playwright==$PLAYWRIGHT_BASE_VERSION"; \
+    fi \
  && echo "All installed Python packages:" \
  && pip freeze
 # % elif cookiecutter.package_manager == 'uv'
@@ -74,13 +80,19 @@ COPY requirements.txt ./
 # Install the dependencies
 RUN echo "Python version:" \
  && python --version \
+ # Snapshot the base image's playwright version before installing so we can pin to it later
+ # and stay aligned with the browser binaries baked into the base image (the `hash` checks if
+ # playwright is installed; it is empty for non-playwright base images).
+ && PLAYWRIGHT_BASE_VERSION=$(hash playwright 2>/dev/null && (playwright --version | cut -d ' ' -f 2) || echo "") \
  && echo "Installing dependencies:" \
- # Install everything using pip, set playwright version so that it matches whatever is pre-installed in the image
- && cat requirements.txt | \
- # Replace playwright version so that it matches whatever is pre-installed in the image (the `hash` checks if playwright is installed)
-    sed "s/^playwright==\(.*\)/playwright==$(hash playwright 2>/dev/null && (playwright --version | cut -d ' ' -f 2) || echo '\1')/" | \
- # Install everything using pip
-    pip install -r /dev/stdin \
+ # Install everything using pip. Playwright is pulled in transitively via `crawlee[playwright]`
+ # and is not pinned in requirements.txt, so pip resolves the latest release here.
+ && pip install -r requirements.txt \
+ # Pin playwright to whatever is pre-installed in the base image so it matches the browser binaries.
+ && if [ -n "$PLAYWRIGHT_BASE_VERSION" ]; then \
+        echo "Pinning playwright to $PLAYWRIGHT_BASE_VERSION to match the browser binaries shipped in the base image" \
+        && pip install --no-deps --force-reinstall "playwright==$PLAYWRIGHT_BASE_VERSION"; \
+    fi \
  && echo "All installed Python packages:" \
  && pip freeze
 # % elif cookiecutter.package_manager == 'manual'
