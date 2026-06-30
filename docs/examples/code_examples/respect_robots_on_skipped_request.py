@@ -20,7 +20,6 @@ async def main() -> None:
     @crawler.on_skipped_request
     async def skipped_request_handler(request: Request, reason: SkippedReason) -> None:
         url = request.url
-
         # Check if the request was skipped due to robots.txt rules
         if reason == 'robots_txt':
             crawler.log.info(f'Skipped {url} due to robots.txt rules.')
