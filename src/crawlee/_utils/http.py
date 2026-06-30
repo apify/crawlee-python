@@ -24,15 +24,20 @@ def parse_retry_after_header(value: str | None) -> timedelta | None:
     if not value:
         return None
 
+    # Numeric form: `delay-seconds`, a non-negative integer per RFC 7231 §7.1.3.
     try:
         seconds = int(value)
-        # `delay-seconds` is a non-negative integer per RFC 7231; ignore malformed negative values,
-        # consistent with the HTTP-date branch below which also rejects non-positive delays.
-        if seconds >= 0:
-            return timedelta(seconds=seconds)
     except ValueError:
-        pass
+        pass  # Not an integer, fall through to the HTTP-date form below.
+    else:
+        if seconds < 0:
+            # A negative delay is malformed. Reject it instead of returning a negative `timedelta`, which would
+            # push `throttled_until` into the past and silently disable the 429 back-off downstream.
+            logger.debug(f'Retry-After delay-seconds {value!r} is negative; ignoring.')
+            return None
+        return timedelta(seconds=seconds)
 
+    # HTTP-date form, e.g. "Wed, 21 Oct 2015 07:28:00 GMT".
     try:
         retry_date = parsedate_to_datetime(value)
         # `parsedate_to_datetime` may return a naive datetime when the input has no timezone info.
