@@ -8,9 +8,20 @@ on:
   schedule:
     - cron: '0 1 * * 1-5'
 
+  # Runs on pull requests that touch the template files, the template e2e tests,
+  # or this workflow itself, so that changes affecting the scheduled tests are
+  # validated before they are merged.
+  pull_request:
+    paths:
+      - 'src/crawlee/project_template/**'
+      - 'tests/e2e/**'
+      - '.github/workflows/on_schedule_tests.yaml'
+
 concurrency:
-  group: scheduled-tests
-  cancel-in-progress: false
+  # Scope the group per event and ref so pull request runs cancel their own
+  # superseded runs without blocking the nightly scheduled run (and vice versa).
+  group: scheduled-tests-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
