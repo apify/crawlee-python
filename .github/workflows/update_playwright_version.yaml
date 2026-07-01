@@ -36,7 +36,7 @@ jobs:
           python-version: '3.13'
 
       - name: Update Playwright version
-        run: python scripts/update_playwright_version.py
+        run: python src/crawlee/project_template/update_playwright_version.py
 
       - name: Detect changes
         id: changes
