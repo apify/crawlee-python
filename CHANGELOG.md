@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 1.7.4 - **not yet released**
 
+### 🚀 Features
+
+- Add PydanticAiCrawler with AI-powered HTML extraction ([#1964](https://github.com/apify/crawlee-python/pull/1964)) ([ccfff76](https://github.com/apify/crawlee-python/commit/ccfff7651670057e3ff5922dc975e461f122822d)) by [@Mantisus](https://github.com/Mantisus), closes [#1593](https://github.com/apify/crawlee-python/issues/1593)
+
 ### 🐛 Bug Fixes
 
 - Add `is_finished` and correct `is_empty` semantics in `RequestQueueClient` ([#1982](https://github.com/apify/crawlee-python/pull/1982)) ([0ef1078](https://github.com/apify/crawlee-python/commit/0ef10780ce1db745dc4218ce52171a6dad61d015)) by [@Mantisus](https://github.com/Mantisus), closes [#1598](https://github.com/apify/crawlee-python/issues/1598), [#1966](https://github.com/apify/crawlee-python/issues/1966)
