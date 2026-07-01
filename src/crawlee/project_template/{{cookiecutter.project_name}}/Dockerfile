@@ -2,9 +2,9 @@
 # You can see the Docker images from Apify at https://hub.docker.com/r/apify/.
 # You can also use any other image from Docker Hub.
 
-# The Playwright version baked into the Apify Playwright base images. Keep this in sync with the
-# `playwright` version resolved by the lockfile so the installed package matches the browser
-# binaries shipped in the base image.
+{# The Playwright version baked into the Apify Playwright base images. Keep this in sync with the
+   `playwright` version resolved by the lockfile so the installed package matches the browser
+   binaries shipped in the base image. #}
 # % set playwright_version = '1.60.0'
 
 # % if cookiecutter.crawler_type == 'playwright' or cookiecutter.crawler_type.startswith('adaptive-') or cookiecutter.crawler_type == 'stagehand'
@@ -20,6 +20,7 @@
 # % else
 # % set base_image = 'apify/actor-python:3.13'
 # % endif
+# % set uses_playwright_base_image = 'playwright' in base_image
 FROM {{ base_image }}
 
 RUN apt update && apt install -yq git && rm -rf /var/lib/apt/lists/*
@@ -43,7 +44,7 @@ RUN echo "Python version:" \
  && poetry export -f requirements.txt --without-hashes | pip install -r /dev/stdin --no-dependencies \
  && echo "All installed Python packages:" \
  && pip freeze
-# % if cookiecutter.crawler_type.startswith('playwright') or cookiecutter.crawler_type.startswith('adaptive-') or cookiecutter.crawler_type == 'stagehand'
+# % if uses_playwright_base_image
 # Pin playwright to the version baked into the base image so it matches the browser binaries.
 RUN pip install --no-deps --force-reinstall "playwright=={{ playwright_version }}"
 # % endif
@@ -60,7 +61,7 @@ RUN echo "Python version:" \
     && uv sync --frozen --no-install-project --no-editable --quiet --no-dev --inexact \
     && echo "All installed Python packages:" \
     && pip freeze
-# % if cookiecutter.crawler_type.startswith('playwright') or cookiecutter.crawler_type.startswith('adaptive-') or cookiecutter.crawler_type == 'stagehand'
+# % if uses_playwright_base_image
 # Pin playwright to the version baked into the base image so it matches the browser binaries.
 RUN uv pip install --system --reinstall --no-deps "playwright=={{ playwright_version }}"
 # % endif
@@ -79,7 +80,7 @@ RUN echo "Python version:" \
  && pip install -r requirements.txt \
  && echo "All installed Python packages:" \
  && pip freeze
-# % if cookiecutter.crawler_type.startswith('playwright') or cookiecutter.crawler_type.startswith('adaptive-') or cookiecutter.crawler_type == 'stagehand'
+# % if uses_playwright_base_image
 # Pin playwright to the version baked into the base image so it matches the browser binaries.
 RUN pip install --no-deps --force-reinstall "playwright=={{ playwright_version }}"
 # % endif
