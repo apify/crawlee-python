@@ -471,13 +471,19 @@ class PlaywrightCrawler(
             kwargs.setdefault('strategy', 'same-hostname')
             strategy = kwargs.get('strategy', 'same-hostname')
 
-            def to_request(url: str) -> Request | None:
-                """Build a `Request` from a single extracted URL, applying the user-provided transform."""
+            def to_request(url: str, *, apply_transform: bool = True) -> Request | None:
+                """Build a `Request` from a single extracted URL.
+
+                `transform_request_function` is applied only to links that will actually be enqueued
+                (`apply_transform=True`); robots.txt-skipped links are reported to the skipped-request
+                callback verbatim, so a transform returning `'skip'` cannot hide a robots-blocked URL
+                from that audit.
+                """
                 request_options = RequestOptions(
                     url=url, user_data={**base_user_data}, label=label, enqueue_strategy=strategy
                 )
 
-                if transform_request_function:
+                if apply_transform and transform_request_function:
                     transform_request_options = transform_request_function(request_options)
                     if transform_request_options == 'skip':
                         return None
@@ -498,11 +504,12 @@ class PlaywrightCrawler(
             links_iterator = to_absolute_url_iterator(base_url, links_iterator, logger=context.log)
 
             # Requests disallowed by robots.txt are reported to the skipped-request callback; the rest
-            # continue to the enqueue filter. Both paths go through `to_request` for consistent building.
+            # continue to the enqueue filter. The transform shapes only the enqueued set, so it is not
+            # applied to skipped links (see `to_request`).
             if robots_txt_file:
                 skipped_iterator, links_iterator = partition(robots_txt_file.is_allowed, links_iterator)
                 for url in skipped_iterator:
-                    request = to_request(url)
+                    request = to_request(url, apply_transform=False)
                     if request is not None:
                         skipped.append(request)
 

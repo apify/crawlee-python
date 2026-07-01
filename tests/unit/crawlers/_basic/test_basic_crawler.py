@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import logging
 import os
@@ -14,6 +15,7 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import timedelta
 from itertools import product
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, Mock, call, patch
 
@@ -37,7 +39,6 @@ from tests.unit.utils import poll_until_condition
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
-    from pathlib import Path
 
     from yarl import URL
 
@@ -1658,6 +1659,28 @@ def test_skipped_request_callback_dispatch_by_annotation() -> None:
     assert _skipped_request_callback_expects_request(expects_request) is True
     assert _skipped_request_callback_expects_request(expects_url) is False
     assert _skipped_request_callback_expects_request(expects_url_unannotated) is False
+
+
+def test_skipped_request_callback_dispatch_accepts_optional_and_deferred_request_annotation() -> None:
+    """Detection recognizes a `Request` annotation given as a union or resolvable only under `TYPE_CHECKING`."""
+
+    # A `Request | None` union still means "give me the Request".
+    async def expects_optional_request(_request: Request | None, _reason: SkippedReason) -> None: ...
+
+    assert _skipped_request_callback_expects_request(expects_optional_request) is True
+
+    # Hooks living in a module that imports `Request` only under `TYPE_CHECKING` (with PEP 563 deferred
+    # annotations, the style Crawlee itself uses) must not silently degrade to the URL-only form.
+    hook_path = Path(__file__).parent / '_deferred_skipped_request_hook.py'
+    spec = importlib.util.spec_from_file_location('_deferred_skipped_request_hook', hook_path)
+    assert spec is not None
+    assert spec.loader is not None
+    hooks = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hooks)
+
+    assert _skipped_request_callback_expects_request(hooks.expects_request) is True
+    assert _skipped_request_callback_expects_request(hooks.expects_optional_request) is True
+    assert _skipped_request_callback_expects_request(hooks.expects_url) is False
 
 
 async def test_add_requests_reports_disallowed_url_to_skipped_callback(server_url: URL) -> None:
