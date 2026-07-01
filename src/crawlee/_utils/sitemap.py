@@ -127,8 +127,9 @@ class _XMLSaxSitemapHandler(ContentHandler):
 
             self._current_tag = None
 
-        if name == 'url' and 'loc' in self._current_url:
-            self.items.append({'type': 'url', **self._current_url})
+        if name == 'url':
+            if 'loc' in self._current_url:
+                self.items.append({'type': 'url', **self._current_url})
             self._current_url = {}
 
 

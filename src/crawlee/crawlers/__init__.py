@@ -65,6 +65,36 @@ with _try_import(
         StagehandPreNavCrawlingContext,
     )
 
+with _try_import(
+    __name__,
+    'PydanticAiCleanHtmlDistiller',
+    'PydanticAiCrawler',
+    'PydanticAiCrawlingContext',
+    'PydanticAiDirectExtractor',
+    'PydanticAiHtmlDistiller',
+    'PydanticAiHtmlExtractor',
+    'PydanticAiSelectorExtractor',
+    'PydanticAiSkeletonDistiller',
+    'PydanticAiUsageStats',
+    'BasePydanticAiHtmlDistiller',
+    'BasePydanticAiHtmlExtractor',
+    'get_basic_http_cleaner',
+):
+    from ._pydantic_ai import (
+        BasePydanticAiHtmlDistiller,
+        BasePydanticAiHtmlExtractor,
+        PydanticAiCleanHtmlDistiller,
+        PydanticAiCrawler,
+        PydanticAiCrawlingContext,
+        PydanticAiDirectExtractor,
+        PydanticAiHtmlDistiller,
+        PydanticAiHtmlExtractor,
+        PydanticAiSelectorExtractor,
+        PydanticAiSkeletonDistiller,
+        PydanticAiUsageStats,
+        get_basic_http_cleaner,
+    )
+
 
 __all__ = [
     'AbstractHttpCrawler',
@@ -74,6 +104,8 @@ __all__ = [
     'AdaptivePlaywrightCrawlingContext',
     'AdaptivePlaywrightPostNavCrawlingContext',
     'AdaptivePlaywrightPreNavCrawlingContext',
+    'BasePydanticAiHtmlDistiller',
+    'BasePydanticAiHtmlExtractor',
     'BasicCrawler',
     'BasicCrawlerOptions',
     'BasicCrawlingContext',
@@ -92,6 +124,15 @@ __all__ = [
     'PlaywrightCrawlingContext',
     'PlaywrightPostNavCrawlingContext',
     'PlaywrightPreNavCrawlingContext',
+    'PydanticAiCleanHtmlDistiller',
+    'PydanticAiCrawler',
+    'PydanticAiCrawlingContext',
+    'PydanticAiDirectExtractor',
+    'PydanticAiHtmlDistiller',
+    'PydanticAiHtmlExtractor',
+    'PydanticAiSelectorExtractor',
+    'PydanticAiSkeletonDistiller',
+    'PydanticAiUsageStats',
     'RenderingType',
     'RenderingTypePrediction',
     'RenderingTypePredictor',
@@ -99,4 +140,5 @@ __all__ = [
     'StagehandCrawlingContext',
     'StagehandPostNavCrawlingContext',
     'StagehandPreNavCrawlingContext',
+    'get_basic_http_cleaner',
 ]

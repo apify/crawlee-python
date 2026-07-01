@@ -1,0 +1,122 @@
+---
+id: http-headers
+title: HTTP headers
+description: Learn how HTTP headers work in web scraping and how to work with them in Crawlee.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import SetHeadersExample from '!!raw-loader!roa-loader!./code_examples/http_headers/set_headers.py';
+
+Every request a crawler sends includes [HTTP headers](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers). These headers tell the server who is making the request, what content is acceptable, and in what language. The server reads them and decides what to return. The same URL can return different content, a different status code, or a blocked page depending on the headers it sees. This guide covers the headers that shape a scraping request, like `User-Agent`, `Accept-Language`, and `Content-Type`, what Crawlee sends by default, and how to change them.
+
+## What headers do
+
+Headers are key-value metadata attached to a request. Some of them shape what you get back. Others identify you or carry state.
+
+### Identity headers
+
+`User-Agent` identifies the client. Many sites serve different markup to a browser than to a crawler. Some reject requests whose `User-Agent` doesn't look like a real browser. It's one of the first signals a server reads.
+
+`Referer` says which page the request came from. Some sites gate content, images, or API responses behind an expected `Referer`. A direct request with no `Referer`, or the wrong one, gets a different answer than a click from inside the site.
+
+### Content negotiation
+
+These headers tell the server what the client can handle and the server uses them to pick what to send:
+
+`Accept` lists the formats the client wants. The same endpoint can return HTML to one `Accept` and JSON to another. If you need data from an API, try setting it to `application/json` to get JSON instead of a rendered page.
+
+`Accept-Language` lists the languages the client prefers, in priority order. It's a preference, not a switch. A server honors it only for content it actually serves in more than one language, and ignores it otherwise. Where it applies, it changes translated text, date and number formats, and sometimes currency. Set it to match the locale you expect, then confirm from the response that the server applied it.
+
+`Accept-Encoding` lists the compression formats the client accepts, such as `gzip`, `br`, or `zstd`. The server compresses the body to one of them. Compression matters for cost. Without compression the response body can be several times larger, and when you route traffic through a metered [proxy](./proxy-management) that extra volume is billed bandwidth. Crawlee's HTTP clients advertise the formats they support and decompress the response for you, so you receive the smaller body and read it as plain bytes.
+
+### Request body
+
+`Content-Type` declares the format of the body you send, not the format you want back. It applies whenever a request carries a body, for example a `POST` that submits a form or JSON. An API that expects `application/json` can reject a payload sent as `application/x-www-form-urlencoded`, and a form endpoint can reject the reverse. Set it to match the body you attach.
+
+`Content-Length` is derived from the body for you, so you don't set it by hand.
+
+`Origin` says which site the request was initiated from. Some APIs check it on requests that carry a body and reject the ones that don't match an expected value.
+
+### Authentication and stateful headers
+
+`Cookie` carries session and login state. Crawlee manages cookies through [sessions](./session-management), so you rarely set this one by hand.
+
+`Authorization` carries credentials, such as a bearer token or basic auth. APIs commonly require it. Set it on the request when the target needs authenticated access. Treat its value as a secret, and don't send it through a [proxy you don't control](./security-of-web-scraping#untrusted-proxies).
+
+### Client hints and fingerprinting headers
+
+`sec-ch-ua` and similar client hints describe the browser and its platform. `sec-fetch-*` metadata headers describe how the request was initiated. Real browsers send them. Most automated clients don't. Anti-bot systems read them to separate a browser from automated traffic.
+
+### Non-standard headers
+
+A server can read any header it wants, not only the standard ones. AJAX endpoints often expect `X-Requested-With: XMLHttpRequest`. A site can require a custom `X-Api-Key` or `X-CSRF-Token`. A mobile app's backend usually expects its own set, such as an app version in `X-App-Version`, a device ID in `X-Device-Id`, or a token the app attaches itself. There is no fixed list. When a request works in a browser or an app but fails from a crawler, capture the full set of headers the original sends and look for one you're missing.
+
+### Headers don't guarantee a result
+
+A header is a request, not a command. The server decides what to do with it. A header it doesn't accept can be ignored, so the value you set has no effect on the response. Another can be rejected outright, and the response comes back as an error. Some headers only take effect in combination with others. Setting a header is the first step. Confirm from the response that it did what you expected.
+
+## Default headers in Crawlee
+
+All built-in HTTP clients impersonate a browser by default. Instead of a bare library `User-Agent` like `python-httpx/0.27`, they send a realistic set of browser-like headers: a browser `User-Agent`, an `Accept`, an `Accept-Language`, and client hints where the client supports them. Such headers make a crawl look like normal browser traffic and avoid the simplest forms of blocking.
+
+Each client implements impersonation its own way:
+
+- <ApiLink to="class/ImpitHttpClient">`ImpitHttpClient`</ApiLink> (the default) impersonates Firefox at the TLS and HTTP layer through the [`impit`](https://pypi.org/project/impit/) library.
+- <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink> uses a <ApiLink to="class/HeaderGenerator">`HeaderGenerator`</ApiLink> to add `Accept`, `Accept-Language`, and `User-Agent`.
+- <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink> impersonates Chrome at the TLS and HTTP layer through [`curl-cffi`](https://curl-cffi.readthedocs.io/).
+
+The header values match a specific version of a real browser, so the whole set stays internally consistent rather than a mix that no real client would send. For more on staying unblocked, see the [avoid blocking](./avoid-blocking) guide.
+
+## When impersonation hurts
+
+Browser-like headers are the right default for scraping normal web pages. They are the wrong default for some APIs and custom endpoints.
+
+A server can expect specific header values that differ from the ones a browser sends. When the headers don't match what it expects, the response can be wrong: an error, a redirect, or a payload meant for a different client. The browser-like values Crawlee adds are part of that mismatch. An endpoint can answer correctly to a plain request and break once an `Accept-Language` or a full browser header set is attached.
+
+If a request behaves differently through Crawlee than through a minimal client, the injected headers are the first thing to check. Inspect what your crawler actually sends by requesting an echo endpoint such as `https://httpbin.org/headers` and reading the response.
+
+## Turning impersonation off
+
+Impersonation is configured on the HTTP client. To turn it off, build the client without it and pass it to the crawler:
+
+```python
+from crawlee.crawlers import HttpCrawler
+from crawlee.http_clients import ImpitHttpClient
+
+# Send plain requests with no browser-like headers.
+crawler = HttpCrawler(http_client=ImpitHttpClient(browser=None))
+```
+
+The opt-out is named differently on each client:
+
+- `ImpitHttpClient(browser=None)`
+- `HttpxHttpClient(header_generator=None)`
+- `CurlImpersonateHttpClient(impersonate=None)`
+
+## Setting your own headers
+
+To send the same custom headers on every request, set them on the HTTP client. To add a header for a single request, pass it on the <ApiLink to="class/Request">`Request`</ApiLink>. The two sets are merged, and if both define the same header, the per-request value wins.
+
+The example below sets `X-Api-Key` on the client and `Accept` on one of two requests to an echo endpoint. The client header reaches both requests, and the per-request `Accept` is added only to the request that sets it. Impersonation stays on, so the echo also returns the full browser header set, with the request's `Accept` in place of the impersonated one:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {SetHeadersExample}
+</RunnableCodeBlock>
+
+<ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink> and <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink> take the same `headers` argument.
+
+Header names are case-insensitive, and <ApiLink to="class/HttpHeaders">`HttpHeaders`</ApiLink> normalizes the casing for you, so `user-agent` and `User-Agent` refer to the same header.
+
+## Header order and fingerprinting
+
+Anti-bot systems look at more than header values. They look at which headers are present, their casing, and the order they arrive in. Real browsers send a consistent, recognizable set. A request that has a browser `User-Agent` but the wrong header order, or missing client hints, still looks automated.
+
+This fingerprinting is why `ImpitHttpClient` and `CurlImpersonateHttpClient` replicate the browser at the transport layer rather than just attaching headers. Setting a browser `User-Agent` on a plain client isn't enough to pass these checks. If a target uses fingerprinting, prefer an impersonating client over hand-set headers.
+
+## Conclusion
+
+Headers decide what a server sends back. Crawlee impersonates a browser by default, which keeps a crawl unblocked on normal pages but can break endpoints that expect different headers. Turn impersonation off by building the client without it when you target such an endpoint, set custom headers on the client or per request, and reach for an impersonating client when the target fingerprints its traffic.
+
+If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!

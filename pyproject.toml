@@ -50,7 +50,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-all = ["crawlee[adaptive-crawler,beautifulsoup,cli,curl-impersonate,httpx,parsel,playwright,otel,sql_sqlite,sql_postgres,sql_mysql,stagehand,redis]"]
+all = ["crawlee[adaptive-crawler,pydantic-ai,beautifulsoup,cli,curl-impersonate,httpx,parsel,playwright,otel,sql_sqlite,sql_postgres,sql_mysql,stagehand,redis]"]
 adaptive-crawler = [
     "jaro-winkler>=2.0.3",
     "playwright>=1.27.0",
@@ -58,6 +58,7 @@ adaptive-crawler = [
     "apify_fingerprint_datapoints>=0.0.3",
     "browserforge>=1.2.4"
 ]
+pydantic-ai = ["pydantic-ai-slim[openai]>=2.1.0", "parsel>=1.10.0", "lxml[html_clean]>=5.2.0"]
 beautifulsoup = ["beautifulsoup4[lxml]>=4.12.0", "html5lib>=1.0"]
 cli = ["cookiecutter>=2.6.0", "inquirer>=3.3.0", "rich>=13.9.0", "typer>=0.12.0"]
 curl-impersonate = ["curl-cffi>=0.9.0"]

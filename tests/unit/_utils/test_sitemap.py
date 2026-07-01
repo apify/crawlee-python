@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
+from xml.sax.expatreader import ExpatParser
 
 import pytest
 from yarl import URL
@@ -410,6 +411,22 @@ def test_xml_handler_resets_current_tag_on_end_element() -> None:
     # Stray text between elements must not be buffered.
     handler.characters('   stray text   ')
     assert handler._buffer == 'https://example.com/'
+
+
+def test_xml_handler_discards_metadata_from_url_without_loc() -> None:
+    """A <url> block with metadata but no <loc> must not leak its metadata into the next <url>."""
+    handler = _XMLSaxSitemapHandler()
+    parser = ExpatParser()
+    parser.setContentHandler(handler)
+    parser.feed(
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        '<url><lastmod>2005-01-01</lastmod><priority>0.1</priority><changefreq>daily</changefreq></url>'
+        '<url><loc>https://example.com/real-page</loc></url>'
+        '</urlset>'
+    )
+
+    assert handler.items == [{'type': 'url', 'loc': 'https://example.com/real-page'}]
 
 
 async def test_txt_parser_flush_clears_buffer() -> None:
