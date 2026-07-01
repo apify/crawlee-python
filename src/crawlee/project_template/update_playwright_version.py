@@ -42,9 +42,16 @@ def fetch_tags() -> list[str]:
 
 def main() -> None:
     content = DOCKERFILE.read_text(encoding='utf-8')
-    current = VERSION_LINE.search(content).group(2)
-    python_prefix = PYTHON_PREFIX.search(content).group(1)
 
+    version_match = VERSION_LINE.search(content)
+    if not version_match:
+        raise SystemExit(f'Pinned Playwright version line not found in {DOCKERFILE}.')
+    current = version_match.group(2)
+
+    python_match = PYTHON_PREFIX.search(content)
+    if not python_match:
+        raise SystemExit(f'Python base image prefix not found in {DOCKERFILE}.')
+    python_prefix = python_match.group(1)
     # Keep only stable `MAJOR.MINOR.PATCH` versions built for the template's current Python line.
     tag_re = re.compile(rf'^{re.escape(python_prefix)}-(\d+\.\d+\.\d+)$')
     versions = [tuple(int(p) for p in m.group(1).split('.')) for tag in fetch_tags() if (m := tag_re.match(tag))]
