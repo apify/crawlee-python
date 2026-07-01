@@ -1669,8 +1669,7 @@ def test_skipped_request_callback_dispatch_accepts_optional_and_deferred_request
 
     assert _skipped_request_callback_expects_request(expects_optional_request) is True
 
-    # Hooks living in a module that imports `Request` only under `TYPE_CHECKING` (with PEP 563 deferred
-    # annotations, the style Crawlee itself uses) must not silently degrade to the URL-only form.
+    # Hooks in a module that imports `Request` only under `TYPE_CHECKING` must not degrade to the URL form.
     hook_path = Path(__file__).parent / '_deferred_skipped_request_hook.py'
     spec = importlib.util.spec_from_file_location('_deferred_skipped_request_hook', hook_path)
     assert spec is not None

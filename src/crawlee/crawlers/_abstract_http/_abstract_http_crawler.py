@@ -218,10 +218,8 @@ class AbstractHttpCrawler(
             def to_request(url: str, *, apply_transform: bool = True) -> Request | None:
                 """Build a `Request` from a single extracted URL.
 
-                `transform_request_function` is applied only to links that will actually be enqueued
-                (`apply_transform=True`); robots.txt-skipped links are reported to the skipped-request
-                callback verbatim, so a transform returning `'skip'` cannot hide a robots-blocked URL
-                from that audit.
+                The transform is applied only to enqueued links (`apply_transform=True`), so a
+                transform returning `'skip'` cannot hide a robots-skipped URL from the callback.
                 """
                 request_options = RequestOptions(
                     url=url, user_data={**base_user_data}, label=label, enqueue_strategy=strategy
@@ -249,9 +247,8 @@ class AbstractHttpCrawler(
             )
             links_iterator = to_absolute_url_iterator(base_url, links_iterator, logger=context.log)
 
-            # Requests disallowed by robots.txt are reported to the skipped-request callback; the rest
-            # continue to the enqueue filter. The transform shapes only the enqueued set, so it is not
-            # applied to skipped links (see `to_request`).
+            # Robots-disallowed requests go to the skipped-request callback (without the transform, see
+            # `to_request`); the rest continue to the enqueue filter.
             if robots_txt_file:
                 skipped_iterator, links_iterator = partition(robots_txt_file.is_allowed, links_iterator)
                 for url in skipped_iterator:

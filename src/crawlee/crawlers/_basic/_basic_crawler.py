@@ -126,19 +126,14 @@ receive `request.url`; callbacks that annotate it as `Request` receive the `Requ
 def _skipped_request_callback_expects_request(callback: Callable[..., Awaitable[None]]) -> bool:
     """Whether a skipped-request callback wants the full `Request` rather than the URL string.
 
-    The first parameter's type annotation decides: a callback annotating it as `Request` (including a
-    union such as `Request | None`) receives the `Request` object, while a callback annotating it as
-    `str` (or leaving it unannotated) receives `request.url`, preserving the original `(url, reason)`
-    signature.
-
-    Annotations are matched leniently. Under `from __future__ import annotations` the annotation is a
-    string, and a hook whose module imports `Request` only under `TYPE_CHECKING` (the idiomatic style)
-    cannot be resolved to the class at runtime. Rather than silently degrading such hooks to the `str`
-    form, string annotations are matched by inspecting their syntax for a bare `Request` name.
+    The first parameter's annotation decides: `Request` (or a union such as `Request | None`) gets the
+    `Request` object; `str` or no annotation keeps the legacy `(url, reason)` signature. String
+    annotations (PEP 563, or a `TYPE_CHECKING`-only `Request` import) are matched by name so such hooks
+    don't silently degrade to the `str` form.
     """
     try:
         parameters = list(inspect.signature(callback).parameters.values())
-    except (TypeError, ValueError):  # Uninspectable callable falls back to the backward-compatible `str` form.
+    except (TypeError, ValueError):  # Uninspectable callable falls back to the `str` form.
         return False
 
     if not parameters:
@@ -149,18 +144,16 @@ def _skipped_request_callback_expects_request(callback: Callable[..., Awaitable[
     if annotation is inspect.Parameter.empty:
         return False
 
-    # A string annotation (PEP 563, or an explicitly quoted forward reference) may not resolve to the
-    # class when `Request` is a `TYPE_CHECKING`-only import, so match it by name instead. This handles
-    # unions like `Request | None` and `Optional[Request]` without misfiring on names like `RequestOptions`.
+    # A string annotation may not resolve to the class (e.g. a `TYPE_CHECKING`-only import), so match by name.
     if isinstance(annotation, str):
         return _annotation_names_request(annotation)
 
-    # An already-resolved annotation (a class or a typing construct): match `Request` directly or inside a union.
+    # A resolved annotation: match `Request` directly or inside a union.
     return annotation is Request or Request in get_args(annotation)
 
 
 def _annotation_names_request(annotation: str) -> bool:
-    """Whether a string type annotation references `Request` as a bare name (e.g. `Request`, `Request | None`)."""
+    """Whether a string annotation names `Request` (e.g. `Request`, `Request | None`), not `RequestOptions`."""
     try:
         tree = ast.parse(annotation, mode='eval')
     except SyntaxError:
