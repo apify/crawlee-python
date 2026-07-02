@@ -1,0 +1,39 @@
+---
+id: using_browser_profile
+title: Using browser profile
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+
+import CodeBlock from '@theme/CodeBlock';
+
+import ChromeProfileExample from '!!raw-loader!./code_examples/using_browser_profiles_chrome.py';
+import FirefoxProfileExample from '!!raw-loader!./code_examples/using_browser_profiles_firefox.py';
+
+This example demonstrates how to run <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> using your local browser profile from [Chrome](https://www.google.com/intl/us/chrome/) or [Firefox](https://www.firefox.com/).
+
+Using browser profiles allows you to leverage existing login sessions, saved passwords, bookmarks, and other personalized browser data during crawling. This can be particularly useful for testing scenarios or when you need to access content that requires authentication.
+
+## Chrome browser
+
+To run <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> with your Chrome profile, you need to know the path to your profile files. You can find this information by entering `chrome://version/` as a URL in your Chrome browser. If you have multiple profiles, pay attention to the profile name - if you only have one profile, it's always `Default`.
+
+:::warning Profile access limitation
+Due to [Chrome's security policies](https://developer.chrome.com/blog/remote-debugging-port), automation cannot use your main browsing profile directly. The example copies your profile to a temporary location as a workaround.
+:::
+
+Make sure you don't have any running Chrome browser processes before running this code:
+
+<CodeBlock className="language-python" language="python">
+    {ChromeProfileExample}
+</CodeBlock>
+
+## Firefox browser
+
+To find the path to your Firefox profile, enter `about:profiles` as a URL in your Firefox browser. Unlike Chrome, you can use your standard profile path directly without copying it first.
+
+Make sure you don't have any running Firefox browser processes before running this code:
+
+<CodeBlock className="language-python" language="python">
+    {FirefoxProfileExample}
+</CodeBlock>

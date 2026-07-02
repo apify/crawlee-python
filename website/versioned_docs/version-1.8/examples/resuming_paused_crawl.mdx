@@ -1,0 +1,35 @@
+---
+id: resuming-paused-crawl
+title: Resuming a paused crawl
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import ResumeCrawl from '!!raw-loader!roa-loader!./code_examples/resuming_paused_crawl.py';
+
+This example demonstrates how to resume crawling from its last state when running locally, if for some reason it was unexpectedly terminated.
+
+If each run should continue crawling from the previous state, you can configure this using `purge_on_start` in <ApiLink to="class/Configuration">`Configuration`</ApiLink>.
+
+Use the code below and perform 2 sequential runs. During the 1st run, stop the crawler by pressing `CTRL+C`, and the 2nd run will resume crawling from where it stopped.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {ResumeCrawl}
+</RunnableCodeBlock>
+
+Perform the 1st run, interrupting the crawler with `CTRL+C` after 2 links have been processed.
+
+![Run with interruption](/img/resuming-paused-crawl/00.webp 'Run with interruption.')
+
+Now resume crawling after the pause to process the remaining 3 links.
+
+![Resuming crawling](/img/resuming-paused-crawl/01.webp 'Resuming crawling.')
+
+Alternatively, use the environment variable `CRAWLEE_PURGE_ON_START=0` instead of using `configuration.purge_on_start = False`.
+
+For example, when running code:
+
+```bash
+CRAWLEE_PURGE_ON_START=0 python -m best_crawler
+```

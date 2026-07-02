@@ -1,0 +1,72 @@
+---
+id: refactoring
+title: Refactoring
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import CodeBlock from '@theme/CodeBlock';
+
+import MainExample from '!!raw-loader!./code_examples/08_main.py';
+import RoutesExample from '!!raw-loader!./code_examples/08_routes.py';
+
+It may seem that the data is extracted and the crawler is done, but honestly, this is just the beginning. For the sake of brevity, we've completely omitted error handling, proxies, logging, architecture, tests, documentation and other stuff that a reliable software should have. The good thing is, error handling is mostly done by Crawlee itself, so no worries on that front, unless you need some custom magic.
+
+:::info Navigating automatic bot-protextion avoidance
+
+You might be wondering about the **anti-blocking, bot-protection avoiding stealthy features** and why we haven't highlighted them yet. The reason is straightforward: these features are **automatically used** within the default configuration, providing a smooth start without manual adjustments.
+
+:::
+
+{/* TODO: add this to the info once the relevant guide is ready
+
+However, the default configuration, while powerful, may not cover every scenario.
+
+If you want to learn more, browse the [Avoid getting blocked](../guides/avoid-blocking), [Proxy management](../guides/proxy-management) and [Session management](../guides/session-management) guides.
+*/}
+
+To promote good coding practices, let's look at how you can use a <ApiLink to="class/Router">`Router`</ApiLink> class to better structure your crawler code.
+
+## Request routing
+
+In the following code, we've made several changes:
+
+- Split the code into multiple files.
+- Added custom instance of <ApiLink to="class/Router">`Router`</ApiLink> to make our routing cleaner, without if clauses.
+- Moved route definitions to a separate `routes.py` file.
+- Simplified the `main.py` file to focus on the general structure of the crawler.
+
+### Routes file
+
+First, let's define our routes in a separate file:
+
+<CodeBlock className="language-python" title="src/routes.py">
+    {RoutesExample}
+</CodeBlock>
+
+### Main file
+
+Next, our main file becomes much simpler and cleaner:
+
+<CodeBlock className="language-python" title="src/main.py">
+    {MainExample}
+</CodeBlock>
+
+By structuring your code this way, you achieve better separation of concerns, making the code easier to read, manage and extend. The <ApiLink to="class/Router">`Router`</ApiLink> class keeps your routing logic clean and modular, replacing if clauses with function decorators.
+
+## Summary
+
+Refactoring your crawler code with these practices enhances readability, maintainability, and scalability.
+
+### Splitting your code into multiple files
+
+There's no reason not to split your code into multiple files and keep your logic separate. Less code in a single file means less complexity to handle at any time, which improves overall readability and maintainability. Consider further splitting the routes into separate files for even better organization.
+
+### Using a router to structure your crawling
+
+Initially, using a simple `if` / `else` statement for selecting different logic based on the crawled pages might appear more readable. However, this approach can become cumbersome with more than two types of pages, especially when the logic for each page extends over dozens or even hundreds of lines of code.
+
+It's good practice in any programming language to split your logic into bite-sized chunks that are easy to read and reason about. Scrolling through a thousand line long `request_handler()` where everything interacts with everything and variables can be used everywhere is not a beautiful thing to do and a pain to debug. That's why we prefer the separation of routes into their own files.
+
+## Next steps
+
+In the next and final step, you'll see how to deploy your Crawlee project to the cloud. If you used the CLI to bootstrap your project, you already have a `Dockerfile` ready, and the next section will show you how to deploy it to the [Apify platform](../deployment/apify-platform) with ease.

@@ -1,0 +1,19 @@
+---
+id: playwright-crawler
+title: Playwright crawler
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import PlaywrightCrawlerExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler.py';
+
+This example demonstrates how to use <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> to recursively scrape the Hacker news website using headless Chromium and Playwright.
+
+The <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> manages the browser and page instances, simplifying the process of interacting with web pages. In the request handler, Playwright's API is used to extract data from each post on the page. Specifically, it retrieves the title, rank, and URL of each post. Additionally, the handler enqueues links to the next pages to ensure continuous scraping. This setup is ideal for scraping dynamic web pages where JavaScript execution is required to render the content.
+
+A **pre-navigation hook** can be used to perform actions before navigating to the URL. This hook provides further flexibility in controlling environment and preparing for navigation.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {PlaywrightCrawlerExample}
+</RunnableCodeBlock>

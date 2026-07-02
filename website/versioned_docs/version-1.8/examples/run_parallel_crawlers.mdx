@@ -1,0 +1,19 @@
+---
+id: run-parallel-crawlers
+title: Run parallel crawlers
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import RunParallelCrawlersExample from '!!raw-loader!roa-loader!./code_examples/run_parallel_crawlers.py';
+
+This example demonstrates how to run two parallel crawlers where one crawler processes links discovered by another crawler.
+
+In some situations, you may need different approaches for scraping data from a website. For example, you might use <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> for navigating JavaScript-heavy pages and a faster, more lightweight <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> for processing static pages. One way to solve this is to use <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink>, see the [Adaptive Playwright crawler example](./adaptive-playwright-crawler) to learn more.
+
+The code below demonstrates an alternative approach using two separate crawlers. Links are passed between crawlers via <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> aliases. The `keep_alive` option allows the Playwright crawler to run in the background and wait for incoming links without stopping when its queue is empty. You can also use different storage clients for each crawler without losing the ability to pass links between queues. Learn more about available storage clients in this [guide](/python/docs/guides/storage-clients).
+
+<RunnableCodeBlock className="language-python" language="python">
+    {RunParallelCrawlersExample}
+</RunnableCodeBlock>

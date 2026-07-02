@@ -1,0 +1,26 @@
+---
+id: playwright-crawler-with-camoufox
+title: Playwright crawler with Camoufox
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import PlaywrightCrawlerExampleWithCamoufox from '!!raw-loader!roa-loader!./code_examples/playwright_crawler_with_camoufox.py';
+
+This example demonstrates how to integrate Camoufox into <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> using <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> with custom <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink>.
+
+Camoufox is a stealthy minimalistic build of Firefox. For details please visit its homepage https://camoufox.com/ .
+To be able to run this example you will need to install camoufox, as it is external tool, and it is not part of the crawlee. For installation please see https://pypi.org/project/camoufox/.
+
+**Warning!** Camoufox is using custom build of firefox. This build can be hundreds of MB large.
+You can either pre-download this file using following command `python3 -m camoufox fetch` or camoufox will download it automatically once you try to run it, and it does not find existing binary.
+For more details please refer to: https://github.com/daijro/camoufox/tree/main/pythonlib#camoufox-python-interface
+
+**Project template -** It is possible to generate project with Python code which includes Camoufox integration into crawlee through crawlee cli. Call `crawlee create` and pick `Playwright-camoufox` when asked for Crawler type.
+
+The example code after PlayWrightCrawler instantiation is similar to example describing the use of Playwright Crawler. The main difference is that in this example Camoufox will be used as the browser through BrowserPool.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {PlaywrightCrawlerExampleWithCamoufox}
+</RunnableCodeBlock>

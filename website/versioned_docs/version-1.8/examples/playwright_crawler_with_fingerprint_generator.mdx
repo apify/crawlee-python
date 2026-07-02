@@ -1,0 +1,17 @@
+---
+id: playwright-crawler-with-fingerprint-generator
+title: Playwright crawler with fingerprint generator
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import PlaywrightCrawlerExample from '!!raw-loader!roa-loader!./code_examples/playwright_crawler_with_fingerprint_generator.py';
+
+This example demonstrates how to use <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> together with <ApiLink to="class/FingerprintGenerator">`FingerprintGenerator`</ApiLink> that will populate several browser attributes to mimic real browser fingerprint. To read more about fingerprints please see: https://docs.apify.com/academy/anti-scraping/techniques/fingerprinting.
+
+You can implement your own fingerprint generator or use <ApiLink to="class/BrowserforgeFingerprintGenerator">`DefaultFingerprintGenerator`</ApiLink>. To use the generator initialize it with the desired fingerprint options. The generator will try to create fingerprint based on those options. Unspecified options will be automatically selected by the generator from the set of reasonable values. If some option is important for you, do not rely on the default and explicitly define it.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {PlaywrightCrawlerExample}
+</RunnableCodeBlock>

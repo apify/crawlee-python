@@ -1,0 +1,27 @@
+---
+id: playwright-crawler-with-block-requests
+title: Playwright crawler with block requests
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import PlaywrightBlockRequests from '!!raw-loader!roa-loader!./code_examples/playwright_block_requests.py';
+
+This example demonstrates how to optimize your <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> performance by blocking unnecessary network requests.
+
+The primary use case is when you need to scrape or interact with web pages without loading non-essential resources like images, styles, or analytics scripts. This can significantly reduce bandwidth usage and improve crawling speed.
+
+The <ApiLink to="class/BlockRequestsFunction">`block_requests`</ApiLink> helper provides the most efficient way to block requests as it operates directly in the browser.
+
+By default, <ApiLink to="class/BlockRequestsFunction">`block_requests`</ApiLink> will block all URLs including the following patterns:
+
+```python
+['.css', '.webp', '.jpg', '.jpeg', '.png', '.svg', '.gif', '.woff', '.pdf', '.zip']
+```
+
+You can also replace the default patterns list with your own by providing `url_patterns`, or extend it by passing additional patterns in `extra_url_patterns`.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {PlaywrightBlockRequests}
+</RunnableCodeBlock>

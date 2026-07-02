@@ -1,0 +1,126 @@
+---
+id: saving-data
+title: Saving data
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import CodeBlock from '@theme/CodeBlock';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import FirstCodeExample from '!!raw-loader!./code_examples/07_first_code.py';
+
+import FinalCodeExample from '!!raw-loader!roa-loader!./code_examples/07_final_code.py';
+
+A data extraction job would not be complete without saving the data for later use and processing. You've come to the final and most difficult part of this tutorial so make sure to pay attention very carefully!
+
+## Save data to the dataset
+
+Crawlee provides a <ApiLink to="class/Dataset">`Dataset`</ApiLink> class, which acts as an abstraction over tabular storage, making it useful for storing scraping results. To get started:
+
+- Add the necessary imports: Include the <ApiLink to="class/Dataset">`Dataset`</ApiLink> and any required crawler classes at the top of your file.
+- Create a Dataset instance: Use the asynchronous <ApiLink to="class/Dataset#open">`Dataset.open`</ApiLink> constructor to initialize the dataset instance within your crawler's setup.
+
+Here's an example:
+
+<CodeBlock language="python">
+    {FirstCodeExample}
+</CodeBlock>
+
+Finally, instead of logging the extracted data to stdout, we can export them to the dataset:
+
+```python
+# ...
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        # ...
+
+        data = {
+            'manufacturer': manufacturer,
+            'title': title,
+            'sku': sku,
+            'price': price,
+            'in_stock': in_stock,
+        }
+
+        # Push the data to the dataset.
+        await dataset.push_data(data)
+
+        # ...
+```
+
+### Using a context helper
+
+Instead of importing a new class and manually creating an instance of the dataset, you can use the context helper  <ApiLink to="class/PushDataFunction">`context.push_data`</ApiLink>. Remove the dataset import and instantiation, and replace `dataset.push_data` with the following:
+
+```python
+# ...
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        # ...
+
+        data = {
+            'manufacturer': manufacturer,
+            'title': title,
+            'sku': sku,
+            'price': price,
+            'in_stock': in_stock,
+        }
+
+        # Push the data to the dataset.
+        await context.push_data(data)
+
+        # ...
+```
+
+### Final code
+
+And that's it. Unlike earlier, we are being serious now. That's it, you're done. The final code looks like this:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {FinalCodeExample}
+</RunnableCodeBlock>
+
+## What `push_data` does?
+
+A helper <ApiLink to="class/PushDataFunction">`context.push_data`</ApiLink> saves data to the default dataset. You can provide additional arguments there like `id` or `name` to open a different dataset. Dataset is a storage designed to hold data in a format similar to a table. Each time you call <ApiLink to="class/PushDataFunction">`context.push_data`</ApiLink> or direct <ApiLink to="class/Dataset#push_data">`Dataset.push_data`</ApiLink> a new row in the table is created, with the property names serving as column titles. In the default configuration, the rows are represented as JSON files saved on your file system, but other backend storage systems can be plugged into Crawlee as well. More on that later.
+
+:::info Automatic dataset initialization
+
+Each time you start Crawlee a default <ApiLink to="class/Dataset">`Dataset`</ApiLink> is automatically created, so there's no need to initialize it or create an instance first. You can create as many datasets as you want and even give them names. For more details see the <ApiLink to="class/Dataset#open">`Dataset.open`</ApiLink> function.
+
+:::
+
+{/* TODO: mention result storage guide once it's done
+
+:::info Automatic dataset initialization
+
+Each time you start Crawlee a default <ApiLink to="class/Dataset">`Dataset`</ApiLink> is automatically created, so there's no need to initialize it or create an instance first. You can create as many datasets as you want and even give them names. For more details see the [Result storage guide](../guides/result-storage#dataset) and the `Dataset.open()` function.
+
+:::
+*/}
+
+## Finding saved data
+
+Unless you changed the configuration that Crawlee uses locally, which would suggest that you knew what you were doing, and you didn't need this tutorial anyway, you'll find your data in the storage directory that Crawlee creates in the working directory of the running script:
+
+```text
+{PROJECT_FOLDER}/storage/datasets/default/
+```
+
+The above folder will hold all your saved data in numbered files, as they were pushed into the dataset. Each file represents one invocation of <ApiLink to="class/Dataset#push_data">`Dataset.push_data`</ApiLink> or one table row.
+
+{/* TODO: add mention of "Result storage guide" once it's ready:
+
+:::tip Single file data storage options
+
+If you would like to store your data in a single big file, instead of many small ones, see the [Result storage guide](../guides/result-storage#key-value-store) for Key-value stores.
+
+:::
+
+*/}
+
+## Next steps
+
+Next, you'll see some improvements that you can add to your crawler code that will make it more readable and maintainable in the long run.

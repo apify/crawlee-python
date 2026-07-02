@@ -1,0 +1,15 @@
+---
+id: crawler-keep-alive
+title: Keep a Crawler alive waiting for more requests
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import BeautifulSoupExample from '!!raw-loader!roa-loader!./code_examples/beautifulsoup_crawler_keep_alive.py';
+
+This example demonstrates how to keep crawler alive even when there are no requests at the moment by using `keep_alive=True` argument of <ApiLink to="class/BasicCrawler#__init__">`BasicCrawler.__init__`</ApiLink>. This is available to all crawlers that inherit from <ApiLink to="class/BasicCrawler">`BasicCrawler`</ApiLink> and in the example below it is shown on <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>. To stop the crawler that was started with `keep_alive=True` you can call `crawler.stop()`.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {BeautifulSoupExample}
+</RunnableCodeBlock>

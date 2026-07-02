@@ -1,0 +1,52 @@
+---
+id: crawl-website-with-relative-links
+title: Crawl website with relative links
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import AllLinksExample from '!!raw-loader!roa-loader!./code_examples/crawl_website_with_relative_links_all_links.py';
+import SameDomainExample from '!!raw-loader!roa-loader!./code_examples/crawl_website_with_relative_links_same_domain.py';
+import SameHostnameExample from '!!raw-loader!roa-loader!./code_examples/crawl_website_with_relative_links_same_hostname.py';
+import SameOriginExample from '!!raw-loader!roa-loader!./code_examples/crawl_website_with_relative_links_same_origin.py';
+
+When crawling a website, you may encounter various types of links that you wish to include in your crawl. To facilitate this, we provide the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> method on the crawler context, which will automatically find and add these links to the crawler's <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>. This method simplifies the process of handling different types of links, including relative links, by automatically resolving them based on the page's context.
+
+:::note
+
+For these examples, we are using the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>. However, the same method is available for other crawlers as well. You can use it in exactly the same way.
+
+:::
+
+`EnqueueStrategy` type alias provides four distinct strategies for crawling relative links:
+
+- `all` - Enqueues all links found, regardless of the domain they point to. This strategy is useful when you want to follow every link, including those that navigate to external websites.
+- `same-domain` - Enqueues all links found that share the same domain name, including any possible subdomains. This strategy ensures that all links within the same top-level and base domain are included.
+- `same-hostname` - Enqueues all links found for the exact same hostname. This is the **default** strategy, and it restricts the crawl to links that have the same hostname as the current page, excluding subdomains.
+- `same-origin` - Enqueues all links found that share the same origin. The same origin refers to URLs that share the same protocol, domain, and port, ensuring a strict scope for the crawl.
+
+<Tabs groupId="main">
+    <TabItem value="all_links" label="All links">
+        <RunnableCodeBlock className="language-python" language="python">
+            {AllLinksExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="same-domain" label="Same domain">
+        <RunnableCodeBlock className="language-python" language="python">
+            {SameDomainExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="same-hostname" label="Same hostname">
+        <RunnableCodeBlock className="language-python" language="python">
+            {SameHostnameExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="same-origin" label="Same origin">
+        <RunnableCodeBlock className="language-python" language="python">
+            {SameOriginExample}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>
