@@ -37,6 +37,15 @@ SITEMAP_HEADERS = {'accept': 'text/plain, application/xhtml+xml, application/xml
 SITEMAP_URL_PATTERN = re.compile(r'\/sitemap\.(?:xml|txt)(?:\.gz)?$', re.IGNORECASE)
 COMMON_SITEMAP_PATHS = ['/sitemap.xml', '/sitemap.txt', '/sitemap_index.xml']
 
+MAX_SITEMAP_SIZE = 50 * 1024 * 1024
+"""Maximum sitemap size in bytes after decompression, per the sitemap protocol; content beyond it is truncated."""
+
+CONTENT_CHUNK_SIZE = 1024 * 1024
+"""Maximum size of a single decompressed content piece fed to the parser, keeping memory usage flat."""
+
+DEFAULT_MAX_DEPTH = 10
+"""Default maximum depth of nested sitemaps to follow, guarding against malicious infinite sitemap chains."""
+
 
 @dataclass()
 class SitemapUrl:
@@ -368,6 +377,9 @@ async def _fetch_and_process_sitemap(
                 # Create appropriate parser
                 parser = _get_parser(content_type, sitemap_url)
                 decompressor = None
+                content_bytes = 0
+                raw_bytes = 0
+                truncated = False
                 try:
                     # Process chunks as they arrive
                     first_chunk = True
@@ -377,20 +389,50 @@ async def _fetch_and_process_sitemap(
                             decompressor = zlib.decompressobj(zlib.MAX_WBITS | 16)
                         first_chunk = False
 
-                        chunk = decompressor.decompress(raw_chunk) if decompressor else raw_chunk
-                        text_chunk = decoder.decode(chunk)
-                        async for item in parser.process_chunk(text_chunk):
-                            async for result in _process_sitemap_item(
-                                item,
-                                source,
-                                depth,
-                                visited_sitemap_urls,
-                                sources,
-                                emit_nested_sitemaps=emit_nested_sitemaps,
-                                enqueue_strategy=enqueue_strategy,
-                            ):
-                                if result:
-                                    yield result
+                        raw_bytes += len(raw_chunk)
+
+                        # Decompress and parse in bounded pieces, capping the total decompressed size,
+                        # so that e.g. a gzip bomb cannot exhaust memory. Slice via a memoryview to avoid
+                        # repeatedly copying the tail when a single chunk is much larger than a piece.
+                        pending: memoryview | bytes = memoryview(raw_chunk)
+                        while pending and content_bytes < MAX_SITEMAP_SIZE:
+                            max_length = min(MAX_SITEMAP_SIZE - content_bytes, CONTENT_CHUNK_SIZE)
+                            if decompressor:
+                                chunk = decompressor.decompress(pending, max_length)
+                                pending = decompressor.unconsumed_tail
+                            else:
+                                chunk, pending = pending[:max_length], pending[max_length:]
+                            content_bytes += len(chunk)
+
+                            text_chunk = decoder.decode(chunk)
+                            async for item in parser.process_chunk(text_chunk):
+                                async for result in _process_sitemap_item(
+                                    item,
+                                    source,
+                                    depth,
+                                    visited_sitemap_urls,
+                                    sources,
+                                    emit_nested_sitemaps=emit_nested_sitemaps,
+                                    enqueue_strategy=enqueue_strategy,
+                                ):
+                                    if result:
+                                        yield result
+
+                        # Stop once the decompressed-size cap leaves unprocessed bytes, or the compressed input
+                        # exceeds the cap (e.g. a stream that produces little or no output). Both are truncations.
+                        if pending or raw_bytes > MAX_SITEMAP_SIZE:
+                            truncated = True
+                            break
+                        # Stop once the gzip stream has ended; further bytes would only accumulate in the
+                        # decompressor's `unused_data` (trailing garbage or extra members are not processed).
+                        if decompressor and decompressor.eof:
+                            break
+
+                    if truncated:
+                        logger.warning(
+                            f'Sitemap {sitemap_url} exceeded the maximum size of {MAX_SITEMAP_SIZE} bytes, '
+                            f'processing only the truncated content.'
+                        )
 
                     # Process any remaining content
                     async for item in parser.flush():
@@ -472,7 +514,7 @@ async def parse_sitemap(
 
     This function coordinates the process of fetching and parsing sitemaps,
     handling both URL-based and raw content sources. It follows nested sitemaps
-    up to the specified maximum depth.
+    up to the specified maximum depth (`ParseSitemapOptions.max_depth`, 10 by default).
 
     Default `ParseSitemapOptions.enqueue_strategy` is `same-hostname` which will skip cross-host URLs.
     Use strategy `all` to process all links.
@@ -480,7 +522,7 @@ async def parse_sitemap(
     # Set default options
     options = options or {}
     emit_nested_sitemaps = options.get('emit_nested_sitemaps', False)
-    max_depth = options.get('max_depth', float('inf'))
+    max_depth = options.get('max_depth', DEFAULT_MAX_DEPTH)
     sitemap_retries = options.get('sitemap_retries', 3)
     timeout = options.get('timeout', timedelta(seconds=30))
     enqueue_strategy = options.get('enqueue_strategy', 'same-hostname')

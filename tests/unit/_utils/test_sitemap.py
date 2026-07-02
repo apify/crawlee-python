@@ -10,6 +10,7 @@ import pytest
 from yarl import URL
 
 from crawlee._utils.sitemap import (
+    DEFAULT_MAX_DEPTH,
     ParseSitemapOptions,
     Sitemap,
     SitemapUrl,
@@ -22,7 +23,7 @@ from crawlee.http_clients._base import HttpClient, HttpResponse
 from tests.unit.utils import DEFAULT_URL, get_basic_results, get_basic_sitemap
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Callable
 
 
 def _make_mock_client(url_map: dict[str, tuple[int, bytes]]) -> AsyncMock:
@@ -64,6 +65,27 @@ def _make_flaky_stream_client(body: bytes, *, fail_times: int) -> tuple[AsyncMoc
     client = AsyncMock(spec=HttpClient)
     client.stream = stream
     return client, attempts
+
+
+def _make_stream_client(body_for_url: 'Callable[[str], bytes]') -> tuple[AsyncMock, list[str]]:
+    """Create a mock client whose `stream` serves `body_for_url(url)` in a single chunk and records fetched URLs."""
+    fetched: list[str] = []
+
+    @asynccontextmanager
+    async def stream(url: str, **_kwargs: Any) -> 'AsyncIterator[HttpResponse]':
+        fetched.append(url)
+
+        async def read_stream() -> 'AsyncIterator[bytes]':
+            yield body_for_url(url)
+
+        response = MagicMock(spec=HttpResponse)
+        response.headers = {'content-type': 'application/xml; charset=utf-8'}
+        response.read_stream = read_stream
+        yield cast('HttpResponse', response)
+
+    client = AsyncMock(spec=HttpClient)
+    client.stream = stream
+    return client, fetched
 
 
 def compress_gzip(data: str) -> bytes:
@@ -315,6 +337,68 @@ async def test_sitemap_fetch_raises_after_retries_exhausted() -> None:
         _ = [item async for item in parse_sitemap([{'type': 'url', 'url': f'{DEFAULT_URL}sitemap.xml'}], client)]
 
     assert len(attempts) == 3
+
+
+async def test_gzip_bomb_sitemap_truncated_at_size_cap(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A gzip sitemap inflating past the size cap is truncated instead of being decompressed without bound."""
+    monkeypatch.setattr('crawlee._utils.sitemap.MAX_SITEMAP_SIZE', 64 * 1024)
+    total_urls = 20_000
+    locs = ''.join(f'<url><loc>{DEFAULT_URL}page-{i}</loc></url>' for i in range(total_urls))
+    # ~1 MB of XML arriving as a single small compressed chunk.
+    bomb = compress_gzip(f'<urlset>{locs}</urlset>')
+
+    client, _ = _make_stream_client(lambda _url: bomb)
+    items = [item async for item in parse_sitemap([{'type': 'url', 'url': f'{DEFAULT_URL}sitemap.xml'}], client)]
+
+    assert 0 < len(items) < total_urls
+
+
+async def test_gzip_sitemap_stops_reading_after_member_end() -> None:
+    """Trailing bytes after a complete gzip member must not be read; otherwise they accumulate unbounded."""
+    member = compress_gzip(get_basic_sitemap())
+    chunks_read = 0
+
+    @asynccontextmanager
+    async def stream(_url: str, **_kwargs: Any) -> 'AsyncIterator[HttpResponse]':
+        async def read_stream() -> 'AsyncIterator[bytes]':
+            nonlocal chunks_read
+            chunks_read += 1
+            yield member
+            # A malicious server would stream trailing junk forever; reading any of it is the bug.
+            while True:
+                chunks_read += 1
+                yield b'\x00' * 65536
+
+        response = MagicMock(spec=HttpResponse)
+        response.headers = {'content-type': 'application/gzip'}
+        response.read_stream = read_stream
+        yield cast('HttpResponse', response)
+
+    client = AsyncMock(spec=HttpClient)
+    client.stream = stream
+
+    items = [item async for item in parse_sitemap([{'type': 'url', 'url': f'{DEFAULT_URL}sitemap.xml.gz'}], client)]
+
+    assert {item.loc for item in items} == get_basic_results()
+    # The member fits in the first chunk, so at most the first trailing chunk may be pulled before we stop.
+    assert chunks_read <= 2
+
+
+async def test_nested_sitemaps_followed_only_to_default_max_depth() -> None:
+    """A chain of unique nested sitemap URLs is followed only up to the default max depth."""
+    chain_length = 3 * DEFAULT_MAX_DEPTH
+
+    def body_for_url(url: str) -> bytes:
+        index = int(url.removesuffix('.xml').rsplit('-', 1)[-1])
+        if index >= chain_length:
+            return f'<urlset><url><loc>{DEFAULT_URL}page</loc></url></urlset>'.encode()
+        next_sitemap = f'{DEFAULT_URL}sitemap-{index + 1}.xml'
+        return f'<sitemapindex><sitemap><loc>{next_sitemap}</loc></sitemap></sitemapindex>'.encode()
+
+    client, fetched = _make_stream_client(body_for_url)
+    _ = [item async for item in parse_sitemap([{'type': 'url', 'url': f'{DEFAULT_URL}sitemap-0.xml'}], client)]
+
+    assert len(fetched) == DEFAULT_MAX_DEPTH + 1
 
 
 async def test_parse_sitemap_with_partial_options() -> None:

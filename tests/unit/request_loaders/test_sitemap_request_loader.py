@@ -1,17 +1,21 @@
 import base64
 import gzip
-from typing import TYPE_CHECKING
-from unittest.mock import patch
+from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING, Any, cast
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from yarl import URL
 
 from crawlee import RequestOptions, RequestTransformAction
-from crawlee.http_clients._base import HttpClient
+from crawlee._utils.sitemap import DEFAULT_MAX_DEPTH
+from crawlee.http_clients._base import HttpClient, HttpResponse
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
 from crawlee.storages import KeyValueStore
-from tests.unit.utils import get_basic_results, get_basic_sitemap, poll_until_condition
+from tests.unit.utils import DEFAULT_URL, get_basic_results, get_basic_sitemap, poll_until_condition
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
     from crawlee._types import JsonSerializable
 
 
@@ -23,6 +27,36 @@ def compress_gzip(data: str) -> bytes:
 def encode_base64(data: bytes) -> str:
     """Encode bytes to a base64 string."""
     return base64.b64encode(data).decode('utf-8')
+
+
+async def test_nested_sitemap_chain_bounded_by_max_depth() -> None:
+    """A malicious endless chain of unique nested sitemaps is followed only up to the default max depth."""
+    fetched: list[str] = []
+
+    @asynccontextmanager
+    async def stream(url: str, **_kwargs: Any) -> 'AsyncIterator[HttpResponse]':
+        fetched.append(url)
+        index = int(url.removesuffix('.xml').rsplit('-', 1)[-1])
+        # Every sitemap is an index pointing at the next unique URL, so only the depth cap can stop the chain.
+        next_sitemap = f'{DEFAULT_URL}sitemap-{index + 1}.xml'
+        body = f'<sitemapindex><sitemap><loc>{next_sitemap}</loc></sitemap></sitemapindex>'.encode()
+
+        async def read_stream() -> 'AsyncIterator[bytes]':
+            yield body
+
+        response = MagicMock(spec=HttpResponse)
+        response.status_code = 200
+        response.headers = {'content-type': 'application/xml; charset=utf-8'}
+        response.read_stream = read_stream
+        yield cast('HttpResponse', response)
+
+    client = AsyncMock(spec=HttpClient)
+    client.stream = stream
+
+    loader = SitemapRequestLoader([f'{DEFAULT_URL}sitemap-0.xml'], http_client=client)
+    assert await poll_until_condition(loader.is_finished)
+
+    assert len(fetched) == DEFAULT_MAX_DEPTH + 1
 
 
 async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> None:
