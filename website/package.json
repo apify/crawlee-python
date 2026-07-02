@@ -56,7 +56,7 @@
         "unist-util-visit": "^5.0.0"
     },
     "devDependencies": {
-        "@apify/oxlint-config": "^0.2.10",
+        "@apify/oxlint-config": "^0.3.0",
         "@apify/tsconfig": "^0.2.0",
         "@apify/ui-icons": "^1.23.0",
         "@docusaurus/module-type-aliases": "^3.9.2",
