@@ -765,18 +765,52 @@ async def test_on_skipped_request(server_url: URL) -> None:
         await context.enqueue_links()
 
     @crawler.on_skipped_request
-    async def skipped_hook(url: str, _reason: SkippedReason) -> None:
-        skip(url)
+    async def skipped_hook(request: Request, _reason: SkippedReason) -> None:
+        skip(request)
 
     await crawler.run([str(server_url / 'start_enqueue')])
 
-    expected_skip_calls = [
-        mock.call(str(server_url / 'page_1')),
-        mock.call(str(server_url / 'page_2')),
-        mock.call(str(server_url / 'page_3')),
-        mock.call(str(server_url / 'page_4')),
-    ]
-    skip.assert_has_calls(expected_skip_calls, any_order=True)
+    expected_skip_urls = {
+        str(server_url / 'page_1'),
+        str(server_url / 'page_2'),
+        str(server_url / 'page_3'),
+        str(server_url / 'page_4'),
+    }
+
+    requests = [call.args[0] for call in skip.call_args_list]
+
+    assert all(isinstance(request, Request) for request in requests)
+    assert {request.url for request in requests} == expected_skip_urls
+
+
+async def test_on_skipped_request_reports_robots_url_despite_transform_skip(server_url: URL) -> None:
+    """A `transform_request_function` returning `'skip'` must not hide a robots-disallowed URL from the callback."""
+    crawler = PlaywrightCrawler(respect_robots_txt_file=True)
+    skip = mock.Mock()
+
+    def transform_request_function(request_options: RequestOptions) -> RequestOptions | RequestTransformAction:
+        # The user only means "do not enqueue page_3"; this must not affect robots.txt reporting.
+        if 'page_3' in request_options['url']:
+            return 'skip'
+        return 'unchanged'
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        await context.enqueue_links(transform_request_function=transform_request_function)
+
+    @crawler.on_skipped_request
+    async def skipped_hook(request: Request, _reason: SkippedReason) -> None:
+        skip(request.url)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    reported = {call.args[0] for call in skip.call_args_list}
+    assert reported == {
+        str(server_url / 'page_1'),
+        str(server_url / 'page_2'),
+        str(server_url / 'page_3'),  # robots-blocked; the transform skip must not hide it here
+        str(server_url / 'page_4'),
+    }
 
 
 async def test_send_request(server_url: URL) -> None:

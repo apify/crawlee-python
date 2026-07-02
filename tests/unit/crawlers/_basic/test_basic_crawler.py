@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import logging
 import os
@@ -14,17 +15,19 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import timedelta
 from itertools import product
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, Mock, call, patch
 
 import pytest
 
-from crawlee import ConcurrencySettings, Glob, service_locator
+from crawlee import ConcurrencySettings, Glob, SkippedReason, service_locator
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpMethod
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
+from crawlee.crawlers._basic._basic_crawler import _skipped_request_callback_expects_request
 from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
 from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
 from crawlee.request_loaders import RequestList, RequestManagerTandem, ThrottlingRequestManager
@@ -36,7 +39,6 @@ from tests.unit.utils import poll_until_condition
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
-    from pathlib import Path
 
     from yarl import URL
 
@@ -1645,6 +1647,72 @@ async def test_lock_with_get_robots_txt_file_for_url(server_url: URL) -> None:
 
         # Check that the lock was acquired only once
         assert spy.call_count == 1
+
+
+def test_skipped_request_callback_dispatch_by_annotation() -> None:
+    """The skipped-request callback receives the full `Request` only when its first parameter annotates it."""
+
+    async def expects_request(_request: Request, _reason: SkippedReason) -> None: ...
+    async def expects_url(_url: str, _reason: SkippedReason) -> None: ...
+    async def expects_url_unannotated(_url, _reason) -> None: ...  # noqa: ANN001
+
+    assert _skipped_request_callback_expects_request(expects_request) is True
+    assert _skipped_request_callback_expects_request(expects_url) is False
+    assert _skipped_request_callback_expects_request(expects_url_unannotated) is False
+
+
+def test_skipped_request_callback_dispatch_accepts_optional_and_deferred_request_annotation() -> None:
+    """Detection recognizes a `Request` annotation given as a union or resolvable only under `TYPE_CHECKING`."""
+
+    # A `Request | None` union still means "give me the Request".
+    async def expects_optional_request(_request: Request | None, _reason: SkippedReason) -> None: ...
+
+    assert _skipped_request_callback_expects_request(expects_optional_request) is True
+
+    # Hooks in a module that imports `Request` only under `TYPE_CHECKING` must not degrade to the URL form.
+    hook_path = Path(__file__).parent / '_deferred_skipped_request_hook.py'
+    spec = importlib.util.spec_from_file_location('_deferred_skipped_request_hook', hook_path)
+    assert spec is not None
+    assert spec.loader is not None
+    hooks = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hooks)
+
+    assert _skipped_request_callback_expects_request(hooks.expects_request) is True
+    assert _skipped_request_callback_expects_request(hooks.expects_optional_request) is True
+    assert _skipped_request_callback_expects_request(hooks.expects_url) is False
+
+
+async def test_add_requests_reports_disallowed_url_to_skipped_callback(server_url: URL) -> None:
+    """A bare `str` URL disallowed by robots.txt reaches the `add_requests` skipped callback as a `Request`."""
+    crawler = BasicCrawler(respect_robots_txt_file=True)
+    skip = Mock()
+
+    @crawler.on_skipped_request
+    async def skipped_hook(request: Request, _reason: SkippedReason) -> None:
+        skip(request)
+
+    # `page_1` is disallowed by the test server's robots.txt; pass it as a plain string.
+    await crawler.add_requests([str(server_url / 'page_1')])
+
+    skipped_requests = [call.args[0] for call in skip.call_args_list]
+    assert all(isinstance(request, Request) for request in skipped_requests)
+    assert {request.url for request in skipped_requests} == {str(server_url / 'page_1')}
+
+
+async def test_skipped_request_callback_receives_url_for_str_signature(server_url: URL) -> None:
+    """A callback whose first parameter is annotated as `str` keeps receiving the URL string (backward compatible)."""
+    crawler = BasicCrawler(respect_robots_txt_file=True)
+    skip = Mock()
+
+    @crawler.on_skipped_request
+    async def skipped_hook(url: str, _reason: SkippedReason) -> None:
+        skip(url)
+
+    await crawler.add_requests([str(server_url / 'page_1')])
+
+    skipped_urls = [call.args[0] for call in skip.call_args_list]
+    assert all(isinstance(url, str) for url in skipped_urls)
+    assert set(skipped_urls) == {str(server_url / 'page_1')}
 
 
 async def test_reduced_logs_from_timed_out_request_handler(caplog: pytest.LogCaptureFixture) -> None:

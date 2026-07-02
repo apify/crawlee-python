@@ -330,18 +330,22 @@ async def test_on_skipped_request(server_url: URL, http_client: HttpClient) -> N
         await context.enqueue_links()
 
     @crawler.on_skipped_request
-    async def skipped_hook(url: str, _reason: SkippedReason) -> None:
-        skip(url)
+    async def skipped_hook(request: Request, _reason: SkippedReason) -> None:
+        skip(request)
 
     await crawler.run([str(server_url / 'start_enqueue')])
 
-    expected_skip_calls = [
-        mock.call(str(server_url / 'page_1')),
-        mock.call(str(server_url / 'page_2')),
-        mock.call(str(server_url / 'page_3')),
-        mock.call(str(server_url / 'page_4')),
-    ]
-    skip.assert_has_calls(expected_skip_calls, any_order=True)
+    expected_skip_urls = {
+        str(server_url / 'page_1'),
+        str(server_url / 'page_2'),
+        str(server_url / 'page_3'),
+        str(server_url / 'page_4'),
+    }
+
+    requests = [call.args[0] for call in skip.call_args_list]
+
+    assert all(isinstance(request, Request) for request in requests)
+    assert {request.url for request in requests} == expected_skip_urls
 
 
 async def test_extract_links(server_url: URL, http_client: HttpClient) -> None:
