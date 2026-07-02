@@ -179,7 +179,8 @@ class _BasicCrawlerOptions(TypedDict):
     """If True, the crawler stops immediately when any request handler error occurs."""
 
     configure_logging: NotRequired[bool]
-    """If True, the crawler will set up logging infrastructure automatically."""
+    """If True, the crawler will set up logging infrastructure automatically, unless the root logger already has
+    handlers configured by the host application."""
 
     statistics_log_format: NotRequired[Literal['table', 'inline']]
     """If 'table', displays crawler statistics as formatted tables in logs. If 'inline', outputs statistics as plain
@@ -349,7 +350,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             abort_on_error: If True, the crawler stops immediately when any request handler error occurs.
             keep_alive: If True, it will keep crawler alive even if there are no requests in queue.
                 Use `crawler.stop()` to exit the crawler.
-            configure_logging: If True, the crawler will set up logging infrastructure automatically.
+            configure_logging: If True, the crawler will set up logging infrastructure automatically, unless the root
+                logger already has handlers configured by the host application.
             statistics_log_format: If 'table', displays crawler statistics as formatted tables in logs. If 'inline',
                 outputs statistics as plain text log messages.
             respect_robots_txt_file: If set to `True`, the crawler will automatically try to fetch the robots.txt file
@@ -451,9 +453,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # Logging setup
         if configure_logging:
             root_logger = logging.getLogger()
-            configure_logger(root_logger, remove_old_handlers=True)
-            httpx_logger = logging.getLogger('httpx')  # Silence HTTPX logger
-            httpx_logger.setLevel(logging.DEBUG if get_configured_log_level() <= logging.DEBUG else logging.WARNING)
+            # Leave the loggers untouched if the host application has already configured the root logger,
+            # mirroring `logging.basicConfig` semantics.
+            if not root_logger.handlers:
+                configure_logger(root_logger)
+                httpx_logger = logging.getLogger('httpx')  # Silence HTTPX logger
+                httpx_logger.setLevel(logging.DEBUG if get_configured_log_level() <= logging.DEBUG else logging.WARNING)
         self._logger = _logger or logging.getLogger(__name__)
         if implicit_event_manager_with_explicit_config:
             self._logger.warning(
@@ -692,8 +697,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Args:
             requests: The requests to be enqueued before the crawler starts.
-            purge_request_queue: If this is `True` and the crawler is not being run for the first time, the default
-                request queue will be purged.
+            purge_request_queue: If this is `True` and the crawler is not being run for the first time, the request
+                queue will be purged. Named request queues are considered persistent and are never purged
+                implicitly.
         """
         if self._running:
             raise RuntimeError(
@@ -717,7 +723,18 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             if purge_request_queue:
                 request_manager = await self.get_request_manager()
-                await request_manager.purge()
+                # A `ThrottlingRequestManager` delegates `purge` to the manager it wraps, so inspect the wrapped
+                # manager when deciding whether the purge would hit a named queue.
+                inner_manager = (
+                    request_manager._inner  # noqa: SLF001
+                    if isinstance(request_manager, ThrottlingRequestManager)
+                    else request_manager
+                )
+                # Named storages are persistent and shared across runs, so they are never purged implicitly
+                # (the same named-storage exemption as in `StorageClient._purge_if_needed`).
+                is_named_queue = isinstance(inner_manager, RequestQueue) and inner_manager.name is not None
+                if not is_named_queue:
+                    await request_manager.purge()
 
         if requests is not None:
             await self.add_requests(requests)

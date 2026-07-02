@@ -20,6 +20,7 @@ from unittest.mock import AsyncMock, Mock, call, patch
 import pytest
 
 from crawlee import ConcurrencySettings, Glob, service_locator
+from crawlee._log_config import CrawleeLogFormatter
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpMethod
 from crawlee._utils.robots import RobotsTxtFile
@@ -1053,6 +1054,40 @@ def test_crawler_log() -> None:
     crawler.log.info('Test log message')
 
 
+def test_configure_logging_preserves_host_app_root_handlers() -> None:
+    """Constructing a crawler must not remove handlers installed on the root logger by the host application."""
+    root_logger = logging.getLogger()
+    host_handler = logging.NullHandler()
+    root_logger.addHandler(host_handler)
+
+    try:
+        BasicCrawler()
+        assert host_handler in root_logger.handlers
+        # The host-configured root logger must not gain Crawlee's own handler either.
+        assert not any(isinstance(handler.formatter, CrawleeLogFormatter) for handler in root_logger.handlers)
+    finally:
+        root_logger.removeHandler(host_handler)
+
+
+def test_configure_logging_sets_up_unconfigured_root_logger() -> None:
+    """Constructing a crawler installs Crawlee's log handler when the root logger has no handlers yet."""
+    root_logger = logging.getLogger()
+    saved_handlers = root_logger.handlers[:]
+    saved_level = root_logger.level
+    for handler in saved_handlers:
+        root_logger.removeHandler(handler)
+
+    try:
+        BasicCrawler()
+        assert any(isinstance(handler.formatter, CrawleeLogFormatter) for handler in root_logger.handlers)
+    finally:
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
+        for handler in saved_handlers:
+            root_logger.addHandler(handler)
+        root_logger.setLevel(saved_level)
+
+
 async def test_consecutive_runs_purge_request_queue() -> None:
     crawler = BasicCrawler()
     visit = Mock()
@@ -1071,6 +1106,45 @@ async def test_consecutive_runs_purge_request_queue() -> None:
         'https://b.placeholder.com': 3,
         'https://c.placeholder.com': 3,
     }
+
+
+async def test_consecutive_runs_do_not_purge_named_request_queue() -> None:
+    """A second `run()` must not purge a user-supplied named request queue, as named storages persist across runs."""
+    queue = await RequestQueue.open(name='persistent-queue')
+    crawler = BasicCrawler(request_manager=queue)
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    # Simulate new work added to the persistent queue between runs.
+    await queue.add_request('https://b.placeholder.com')
+    await crawler.run()
+
+    assert visited == ['https://a.placeholder.com', 'https://b.placeholder.com']
+
+
+async def test_consecutive_runs_do_not_purge_named_queue_wrapped_in_throttling_manager() -> None:
+    """A second `run()` must not purge a named request queue wrapped in a `ThrottlingRequestManager`."""
+    queue = await RequestQueue.open(name='persistent-queue')
+    throttler = ThrottlingRequestManager(inner=queue, domains=[], request_manager_opener=RequestQueue.open)
+    crawler = BasicCrawler(request_manager=throttler)
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    # Simulate new work added to the persistent queue between runs.
+    await queue.add_request('https://b.placeholder.com')
+    await crawler.run()
+
+    assert visited == ['https://a.placeholder.com', 'https://b.placeholder.com']
 
 
 @pytest.mark.skipif(os.name == 'nt' and 'CI' in os.environ, reason='Skipped in Windows CI')
