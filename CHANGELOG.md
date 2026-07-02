@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.7.4 - **not yet released**
+## [1.8.0](https://github.com/apify/crawlee-python/releases/tag/v1.8.0) (2026-07-02)
 
 ### 🚀 Features
 
@@ -19,7 +18,6 @@ All notable changes to this project will be documented in this file.
 - **templates:** Pin Playwright to base image version for templates ([#1996](https://github.com/apify/crawlee-python/pull/1996)) ([917b6b6](https://github.com/apify/crawlee-python/commit/917b6b6361c29467e62857e377ebe7322f1d42da)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.7.3](https://github.com/apify/crawlee-python/releases/tag/v1.7.3) (2026-06-22)
 
 ### 🐛 Bug Fixes
