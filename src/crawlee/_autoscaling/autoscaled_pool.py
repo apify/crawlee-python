@@ -279,7 +279,9 @@ class AutoscaledPool:
                 timeout=self._TASK_TIMEOUT.total_seconds() if self._TASK_TIMEOUT is not None else None,
             )
         except asyncio.TimeoutError:
-            timeout_str = self._TASK_TIMEOUT.total_seconds() if self._TASK_TIMEOUT is not None else '*not set*'
-            logger.warning(f'Task timed out after {timeout_str} seconds')
+            if self._TASK_TIMEOUT is None:
+                # Without a timeout, `wait_for` cannot time out - the error comes from the task function itself.
+                raise
+            logger.warning(f'Task timed out after {self._TASK_TIMEOUT.total_seconds()} seconds')
         finally:
             logger.debug('Worker task finished')

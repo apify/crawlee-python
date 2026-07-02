@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import timedelta
 from unittest.mock import AsyncMock
 
@@ -53,3 +54,29 @@ async def test_execution(function: AsyncMock, delay: timedelta) -> None:
     assert task.func.call_count >= 3
 
     await task.stop()
+
+
+async def test_execution_continues_after_exception(delay: timedelta, caplog: pytest.LogCaptureFixture) -> None:
+    """Test that the recurring task logs an exception raised by its function and keeps executing."""
+    caplog.set_level(logging.ERROR, logger='crawlee._utils.recurring_task')
+    call_count = 0
+    second_call_done = asyncio.Event()
+
+    async def func() -> None:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise ValueError('Scheduled crash')
+        second_call_done.set()
+
+    task = RecurringTask(func, delay)
+    task.start()
+
+    await asyncio.wait_for(second_call_done.wait(), timeout=5)
+    await task.stop()
+
+    assert call_count >= 2
+    assert any(
+        record.name == 'crawlee._utils.recurring_task' and record.levelno == logging.ERROR and record.exc_info
+        for record in caplog.records
+    )
