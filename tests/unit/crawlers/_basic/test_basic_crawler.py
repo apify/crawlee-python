@@ -1073,6 +1073,45 @@ async def test_consecutive_runs_purge_request_queue() -> None:
     }
 
 
+async def test_consecutive_runs_do_not_purge_named_request_queue() -> None:
+    """A second `run()` must not purge a user-supplied named request queue, as named storages persist across runs."""
+    queue = await RequestQueue.open(name='persistent-queue')
+    crawler = BasicCrawler(request_manager=queue)
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    # Simulate new work added to the persistent queue between runs.
+    await queue.add_request('https://b.placeholder.com')
+    await crawler.run()
+
+    assert visited == ['https://a.placeholder.com', 'https://b.placeholder.com']
+
+
+async def test_consecutive_runs_do_not_purge_named_queue_wrapped_in_throttling_manager() -> None:
+    """A second `run()` must not purge a named request queue wrapped in a `ThrottlingRequestManager`."""
+    queue = await RequestQueue.open(name='persistent-queue')
+    throttler = ThrottlingRequestManager(inner=queue, domains=[], request_manager_opener=RequestQueue.open)
+    crawler = BasicCrawler(request_manager=throttler)
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    # Simulate new work added to the persistent queue between runs.
+    await queue.add_request('https://b.placeholder.com')
+    await crawler.run()
+
+    assert visited == ['https://a.placeholder.com', 'https://b.placeholder.com']
+
+
 @pytest.mark.skipif(os.name == 'nt' and 'CI' in os.environ, reason='Skipped in Windows CI')
 @pytest.mark.parametrize(
     ('statistics_log_format'),
