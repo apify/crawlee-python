@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Keep named request queues across runs ([#2015](https://github.com/apify/crawlee-python/pull/2015)) ([3b9f8c6](https://github.com/apify/crawlee-python/commit/3b9f8c6207b34a8bb1b1108589ea100bb83d3f66)) by [@vdusek](https://github.com/vdusek)
+- Make adaptive-crawler extra importable ([#2016](https://github.com/apify/crawlee-python/pull/2016)) ([b850cd6](https://github.com/apify/crawlee-python/commit/b850cd67411026c3c40b65f3e39de4d8b8fb3182)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->
