@@ -15,7 +15,9 @@ from crawlee._utils.requests import compute_unique_key, normalize_url
             'http://example.com/?another_key=another_value&key=value',
             False,
         ),
-        ('HTTPS://EXAMPLE.COM/?KEY=VALUE', 'https://example.com/?key=value', False),
+        ('HTTPS://EXAMPLE.COM/?KEY=VALUE', 'https://example.com/?KEY=VALUE', False),
+        ('HTTPS://EXAMPLE.COM/Product/ABC?token=SeCrEt', 'https://example.com/Product/ABC?token=SeCrEt', False),
+        ('HTTP://EXAMPLE.COM/Path#Frag', 'http://example.com/Path#Frag', True),
         ('', '', False),
         ('http://example.com/#fragment', 'http://example.com/#fragment', True),
         ('http://example.com/#fragment', 'http://example.com', False),
@@ -26,6 +28,8 @@ from crawlee._utils.requests import compute_unique_key, normalize_url
         'remove_utm_params',
         'retain_sort_non_utm_params',
         'convert_scheme_netloc_to_lowercase',
+        'preserve_path_query_case',
+        'preserve_fragment_case',
         'handle_empty_url',
         'retain_fragment',
         'remove_fragment',
@@ -36,6 +40,19 @@ from crawlee._utils.requests import compute_unique_key, normalize_url
 def test_normalize_url(url: str, expected_output: str, *, keep_url_fragment: bool) -> None:
     output = normalize_url(url, keep_url_fragment=keep_url_fragment)
     assert output == expected_output
+
+
+@pytest.mark.parametrize(
+    ('first_url', 'second_url'),
+    [
+        ('https://example.com/Product/ABC', 'https://example.com/product/abc'),
+        ('https://example.com/?token=SeCrEt', 'https://example.com/?token=secret'),
+        ('https://example.com/?Token=secret', 'https://example.com/?token=secret'),
+    ],
+    ids=['path_key', 'query_value_key', 'query_name_key'],
+)
+def test_compute_unique_key_preserves_case_sensitive_path_and_query(first_url: str, second_url: str) -> None:
+    assert compute_unique_key(first_url) != compute_unique_key(second_url)
 
 
 def test_compute_unique_key_basic() -> None:

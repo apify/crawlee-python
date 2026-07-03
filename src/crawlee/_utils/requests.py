@@ -20,7 +20,7 @@ def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:
     converting the scheme and netloc to lower case, stripping unwanted tracking parameters
     (specifically those beginning with 'utm_'), sorting the remaining query parameters alphabetically,
     and optionally retaining the URL fragment. The goal is to ensure that URLs that are functionally
-    identical but differ in trivial ways (such as parameter order or casing) are treated as the same.
+    identical but differ in trivial ways (such as parameter order or scheme/host casing) are treated as the same.
 
     Args:
         url: The URL to be normalized.
@@ -44,7 +44,7 @@ def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:
         yarl_new_url.path.removesuffix('/'), keep_query=True, keep_fragment=keep_url_fragment
     )
 
-    return str(yarl_new_url).lower()
+    return str(yarl_new_url)
 
 
 def compute_unique_key(
