@@ -1238,12 +1238,8 @@ async def test_error_handler_can_access_page(server_url: URL) -> None:
 
     await crawler.run([str(server_url / 'hello-world')])
 
-    # The error handler runs on each retry and the failed-request handler on the final failure, each recording the
-    # page content when it received a `PlaywrightCrawlingContext` or `None` otherwise. On CI (notably Windows under
-    # `xdist` load) navigation can spuriously fail with `net::ERR_NO_BUFFER_SPACE` before the page is created, so that
-    # attempt surfaces a `BasicCrawlingContext` recorded as `None`. Such attempts are environmental noise rather than
-    # the behavior under test, so assert on the attempts that actually reached the page: at least one must have, and
-    # every one that did must expose the page HTML.
+    # On Windows CI, navigation can spuriously fail with `net::ERR_NO_BUFFER_SPACE`, giving an error-handler call
+    # with a non-Playwright context (`None`). Ignore those and require page-reaching attempts to see the page HTML.
     page_error_calls = [content for content in error_handler_calls if content is not None]
     page_failed_calls = [content for content in failed_handler_calls if content is not None]
 
