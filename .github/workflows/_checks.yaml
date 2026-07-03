@@ -62,7 +62,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install pnpm and website dependencies
-        uses: apify/actions/pnpm-install@v1.3.1
+        uses: apify/actions/pnpm-install@v1.3.2
         with:
           working-directory: website
 
@@ -83,7 +83,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install pnpm and website dependencies
-        uses: apify/actions/pnpm-install@v1.3.1
+        uses: apify/actions/pnpm-install@v1.3.2
         with:
           working-directory: website
 
@@ -157,7 +157,7 @@ jobs:
         run: uv run poe build
 
       - name: Verify built package
-        uses: apify/actions/python-package-check@v1.3.0
+        uses: apify/actions/python-package-check@v1.3.2
         with:
           package_name: crawlee
           dist_dir: dist
