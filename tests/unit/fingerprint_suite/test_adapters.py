@@ -8,7 +8,10 @@ from crawlee.fingerprint_suite import (
     HeaderGeneratorOptions,
     ScreenOptions,
 )
-from crawlee.fingerprint_suite._browserforge_adapter import PatchedHeaderGenerator
+from crawlee.fingerprint_suite._browserforge_adapter import (
+    BrowserforgeFingerprintGenerator,
+    PatchedHeaderGenerator,
+)
 from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
 
 
@@ -85,3 +88,27 @@ def test_patched_header_generator_generate(browser: Iterable[str | Browser]) -> 
     """Test that PatchedHeaderGenerator works with all the possible types correctly."""
     header = PatchedHeaderGenerator().generate(browser=browser)
     assert any(keyword in header['User-Agent'] for keyword in BROWSER_TYPE_HEADER_KEYWORD['firefox'])
+
+
+def test_fingerprint_generator_preserves_error_on_persistent_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that a persistently failing fingerprint generation preserves the original error.
+
+    `browserforge` is flaky and raises `ValueError` when the constraints cannot be satisfied. After exhausting all
+    retries, `generate` must raise a `RuntimeError` that chains the last `ValueError` so its context is not lost.
+    """
+    generator = BrowserforgeFingerprintGenerator()
+    attempts = 0
+
+    def always_fail(**_kwargs: object) -> None:
+        nonlocal attempts
+        attempts += 1
+        raise ValueError('screen constraints are too strict')
+
+    monkeypatch.setattr(generator._generator, 'generate', always_fail)
+
+    with pytest.raises(RuntimeError, match=r'Failed to generate fingerprint') as exc_info:
+        generator.generate()
+
+    assert attempts == 10
+    assert isinstance(exc_info.value.__cause__, ValueError)
+    assert str(exc_info.value.__cause__) == 'screen constraints are too strict'
