@@ -25,6 +25,16 @@ async def test_allow_disallow_robots_txt(server_url: URL, http_client: HttpClien
     assert not robots.is_allowed(str(server_url / 'deny_all/page.html'))
 
 
+async def test_server_error_disallows_all(server_url: URL, http_client: HttpClient) -> None:
+    """A 5xx robots.txt response is treated as complete disallow (RFC 9309, section 2.3.1.4).
+
+    The response body must not be parsed as rules; otherwise an error page would be misread as allow-all.
+    """
+    robots = await RobotsTxtFile.load(str(server_url / 'status/500'), http_client)
+    assert not robots.is_allowed(str(server_url / 'admin/page.html'))
+    assert not robots.is_allowed(str(server_url / 'something/page.html'))
+
+
 async def test_extract_sitemaps_urls(server_url: URL, http_client: HttpClient) -> None:
     """Cross-host sitemap entries are dropped under the `'same-hostname'` enqueue strategy."""
     robots = await RobotsTxtFile.find(str(server_url), http_client)

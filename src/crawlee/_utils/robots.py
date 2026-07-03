@@ -8,7 +8,7 @@ from yarl import URL
 
 from crawlee._utils.sitemap import Sitemap
 from crawlee._utils.urls import filter_url
-from crawlee._utils.web import is_status_code_client_error
+from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -57,11 +57,15 @@ class RobotsTxtFile:
         try:
             response = await http_client.send_request(url, proxy_info=proxy_info)
 
-            body = (
-                b'User-agent: *\nAllow: /'
-                if is_status_code_client_error(response.status_code)
-                else await response.read()
-            )
+            status_code = response.status_code
+            if is_status_code_client_error(status_code):
+                # A 4xx response means the file is unavailable, so crawling is unrestricted (RFC 9309, section 2.3.1.3).
+                body = b'User-agent: *\nAllow: /'
+            elif is_status_code_server_error(status_code):
+                # A 5xx response means the file is unreachable, so assume complete disallow (RFC 9309, section 2.3.1.4).
+                body = b'User-agent: *\nDisallow: /'
+            else:
+                body = await response.read()
             robots = Protego.parse(body.decode('utf-8'))
 
         except Exception as e:
