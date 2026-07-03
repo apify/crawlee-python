@@ -122,14 +122,19 @@ def get_memory_info() -> MemoryInfo:
     logger.debug('Calling get_memory_info()...')
     current_process = psutil.Process(os.getpid())
 
-    # Retrieve estimated memory usage of the current process.
-    current_size_bytes = _get_used_memory(current_process)
+    # Retrieve estimated memory usage of the current process. On Linux `_get_used_memory` reads PSS via
+    # `memory_full_info`, which can raise `AccessDenied` in restricted environments (e.g. hardened containers);
+    # fall back to RSS, which a process can always read for itself.
+    try:
+        current_size_bytes = _get_used_memory(current_process)
+    except psutil.AccessDenied:
+        current_size_bytes = int(current_process.memory_info().rss)
 
     # Sum memory usage by all children processes, try to exclude shared memory from the sum if allowed by OS.
     for child in current_process.children(recursive=True):
-        # Ignore any NoSuchProcess exception that might occur if a child process ends before we retrieve
-        # its memory usage.
-        with suppress(psutil.NoSuchProcess):
+        # Ignore a child that ends before we retrieve its memory usage (`NoSuchProcess`) or that we are not
+        # allowed to inspect (`AccessDenied`, e.g. an unreadable subprocess in a restricted environment).
+        with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
             current_size_bytes += _get_used_memory(child)
 
     vm = psutil.virtual_memory()

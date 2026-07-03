@@ -5,8 +5,10 @@ from multiprocessing import get_context, synchronize
 from multiprocessing.shared_memory import SharedMemory
 from typing import TYPE_CHECKING
 
+import psutil
 import pytest
 
+from crawlee._utils import system
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.system import get_cpu_info, get_memory_info
 
@@ -19,6 +21,49 @@ def test_get_memory_info_returns_valid_values() -> None:
 
     assert ByteSize(0) < memory_info.total_size < ByteSize.from_tb(1)
     assert memory_info.current_size < memory_info.total_size
+
+
+def test_get_memory_info_skips_children_with_access_denied(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A child process we are not allowed to inspect must be skipped, not abort the whole snapshot.
+
+    In restricted environments (e.g. hardened containers) reading a child's memory can raise
+    `psutil.AccessDenied`, which is not a subclass of `psutil.NoSuchProcess` and so was not suppressed.
+    """
+    child = psutil.Process()  # any process object works; only `_get_used_memory` behavior matters here
+
+    monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: [child])
+
+    def fake_get_used_memory(process: psutil.Process) -> int:
+        if process is child:
+            raise psutil.AccessDenied(pid=child.pid)
+        return 100
+
+    monkeypatch.setattr(system, '_get_used_memory', fake_get_used_memory)
+
+    memory_info = get_memory_info()
+
+    # The unreadable child is skipped, so only the current process (100) is counted.
+    assert memory_info.current_size == ByteSize(100)
+
+
+def test_get_memory_info_falls_back_to_rss_when_current_process_access_denied(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If PSS for the current process is denied, fall back to RSS instead of crashing.
+
+    On Linux `_get_used_memory` reads PSS via `memory_full_info`, which may require elevated privileges.
+    """
+    monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: [])
+
+    def fake_get_used_memory(process: psutil.Process) -> int:
+        raise psutil.AccessDenied(pid=process.pid)
+
+    monkeypatch.setattr(system, '_get_used_memory', fake_get_used_memory)
+
+    memory_info = get_memory_info()
+
+    # RSS of the current process is a positive value below total system memory.
+    assert ByteSize(0) < memory_info.current_size < memory_info.total_size
 
 
 def test_get_cpu_info_returns_valid_values() -> None:
