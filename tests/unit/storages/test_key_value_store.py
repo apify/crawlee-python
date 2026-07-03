@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -1180,3 +1181,74 @@ async def test_record_with_noascii_chars(kvs: KeyValueStore) -> None:
     value = await kvs.get_value(key)
     assert value is not None
     assert value == init_value
+
+
+async def test_persist_autosaved_values_with_concurrent_new_key(
+    kvs: KeyValueStore,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that persisting autosaved values tolerates a concurrent new autosaved key.
+
+    `get_auto_saved_value` mutates the shared autosave cache while holding the autosave lock, so
+    `persist_autosaved_values` must hold the same lock while iterating that cache. Otherwise a request
+    inserting a new key mid-iteration raises `RuntimeError: dictionary changed size during iteration`.
+    """
+    await kvs.get_auto_saved_value('existing')
+
+    # Park the persist loop mid-iteration by blocking the underlying write, then insert a new key.
+    persist_entered = asyncio.Event()
+    release_persist = asyncio.Event()
+    original_set_value = kvs.set_value
+
+    async def blocking_set_value(*args: Any, **kwargs: Any) -> None:
+        persist_entered.set()
+        await release_persist.wait()
+        await original_set_value(*args, **kwargs)
+
+    monkeypatch.setattr(kvs, 'set_value', blocking_set_value)
+
+    persist_task = asyncio.ensure_future(kvs.persist_autosaved_values())
+    await persist_entered.wait()
+
+    insert_task = asyncio.ensure_future(kvs.get_auto_saved_value('added-during-persist'))
+    await asyncio.sleep(0)  # Give the insert a chance to reach the shared cache.
+    release_persist.set()
+
+    # Should not raise `RuntimeError: dictionary changed size during iteration`.
+    await asyncio.gather(persist_task, insert_task)
+
+
+async def test_drop_with_concurrent_new_autosaved_key(
+    storage_client: StorageClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that dropping a store tolerates a concurrent new autosaved key.
+
+    `drop` clears the autosave cache via `_clear_cache`, which must hold the autosave lock while
+    iterating. Otherwise a request inserting a new key mid-iteration raises
+    `RuntimeError: dictionary changed size during iteration`.
+    """
+    kvs = await KeyValueStore.open(storage_client=storage_client)
+    await kvs.get_auto_saved_value('existing')
+
+    # Park the clear loop mid-iteration by blocking the underlying write, then insert a new key.
+    clear_entered = asyncio.Event()
+    release_clear = asyncio.Event()
+    original_set_value = kvs.set_value
+
+    async def blocking_set_value(*args: Any, **kwargs: Any) -> None:
+        clear_entered.set()
+        await release_clear.wait()
+        await original_set_value(*args, **kwargs)
+
+    monkeypatch.setattr(kvs, 'set_value', blocking_set_value)
+
+    drop_task = asyncio.ensure_future(kvs.drop())
+    await clear_entered.wait()
+
+    insert_task = asyncio.ensure_future(kvs.get_auto_saved_value('added-during-drop'))
+    await asyncio.sleep(0)  # Give the insert a chance to reach the shared cache.
+    release_clear.set()
+
+    # Should not raise `RuntimeError: dictionary changed size during iteration`.
+    await asyncio.gather(drop_task, insert_task)
