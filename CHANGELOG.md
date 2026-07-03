@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.8.1 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Keep named request queues across runs ([#2015](https://github.com/apify/crawlee-python/pull/2015)) ([3b9f8c6](https://github.com/apify/crawlee-python/commit/3b9f8c6207b34a8bb1b1108589ea100bb83d3f66)) by [@vdusek](https://github.com/vdusek)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.8.0](https://github.com/apify/crawlee-python/releases/tag/v1.8.0) (2026-07-02)
 
 ### 🚀 Features
