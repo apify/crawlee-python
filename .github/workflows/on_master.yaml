@@ -63,6 +63,6 @@ jobs:
       actions: write # Required by execute-workflow.
     steps:
       - name: Dispatch beta release workflow
-        uses: apify/actions/execute-workflow@v1.3.0
+        uses: apify/actions/execute-workflow@v1.3.2
         with:
           workflow: manual_release_beta.yaml
