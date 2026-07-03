@@ -721,9 +721,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 # A `ThrottlingRequestManager` delegates `purge` to the manager it wraps, so inspect the wrapped
                 # manager when deciding whether the purge would hit a named queue.
                 inner_manager = (
-                    request_manager._inner  # noqa: SLF001
-                    if isinstance(request_manager, ThrottlingRequestManager)
-                    else request_manager
+                    request_manager.inner if isinstance(request_manager, ThrottlingRequestManager) else request_manager
                 )
                 # Named storages are persistent and shared across runs, so they are never purged implicitly
                 # (the same named-storage exemption as in `StorageClient._purge_if_needed`).

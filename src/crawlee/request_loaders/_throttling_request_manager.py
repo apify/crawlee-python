@@ -105,6 +105,11 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """Set whenever a request is added or reclaimed. Lets `fetch_next_request` wake from a throttle
         wait early when fresh work appears, instead of sleeping for the full computed cooldown."""
 
+    @property
+    def inner(self) -> TRequestManager:
+        """The wrapped request manager that stores requests for non-throttled domains."""
+        return self._inner
+
     @override
     async def drop(self) -> None:
         await asyncio.gather(self._inner.drop(), *(sm.drop() for sm in self._sub_managers.values()))
