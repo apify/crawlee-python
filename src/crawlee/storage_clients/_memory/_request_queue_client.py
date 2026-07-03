@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections import deque
-from contextlib import suppress
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -175,19 +174,15 @@ class MemoryRequestQueueClient(RequestQueueClient):
                 )
                 continue
 
-            # If the request is already in the queue but not handled, update it.
+            # If the request is already in the queue but not handled, we only reposition it when `forefront`
+            # is set; a regular re-add leaves the already-pending entry untouched.
             if was_already_present and existing_request:
-                # Update indexes.
-                self._requests_by_unique_key[request.unique_key] = request
-
-                # We only update `forefront` by updating its position by shifting it to the left.
                 if forefront:
-                    # Update the existing request with any new data and
-                    # remove old request from pending queue if it's there.
-                    with suppress(ValueError):
-                        self._pending_requests.remove(existing_request)
-
-                    # Add updated request back to queue.
+                    # Move the request to the front. The old entry is left in the deque instead of being
+                    # located and removed (`deque.remove` is O(n), which makes a batch of forefront re-adds
+                    # O(n^2)); registering the new object here supersedes the old one, and the stale entry is
+                    # skipped lazily by `fetch_next_request` and `is_empty`.
+                    self._requests_by_unique_key[request.unique_key] = request
                     self._pending_requests.appendleft(request)
 
             # Add the new request to the queue.
@@ -224,6 +219,11 @@ class MemoryRequestQueueClient(RequestQueueClient):
     async def fetch_next_request(self) -> Request | None:
         while self._pending_requests:
             request = self._pending_requests.popleft()
+
+            # Skip stale entries left behind when a request was repositioned to the forefront while already
+            # pending. Only the object currently registered for the unique key is live.
+            if self._requests_by_unique_key.get(request.unique_key) is not request:
+                continue
 
             # Skip if already handled (shouldn't happen, but safety check).
             if request.was_already_handled:
@@ -308,6 +308,13 @@ class MemoryRequestQueueClient(RequestQueueClient):
     @override
     async def is_empty(self) -> bool:
         await self._update_metadata(update_accessed_at=True)
+
+        # Discard stale entries left at the front by forefront repositioning; a live request is always
+        # enqueued ahead of the stale entry it supersedes, so pruning stops at the first live request.
+        while self._pending_requests and (
+            self._requests_by_unique_key.get(self._pending_requests[0].unique_key) is not self._pending_requests[0]
+        ):
+            self._pending_requests.popleft()
 
         # Queue is empty if there are no pending requests.
         return len(self._pending_requests) == 0

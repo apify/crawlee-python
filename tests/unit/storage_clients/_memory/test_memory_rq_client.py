@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from typing import TYPE_CHECKING
 
 import pytest
@@ -93,3 +94,105 @@ async def test_memory_metadata_updates(rq_client: MemoryRequestQueueClient) -> N
     assert metadata.created_at == initial_created
     assert metadata.modified_at > initial_modified
     assert metadata.accessed_at > accessed_after_read
+
+
+async def test_forefront_readd_repositions_without_deque_scan(rq_client: MemoryRequestQueueClient) -> None:
+    """Test that re-adding pending requests to the forefront does not do an O(n) `deque.remove` scan."""
+
+    class CountingDeque(deque):  # type: ignore[type-arg]
+        remove_calls = 0
+
+        def remove(self, value: object) -> None:
+            CountingDeque.remove_calls += 1
+            super().remove(value)
+
+    rq_client._pending_requests = CountingDeque(rq_client._pending_requests)
+
+    requests = [Request.from_url(f'https://example.com/{i}') for i in range(20)]
+    await rq_client.add_batch_of_requests(requests)
+
+    # Re-add the same, still-pending requests with `forefront=True`. Previously each re-add scanned the
+    # whole pending deque with `deque.remove` to reposition the existing entry, which is O(n) per request.
+    await rq_client.add_batch_of_requests(requests, forefront=True)
+
+    assert CountingDeque.remove_calls == 0
+
+
+async def test_forefront_readd_preserves_order_and_dedup(rq_client: MemoryRequestQueueClient) -> None:
+    """Test that repositioning already-pending requests to the forefront keeps LIFO order and dedup."""
+    requests = [Request.from_url(f'https://example.com/{i}') for i in range(3)]
+    await rq_client.add_batch_of_requests(requests)
+
+    # Re-add a subset (0 and 1) to the forefront while still pending. Request 1 is added last, so it must
+    # end up at the very front, followed by request 0, then the untouched regular request 2.
+    await rq_client.add_batch_of_requests(requests[:2], forefront=True)
+
+    fetched_urls = []
+    while (request := await rq_client.fetch_next_request()) is not None:
+        fetched_urls.append(request.url)
+        await rq_client.mark_request_as_handled(request)
+
+    assert fetched_urls == [
+        'https://example.com/1',
+        'https://example.com/0',
+        'https://example.com/2',
+    ]
+
+    # No stale duplicates should linger after all live requests are drained.
+    assert await rq_client.is_empty() is True
+    assert await rq_client.is_finished() is True
+
+
+async def test_regular_readd_of_pending_request_is_not_dropped(rq_client: MemoryRequestQueueClient) -> None:
+    """Test that a regular (non-forefront) re-add of a still-pending request keeps it fetchable.
+
+    The lazy-tombstone skip in `fetch_next_request`/`is_empty` keys off object identity, so a regular re-add
+    must not repoint the registered object away from the entry still sitting in the pending deque, otherwise
+    the genuinely-live request would be treated as stale and silently dropped.
+    """
+    original = Request.from_url('https://example.com/page')
+    await rq_client.add_batch_of_requests([original])
+
+    # Re-add the same URL while still pending, as a distinct object (as the higher-level API does when it
+    # rebuilds requests). `forefront` defaults to False.
+    duplicate = Request.from_url('https://example.com/page')
+    assert duplicate is not original
+    assert duplicate.unique_key == original.unique_key
+    await rq_client.add_batch_of_requests([duplicate])
+
+    # The request must still be pending and fetchable exactly once, and the counts must stay consistent.
+    assert await rq_client.is_empty() is False
+
+    fetched = await rq_client.fetch_next_request()
+    assert fetched is not None
+    assert fetched.url == 'https://example.com/page'
+    await rq_client.mark_request_as_handled(fetched)
+
+    assert await rq_client.fetch_next_request() is None
+    assert await rq_client.is_empty() is True
+    assert await rq_client.is_finished() is True
+
+    metadata = await rq_client.get_metadata()
+    assert metadata.total_request_count == 1
+    assert metadata.pending_request_count == 0
+    assert metadata.handled_request_count == 1
+
+
+async def test_regular_readd_does_not_reorder_pending_queue(rq_client: MemoryRequestQueueClient) -> None:
+    """Test that a regular re-add of an already-pending request leaves the FIFO order untouched."""
+    requests = [Request.from_url(f'https://example.com/{i}') for i in range(3)]
+    await rq_client.add_batch_of_requests(requests)
+
+    # Re-add the first request (still pending) without `forefront`; it must stay in its original position.
+    await rq_client.add_batch_of_requests([requests[0]])
+
+    fetched_urls = []
+    while (request := await rq_client.fetch_next_request()) is not None:
+        fetched_urls.append(request.url)
+        await rq_client.mark_request_as_handled(request)
+
+    assert fetched_urls == [
+        'https://example.com/0',
+        'https://example.com/1',
+        'https://example.com/2',
+    ]
