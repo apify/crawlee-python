@@ -697,9 +697,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Args:
             requests: The requests to be enqueued before the crawler starts.
-            purge_request_queue: If this is `True` and the crawler is not being run for the first time, the request
-                queue will be purged. Named request queues are considered persistent and are never purged
-                implicitly.
+            purge_request_queue: If this is `True` and the crawler is not being run for the first time, the default
+                request queue will be purged.
         """
         if self._running:
             raise RuntimeError(
@@ -723,18 +722,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             if purge_request_queue:
                 request_manager = await self.get_request_manager()
-                # A `ThrottlingRequestManager` delegates `purge` to the manager it wraps, so inspect the wrapped
-                # manager when deciding whether the purge would hit a named queue.
-                inner_manager = (
-                    request_manager._inner  # noqa: SLF001
-                    if isinstance(request_manager, ThrottlingRequestManager)
-                    else request_manager
-                )
-                # Named storages are persistent and shared across runs, so they are never purged implicitly
-                # (the same named-storage exemption as in `StorageClient._purge_if_needed`).
-                is_named_queue = isinstance(inner_manager, RequestQueue) and inner_manager.name is not None
-                if not is_named_queue:
-                    await request_manager.purge()
+                await request_manager.purge()
 
         if requests is not None:
             await self.add_requests(requests)

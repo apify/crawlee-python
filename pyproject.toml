@@ -52,7 +52,6 @@ dependencies = [
 [project.optional-dependencies]
 all = ["crawlee[adaptive-crawler,pydantic-ai,beautifulsoup,cli,curl-impersonate,httpx,parsel,playwright,otel,sql_sqlite,sql_postgres,sql_mysql,stagehand,redis]"]
 adaptive-crawler = [
-    "crawlee[beautifulsoup,parsel]",
     "jaro-winkler>=2.0.3",
     "playwright>=1.27.0",
     "scikit-learn>=1.6.0",
