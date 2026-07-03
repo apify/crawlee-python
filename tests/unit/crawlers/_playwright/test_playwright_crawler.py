@@ -1220,32 +1220,30 @@ async def test_error_handler_can_access_page(server_url: URL) -> None:
     request_handler = mock.AsyncMock(side_effect=RuntimeError('Intentional crash'))
     crawler.router.default_handler(request_handler)
 
-    error_handler_calls: list[str | None] = []
+    error_handler_calls: list[str] = []
 
     @crawler.error_handler
     async def error_handler(context: BasicCrawlingContext | PlaywrightCrawlingContext, _error: Exception) -> None:
-        error_handler_calls.append(
-            await context.page.content() if isinstance(context, PlaywrightCrawlingContext) else None
-        )
+        if isinstance(context, PlaywrightCrawlingContext):
+            error_handler_calls.append(await context.page.content())
 
-    failed_handler_calls: list[str | None] = []
+    failed_handler_calls: list[str] = []
 
     @crawler.failed_request_handler
     async def failed_handler(context: BasicCrawlingContext | PlaywrightCrawlingContext, _error: Exception) -> None:
-        failed_handler_calls.append(
-            await context.page.content() if isinstance(context, PlaywrightCrawlingContext) else None
-        )
+        if isinstance(context, PlaywrightCrawlingContext):
+            failed_handler_calls.append(await context.page.content())
 
     await crawler.run([str(server_url / 'hello-world')])
 
-    # On Windows CI, navigation can spuriously fail with `net::ERR_NO_BUFFER_SPACE`, giving an error-handler call
-    # with a non-Playwright context (`None`). Ignore those and require page-reaching attempts to see the page HTML.
-    page_error_calls = [content for content in error_handler_calls if content is not None]
-    page_failed_calls = [content for content in failed_handler_calls if content is not None]
-
-    assert page_error_calls, 'the error handler never received a PlaywrightCrawlingContext'
-    assert all(content == HELLO_WORLD.decode() for content in page_error_calls)
-    assert all(content == HELLO_WORLD.decode() for content in page_failed_calls)
+    # The error handler runs on each retry and the failed-request handler on the final failure. Each records the page
+    # content only when it received a `PlaywrightCrawlingContext`. On CI (notably Windows under `xdist` load) navigation
+    # can spuriously fail with `net::ERR_NO_BUFFER_SPACE` before the page is created, yielding a `BasicCrawlingContext`
+    # that never reached the page. Such attempts are environmental noise rather than the behavior under test, so assert
+    # only on the attempts that actually reached the page: at least one must have, and every one that did exposes it.
+    assert error_handler_calls, 'the error handler never received a PlaywrightCrawlingContext'
+    assert all(content == HELLO_WORLD.decode() for content in error_handler_calls)
+    assert all(content == HELLO_WORLD.decode() for content in failed_handler_calls)
 
 
 def test_import_error_handled() -> None:
