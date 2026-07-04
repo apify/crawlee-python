@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from io import StringIO
 from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee._utils.file import json_dumps, validate_subdirectory
+from crawlee._utils.file import export_csv_to_stream, json_dumps, validate_subdirectory
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Mapping
     from pathlib import Path
+
+    from crawlee._types import JsonSerializable
 
 
 async def test_json_dumps() -> None:
@@ -17,6 +21,48 @@ async def test_json_dumps() -> None:
     assert await json_dumps('string') == '"string"'
     assert await json_dumps(123) == '123'
     assert await json_dumps(datetime(2022, 1, 1, tzinfo=timezone.utc)) == '"2022-01-01 00:00:00+00:00"'
+
+
+# Tests for export_csv_to_stream (dataset CSV export).
+
+
+async def _async_iter(
+    items: list[Mapping[str, JsonSerializable]],
+) -> AsyncIterator[Mapping[str, JsonSerializable]]:
+    for item in items:
+        yield item
+
+
+async def test_export_csv_to_stream_keeps_columns_aligned_for_heterogeneous_items() -> None:
+    """Values must be written under their own header column even when items have different key orders/sets."""
+    dst = StringIO()
+    await export_csv_to_stream(
+        _async_iter(
+            [
+                {'name': 'Alice', 'age': 30},
+                {'name': 'Bob', 'city': 'NYC', 'age': 25},
+                {'age': 40, 'name': 'Carol'},
+            ]
+        ),
+        dst,
+        lineterminator='\n',
+    )
+
+    # The header comes from the first item; later items are mapped by key (extra keys such as `city` are dropped),
+    # so `Carol`/`40` stay aligned with the `name`/`age` columns instead of being written positionally.
+    assert dst.getvalue() == 'name,age\nAlice,30\nBob,25\nCarol,40\n'
+
+
+async def test_export_csv_to_stream_skips_empty_items() -> None:
+    """Empty mappings are skipped and do not define or shift the header."""
+    dst = StringIO()
+    await export_csv_to_stream(
+        _async_iter([{}, {'id': 1, 'name': 'Item 1'}, {}, {'id': 2, 'name': 'Item 2'}]),
+        dst,
+        lineterminator='\n',
+    )
+
+    assert dst.getvalue() == 'id,name\n1,Item 1\n2,Item 2\n'
 
 
 # Tests for validate_subdirectory (storage name/alias directory validation).
