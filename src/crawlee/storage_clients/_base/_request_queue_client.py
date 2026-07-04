@@ -51,11 +51,6 @@ class RequestQueueClient(ABC):
             requests: The collection of requests to add to the queue.
             forefront: Whether to put the added requests at the beginning (True) or the end (False) of the queue.
                 When True, the requests will be processed sooner than previously added requests.
-            batch_size: The maximum number of requests to add in a single batch.
-            wait_time_between_batches: The time to wait between adding batches of requests.
-            wait_for_all_requests_to_be_added: If True, the method will wait until all requests are added
-                to the queue before returning.
-            wait_for_all_requests_to_be_added_timeout: The maximum time to wait for all requests to be added.
 
         Returns:
             A response object containing information about which requests were successfully
