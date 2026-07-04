@@ -117,7 +117,9 @@ class Configuration(BaseSettings):
             validation_alias=AliasChoices(
                 'apify_max_used_cpu_ratio',
                 'crawlee_max_used_cpu_ratio',
-            )
+            ),
+            gt=0.0,
+            le=1.0,
         ),
     ] = 0.95
     """The maximum CPU usage ratio. If the CPU usage exceeds this value, the system is considered overloaded.
@@ -129,7 +131,9 @@ class Configuration(BaseSettings):
             validation_alias=AliasChoices(
                 'apify_max_used_memory_ratio',
                 'crawlee_max_used_memory_ratio',
-            )
+            ),
+            gt=0.0,
+            le=1.0,
         ),
     ] = 0.9
     """The maximum memory usage ratio. If the memory usage exceeds this ratio, it is considered overloaded.
