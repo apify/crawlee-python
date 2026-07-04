@@ -203,16 +203,18 @@ async def export_csv_to_stream(
     if 'lineterminator' not in kwargs:
         kwargs['lineterminator'] = '\n'
 
-    writer = csv.writer(dst, **kwargs)
-    write_header = True
+    writer: csv.DictWriter | None = None
 
-    # Iterate over the dataset and write to CSV.
+    # Iterate over the dataset and write to CSV. The header (field names) is taken from the first non-empty
+    # item, and each row is written by key via `csv.DictWriter` so values stay aligned with their columns even
+    # when later items have a different key set or order. Keys not present in the header are ignored, matching
+    # the behavior of Crawlee for JavaScript.
     async for item in iterator:
         if not item:
             continue
 
-        if write_header:
-            writer.writerow(item.keys())
-            write_header = False
+        if writer is None:
+            writer = csv.DictWriter(dst, fieldnames=list(item.keys()), extrasaction='ignore', **kwargs)
+            writer.writeheader()
 
-        writer.writerow(item.values())
+        writer.writerow(item)
