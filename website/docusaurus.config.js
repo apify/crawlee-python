@@ -414,9 +414,6 @@ module.exports = {
                 apiKey: '878493fcd7001e3c179b6db6796a999b', // search only (public) API key
                 indexName: 'crawlee_python',
                 placeholder: 'Search documentation',
-                algoliaOptions: {
-                    facetFilters: ['version:VERSION'],
-                },
                 translations: {
                     button: {
                         buttonText: 'Search documentation...',
