@@ -13,7 +13,7 @@ jobs:
     name: PR title check
     runs-on: ubuntu-latest
     steps:
-      - uses: apify/actions/pr-title-check@v1.3.2
+      - uses: apify/actions/pr-title-check@v1.4.0
 
   checks:
     name: Checks
