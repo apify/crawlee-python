@@ -152,7 +152,6 @@ class SqlClientMixin(ABC):
             name: The name of the storage for named (global scope) storages.
             alias: The alias of the storage for unnamed (run scope) storages.
             storage_client: SQL storage client instance.
-            client_class: Concrete client class to instantiate.
             metadata_model: Pydantic model for metadata validation.
             extra_metadata_fields: Storage-specific metadata fields.
         """
