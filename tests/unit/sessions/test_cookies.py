@@ -40,7 +40,7 @@ def test_set_basic_cookie() -> None:
     assert cookie.value == 'value'
     assert cookie.path == '/'
     assert not cookie.secure
-    assert not cookie.has_nonstandard_attr('httpOnpy')
+    assert not cookie.has_nonstandard_attr('HttpOnly')
 
 
 def test_set_cookie_with_all_attributes(session_cookies: SessionCookies, cookie_dict: CookieParam) -> None:
