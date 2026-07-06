@@ -122,7 +122,7 @@ class SitemapRequestLoader(RequestLoader):
         """Initialize the sitemap request loader.
 
         Args:
-            sitemap_urls: Configuration options for the loader.
+            sitemap_urls: List of sitemap URLs to fetch and parse for request URLs.
             proxy_info: Optional proxy to use for fetching sitemaps.
             include: List of glob or regex patterns to include URLs.
             exclude: List of glob or regex patterns to exclude URLs.
