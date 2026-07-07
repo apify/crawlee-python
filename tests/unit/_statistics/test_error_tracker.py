@@ -114,3 +114,16 @@ async def test_error_tracker_with_errors_chain() -> None:
             await error_tracker.add(e)
 
     assert error_tracker.get_most_common_errors()[0][0] == 'Zero division error'
+
+
+async def test_error_tracker_error_without_traceback() -> None:
+    """Test that an exception with no traceback (never raised) is tracked without crashing."""
+    error_tracker = ErrorTracker()
+
+    # A freshly constructed exception has `__traceback__` set to None.
+    await error_tracker.add(ValueError('Some value error'))
+
+    assert error_tracker.total == 1
+    assert error_tracker.unique_error_count == 1
+    # With no traceback there is no file and line, so the group has just the name and message.
+    assert error_tracker.get_most_common_errors()[0][0] == 'ValueError:Some value error'

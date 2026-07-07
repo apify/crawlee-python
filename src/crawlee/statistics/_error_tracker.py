@@ -107,6 +107,9 @@ class ErrorTracker:
     def _get_file_and_line(self, error: Exception) -> str:
         if self.show_file_and_line_number:
             error_traceback = traceback.extract_tb(error.__traceback__)
+            if not error_traceback:
+                # The exception has no traceback (e.g. it was never raised).
+                return ''
             # Show only the most specific frame.
             return f'{error_traceback[-1].filename.split("/")[-1]}:{error_traceback[-1].lineno}'
         return ''
