@@ -15,6 +15,7 @@ from crawlee.errors import ProxyError
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpClient, HttpxHttpClient, ImpitHttpClient
 from crawlee.statistics import Statistics
 from tests.unit.server_endpoints import HELLO_WORLD
+from tests.unit.utils import run_alone_on_mac
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -42,6 +43,10 @@ async def test_http_1(http_client: HttpClient, server_url: URL) -> None:
     assert response.http_version == 'HTTP/1.1'
 
 
+# This test issues a live HTTP/2 request to an external host. On the macOS CI runner it runs alongside several
+# `pytest-xdist` workers, and the resource contention starves the read so it exceeds the client's default timeout
+# (`ReadTimeout` -> `TimeoutError`). Running it alone on macOS removes the contention; it's a no-op elsewhere.
+@run_alone_on_mac
 @pytest.mark.parametrize(
     'custom_http_client',
     [
