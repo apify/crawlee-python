@@ -30,13 +30,23 @@ jobs:
           token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
           fetch-depth: 0
 
+      # Continue an already-open update branch so the bump lands on the existing PR (preserving
+      # its history, comments and approvals) instead of opening a fresh PR on every run. When no
+      # update branch exists yet, stay on the default branch so a new one is created below.
+      - name: Switch to the update branch if it exists
+        run: |
+          if git ls-remote --exit-code --heads origin "$BRANCH_NAME" >/dev/null 2>&1; then
+            git fetch origin "$BRANCH_NAME"
+            git checkout -B "$BRANCH_NAME" FETCH_HEAD
+          fi
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.13'
 
       - name: Update Playwright version
-        run: python src/crawlee/project_template/update_playwright_version.py
+        run: python scripts/update_playwright_version.py
 
       - name: Detect changes
         id: changes
@@ -45,25 +55,6 @@ jobs:
             echo "has-changes=false" >> "$GITHUB_OUTPUT"
           else
             echo "has-changes=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Reset existing branch
-        if: steps.changes.outputs.has-changes == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
-        run: |
-          # If a PR already exists for this branch, disable auto-merge before we recreate the
-          # branch so the old commit can't be merged.
-          PR_NUMBER=$(gh pr list --head "$BRANCH_NAME" --base master --json number --jq '.[0].number // empty')
-          if [ -n "$PR_NUMBER" ]; then
-            gh pr merge "$PR_NUMBER" --disable-auto || true
-          fi
-
-          # Delete the remote branch if it exists. The signed-commit step below recreates it from
-          # the current HEAD (origin/master).
-          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
-            echo "Deleting existing remote branch $BRANCH_NAME"
-            git push origin --delete "$BRANCH_NAME"
           fi
 
       - name: Commit and push changes

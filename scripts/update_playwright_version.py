@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """Bump the Playwright version pinned by the project template's Dockerfile.
 
-The template Dockerfile pins a single Playwright version (a Jinja ``# % set playwright_version
-= '...'`` line) that selects the Apify base image tag and the in-image ``playwright==<version>``
+The template Dockerfile pins a single Playwright version (a Jinja `# % set playwright_version
+= '...'` line) that selects the Apify base image tag and the in-image `playwright==<version>`
 pin. A version is only safe to pin once Apify has published the matching base image, so the
 Apify Playwright base image's Docker Hub tags are the source of truth: this picks the highest
-stable ``<python>-<semver>`` tag for the Python version the template already uses, and rewrites
+stable `<python>-<semver>` tag for the Python version the template already uses, and rewrites
 the pinned version line if it is newer. The Python version itself is never changed.
 
-Single-purpose: run with no arguments. It lives next to the Dockerfile it maintains and
-resolves that path relative to itself, so it can be run from anywhere in the repository.
+Single-purpose: run with no arguments from anywhere in the repository.
 """
 
 from __future__ import annotations
@@ -19,12 +18,14 @@ import re
 import urllib.request
 from pathlib import Path
 
-DOCKERFILE = Path(__file__).resolve().parent / '{{cookiecutter.project_name}}/Dockerfile'
+DOCKERFILE = (
+    Path(__file__).resolve().parent.parent / 'src/crawlee/project_template/{{cookiecutter.project_name}}/Dockerfile'
+)
 TAGS_URL = 'https://hub.docker.com/v2/repositories/apify/actor-python-playwright/tags?page_size=100'
 
-# The pinned version line, e.g. ``# % set playwright_version = '1.60.0'``.
+# The pinned version line, e.g. `# % set playwright_version = '1.60.0'`.
 VERSION_LINE = re.compile(r"(# % set playwright_version = ')([^']+)(')")
-# The Python part of the base image tag, e.g. the ``3.13`` in ``...:3.13-1.60.0``.
+# The Python part of the base image tag, e.g. the `3.13` in `...:3.13-1.60.0`.
 PYTHON_PREFIX = re.compile(r'python-playwright[a-z-]*:(\d+\.\d+)-')
 
 
@@ -41,8 +42,8 @@ def fetch_tags() -> list[str]:
 
 
 def main() -> None:
+    """Bump the pinned Playwright version in the template Dockerfile if a newer one is available."""
     content = DOCKERFILE.read_text(encoding='utf-8')
-
     version_match = VERSION_LINE.search(content)
     if not version_match:
         raise SystemExit(f'Pinned Playwright version line not found in {DOCKERFILE}.')
