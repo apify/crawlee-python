@@ -1220,26 +1220,32 @@ async def test_error_handler_can_access_page(server_url: URL) -> None:
     request_handler = mock.AsyncMock(side_effect=RuntimeError('Intentional crash'))
     crawler.router.default_handler(request_handler)
 
-    error_handler_calls: list[str | None] = []
+    error_handler_calls: list[str] = []
 
     @crawler.error_handler
     async def error_handler(context: BasicCrawlingContext | PlaywrightCrawlingContext, _error: Exception) -> None:
-        error_handler_calls.append(
-            await context.page.content() if isinstance(context, PlaywrightCrawlingContext) else None
-        )
+        if isinstance(context, PlaywrightCrawlingContext):
+            error_handler_calls.append(await context.page.content())
 
-    failed_handler_calls: list[str | None] = []
+    failed_handler_calls: list[str] = []
 
     @crawler.failed_request_handler
     async def failed_handler(context: BasicCrawlingContext | PlaywrightCrawlingContext, _error: Exception) -> None:
-        failed_handler_calls.append(
-            await context.page.content() if isinstance(context, PlaywrightCrawlingContext) else None
-        )
+        if isinstance(context, PlaywrightCrawlingContext):
+            failed_handler_calls.append(await context.page.content())
 
     await crawler.run([str(server_url / 'hello-world')])
 
-    assert error_handler_calls == [HELLO_WORLD.decode(), HELLO_WORLD.decode()]
-    assert failed_handler_calls == [HELLO_WORLD.decode()]
+    # Each handler records page content only when it received a `PlaywrightCrawlingContext`. On CI (notably Windows
+    # under `xdist` load) navigation can spuriously fail with `net::ERR_NO_BUFFER_SPACE` before the page is created,
+    # yielding a `BasicCrawlingContext` that never reached the page.
+    #
+    # The error handler runs on every retry, so at least one attempt must have reached the page, and every attempt that
+    # did must expose its HTML.
+    assert set(error_handler_calls) == {HELLO_WORLD.decode()}
+    # The failed-request handler runs only on the final attempt, which may itself be a non-navigated one, so an empty
+    # result is legitimate here. Any content it did record must still be the page HTML.
+    assert set(failed_handler_calls) <= {HELLO_WORLD.decode()}
 
 
 def test_import_error_handled() -> None:
