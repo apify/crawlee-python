@@ -1,7 +1,7 @@
 {
-    "extends": ["config:base", ":semanticCommitTypeAll(chore)"],
+    "extends": ["config:recommended", ":semanticCommitTypeAll(chore)"],
     "ignorePaths": ["docs/**", "src/crawlee/project_template/**", "website/versioned_docs/**"],
-    "pinVersions": false,
+    "rangeStrategy": "replace",
     "separateMajorMinor": false,
     "dependencyDashboard": false,
     "semanticCommits": "enabled",
@@ -15,7 +15,7 @@
     },
     "packageRules": [
         {
-            "matchPaths": ["pyproject.toml"],
+            "matchFileNames": ["pyproject.toml"],
             "matchDepTypes": ["devDependencies"],
             "matchUpdateTypes": ["major", "minor"],
             "groupName": "major/minor dev dependencies",
@@ -28,8 +28,8 @@
             "minimumReleaseAge": "0 days"
         },
         {
-          "matchUpdateTypes": ["lockFileMaintenance"],
-          "minimumReleaseAgeBehaviour": "timestamp-optional"
+            "matchUpdateTypes": ["lockFileMaintenance"],
+            "minimumReleaseAgeBehaviour": "timestamp-optional"
         }
     ],
     "schedule": ["* 0-5 * * 2-5"],
