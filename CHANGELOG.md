@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Make adaptive-crawler extra importable ([#2016](https://github.com/apify/crawlee-python/pull/2016)) ([b850cd6](https://github.com/apify/crawlee-python/commit/b850cd67411026c3c40b65f3e39de4d8b8fb3182)) by [@vdusek](https://github.com/vdusek)
 - **deps:** Raise tldextract floor to &gt;=5.3.0 to avoid AttributeError on same-domain enqueue ([#2031](https://github.com/apify/crawlee-python/pull/2031)) ([8850a86](https://github.com/apify/crawlee-python/commit/8850a86297f8d1b68ab979c298faf5fbac60f510)) by [@anxkhn](https://github.com/anxkhn)
 - **statistics:** Handle exceptions without a traceback in ErrorTracker ([#2035](https://github.com/apify/crawlee-python/pull/2035)) ([be04c17](https://github.com/apify/crawlee-python/commit/be04c17c0df0b34813ccb03afead0b1e3e376a4c)) by [@anxkhn](https://github.com/anxkhn)
+- **sessions:** Preserve cookie expiry of 0 (Unix epoch) on serialization ([#2034](https://github.com/apify/crawlee-python/pull/2034)) ([49665e2](https://github.com/apify/crawlee-python/commit/49665e22b611c2d01d5a96fa7d3261e704a8e162)) by [@anxkhn](https://github.com/anxkhn)
 
 
 <!-- git-cliff-unreleased-end -->
