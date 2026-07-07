@@ -156,7 +156,7 @@ async def test_max_open_pages_limit_error_on_concurrent_creation(controller: Pla
 
 
 async def test_browser_with_pre_existing_context(tmp_path: Path) -> None:
-    """Test that using `Browser` with pre-existing active context re-uses such context."""
+    """Test that using `Browser` with pre-existing active context reuses such context."""
     async with async_playwright() as pw:
         persistent_context = await pw.firefox.launch_persistent_context(
             user_data_dir=str(tmp_path),
