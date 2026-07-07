@@ -99,7 +99,14 @@ class _CurlImpersonateResponse:
         if not self._response.astream_task:
             raise RuntimeError('Cannot read stream, Response not obtained from `stream` method.')
 
-        if isinstance(self._response.astream_task, asyncio.Future) and self._response.astream_task.done():
+        # A finished transfer task only means the whole body arrived into the response queue. The stream is consumed
+        # once the queue has also been drained.
+        if (
+            isinstance(self._response.astream_task, asyncio.Future)
+            and self._response.astream_task.done()
+            and self._response.queue is not None
+            and self._response.queue.empty()
+        ):
             raise RuntimeError('Cannot read stream, it was already consumed.')
 
         async for chunk in self._response.aiter_content():

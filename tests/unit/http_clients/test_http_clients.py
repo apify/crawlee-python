@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import importlib
 import os
 import sys
@@ -175,6 +176,31 @@ async def test_stream(http_client: HttpClient, server_url: URL) -> None:
             content_body += chunk
 
     assert content_body == HELLO_WORLD
+
+
+async def test_stream_read_after_transfer_finished(http_client: HttpClient, server_url: URL) -> None:
+    """A small body can be fully buffered before `read_stream` is called. It must still be readable."""
+    content_body: bytes = b''
+
+    async with http_client.stream(str(server_url)) as response:
+        # Give the event loop time to finish the transfer before the body is consumed.
+        await asyncio.sleep(0.1)
+
+        async for chunk in response.read_stream():
+            content_body += chunk
+
+    assert content_body == HELLO_WORLD
+
+
+async def test_stream_with_empty_body(http_client: HttpClient, server_url: URL) -> None:
+    """A streamed response with an empty body must be readable and yield no chunks."""
+    content_body: bytes = b''
+    async with http_client.stream(str(server_url / 'status/200')) as response:
+        assert response.status_code == 200
+        async for chunk in response.read_stream():
+            content_body += chunk
+
+    assert content_body == b''
 
 
 async def test_stream_error_double_read_stream(http_client: HttpClient, server_url: URL) -> None:
