@@ -76,6 +76,7 @@ async def test_persist_requests_key_with_sync_iterable() -> None:
     kvs = await KeyValueStore.open()
     persisted_data = await kvs.get_value(persist_key)
     assert persisted_data is not None
+    assert [request['url'] for request in persisted_data['requests']] == urls
 
 
 async def test_persist_requests_key_with_empty_iterator() -> None:
@@ -93,6 +94,7 @@ async def test_persist_requests_key_with_empty_iterator() -> None:
     kvs = await KeyValueStore.open()
     persisted_data = await kvs.get_value(persist_key)
     assert persisted_data is not None
+    assert persisted_data['requests'] == []
 
 
 async def test_requests_restoration_without_state() -> None:
@@ -268,3 +270,4 @@ async def test_handle_invalid_url_with_persistence() -> None:
     kvs = await KeyValueStore.open()
     persisted_data = await kvs.get_value(persist_key)
     assert persisted_data is not None
+    assert [request['url'] for request in persisted_data['requests']] == ['https://valid.placeholder.com']
