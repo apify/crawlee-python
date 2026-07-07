@@ -10,7 +10,8 @@
     "lockFileMaintenance": {
         "enabled": true,
         "automerge": true,
-        "automergeType": "branch"
+        "automergeType": "pr",
+        "schedule": ["* 0-5 * * 1"]
     },
     "packageRules": [
         {
@@ -25,8 +26,12 @@
         {
             "matchPackageNames": ["@apify/*", "@crawlee/*", "apify", "apify-client", "apify-shared", "apify-fingerprint-datapoints", "crawlee", "got-scraping"],
             "minimumReleaseAge": "0 days"
+        },
+        {
+          "matchUpdateTypes": ["lockFileMaintenance"],
+          "minimumReleaseAgeBehaviour": "timestamp-optional"
         }
     ],
-    "schedule": ["before 7am every weekday"],
+    "schedule": ["* 0-5 * * 2-5"],
     "ignoreDeps": ["crawlee", "docusaurus-plugin-typedoc-api"]
 }
