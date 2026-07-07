@@ -156,7 +156,7 @@ only-include = [
 
 [tool.ruff]
 line-length = 120
-include = ["src/**/*.py", "tests/**/*.py", "docs/**/*.py", "website/**/*.py"]
+include = ["src/**/*.py", "tests/**/*.py", "docs/**/*.py", "website/**/*.py", "scripts/**/*.py"]
 exclude = [
     "website/versioned_docs/**",
 ]
@@ -229,6 +229,9 @@ indent-style = "space"
 ]
 "**/docs/guides/code_examples/creating_web_archive/*.*" = [
     "ASYNC230", # Ignore for simplicity of the example.
+]
+"scripts/update_playwright_version.py" = [
+    "T201", # Allow prints as feedback from simple script
 ]
 
 [tool.ruff.lint.flake8-quotes]
