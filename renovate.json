@@ -28,8 +28,8 @@
             "minimumReleaseAge": "0 days"
         },
         {
-          "matchUpdateTypes": ["lockFileMaintenance"],
-          "minimumReleaseAgeBehaviour": "timestamp-optional"
+            "matchUpdateTypes": ["lockFileMaintenance"],
+            "minimumReleaseAgeBehaviour": "timestamp-optional"
         }
     ],
     "schedule": ["* 0-5 * * 2-5"],
