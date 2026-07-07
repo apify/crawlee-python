@@ -150,7 +150,7 @@ class SessionCookies:
             http_only=cookie.has_nonstandard_attr('HttpOnly'),
         )
 
-        if cookie.expires:
+        if cookie.expires is not None:
             cookie_dict['expires'] = cookie.expires
 
         if (same_site := cookie.get_nonstandard_attr('SameSite')) and self._is_valid_same_site(same_site):

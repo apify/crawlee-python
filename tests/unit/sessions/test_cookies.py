@@ -110,6 +110,20 @@ def test_get_cookies_as_dicts(session_cookies: SessionCookies, cookie_dict: Cook
     assert [cookie_dict] == test_session_cookies
 
 
+def test_convert_cookie_to_dict_preserves_epoch_expiry() -> None:
+    """Test that an explicit `expires=0` (the Unix epoch) is not dropped on conversion."""
+    session_cookies = SessionCookies()
+    session_cookies.set('test', 'value', expires=0)
+
+    cookie_dicts = session_cookies.get_cookies_as_dicts()
+    assert len(cookie_dicts) == 1
+    assert cookie_dicts[0]['expires'] == 0
+
+    browser_cookies = session_cookies.get_cookies_as_playwright_format()
+    assert len(browser_cookies) == 1
+    assert browser_cookies[0]['expires'] == 0
+
+
 def test_store_cookie(session_cookies: SessionCookies) -> None:
     """Test storing a Cookie object directly."""
     test_session_cookies = SessionCookies()
