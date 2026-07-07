@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Keep named request queues across runs ([#2015](https://github.com/apify/crawlee-python/pull/2015)) ([3b9f8c6](https://github.com/apify/crawlee-python/commit/3b9f8c6207b34a8bb1b1108589ea100bb83d3f66)) by [@vdusek](https://github.com/vdusek)
 - Make adaptive-crawler extra importable ([#2016](https://github.com/apify/crawlee-python/pull/2016)) ([b850cd6](https://github.com/apify/crawlee-python/commit/b850cd67411026c3c40b65f3e39de4d8b8fb3182)) by [@vdusek](https://github.com/vdusek)
+- **deps:** Raise tldextract floor to &gt;=5.3.0 to avoid AttributeError on same-domain enqueue ([#2031](https://github.com/apify/crawlee-python/pull/2031)) ([8850a86](https://github.com/apify/crawlee-python/commit/8850a86297f8d1b68ab979c298faf5fbac60f510)) by [@anxkhn](https://github.com/anxkhn)
 
 
 <!-- git-cliff-unreleased-end -->
