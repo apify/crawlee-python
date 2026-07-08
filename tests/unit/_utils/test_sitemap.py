@@ -429,6 +429,22 @@ def test_xml_handler_discards_metadata_from_url_without_loc() -> None:
     assert handler.items == [{'type': 'url', 'loc': 'https://example.com/real-page'}]
 
 
+def test_xml_handler_discards_url_with_empty_loc() -> None:
+    """A <url> block with an empty <loc></loc> must be discarded instead of emitting an empty-string URL."""
+    handler = _XMLSaxSitemapHandler()
+    parser = ExpatParser()
+    parser.setContentHandler(handler)
+    parser.feed(
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        '<url><loc></loc><priority>0.5</priority></url>'
+        '<url><loc>https://example.com/real-page</loc></url>'
+        '</urlset>'
+    )
+
+    assert handler.items == [{'type': 'url', 'loc': 'https://example.com/real-page'}]
+
+
 async def test_txt_parser_flush_clears_buffer() -> None:
     """Feeding more data after flush() must not concatenate the previously flushed URL."""
     parser = _TxtSitemapParser()

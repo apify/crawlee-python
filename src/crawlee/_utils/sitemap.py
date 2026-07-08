@@ -111,7 +111,7 @@ class _XMLSaxSitemapHandler(ContentHandler):
             if name == 'loc':
                 if self._root_tag_name == 'sitemapindex':
                     self._items.append({'type': 'sitemap_url', 'url': text})
-                else:
+                elif text:
                     self._current_url['loc'] = text
 
             elif name == 'lastmod' and text:
