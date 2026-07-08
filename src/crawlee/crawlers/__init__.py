@@ -3,6 +3,7 @@ from crawlee._utils.try_import import try_import as _try_import
 
 from ._abstract_http import AbstractHttpCrawler, AbstractHttpParser, HttpCrawlerOptions, ParsedHttpCrawlingContext
 from ._basic import BasicCrawler, BasicCrawlerOptions, BasicCrawlingContext, ContextPipeline
+from ._file_download import FileDownloadCrawler, FileDownloadCrawlingContext
 from ._http import HttpCrawler, HttpCrawlingContext, HttpCrawlingResult
 
 _install_import_hook(__name__)
@@ -113,6 +114,8 @@ __all__ = [
     'BeautifulSoupCrawlingContext',
     'BeautifulSoupParserType',
     'ContextPipeline',
+    'FileDownloadCrawler',
+    'FileDownloadCrawlingContext',
     'HttpCrawler',
     'HttpCrawlerOptions',
     'HttpCrawlingContext',

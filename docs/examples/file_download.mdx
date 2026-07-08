@@ -1,0 +1,25 @@
+---
+id: file-download
+title: Download files
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+import CodeBlock from '@theme/CodeBlock';
+
+import FileDownloadExample from '!!raw-loader!roa-loader!./code_examples/file_download.py';
+import FileDownloadStreamExample from '!!raw-loader!./code_examples/file_download_stream.py';
+
+This example demonstrates how to use <ApiLink to="class/FileDownloadCrawler">`FileDownloadCrawler`</ApiLink> to download files such as PDFs, images or videos with plain HTTP requests. The crawler doesn't parse the response body, so any content type is accepted. Each downloaded file is saved to the default <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink> together with the content type reported by the server.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {FileDownloadExample}
+</RunnableCodeBlock>
+
+## Streaming large files
+
+Buffering a whole file in memory doesn't scale to large downloads. Construct the crawler with `stream=True` and the request handler receives a response whose body hasn't been read yet. Consume it in chunks with <ApiLink to="class/HttpResponse#read_stream">`read_stream()`</ApiLink> and write each chunk to disk as it arrives.
+
+<CodeBlock className="language-python" language="python">
+    {FileDownloadStreamExample}
+</CodeBlock>

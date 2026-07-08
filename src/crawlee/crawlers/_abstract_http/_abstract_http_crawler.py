@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
     from ._abstract_http_parser import AbstractHttpParser
 
-TCrawlingContext = TypeVar('TCrawlingContext', bound=ParsedHttpCrawlingContext)
+TCrawlingContext = TypeVar('TCrawlingContext', bound=HttpCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 
 
