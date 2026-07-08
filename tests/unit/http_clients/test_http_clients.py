@@ -15,6 +15,7 @@ from crawlee import Request
 from crawlee.errors import ProxyError
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpClient, HttpxHttpClient, ImpitHttpClient
 from crawlee.statistics import Statistics
+from tests.unit.server import generate_file_content
 from tests.unit.server_endpoints import HELLO_WORLD
 
 if TYPE_CHECKING:
@@ -180,16 +181,19 @@ async def test_stream(http_client: HttpClient, server_url: URL) -> None:
 
 async def test_stream_read_after_transfer_finished(http_client: HttpClient, server_url: URL) -> None:
     """A small body can be fully buffered before `read_stream` is called. It must still be readable."""
+    file_size = 16
     content_body: bytes = b''
 
-    async with http_client.stream(str(server_url)) as response:
-        # Give the event loop time to finish the transfer before the body is consumed.
-        await asyncio.sleep(0.1)
+    small_file_url = str((server_url / 'file').update_query(size=file_size))
+
+    async with http_client.stream(small_file_url) as response:
+        # Guarantee at least one event-loop tick for the response to be buffered.
+        await asyncio.sleep(0)
 
         async for chunk in response.read_stream():
             content_body += chunk
 
-    assert content_body == HELLO_WORLD
+    assert content_body == generate_file_content(file_size)
 
 
 async def test_stream_with_empty_body(http_client: HttpClient, server_url: URL) -> None:
