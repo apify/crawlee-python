@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.8.1 - **not yet released**
+## [1.8.1](https://github.com/apify/crawlee-python/releases/tag/v1.8.1) (2026-07-08)
 
 ### 🐛 Bug Fixes
 
@@ -15,7 +14,6 @@ All notable changes to this project will be documented in this file.
 - **sitemap:** Ignore sitemap URLs with an empty &lt;loc&gt; ([#2032](https://github.com/apify/crawlee-python/pull/2032)) ([54bce08](https://github.com/apify/crawlee-python/commit/54bce08cacfdf1b53f31440da4932ffc08ff4cf6)) by [@anxkhn](https://github.com/anxkhn)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.8.0](https://github.com/apify/crawlee-python/releases/tag/v1.8.0) (2026-07-02)
 
 ### 🚀 Features
