@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
 from anyio import Path as AnyioPath
+from pydantic import ValidationError
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
@@ -15,6 +17,28 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from yarl import URL
+
+
+@pytest.mark.parametrize('invalid_value', [-0.1, 0.0, 1.5])
+def test_configuration_rejects_out_of_range_max_used_cpu_ratio(invalid_value: float) -> None:
+    with pytest.raises(ValidationError):
+        Configuration(max_used_cpu_ratio=invalid_value)
+
+
+@pytest.mark.parametrize('invalid_value', [-0.1, 0.0, 1.5])
+def test_configuration_rejects_out_of_range_max_used_memory_ratio(invalid_value: float) -> None:
+    with pytest.raises(ValidationError):
+        Configuration(max_used_memory_ratio=invalid_value)
+
+
+@pytest.mark.parametrize('valid_value', [0.1, 0.9, 1.0])
+def test_configuration_accepts_in_range_max_used_cpu_ratio(valid_value: float) -> None:
+    assert Configuration(max_used_cpu_ratio=valid_value).max_used_cpu_ratio == valid_value
+
+
+@pytest.mark.parametrize('valid_value', [0.1, 0.9, 1.0])
+def test_configuration_accepts_in_range_max_used_memory_ratio(valid_value: float) -> None:
+    assert Configuration(max_used_memory_ratio=valid_value).max_used_memory_ratio == valid_value
 
 
 def test_global_configuration_works() -> None:
