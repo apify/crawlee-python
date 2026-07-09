@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.8.2 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **configuration:** Reject out-of-range max_used_cpu_ratio and max_used_memory_ratio ([#2037](https://github.com/apify/crawlee-python/pull/2037)) ([8e26903](https://github.com/apify/crawlee-python/commit/8e26903c9e001e536ca469d7de082570e6059f6f)) by [@anxkhn](https://github.com/anxkhn)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.8.1](https://github.com/apify/crawlee-python/releases/tag/v1.8.1) (2026-07-08)
 
 ### 🐛 Bug Fixes
