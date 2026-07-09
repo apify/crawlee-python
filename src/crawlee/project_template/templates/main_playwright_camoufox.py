@@ -31,6 +31,8 @@ class CamoufoxPlugin(PlaywrightBrowserPlugin):
 crawler = PlaywrightCrawler(
     max_requests_per_crawl=10,
     request_handler=router,
-    browser_pool=BrowserPool(plugins=[CamoufoxPlugin()])
+    browser_pool=BrowserPool(plugins=[CamoufoxPlugin(
+        browser_new_context_options={'no_viewport': True},
+    )])
 )
 # % endblock
