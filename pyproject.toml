@@ -119,7 +119,6 @@ dev = [
     "anyio<5.0.0",
     "apify_client", # For e2e tests.
     "build<2.0.0", # For e2e tests.
-    "dycw-pytest-only<3.0.0",
     "fakeredis[probabilistic,json,lua]<3.0.0",
     "poethepoet<1.0.0",
     "pre-commit<5.0.0",
