@@ -905,7 +905,6 @@ dev = [
     { name = "apify-client" },
     { name = "black" },
     { name = "build" },
-    { name = "dycw-pytest-only" },
     { name = "fakeredis", extra = ["json", "lua", "probabilistic"] },
     { name = "poethepoet" },
     { name = "pre-commit" },
@@ -995,7 +994,6 @@ dev = [
     { name = "apify-client" },
     { name = "black", specifier = ">=24.3.0" },
     { name = "build", specifier = "<2.0.0" },
-    { name = "dycw-pytest-only", specifier = "<3.0.0" },
     { name = "fakeredis", extras = ["probabilistic", "json", "lua"], specifier = "<3.0.0" },
     { name = "poethepoet", specifier = "<1.0.0" },
     { name = "pre-commit", specifier = "<5.0.0" },
@@ -1220,18 +1218,6 @@ name = "docstring-parser"
 version = "0.11"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a2/ce/5d6a3782b9f88097ce3e579265015db3372ae78d12f67629b863a9208c96/docstring_parser-0.11.tar.gz", hash = "sha256:93b3f8f481c7d24e37c5d9f30293c89e2933fa209421c8abd731dd3ef0715ecb", size = 22775, upload-time = "2021-09-30T07:44:10.288Z" }
-
-[[package]]
-name = "dycw-pytest-only"
-version = "2.1.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pytest" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b9/71/0c544627c131eee64e41653bf35ebbf02a5aa2318b69c2f9d9415b8005f5/dycw_pytest_only-2.1.1.tar.gz", hash = "sha256:b3c7dce202ee3fac6c83a47d7b9b581737d83db89aab4c624102def18edd00d5", size = 5054, upload-time = "2025-06-03T01:04:47.751Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f8/1a/25272fafd13c92a2e3b8e351127410b9ea5557324bfea3552388d65797fc/dycw_pytest_only-2.1.1-py3-none-any.whl", hash = "sha256:ea8fe48878dd95ad0ca804e549225cf3b7a1928eb188c22a284c1d17b48a7b89", size = 2413, upload-time = "2025-06-03T01:04:46.585Z" },
-]
 
 [[package]]
 name = "editor"
