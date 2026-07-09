@@ -25,11 +25,8 @@ class RecurringTask:
     """
 
     def __init__(self, func: Callable, delay: timedelta) -> None:
-        logger.debug(
-            'Calling RecurringTask.__init__(func={%s}, delay={%s})...',
-            func.__name__ if hasattr(func, '__name__') else func.__class__.__name__,
-            delay,
-        )
+        self._func_name = func.__name__ if hasattr(func, '__name__') else func.__class__.__name__
+        logger.debug('Calling RecurringTask.__init__(func={%s}, delay={%s})...', self._func_name, delay)
         self.func = func
         self.delay = delay
         self.task: asyncio.Task | None = None
@@ -49,20 +46,22 @@ class RecurringTask:
     async def _wrapper(self) -> None:
         """Continuously execute the provided function with the specified delay.
 
-        Run the function in a loop, waiting for the configured delay between executions.
-        Supports both synchronous and asynchronous functions.
+        Run the function in a loop, waiting for the configured delay between executions. Supports both synchronous and
+        asynchronous functions. An exception raised by the function is logged and does not stop the recurrence.
         """
         sleep_time_secs = self.delay.total_seconds()
         while True:
-            await self.func() if inspect.iscoroutinefunction(self.func) else self.func()
+            try:
+                await self.func() if inspect.iscoroutinefunction(self.func) else self.func()
+            except Exception:
+                logger.exception('Recurring task `%s` failed; it will run again after the delay.', self._func_name)
             await asyncio.sleep(sleep_time_secs)
 
     def start(self) -> None:
         """Start the recurring task execution."""
-        name = self.func.__name__ if hasattr(self.func, '__name__') else self.func.__class__.__name__
         self.task = asyncio.create_task(
             self._wrapper(),
-            name=f'Task-recurring-{name}',
+            name=f'Task-recurring-{self._func_name}',
         )
 
     async def stop(self) -> None:

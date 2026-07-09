@@ -145,6 +145,31 @@ async def test_propagates_exceptions_after_finished(system_status: SystemStatus 
         await pool.run()
 
 
+async def test_propagates_timeout_error_from_task_function(system_status: SystemStatus | Mock) -> None:
+    """Test that a `TimeoutError` raised by the task function propagates instead of being swallowed by the pool."""
+    started_count = 0
+
+    async def run() -> None:
+        nonlocal started_count
+        started_count += 1
+        raise asyncio.TimeoutError('Fetching a session from the pool timed out after 10 seconds')
+
+    pool = AutoscaledPool(
+        system_status=system_status,
+        run_task_function=run,
+        is_task_ready_function=lambda: future(True),
+        is_finished_function=lambda: future(started_count > 0),
+        concurrency_settings=ConcurrencySettings(
+            min_concurrency=1,
+            desired_concurrency=1,
+            max_concurrency=1,
+        ),
+    )
+
+    with pytest.raises(asyncio.TimeoutError, match=r'Fetching a session from the pool timed out'):
+        await pool.run()
+
+
 async def test_autoscales(
     monkeypatch: pytest.MonkeyPatch,
     system_status: SystemStatus | Mock,
