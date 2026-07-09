@@ -5,7 +5,7 @@
 {# The Playwright version baked into the Apify Playwright base images. Keep this in sync with the
    `playwright` version resolved by the lockfile so the installed package matches the browser
    binaries shipped in the base image. #}
-# % set playwright_version = '1.60.0'
+# % set playwright_version = '1.61.0'
 
 # % if cookiecutter.crawler_type == 'playwright' or cookiecutter.crawler_type.startswith('adaptive-') or cookiecutter.crawler_type == 'stagehand'
 # % set base_image = 'apify/actor-python-playwright:3.13-' ~ playwright_version
