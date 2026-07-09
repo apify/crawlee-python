@@ -60,7 +60,7 @@ jobs:
       - name: Commit and push changes
         id: commit-and-push
         if: steps.changes.outputs.has-changes == 'true'
-        uses: apify/actions/signed-commit@v1.3.0
+        uses: apify/actions/signed-commit@v1.4.0
         with:
           message: 'chore: update Playwright version in project template'
           github-token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
