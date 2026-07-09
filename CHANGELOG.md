@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - **configuration:** Reject out-of-range max_used_cpu_ratio and max_used_memory_ratio ([#2037](https://github.com/apify/crawlee-python/pull/2037)) ([8e26903](https://github.com/apify/crawlee-python/commit/8e26903c9e001e536ca469d7de082570e6059f6f)) by [@anxkhn](https://github.com/anxkhn)
+- Prevent silent RecurringTask death and swallowed timeouts in AutoscaledPool ([#2009](https://github.com/apify/crawlee-python/pull/2009)) ([42c96fe](https://github.com/apify/crawlee-python/commit/42c96fe1f957a2f8684e340ad531a49a33c2f89e)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->
