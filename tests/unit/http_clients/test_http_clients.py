@@ -44,6 +44,12 @@ async def test_http_1(http_client: HttpClient, server_url: URL) -> None:
     assert response.http_version == 'HTTP/1.1'
 
 
+@pytest.mark.flaky(
+    reruns=3,
+    reason='`https://apify.com/` occasionally terminates the HTTP/2 connection with a GOAWAY '
+    '(RemoteProtocolError / ConnectionTerminated); an external transient condition where a fresh '
+    'rerun reconnects and negotiates HTTP/2 cleanly.',
+)
 @pytest.mark.parametrize(
     'custom_http_client',
     [
