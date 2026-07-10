@@ -149,7 +149,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up uv package manager
-        uses: astral-sh/setup-uv@v8.3.1
+        uses: astral-sh/setup-uv@v8.3.2
         with:
           python-version: "3.14"
 
