@@ -9,6 +9,7 @@ async def main() -> None:
     # A regular request queue holds requests for non-throttled domains.
     request_queue = await RequestQueue.open()
 
+    # highlight-start
     # `ThrottlingRequestManager` wraps the queue and adds per-domain backoff.
     # It reacts to HTTP 429 responses and `robots.txt` crawl-delay directives, which
     # makes it the closest built-in analog to Scrapy's `AutoThrottle`. The crawler
@@ -18,6 +19,7 @@ async def main() -> None:
         domains=['quotes.toscrape.com'],
         request_manager_opener=RequestQueue.open,
     )
+    # highlight-end
 
     crawler = ParselCrawler(
         request_manager=request_manager,

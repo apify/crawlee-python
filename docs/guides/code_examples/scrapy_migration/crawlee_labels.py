@@ -12,14 +12,17 @@ async def main() -> None:
     async def listing_handler(context: ParselCrawlingContext) -> None:
         context.log.info(f'Listing {context.request.url}')
 
+        # highlight-start
         # Enqueue author detail pages with a label. It replaces a Scrapy
         # `Request(url, callback=self.parse_author)`.
         await context.enqueue_links(selector='div.quote span a', label='author')
+        # highlight-end
 
         # Follow the pagination link.
         await context.enqueue_links(selector='li.next a')
 
     # This handler runs only for requests labeled 'author'.
+    # highlight-next-line
     @crawler.router.handler('author')
     async def author_handler(context: ParselCrawlingContext) -> None:
         context.log.info(f'Author {context.request.url}')

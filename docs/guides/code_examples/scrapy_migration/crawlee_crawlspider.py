@@ -13,6 +13,7 @@ async def main() -> None:
     async def listing_handler(context: ParselCrawlingContext) -> None:
         context.log.info(f'Listing {context.request.url}')
 
+        # highlight-start
         # `selector` is the `restrict_css` analog. `include` is the `allow` analog:
         # it keeps only URLs matching the given globs.
         await context.enqueue_links(
@@ -20,6 +21,7 @@ async def main() -> None:
             include=[Glob('https://books.toscrape.com/catalogue/**')],
             label='book',
         )
+        # highlight-end
 
         # Follow pagination without a label, like a `Rule` with no callback.
         await context.enqueue_links(selector='li.next a')

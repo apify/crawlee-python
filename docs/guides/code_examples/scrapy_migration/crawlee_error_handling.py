@@ -15,6 +15,7 @@ async def main() -> None:
         for quote in context.selector.css('div.quote'):
             await context.push_data({'text': quote.css('span.text::text').get()})
 
+    # highlight-start
     # Runs between retries. It can inspect or adjust the request before the next try.
     @crawler.error_handler
     async def on_error(context: BasicCrawlingContext, error: Exception) -> None:
@@ -24,6 +25,7 @@ async def main() -> None:
     @crawler.failed_request_handler
     async def on_failed(context: BasicCrawlingContext, error: Exception) -> None:
         context.log.error(f'Giving up on {context.request.url}: {error}')
+        # highlight-end
 
     await crawler.run(['https://quotes.toscrape.com/'])
 

@@ -23,11 +23,13 @@ async def main() -> None:
 
     await crawler.run(['https://quotes.toscrape.com/'])
 
+    # highlight-start
     # Export the whole dataset to a file. The format follows the extension,
     # which must be .json or .csv. It replaces Scrapy's `FEEDS` setting and
     # the `-O output.json` CLI flag.
     await crawler.export_data('quotes.json')
     await crawler.export_data('quotes.csv')
+    # highlight-end
 
 
 if __name__ == '__main__':

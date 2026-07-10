@@ -17,6 +17,7 @@ async def main() -> None:
             if href is None:
                 continue
 
+            # highlight-start
             # `user_data` travels with the request to the detail handler,
             # the same role Scrapy's `cb_kwargs` plays.
             requests.append(
@@ -28,6 +29,7 @@ async def main() -> None:
                     },
                 )
             )
+            # highlight-end
 
         await context.add_requests(requests)
 
@@ -36,6 +38,7 @@ async def main() -> None:
         await context.push_data(
             {
                 'title': context.selector.css('h1::text').get(),
+                # highlight-next-line
                 'listing_price': context.request.user_data.get('listing_price'),
             }
         )

@@ -5,6 +5,7 @@ from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
 
 
 async def main() -> None:
+    # highlight-start
     # `ConcurrencySettings` replaces Scrapy's `CONCURRENT_REQUESTS` and
     # `DOWNLOAD_DELAY`.
     concurrency_settings = ConcurrencySettings(
@@ -15,6 +16,7 @@ async def main() -> None:
         # Cap total throughput across the whole pool.
         max_tasks_per_minute=120,
     )
+    # highlight-end
 
     crawler = ParselCrawler(
         concurrency_settings=concurrency_settings,

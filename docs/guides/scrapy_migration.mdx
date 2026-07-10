@@ -39,11 +39,11 @@ import PlaywrightExample from '!!raw-loader!roa-loader!./code_examples/scrapy_mi
 
 This guide maps Scrapy concepts to their Crawlee equivalents and rewrites a small spider step by step. The examples use <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> because it's the closest match for a Scrapy spider. The other HTTP option is <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, and the choice between them is covered in the [HTTP crawlers guide](./http-crawlers). For pages that need a browser, Crawlee has <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, covered in the [Playwright crawler guide](./playwright-crawler).
 
-Each section below pairs the Scrapy code with its Crawlee rewrite. Switch the tab to compare the two side by side. The Crawlee examples cap each run with `max_requests_per_crawl` to keep the demos short. The Scrapy equivalent is the `CLOSESPIDER_PAGECOUNT` setting from the built-in `CloseSpider` extension.
+Each section pairs the Scrapy code with its Crawlee rewrite. Switch the tab to compare the two side by side. The Crawlee examples cap each run with <ApiLink to="class/BasicCrawler#__init__">`max_requests_per_crawl`</ApiLink> to keep the demos short. The Scrapy equivalent is the `CLOSESPIDER_PAGECOUNT` setting from the built-in `CloseSpider` extension.
 
 ## Installation
 
-Crawlee needs Python 3.10 or later. Install it with the Parsel extra:
+Install Crawlee with the Parsel extra:
 
 ```bash
 pip install 'crawlee[parsel]'
@@ -61,6 +61,7 @@ playwright install
 Both frameworks give you a request scheduler, a duplicate filter, retries, and a way to pull data out of pages. The way you wire those pieces together differs.
 
 - Scrapy runs on the [Twisted](https://twisted.org/) reactor, and your callbacks are synchronous generators that `yield` items and requests. Crawlee runs on `asyncio`, and handlers are coroutines defined with `async def` that `await` helpers like <ApiLink to="class/PushDataFunction">`push_data`</ApiLink> and <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink>. You write straight-line `async`/`await` code without a reactor.
+- Scrapy starts spiders through its own `scrapy crawl` command, so tracing the program flow and debugging it step by step takes extra setup. A Crawlee project is a regular Python script. You run it with `python main.py` and step through it in any debugger.
 - A Scrapy spider is a class with a `parse` method and callbacks. Crawlee routes requests through a <ApiLink to="class/Router">`Router`</ApiLink> that dispatches them to handler functions by their `label`.
 - Browser rendering, proxy rotation, session management, and storage are part of the framework. In Scrapy you reach for `scrapy-playwright`, proxy middlewares, and feed exporters. In Crawlee these are built in and share one API.
 
@@ -85,11 +86,11 @@ Both frameworks give you a request scheduler, a duplicate filter, retries, and a
 | `settings.py` | <ApiLink to="class/Configuration">`Configuration`</ApiLink> + crawler arguments |
 | `CONCURRENT_REQUESTS` / `DOWNLOAD_DELAY` | <ApiLink to="class/ConcurrencySettings">`ConcurrencySettings`</ApiLink> |
 | `AutoThrottle` | <ApiLink to="class/ThrottlingRequestManager">`ThrottlingRequestManager`</ApiLink> |
-| `DEPTH_LIMIT` | `max_crawl_depth` |
-| `CLOSESPIDER_PAGECOUNT` | `max_requests_per_crawl` |
-| `DOWNLOAD_TIMEOUT` | `navigation_timeout` |
-| `ROBOTSTXT_OBEY` | `respect_robots_txt_file` |
-| `RetryMiddleware` | `max_request_retries` |
+| `DEPTH_LIMIT` | <ApiLink to="class/BasicCrawler#__init__">`max_crawl_depth`</ApiLink> |
+| `CLOSESPIDER_PAGECOUNT` | <ApiLink to="class/BasicCrawler#__init__">`max_requests_per_crawl`</ApiLink> |
+| `DOWNLOAD_TIMEOUT` | <ApiLink to="class/AbstractHttpCrawler#__init__">`navigation_timeout`</ApiLink> |
+| `ROBOTSTXT_OBEY` | <ApiLink to="class/BasicCrawler#__init__">`respect_robots_txt_file`</ApiLink> |
+| `RetryMiddleware` | <ApiLink to="class/BasicCrawler#__init__">`max_request_retries`</ApiLink> |
 | `errback` | <ApiLink to="class/BasicCrawler#failed_request_handler">`failed_request_handler`</ApiLink> |
 | `FEEDS` / feed exports | <ApiLink to="class/BasicCrawler#export_data">`export_data`</ApiLink> |
 | `CrawlSpider` / `Rules` | <ApiLink to="class/EnqueueLinksFunction">`enqueue_links(selector=..., label=...)`</ApiLink> |
@@ -141,7 +142,7 @@ Scrapy routes pages by passing a `callback` to each request. A listing page hand
 
 A listing page often holds data you want to keep, then merge with fields from the detail page. Scrapy carries it through `cb_kwargs` (or `Request.meta`). Crawlee carries it through <ApiLink to="class/Request#user_data">`Request.user_data`</ApiLink>, which travels with the request and is available on `context.request.user_data` in the next handler.
 
-How you attach it depends on the data. When each link carries its own value, like a price that belongs to one book, create a request per URL with <ApiLink to="class/Request#from_url">`Request.from_url(..., user_data=...)`</ApiLink> and add them with <ApiLink to="class/AddRequestsFunction">`add_requests`</ApiLink>. That's what the example below does. When a single value applies to the whole batch, skip the loop and pass `user_data` straight to <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink>.
+How you attach it depends on the data. When each link carries its own value, like a price that belongs to one book, create a request per URL with <ApiLink to="class/Request#from_url">`Request.from_url(..., user_data=...)`</ApiLink> and add them with <ApiLink to="class/AddRequestsFunction">`add_requests`</ApiLink>. That's what the Crawlee example does. When a single value applies to the whole batch, skip the loop and pass `user_data` straight to <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink>.
 
 <Tabs groupId="scrapy-migration-user-data">
     <TabItem value="scrapy" label="Scrapy">
@@ -194,7 +195,7 @@ The default (unnamed) <ApiLink to="class/Dataset">`Dataset`</ApiLink> stays on d
 
 ## Concurrency and throttling
 
-Scrapy tunes throughput through several settings. Crawlee gathers the fixed controls into <ApiLink to="class/ConcurrencySettings">`ConcurrencySettings`</ApiLink> and scales concurrency automatically based on system resources, as described in the [Scaling crawlers guide](./scaling-crawlers). Use `max_tasks_per_minute` to cap the request rate. It's close to `DOWNLOAD_DELAY`, but it limits the whole pool rather than adding a fixed delay per domain.
+Scrapy tunes throughput through several settings. Crawlee gathers the fixed controls into <ApiLink to="class/ConcurrencySettings">`ConcurrencySettings`</ApiLink> and scales concurrency automatically based on system resources, as described in the [Scaling crawlers guide](./scaling-crawlers). Use <ApiLink to="class/ConcurrencySettings#__init__">`max_tasks_per_minute`</ApiLink> to cap the request rate. It's close to `DOWNLOAD_DELAY`, but it limits the whole pool rather than adding a fixed delay per domain.
 
 <Tabs groupId="scrapy-migration-concurrency">
     <TabItem value="scrapy" label="Scrapy">
@@ -211,7 +212,7 @@ Scrapy tunes throughput through several settings. Crawlee gathers the fixed cont
 
 The closest built-in analog to the `AutoThrottle` extension is <ApiLink to="class/ThrottlingRequestManager">`ThrottlingRequestManager`</ApiLink>, covered in the [Request throttling guide](./request-throttling). It differs in what drives the backoff. `AutoThrottle` adapts to measured latency, while the manager reacts to explicit signals: HTTP 429 replies and `robots.txt` crawl-delay directives. It wraps a <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> and applies the backoff per domain. You list the domains to watch, and the crawler reports the signals to the manager on its own.
 
-Crawl-delay works only when the crawler fetches `robots.txt`. A project generated by `scrapy startproject` obeys `robots.txt`, but Crawlee doesn't by default. Pass `respect_robots_txt_file=True` to keep that behavior. The flag enforces the `Disallow` rules on its own. It reads crawl-delay only together with <ApiLink to="class/ThrottlingRequestManager">`ThrottlingRequestManager`</ApiLink>, and without the manager the crawler logs a warning.
+Crawl-delay works only when the crawler fetches `robots.txt`. A project generated by `scrapy startproject` obeys `robots.txt`, but Crawlee doesn't by default. Pass <ApiLink to="class/BasicCrawler#__init__">`respect_robots_txt_file=True`</ApiLink> to keep that behavior. The flag enforces the `Disallow` rules on its own. It reads crawl-delay only together with <ApiLink to="class/ThrottlingRequestManager">`ThrottlingRequestManager`</ApiLink>, and without the manager the crawler logs a warning.
 
 <Tabs groupId="scrapy-migration-throttling">
     <TabItem value="scrapy" label="Scrapy">
@@ -245,7 +246,7 @@ Scrapy rotates proxies through a middleware or a third-party package. Crawlee ta
 
 ## Error handling
 
-Scrapy retries failed requests with `RetryMiddleware` and reports terminal failures through `errback`. Crawlee retries with `max_request_retries`, runs an <ApiLink to="class/BasicCrawler#error_handler">`error_handler`</ApiLink> between attempts, and calls a <ApiLink to="class/BasicCrawler#failed_request_handler">`failed_request_handler`</ApiLink> once the retries run out. For details, see the [Error handling guide](./error-handling).
+Scrapy retries failed requests with `RetryMiddleware` and reports terminal failures through `errback`. Crawlee retries with <ApiLink to="class/BasicCrawler#__init__">`max_request_retries`</ApiLink>, runs an <ApiLink to="class/BasicCrawler#error_handler">`error_handler`</ApiLink> between attempts, and calls a <ApiLink to="class/BasicCrawler#failed_request_handler">`failed_request_handler`</ApiLink> once the retries run out. For details, see the [Error handling guide](./error-handling).
 
 <Tabs groupId="scrapy-migration-errors">
     <TabItem value="scrapy" label="Scrapy">
@@ -262,7 +263,7 @@ Scrapy retries failed requests with `RetryMiddleware` and reports terminal failu
 
 ## Forms and login
 
-Scrapy submits forms with `FormRequest`, which encodes `formdata` as `form-urlencoded` and sets the header for you. Crawlee's `payload` takes the raw request body, so encode the fields yourself with `urllib.parse.urlencode` and set the `Content-Type` through `headers=`. For a full login flow with session reuse, see the [Logging in with a crawler guide](./logging-in-with-a-crawler).
+Scrapy submits forms with `FormRequest`, which encodes `formdata` as `form-urlencoded` and sets the header for you. Crawlee's <ApiLink to="class/Request#from_url">`payload`</ApiLink> takes the raw request body, so encode the fields yourself with `urllib.parse.urlencode` and set the `Content-Type` through `headers=`. For a full login flow with session reuse, see the [Logging in with a crawler guide](./logging-in-with-a-crawler).
 
 <Tabs groupId="scrapy-migration-login">
     <TabItem value="scrapy" label="Scrapy">

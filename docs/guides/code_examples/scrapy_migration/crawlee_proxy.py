@@ -5,6 +5,7 @@ from crawlee.proxy_configuration import ProxyConfiguration
 
 
 async def main() -> None:
+    # highlight-start
     # `ProxyConfiguration` replaces Scrapy's `HttpProxyMiddleware` and the
     # `scrapy-rotating-proxies` package. The URLs rotate in a round-robin fashion.
     proxy_configuration = ProxyConfiguration(
@@ -13,6 +14,7 @@ async def main() -> None:
             'http://proxy-2.com/',
         ]
     )
+    # highlight-end
 
     crawler = ParselCrawler(
         proxy_configuration=proxy_configuration,

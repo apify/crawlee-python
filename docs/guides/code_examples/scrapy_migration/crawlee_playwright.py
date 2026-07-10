@@ -4,17 +4,20 @@ from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 
 
 async def main() -> None:
+    # highlight-start
     # `PlaywrightCrawler` renders JavaScript in a real browser. It replaces the
     # `scrapy-playwright` package, with browser support built into the framework.
     crawler = PlaywrightCrawler(
         headless=True,
         max_requests_per_crawl=50,
     )
+    # highlight-end
 
     @crawler.router.default_handler
     async def handler(context: PlaywrightCrawlingContext) -> None:
         context.log.info(f'Processing {context.request.url}')
 
+        # highlight-start
         # `context.page` is a Playwright `Page`. Query the rendered DOM directly.
         for quote in await context.page.locator('div.quote').all():
             await context.push_data(
@@ -23,6 +26,7 @@ async def main() -> None:
                     'author': await quote.locator('small.author').text_content(),
                 }
             )
+        # highlight-end
 
         await context.enqueue_links(selector='li.next a')
 

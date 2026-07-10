@@ -15,8 +15,15 @@ async def main() -> None:
             raise RuntimeError('Session not found')
 
         token = context.selector.css('input[name="csrf_token"]::attr(value)').get()
+
+        # The CSRF token is required for the POST to succeed. If it's missing,
+        # the login will fail.
+        if not token:
+            raise RuntimeError('CSRF token not found')
+
         form = {'csrf_token': token, 'username': 'user', 'password': 'pass'}
 
+        # highlight-start
         # Crawlee's `payload` is the raw request body, so encode the fields yourself
         # and set the `Content-Type`. Scrapy's `FormRequest` does both for you.
         await context.add_requests(
@@ -35,6 +42,7 @@ async def main() -> None:
                 )
             ]
         )
+        # highlight-end
 
     @crawler.router.handler('after-login')
     async def after_login(context: ParselCrawlingContext) -> None:
