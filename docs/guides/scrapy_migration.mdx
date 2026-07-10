@@ -39,7 +39,7 @@ import PlaywrightExample from '!!raw-loader!roa-loader!./code_examples/scrapy_mi
 
 This guide maps Scrapy concepts to their Crawlee equivalents and rewrites a small spider step by step. The examples use <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> because it's the closest match for a Scrapy spider. The other HTTP option is <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, and the choice between them is covered in the [HTTP crawlers guide](./http-crawlers). For pages that need a browser, Crawlee has <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, covered in the [Playwright crawler guide](./playwright-crawler).
 
-Each section pairs the Scrapy code with its Crawlee rewrite. Switch the tab to compare the two side by side. The Crawlee examples cap each run with <ApiLink to="class/BasicCrawler#__init__">`max_requests_per_crawl`</ApiLink> to keep the demos short. The Scrapy equivalent is the `CLOSESPIDER_PAGECOUNT` setting from the built-in `CloseSpider` extension.
+The Crawlee examples cap each run with <ApiLink to="class/BasicCrawler#__init__">`max_requests_per_crawl`</ApiLink> to keep the demos short. The Scrapy equivalent is the `CLOSESPIDER_PAGECOUNT` setting from the built-in `CloseSpider` extension.
 
 ## Installation
 
