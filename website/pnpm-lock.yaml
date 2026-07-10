@@ -118,10 +118,10 @@ importers:
         specifier: ^0.49.0
         version: 0.49.0
       oxfmt:
-        specifier: 0.58.0
+        specifier: ^0.58.0
         version: 0.58.0
       oxlint:
-        specifier: 1.73.0
+        specifier: ^1.73.0
         version: 1.73.0
       patch-package:
         specifier: ^8.0.0
