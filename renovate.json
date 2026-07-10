@@ -32,6 +32,6 @@
             "minimumReleaseAgeBehaviour": "timestamp-optional"
         }
     ],
-    "schedule": ["* 0-5 * * 2-5"],
+    "schedule": ["* 0-5 * * 2"],
     "ignoreDeps": ["crawlee", "docusaurus-plugin-typedoc-api"]
 }
