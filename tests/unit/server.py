@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import gzip
+import hashlib
 import json
 import sys
 import threading
@@ -129,6 +130,7 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         'xml': hello_world_xml,
         'robots.txt': robots_txt,
         'get_compressed': get_compressed,
+        'file': file_endpoint,
         'slow': slow_response,
         'infinite_scroll': infinite_scroll_endpoint,
         'resource_loading_page': resource_loading_endpoint,
@@ -428,6 +430,50 @@ async def get_compressed(_scope: dict[str, Any], _receive: Receive, send: Send) 
         }
     )
     await send({'type': 'http.response.body', 'body': gzip.compress(HELLO_WORLD * 1000)})
+
+
+def generate_file_content(size: int) -> bytes:
+    """Generate deterministic binary content of the given size."""
+    content = bytearray()
+    counter = 0
+    while len(content) < size:
+        content += hashlib.sha256(str(counter).encode()).digest()
+        counter += 1
+    return bytes(content[:size])
+
+
+async def file_endpoint(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Stream deterministic binary content in chunks to test file downloads."""
+    query_params = get_query_params(scope.get('query_string', b''))
+
+    size = int(query_params.get('size', '1024'))
+    chunk_size = int(query_params.get('chunk_size', '65536'))
+    throttle = float(query_params.get('throttle', '0'))
+    content_type = query_params.get('content_type', 'application/octet-stream')
+
+    content = generate_file_content(size)
+
+    await send(
+        {
+            'type': 'http.response.start',
+            'status': 200,
+            'headers': [
+                [b'content-type', content_type.encode()],
+                [b'content-length', str(len(content)).encode()],
+            ],
+        }
+    )
+
+    for offset in range(0, len(content), chunk_size):
+        if throttle and offset:
+            await asyncio.sleep(throttle)
+        await send(
+            {
+                'type': 'http.response.body',
+                'body': content[offset : offset + chunk_size],
+                'more_body': offset + chunk_size < len(content),
+            }
+        )
 
 
 async def slow_response(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
