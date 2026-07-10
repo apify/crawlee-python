@@ -26,7 +26,7 @@ from yarl import URL
 
 from crawlee import Glob, RequestTransformAction, service_locator
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
-from crawlee._log_config import configure_logger, get_configured_log_level, string_to_log_level
+from crawlee._log_config import configure_logger, string_to_log_level
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._service_locator import ServiceLocator
 from crawlee._types import (
@@ -457,8 +457,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             # mirroring `logging.basicConfig` semantics.
             if not root_logger.handlers:
                 configure_logger(root_logger)
-                httpx_logger = logging.getLogger('httpx')  # Silence HTTPX logger
-                httpx_logger.setLevel(logging.DEBUG if get_configured_log_level() <= logging.DEBUG else logging.WARNING)
         self._logger = _logger or logging.getLogger(__name__)
         if implicit_event_manager_with_explicit_config:
             self._logger.warning(

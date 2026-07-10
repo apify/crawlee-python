@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-from logging import getLogger
+from logging import DEBUG, WARNING, getLogger
 from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 from typing_extensions import override
 
+from crawlee._log_config import get_configured_log_level
 from crawlee._types import HttpHeaders
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee._utils.docs import docs_group
@@ -128,6 +129,12 @@ class HttpxHttpClient(HttpClient):
         super().__init__(
             persist_cookies_per_session=persist_cookies_per_session,
         )
+
+        # `httpx` logs one INFO line per request, which is too noisy for the default log level. Silence it down to
+        # WARNING unless the user has explicitly opted into DEBUG.
+        httpx_logger = getLogger('httpx')
+        httpx_logger.setLevel(DEBUG if get_configured_log_level() <= DEBUG else WARNING)
+
         self._http1 = http1
         self._http2 = http2
 
