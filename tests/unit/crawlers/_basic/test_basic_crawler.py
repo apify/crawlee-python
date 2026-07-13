@@ -1529,10 +1529,6 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     assert mocked_handler_after_sleep.call_count == 1
 
 
-@pytest.mark.flaky(
-    reruns=3,
-    reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1649.',
-)
 @pytest.mark.parametrize(
     ('keep_alive', 'max_requests_per_crawl', 'expected_handled_requests_count'),
     [
@@ -1565,16 +1561,38 @@ async def test_keep_alive(
         if context.request == additional_urls[-1]:
             crawler.stop()
 
-    crawler_run_task = asyncio.create_task(crawler.run())
+    # Deterministically wait until the crawler has drained the initial queue.
+    idle_signal = asyncio.Event()
+    original_is_finished = crawler._autoscaled_pool._is_finished_function
 
-    # Give some time to crawler to finish(or be in keep_alive state) and add new request.
-    # TODO: Replace sleep time by waiting for specific crawler state.
-    # https://github.com/apify/crawlee-python/issues/925
-    await asyncio.sleep(1)
-    assert crawler_run_task.done() != keep_alive
-    add_request_task = asyncio.create_task(crawler.add_requests(additional_urls))
+    async def signal_idle_reached(*args: object, **kwargs: object) -> bool:
+        try:
+            return await original_is_finished(*args, **kwargs)
+        finally:
+            idle_signal.set()
 
-    await asyncio.gather(crawler_run_task, add_request_task)
+    with patch.object(
+        crawler._autoscaled_pool,
+        '_is_finished_function',
+        side_effect=signal_idle_reached,
+    ):
+        crawler_run_task = asyncio.create_task(crawler.run())
+        try:
+            await asyncio.wait_for(idle_signal.wait(), timeout=30)
+
+            if not keep_alive:
+                # Without keep_alive the crawler finishes on its own once the queue is drained.
+                await asyncio.wait_for(crawler_run_task, timeout=30)
+
+            assert crawler_run_task.done() != keep_alive
+            add_request_task = asyncio.create_task(crawler.add_requests(additional_urls))
+
+            await asyncio.gather(crawler_run_task, add_request_task)
+        finally:
+            # Never leave the crawler running in the background if an assertion above fails.
+            if not crawler_run_task.done():
+                crawler.stop()
+                await asyncio.gather(crawler_run_task, return_exceptions=True)
 
     mocked_handler.assert_has_calls(expected_handler_calls)
 
@@ -2252,7 +2270,7 @@ async def test_global_and_local_event_manager_in_crawler_run() -> None:
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
         global_event_manager = service_locator.get_event_manager()
-        handler_call(local_event_manager.active, global_event_manager.active)
+        await handler_call(local_event_manager.active, global_event_manager.active)
 
     await crawler.run(['https://a.placeholder.com'])
 
