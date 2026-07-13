@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Prevent silent RecurringTask death and swallowed timeouts in AutoscaledPool ([#2009](https://github.com/apify/crawlee-python/pull/2009)) ([42c96fe](https://github.com/apify/crawlee-python/commit/42c96fe1f957a2f8684e340ad531a49a33c2f89e)) by [@vdusek](https://github.com/vdusek)
 - **curl-impersonate:** Avoid false already consumed error for buffered streams in `CurlImpersonateHttpClient` ([#2042](https://github.com/apify/crawlee-python/pull/2042)) ([86ca2f2](https://github.com/apify/crawlee-python/commit/86ca2f2791d1fccbe2fa31a31d4169c8f13013be)) by [@Mantisus](https://github.com/Mantisus)
 - **logging:** Preserve host application logging configuration ([#2010](https://github.com/apify/crawlee-python/pull/2010)) ([51018d4](https://github.com/apify/crawlee-python/commit/51018d47d206c2bb48bd9b8cdd1114a4f4fda208)) by [@vdusek](https://github.com/vdusek)
+- **cli:** Pin typer&lt;0.26 to keep CLI choice options working ([#2064](https://github.com/apify/crawlee-python/pull/2064)) ([bf5fe48](https://github.com/apify/crawlee-python/commit/bf5fe4896750a383a5be831224827d0a5e05ba4d)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->
