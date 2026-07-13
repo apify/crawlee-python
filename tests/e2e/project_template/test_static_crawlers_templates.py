@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+from datetime import timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -137,15 +138,15 @@ async def test_static_crawler_actor_at_apify(
             # then poll client-side via `BuildClientAsync.wait_for_finish` until it reaches a terminal
             # status, and assert it succeeded before starting the run.
             rebuild = await actor.build(version_number='0.0')
-            finished_build = await client.build(rebuild['id']).wait_for_finish(wait_secs=900)
+            finished_build = await client.build(rebuild.id).wait_for_finish(wait_duration=timedelta(seconds=900))
             assert finished_build is not None, 'Stagehand rebuild did not reach a terminal status within 900s.'
-            assert finished_build['status'] == 'SUCCEEDED', (
-                f'Stagehand rebuild did not succeed: status={finished_build["status"]!r}, build={finished_build}'
+            assert finished_build.status == 'SUCCEEDED', (
+                f'Stagehand rebuild did not succeed: status={finished_build.status!r}, build={finished_build}'
             )
-            build_number = finished_build['buildNumber']
+            build_number = finished_build.build_number
 
         started_run_data = await actor.start(memory_mbytes=8192, build=build_number)
-        actor_run = client.run(started_run_data['id'])
+        actor_run = client.run(started_run_data.id)
 
         finished_run_data = await actor_run.wait_for_finish()
         actor_run_log = await actor_run.log().get()
@@ -157,7 +158,7 @@ async def test_static_crawler_actor_at_apify(
     additional_run_info = f'Full actor run log: {actor_run_log}'
     assert actor_run_log
     assert finished_run_data
-    assert finished_run_data['status'] == 'SUCCEEDED', additional_run_info
+    assert finished_run_data.status == 'SUCCEEDED', additional_run_info
     assert (
         'Crawler.stop() was called with following reason: The crawler has reached its limit of 10 requests per crawl.'
     ) in actor_run_log, additional_run_info

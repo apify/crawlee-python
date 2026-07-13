@@ -92,7 +92,7 @@ async def test_request_records_persistence(rq_client: RedisRequestQueueClient) -
     assert isinstance(requests_records_data, dict)
 
     for key in request_keys:
-        request_data = json.loads(requests_records_data[key])  # ty: ignore[invalid-argument-type]
+        request_data = json.loads(requests_records_data[key])
         assert 'url' in request_data
         assert request_data['url'].startswith('https://example.com/')
 

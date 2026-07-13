@@ -46,6 +46,7 @@ async def test_base_keys_creation(dataset_client: RedisDatasetClient) -> None:
 
     items = await await_redis_response(dataset_client.redis.json().get('datasets:test_dataset:items', '$'))
     assert items is not None
+    assert isinstance(items, list)
     assert len(items) == 0
 
     metadata_data = await await_redis_response(dataset_client.redis.json().get('datasets:test_dataset:metadata'))
@@ -70,6 +71,7 @@ async def test_record_and_content_verification(dataset_client: RedisDatasetClien
     all_items = await await_redis_response(dataset_client.redis.json().get('datasets:test_dataset:items', '$'))
 
     assert all_items is not None
+    assert isinstance(all_items, list)
     assert len(all_items) == 1
 
     # Verify actual file content
@@ -81,6 +83,7 @@ async def test_record_and_content_verification(dataset_client: RedisDatasetClien
 
     all_items = await await_redis_response(dataset_client.redis.json().get('datasets:test_dataset:items', '$'))
     assert all_items is not None
+    assert isinstance(all_items, list)
     assert len(all_items) == 4
 
 
@@ -98,6 +101,7 @@ async def test_drop_removes_records(dataset_client: RedisDatasetClient) -> None:
     assert dataset_id is not None
     assert (dataset_id.decode() if isinstance(dataset_id, bytes) else dataset_id) == metadata.id
     assert items is not None
+    assert isinstance(items, list)
     assert len(items) == 1
 
     # Drop the dataset
