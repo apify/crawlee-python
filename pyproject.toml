@@ -242,6 +242,10 @@ indent-style = "space"
 "**/docs/guides/code_examples/creating_web_archive/*.*" = [
     "ASYNC230", # Ignore for simplicity of the example.
 ]
+"**/docs/guides/code_examples/scrapy_migration/scrapy_*.py" = [
+    "ANN",    # Idiomatic Scrapy tutorial snippets are untyped; shown for comparison, not executed.
+    "RUF012", # Scrapy declares `start_urls` as a plain class-level list.
+]
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
