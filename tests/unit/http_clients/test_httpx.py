@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING
 
 import pytest
@@ -21,6 +22,16 @@ if TYPE_CHECKING:
 async def http_client() -> AsyncGenerator[HttpClient]:
     async with HttpxHttpClient(http2=False) as client:
         yield client
+
+
+def test_silences_httpx_request_logging() -> None:
+    """Instantiating the client lowers the noisy per-request `httpx` INFO logs to WARNING by default."""
+    httpx_logger = logging.getLogger('httpx')
+    httpx_logger.setLevel(logging.NOTSET)
+
+    HttpxHttpClient()
+
+    assert httpx_logger.level == logging.WARNING
 
 
 async def test_common_headers_and_user_agent(server_url: URL, header_network: dict) -> None:

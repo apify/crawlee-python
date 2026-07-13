@@ -26,7 +26,7 @@ from yarl import URL
 
 from crawlee import Glob, RequestTransformAction, service_locator
 from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
-from crawlee._log_config import configure_logger, get_configured_log_level, string_to_log_level
+from crawlee._log_config import configure_logger, string_to_log_level
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._service_locator import ServiceLocator
 from crawlee._types import (
@@ -179,7 +179,8 @@ class _BasicCrawlerOptions(TypedDict):
     """If True, the crawler stops immediately when any request handler error occurs."""
 
     configure_logging: NotRequired[bool]
-    """If True, the crawler will set up logging infrastructure automatically."""
+    """If True, the crawler will set up logging infrastructure automatically, unless the root logger already has
+    handlers configured by the host application."""
 
     statistics_log_format: NotRequired[Literal['table', 'inline']]
     """If 'table', displays crawler statistics as formatted tables in logs. If 'inline', outputs statistics as plain
@@ -349,7 +350,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             abort_on_error: If True, the crawler stops immediately when any request handler error occurs.
             keep_alive: If True, it will keep crawler alive even if there are no requests in queue.
                 Use `crawler.stop()` to exit the crawler.
-            configure_logging: If True, the crawler will set up logging infrastructure automatically.
+            configure_logging: If True, the crawler will set up logging infrastructure automatically, unless the root
+                logger already has handlers configured by the host application.
             statistics_log_format: If 'table', displays crawler statistics as formatted tables in logs. If 'inline',
                 outputs statistics as plain text log messages.
             respect_robots_txt_file: If set to `True`, the crawler will automatically try to fetch the robots.txt file
@@ -451,9 +453,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # Logging setup
         if configure_logging:
             root_logger = logging.getLogger()
-            configure_logger(root_logger, remove_old_handlers=True)
-            httpx_logger = logging.getLogger('httpx')  # Silence HTTPX logger
-            httpx_logger.setLevel(logging.DEBUG if get_configured_log_level() <= logging.DEBUG else logging.WARNING)
+            # Leave the loggers untouched if the host application has already configured the root logger,
+            # mirroring `logging.basicConfig` semantics.
+            if not root_logger.handlers:
+                configure_logger(root_logger)
         self._logger = _logger or logging.getLogger(__name__)
         if implicit_event_manager_with_explicit_config:
             self._logger.warning(
