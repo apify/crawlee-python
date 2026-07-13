@@ -725,10 +725,7 @@ async def test_respect_robots_txt_with_problematic_links(server_url: URL) -> Non
     """Test checks the crawler behavior with links that may cause problems when attempting to retrieve robots.txt."""
     visit = mock.Mock()
     fail = mock.Mock()
-    crawler = PlaywrightCrawler(
-        respect_robots_txt_file=True,
-        max_request_retries=0,
-    )
+    crawler = PlaywrightCrawler(respect_robots_txt_file=True)
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
@@ -1044,10 +1041,7 @@ async def test_navigation_timeout_applies_to_hooks(server_url: URL) -> None:
 
 
 async def test_slow_navigation_does_not_count_toward_handler_timeout(server_url: URL) -> None:
-    crawler = PlaywrightCrawler(
-        request_handler_timeout=timedelta(seconds=0.5),
-        max_request_retries=0,
-    )
+    crawler = PlaywrightCrawler(request_handler_timeout=timedelta(seconds=0.5))
 
     request_handler = AsyncMock()
     crawler.router.default_handler(request_handler)
