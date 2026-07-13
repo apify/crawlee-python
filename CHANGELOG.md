@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.8.2 - **not yet released**
+## [1.8.2](https://github.com/apify/crawlee-python/releases/tag/v1.8.2) (2026-07-13)
 
 ### 🐛 Bug Fixes
 
@@ -14,7 +13,6 @@ All notable changes to this project will be documented in this file.
 - **cli:** Pin typer&lt;0.26 to keep CLI choice options working ([#2064](https://github.com/apify/crawlee-python/pull/2064)) ([bf5fe48](https://github.com/apify/crawlee-python/commit/bf5fe4896750a383a5be831224827d0a5e05ba4d)) by [@vdusek](https://github.com/vdusek)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.8.1](https://github.com/apify/crawlee-python/releases/tag/v1.8.1) (2026-07-08)
 
 ### 🐛 Bug Fixes
