@@ -205,7 +205,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
 
         data = await await_redis_response(self._redis.json().get(self._items_key, json_path))
 
-        if data is None:
+        if not isinstance(data, list):
             data = []
 
         data = [item for item in data if isinstance(item, dict)]
@@ -293,7 +293,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
             batch_items = await await_redis_response(self._redis.json().get(self._items_key, json_path))
 
             # Handle case where batch_items might be None or not a list
-            if batch_items is None:
+            if batch_items is None or not isinstance(batch_items, list):
                 continue
 
             # Reverse batch if desc order (since we got items in normal order but need desc)

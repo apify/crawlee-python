@@ -148,8 +148,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             size=size,
         )
         async with self._get_pipeline() as pipe:
-            # redis-py typing issue
-            await await_redis_response(pipe.hset(self._items_key, key, value_bytes))  # ty: ignore[invalid-argument-type]
+            await await_redis_response(pipe.hset(self._items_key, key, value_bytes))
 
             await await_redis_response(
                 pipe.hset(
@@ -234,8 +233,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
 
         # Apply exclusive_start_key filter if provided
         if exclusive_start_key is not None:
-            bytes_exclusive_start_key = exclusive_start_key.encode()
-            keys = [k for k in keys if k > bytes_exclusive_start_key]
+            keys = [k for k in keys if (k.decode() if isinstance(k, bytes) else k) > exclusive_start_key]
 
         # Apply limit if provided
         if limit is not None:
