@@ -117,7 +117,9 @@ dev = [
     # We explicitly constrain black>=24.3.0 to override the transitive dependency.
     "black>=24.3.0",
     "anyio<5.0.0",
-    "apify_client", # For e2e tests.
+    # Pin below 3.0, which drops Python 3.10 support and introduces a breaking API. Revisit once
+    # Crawlee itself drops Python 3.10.
+    "apify_client<3.0.0", # For e2e tests.
     "build<2.0.0", # For e2e tests.
     "fakeredis[probabilistic,json,lua]<3.0.0",
     "poethepoet<1.0.0",
