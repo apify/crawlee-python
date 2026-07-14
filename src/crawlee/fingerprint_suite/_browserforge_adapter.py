@@ -230,13 +230,13 @@ class BrowserforgeFingerprintGenerator(FingerprintGenerator):
         # During test runs around 10 % flakiness was detected.
         # Max attempt set to 10 as (0.1)^10 is considered sufficiently low probability.
         max_attempts = 10
-        for attempt in range(max_attempts):
+        last_error: ValueError | None = None
+        for _attempt in range(max_attempts):
             try:
                 return self._generator.generate(**self._options)
-            except ValueError:  # noqa:PERF203
-                if attempt == max_attempts:
-                    raise
-        raise RuntimeError('Failed to generate fingerprint.')
+            except ValueError as exc:  # noqa:PERF203
+                last_error = exc
+        raise RuntimeError('Failed to generate fingerprint.') from last_error
 
 
 class BrowserforgeHeaderGenerator:
