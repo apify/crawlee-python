@@ -384,6 +384,29 @@ async def test_gzip_sitemap_stops_reading_after_member_end() -> None:
     assert chunks_read <= 2
 
 
+async def test_gzip_text_sitemap_parsed_by_extension_when_served_as_gzip() -> None:
+    """A gzipped `.txt.gz` text sitemap served as `application/gzip` is parsed as text, not XML."""
+    urls = {f'{DEFAULT_URL}page-{i}' for i in range(3)}
+    body = compress_gzip('\n'.join(urls))
+
+    @asynccontextmanager
+    async def stream(_url: str, **_kwargs: Any) -> 'AsyncIterator[HttpResponse]':
+        async def read_stream() -> 'AsyncIterator[bytes]':
+            yield body
+
+        response = MagicMock(spec=HttpResponse)
+        response.headers = {'content-type': 'application/gzip'}
+        response.read_stream = read_stream
+        yield cast('HttpResponse', response)
+
+    client = AsyncMock(spec=HttpClient)
+    client.stream = stream
+
+    items = [item async for item in parse_sitemap([{'type': 'url', 'url': f'{DEFAULT_URL}sitemap.txt.gz'}], client)]
+
+    assert {item.loc for item in items} == urls
+
+
 async def test_nested_sitemaps_followed_only_to_default_max_depth() -> None:
     """A chain of unique nested sitemap URLs is followed only up to the default max depth."""
     chain_length = 3 * DEFAULT_MAX_DEPTH

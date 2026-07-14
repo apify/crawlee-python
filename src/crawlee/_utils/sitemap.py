@@ -219,7 +219,10 @@ class _XmlSitemapParser:
 
 def _get_parser(content_type: str = '', url: str | None = None) -> _XmlSitemapParser | _TxtSitemapParser:
     """Create appropriate parser based on content type and URL."""
-    if 'text/plain' in content_type.lower() or (url and URL(url).path.endswith('.txt')):
+    # Strip a trailing `.gz` so gzipped sitemaps are classified by their real extension (e.g. `sitemap.txt.gz`
+    # is a text sitemap, not XML) even when the compressed response is served as `application/gzip`.
+    path = URL(url).path.removesuffix('.gz') if url else ''
+    if 'text/plain' in content_type.lower() or path.endswith('.txt'):
         return _TxtSitemapParser()
     # Default to XML parser for most cases
     return _XmlSitemapParser()
