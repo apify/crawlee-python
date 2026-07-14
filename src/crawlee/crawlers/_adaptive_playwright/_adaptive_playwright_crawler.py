@@ -293,7 +293,8 @@ class AdaptivePlaywrightCrawler(
 
         `SubCrawlerRun` contains either result of the crawl or the exception that was thrown during the crawl.
         Sub crawler pipeline call is dynamically created based on the `rendering_type`.
-        New copy-like context is created from passed `context` and `state` and is passed to sub crawler pipeline.
+        A new context is created from passed `context` and `state` and is passed to sub crawler pipeline. The original
+        `request` is shared, so its mutations persist. Only `result` and `use_state` are isolated per sub crawler.
         """
         if state is not None:
 
@@ -306,13 +307,13 @@ class AdaptivePlaywrightCrawler(
         else:
             use_state_function = context.use_state
 
-        # New result is created and injected to newly created context. This is done to ensure isolation of sub crawlers.
+        # A fresh result is injected into the new context to isolate `add_requests`/`push_data`/`kvs` calls between
+        # sub crawlers. The `request` itself is shared, so mutations to it persist.
         result = RequestHandlerRunResult(
             key_value_store_getter=self.get_key_value_store,
-            request=context.request,
         )
         context_linked_to_result = BasicCrawlingContext(
-            request=result.request,
+            request=context.request,
             session=context.session,
             proxy_info=context.proxy_info,
             send_request=context.send_request,

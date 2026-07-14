@@ -2111,27 +2111,57 @@ async def test_crawler_intermediate_statistics() -> None:
     await crawler_task
 
 
-async def test_protect_request_in_run_handlers() -> None:
-    """Test that request in crawling context are protected in run handlers."""
+async def test_mutation_request_and_session() -> None:
+    """Test that request and session mutated in the request handler and error handler, and mutations are persisted."""
     request_queue = await RequestQueue.open(name='state-test')
 
-    request = Request.from_url('https://test.url/', user_data={'request_state': ['initial']})
+    async with SessionPool(max_pool_size=1) as session_pool:
+        session = await session_pool.get_session()
+        session.user_data['session_state'] = ['initial']
+        session.cookies['initial'] = 'yes'
+        request = Request.from_url('https://test.url/', user_data={'request_state': ['initial']}, session_id=session.id)
 
-    crawler = BasicCrawler(request_manager=request_queue, max_request_retries=0)
+        crawler = BasicCrawler(
+            request_manager=request_queue,
+            max_request_retries=1,
+            concurrency_settings=ConcurrencySettings(max_concurrency=1, desired_concurrency=1),
+            session_pool=session_pool,
+        )
 
-    @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
-        if isinstance(context.request.user_data['request_state'], list):
-            context.request.user_data['request_state'].append('modified')
-        raise ValueError('Simulated error after modifying request')
+        @crawler.error_handler
+        async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request | None:
+            if isinstance(context.request.user_data['request_state'], list):
+                context.request.user_data['request_state'].append('error')
 
-    await crawler.run([request])
+            if context.session and isinstance(context.session.user_data['session_state'], list):
+                context.session.user_data['session_state'].append('error')
+                context.session.cookies['error'] = 'yes'
 
-    check_request = await request_queue.get_request(request.unique_key)
-    assert check_request is not None
-    assert check_request.user_data['request_state'] == ['initial']
+        @crawler.router.default_handler
+        async def handler(context: BasicCrawlingContext) -> None:
+            if isinstance(context.request.user_data['request_state'], list):
+                context.request.user_data['request_state'].append(f'modified_{context.request.retry_count}')
+            if context.session and isinstance(context.session.user_data['session_state'], list):
+                context.session.user_data['session_state'].append(f'modified_{context.request.retry_count}')
+                context.session.cookies[f'modified_{context.request.retry_count}'] = 'yes'
 
-    await request_queue.drop()
+            if context.request.retry_count == 0:
+                raise ValueError('Simulated error after modifying request')
+
+        await crawler.run([request])
+
+        check_request = await request_queue.get_request(request.unique_key)
+        assert check_request is not None
+        assert check_request.user_data['request_state'] == ['initial', 'modified_0', 'error', 'modified_1']
+        session = await session_pool.get_session_by_id(session.id)
+        assert session is not None
+        assert session.user_data['session_state'] == ['initial', 'modified_0', 'error', 'modified_1']
+        assert session.cookies['initial'] == 'yes'
+        assert session.cookies['error'] == 'yes'
+        assert session.cookies['modified_0'] == 'yes'
+        assert session.cookies['modified_1'] == 'yes'
+
+        await request_queue.drop()
 
 
 async def test_new_request_error_handler() -> None:

@@ -267,8 +267,9 @@ async def test_adaptive_crawling_pre_nav_change_to_context(test_urls: list[str])
             context.request.user_data['data'] = 'bs'
 
     await crawler.run(test_urls[:1])
-    # Check that repeated pre nav hook invocations do not influence each other while probing
-    assert user_data_in_pre_nav_hook == [None, None]
+    # First probe starts from the original user data. The second probe runs on the same request, so it
+    # sees the mutation from the first one.
+    assert user_data_in_pre_nav_hook == [None, 'pw']
     # Check that the request handler sees changes to user data done by pre nav hooks
     assert user_data_in_handler == ['pw', 'bs']
 
@@ -331,8 +332,9 @@ async def test_adaptive_crawling_post_nav_change_to_context(test_urls: list[str]
             context.request.user_data['data'] = 'bs'
 
     await crawler.run(test_urls[:1])
-    # Check that repeated post nav hook invocations do not influence each other while probing
-    assert user_data_in_post_nav_hook == [None, None]
+    # First probe starts from the original user data. The second probe runs on the same request, so it
+    # sees the mutation from the first one.
+    assert user_data_in_post_nav_hook == [None, 'pw']
     # Check that the request handler sees changes to user data done by post nav hooks
     assert user_data_in_handler == ['pw', 'bs']
 
@@ -816,7 +818,7 @@ async def test_adaptive_context_query_non_existing_element(test_urls: list[str])
 
 
 @pytest.mark.parametrize(
-    'test_input',
+    ('test_input', 'expected_request_state'),
     [
         pytest.param(
             TestInput(
@@ -825,6 +827,7 @@ async def test_adaptive_context_query_non_existing_element(test_urls: list[str])
                 rendering_types=cycle(['static']),
                 detection_probability_recommendation=cycle([0]),
             ),
+            ['initial', 'static'],
             id='Static only',
         ),
         pytest.param(
@@ -834,6 +837,7 @@ async def test_adaptive_context_query_non_existing_element(test_urls: list[str])
                 rendering_types=cycle(['client only']),
                 detection_probability_recommendation=cycle([0]),
             ),
+            ['initial', 'browser'],
             id='Client only',
         ),
         pytest.param(
@@ -843,11 +847,16 @@ async def test_adaptive_context_query_non_existing_element(test_urls: list[str])
                 rendering_types=cycle(['static', 'client only']),
                 detection_probability_recommendation=cycle([1]),
             ),
+            # Both sub crawlers run on the same request: browser first, then the static detection probe.
+            # Mutations from both handlers persist.
+            ['initial', 'browser', 'static'],
             id='Enforced rendering type detection',
         ),
     ],
 )
-async def test_change_context_state_after_handling(test_input: TestInput, server_url: URL) -> None:
+async def test_change_context_state_after_handling(
+    test_input: TestInput, expected_request_state: list[str], server_url: URL
+) -> None:
     """Test that context state is saved after handling the request."""
     predictor = _SimpleRenderingTypePredictor(
         rendering_types=test_input.rendering_types,
@@ -872,8 +881,15 @@ async def test_change_context_state_after_handling(test_input: TestInput, server
                 used_session_id = context.session.id
                 context.session.user_data['session_state'] = True
 
+            try:
+                # `page` is only available in the browser sub crawler, static crawling raises here.
+                _ = context.page
+                handler_type = 'browser'
+            except AdaptiveContextError:
+                handler_type = 'static'
+
             if isinstance(context.request.user_data['request_state'], list):
-                context.request.user_data['request_state'].append('handler')
+                context.request.user_data['request_state'].append(handler_type)
 
         request = Request.from_url(str(server_url), user_data={'request_state': ['initial']})
 
@@ -888,8 +904,8 @@ async def test_change_context_state_after_handling(test_input: TestInput, server
         assert check_request is not None
 
         assert session.user_data.get('session_state') is True
-        # Check that request user data was updated in the handler and only onse.
-        assert check_request.user_data.get('request_state') == ['initial', 'handler']
+
+        assert check_request.user_data.get('request_state') == expected_request_state
 
         await request_queue.drop()
 
