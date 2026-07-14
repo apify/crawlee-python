@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.8.3 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **fingerprint:** Keep the original error as the cause when generation fails ([#2066](https://github.com/apify/crawlee-python/pull/2066)) ([272bb28](https://github.com/apify/crawlee-python/commit/272bb28f9bf6d0a8b47c1e1424e2c5705ec6e53b)) by [@anxkhn](https://github.com/anxkhn)
+- **robots:** Disallow crawling when robots.txt returns a 5xx ([#2065](https://github.com/apify/crawlee-python/pull/2065)) ([87e3437](https://github.com/apify/crawlee-python/commit/87e3437215fddc080f7bcffe08eecfae0261ea4a)) by [@anxkhn](https://github.com/anxkhn)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.8.2](https://github.com/apify/crawlee-python/releases/tag/v1.8.2) (2026-07-13)
 
 ### 🐛 Bug Fixes
