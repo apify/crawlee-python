@@ -38,6 +38,8 @@ class FileDownloadCrawler(AbstractHttpCrawler[FileDownloadCrawlingContext, bytes
     ### Usage
 
     ```python
+    from yarl import URL
+
     from crawlee.crawlers import FileDownloadCrawler, FileDownloadCrawlingContext
 
     crawler = FileDownloadCrawler()
@@ -51,7 +53,7 @@ class FileDownloadCrawler(AbstractHttpCrawler[FileDownloadCrawlingContext, bytes
         content = await context.http_response.read()
         kvs = await context.get_key_value_store()
         await kvs.set_value(
-            key=context.request.url.split('/')[-1],
+            key=URL(context.request.url).name,
             value=content,
             content_type=context.http_response.headers.get('content-type'),
         )
@@ -64,13 +66,15 @@ class FileDownloadCrawler(AbstractHttpCrawler[FileDownloadCrawlingContext, bytes
     ```python
     from pathlib import Path
 
+    from yarl import URL
+
     from crawlee.crawlers import FileDownloadCrawler, FileDownloadCrawlingContext
 
     crawler = FileDownloadCrawler(stream=True)
 
     @crawler.router.default_handler
     async def request_handler(context: FileDownloadCrawlingContext) -> None:
-        file_name = context.request.url.split('/')[-1]
+        file_name = URL(context.request.url).name
 
         # Write chunks to disk as they arrive.
         with Path(file_name).open('wb') as file:
