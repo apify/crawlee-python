@@ -37,10 +37,15 @@ def future(value: T, /) -> Awaitable[T]:
 @pytest.mark.run_alone
 async def test_runs_concurrently(system_status: SystemStatus | Mock) -> None:
     done_count = 0
+    running_count = 0
+    max_running_count = 0
 
     async def run() -> None:
+        nonlocal done_count, running_count, max_running_count
+        running_count += 1
+        max_running_count = max(max_running_count, running_count)
         await asyncio.sleep(0.1)
-        nonlocal done_count
+        running_count -= 1
         done_count += 1
 
     pool = AutoscaledPool(
@@ -54,12 +59,12 @@ async def test_runs_concurrently(system_status: SystemStatus | Mock) -> None:
         ),
     )
 
-    with measure_time() as elapsed:
-        await pool.run()
+    await pool.run()
 
-    assert elapsed.wall is not None
-    assert elapsed.wall < 0.3
-
+    # Assert the tasks actually ran concurrently by checking the peak number that overlapped in time.
+    # A sequential (or only partially concurrent) pool would peak below the configured concurrency.
+    # Previously this was inferred from the total wall time, which was flaky under load on slow CI runners.
+    assert max_running_count == 10
     assert done_count >= 10
 
 
