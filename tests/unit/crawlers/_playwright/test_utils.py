@@ -1,9 +1,14 @@
+import pytest
 from playwright.async_api import async_playwright
 from yarl import URL
 
 from crawlee.crawlers._playwright._utils import block_requests, infinite_scroll
 
 
+@pytest.mark.flaky(
+    reruns=3,
+    reason='Test is flaky on Windows when Playwright hits net::ERR_NO_BUFFER_SPACE under xdist load.',
+)
 async def test_infinite_scroll_on_dynamic_page(server_url: URL) -> None:
     """Checks that infinite_scroll loads all items on a page with infinite scrolling."""
     async with async_playwright() as p:
