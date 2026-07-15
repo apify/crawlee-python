@@ -47,7 +47,7 @@ _H3_CHANGED_TEXT = 'Changed by JS'
 _INJECTED_JS_DELAY_MS = 100
 # Generous wait for the JS-injected element. Resolves as soon as it appears, so it stays robust on
 # slow CI without slowing the happy path.
-_ELEMENT_WAIT_TIMEOUT = timedelta(seconds=5)
+_ELEMENT_WAIT_TIMEOUT = timedelta(milliseconds=50 * _INJECTED_JS_DELAY_MS)
 _PAGE_CONTENT_STATIC = f"""
 <h1>{_H1_TEXT}</h1>
 <h3>Initial text</h3>
