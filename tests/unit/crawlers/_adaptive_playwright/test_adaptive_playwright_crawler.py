@@ -45,6 +45,9 @@ _H1_TEXT = 'Static'
 _H2_TEXT = 'Only in browser'
 _H3_CHANGED_TEXT = 'Changed by JS'
 _INJECTED_JS_DELAY_MS = 100
+# Generous wait for the JS-injected element. Resolves as soon as it appears, so it stays robust on
+# slow CI without slowing the happy path.
+_ELEMENT_WAIT_TIMEOUT = timedelta(milliseconds=50 * _INJECTED_JS_DELAY_MS)
 _PAGE_CONTENT_STATIC = f"""
 <h1>{_H1_TEXT}</h1>
 <h3>Initial text</h3>
@@ -638,10 +641,6 @@ async def test_adaptive_playwright_crawler_default_predictor(test_urls: list[str
     mocked_browser_handler.assert_called_once_with()
 
 
-@pytest.mark.flaky(
-    reruns=3,
-    reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1650.',
-)
 async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[str]) -> None:
     """Test that `context.query_selector_one` works regardless of the crawl type for BeautifulSoup variant.
 
@@ -665,9 +664,9 @@ async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[st
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        h1 = await context.query_selector_one('h1', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2))
+        h1 = await context.query_selector_one('h1', _ELEMENT_WAIT_TIMEOUT)
         mocked_h1_handler(h1)
-        h2 = await context.query_selector_one('h2', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2))
+        h2 = await context.query_selector_one('h2', _ELEMENT_WAIT_TIMEOUT)
         mocked_h2_handler(h2)
 
     await crawler.run(test_urls[:1])
@@ -684,10 +683,6 @@ async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[st
     mocked_h2_handler.assert_has_calls([call(expected_h2_tag)])
 
 
-@pytest.mark.flaky(
-    reruns=3,
-    reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1650.',
-)
 async def test_adaptive_context_query_selector_parsel(test_urls: list[str]) -> None:
     """Test that `context.query_selector_one` works regardless of the crawl type for Parsel variant.
 
@@ -713,9 +708,9 @@ async def test_adaptive_context_query_selector_parsel(test_urls: list[str]) -> N
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        if h1 := await context.query_selector_one('h1', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2)):
+        if h1 := await context.query_selector_one('h1', _ELEMENT_WAIT_TIMEOUT):
             mocked_h1_handler(type(h1), h1.get())
-        if h2 := await context.query_selector_one('h2', timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2)):
+        if h2 := await context.query_selector_one('h2', _ELEMENT_WAIT_TIMEOUT):
             mocked_h2_handler(type(h2), h2.get())
 
     await crawler.run(test_urls[:1])
@@ -748,7 +743,7 @@ async def test_adaptive_context_parse_with_static_parser_parsel(test_urls: list[
 
         # Reparse whole page after h2 appears
         parsed_content_after_h2_appeared = await context.parse_with_static_parser(
-            selector='h2', timeout=timedelta(milliseconds=_INJECTED_JS_DELAY_MS * 2)
+            selector='h2', timeout=_ELEMENT_WAIT_TIMEOUT
         )
         mocked_h2_handler(parsed_content_after_h2_appeared.css('h2')[0].get())
 

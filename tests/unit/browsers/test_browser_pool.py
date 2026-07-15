@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import timedelta
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock
 
@@ -40,6 +39,7 @@ async def test_default_plugin_new_page_creation(server_url: URL) -> None:
         await page_2.page.close()
 
 
+@pytest.mark.run_alone
 async def test_multiple_plugins_new_page_creation(server_url: URL) -> None:
     plugin_chromium = PlaywrightBrowserPlugin(browser_type='chromium')
     plugin_firefox = PlaywrightBrowserPlugin(browser_type='firefox')
@@ -72,10 +72,7 @@ async def test_multiple_plugins_new_page_creation(server_url: URL) -> None:
         assert browser_pool.total_pages_count == 3
 
 
-@pytest.mark.flaky(
-    reruns=3,
-    reason='Test is flaky on Windows and MacOS, see https://github.com/apify/crawlee-python/issues/1660.',
-)
+@pytest.mark.run_alone
 async def test_new_page_with_each_plugin(server_url: URL) -> None:
     plugin_chromium = PlaywrightBrowserPlugin(browser_type='chromium')
     plugin_firefox = PlaywrightBrowserPlugin(browser_type='firefox')
@@ -108,7 +105,8 @@ async def test_with_default_plugin_constructor(server_url: URL) -> None:
     # even with a generous operation timeout when several workers compete for the runner). Run it alone and
     # keep a generous operation timeout so that Firefox has enough time to launch on slow CI.
     async with BrowserPool.with_default_plugin(
-        headless=True, browser_type='firefox', operation_timeout=timedelta(seconds=60)
+        headless=True,
+        browser_type='firefox',
     ) as browser_pool:
         assert len(browser_pool.plugins) == 1
         assert isinstance(browser_pool.plugins[0], PlaywrightBrowserPlugin)
