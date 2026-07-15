@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import functools
 import json
 import shutil
 from collections import deque
@@ -333,7 +332,8 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             unprocessed_requests = list[UnprocessedRequest]()
             state = self._state.current_value
 
-            all_requests = state.forefront_requests | state.regular_requests
+            def is_in_queue(unique_key: str) -> bool:
+                return unique_key in state.forefront_requests or unique_key in state.regular_requests
 
             requests_to_enqueue = {}
 
@@ -352,7 +352,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 # Or if the request is already in the queue and the `forefront` flag is not used, we do not change the
                 # position of the request.
                 elif (request.unique_key in state.in_progress_requests) or (
-                    request.unique_key in all_requests and not forefront
+                    not forefront and is_in_queue(request.unique_key)
                 ):
                     processed_requests.append(
                         ProcessedRequest(
@@ -368,7 +368,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             # Process each request in the batch.
             for request in requests_to_enqueue.values():
                 # If the request is not already in the RQ, this is a new request.
-                if request.unique_key not in all_requests:
+                if not is_in_queue(request.unique_key):
                     request_path = self._get_request_path(request.unique_key)
                     # Add sequence number to ensure FIFO ordering using state.
                     if forefront:
@@ -383,6 +383,17 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     # Save the clean request without extra fields
                     request_data = await json_dumps(request.model_dump())
                     await atomic_write(request_path, request_data)
+
+                    # A new forefront request belongs to the very front of the queue, so it can go straight
+                    # to the cache without a full refresh, unless the cache is at capacity or a refresh is
+                    # already pending. New regular requests must not be appended to the cache: it may be
+                    # truncated, so its tail is not necessarily the end of the queue; they are picked up by a
+                    # refresh once the cache drains.
+                    if forefront and not self._request_cache_needs_refresh:
+                        if len(self._request_cache) < self._MAX_REQUESTS_IN_CACHE:
+                            self._request_cache.appendleft(request)
+                        else:
+                            self._request_cache_needs_refresh = True
 
                     # Update the metadata counts.
                     new_total_request_count += 1
@@ -405,6 +416,9 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     # If the request is already in `forefront`, we just need to update its position.
                     state.forefront_requests[request.unique_key] = state.forefront_sequence_counter
                     state.forefront_sequence_counter += 1
+
+                    # The request may already sit elsewhere in the cache, so its position must be recomputed.
+                    self._request_cache_needs_refresh = True
 
                     processed_requests.append(
                         ProcessedRequest(
@@ -430,10 +444,6 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 new_total_request_count=new_total_request_count,
                 new_pending_request_count=new_pending_request_count,
             )
-
-            # Invalidate the cache if we added forefront requests.
-            if forefront:
-                self._request_cache_needs_refresh = True
 
             # Invalidate is_empty cache.
             self._is_empty_cache = None
@@ -506,8 +516,12 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             request_data = await json_dumps(request.model_dump())
             await atomic_write(request_path, request_data)
 
-            # Update state: remove from in-progress and add to handled.
+            # Update state: remove from in-progress and pending, and add to handled. Dropping the key from
+            # the pending mappings keeps them (and the persisted state) sized by the backlog rather than by
+            # every request ever processed.
             state.in_progress_requests.discard(request.unique_key)
+            state.forefront_requests.pop(request.unique_key, None)
+            state.regular_requests.pop(request.unique_key, None)
             state.handled_requests.add(request.unique_key)
 
             # Update RQ metadata.
@@ -696,62 +710,38 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         await atomic_write(self.path_to_metadata, data)
 
     async def _refresh_cache(self) -> None:
-        """Refresh the request cache from filesystem.
+        """Refresh the request cache from the filesystem.
 
-        This method loads up to _MAX_REQUESTS_IN_CACHE requests from the filesystem,
-        prioritizing forefront requests and maintaining proper ordering.
+        This method loads up to `_MAX_REQUESTS_IN_CACHE` requests from the filesystem, prioritizing forefront
+        requests and maintaining proper ordering. Only requests that are pending according to the state are
+        read, so files of already handled or in-progress requests are not touched at all.
         """
         self._request_cache.clear()
         state = self._state.current_value
 
-        forefront_requests = list[tuple[Request, int]]()  # (request, sequence)
-        regular_requests = list[tuple[Request, int]]()  # (request, sequence)
+        def is_pending(unique_key: str) -> bool:
+            return unique_key not in state.handled_requests and unique_key not in state.in_progress_requests
 
-        request_files = await self._get_request_files(self.path_to_rq)
+        # Forefront requests are fetched newest first (LIFO), regular requests oldest first (FIFO).
+        forefront_keys = sorted(
+            filter(is_pending, state.forefront_requests),
+            key=lambda unique_key: state.forefront_requests[unique_key],
+            reverse=True,
+        )
+        regular_keys = sorted(
+            filter(is_pending, state.regular_requests),
+            key=lambda unique_key: state.regular_requests[unique_key],
+        )
 
-        for request_file in request_files:
-            request = await self._parse_request_file(request_file)
+        for unique_key in forefront_keys + regular_keys:
+            if len(self._request_cache) >= self._MAX_REQUESTS_IN_CACHE:
+                break
 
+            request = await self._parse_request_file(self._get_request_path(unique_key))
             if request is None:
+                logger.warning(f'Request file for "{unique_key}" is missing or invalid, skipping.')
                 continue
 
-            # Skip handled requests
-            if request.unique_key in state.handled_requests:
-                continue
-
-            # Skip in-progress requests
-            if request.unique_key in state.in_progress_requests:
-                continue
-
-            # Determine if request is forefront or regular based on state
-            if request.unique_key in state.forefront_requests:
-                sequence = state.forefront_requests[request.unique_key]
-                forefront_requests.append((request, sequence))
-            elif request.unique_key in state.regular_requests:
-                sequence = state.regular_requests[request.unique_key]
-                regular_requests.append((request, sequence))
-            else:
-                # Request not in state, skip it (might be orphaned)
-                logger.warning(f'Request {request.unique_key} not found in state, skipping.')
-                continue
-
-        # Sort forefront requests by sequence (newest first for LIFO behavior).
-        forefront_requests.sort(key=lambda item: item[1], reverse=True)
-
-        # Sort regular requests by sequence (oldest first for FIFO behavior).
-        regular_requests.sort(key=lambda item: item[1], reverse=False)
-
-        # Add forefront requests to the beginning of the cache (left side). Since forefront_requests are sorted
-        # by sequence (newest first), we need to add them in reverse order to maintain correct priority.
-        for request, _ in reversed(forefront_requests):
-            if len(self._request_cache) >= self._MAX_REQUESTS_IN_CACHE:
-                break
-            self._request_cache.appendleft(request)
-
-        # Add regular requests to the end of the cache (right side).
-        for request, _ in regular_requests:
-            if len(self._request_cache) >= self._MAX_REQUESTS_IN_CACHE:
-                break
             self._request_cache.append(request)
 
         self._request_cache_needs_refresh = False
@@ -787,25 +777,23 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         Returns:
             The parsed `Request` object or `None` if the file could not be read or parsed.
         """
-        # Open the request file.
+        # Read the request file in a thread to avoid blocking the event loop.
         try:
-            file = await asyncio.to_thread(functools.partial(file_path.open, mode='r', encoding='utf-8'))
+            file_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
         except FileNotFoundError:
             logger.warning(f'Request file "{file_path}" not found.')
             return None
 
-        # Read the file content and parse it as JSON.
+        # Parse the file content as JSON.
         try:
-            file_content = json.load(file)
+            parsed = json.loads(file_content)
         except json.JSONDecodeError as exc:
             logger.warning(f'Failed to parse request file {file_path}: {exc!s}')
             return None
-        finally:
-            await asyncio.to_thread(file.close)
 
         # Validate the content against the Request model.
         try:
-            return Request.model_validate(file_content)
+            return Request.model_validate(parsed)
         except ValidationError as exc:
             logger.warning(f'Failed to validate request file {file_path}: {exc!s}')
             return None
@@ -830,15 +818,16 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             if request is None:
                 continue
 
-            # Add request to state as regular request (assign sequence numbers)
-            if request.unique_key not in state.regular_requests and request.unique_key not in state.forefront_requests:
-                # Assign as regular request with current sequence counter
+            # Already handled requests are tracked only for deduplication, not as pending work.
+            if request.handled_at is not None:
+                state.handled_requests.add(request.unique_key)
+
+            # Add pending request to state as regular request (assign sequence numbers)
+            elif (
+                request.unique_key not in state.regular_requests and request.unique_key not in state.forefront_requests
+            ):
                 state.regular_requests[request.unique_key] = state.sequence_counter
                 state.sequence_counter += 1
-
-                # Check if request was already handled
-                if request.handled_at is not None:
-                    state.handled_requests.add(request.unique_key)
 
     @staticmethod
     def _get_file_base_name_from_unique_key(unique_key: str) -> str:
