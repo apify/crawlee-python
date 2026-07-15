@@ -72,7 +72,6 @@ from crawlee.statistics import Statistics, StatisticsState
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 from ._context_pipeline import ContextPipeline
-from ._context_utils import swapped_context
 from ._logging_utils import (
     get_one_line_error_summary_if_possible,
     reduce_asyncio_timeout_error_to_relevant_traceback_parts,
@@ -1346,8 +1345,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         await self._commit_key_value_store_changes(result, get_kvs=self.get_key_value_store)
 
-        result.apply_request_changes(target=context.request)
-
     @staticmethod
     async def _commit_key_value_store_changes(
         result: RequestHandlerRunResult, get_kvs: GetKeyValueStoreFromRequestHandlerFunction
@@ -1413,12 +1410,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         else:
             session = await self._get_session()
         proxy_info = await self._get_proxy_info(request, session)
-        result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store, request=request)
+        result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
 
         deferred_cleanup: list[Callable[[], Awaitable[None]]] = []
 
         context = BasicCrawlingContext(
-            request=result.request,
+            request=request,
             session=session,
             proxy_info=proxy_info,
             send_request=self._prepare_send_request_function(session, proxy_info),
@@ -1437,9 +1434,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request.state = RequestState.REQUEST_HANDLER
 
             try:
-                with swapped_context(context, request):
-                    self._check_request_collision(request, session)
-                    await self._run_request_handler(context=context)
+                self._check_request_collision(request, session)
+                await self._run_request_handler(context=context)
             except asyncio.TimeoutError as e:
                 raise RequestHandlerError(e, context) from e
 
