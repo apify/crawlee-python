@@ -352,7 +352,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 # Or if the request is already in the queue and the `forefront` flag is not used, we do not change the
                 # position of the request.
                 elif (request.unique_key in state.in_progress_requests) or (
-                    is_in_queue(request.unique_key) and not forefront
+                    not forefront and is_in_queue(request.unique_key)
                 ):
                     processed_requests.append(
                         ProcessedRequest(
@@ -385,10 +385,11 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                     await atomic_write(request_path, request_data)
 
                     # A new forefront request belongs to the very front of the queue, so it can go straight
-                    # to the cache without a full refresh, unless the cache is at capacity. New regular
-                    # requests must not be appended to the cache: it may be truncated, so its tail is not
-                    # necessarily the end of the queue; they are picked up by a refresh once the cache drains.
-                    if forefront:
+                    # to the cache without a full refresh, unless the cache is at capacity or a refresh is
+                    # already pending. New regular requests must not be appended to the cache: it may be
+                    # truncated, so its tail is not necessarily the end of the queue; they are picked up by a
+                    # refresh once the cache drains.
+                    if forefront and not self._request_cache_needs_refresh:
                         if len(self._request_cache) < self._MAX_REQUESTS_IN_CACHE:
                             self._request_cache.appendleft(request)
                         else:
@@ -737,8 +738,11 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 break
 
             request = await self._parse_request_file(self._get_request_path(unique_key))
-            if request is not None:
-                self._request_cache.append(request)
+            if request is None:
+                logger.warning(f'Request file for "{unique_key}" is missing or invalid, skipping.')
+                continue
+
+            self._request_cache.append(request)
 
         self._request_cache_needs_refresh = False
 

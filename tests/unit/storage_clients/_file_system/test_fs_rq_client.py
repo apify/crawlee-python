@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 
@@ -262,34 +263,25 @@ async def test_get_request_does_not_mark_in_progress(rq_client: FileSystemReques
 
 
 async def test_forefront_add_fetch_handle_parses_linear_number_of_files(
-    rq_client: FileSystemRequestQueueClient, monkeypatch: pytest.MonkeyPatch
+    rq_client: FileSystemRequestQueueClient,
 ) -> None:
     """Test that per-request forefront adds (the `RequestManagerTandem` pattern) do not rescan all request files."""
-    parse_count = 0
-    original_parse = type(rq_client)._parse_request_file
-
-    async def counting_parse(file_path: Path) -> Request | None:
-        nonlocal parse_count
-        parse_count += 1
-        return await original_parse(file_path)
-
-    monkeypatch.setattr(type(rq_client), '_parse_request_file', staticmethod(counting_parse))
-
-    n = 25
-    for i in range(n):
-        await rq_client.add_batch_of_requests([Request.from_url(f'https://example.com/{i}')], forefront=True)
-        request = await rq_client.fetch_next_request()
-        assert request is not None
-        await rq_client.mark_request_as_handled(request)
+    with patch.object(rq_client, '_parse_request_file', wraps=rq_client._parse_request_file) as parse_spy:
+        n = 25
+        for i in range(n):
+            await rq_client.add_batch_of_requests([Request.from_url(f'https://example.com/{i}')], forefront=True)
+            request = await rq_client.fetch_next_request()
+            assert request is not None
+            await rq_client.mark_request_as_handled(request)
 
     # Before the fix, each forefront add invalidated the cache and each fetch re-parsed every request file
     # ever written, giving n * (n + 1) / 2 parses in total. With the fix, new forefront requests go straight
     # to the cache, so only the initial refresh parses anything.
-    assert parse_count <= 5
+    assert parse_spy.call_count <= 5
 
 
 async def test_cache_refresh_skips_handled_request_files(
-    rq_client: FileSystemRequestQueueClient, monkeypatch: pytest.MonkeyPatch
+    rq_client: FileSystemRequestQueueClient,
 ) -> None:
     """Test that a cache refresh reads only pending request files, not files of already handled requests."""
     await rq_client.add_batch_of_requests([Request.from_url(f'https://example.com/{i}') for i in range(5)])
@@ -302,19 +294,11 @@ async def test_cache_refresh_skips_handled_request_files(
     # the cache, which must not parse the handled files again.
     await rq_client.add_batch_of_requests([Request.from_url(f'https://example.com/new/{i}') for i in range(5)])
 
-    parse_count = 0
-    original_parse = type(rq_client)._parse_request_file
+    with patch.object(rq_client, '_parse_request_file', wraps=rq_client._parse_request_file) as parse_spy:
+        request = await rq_client.fetch_next_request()
 
-    async def counting_parse(file_path: Path) -> Request | None:
-        nonlocal parse_count
-        parse_count += 1
-        return await original_parse(file_path)
-
-    monkeypatch.setattr(type(rq_client), '_parse_request_file', staticmethod(counting_parse))
-
-    request = await rq_client.fetch_next_request()
     assert request is not None
-    assert parse_count == 5
+    assert parse_spy.call_count == 5
 
 
 async def test_handled_requests_pruned_from_pending_state(rq_client: FileSystemRequestQueueClient) -> None:
