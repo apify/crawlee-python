@@ -319,10 +319,8 @@ class Request(BaseModel):
         if enqueue_strategy is not None:
             crawlee_data_dict['enqueueStrategy'] = enqueue_strategy
 
-        crawlee_data = CrawleeRequestData(**crawlee_data_dict)
-
-        if crawlee_data != CrawleeRequestData():
-            user_data_dict['__crawlee'] = crawlee_data
+        if crawlee_data_dict:
+            user_data_dict['__crawlee'] = CrawleeRequestData(**crawlee_data_dict)
 
         request = cls(
             url=url,
