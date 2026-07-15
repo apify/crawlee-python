@@ -14,7 +14,14 @@ from crawlee import Request, RequestOptions
 from crawlee._utils.docs import docs_group
 from crawlee._utils.globs import Glob
 from crawlee._utils.recoverable_state import RecoverableState
-from crawlee._utils.sitemap import NestedSitemap, ParseSitemapOptions, SitemapSource, SitemapUrl, parse_sitemap
+from crawlee._utils.sitemap import (
+    DEFAULT_MAX_DEPTH,
+    NestedSitemap,
+    ParseSitemapOptions,
+    SitemapSource,
+    SitemapUrl,
+    parse_sitemap,
+)
 from crawlee._utils.urls import filter_url
 from crawlee.request_loaders._request_loader import RequestLoader
 
@@ -79,6 +86,9 @@ class SitemapRequestLoaderState(BaseModel):
 
     processed_sitemap_urls: Annotated[set[str], Field(alias='processedSitemapUrls')] = set()
     """Set of processed sitemap URLs."""
+
+    sitemap_depths: Annotated[dict[str, int], Field(alias='sitemapDepths')] = {}
+    """Nesting depth of each known sitemap URL, used to bound how far nested sitemap chains are followed."""
 
     completed: Annotated[bool, Field(alias='sitemapCompleted')] = False
     """Whether all sitemaps have been fully processed."""
@@ -286,6 +296,8 @@ class SitemapRequestLoader(RequestLoader):
             )
             if not has_sitemap_for_processing and not self._state.current_value.completed:
                 self._state.current_value.pending_sitemap_urls.extend(self._sitemap_urls)
+                for sitemap_url in self._sitemap_urls:
+                    self._state.current_value.sitemap_depths.setdefault(sitemap_url, 0)
 
             if self._state.current_value.in_progress:
                 self._state.current_value.url_queue.extendleft(self._state.current_value.in_progress)
@@ -352,6 +364,10 @@ class SitemapRequestLoader(RequestLoader):
                         continue
                     state.in_progress_sitemap_url = sitemap_url
 
+                # Depth of the sitemap currently being processed; nested sitemaps found in it are one level deeper.
+                # This bounds a malicious chain of unique nested sitemap URLs, which exact-URL dedup alone cannot.
+                current_depth = state.sitemap_depths.get(sitemap_url, 0)
+
                 parse_options = ParseSitemapOptions(
                     max_depth=0,
                     emit_nested_sitemaps=True,
@@ -375,9 +391,15 @@ class SitemapRequestLoader(RequestLoader):
                                 item.loc not in state.pending_sitemap_urls
                                 and item.loc not in state.processed_sitemap_urls
                             ):
+                                if current_depth >= DEFAULT_MAX_DEPTH:
+                                    logger.warning(
+                                        f'Skipping nested sitemap {item.loc!r}: max depth {DEFAULT_MAX_DEPTH} reached.'
+                                    )
+                                    continue
                                 if not self._passes_filters(item.loc, parsed_sitemap_url, 'nested sitemap'):
                                     continue
                                 state.pending_sitemap_urls.append(item.loc)
+                                state.sitemap_depths[item.loc] = current_depth + 1
                             continue
 
                         if isinstance(item, SitemapUrl):
@@ -413,6 +435,7 @@ class SitemapRequestLoader(RequestLoader):
                 state.in_progress_sitemap_url = None
                 if current_sitemap_url:
                     state.processed_sitemap_urls.add(current_sitemap_url)
+                    state.sitemap_depths.pop(current_sitemap_url, None)
                 state.current_sitemap_processed_urls.clear()
 
             # Mark as completed after processing all sitemap urls
