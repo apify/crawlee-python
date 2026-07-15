@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - **fingerprint:** Keep the original error as the cause when generation fails ([#2066](https://github.com/apify/crawlee-python/pull/2066)) ([272bb28](https://github.com/apify/crawlee-python/commit/272bb28f9bf6d0a8b47c1e1424e2c5705ec6e53b)) by [@anxkhn](https://github.com/anxkhn)
 - **robots:** Disallow crawling when robots.txt returns a 5xx ([#2065](https://github.com/apify/crawlee-python/pull/2065)) ([87e3437](https://github.com/apify/crawlee-python/commit/87e3437215fddc080f7bcffe08eecfae0261ea4a)) by [@anxkhn](https://github.com/anxkhn)
 - **crawlers:** Keep `Request` mutations across handler runs and retries ([#2076](https://github.com/apify/crawlee-python/pull/2076)) ([e971279](https://github.com/apify/crawlee-python/commit/e971279cc74af207cb2b96b79cd0d40ffe4d3b7c)) by [@Mantisus](https://github.com/Mantisus), closes [#2061](https://github.com/apify/crawlee-python/issues/2061)
+- **sitemap:** Bound sitemap decompression size and nesting depth to prevent DoS ([#2012](https://github.com/apify/crawlee-python/pull/2012)) ([68b606c](https://github.com/apify/crawlee-python/commit/68b606cc4c2503ec16ab25d6cbe578404392ed3d)) by [@vdusek](https://github.com/vdusek)
 
 ### ⚡ Performance
 
