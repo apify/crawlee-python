@@ -2111,7 +2111,7 @@ async def test_crawler_intermediate_statistics() -> None:
     await crawler_task
 
 
-async def test_mutation_request_and_session() -> None:
+async def test_request_and_session_mutations_persist() -> None:
     """Test that request and session mutated in the request handler and error handler, and mutations are persisted."""
     request_queue = await RequestQueue.open(name='state-test')
 
