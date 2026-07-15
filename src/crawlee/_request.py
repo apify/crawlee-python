@@ -310,8 +310,8 @@ class Request(BaseModel):
         if always_enqueue:
             unique_key = f'{crypto_random_object_id()}|{unique_key}'
 
-        user_data_dict = kwargs.pop('user_data', {}) or {}
-        crawlee_data_dict = user_data_dict.get('__crawlee', {})
+        user_data_dict = dict(kwargs.pop('user_data', {}) or {})
+        crawlee_data_dict = dict(user_data_dict.get('__crawlee') or {})
 
         if max_retries is not None:
             crawlee_data_dict['maxRetries'] = max_retries
@@ -319,10 +319,8 @@ class Request(BaseModel):
         if enqueue_strategy is not None:
             crawlee_data_dict['enqueueStrategy'] = enqueue_strategy
 
-        crawlee_data = CrawleeRequestData(**crawlee_data_dict)
-
-        if crawlee_data:
-            user_data_dict['__crawlee'] = crawlee_data
+        if crawlee_data_dict:
+            user_data_dict['__crawlee'] = CrawleeRequestData(**crawlee_data_dict)
 
         request = cls(
             url=url,
