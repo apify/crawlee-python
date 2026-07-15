@@ -15,12 +15,17 @@ from crawlee._utils.requests import compute_unique_key, normalize_url
             'http://example.com/?another_key=another_value&key=value',
             False,
         ),
-        ('HTTPS://EXAMPLE.COM/?KEY=VALUE', 'https://example.com/?key=value', False),
+        ('HTTPS://EXAMPLE.COM/?KEY=VALUE', 'https://example.com/?KEY=VALUE', False),
         ('', '', False),
         ('http://example.com/#fragment', 'http://example.com/#fragment', True),
         ('http://example.com/#fragment', 'http://example.com', False),
         ('  https://example.com/  ', 'https://example.com', False),
         ('http://example.com/?b=2&a=1', 'http://example.com/?a=1&b=2', False),
+        (
+            'https://EXAMPLE.com/Product/ABC?token=SeCrEt&Z=1',
+            'https://example.com/Product/ABC?Z=1&token=SeCrEt',
+            False,
+        ),
     ],
     ids=[
         'remove_utm_params',
@@ -31,6 +36,7 @@ from crawlee._utils.requests import compute_unique_key, normalize_url
         'remove_fragment',
         'trim_whitespace',
         'sort_query_params',
+        'preserve_path_and_query_case',
     ],
 )
 def test_normalize_url(url: str, expected_output: str, *, keep_url_fragment: bool) -> None:
@@ -112,6 +118,15 @@ def test_compute_unique_key_complex() -> None:
         use_extended_unique_key=True,
     )
     assert extended_uk == 'POST|4e1a2cf6|9724c1e2|test_session|https://crawlee.dev'
+
+
+def test_compute_unique_key_preserves_case_sensitive_url_parts() -> None:
+    upper_path_key = compute_unique_key('https://example.com/Product/ABC?token=SeCrEt')
+    lower_path_key = compute_unique_key('https://example.com/product/abc?token=secret')
+
+    assert upper_path_key == 'https://example.com/Product/ABC?token=SeCrEt'
+    assert lower_path_key == 'https://example.com/product/abc?token=secret'
+    assert upper_path_key != lower_path_key
 
 
 def test_compute_unique_key_post_with_none_payload() -> None:
