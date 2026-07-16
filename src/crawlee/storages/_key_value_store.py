@@ -299,14 +299,16 @@ class KeyValueStore(Storage):
     async def persist_autosaved_values(self) -> None:
         """Force autosaved values to be saved without waiting for an event in Event Manager."""
         if self.id in self._autosaved_values:
-            cache = self._autosaved_values[self.id]
-            for value in cache.values():
-                await value.persist_state()
+            async with self._autosave_lock:
+                cache = self._autosaved_values[self.id]
+                for value in cache.values():
+                    await value.persist_state()
 
     async def _clear_cache(self) -> None:
         """Clear cache with autosaved values."""
         if self.id in self._autosaved_values:
-            cache = self._autosaved_values[self.id]
-            for value in cache.values():
-                await value.teardown()
-            cache.clear()
+            async with self._autosave_lock:
+                cache = self._autosaved_values[self.id]
+                for value in cache.values():
+                    await value.teardown()
+                cache.clear()

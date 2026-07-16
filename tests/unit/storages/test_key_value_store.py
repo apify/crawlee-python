@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -1180,3 +1181,75 @@ async def test_record_with_noascii_chars(kvs: KeyValueStore) -> None:
     value = await kvs.get_value(key)
     assert value is not None
     assert value == init_value
+
+
+async def test_persist_autosaved_values_with_concurrent_new_key(
+    kvs: KeyValueStore,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test persisting autosaved values while adding a new autosaved key."""
+    await kvs.get_auto_saved_value('existing')
+
+    # Park the persist loop mid-iteration by blocking the underlying write, then insert a new key.
+    persist_entered = asyncio.Event()
+    release_persist = asyncio.Event()
+    original_set_value = kvs.set_value
+
+    async def blocking_set_value(*args: Any, **kwargs: Any) -> None:
+        persist_entered.set()
+        await asyncio.wait_for(release_persist.wait(), timeout=5)
+        await original_set_value(*args, **kwargs)
+
+    monkeypatch.setattr(kvs, 'set_value', blocking_set_value)
+
+    persist_task = asyncio.create_task(kvs.persist_autosaved_values())
+    await asyncio.wait_for(persist_entered.wait(), timeout=5)
+
+    insert_started = asyncio.Event()
+
+    async def insert_autosaved_value() -> None:
+        insert_started.set()
+        await kvs.get_auto_saved_value('added-during-persist')
+
+    insert_task = asyncio.create_task(insert_autosaved_value())
+    await asyncio.wait_for(insert_started.wait(), timeout=5)
+    release_persist.set()
+
+    # Should not raise `RuntimeError: dictionary changed size during iteration`.
+    await asyncio.wait_for(asyncio.gather(persist_task, insert_task), timeout=5)
+
+
+async def test_clear_cache_with_concurrent_new_autosaved_key(
+    kvs: KeyValueStore,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test clearing the cache while adding a new autosaved key."""
+    await kvs.get_auto_saved_value('existing')
+
+    # Park the clear loop mid-iteration by blocking the underlying write, then insert a new key.
+    clear_entered = asyncio.Event()
+    release_clear = asyncio.Event()
+    original_set_value = kvs.set_value
+
+    async def blocking_set_value(*args: Any, **kwargs: Any) -> None:
+        clear_entered.set()
+        await asyncio.wait_for(release_clear.wait(), timeout=5)
+        await original_set_value(*args, **kwargs)
+
+    monkeypatch.setattr(kvs, 'set_value', blocking_set_value)
+
+    clear_task = asyncio.create_task(kvs._clear_cache())
+    await asyncio.wait_for(clear_entered.wait(), timeout=5)
+
+    insert_started = asyncio.Event()
+
+    async def insert_autosaved_value() -> None:
+        insert_started.set()
+        await kvs.get_auto_saved_value('added-during-clear')
+
+    insert_task = asyncio.create_task(insert_autosaved_value())
+    await asyncio.wait_for(insert_started.wait(), timeout=5)
+    release_clear.set()
+
+    # Should not raise `RuntimeError: dictionary changed size during iteration`.
+    await asyncio.wait_for(asyncio.gather(clear_task, insert_task), timeout=5)
