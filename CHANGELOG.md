@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - **crawlers:** Keep `Request` mutations across handler runs and retries ([#2076](https://github.com/apify/crawlee-python/pull/2076)) ([e971279](https://github.com/apify/crawlee-python/commit/e971279cc74af207cb2b96b79cd0d40ffe4d3b7c)) by [@Mantisus](https://github.com/Mantisus), closes [#2061](https://github.com/apify/crawlee-python/issues/2061)
 - **sitemap:** Bound sitemap decompression size and nesting depth to prevent DoS ([#2012](https://github.com/apify/crawlee-python/pull/2012)) ([68b606c](https://github.com/apify/crawlee-python/commit/68b606cc4c2503ec16ab25d6cbe578404392ed3d)) by [@vdusek](https://github.com/vdusek)
 - **request:** Do not mutate caller user_data or write empty __crawlee in from_url ([#2067](https://github.com/apify/crawlee-python/pull/2067)) ([08c0ffc](https://github.com/apify/crawlee-python/commit/08c0ffc5af1a85ef565dda41f4a0d3ef13f9a1a0)) by [@anxkhn](https://github.com/anxkhn)
+- **key-value store:** Avoid &quot;dictionary changed size&quot; error in KVS autosave ([#2075](https://github.com/apify/crawlee-python/pull/2075)) ([b67712b](https://github.com/apify/crawlee-python/commit/b67712b6ab1b90068e742d9330e89ac4ea396455)) by [@anxkhn](https://github.com/anxkhn)
 
 ### ⚡ Performance
 
