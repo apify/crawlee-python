@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from collections import deque
 from typing import TYPE_CHECKING
 
 import pytest
@@ -96,26 +95,15 @@ async def test_memory_metadata_updates(rq_client: MemoryRequestQueueClient) -> N
     assert metadata.accessed_at > accessed_after_read
 
 
-async def test_forefront_readd_repositions_without_deque_scan(rq_client: MemoryRequestQueueClient) -> None:
-    """Test that re-adding pending requests to the forefront does not do an O(n) `deque.remove` scan."""
-
-    class CountingDeque(deque):  # type: ignore[type-arg]
-        remove_calls = 0
-
-        def remove(self, value: object) -> None:
-            CountingDeque.remove_calls += 1
-            super().remove(value)
-
-    rq_client._pending_requests = CountingDeque(rq_client._pending_requests)
-
+async def test_forefront_readd_does_not_grow_pending_requests(rq_client: MemoryRequestQueueClient) -> None:
+    """Test that repeatedly repositioning pending requests does not create duplicate entries."""
     requests = [Request.from_url(f'https://example.com/{i}') for i in range(20)]
     await rq_client.add_batch_of_requests(requests)
 
-    # Re-add the same, still-pending requests with `forefront=True`. Previously each re-add scanned the
-    # whole pending deque with `deque.remove` to reposition the existing entry, which is O(n) per request.
-    await rq_client.add_batch_of_requests(requests, forefront=True)
+    for _ in range(10):
+        await rq_client.add_batch_of_requests(requests, forefront=True)
 
-    assert CountingDeque.remove_calls == 0
+    assert len(rq_client._pending_requests) == len(requests)
 
 
 async def test_forefront_readd_preserves_order_and_dedup(rq_client: MemoryRequestQueueClient) -> None:
@@ -144,18 +132,14 @@ async def test_forefront_readd_preserves_order_and_dedup(rq_client: MemoryReques
 
 
 async def test_regular_readd_of_pending_request_is_not_dropped(rq_client: MemoryRequestQueueClient) -> None:
-    """Test that a regular (non-forefront) re-add of a still-pending request keeps it fetchable.
-
-    The lazy-tombstone skip in `fetch_next_request`/`is_empty` keys off object identity, so a regular re-add
-    must not repoint the registered object away from the entry still sitting in the pending deque, otherwise
-    the genuinely-live request would be treated as stale and silently dropped.
-    """
+    """Test that a regular re-add updates a still-pending request without dropping it."""
     original = Request.from_url('https://example.com/page')
     await rq_client.add_batch_of_requests([original])
 
     # Re-add the same URL while still pending, as a distinct object (as the higher-level API does when it
     # rebuilds requests). `forefront` defaults to False.
     duplicate = Request.from_url('https://example.com/page')
+    duplicate.user_data['version'] = 2
     assert duplicate is not original
     assert duplicate.unique_key == original.unique_key
     await rq_client.add_batch_of_requests([duplicate])
@@ -164,8 +148,8 @@ async def test_regular_readd_of_pending_request_is_not_dropped(rq_client: Memory
     assert await rq_client.is_empty() is False
 
     fetched = await rq_client.fetch_next_request()
-    assert fetched is not None
-    assert fetched.url == 'https://example.com/page'
+    assert fetched is duplicate
+    assert fetched.user_data['version'] == 2
     await rq_client.mark_request_as_handled(fetched)
 
     assert await rq_client.fetch_next_request() is None
@@ -196,3 +180,22 @@ async def test_regular_readd_does_not_reorder_pending_queue(rq_client: MemoryReq
         'https://example.com/1',
         'https://example.com/2',
     ]
+
+
+async def test_reclaim_modified_request_after_forefront_readd(rq_client: MemoryRequestQueueClient) -> None:
+    """Test reclaiming a modified request after it was repositioned to the forefront."""
+    request = Request.from_url('https://example.com/page')
+    await rq_client.add_batch_of_requests([request])
+    await rq_client.add_batch_of_requests([request], forefront=True)
+
+    fetched = await rq_client.fetch_next_request()
+    assert fetched is request
+
+    modified = request.model_copy(deep=True)
+    modified.user_data['reclaimed'] = True
+    await rq_client.reclaim_request(modified)
+
+    assert await rq_client.is_empty() is False
+    reclaimed = await rq_client.fetch_next_request()
+    assert reclaimed is modified
+    assert reclaimed.user_data['reclaimed'] is True

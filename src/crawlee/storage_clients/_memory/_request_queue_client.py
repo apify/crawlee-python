@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import deque
+from collections import OrderedDict
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -41,7 +41,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
         """
         self._metadata = metadata
 
-        self._pending_requests = deque[Request]()
+        self._pending_requests = OrderedDict[str, Request]()
         """Pending requests are those that have been added to the queue but not yet fetched for processing."""
 
         self._handled_requests = dict[str, Request]()
@@ -174,23 +174,21 @@ class MemoryRequestQueueClient(RequestQueueClient):
                 )
                 continue
 
-            # If the request is already in the queue but not handled, we only reposition it when `forefront`
-            # is set; a regular re-add leaves the already-pending entry untouched.
+            # If the request is already in the queue but not handled, update it without changing its position.
             if was_already_present and existing_request:
+                self._requests_by_unique_key[request.unique_key] = request
+                self._pending_requests[request.unique_key] = request
+
                 if forefront:
-                    # Move the request to the front. The old entry is left in the deque instead of being
-                    # located and removed (`deque.remove` is O(n), which makes a batch of forefront re-adds
-                    # O(n^2)); registering the new object here supersedes the old one, and the stale entry is
-                    # skipped lazily by `fetch_next_request` and `is_empty`.
-                    self._requests_by_unique_key[request.unique_key] = request
-                    self._pending_requests.appendleft(request)
+                    self._pending_requests.move_to_end(request.unique_key, last=False)
 
             # Add the new request to the queue.
             else:
                 if forefront:
-                    self._pending_requests.appendleft(request)
+                    self._pending_requests[request.unique_key] = request
+                    self._pending_requests.move_to_end(request.unique_key, last=False)
                 else:
-                    self._pending_requests.append(request)
+                    self._pending_requests[request.unique_key] = request
 
                 # Update indexes.
                 self._requests_by_unique_key[request.unique_key] = request
@@ -218,12 +216,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
     @override
     async def fetch_next_request(self) -> Request | None:
         while self._pending_requests:
-            request = self._pending_requests.popleft()
-
-            # Skip stale entries left behind when a request was repositioned to the forefront while already
-            # pending. Only the object currently registered for the unique key is live.
-            if self._requests_by_unique_key.get(request.unique_key) is not request:
-                continue
+            _, request = self._pending_requests.popitem(last=False)
 
             # Skip if already handled (shouldn't happen, but safety check).
             if request.was_already_handled:
@@ -290,11 +283,13 @@ class MemoryRequestQueueClient(RequestQueueClient):
         # Remove from in-progress.
         del self._in_progress_requests[request.unique_key]
 
+        # Update index with the possibly modified request.
+        self._requests_by_unique_key[request.unique_key] = request
+
         # Add request back to pending queue.
+        self._pending_requests[request.unique_key] = request
         if forefront:
-            self._pending_requests.appendleft(request)
-        else:
-            self._pending_requests.append(request)
+            self._pending_requests.move_to_end(request.unique_key, last=False)
 
         # Update metadata timestamps.
         await self._update_metadata(update_modified_at=True)
@@ -308,13 +303,6 @@ class MemoryRequestQueueClient(RequestQueueClient):
     @override
     async def is_empty(self) -> bool:
         await self._update_metadata(update_accessed_at=True)
-
-        # Discard stale entries left at the front by forefront repositioning; a live request is always
-        # enqueued ahead of the stale entry it supersedes, so pruning stops at the first live request.
-        while self._pending_requests and (
-            self._requests_by_unique_key.get(self._pending_requests[0].unique_key) is not self._pending_requests[0]
-        ):
-            self._pending_requests.popleft()
 
         # Queue is empty if there are no pending requests.
         return len(self._pending_requests) == 0
