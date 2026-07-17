@@ -48,9 +48,7 @@ async def test_export_csv_to_stream_keeps_columns_aligned_for_heterogeneous_item
         lineterminator='\n',
     )
 
-    # The header comes from the first item; later items are mapped by key (extra keys such as `city` are dropped),
-    # so `Carol`/`40` stay aligned with the `name`/`age` columns instead of being written positionally.
-    assert dst.getvalue() == 'name,age\nAlice,30\nBob,25\nCarol,40\n'
+    assert dst.getvalue() == 'name,age,city\nAlice,30,\nBob,25,NYC\nCarol,40,\n'
 
 
 async def test_export_csv_to_stream_skips_empty_items() -> None:
