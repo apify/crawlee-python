@@ -30,7 +30,7 @@ HTTP crawlers are ideal for extracting data from server-rendered websites that d
 
 ## Overview
 
-All HTTP crawlers share a common architecture built around the <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> base class. The main differences lie in the parsing strategy and the context provided to request handlers. There are <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>, and <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink>. It can also be extended to create custom crawlers with specialized parsing requirements. They use HTTP clients to fetch page content and parsing libraries to extract data from the HTML, check out the [HTTP clients guide](./http-clients) to learn about the HTTP clients used by these crawlers, how to switch between them, and how to create custom HTTP clients tailored to your specific requirements.
+All HTTP crawlers share a common architecture built around the <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> base class. The main differences lie in the parsing strategy and the context provided to request handlers. There are <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>, <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink>, and <ApiLink to="class/FileDownloadCrawler">`FileDownloadCrawler`</ApiLink>. It can also be extended to create custom crawlers with specialized parsing requirements. They use HTTP clients to fetch page content and parsing libraries to extract data from the HTML, check out the [HTTP clients guide](./http-clients) to learn about the HTTP clients used by these crawlers, how to switch between them, and how to create custom HTTP clients tailored to your specific requirements.
 
 ```mermaid
 ---
@@ -63,6 +63,8 @@ class ParselCrawler
 
 class BeautifulSoupCrawler
 
+class FileDownloadCrawler
+
 %% ========================
 %% Inheritance arrows
 %% ========================
@@ -71,6 +73,7 @@ BasicCrawler --|> AbstractHttpCrawler
 AbstractHttpCrawler --|> HttpCrawler
 AbstractHttpCrawler --|> ParselCrawler
 AbstractHttpCrawler --|> BeautifulSoupCrawler
+AbstractHttpCrawler --|> FileDownloadCrawler
 ```
 
 ## BeautifulSoupCrawler
@@ -130,6 +133,10 @@ The following examples demonstrate how to integrate with several popular parsing
         </RunnableCodeBlock>
     </TabItem>
 </Tabs>
+
+## FileDownloadCrawler
+
+The <ApiLink to="class/FileDownloadCrawler">`FileDownloadCrawler`</ApiLink> downloads files instead of scraping pages. It accepts any content type without parsing and gives the request handler direct access to the response body. By default the whole file is buffered in memory. For large files, construct the crawler with `stream=True` and consume the body in chunks via <ApiLink to="class/HttpResponse#read_stream">`read_stream()`</ApiLink>. For usage, see the [Download files](../examples/file-download) example.
 
 ## Custom HTTP crawler
 
