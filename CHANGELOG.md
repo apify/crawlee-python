@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.8.3 - **not yet released**
+## [1.8.3](https://github.com/apify/crawlee-python/releases/tag/v1.8.3) (2026-07-20)
 
 ### 🐛 Bug Fixes
 
@@ -19,7 +18,6 @@ All notable changes to this project will be documented in this file.
 - **file-system:** Fix quadratic file rescans in the FS request queue ([#2011](https://github.com/apify/crawlee-python/pull/2011)) ([499fbff](https://github.com/apify/crawlee-python/commit/499fbff44da6db320a9df34b0d8ba62a61ceb3db)) by [@vdusek](https://github.com/vdusek)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.8.2](https://github.com/apify/crawlee-python/releases/tag/v1.8.2) (2026-07-13)
 
 ### 🐛 Bug Fixes
