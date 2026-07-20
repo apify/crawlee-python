@@ -151,17 +151,19 @@ class EnqueueLinksKwargs(TypedDict):
     """Base URL to be used for relative URLs."""
 
     strategy: NotRequired[EnqueueStrategy]
-    """Enqueue strategy to be used for determining which links to extract and enqueue.
+    """Enqueue strategy that determines which URLs are enqueued based on their relation to the page the crawler
+    is currently on. With `enqueue_links` it filters the links extracted from the page. With `add_requests` it
+    filters the explicitly provided requests.
 
     Options:
-        all: Enqueue every link encountered, regardless of the target domain. Use this option to ensure that all
-            links, including those leading to external websites, are followed.
-        same-domain: Enqueue links that share the same domain name as the current page, including any subdomains.
+        all: Enqueue every URL encountered, regardless of the target domain. Use this option to ensure that all
+            URLs, including those leading to external websites, are followed.
+        same-domain: Enqueue URLs that share the same domain name as the current page, including any subdomains.
             This strategy is ideal for crawling within the same top-level domain while still allowing for subdomain
             exploration.
-        same-hostname: Enqueue links only if they match the exact hostname of the current page. This is the default
-            behavior and restricts the crawl to the current hostname, excluding subdomains.
-        same-origin: Enqueue links that share the same origin as the current page. The origin is defined by the
+        same-hostname: Enqueue URLs only if they match the exact hostname of the current page. This is the default
+            for `enqueue_links` and restricts the crawl to the current hostname, excluding subdomains.
+        same-origin: Enqueue URLs that share the same origin as the current page. The origin is defined by the
             combination of protocol, domain, and port, ensuring a strict scope for the crawl.
     """
 

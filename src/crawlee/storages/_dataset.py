@@ -137,13 +137,13 @@ class Dataset(Storage):
     async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
         """Store an object or an array of objects to the dataset.
 
-        The size of the data is limited by the receiving API and therefore `push_data()` will only
-        allow objects whose JSON representation is smaller than 9MB. When an array is passed,
-        none of the included objects may be larger than 9MB, but the array itself may be of any size.
+        Local storage clients impose no size limit on the pushed data. Some remote storage clients do,
+        however. For example, when running on the Apify platform, the receiving API only accepts objects
+        whose JSON representation is smaller than 9MB, and each item of a passed array is subject to the
+        same per-item limit (the array itself may be of any size).
 
         Args:
-            data: A JSON serializable data structure to be stored in the dataset. The JSON representation
-                of each item must be smaller than 9MB.
+            data: A JSON serializable data structure to be stored in the dataset.
         """
         await self._client.push_data(data=data)
 
