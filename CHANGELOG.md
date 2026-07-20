@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.8.4 - **not yet released**
+
+### 🚀 Features
+
+- Add FileDownloadCrawler for downloading and streaming files ([#2043](https://github.com/apify/crawlee-python/pull/2043)) ([90d550d](https://github.com/apify/crawlee-python/commit/90d550d8a4b4dfe134c76086a5390b7ecea1d1a7)) by [@Mantisus](https://github.com/Mantisus), closes [#875](https://github.com/apify/crawlee-python/issues/875)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.8.3](https://github.com/apify/crawlee-python/releases/tag/v1.8.3) (2026-07-20)
 
 ### 🐛 Bug Fixes
