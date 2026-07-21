@@ -81,8 +81,7 @@ class EventManager:
         # Listeners are wrapped inside asyncio.Task. Store their references here so that we can wait for them to finish.
         self._listener_tasks: set[asyncio.Task] = set()
 
-        # Tasks currently blocked inside `wait_for_all_listeners_to_complete`. They are excluded when gathering
-        # listener tasks, otherwise a waiter would await itself or another waiter and deadlock.
+        # Tasks currently blocked in `wait_for_all_listeners_to_complete`; excluded when gathering to avoid deadlock.
         self._waiting_listener_tasks: set[asyncio.Task] = set()
 
         # Store the mapping between events, listeners and their wrappers in the following way:
@@ -206,7 +205,7 @@ class EventManager:
                 )
             finally:
                 logger.debug('EventManager.on.listener_wrapper(): Removing listener task from the set...')
-                # `discard` not `remove`: `__aexit__` may have already cleared the set while this listener ran.
+                # `discard`, not `remove`: `__aexit__` may have cleared the set while this listener ran.
                 self._listener_tasks.discard(listener_task)
 
         self._listeners_to_wrappers[event][listener].append(listener_wrapper)
@@ -261,9 +260,8 @@ class EventManager:
             timeout: The maximum time to wait for the event listeners to finish. If they do not complete within
                 the specified timeout, they will be canceled.
         """
-        # Register this call's task as a waiter. A waiting task cannot finish until the listeners it awaits do,
-        # so no waiter may await another waiter (nor itself) - otherwise they would deadlock. This happens when
-        # a listener waits for or closes the event manager from within itself (as `Actor.exit()` does).
+        # A waiter can't finish until the listeners it awaits do, so waiters must never await each other or
+        # themselves - this is what happens when a listener waits or closes from within itself.
         waiting_task = asyncio.current_task()
         if waiting_task is not None:
             self._waiting_listener_tasks.add(waiting_task)

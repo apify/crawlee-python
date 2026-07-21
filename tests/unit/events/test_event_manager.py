@@ -270,8 +270,8 @@ async def test_close_from_within_a_listener_does_not_deadlock_or_error(
     event_manager = EventManager()
     await event_manager.__aenter__()
 
-    # A wrapper that finalizes after close raises through pyee onto the event loop (its `error` listener is
-    # gone by then, removed during close), so watch both channels to catch a stray exception on finalize.
+    # A wrapper finalizing after close raises onto the loop (its `error` listener is gone by then), so watch
+    # both channels for a stray exception.
     emitter_errors: list[BaseException] = []
     event_manager._event_emitter.add_listener('error', emitter_errors.append)
     loop_errors: list[dict[str, Any]] = []
@@ -288,8 +288,7 @@ async def test_close_from_within_a_listener_does_not_deadlock_or_error(
         await event_manager.__aexit__(None, None, None)
         closed.set()
 
-    # Register a regular listener too, so closing must await a concurrently-running listener (the real
-    # `Actor.exit()` shape) and exercise the task-set cleanup while another listener is still in flight.
+    # A second listener makes close await a concurrently-running listener - the real `Actor.exit()` shape.
     event_manager.on(event=Event.SYSTEM_INFO, listener=other_listener)
     event_manager.on(event=Event.SYSTEM_INFO, listener=closing_listener)
 
@@ -298,20 +297,17 @@ async def test_close_from_within_a_listener_does_not_deadlock_or_error(
 
     try:
         await asyncio.wait_for(closed.wait(), timeout=5)
-        # Deterministically drain the listener-wrapper tasks so their `finally` blocks (and any exception
-        # they raise on finalize) run before we assert - no arbitrary sleep.
+        # Drain the wrapper tasks so their `finally` blocks run before we assert - no arbitrary sleep.
         spawned = asyncio.all_tasks() - tasks_before - {asyncio.current_task()}
         if spawned:
             await asyncio.wait(spawned)
     finally:
-        # On a regression the listener may deadlock; cap the cleanup so the primary failure surfaces instead
-        # of hanging indefinitely.
+        # Cap the cleanup so a regressed deadlock surfaces the real failure instead of hanging.
         if event_manager.active:
             with suppress(Exception):
                 await asyncio.wait_for(event_manager.__aexit__(None, None, None), timeout=5)
 
-    # The discard-not-remove fix means no wrapper raises on finalize; the `remove` regression would surface
-    # on one of these channels (whichever fires depends on whether the `error` listener is still registered).
+    # With `discard` no wrapper raises on finalize; the `remove` regression would surface on one of these.
     assert emitter_errors == []
     assert loop_errors == []
     assert other_listener_done.is_set()
