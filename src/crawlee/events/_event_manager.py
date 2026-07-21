@@ -81,6 +81,10 @@ class EventManager:
         # Listeners are wrapped inside asyncio.Task. Store their references here so that we can wait for them to finish.
         self._listener_tasks: set[asyncio.Task] = set()
 
+        # Tasks currently blocked inside `wait_for_all_listeners_to_complete`. They are excluded when gathering
+        # listener tasks, otherwise a waiter would await itself or another waiter and deadlock.
+        self._waiting_listener_tasks: set[asyncio.Task] = set()
+
         # Store the mapping between events, listeners and their wrappers in the following way:
         #   event -> listener -> [wrapped_listener_1, wrapped_listener_2, ...]
         self._listeners_to_wrappers: dict[Event, dict[EventListener[Any], list[WrappedListener]]] = defaultdict(
@@ -257,12 +261,16 @@ class EventManager:
             timeout: The maximum time to wait for the event listeners to finish. If they do not complete within
                 the specified timeout, they will be canceled.
         """
-        # Exclude the calling task: when called from within a listener, awaiting it here would deadlock (self-await).
-        current_task = asyncio.current_task()
+        # Register this call's task as a waiter. A waiting task cannot finish until the listeners it awaits do,
+        # so no waiter may await another waiter (nor itself) - otherwise they would deadlock. This happens when
+        # a listener waits for or closes the event manager from within itself (as `Actor.exit()` does).
+        waiting_task = asyncio.current_task()
+        if waiting_task is not None:
+            self._waiting_listener_tasks.add(waiting_task)
 
         async def wait_for_listeners() -> None:
             """Gathers all listener tasks and awaits their completion, logging any exceptions encountered."""
-            listener_tasks = [task for task in self._listener_tasks if task is not current_task]
+            listener_tasks = [task for task in self._listener_tasks if task not in self._waiting_listener_tasks]
             results = await asyncio.gather(*listener_tasks, return_exceptions=True)
             for result in results:
                 if isinstance(result, Exception):
@@ -270,7 +278,11 @@ class EventManager:
 
         tasks = [asyncio.create_task(wait_for_listeners(), name=f'Task-{wait_for_listeners.__name__}')]
 
-        await wait_for_all_tasks_for_finish(tasks=tasks, logger=logger, timeout=timeout)
+        try:
+            await wait_for_all_tasks_for_finish(tasks=tasks, logger=logger, timeout=timeout)
+        finally:
+            if waiting_task is not None:
+                self._waiting_listener_tasks.discard(waiting_task)
 
     async def _emit_persist_state_event(self) -> None:
         """Emit a persist state event with the given migration status."""
