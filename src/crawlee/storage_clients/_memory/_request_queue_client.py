@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections import deque
-from contextlib import suppress
+from collections import OrderedDict
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -42,7 +41,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
         """
         self._metadata = metadata
 
-        self._pending_requests = deque[Request]()
+        self._pending_requests = OrderedDict[str, Request]()
         """Pending requests are those that have been added to the queue but not yet fetched for processing."""
 
         self._handled_requests = dict[str, Request]()
@@ -175,27 +174,21 @@ class MemoryRequestQueueClient(RequestQueueClient):
                 )
                 continue
 
-            # If the request is already in the queue but not handled, update it.
+            # If the request is already in the queue but not handled, update it without changing its position.
             if was_already_present and existing_request:
-                # Update indexes.
                 self._requests_by_unique_key[request.unique_key] = request
+                self._pending_requests[request.unique_key] = request
 
-                # We only update `forefront` by updating its position by shifting it to the left.
                 if forefront:
-                    # Update the existing request with any new data and
-                    # remove old request from pending queue if it's there.
-                    with suppress(ValueError):
-                        self._pending_requests.remove(existing_request)
-
-                    # Add updated request back to queue.
-                    self._pending_requests.appendleft(request)
+                    self._pending_requests.move_to_end(request.unique_key, last=False)
 
             # Add the new request to the queue.
             else:
                 if forefront:
-                    self._pending_requests.appendleft(request)
+                    self._pending_requests[request.unique_key] = request
+                    self._pending_requests.move_to_end(request.unique_key, last=False)
                 else:
-                    self._pending_requests.append(request)
+                    self._pending_requests[request.unique_key] = request
 
                 # Update indexes.
                 self._requests_by_unique_key[request.unique_key] = request
@@ -223,7 +216,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
     @override
     async def fetch_next_request(self) -> Request | None:
         while self._pending_requests:
-            request = self._pending_requests.popleft()
+            _, request = self._pending_requests.popitem(last=False)
 
             # Skip if already handled (shouldn't happen, but safety check).
             if request.was_already_handled:
@@ -290,11 +283,13 @@ class MemoryRequestQueueClient(RequestQueueClient):
         # Remove from in-progress.
         del self._in_progress_requests[request.unique_key]
 
+        # Update index with the possibly modified request.
+        self._requests_by_unique_key[request.unique_key] = request
+
         # Add request back to pending queue.
+        self._pending_requests[request.unique_key] = request
         if forefront:
-            self._pending_requests.appendleft(request)
-        else:
-            self._pending_requests.append(request)
+            self._pending_requests.move_to_end(request.unique_key, last=False)
 
         # Update metadata timestamps.
         await self._update_metadata(update_modified_at=True)
