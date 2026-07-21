@@ -202,7 +202,9 @@ class EventManager:
                 )
             finally:
                 logger.debug('EventManager.on.listener_wrapper(): Removing listener task from the set...')
-                self._listener_tasks.remove(listener_task)
+                # Use `discard` rather than `remove`: the task may already be gone from the set if `__aexit__`
+                # cleared it while this listener was mid-flight (e.g. `Actor.exit()` called from the listener).
+                self._listener_tasks.discard(listener_task)
 
         self._listeners_to_wrappers[event][listener].append(listener_wrapper)
         self._event_emitter.add_listener(event.value, listener_wrapper)
@@ -256,10 +258,15 @@ class EventManager:
             timeout: The maximum time to wait for the event listeners to finish. If they do not complete within
                 the specified timeout, they will be canceled.
         """
+        # Exclude the calling task from the wait set. When this method is reached from within an event listener
+        # (e.g. `Actor.exit()` invoked inside an `ABORTING` handler), that listener runs in a task which is itself
+        # present in `_listener_tasks`. Awaiting it here would make the task wait for its own completion and deadlock.
+        current_task = asyncio.current_task()
 
         async def wait_for_listeners() -> None:
             """Gathers all listener tasks and awaits their completion, logging any exceptions encountered."""
-            results = await asyncio.gather(*self._listener_tasks, return_exceptions=True)
+            listener_tasks = [task for task in self._listener_tasks if task is not current_task]
+            results = await asyncio.gather(*listener_tasks, return_exceptions=True)
             for result in results:
                 if isinstance(result, Exception):
                     logger.exception('Event listener raised an exception.', exc_info=result)

@@ -206,6 +206,56 @@ async def test_methods_raise_error_when_not_active(event_system_info_data: Event
         assert event_manager.active is True
 
 
+async def test_wait_for_all_listeners_from_within_a_listener_does_not_deadlock(
+    event_manager: EventManager,
+    event_system_info_data: EventSystemInfoData,
+) -> None:
+    """Waiting for all listeners from within a listener must not make the listener wait for its own task."""
+    completed = asyncio.Event()
+
+    async def waiting_listener(_: Any) -> None:
+        await event_manager.wait_for_all_listeners_to_complete()
+        completed.set()
+
+    event_manager.on(event=Event.SYSTEM_INFO, listener=waiting_listener)
+    event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
+
+    await asyncio.wait_for(completed.wait(), timeout=5)
+
+
+async def test_close_from_within_a_listener_does_not_deadlock_or_error(
+    event_system_info_data: EventSystemInfoData,
+) -> None:
+    """Closing the event manager from within a listener (as `Actor.exit()` does) must not deadlock or raise."""
+    event_manager = EventManager()
+    await event_manager.__aenter__()
+
+    # Capture exceptions raised inside listener wrappers - pyee re-emits them on the `error` event.
+    errors: list[BaseException] = []
+    event_manager._event_emitter.add_listener('error', errors.append)
+
+    closed = asyncio.Event()
+
+    async def closing_listener(_: Any) -> None:
+        await event_manager.__aexit__(None, None, None)
+        closed.set()
+
+    event_manager.on(event=Event.SYSTEM_INFO, listener=closing_listener)
+    event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
+
+    try:
+        await asyncio.wait_for(closed.wait(), timeout=5)
+        # Let the listener wrapper run its `finally` block that discards the completed task.
+        await asyncio.sleep(0.1)
+    finally:
+        if event_manager.active:
+            await event_manager.__aexit__(None, None, None)
+
+    assert errors == []
+    assert event_manager.active is False
+    assert len(event_manager._listener_tasks) == 0
+
+
 async def test_event_manager_in_context_persistence() -> None:
     """Test that entering the `EventManager` context emits persist state event at least once."""
     event_manager = EventManager()
