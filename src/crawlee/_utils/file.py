@@ -203,16 +203,12 @@ async def export_csv_to_stream(
     if 'lineterminator' not in kwargs:
         kwargs['lineterminator'] = '\n'
 
-    writer = csv.writer(dst, **kwargs)
-    write_header = True
+    items = [item async for item in iterator if item]
+    if not items:
+        return
 
-    # Iterate over the dataset and write to CSV.
-    async for item in iterator:
-        if not item:
-            continue
-
-        if write_header:
-            writer.writerow(item.keys())
-            write_header = False
-
-        writer.writerow(item.values())
+    fieldnames = list(dict.fromkeys(key for item in items for key in item))
+    writer = csv.DictWriter(dst, fieldnames=fieldnames, **kwargs)
+    writer.writeheader()
+    for item in items:
+        writer.writerow(item)
