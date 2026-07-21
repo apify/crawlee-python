@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from contextlib import suppress
 from datetime import timedelta
 from functools import update_wrapper
 from typing import TYPE_CHECKING, Any
@@ -204,6 +205,114 @@ async def test_methods_raise_error_when_not_active(event_system_info_data: Event
         await event_manager.wait_for_all_listeners_to_complete()
 
         assert event_manager.active is True
+
+
+async def test_wait_for_all_listeners_from_within_a_listener_does_not_deadlock(
+    event_manager: EventManager,
+    event_system_info_data: EventSystemInfoData,
+) -> None:
+    """Waiting from within a listener must not self-await, yet must still await the other listeners."""
+    other_listener_done = asyncio.Event()
+    waiter_done = asyncio.Event()
+    other_done_when_wait_returned: bool | None = None
+
+    async def other_listener(_: Any) -> None:
+        await asyncio.sleep(0.2)
+        other_listener_done.set()
+
+    async def waiting_listener(_: Any) -> None:
+        nonlocal other_done_when_wait_returned
+        await event_manager.wait_for_all_listeners_to_complete()
+        other_done_when_wait_returned = other_listener_done.is_set()
+        waiter_done.set()
+
+    event_manager.on(event=Event.SYSTEM_INFO, listener=other_listener)
+    event_manager.on(event=Event.SYSTEM_INFO, listener=waiting_listener)
+    event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
+
+    await asyncio.wait_for(waiter_done.wait(), timeout=5)
+
+    # No self-await deadlock, and the wait must have blocked until the co-registered listener finished.
+    assert other_done_when_wait_returned is True
+    assert other_listener_done.is_set()
+
+
+async def test_wait_from_within_multiple_listeners_does_not_deadlock(
+    event_manager: EventManager,
+    event_system_info_data: EventSystemInfoData,
+) -> None:
+    """Several listeners each waiting for all listeners at once must not deadlock one another."""
+    first_done = asyncio.Event()
+    second_done = asyncio.Event()
+
+    async def first_waiting_listener(_: Any) -> None:
+        await event_manager.wait_for_all_listeners_to_complete()
+        first_done.set()
+
+    async def second_waiting_listener(_: Any) -> None:
+        await event_manager.wait_for_all_listeners_to_complete()
+        second_done.set()
+
+    event_manager.on(event=Event.SYSTEM_INFO, listener=first_waiting_listener)
+    event_manager.on(event=Event.SYSTEM_INFO, listener=second_waiting_listener)
+    event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
+
+    await asyncio.wait_for(asyncio.gather(first_done.wait(), second_done.wait()), timeout=5)
+
+    assert first_done.is_set()
+    assert second_done.is_set()
+
+
+async def test_close_from_within_a_listener_does_not_deadlock_or_error(
+    event_system_info_data: EventSystemInfoData,
+) -> None:
+    """Closing the event manager from within a listener (as `Actor.exit()` does) must not deadlock or raise."""
+    event_manager = EventManager()
+    await event_manager.__aenter__()
+
+    # A wrapper finalizing after close raises onto the loop (its `error` listener is gone by then), so watch
+    # both channels for a stray exception.
+    emitter_errors: list[BaseException] = []
+    event_manager._event_emitter.add_listener('error', emitter_errors.append)
+    loop_errors: list[dict[str, Any]] = []
+    asyncio.get_running_loop().set_exception_handler(lambda _loop, context: loop_errors.append(context))
+
+    closed = asyncio.Event()
+    other_listener_done = asyncio.Event()
+
+    async def other_listener(_: Any) -> None:
+        await asyncio.sleep(0.2)
+        other_listener_done.set()
+
+    async def closing_listener(_: Any) -> None:
+        await event_manager.__aexit__(None, None, None)
+        closed.set()
+
+    # A second listener makes close await a concurrently-running listener - the real `Actor.exit()` shape.
+    event_manager.on(event=Event.SYSTEM_INFO, listener=other_listener)
+    event_manager.on(event=Event.SYSTEM_INFO, listener=closing_listener)
+
+    tasks_before = asyncio.all_tasks()
+    event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
+
+    try:
+        await asyncio.wait_for(closed.wait(), timeout=5)
+        # Drain the wrapper tasks so their `finally` blocks run before we assert - no arbitrary sleep.
+        spawned = asyncio.all_tasks() - tasks_before - {asyncio.current_task()}
+        if spawned:
+            await asyncio.wait(spawned)
+    finally:
+        # Cap the cleanup so a regressed deadlock surfaces the real failure instead of hanging.
+        if event_manager.active:
+            with suppress(Exception):
+                await asyncio.wait_for(event_manager.__aexit__(None, None, None), timeout=5)
+
+    # With `discard` no wrapper raises on finalize; the `remove` regression would surface on one of these.
+    assert emitter_errors == []
+    assert loop_errors == []
+    assert other_listener_done.is_set()
+    assert event_manager.active is False
+    assert len(event_manager._listener_tasks) == 0
 
 
 async def test_event_manager_in_context_persistence() -> None:
