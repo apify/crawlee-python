@@ -172,6 +172,7 @@ async def test_close_after_emit_processes_event(
 async def test_wait_for_all_listeners_cancelled_error(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
+    event_system_info_data: EventSystemInfoData,
 ) -> None:
     # Simulate long-running listener tasks
     async def long_running_listener() -> None:
@@ -184,9 +185,10 @@ async def test_wait_for_all_listeners_cancelled_error(
     with pytest.raises(asyncio.CancelledError), caplog.at_level(logging.WARNING):  # noqa: PT012
         async with EventManager(close_timeout=timedelta(milliseconds=10)) as event_manager:
             event_manager.on(event=Event.SYSTEM_INFO, listener=long_running_listener)
+            event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
 
             # Use monkeypatch to replace asyncio.wait with mock_async_wait
-            monkeypatch.setattr('asyncio.wait', mock_async_wait)
+            monkeypatch.setattr('crawlee._utils.wait.asyncio.wait', mock_async_wait)
 
 
 async def test_methods_raise_error_when_not_active(event_system_info_data: EventSystemInfoData) -> None:

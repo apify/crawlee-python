@@ -168,9 +168,26 @@ class EventManager:
             listener: The function (sync or async) which is to be called when the event is emitted.
         """
         signature = inspect.signature(listener)
+        listener_name = listener.__name__ if hasattr(listener, '__name__') else listener.__class__.__name__
+
+        async def run_listener(coro: Awaitable[None]) -> None:
+            """Await the listener, logging any exception, and deregister its task once it finishes."""
+            try:
+                await coro
+            except Exception:
+                # We need to swallow the exception and just log it here, otherwise it could break the event emitter
+                logger.exception(
+                    'Exception in the event listener',
+                    extra={'event_name': event.value, 'listener_name': listener_name},
+                )
+            finally:
+                listener_task = asyncio.current_task()
+                if listener_task is not None:
+                    # `discard`, not `remove`: `__aexit__` may have cleared the set while this listener ran.
+                    self._listener_tasks.discard(listener_task)
 
         @wraps(cast('Callable[..., None | Awaitable[None]]', listener))
-        async def listener_wrapper(event_data: EventData) -> None:
+        def listener_wrapper(event_data: EventData) -> None:
             try:
                 bound_args = signature.bind(event_data)
             except TypeError:  # Parameterless listener
@@ -184,29 +201,10 @@ class EventManager:
                 else asyncio.to_thread(cast('Callable[..., None]', listener), *bound_args.args, **bound_args.kwargs)
             )
 
-            listener_name = listener.__name__ if hasattr(listener, '__name__') else listener.__class__.__name__
-            listener_task = asyncio.create_task(coro, name=f'Task-{event.value}-{listener_name}')
+            # The wrapper runs synchronously inside `emit`, so the listener task is registered in
+            # `_listener_tasks` before `emit` returns - `wait_for_all_listeners_to_complete` relies on that.
+            listener_task = asyncio.create_task(run_listener(coro), name=f'Task-{event.value}-{listener_name}')
             self._listener_tasks.add(listener_task)
-
-            try:
-                logger.debug('EventManager.on.listener_wrapper(): Awaiting listener task...')
-                await listener_task
-                logger.debug('EventManager.on.listener_wrapper(): Listener task completed.')
-            except Exception:
-                # We need to swallow the exception and just log it here, otherwise it could break the event emitter
-                logger.exception(
-                    'Exception in the event listener',
-                    extra={
-                        'event_name': event.value,
-                        'listener_name': listener.__name__
-                        if hasattr(listener, '__name__')
-                        else listener.__class__.__name__,
-                    },
-                )
-            finally:
-                logger.debug('EventManager.on.listener_wrapper(): Removing listener task from the set...')
-                # `discard`, not `remove`: `__aexit__` may have cleared the set while this listener ran.
-                self._listener_tasks.discard(listener_task)
 
         self._listeners_to_wrappers[event][listener].append(listener_wrapper)
         self._event_emitter.add_listener(event.value, listener_wrapper)
@@ -266,18 +264,9 @@ class EventManager:
         if waiting_task is not None:
             self._waiting_listener_tasks.add(waiting_task)
 
-        async def wait_for_listeners() -> None:
-            """Gathers all listener tasks and awaits their completion, logging any exceptions encountered."""
-            listener_tasks = [task for task in self._listener_tasks if task not in self._waiting_listener_tasks]
-            results = await asyncio.gather(*listener_tasks, return_exceptions=True)
-            for result in results:
-                if isinstance(result, Exception):
-                    logger.exception('Event listener raised an exception.', exc_info=result)
-
-        tasks = [asyncio.create_task(wait_for_listeners(), name=f'Task-{wait_for_listeners.__name__}')]
-
         try:
-            await wait_for_all_tasks_for_finish(tasks=tasks, logger=logger, timeout=timeout)
+            listener_tasks = [task for task in self._listener_tasks if task not in self._waiting_listener_tasks]
+            await wait_for_all_tasks_for_finish(tasks=listener_tasks, logger=logger, timeout=timeout)
         finally:
             if waiting_task is not None:
                 self._waiting_listener_tasks.discard(waiting_task)

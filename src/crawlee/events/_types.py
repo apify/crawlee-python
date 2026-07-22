@@ -106,7 +106,7 @@ EventData = (
 )
 """A helper type for all possible event payloads"""
 
-WrappedListener = Callable[..., Coroutine[Any, Any, None]]
+WrappedListener = Callable[..., None]
 
 TEvent = TypeVar('TEvent')
 EventListener = (
