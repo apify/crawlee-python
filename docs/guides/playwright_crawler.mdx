@@ -56,7 +56,15 @@ You can also configure each plugin used by <ApiLink to="class/BrowserPool">`Brow
     {PluginBrowserConfigExample}
 </CodeBlock>
 
-For an example of how to implement a custom browser plugin, see the [Camoufox example](../examples/playwright-crawler-with-camoufox). [Camoufox](https://camoufox.com/) is a stealth browser plugin designed to reduce detection by anti-scraping measures and is fully compatible with <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.
+## Extending the browser plugin
+
+Use the configuration options provided by <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink> when the standard Playwright launch API supports the required browser. This keeps browser launch and context settings, incognito behavior, and user data directory handling on the built-in path without requiring a custom plugin.
+
+Create a subclass only when an integration uses a different browser launch API. Override `new_browser()` to launch the browser and return a <ApiLink to="class/PlaywrightBrowserController">`PlaywrightBrowserController`</ApiLink>. <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> initializes the plugin before calling this method, forwards its browser context options when creating pages, and manages the returned controller's lifecycle.
+
+Keep the inherited plugin configuration intact so that browser context options remain available to <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink>. When constructing the controller, explicitly preserve or intentionally replace `use_incognito_pages`, `max_open_pages_per_browser`, and fingerprint or header generation behavior. The custom launch path must likewise define how it applies browser launch options and `user_data_dir`.
+
+See the [Camoufox example](../examples/playwright-crawler-with-camoufox) for a complete implementation that uses a different browser launcher.
 
 ## Browser pool lifecycle hooks
 
