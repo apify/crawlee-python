@@ -63,6 +63,13 @@ async def test_export_csv_to_stream_skips_empty_items() -> None:
     assert dst.getvalue() == 'id,name\n1,Item 1\n2,Item 2\n'
 
 
+async def test_export_csv_to_stream_handles_empty_iterator() -> None:
+    dst = StringIO()
+    await export_csv_to_stream(_async_iter([]), dst)
+
+    assert dst.getvalue() == ''
+
+
 # Tests for validate_subdirectory (storage name/alias directory validation).
 
 

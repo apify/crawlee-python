@@ -203,12 +203,21 @@ async def export_csv_to_stream(
     if 'lineterminator' not in kwargs:
         kwargs['lineterminator'] = '\n'
 
-    items = [item async for item in iterator if item]
-    if not items:
-        return
+    fieldnames = dict[str, None]()
+    with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as items:
+        async for item in iterator:
+            if not item:
+                continue
 
-    fieldnames = list(dict.fromkeys(key for item in items for key in item))
-    writer = csv.DictWriter(dst, fieldnames=fieldnames, **kwargs)
-    writer.writeheader()
-    for item in items:
-        writer.writerow(item)
+            fieldnames.update(dict.fromkeys(item))
+            json.dump(item, items)
+            items.write('\n')
+
+        if not fieldnames:
+            return
+
+        writer = csv.DictWriter(dst, fieldnames=fieldnames, **kwargs)
+        writer.writeheader()
+        items.seek(0)
+        for item in items:
+            writer.writerow(json.loads(item))
