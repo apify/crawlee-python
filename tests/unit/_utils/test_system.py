@@ -25,7 +25,8 @@ def test_get_memory_info_returns_valid_values() -> None:
 
 
 def test_get_memory_info_falls_back_to_rss_for_children_with_access_denied(monkeypatch: pytest.MonkeyPatch) -> None:
-    child = psutil.Process()  # any process object works; only `_get_used_memory` behavior matters here
+    """Test that denied child PSS reads fall back to RSS."""
+    child = psutil.Process()
 
     monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: [child])
     monkeypatch.setattr(child, 'memory_info', lambda: SimpleNamespace(rss=50))
@@ -42,14 +43,41 @@ def test_get_memory_info_falls_back_to_rss_for_children_with_access_denied(monke
     assert memory_info.current_size == ByteSize(150)
 
 
-@pytest.mark.parametrize('error', [psutil.AccessDenied(), psutil.NoSuchProcess(pid=1)])
+@pytest.mark.parametrize(
+    'error',
+    [
+        pytest.param(psutil.AccessDenied(), id='access denied'),
+        pytest.param(psutil.NoSuchProcess(pid=1), id='no such process'),
+    ],
+)
 def test_get_memory_info_handles_failure_to_list_children(monkeypatch: pytest.MonkeyPatch, error: psutil.Error) -> None:
+    """Test that failure to list children does not abort memory collection."""
     monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: (_ for _ in ()).throw(error))
     monkeypatch.setattr(system, '_get_used_memory', lambda _process: 100)
 
     memory_info = get_memory_info()
 
     assert memory_info.current_size == ByteSize(100)
+
+
+def test_get_memory_info_continues_after_child_exits(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that a child exiting mid-iteration does not hide later children."""
+    exited_child = psutil.Process()
+    live_child = psutil.Process()
+    monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: [exited_child, live_child])
+
+    def fake_get_used_memory(process: psutil.Process) -> int:
+        if process is exited_child:
+            raise psutil.NoSuchProcess(pid=process.pid)
+        if process is live_child:
+            return 40
+        return 100
+
+    monkeypatch.setattr(system, '_get_used_memory', fake_get_used_memory)
+
+    memory_info = get_memory_info()
+
+    assert memory_info.current_size == ByteSize(140)
 
 
 def test_get_memory_info_falls_back_to_rss_when_current_process_access_denied(

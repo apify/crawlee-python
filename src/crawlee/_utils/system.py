@@ -122,24 +122,16 @@ def get_memory_info() -> MemoryInfo:
     logger.debug('Calling get_memory_info()...')
     current_process = psutil.Process(os.getpid())
 
-    # Retrieve estimated memory usage of the current process. On Linux `_get_used_memory` reads PSS via
-    # `memory_full_info`, which can raise `AccessDenied` in restricted environments (e.g. hardened containers);
-    # fall back to RSS, which a process can always read for itself.
-    try:
-        current_size_bytes = _get_used_memory(current_process)
-    except psutil.AccessDenied:
-        logger.debug('PSS access denied for the current process, falling back to RSS.')
-        current_size_bytes = int(current_process.memory_info().rss)
+    current_size_bytes = _get_used_memory_with_rss_fallback(current_process)
 
     # Sum memory usage by all children processes, try to exclude shared memory from the sum if allowed by OS.
+    children: list[psutil.Process] = []
     with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
-        for child in current_process.children(recursive=True):
-            try:
-                current_size_bytes += _get_used_memory(child)
-            except psutil.AccessDenied:  # noqa: PERF203
-                logger.debug('PSS access denied for child process %s, falling back to RSS.', child.pid)
-                with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
-                    current_size_bytes += int(child.memory_info().rss)
+        children = current_process.children(recursive=True)
+
+    for child in children:
+        with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
+            current_size_bytes += _get_used_memory_with_rss_fallback(child)
 
     vm = psutil.virtual_memory()
 
@@ -148,3 +140,11 @@ def get_memory_info() -> MemoryInfo:
         current_size=ByteSize(current_size_bytes),
         system_wide_used_size=ByteSize(vm.total - vm.available),
     )
+
+
+def _get_used_memory_with_rss_fallback(process: psutil.Process) -> int:
+    try:
+        return _get_used_memory(process)
+    except psutil.AccessDenied:
+        logger.debug('PSS access denied for process %s, falling back to RSS.', process.pid)
+        return int(process.memory_info().rss)
