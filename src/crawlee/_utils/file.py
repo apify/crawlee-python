@@ -7,7 +7,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, cast, overload
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Mapping
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs, JsonSerializable
+    from crawlee._types import ExportDataCsvKwargs, ExportDataCsvWriterKwargs, ExportDataJsonKwargs, JsonSerializable
 
 if sys.platform == 'win32':
 
@@ -196,6 +196,8 @@ async def export_csv_to_stream(
     dst: TextIO,
     **kwargs: Unpack[ExportDataCsvKwargs],
 ) -> None:
+    collect_all_keys = kwargs.pop('collect_all_keys', False)
+    writer_kwargs = cast('ExportDataCsvWriterKwargs', kwargs)
     # Set lineterminator to '\n' if not explicitly provided. This prevents double line endings on Windows.
     # The csv.writer default is '\r\n', which when written to a file in text mode on Windows gets converted
     # to '\r\r\n' due to newline translation. By using '\n', we let the platform handle the line ending
@@ -203,21 +205,23 @@ async def export_csv_to_stream(
     if 'lineterminator' not in kwargs:
         kwargs['lineterminator'] = '\n'
 
-    fieldnames = dict[str, None]()
-    with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as items:
-        async for item in iterator:
-            if not item:
-                continue
-
-            fieldnames.update(dict.fromkeys(item))
-            json.dump(item, items)
-            items.write('\n')
-
-        if not fieldnames:
+    if collect_all_keys:
+        items = [item async for item in iterator if item]
+        if not items:
             return
 
-        writer = csv.DictWriter(dst, fieldnames=fieldnames, **kwargs)
+        fieldnames = list(dict.fromkeys(key for item in items for key in item))
+        writer = csv.DictWriter(dst, fieldnames=fieldnames, **writer_kwargs)
         writer.writeheader()
-        items.seek(0)
         for item in items:
-            writer.writerow(json.loads(item))
+            writer.writerow(item)
+        return
+
+    writer = None
+    async for item in iterator:
+        if not item:
+            continue
+        if writer is None:
+            writer = csv.DictWriter(dst, fieldnames=list(item), extrasaction='ignore', **writer_kwargs)
+            writer.writeheader()
+        writer.writerow(item)

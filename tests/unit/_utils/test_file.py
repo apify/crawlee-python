@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from io import StringIO
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -26,7 +26,7 @@ async def test_json_dumps() -> None:
 # Tests for export_csv_to_stream (dataset CSV export).
 
 
-async def _async_iter(
+async def async_iter(
     items: list[Mapping[str, JsonSerializable]],
 ) -> AsyncIterator[Mapping[str, JsonSerializable]]:
     for item in items:
@@ -37,7 +37,7 @@ async def test_export_csv_to_stream_keeps_columns_aligned_for_heterogeneous_item
     """Values must be written under their own header column even when items have different key orders/sets."""
     dst = StringIO()
     await export_csv_to_stream(
-        _async_iter(
+        async_iter(
             [
                 {'name': 'Alice', 'age': 30},
                 {'name': 'Bob', 'city': 'NYC', 'age': 25},
@@ -48,14 +48,27 @@ async def test_export_csv_to_stream_keeps_columns_aligned_for_heterogeneous_item
         lineterminator='\n',
     )
 
-    assert dst.getvalue() == 'name,age,city\nAlice,30,\nBob,25,NYC\nCarol,40,\n'
+    assert dst.getvalue() == 'name,age\nAlice,30\nBob,25\nCarol,40\n'
+
+
+async def test_export_csv_to_stream_collects_all_keys_when_requested() -> None:
+    """All item keys are included when key collection is enabled."""
+    dst = StringIO()
+    await export_csv_to_stream(
+        async_iter([{'name': 'Alice', 'age': 30}, {'name': 'Bob', 'city': 'NYC', 'age': 25}]),
+        dst,
+        collect_all_keys=True,
+        lineterminator='\n',
+    )
+
+    assert dst.getvalue() == 'name,age,city\nAlice,30,\nBob,25,NYC\n'
 
 
 async def test_export_csv_to_stream_skips_empty_items() -> None:
     """Empty mappings are skipped and do not define or shift the header."""
     dst = StringIO()
     await export_csv_to_stream(
-        _async_iter([{}, {'id': 1, 'name': 'Item 1'}, {}, {'id': 2, 'name': 'Item 2'}]),
+        async_iter([{}, {'id': 1, 'name': 'Item 1'}, {}, {'id': 2, 'name': 'Item 2'}]),
         dst,
         lineterminator='\n',
     )
@@ -64,10 +77,39 @@ async def test_export_csv_to_stream_skips_empty_items() -> None:
 
 
 async def test_export_csv_to_stream_handles_empty_iterator() -> None:
+    """An empty iterator produces no CSV content."""
     dst = StringIO()
-    await export_csv_to_stream(_async_iter([]), dst)
+    await export_csv_to_stream(async_iter([]), dst)
 
     assert dst.getvalue() == ''
+
+
+async def test_export_csv_to_stream_writes_before_consuming_all_items() -> None:
+    """The default export writes its header before requesting the second item."""
+    dst = StringIO()
+
+    async def items() -> AsyncIterator[Mapping[str, JsonSerializable]]:
+        yield {'id': 1}
+        assert dst.getvalue() == 'id\n1\n'
+        yield {'id': 2}
+
+    await export_csv_to_stream(items(), dst, lineterminator='\n')
+
+    assert dst.getvalue() == 'id\n1\n2\n'
+
+
+async def test_export_csv_to_stream_preserves_non_json_values() -> None:
+    """CSV values do not pass through JSON serialization."""
+    dst = StringIO()
+    value = datetime(2020, 1, 1, tzinfo=timezone.utc)
+
+    await export_csv_to_stream(
+        async_iter([{'created_at': cast('JsonSerializable', value)}]),
+        dst,
+        lineterminator='\n',
+    )
+
+    assert dst.getvalue() == 'created_at\n2020-01-01 00:00:00+00:00\n'
 
 
 # Tests for validate_subdirectory (storage name/alias directory validation).

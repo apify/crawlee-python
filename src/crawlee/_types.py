@@ -772,8 +772,8 @@ class ExportDataJsonKwargs(TypedDict):
     """Specifies whether the output JSON object should have keys sorted alphabetically."""
 
 
-class ExportDataCsvKwargs(TypedDict):
-    """Keyword arguments for dataset's `export_data_csv` method."""
+class ExportDataCsvWriterKwargs(TypedDict):
+    """Keyword arguments forwarded to `csv.DictWriter`."""
 
     dialect: NotRequired[str]
     """Specifies a dialect to be used in CSV parsing and writing."""
@@ -805,6 +805,13 @@ class ExportDataCsvKwargs(TypedDict):
 
     strict: NotRequired[bool]
     """When True, raises an exception on bad CSV input. Defaults to False."""
+
+
+class ExportDataCsvKwargs(ExportDataCsvWriterKwargs):
+    """Keyword arguments for dataset's CSV export."""
+
+    collect_all_keys: NotRequired[bool]
+    """When True, includes keys from all items as CSV columns. Defaults to False."""
 
 
 class ExportDataKwargs(ExportDataJsonKwargs, ExportDataCsvKwargs):
