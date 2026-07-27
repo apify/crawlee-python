@@ -338,16 +338,8 @@ async def test_list_items_with_options(dataset: Dataset) -> None:
     # Test with descending order - skip empty items to avoid KeyError
     collected_items = await dataset.list_items(desc=True, skip_empty=True)
 
-    # Filter items that have an 'id' field
-    items_with_ids = [item for item in collected_items if 'id' in item]
-    id_values = [item['id'] for item in items_with_ids]
-
-    # Verify the list is sorted in descending order
-    assert sorted(id_values, reverse=True) == id_values, f'IDs should be in descending order. Got {id_values}'
-
-    # Verify key IDs are present and in the right order
-    if 5 in id_values and 3 in id_values:
-        assert id_values.index(5) < id_values.index(3), 'ID 5 should come before ID 3 in descending order'
+    id_values = [item['id'] for item in collected_items]
+    assert id_values == [5, 3, 2, 1], f'IDs should be in descending order. Got {id_values}'
 
     # Test with skip_empty
     collected_items = await dataset.list_items(skip_empty=True)
