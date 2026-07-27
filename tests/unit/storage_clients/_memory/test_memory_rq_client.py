@@ -96,7 +96,7 @@ async def test_memory_metadata_updates(rq_client: MemoryRequestQueueClient) -> N
 
 
 async def test_forefront_readd_does_not_grow_pending_requests(rq_client: MemoryRequestQueueClient) -> None:
-    """Test that repeatedly repositioning pending requests does not create duplicate entries."""
+    """Test the structural O(1) forefront repositioning does not create duplicate entries."""
     requests = [Request.from_url(f'https://example.com/{i}') for i in range(20)]
     await rq_client.add_batch_of_requests(requests)
 
