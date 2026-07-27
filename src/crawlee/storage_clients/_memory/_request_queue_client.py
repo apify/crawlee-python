@@ -174,7 +174,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
                 )
                 continue
 
-            # If the request is already in the queue but not handled, update it without changing its position.
+            # If the request is already in the queue but not handled, update it; forefront moves it to the front.
             if was_already_present and existing_request:
                 self._requests_by_unique_key[request.unique_key] = request
                 self._pending_requests[request.unique_key] = request
@@ -184,11 +184,9 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
             # Add the new request to the queue.
             else:
+                self._pending_requests[request.unique_key] = request
                 if forefront:
-                    self._pending_requests[request.unique_key] = request
                     self._pending_requests.move_to_end(request.unique_key, last=False)
-                else:
-                    self._pending_requests[request.unique_key] = request
 
                 # Update indexes.
                 self._requests_by_unique_key[request.unique_key] = request

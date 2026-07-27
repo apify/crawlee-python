@@ -103,7 +103,13 @@ async def test_forefront_readd_does_not_grow_pending_requests(rq_client: MemoryR
     for _ in range(10):
         await rq_client.add_batch_of_requests(requests, forefront=True)
 
-    assert len(rq_client._pending_requests) == len(requests)
+    fetched = []
+    while (request := await rq_client.fetch_next_request()) is not None:
+        fetched.append(request)
+        await rq_client.mark_request_as_handled(request)
+
+    assert len(fetched) == len(requests)
+    assert {request.unique_key for request in fetched} == {request.unique_key for request in requests}
 
 
 async def test_forefront_readd_preserves_order_and_dedup(rq_client: MemoryRequestQueueClient) -> None:
