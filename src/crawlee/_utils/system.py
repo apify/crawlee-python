@@ -128,14 +128,18 @@ def get_memory_info() -> MemoryInfo:
     try:
         current_size_bytes = _get_used_memory(current_process)
     except psutil.AccessDenied:
+        logger.debug('PSS access denied for the current process, falling back to RSS.')
         current_size_bytes = int(current_process.memory_info().rss)
 
     # Sum memory usage by all children processes, try to exclude shared memory from the sum if allowed by OS.
-    for child in current_process.children(recursive=True):
-        # Ignore a child that ends before we retrieve its memory usage (`NoSuchProcess`) or that we are not
-        # allowed to inspect (`AccessDenied`, e.g. an unreadable subprocess in a restricted environment).
-        with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
-            current_size_bytes += _get_used_memory(child)
+    with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
+        for child in current_process.children(recursive=True):
+            try:
+                current_size_bytes += _get_used_memory(child)
+            except psutil.AccessDenied:  # noqa: PERF203
+                logger.debug('PSS access denied for child process %s, falling back to RSS.', child.pid)
+                with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
+                    current_size_bytes += int(child.memory_info().rss)
 
     vm = psutil.virtual_memory()
 

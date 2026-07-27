@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 from multiprocessing import get_context, synchronize
 from multiprocessing.shared_memory import SharedMemory
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import psutil
@@ -23,15 +24,11 @@ def test_get_memory_info_returns_valid_values() -> None:
     assert memory_info.current_size < memory_info.total_size
 
 
-def test_get_memory_info_skips_children_with_access_denied(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A child process we are not allowed to inspect must be skipped, not abort the whole snapshot.
-
-    In restricted environments (e.g. hardened containers) reading a child's memory can raise
-    `psutil.AccessDenied`, which is not a subclass of `psutil.NoSuchProcess` and so was not suppressed.
-    """
+def test_get_memory_info_falls_back_to_rss_for_children_with_access_denied(monkeypatch: pytest.MonkeyPatch) -> None:
     child = psutil.Process()  # any process object works; only `_get_used_memory` behavior matters here
 
     monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: [child])
+    monkeypatch.setattr(child, 'memory_info', lambda: SimpleNamespace(rss=50))
 
     def fake_get_used_memory(process: psutil.Process) -> int:
         if process is child:
@@ -42,7 +39,16 @@ def test_get_memory_info_skips_children_with_access_denied(monkeypatch: pytest.M
 
     memory_info = get_memory_info()
 
-    # The unreadable child is skipped, so only the current process (100) is counted.
+    assert memory_info.current_size == ByteSize(150)
+
+
+@pytest.mark.parametrize('error', [psutil.AccessDenied(), psutil.NoSuchProcess(pid=1)])
+def test_get_memory_info_handles_failure_to_list_children(monkeypatch: pytest.MonkeyPatch, error: psutil.Error) -> None:
+    monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: (_ for _ in ()).throw(error))
+    monkeypatch.setattr(system, '_get_used_memory', lambda _process: 100)
+
+    memory_info = get_memory_info()
+
     assert memory_info.current_size == ByteSize(100)
 
 
