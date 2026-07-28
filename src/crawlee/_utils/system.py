@@ -4,15 +4,17 @@ import os
 import sys
 from contextlib import suppress
 from datetime import datetime, timezone
-from logging import getLogger
+from logging import WARNING, getLogger
 from typing import TYPE_CHECKING, Annotated
 
 import psutil
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
 
 from crawlee._utils.byte_size import ByteSize
+from crawlee._utils.log import LoggerOnce
 
 logger = getLogger(__name__)
+logger_once = LoggerOnce(logger)
 
 if sys.platform == 'linux':
     """Get the most suitable available used memory metric.
@@ -26,7 +28,23 @@ if sys.platform == 'linux':
     """
 
     def _get_used_memory(process: psutil.Process) -> int:
-        return int(process.memory_full_info().pss)
+        # A restricted environment may deny `/proc/<pid>/smaps` or not expose it at all - psutil then aliases
+        # `memory_full_info` to `memory_info`, which has no `pss`. An unreadable `smaps` parses to a PSS of zero.
+        try:
+            pss = getattr(process.memory_full_info(), 'pss', 0)
+        except psutil.AccessDenied:
+            pss = 0
+
+        if pss:
+            return int(pss)
+
+        # RSS counts shared memory in full for every process that maps it, so a sharing process tree is overestimated.
+        logger_once.log(
+            'Unable to read the PSS memory metric, falling back to RSS - shared memory may be counted repeatedly.',
+            key='pss_unavailable',
+            level=WARNING,
+        )
+        return int(process.memory_info().rss)
 else:
 
     def _get_used_memory(process: psutil.Process) -> int:
@@ -117,21 +135,32 @@ def get_cpu_info() -> CpuInfo:
 def get_memory_info() -> MemoryInfo:
     """Retrieve the current memory usage of the process and its children.
 
-    It utilizes the `psutil` library.
+    It utilizes the `psutil` library. The reported `current_size` is best-effort - processes that cannot be inspected
+    are left out of the sum and PSS may be substituted by RSS.
     """
     logger.debug('Calling get_memory_info()...')
     current_process = psutil.Process(os.getpid())
 
-    current_size_bytes = _get_used_memory_with_rss_fallback(current_process)
+    # Retrieve estimated memory usage of the current process.
+    current_size_bytes = _get_used_memory(current_process)
 
     # Sum memory usage by all children processes, try to exclude shared memory from the sum if allowed by OS.
     children: list[psutil.Process] = []
-    with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
+    try:
         children = current_process.children(recursive=True)
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        # A missing child list hides the whole subprocess tree from the estimate, so do not degrade silently.
+        logger_once.log(
+            'Unable to list child processes, their memory usage is excluded from the estimate.',
+            key='children_unavailable',
+            level=WARNING,
+        )
 
     for child in children:
+        # Skip a child that exits mid-loop (`NoSuchProcess`) or that we cannot inspect (`AccessDenied`); either way
+        # it drops out of the sum.
         with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
-            current_size_bytes += _get_used_memory_with_rss_fallback(child)
+            current_size_bytes += _get_used_memory(child)
 
     vm = psutil.virtual_memory()
 
@@ -140,11 +169,3 @@ def get_memory_info() -> MemoryInfo:
         current_size=ByteSize(current_size_bytes),
         system_wide_used_size=ByteSize(vm.total - vm.available),
     )
-
-
-def _get_used_memory_with_rss_fallback(process: psutil.Process) -> int:
-    try:
-        return _get_used_memory(process)
-    except psutil.AccessDenied:
-        logger.debug('PSS access denied for process %s, falling back to RSS.', process.pid)
-        return int(process.memory_info().rss)

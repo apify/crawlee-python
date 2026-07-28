@@ -17,6 +17,30 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
+class FakeProcess:
+    """Stand-in for `psutil.Process` that lets a test decide what a child process reports as its memory usage."""
+
+    def __init__(self, pid: int, used_memory: int | Exception) -> None:
+        self.pid = pid
+        self.used_memory = used_memory
+
+
+def fake_get_used_memory(process: psutil.Process | FakeProcess) -> int:
+    """Report the scripted value for a `FakeProcess` child and a fixed value for the real current process."""
+    if not isinstance(process, FakeProcess):
+        return 100
+
+    used_memory = process.used_memory
+    if isinstance(used_memory, Exception):
+        raise used_memory
+    return used_memory
+
+
+def raise_access_denied(process: psutil.Process) -> object:
+    """Stand in for `psutil.Process.memory_full_info` in an environment that refuses to expose PSS."""
+    raise psutil.AccessDenied(pid=process.pid)
+
+
 def test_get_memory_info_returns_valid_values() -> None:
     memory_info = get_memory_info()
 
@@ -24,23 +48,48 @@ def test_get_memory_info_returns_valid_values() -> None:
     assert memory_info.current_size < memory_info.total_size
 
 
-def test_get_memory_info_falls_back_to_rss_for_children_with_access_denied(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test that denied child PSS reads fall back to RSS."""
-    child = psutil.Process()
+@pytest.mark.skipif(sys.platform != 'linux', reason='PSS is read only on Linux, elsewhere RSS is used directly')
+@pytest.mark.parametrize(
+    'memory_full_info',
+    [
+        pytest.param(raise_access_denied, id='access denied'),
+        pytest.param(lambda _process: SimpleNamespace(), id='pss field missing'),
+        pytest.param(lambda _process: SimpleNamespace(pss=0), id='pss reported as zero'),
+    ],
+)
+def test_get_used_memory_falls_back_to_rss_when_pss_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch, memory_full_info: Callable[[psutil.Process], object]
+) -> None:
+    """An unreadable PSS metric falls back to the RSS of the same process instead of raising or reporting zero."""
+    monkeypatch.setattr(psutil.Process, 'memory_full_info', memory_full_info)
+    monkeypatch.setattr(psutil.Process, 'memory_info', lambda _process: SimpleNamespace(rss=1024))
 
-    monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: [child])
-    monkeypatch.setattr(child, 'memory_info', lambda: SimpleNamespace(rss=50))
+    assert system._get_used_memory(psutil.Process()) == 1024
 
-    def fake_get_used_memory(process: psutil.Process) -> int:
-        if process is child:
-            raise psutil.AccessDenied(pid=child.pid)
-        return 100
 
+def test_get_memory_info_skips_children_that_cannot_be_measured(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A child that cannot be inspected at all is left out of the sum instead of aborting the snapshot."""
+    children = [FakeProcess(pid=1001, used_memory=psutil.AccessDenied(pid=1001)), FakeProcess(pid=1002, used_memory=40)]
+    monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: children)
     monkeypatch.setattr(system, '_get_used_memory', fake_get_used_memory)
 
     memory_info = get_memory_info()
 
-    assert memory_info.current_size == ByteSize(150)
+    assert memory_info.current_size == ByteSize(140)
+
+
+def test_get_memory_info_continues_after_child_exits(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A child exiting mid-iteration does not hide the children measured after it."""
+    children = [
+        FakeProcess(pid=1001, used_memory=psutil.NoSuchProcess(pid=1001)),
+        FakeProcess(pid=1002, used_memory=40),
+    ]
+    monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: children)
+    monkeypatch.setattr(system, '_get_used_memory', fake_get_used_memory)
+
+    memory_info = get_memory_info()
+
+    assert memory_info.current_size == ByteSize(140)
 
 
 @pytest.mark.parametrize(
@@ -51,53 +100,17 @@ def test_get_memory_info_falls_back_to_rss_for_children_with_access_denied(monke
     ],
 )
 def test_get_memory_info_handles_failure_to_list_children(monkeypatch: pytest.MonkeyPatch, error: psutil.Error) -> None:
-    """Test that failure to list children does not abort memory collection."""
-    monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: (_ for _ in ()).throw(error))
-    monkeypatch.setattr(system, '_get_used_memory', lambda _process: 100)
+    """Failure to list the child processes does not abort the whole memory snapshot."""
+
+    def raise_error(*_args: object, **_kwargs: object) -> list[psutil.Process]:
+        raise error
+
+    monkeypatch.setattr(psutil.Process, 'children', raise_error)
+    monkeypatch.setattr(system, '_get_used_memory', fake_get_used_memory)
 
     memory_info = get_memory_info()
 
     assert memory_info.current_size == ByteSize(100)
-
-
-def test_get_memory_info_continues_after_child_exits(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test that a child exiting mid-iteration does not hide later children."""
-    exited_child = psutil.Process()
-    live_child = psutil.Process()
-    monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: [exited_child, live_child])
-
-    def fake_get_used_memory(process: psutil.Process) -> int:
-        if process is exited_child:
-            raise psutil.NoSuchProcess(pid=process.pid)
-        if process is live_child:
-            return 40
-        return 100
-
-    monkeypatch.setattr(system, '_get_used_memory', fake_get_used_memory)
-
-    memory_info = get_memory_info()
-
-    assert memory_info.current_size == ByteSize(140)
-
-
-def test_get_memory_info_falls_back_to_rss_when_current_process_access_denied(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """If PSS for the current process is denied, fall back to RSS instead of crashing.
-
-    On Linux `_get_used_memory` reads PSS via `memory_full_info`, which may require elevated privileges.
-    """
-    monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: [])
-
-    def fake_get_used_memory(process: psutil.Process) -> int:
-        raise psutil.AccessDenied(pid=process.pid)
-
-    monkeypatch.setattr(system, '_get_used_memory', fake_get_used_memory)
-
-    memory_info = get_memory_info()
-
-    # RSS of the current process is a positive value below total system memory.
-    assert ByteSize(0) < memory_info.current_size < memory_info.total_size
 
 
 def test_get_cpu_info_returns_valid_values() -> None:
