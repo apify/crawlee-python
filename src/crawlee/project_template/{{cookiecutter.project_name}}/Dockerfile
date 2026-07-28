@@ -49,7 +49,7 @@ RUN echo "Python version:" \
 RUN pip install --no-deps --force-reinstall "playwright=={{ playwright_version }}"
 # % endif
 # % elif cookiecutter.package_manager == 'uv'
-COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.12 /uv /uvx /bin/
 
 ENV UV_PROJECT_ENVIRONMENT="/usr/local"
 
