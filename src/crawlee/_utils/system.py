@@ -16,39 +16,92 @@ from crawlee._utils.log import LoggerOnce
 logger = getLogger(__name__)
 logger_once = LoggerOnce(logger)
 
-if sys.platform == 'linux':
-    """Get the most suitable available used memory metric.
+# Reading a memory metric of a process that is denied or gone raises either a `psutil.Error` or a bare `OSError` -
+# psutil re-raises `FileNotFoundError` as is when a `/proc` entry is missing for a process that is still alive.
+_METRIC_ERRORS = (psutil.Error, OSError)
 
-    `Proportional Set Size (PSS)`, is the amount of own memory and memory shared with other processes, accounted in a
-    way that the shared amount is divided evenly between the processes that share it. Available on Linux. Suitable for
-    avoiding overestimation by counting the same shared memory used by children processes multiple times.
 
-    `Resident Set Size (RSS)` is the non-swapped physical memory a process has used; it includes shared memory. It
-    should be available everywhere.
+class _PssAvailability:
+    """Process-wide latch for whether the PSS memory metric exists on this system at all.
+
+    Memory is sampled on a short recurring interval, so once psutil is known to not expose PSS there is no point in
+    asking for it again for every process on every sample. Only the system-wide verdict is latched; a single process
+    refusing to be inspected says nothing about the others.
     """
 
+    is_available = True
+
+
+if sys.platform == 'linux':
+
     def _get_used_memory(process: psutil.Process) -> int:
-        # A restricted environment may deny `/proc/<pid>/smaps` or not expose it at all - psutil then aliases
-        # `memory_full_info` to `memory_info`, which has no `pss`. An unreadable `smaps` parses to a PSS of zero.
-        try:
-            pss = getattr(process.memory_full_info(), 'pss', 0)
-        except psutil.AccessDenied:
-            pss = 0
+        """Get the most suitable available used memory metric of a single process.
 
-        if pss:
-            return int(pss)
+        `Proportional Set Size (PSS)` is the amount of own memory and memory shared with other processes, accounted in
+        a way that the shared amount is divided evenly between the processes that share it. Available on Linux.
+        Suitable for avoiding overestimation by counting the same shared memory used by children processes multiple
+        times.
 
-        # RSS counts shared memory in full for every process that maps it, so a sharing process tree is overestimated.
-        logger_once.log(
-            'Unable to read the PSS memory metric, falling back to RSS - shared memory may be counted repeatedly.',
-            key='pss_unavailable',
-            level=WARNING,
-        )
+        `Resident Set Size (RSS)` is the non-swapped physical memory a process has used; it includes shared memory. It
+        should be available everywhere, so it is used whenever PSS cannot be read. It counts shared memory in full for
+        every process that maps it, so a sharing process tree gets overestimated.
+
+        Raises:
+            psutil.Error: If the process refuses inspection or is gone.
+            OSError: If a `/proc` entry of the process is missing.
+        """
+        if _PssAvailability.is_available:
+            # A restricted environment may deny `/proc/<pid>/smaps`, which is a property of the single process, so it
+            # only falls back to RSS for that one process.
+            with suppress(*_METRIC_ERRORS):
+                # A system that does not expose `smaps` at all makes psutil alias `memory_full_info` to
+                # `memory_info`, whose result has no `pss` field.
+                pss = getattr(process.memory_full_info(), 'pss', None)
+
+                if pss is None:
+                    _PssAvailability.is_available = False
+                    logger_once.log(
+                        'Unable to read the PSS memory metric, falling back to RSS - shared memory may be counted '
+                        'repeatedly.',
+                        key='pss_unavailable',
+                        level=WARNING,
+                    )
+                # A `smaps` file can be empty for some processes, which parses to a PSS of zero. No live process
+                # really uses zero memory, so treat it as a missing reading rather than as a measurement.
+                elif pss > 0:
+                    return int(pss)
+
         return int(process.memory_info().rss)
 else:
 
     def _get_used_memory(process: psutil.Process) -> int:
+        """Get the used memory metric of a single process.
+
+        `Resident Set Size (RSS)` is the non-swapped physical memory a process has used; it includes shared memory, so
+        a process tree that shares memory gets overestimated. It is the only metric available outside of Linux.
+
+        Raises:
+            psutil.Error: If the process refuses inspection or is gone.
+            OSError: If the memory metric of the process cannot be read.
+        """
         return int(process.memory_info().rss)
+
+
+def _get_child_used_memory(child: psutil.Process) -> int:
+    """Get the used memory of a child process, or zero if the child cannot be measured at all."""
+    try:
+        return _get_used_memory(child)
+    except psutil.NoSuchProcess:
+        # A child that exits mid-measurement just drops out of the sum, which is business as usual.
+        return 0
+    except _METRIC_ERRORS:
+        # A child we cannot inspect at all drops out of the sum too, which does hide its memory usage.
+        logger_once.log(
+            'Unable to read the memory usage of a child process, it is excluded from the estimate.',
+            key='child_unmeasurable',
+            level=WARNING,
+        )
+        return 0
 
 
 class CpuInfo(BaseModel):
@@ -85,7 +138,11 @@ class MemoryUsageInfo(BaseModel):
         PlainSerializer(lambda size: size.bytes),
         Field(alias='currentSize'),
     ]
-    """Memory usage of the current Python process and its children."""
+    """Memory usage of the current Python process and its children.
+
+    This is a best-effort estimate - a process that cannot be inspected is left out of the sum, and the metric used
+    may be RSS, which counts memory shared between the processes repeatedly.
+    """
 
     # Workaround for Pydantic and type checkers when using Annotated with default_factory
     if TYPE_CHECKING:
@@ -136,7 +193,8 @@ def get_memory_info() -> MemoryInfo:
     """Retrieve the current memory usage of the process and its children.
 
     It utilizes the `psutil` library. The reported `current_size` is best-effort - processes that cannot be inspected
-    are left out of the sum and PSS may be substituted by RSS.
+    are left out of the sum, PSS may be substituted by RSS, and the result is capped at the total memory of the
+    machine.
     """
     logger.debug('Calling get_memory_info()...')
     current_process = psutil.Process(os.getpid())
@@ -148,7 +206,7 @@ def get_memory_info() -> MemoryInfo:
     children: list[psutil.Process] = []
     try:
         children = current_process.children(recursive=True)
-    except (psutil.NoSuchProcess, psutil.AccessDenied):
+    except _METRIC_ERRORS:
         # A missing child list hides the whole subprocess tree from the estimate, so do not degrade silently.
         logger_once.log(
             'Unable to list child processes, their memory usage is excluded from the estimate.',
@@ -157,12 +215,13 @@ def get_memory_info() -> MemoryInfo:
         )
 
     for child in children:
-        # Skip a child that exits mid-loop (`NoSuchProcess`) or that we cannot inspect (`AccessDenied`); either way
-        # it drops out of the sum.
-        with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
-            current_size_bytes += _get_used_memory(child)
+        current_size_bytes += _get_child_used_memory(child)
 
     vm = psutil.virtual_memory()
+
+    # Summing RSS counts memory shared between the processes repeatedly, which can add up to more than the machine
+    # has. Reporting more than the total would make the autoscaler throttle forever, so cap the estimate.
+    current_size_bytes = min(current_size_bytes, vm.total)
 
     return MemoryInfo(
         total_size=ByteSize(vm.total),

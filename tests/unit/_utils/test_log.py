@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import TYPE_CHECKING
 
 from crawlee._utils.log import LoggerOnce
@@ -23,6 +24,28 @@ def test_duplicate_key_is_suppressed(caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level(logging.INFO, logger=logger.name):
         logger_once.log('first', key='k1')
         logger_once.log('second', key='k1')
+    assert [r.getMessage() for r in caplog.records] == ['first']
+
+
+def test_threads_racing_on_one_key_log_once(caplog: pytest.LogCaptureFixture) -> None:
+    """Threads reaching the same key at once emit a single record - metrics are sampled in a worker thread."""
+    logger = logging.getLogger('crawlee.tests.log_dedup_threads')
+    logger_once = LoggerOnce(logger)
+    thread_count = 16
+    ready = threading.Barrier(thread_count)
+
+    def log_once() -> None:
+        ready.wait()
+        logger_once.log('first', key='k1')
+
+    threads = [threading.Thread(target=log_once) for _ in range(thread_count)]
+
+    with caplog.at_level(logging.INFO, logger=logger.name):
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
     assert [r.getMessage() for r in caplog.records] == ['first']
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sys
 from multiprocessing import get_context, synchronize
 from multiprocessing.shared_memory import SharedMemory
@@ -11,6 +12,7 @@ import pytest
 
 from crawlee._utils import system
 from crawlee._utils.byte_size import ByteSize
+from crawlee._utils.log import LoggerOnce
 from crawlee._utils.system import get_cpu_info, get_memory_info
 
 if TYPE_CHECKING:
@@ -24,21 +26,34 @@ class FakeProcess:
         self.pid = pid
         self.used_memory = used_memory
 
+    def memory_full_info(self) -> object:
+        if isinstance(self.used_memory, Exception):
+            raise self.used_memory
+        return SimpleNamespace(pss=self.used_memory)
 
-def fake_get_used_memory(process: psutil.Process | FakeProcess) -> int:
-    """Report the scripted value for a `FakeProcess` child and a fixed value for the real current process."""
-    if not isinstance(process, FakeProcess):
-        return 100
-
-    used_memory = process.used_memory
-    if isinstance(used_memory, Exception):
-        raise used_memory
-    return used_memory
+    def memory_info(self) -> object:
+        if isinstance(self.used_memory, Exception):
+            raise self.used_memory
+        return SimpleNamespace(rss=self.used_memory)
 
 
 def raise_access_denied(process: psutil.Process) -> object:
     """Stand in for `psutil.Process.memory_full_info` in an environment that refuses to expose PSS."""
     raise psutil.AccessDenied(pid=process.pid)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_module_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reset the process-wide state of the module, so that dedup keys and the PSS latch do not leak between tests."""
+    monkeypatch.setattr(system, 'logger_once', LoggerOnce(system.logger))
+    monkeypatch.setattr(system._PssAvailability, 'is_available', True)
+
+
+@pytest.fixture
+def measured_current_process(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the real current process report a fixed memory usage of 100 bytes, whichever metric is used."""
+    monkeypatch.setattr(psutil.Process, 'memory_full_info', lambda _process: SimpleNamespace(pss=100))
+    monkeypatch.setattr(psutil.Process, 'memory_info', lambda _process: SimpleNamespace(rss=100))
 
 
 def test_get_memory_info_returns_valid_values() -> None:
@@ -50,46 +65,83 @@ def test_get_memory_info_returns_valid_values() -> None:
 
 @pytest.mark.skipif(sys.platform != 'linux', reason='PSS is read only on Linux, elsewhere RSS is used directly')
 @pytest.mark.parametrize(
-    'memory_full_info',
+    ('memory_full_info', 'expected_warning'),
     [
-        pytest.param(raise_access_denied, id='access denied'),
-        pytest.param(lambda _process: SimpleNamespace(), id='pss field missing'),
-        pytest.param(lambda _process: SimpleNamespace(pss=0), id='pss reported as zero'),
+        pytest.param(raise_access_denied, False, id='access denied'),
+        pytest.param(lambda _process: SimpleNamespace(pss=0), False, id='pss reported as zero'),
+        pytest.param(lambda _process: SimpleNamespace(), True, id='pss field missing'),
     ],
 )
 def test_get_used_memory_falls_back_to_rss_when_pss_is_unavailable(
-    monkeypatch: pytest.MonkeyPatch, memory_full_info: Callable[[psutil.Process], object]
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    memory_full_info: Callable[[psutil.Process], object],
+    *,
+    expected_warning: bool,
 ) -> None:
     """An unreadable PSS metric falls back to the RSS of the same process instead of raising or reporting zero."""
     monkeypatch.setattr(psutil.Process, 'memory_full_info', memory_full_info)
     monkeypatch.setattr(psutil.Process, 'memory_info', lambda _process: SimpleNamespace(rss=1024))
 
-    assert system._get_used_memory(psutil.Process()) == 1024
+    with caplog.at_level(logging.WARNING, logger=system.logger.name):
+        assert system._get_used_memory(psutil.Process()) == 1024
+
+    # Only a system that has no PSS at all is worth reporting - a single process denying it says nothing about the
+    # others, and an empty `smaps` parses to zero for a process that is on its way out.
+    warnings = [record.getMessage() for record in caplog.records if 'PSS' in record.getMessage()]
+    assert bool(warnings) == expected_warning
+    assert system._PssAvailability.is_available != expected_warning
 
 
-def test_get_memory_info_skips_children_that_cannot_be_measured(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A child that cannot be inspected at all is left out of the sum instead of aborting the snapshot."""
-    children = [FakeProcess(pid=1001, used_memory=psutil.AccessDenied(pid=1001)), FakeProcess(pid=1002, used_memory=40)]
+@pytest.mark.skipif(sys.platform != 'linux', reason='PSS is read only on Linux, elsewhere RSS is used directly')
+def test_get_used_memory_stops_asking_for_pss_once_it_is_known_to_be_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A system without PSS is asked for it only once, not on every sample of every process."""
+    call_count = 0
+
+    def memory_full_info(_process: psutil.Process) -> object:
+        nonlocal call_count
+        call_count += 1
+        return SimpleNamespace()
+
+    monkeypatch.setattr(psutil.Process, 'memory_full_info', memory_full_info)
+    monkeypatch.setattr(psutil.Process, 'memory_info', lambda _process: SimpleNamespace(rss=1024))
+
+    for _ in range(3):
+        assert system._get_used_memory(psutil.Process()) == 1024
+
+    assert call_count == 1
+
+
+@pytest.mark.parametrize(
+    ('error', 'expected_warning'),
+    [
+        pytest.param(psutil.AccessDenied(pid=1001), True, id='access denied'),
+        pytest.param(psutil.NoSuchProcess(pid=1001), False, id='no such process'),
+        pytest.param(FileNotFoundError('/proc/1001/smaps'), True, id='proc entry missing'),
+    ],
+)
+@pytest.mark.usefixtures('measured_current_process')
+def test_get_memory_info_skips_children_that_cannot_be_measured(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    error: Exception,
+    *,
+    expected_warning: bool,
+) -> None:
+    """A child that cannot be measured is left out of the sum without hiding the children measured after it."""
+    children = [FakeProcess(pid=1001, used_memory=error), FakeProcess(pid=1002, used_memory=40)]
     monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: children)
-    monkeypatch.setattr(system, '_get_used_memory', fake_get_used_memory)
 
-    memory_info = get_memory_info()
+    with caplog.at_level(logging.WARNING, logger=system.logger.name):
+        memory_info = get_memory_info()
 
     assert memory_info.current_size == ByteSize(140)
 
-
-def test_get_memory_info_continues_after_child_exits(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A child exiting mid-iteration does not hide the children measured after it."""
-    children = [
-        FakeProcess(pid=1001, used_memory=psutil.NoSuchProcess(pid=1001)),
-        FakeProcess(pid=1002, used_memory=40),
-    ]
-    monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: children)
-    monkeypatch.setattr(system, '_get_used_memory', fake_get_used_memory)
-
-    memory_info = get_memory_info()
-
-    assert memory_info.current_size == ByteSize(140)
+    # A child that exits mid-iteration is business as usual, an uninspectable one hides its memory usage.
+    warnings = [record.getMessage() for record in caplog.records if 'child process' in record.getMessage()]
+    assert bool(warnings) == expected_warning
 
 
 @pytest.mark.parametrize(
@@ -97,20 +149,37 @@ def test_get_memory_info_continues_after_child_exits(monkeypatch: pytest.MonkeyP
     [
         pytest.param(psutil.AccessDenied(), id='access denied'),
         pytest.param(psutil.NoSuchProcess(pid=1), id='no such process'),
+        pytest.param(FileNotFoundError('/proc/1/stat'), id='proc entry missing'),
     ],
 )
-def test_get_memory_info_handles_failure_to_list_children(monkeypatch: pytest.MonkeyPatch, error: psutil.Error) -> None:
-    """Failure to list the child processes does not abort the whole memory snapshot."""
+@pytest.mark.usefixtures('measured_current_process')
+def test_get_memory_info_handles_failure_to_list_children(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, error: Exception
+) -> None:
+    """Failure to list the child processes does not abort the whole memory snapshot, but is reported."""
 
     def raise_error(*_args: object, **_kwargs: object) -> list[psutil.Process]:
         raise error
 
     monkeypatch.setattr(psutil.Process, 'children', raise_error)
-    monkeypatch.setattr(system, '_get_used_memory', fake_get_used_memory)
+
+    with caplog.at_level(logging.WARNING, logger=system.logger.name):
+        memory_info = get_memory_info()
+
+    assert memory_info.current_size == ByteSize(100)
+    assert [record.getMessage() for record in caplog.records if 'child processes' in record.getMessage()]
+
+
+@pytest.mark.usefixtures('measured_current_process')
+def test_get_memory_info_caps_the_estimate_at_the_total_memory_size(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Summing RSS of processes that share memory cannot report more memory than the machine has."""
+    total_size = psutil.virtual_memory().total
+    children = [FakeProcess(pid=1001, used_memory=total_size), FakeProcess(pid=1002, used_memory=total_size)]
+    monkeypatch.setattr(psutil.Process, 'children', lambda *_args, **_kwargs: children)
 
     memory_info = get_memory_info()
 
-    assert memory_info.current_size == ByteSize(100)
+    assert memory_info.current_size == ByteSize(total_size)
 
 
 def test_get_cpu_info_returns_valid_values() -> None:
