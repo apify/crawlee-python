@@ -41,7 +41,7 @@ These headers tell the server what the client can handle and the server uses the
 
 ### Authentication and stateful headers
 
-`Cookie` carries session and login state. Crawlee manages cookies through [sessions](./session-management), so you rarely set this one by hand.
+`Cookie` carries session and login state. Crawlee manages cookies through [sessions](./session-management), so you rarely set this one by hand. For details, see [Cookie management](./cookie-management).
 
 `Authorization` carries credentials, such as a bearer token or basic auth. APIs commonly require it. Set it on the request when the target needs authenticated access. Treat its value as a secret, and don't send it through a [proxy you don't control](./security-of-web-scraping#untrusted-proxies).
 
