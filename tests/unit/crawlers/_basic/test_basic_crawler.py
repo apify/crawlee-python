@@ -799,6 +799,25 @@ async def test_crawler_export_data_csv_collect_all_keys(tmp_path: Path) -> None:
     assert all_keys_path.read_text() == 'a,b\n1,\n2,3\n'
 
 
+async def test_crawler_export_data_ignores_kwargs_of_the_other_format(tmp_path: Path) -> None:
+    """Each exporter receives only the kwargs of its own format, since the format is inferred from the path."""
+    crawler = BasicCrawler()
+    dataset = await Dataset.open()
+
+    await dataset.push_data([{'a': 1}, {'a': 2, 'b': 3}])
+
+    json_path = tmp_path / 'dataset.json'
+    csv_path = tmp_path / 'dataset.csv'
+
+    # `collect_all_keys` is CSV-only and `separators` is JSON-only, so each call passes one kwarg the selected
+    # format does not understand.
+    await crawler.export_data(path=json_path, separators=(',', ':'), collect_all_keys=True)
+    await crawler.export_data(path=csv_path, separators=(',', ':'), lineterminator='\n')
+
+    assert json_path.read_text() == '[{"a":1},{"a":2,"b":3}]'
+    assert csv_path.read_text() == 'a\n1\n2\n'
+
+
 async def test_context_push_and_export_data(tmp_path: Path) -> None:
     crawler = BasicCrawler()
 

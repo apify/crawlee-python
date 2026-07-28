@@ -250,5 +250,8 @@ async def export_csv_to_stream(
             'CSV export dropped %d key(s) not present in the first item: %s. '
             'Pass collect_all_keys=True to include keys from all items as columns.',
             len(dropped_keys),
-            ', '.join(sorted(dropped_keys)),
+            # The keys are annotated as `str`, but nothing enforces that at runtime, and a storage client that
+            # does not round-trip items through JSON hands them over as pushed. Stringify them so building the
+            # message cannot fail on a key that is not a string, or on a set mixing several key types.
+            ', '.join(sorted(str(key) for key in dropped_keys)),
         )

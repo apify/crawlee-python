@@ -36,10 +36,12 @@ For these examples, we are using the <ApiLink to="class/BeautifulSoupCrawler">`B
 
 Dataset items don't have to share a schema. Different handlers can push different fields, so the items of one dataset often have different keys.
 
-By default, the CSV columns are the keys of the first item. When a later item has a key the first one doesn't, its value isn't written, and Crawlee logs a warning naming the dropped keys. To use the keys of all items as columns instead, pass `collect_all_keys=True`:
+By default, the CSV columns are the keys of the first non-empty item. When a later item has a key the first one doesn't, its value isn't written, and Crawlee logs a warning naming the dropped keys. To use the keys of all items as columns instead, pass `collect_all_keys=True`:
 
 ```python
 await crawler.export_data(path='results.csv', collect_all_keys=True)
 ```
 
-No value is dropped in that mode. Cells for keys an item doesn't have stay empty, or hold the `restval` value if you pass one. Collecting all keys means reading the whole dataset before the first row can be written, so only the default mode writes rows as it goes.
+No value is dropped in that mode. Collecting all keys means reading the whole dataset before the first row can be written, so only the default mode writes rows as it goes.
+
+In both modes, cells for columns an item doesn't have stay empty, or hold the `restval` value if you pass one.

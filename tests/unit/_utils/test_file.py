@@ -150,6 +150,23 @@ async def test_export_csv_to_stream_warns_about_dropped_keys(caplog: pytest.LogC
     assert 'collect_all_keys=True' in caplog.records[0].message
 
 
+async def test_export_csv_to_stream_warns_about_dropped_keys_that_are_not_strings(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Dropped keys are reported even when they are not strings, which a storage client may hand over as pushed."""
+    dst = StringIO()
+    items = cast('list[Mapping[str, JsonSerializable]]', [{'name': 'Alice'}, {1: 'x', 'city': 'NYC'}])
+
+    with caplog.at_level('WARNING', logger='crawlee._utils.file'):
+        await export_csv_to_stream(async_iter(items), dst, lineterminator='\n')
+
+    # The second item has no value for the only column, so its row holds a single empty field, written as '""' to
+    # keep it distinguishable from a blank line.
+    assert dst.getvalue() == 'name\nAlice\n""\n'
+    assert len(caplog.records) == 1
+    assert '1, city' in caplog.records[0].message
+
+
 async def test_export_csv_to_stream_does_not_warn_when_nothing_is_dropped(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -195,6 +212,19 @@ async def test_export_csv_to_stream_honors_restval() -> None:
     )
 
     assert dst.getvalue() == 'name,city\nAlice,N/A\nBob,NYC\n'
+
+
+async def test_export_csv_to_stream_honors_restval_without_collecting_all_keys() -> None:
+    """`restval` also fills the cells of header columns a later item does not contain in the default column mode."""
+    dst = StringIO()
+    await export_csv_to_stream(
+        async_iter([{'name': 'Alice', 'city': 'NYC'}, {'name': 'Bob'}]),
+        dst,
+        restval='N/A',
+        lineterminator='\n',
+    )
+
+    assert dst.getvalue() == 'name,city\nAlice,NYC\nBob,N/A\n'
 
 
 # Tests for validate_subdirectory (storage name/alias directory validation).

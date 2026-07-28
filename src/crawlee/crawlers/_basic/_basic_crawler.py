@@ -111,6 +111,13 @@ ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Request | None]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 SkippedRequestCallback = Callable[[str, SkippedReason], Awaitable[None]]
 
+# `export_data` accepts the kwargs of both export formats, since the format is only known once the destination path
+# is inspected. These are used to forward just the ones the selected format understands. Both key sets are unioned,
+# because `NotRequired` is invisible to `TypedDict` under postponed annotation evaluation, which makes every key land
+# in `__required_keys__` instead of `__optional_keys__`.
+_CSV_EXPORT_KEYS = ExportDataCsvKwargs.__required_keys__ | ExportDataCsvKwargs.__optional_keys__
+_JSON_EXPORT_KEYS = ExportDataJsonKwargs.__required_keys__ | ExportDataJsonKwargs.__optional_keys__
+
 
 class _BasicCrawlerOptions(TypedDict):
     """Non-generic options the `BasicCrawler` constructor."""
@@ -940,12 +947,18 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if path.suffix == '.csv':
             dst = StringIO()
-            csv_kwargs = cast('ExportDataCsvKwargs', additional_kwargs)
+            csv_kwargs = cast(
+                'ExportDataCsvKwargs',
+                {key: value for key, value in additional_kwargs.items() if key in _CSV_EXPORT_KEYS},
+            )
             await export_csv_to_stream(dataset.iterate_items(), dst, **csv_kwargs)
             await atomic_write(path, dst.getvalue())
         elif path.suffix == '.json':
             dst = StringIO()
-            json_kwargs = cast('ExportDataJsonKwargs', additional_kwargs)
+            json_kwargs = cast(
+                'ExportDataJsonKwargs',
+                {key: value for key, value in additional_kwargs.items() if key in _JSON_EXPORT_KEYS},
+            )
             await export_json_to_stream(dataset.iterate_items(), dst, **json_kwargs)
             await atomic_write(path, dst.getvalue())
         else:
