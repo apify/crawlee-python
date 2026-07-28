@@ -472,6 +472,46 @@ async def test_export_to_csv(
     await kvs.drop()
 
 
+async def test_export_to_csv_columns(
+    dataset: Dataset,
+    storage_client: StorageClient,
+) -> None:
+    """Test the CSV columns come from the first item by default, and from all items with `collect_all_keys`."""
+    kvs = await KeyValueStore.open(
+        name='export-kvs',
+        storage_client=storage_client,
+    )
+
+    await dataset.push_data(
+        [
+            {'name': 'Alice', 'age': 30},
+            {'name': 'Bob', 'city': 'NYC', 'age': 25},
+            {'age': 40, 'name': 'Carol'},
+        ]
+    )
+
+    await dataset.export_to(
+        key='first_item_keys.csv',
+        content_type='csv',
+        to_kvs_name='export-kvs',
+        to_kvs_storage_client=storage_client,
+        lineterminator='\n',
+    )
+    await dataset.export_to(
+        key='all_keys.csv',
+        content_type='csv',
+        to_kvs_name='export-kvs',
+        to_kvs_storage_client=storage_client,
+        collect_all_keys=True,
+        lineterminator='\n',
+    )
+
+    assert await kvs.get_value(key='first_item_keys.csv') == 'name,age\nAlice,30\nBob,25\nCarol,40\n'
+    assert await kvs.get_value(key='all_keys.csv') == 'name,age,city\nAlice,30,\nBob,25,NYC\nCarol,40,\n'
+
+    await kvs.drop()
+
+
 async def test_export_to_invalid_content_type(dataset: Dataset) -> None:
     """Test exporting dataset with invalid content type raises error."""
     with pytest.raises(ValueError, match=r'Unsupported content type'):
