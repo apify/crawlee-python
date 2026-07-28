@@ -235,7 +235,7 @@ async def test_redirect_handling(server_url: URL, redirect_server_url: URL) -> N
     ],
 )
 async def test_chromium_headless_headers(
-    header_network: dict, fingerprint_generator: None | FingerprintGenerator | Literal['default'], server_url: URL
+    header_network: dict, fingerprint_generator: FingerprintGenerator | Literal['default'] | None, server_url: URL
 ) -> None:
     browser_type: BrowserType = 'chromium'
     crawler = PlaywrightCrawler(headless=True, browser_type=browser_type, fingerprint_generator=fingerprint_generator)

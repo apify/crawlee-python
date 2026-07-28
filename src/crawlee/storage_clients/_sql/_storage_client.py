@@ -73,7 +73,7 @@ class SqlStorageClient(StorageClient):
         self._connection_string = connection_string
         self._engine = engine
         self._initialized = False
-        self.session_maker: None | async_sessionmaker[AsyncSession] = None
+        self.session_maker: async_sessionmaker[AsyncSession] | None = None
 
         self._listeners_registered = False
         self._dialect_name: str | None = None

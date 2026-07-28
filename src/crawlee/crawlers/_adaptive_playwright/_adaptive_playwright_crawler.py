@@ -235,6 +235,7 @@ class AdaptivePlaywrightCrawler(
     @classmethod
     def with_beautifulsoup_static_parser(
         cls,
+        *,
         rendering_type_predictor: RenderingTypePredictor | None = None,
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
@@ -261,6 +262,7 @@ class AdaptivePlaywrightCrawler(
     @classmethod
     def with_parsel_static_parser(
         cls,
+        *,
         rendering_type_predictor: RenderingTypePredictor | None = None,
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
@@ -396,7 +398,7 @@ class AdaptivePlaywrightCrawler(
                     self._context_result_map[context] = static_run.result
                     return
                 if static_run.exception:
-                    context.log.exception(
+                    context.log.error(
                         msg=f'Static crawler: failed for {context.request.url}', exc_info=static_run.exception
                     )
                 else:

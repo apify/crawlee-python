@@ -123,7 +123,7 @@ class PlaywrightCrawler(
         browser_launch_options: Mapping[str, Any] | None = None,
         browser_new_context_options: Mapping[str, Any] | None = None,
         goto_options: GotoOptions | None = None,
-        fingerprint_generator: FingerprintGenerator | None | Literal['default'] = 'default',
+        fingerprint_generator: FingerprintGenerator | Literal['default'] | None = 'default',
         headless: bool | None = None,
         use_incognito_pages: bool | None = None,
         navigation_timeout: timedelta | None = None,
