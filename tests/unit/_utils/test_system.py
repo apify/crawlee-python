@@ -123,6 +123,7 @@ def test_get_used_memory_stops_asking_for_pss_once_it_is_known_to_be_missing(
     [
         pytest.param(psutil.AccessDenied(pid=1001), True, id='access denied'),
         pytest.param(psutil.NoSuchProcess(pid=1001), False, id='no such process'),
+        pytest.param(psutil.ZombieProcess(pid=1001), False, id='zombie process'),
         pytest.param(FileNotFoundError('/proc/1001/smaps'), True, id='proc entry missing'),
     ],
 )
