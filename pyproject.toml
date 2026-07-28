@@ -137,7 +137,7 @@ dev = [
     "pytest-timeout<3.0.0",
     "pytest-xdist<4.0.0",
     "pytest<10.0.0",
-    "ruff~=0.15.0",
+    "ruff~=0.16.0",
     "setuptools", # setuptools are used by pytest, but not explicitly required
     "ty~=0.0.0",
     "types-beautifulsoup4<5.0.0",
