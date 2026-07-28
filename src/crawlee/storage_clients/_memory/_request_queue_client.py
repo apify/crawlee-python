@@ -174,6 +174,8 @@ class MemoryRequestQueueClient(RequestQueueClient):
                 )
                 continue
 
+            # Store the request. Assigning an existing key in `_pending_requests` keeps its position, so this
+            # single store covers both a regular re-add (keeps FIFO order) and a new request (appended last).
             self._requests_by_unique_key[request.unique_key] = request
             self._pending_requests[request.unique_key] = request
             if forefront:
