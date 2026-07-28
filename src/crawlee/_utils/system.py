@@ -56,7 +56,8 @@ if sys.platform == 'linux':
             with suppress(*_METRIC_ERRORS):
                 # A system that does not expose `smaps` at all makes psutil alias `memory_full_info` to
                 # `memory_info`, whose result has no `pss` field.
-                pss = getattr(process.memory_full_info(), 'pss', None)
+                memory = process.memory_full_info()
+                pss = getattr(memory, 'pss', None)
 
                 if pss is None:
                     _PssAvailability.is_available = False
@@ -70,6 +71,10 @@ if sys.platform == 'linux':
                 # really uses zero memory, so treat it as a missing reading rather than as a measurement.
                 elif pss > 0:
                     return int(pss)
+
+                # `memory_full_info` reads the RSS on its way to the PSS, so the fallback does not have to read it
+                # again.
+                return int(memory.rss)
 
         return int(process.memory_info().rss)
 else:
@@ -141,7 +146,8 @@ class MemoryUsageInfo(BaseModel):
     """Memory usage of the current Python process and its children.
 
     This is a best-effort estimate - a process that cannot be inspected is left out of the sum, and the metric used
-    may be RSS, which counts memory shared between the processes repeatedly.
+    may be RSS, which counts memory shared between the processes repeatedly. When only some of the processes expose
+    PSS, the sum mixes both metrics, so the memory those processes share with the rest of the tree is counted twice.
     """
 
     # Workaround for Pydantic and type checkers when using Annotated with default_factory
@@ -193,13 +199,14 @@ def get_memory_info() -> MemoryInfo:
     """Retrieve the current memory usage of the process and its children.
 
     It utilizes the `psutil` library. The reported `current_size` is best-effort - processes that cannot be inspected
-    are left out of the sum, PSS may be substituted by RSS, and the result is capped at the total memory of the
-    machine.
+    are left out of the sum, and PSS may be substituted by RSS for some or all of the processes.
     """
     logger.debug('Calling get_memory_info()...')
     current_process = psutil.Process(os.getpid())
 
-    # Retrieve estimated memory usage of the current process.
+    # Retrieve estimated memory usage of the current process. Deliberately not guarded - a process can always read
+    # its own RSS, and if it somehow cannot, failing the whole snapshot is safer than reporting a sum that is missing
+    # the main process: the autoscaler would read the gap as free memory and keep scaling up.
     current_size_bytes = _get_used_memory(current_process)
 
     # Sum memory usage by all children processes, try to exclude shared memory from the sum if allowed by OS.
@@ -218,10 +225,6 @@ def get_memory_info() -> MemoryInfo:
         current_size_bytes += _get_child_used_memory(child)
 
     vm = psutil.virtual_memory()
-
-    # Summing RSS counts memory shared between the processes repeatedly, which can add up to more than the machine
-    # has. Reporting more than the total would make the autoscaler throttle forever, so cap the estimate.
-    current_size_bytes = min(current_size_bytes, vm.total)
 
     return MemoryInfo(
         total_size=ByteSize(vm.total),

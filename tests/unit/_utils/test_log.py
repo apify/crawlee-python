@@ -32,7 +32,8 @@ def test_threads_racing_on_one_key_log_once(caplog: pytest.LogCaptureFixture) ->
     logger = logging.getLogger('crawlee.tests.log_dedup_threads')
     logger_once = LoggerOnce(logger)
     thread_count = 16
-    ready = threading.Barrier(thread_count)
+    # A timeout keeps a thread that never arrives from hanging the whole run - the assertion below fails instead.
+    ready = threading.Barrier(thread_count, timeout=10)
 
     def log_once() -> None:
         ready.wait()

@@ -9,7 +9,7 @@ class LoggerOnce:
 
     Useful for diagnostic warnings that would otherwise spam the log when the same condition recurs (per-request
     misconfiguration warnings, repeated fallback paths, etc.). Deduplication scope follows the lifetime of the
-    instance — a module-level instance gives process-wide dedup; an attribute on a class gives per-instance dedup.
+    instance - a module-level instance gives process-wide dedup; an attribute on a class gives per-instance dedup.
 
     Safe to call from multiple threads - some callers (e.g. system metric sampling) run in a worker thread.
     """
