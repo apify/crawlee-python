@@ -320,7 +320,7 @@ class Dataset(Storage):
         **kwargs: Unpack[ExportDataCsvKwargs],
     ) -> None: ...
 
-    async def export_to(
+    async def export_to(  # noqa: PLR0917
         self,
         key: str,
         content_type: Literal['json', 'csv'] = 'json',

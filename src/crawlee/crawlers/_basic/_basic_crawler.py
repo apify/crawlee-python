@@ -1152,7 +1152,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         request = context.request
 
         if self._abort_on_error:
-            self._logger.exception('Aborting crawler run due to error (abort_on_error=True)', exc_info=error)
+            self._logger.error('Aborting crawler run due to error (abort_on_error=True)', exc_info=error)
             self._failed = True
 
         if self._should_retry_request(context, error):

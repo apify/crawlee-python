@@ -348,13 +348,13 @@ async def _process_raw_source(
 
 
 async def _fetch_and_process_sitemap(
+    *,
     http_client: HttpClient,
     source: SitemapSource,
     depth: int,
     visited_sitemap_urls: set[str],
     sources: list[SitemapSource],
     retries_left: int,
-    *,
     proxy_info: ProxyInfo | None = None,
     timeout: timedelta | None = None,
     emit_nested_sitemaps: bool,
@@ -564,12 +564,12 @@ async def parse_sitemap(
             visited_sitemap_urls.add(source['url'])
 
             async for result in _fetch_and_process_sitemap(
-                http_client,
-                source,
-                depth,
-                visited_sitemap_urls,
-                sources,
-                sitemap_retries,
+                http_client=http_client,
+                source=source,
+                depth=depth,
+                visited_sitemap_urls=visited_sitemap_urls,
+                sources=sources,
+                retries_left=sitemap_retries,
                 emit_nested_sitemaps=emit_nested_sitemaps,
                 enqueue_strategy=enqueue_strategy,
                 proxy_info=proxy_info,
