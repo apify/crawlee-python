@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import sys
-from contextlib import suppress
 from datetime import datetime, timezone
 from logging import WARNING, getLogger
 from typing import TYPE_CHECKING, Annotated
@@ -51,12 +50,24 @@ if sys.platform == 'linux':
             OSError: If a `/proc` entry of the process is missing.
         """
         if _PssAvailability.is_available:
-            # A restricted environment may deny `/proc/<pid>/smaps`, which is a property of the single process, so it
-            # only falls back to RSS for that one process.
-            with suppress(*_METRIC_ERRORS):
+            try:
                 # A system that does not expose `smaps` at all makes psutil alias `memory_full_info` to
                 # `memory_info`, whose result has no `pss` field.
                 memory = process.memory_full_info()
+            except (psutil.NoSuchProcess, psutil.ZombieProcess):
+                # A process that is gone is not refusing inspection, so let the RSS read below fail for it as usual.
+                pass
+            except _METRIC_ERRORS:
+                # A restricted environment may deny `/proc/<pid>/smaps`, which is a property of the single process, so
+                # only that one process falls back to RSS. Still worth reporting - when the denial covers the whole
+                # process tree, the estimate switches to RSS with nothing else to show it.
+                logger_once.log(
+                    'Unable to read the PSS memory metric of a process, falling back to RSS for it - shared memory '
+                    'may be counted repeatedly.',
+                    key='pss_denied',
+                    level=WARNING,
+                )
+            else:
                 pss = getattr(memory, 'pss', None)
 
                 if pss is None:

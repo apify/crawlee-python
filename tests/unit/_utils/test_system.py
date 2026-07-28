@@ -43,6 +43,11 @@ def raise_access_denied(process: psutil.Process) -> object:
     raise psutil.AccessDenied(pid=process.pid)
 
 
+def raise_no_such_process(process: psutil.Process) -> object:
+    """Stand in for a memory metric of a process that exits in the middle of being measured."""
+    raise psutil.NoSuchProcess(pid=process.pid)
+
+
 @pytest.fixture(autouse=True)
 def _isolated_module_state(monkeypatch: pytest.MonkeyPatch) -> None:
     """Reset the process-wide state of the module, so that dedup keys and the PSS latch do not leak between tests."""
@@ -66,11 +71,11 @@ def test_get_memory_info_returns_valid_values() -> None:
 
 @pytest.mark.skipif(sys.platform != 'linux', reason='PSS is read only on Linux, elsewhere RSS is used directly')
 @pytest.mark.parametrize(
-    ('memory_full_info', 'expected_size', 'expected_warning'),
+    ('memory_full_info', 'expected_size', 'expected_warning', 'pss_stays_available'),
     [
-        pytest.param(raise_access_denied, 2048, False, id='access denied'),
-        pytest.param(lambda _process: SimpleNamespace(rss=1024, pss=0), 1024, False, id='pss reported as zero'),
-        pytest.param(lambda _process: SimpleNamespace(rss=1024), 1024, True, id='pss field missing'),
+        pytest.param(raise_access_denied, 2048, True, True, id='access denied'),
+        pytest.param(lambda _process: SimpleNamespace(rss=1024, pss=0), 1024, False, True, id='pss reported as zero'),
+        pytest.param(lambda _process: SimpleNamespace(rss=1024), 1024, True, False, id='pss field missing'),
     ],
 )
 def test_get_used_memory_falls_back_to_rss_when_pss_is_unavailable(
@@ -80,6 +85,7 @@ def test_get_used_memory_falls_back_to_rss_when_pss_is_unavailable(
     expected_size: int,
     *,
     expected_warning: bool,
+    pss_stays_available: bool,
 ) -> None:
     """An unreadable PSS metric falls back to the RSS of the same process instead of raising or reporting zero."""
     monkeypatch.setattr(psutil.Process, 'memory_full_info', memory_full_info)
@@ -90,11 +96,27 @@ def test_get_used_memory_falls_back_to_rss_when_pss_is_unavailable(
     with caplog.at_level(logging.WARNING, logger=system.logger.name):
         assert system._get_used_memory(psutil.Process()) == expected_size
 
-    # Only a system that has no PSS at all is worth reporting - a single process denying it says nothing about the
-    # others, and an empty `smaps` parses to zero for a process that is on its way out.
+    # Silently switching the metric would leave an overestimated memory usage unexplained, so both a denial and a
+    # system without PSS are reported. An empty `smaps` parses to zero for a process on its way out, which is not.
     warnings = [record.getMessage() for record in caplog.records if 'PSS' in record.getMessage()]
     assert bool(warnings) == expected_warning
-    assert system._PssAvailability.is_available != expected_warning
+    # Only a system that has no PSS at all is latched - a single process denying it says nothing about the others.
+    assert system._PssAvailability.is_available == pss_stays_available
+
+
+@pytest.mark.skipif(sys.platform != 'linux', reason='PSS is read only on Linux, elsewhere RSS is used directly')
+def test_get_used_memory_does_not_report_a_vanished_process_as_a_pss_denial(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A process that exits mid-measurement propagates rather than being reported as refusing to expose PSS."""
+    monkeypatch.setattr(psutil.Process, 'memory_full_info', raise_no_such_process)
+    monkeypatch.setattr(psutil.Process, 'memory_info', raise_no_such_process)
+
+    with caplog.at_level(logging.WARNING, logger=system.logger.name), pytest.raises(psutil.NoSuchProcess):
+        system._get_used_memory(psutil.Process())
+
+    assert not [record.getMessage() for record in caplog.records if 'PSS' in record.getMessage()]
 
 
 @pytest.mark.skipif(sys.platform != 'linux', reason='PSS is read only on Linux, elsewhere RSS is used directly')
