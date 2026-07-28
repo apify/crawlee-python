@@ -48,6 +48,20 @@ def raise_no_such_process(process: psutil.Process) -> object:
     raise psutil.NoSuchProcess(pid=process.pid)
 
 
+def fill_buffer(buffer: memoryview, size: int) -> None:
+    """Fill the first `size` bytes of a shared memory buffer, one chunk at a time.
+
+    Building the payload as a single object would double the peak memory usage of every process that fills a buffer,
+    which is enough for the memory estimation below to be thrown off by page reclaim on a loaded machine.
+    """
+    chunk_size = 1024 * 1024
+    chunk = b'\xff' * chunk_size
+
+    for offset in range(0, size, chunk_size):
+        end = min(offset + chunk_size, size)
+        buffer[offset:end] = chunk[: end - offset]
+
+
 @pytest.fixture(autouse=True)
 def _isolated_module_state(monkeypatch: pytest.MonkeyPatch) -> None:
     """Reset the process-wide state of the module, so that dedup keys and the PSS latch do not leak between tests."""
@@ -202,6 +216,9 @@ def test_get_cpu_info_returns_valid_values() -> None:
     assert 0 <= cpu_info.used_ratio <= 1
 
 
+# The estimation is asserted on absolute memory readings, which hold only as long as nothing else on the machine makes
+# the kernel reclaim the pages allocated below. Running alongside the other test workers is enough to break that.
+@pytest.mark.run_alone
 @pytest.mark.skipif(sys.platform != 'linux', reason='Improved estimation available only on Linux')
 def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
     """Test that memory usage estimation is not overestimating memory usage by counting shared memory multiple times.
@@ -231,7 +248,7 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
         def extra_memory_child(ready: synchronize.Barrier, measured: synchronize.Barrier) -> None:
             memory = SharedMemory(size=extra_memory_size, create=True)
             assert memory.buf is not None
-            memory.buf[:] = b'\xff' * extra_memory_size
+            fill_buffer(memory.buf, extra_memory_size)
             print(f'Using the memory... {memory.buf[-1]}')
             ready.wait()
             measured.wait()
@@ -258,7 +275,7 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
             if use_shared_memory:
                 shared_memory = SharedMemory(size=extra_memory_size, create=True)
                 assert shared_memory.buf is not None
-                shared_memory.buf[:] = b'\xff' * extra_memory_size
+                fill_buffer(shared_memory.buf, extra_memory_size)
                 extra_args = [shared_memory]
             else:
                 extra_args = []
