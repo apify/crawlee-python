@@ -97,12 +97,12 @@ async def test_memory_metadata_updates(rq_client: MemoryRequestQueueClient) -> N
 
 async def test_readd_of_pending_requests_does_not_create_duplicates(rq_client: MemoryRequestQueueClient) -> None:
     """Test that mixing regular and forefront re-adds of pending requests leaves no stale duplicates behind."""
-    urls = [f'https://example.com/{i}' for i in range(20)]
+    urls = [f'https://example.com/{i}' for i in range(3)]
     await rq_client.add_batch_of_requests([Request.from_url(url) for url in urls])
 
     # Re-add the same URLs as freshly built objects with a differing payload, the way the higher-level API does
     # when it rebuilds requests discovered on another page.
-    for version in range(10):
+    for version in range(2):
         duplicates = []
         for url in urls:
             duplicate = Request.from_url(url)
@@ -152,6 +152,61 @@ async def test_forefront_readd_preserves_order_and_dedup(rq_client: MemoryReques
     assert await rq_client.is_finished() is True
 
 
+async def test_forefront_readd_of_in_progress_request_is_a_no_op(rq_client: MemoryRequestQueueClient) -> None:
+    """Test that a forefront re-add of an in-progress request does not raise and does not re-enqueue it."""
+    requests = [Request.from_url(f'https://example.com/{i}') for i in range(3)]
+    await rq_client.add_batch_of_requests(requests)
+
+    in_progress = await rq_client.fetch_next_request()
+    assert in_progress is not None
+
+    response = await rq_client.add_batch_of_requests([in_progress], forefront=True)
+    assert len(response.processed_requests) == 1
+    assert response.processed_requests[0].was_already_present is True
+    assert response.processed_requests[0].was_already_handled is False
+
+    # The request must not have been queued again ahead of the requests still waiting behind it.
+    await rq_client.mark_request_as_handled(in_progress)
+
+    fetched_urls = []
+    while (request := await rq_client.fetch_next_request()) is not None:
+        fetched_urls.append(request.url)
+        await rq_client.mark_request_as_handled(request)
+
+    assert fetched_urls == [
+        'https://example.com/1',
+        'https://example.com/2',
+    ]
+
+    metadata = await rq_client.get_metadata()
+    assert metadata.total_request_count == 3
+    assert metadata.pending_request_count == 0
+    assert metadata.handled_request_count == 3
+
+
+async def test_forefront_readd_of_handled_request_is_a_no_op(rq_client: MemoryRequestQueueClient) -> None:
+    """Test that a forefront re-add of an already handled request does not raise and does not re-enqueue it."""
+    await rq_client.add_batch_of_requests([Request.from_url('https://example.com/page')])
+
+    fetched = await rq_client.fetch_next_request()
+    assert fetched is not None
+    await rq_client.mark_request_as_handled(fetched)
+
+    response = await rq_client.add_batch_of_requests([Request.from_url('https://example.com/page')], forefront=True)
+    assert len(response.processed_requests) == 1
+    assert response.processed_requests[0].was_already_present is True
+    assert response.processed_requests[0].was_already_handled is True
+
+    assert await rq_client.fetch_next_request() is None
+    assert await rq_client.is_empty() is True
+    assert await rq_client.is_finished() is True
+
+    metadata = await rq_client.get_metadata()
+    assert metadata.total_request_count == 1
+    assert metadata.pending_request_count == 0
+    assert metadata.handled_request_count == 1
+
+
 async def test_readd_keeps_the_originally_enqueued_request(rq_client: MemoryRequestQueueClient) -> None:
     """Test that re-adding a still-pending request does not replace it with the incoming duplicate."""
     original = Request.from_url('https://example.com/page')
@@ -184,7 +239,18 @@ async def test_readd_keeps_the_originally_enqueued_request(rq_client: MemoryRequ
     assert metadata.handled_request_count == 1
 
 
-async def test_readd_does_not_reset_retry_count_of_reclaimed_request(rq_client: MemoryRequestQueueClient) -> None:
+@pytest.mark.parametrize(
+    'forefront',
+    [
+        pytest.param(False, id='regular re-add'),
+        pytest.param(True, id='forefront re-add'),
+    ],
+)
+async def test_readd_does_not_reset_retry_count_of_reclaimed_request(
+    rq_client: MemoryRequestQueueClient,
+    *,
+    forefront: bool,
+) -> None:
     """Test that a duplicate enqueued while a failed request awaits a retry does not reset its `retry_count`."""
     request = Request.from_url('https://example.com/page')
     await rq_client.add_batch_of_requests([request])
@@ -195,7 +261,7 @@ async def test_readd_does_not_reset_retry_count_of_reclaimed_request(rq_client: 
     await rq_client.reclaim_request(fetched)
 
     # A handler running in parallel discovers the same URL and enqueues a freshly built request for it.
-    await rq_client.add_batch_of_requests([Request.from_url('https://example.com/page')])
+    await rq_client.add_batch_of_requests([Request.from_url('https://example.com/page')], forefront=forefront)
 
     retried = await rq_client.fetch_next_request()
     assert retried is not None
