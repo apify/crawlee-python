@@ -112,11 +112,11 @@ TEvent = TypeVar('TEvent')
 EventListener = (
     Callable[
         [TEvent],
-        None | Coroutine[Any, Any, None],
+        Coroutine[Any, Any, None] | None,
     ]
     | Callable[
         [],
-        None | Coroutine[Any, Any, None],
+        Coroutine[Any, Any, None] | None,
     ]
 )
 """An event listener function - it can be both sync and async and may accept zero or one argument."""

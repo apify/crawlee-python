@@ -229,7 +229,7 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
             processes = []
             ready = ctx.Barrier(parties=count + 1)
             measured = ctx.Barrier(parties=count + 1)
-            shared_memory: None | SharedMemory = None
+            shared_memory: SharedMemory | None = None
             memory_before = get_memory_info().current_size
 
             if use_shared_memory:
