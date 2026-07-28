@@ -737,7 +737,10 @@ class ExportToKwargs(TypedDict):
 
 
 class ExportDataJsonKwargs(TypedDict):
-    """Keyword arguments for dataset's `export_data_json` method."""
+    """Keyword arguments forwarded to `json.dump` by the JSON export.
+
+    Mirrors the keyword arguments of `json.dump`, so consult its documentation for their exact meaning.
+    """
 
     skipkeys: NotRequired[bool]
     """If True (default: False), dict keys that are not of a basic type (str, int, float, bool, None) will be skipped
@@ -772,11 +775,12 @@ class ExportDataJsonKwargs(TypedDict):
     """Specifies whether the output JSON object should have keys sorted alphabetically."""
 
 
-class ExportDataCsvWriterKwargs(TypedDict):
-    """Keyword arguments forwarded to the underlying `csv` writer.
+class ExportDataCsvKwargs(TypedDict):
+    """Keyword arguments forwarded to `csv.DictWriter` by the CSV export.
 
-    The `fieldnames` and `extrasaction` arguments of `csv.DictWriter` are managed by Crawlee and cannot be
-    overridden. Use `collect_all_keys` to control which columns the export contains.
+    Mirrors the keyword arguments of `csv.DictWriter`, so consult its documentation for their exact meaning.
+    The `fieldnames` and `extrasaction` arguments are omitted, because the export derives the columns from the
+    exported items and manages how keys outside them are handled.
     """
 
     dialect: NotRequired[str]
@@ -812,15 +816,6 @@ class ExportDataCsvWriterKwargs(TypedDict):
 
     strict: NotRequired[bool]
     """When True, raises an exception on bad CSV input. Defaults to False."""
-
-
-class ExportDataCsvKwargs(ExportDataCsvWriterKwargs):
-    """Keyword arguments for dataset's CSV export."""
-
-    collect_all_keys: NotRequired[bool]
-    """When True, the columns are the keys of all items combined, and no value is dropped. When False, the columns
-    are the keys of the first non-empty item, and keys introduced by later items are dropped with a warning.
-    Defaults to False."""
 
 
 class ExportDataKwargs(ExportDataJsonKwargs, ExportDataCsvKwargs):

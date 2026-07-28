@@ -8,7 +8,7 @@ import sys
 import tempfile
 from logging import getLogger
 from pathlib import Path
-from typing import TYPE_CHECKING, cast, overload
+from typing import TYPE_CHECKING, overload
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Mapping
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from crawlee._types import ExportDataCsvKwargs, ExportDataCsvWriterKwargs, ExportDataJsonKwargs, JsonSerializable
+    from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs, JsonSerializable
 
 logger = getLogger(__name__)
 
@@ -197,18 +197,16 @@ async def export_json_to_stream(
 async def export_csv_to_stream(
     iterator: AsyncIterator[Mapping[str, JsonSerializable]],
     dst: TextIO,
-    **kwargs: Unpack[ExportDataCsvKwargs],
+    *,
+    collect_all_keys: bool = False,
+    **writer_kwargs: Unpack[ExportDataCsvKwargs],
 ) -> None:
-    collect_all_keys = kwargs.pop('collect_all_keys', False)
-
     # Set lineterminator to '\n' if not explicitly provided. This prevents double line endings on Windows. The
     # `csv.DictWriter` default is '\r\n', which when written to a file in text mode on Windows gets converted to
     # '\r\r\n' due to newline translation. By using '\n', we let the platform handle the line ending conversion:
     # '\n' stays as '\n' on Unix, and becomes '\r\n' on Windows.
-    if 'lineterminator' not in kwargs:
-        kwargs['lineterminator'] = '\n'
-
-    writer_kwargs = cast('ExportDataCsvWriterKwargs', kwargs)
+    if 'lineterminator' not in writer_kwargs:
+        writer_kwargs['lineterminator'] = '\n'
 
     # The real writer cannot be built until the first item's keys are known, so construct a throwaway one up front
     # to validate the options. Without this, an export configured with e.g. `delimiter='ab'` would raise only when
