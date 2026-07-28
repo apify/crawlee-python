@@ -301,7 +301,6 @@ class Dataset(Storage):
         self,
         key: str,
         content_type: Literal['json'],
-        *,
         to_kvs_id: str | None = None,
         to_kvs_name: str | None = None,
         to_kvs_storage_client: StorageClient | None = None,
@@ -314,7 +313,6 @@ class Dataset(Storage):
         self,
         key: str,
         content_type: Literal['csv'],
-        *,
         to_kvs_id: str | None = None,
         to_kvs_name: str | None = None,
         to_kvs_storage_client: StorageClient | None = None,
@@ -322,11 +320,10 @@ class Dataset(Storage):
         **kwargs: Unpack[ExportDataCsvKwargs],
     ) -> None: ...
 
-    async def export_to(
+    async def export_to(  # noqa: PLR0917  # Keyword-only params would be a breaking change.
         self,
         key: str,
         content_type: Literal['json', 'csv'] = 'json',
-        *,
         to_kvs_id: str | None = None,
         to_kvs_name: str | None = None,
         to_kvs_storage_client: StorageClient | None = None,
