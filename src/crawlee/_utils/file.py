@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import tempfile
+from logging import getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING, cast, overload
 
@@ -16,6 +17,8 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from crawlee._types import ExportDataCsvKwargs, ExportDataCsvWriterKwargs, ExportDataJsonKwargs, JsonSerializable
+
+logger = getLogger(__name__)
 
 if sys.platform == 'win32':
 
@@ -197,13 +200,20 @@ async def export_csv_to_stream(
     **kwargs: Unpack[ExportDataCsvKwargs],
 ) -> None:
     collect_all_keys = kwargs.pop('collect_all_keys', False)
-    writer_kwargs = cast('ExportDataCsvWriterKwargs', kwargs)
-    # Set lineterminator to '\n' if not explicitly provided. This prevents double line endings on Windows.
-    # The csv.writer default is '\r\n', which when written to a file in text mode on Windows gets converted
-    # to '\r\r\n' due to newline translation. By using '\n', we let the platform handle the line ending
-    # conversion: '\n' stays as '\n' on Unix, and becomes '\r\n' on Windows.
+
+    # Set lineterminator to '\n' if not explicitly provided. This prevents double line endings on Windows. The
+    # `csv.DictWriter` default is '\r\n', which when written to a file in text mode on Windows gets converted to
+    # '\r\r\n' due to newline translation. By using '\n', we let the platform handle the line ending conversion:
+    # '\n' stays as '\n' on Unix, and becomes '\r\n' on Windows.
     if 'lineterminator' not in kwargs:
         kwargs['lineterminator'] = '\n'
+
+    writer_kwargs = cast('ExportDataCsvWriterKwargs', kwargs)
+
+    # The real writer cannot be built until the first item's keys are known, so construct a throwaway one up front
+    # to validate the options. Without this, an export configured with e.g. `delimiter='ab'` would raise only when
+    # the dataset happens to contain an item, and silently succeed on a run that scraped nothing.
+    csv.DictWriter(dst, fieldnames=[], extrasaction='ignore', **writer_kwargs)
 
     if collect_all_keys:
         items = [item async for item in iterator if item]
@@ -211,17 +221,34 @@ async def export_csv_to_stream(
             return
 
         fieldnames = list(dict.fromkeys(key for item in items for key in item))
-        writer = csv.DictWriter(dst, fieldnames=fieldnames, **writer_kwargs)
+        writer = csv.DictWriter(dst, fieldnames=fieldnames, extrasaction='ignore', **writer_kwargs)
         writer.writeheader()
         for item in items:
             writer.writerow(item)
         return
 
     writer = None
+    header_keys: set[str] = set()
+    dropped_keys: set[str] = set()
+
     async for item in iterator:
         if not item:
             continue
+
         if writer is None:
             writer = csv.DictWriter(dst, fieldnames=list(item), extrasaction='ignore', **writer_kwargs)
             writer.writeheader()
+            header_keys = set(writer.fieldnames)
+
+        dropped_keys.update(item.keys() - header_keys)
         writer.writerow(item)
+
+    # The header comes from the first item, so any key introduced by a later item is dropped. Dropping them is
+    # intentional and matches Crawlee for JS. Doing it silently is not, so report it once for the whole export.
+    if dropped_keys:
+        logger.warning(
+            'CSV export dropped %d key(s) not present in the first item: %s. '
+            'Pass collect_all_keys=True to include keys from all items as columns.',
+            len(dropped_keys),
+            ', '.join(sorted(dropped_keys)),
+        )

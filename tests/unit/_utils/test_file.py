@@ -23,9 +23,6 @@ async def test_json_dumps() -> None:
     assert await json_dumps(datetime(2022, 1, 1, tzinfo=timezone.utc)) == '"2022-01-01 00:00:00+00:00"'
 
 
-# Tests for export_csv_to_stream (dataset CSV export).
-
-
 async def async_iter(
     items: list[Mapping[str, JsonSerializable]],
 ) -> AsyncIterator[Mapping[str, JsonSerializable]]:
@@ -64,12 +61,20 @@ async def test_export_csv_to_stream_collects_all_keys_when_requested() -> None:
     assert dst.getvalue() == 'name,age,city\nAlice,30,\nBob,25,NYC\n'
 
 
-async def test_export_csv_to_stream_skips_empty_items() -> None:
-    """Empty mappings are skipped and do not define or shift the header."""
+@pytest.mark.parametrize(
+    'collect_all_keys',
+    [
+        pytest.param(False, id='header from first item'),
+        pytest.param(True, id='all keys collected'),
+    ],
+)
+async def test_export_csv_to_stream_skips_empty_items(*, collect_all_keys: bool) -> None:
+    """Empty mappings are skipped and neither define the header nor emit a blank row, in either column mode."""
     dst = StringIO()
     await export_csv_to_stream(
         async_iter([{}, {'id': 1, 'name': 'Item 1'}, {}, {'id': 2, 'name': 'Item 2'}]),
         dst,
+        collect_all_keys=collect_all_keys,
         lineterminator='\n',
     )
 
@@ -80,6 +85,23 @@ async def test_export_csv_to_stream_handles_empty_iterator() -> None:
     """An empty iterator produces no CSV content."""
     dst = StringIO()
     await export_csv_to_stream(async_iter([]), dst)
+
+    assert dst.getvalue() == ''
+
+
+@pytest.mark.parametrize(
+    'items',
+    [
+        pytest.param([], id='no items'),
+        pytest.param([{}, {}], id='only empty items'),
+    ],
+)
+async def test_export_csv_to_stream_collects_all_keys_without_writable_items(
+    items: list[Mapping[str, JsonSerializable]],
+) -> None:
+    """Key collection produces no CSV content, not a bare header line, when there is nothing to write."""
+    dst = StringIO()
+    await export_csv_to_stream(async_iter(items), dst, collect_all_keys=True)
 
     assert dst.getvalue() == ''
 
@@ -110,6 +132,68 @@ async def test_export_csv_to_stream_preserves_non_json_values() -> None:
     )
 
     assert dst.getvalue() == 'created_at\n2020-01-01 00:00:00+00:00\n'
+
+
+async def test_export_csv_to_stream_warns_about_dropped_keys(caplog: pytest.LogCaptureFixture) -> None:
+    """Keys dropped because they are absent from the first item are reported once, naming every dropped key."""
+    dst = StringIO()
+    with caplog.at_level('WARNING', logger='crawlee._utils.file'):
+        await export_csv_to_stream(
+            async_iter([{'name': 'Alice'}, {'name': 'Bob', 'city': 'NYC'}, {'name': 'Carol', 'age': 40}]),
+            dst,
+            lineterminator='\n',
+        )
+
+    assert dst.getvalue() == 'name\nAlice\nBob\nCarol\n'
+    assert len(caplog.records) == 1
+    assert 'age, city' in caplog.records[0].message
+    assert 'collect_all_keys=True' in caplog.records[0].message
+
+
+async def test_export_csv_to_stream_does_not_warn_when_nothing_is_dropped(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Collecting all keys drops nothing, so it must not warn even for items with differing key sets."""
+    dst = StringIO()
+    with caplog.at_level('WARNING', logger='crawlee._utils.file'):
+        await export_csv_to_stream(
+            async_iter([{'name': 'Alice'}, {'name': 'Bob', 'city': 'NYC'}]),
+            dst,
+            collect_all_keys=True,
+            lineterminator='\n',
+        )
+
+    assert dst.getvalue() == 'name,city\nAlice,\nBob,NYC\n'
+    assert caplog.records == []
+
+
+@pytest.mark.parametrize(
+    'collect_all_keys',
+    [
+        pytest.param(False, id='header from first item'),
+        pytest.param(True, id='all keys collected'),
+    ],
+)
+async def test_export_csv_to_stream_rejects_invalid_writer_options_for_empty_iterator(
+    *, collect_all_keys: bool
+) -> None:
+    """Writer options are validated up front, so a misconfigured export fails even when there is nothing to write."""
+    with pytest.raises(TypeError, match='must be a 1-character string'):
+        await export_csv_to_stream(async_iter([]), StringIO(), delimiter='ab', collect_all_keys=collect_all_keys)
+
+
+async def test_export_csv_to_stream_honors_restval() -> None:
+    """`restval` fills the cells of columns an item does not contain."""
+    dst = StringIO()
+    await export_csv_to_stream(
+        async_iter([{'name': 'Alice'}, {'name': 'Bob', 'city': 'NYC'}]),
+        dst,
+        collect_all_keys=True,
+        restval='N/A',
+        lineterminator='\n',
+    )
+
+    assert dst.getvalue() == 'name,city\nAlice,N/A\nBob,NYC\n'
 
 
 # Tests for validate_subdirectory (storage name/alias directory validation).
