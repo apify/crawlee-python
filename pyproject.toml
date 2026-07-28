@@ -1,20 +1,20 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.12.0,<0.13.0"]
+build-backend = "uv_build"
 
 [project]
 name = "crawlee"
 version = "1.8.4"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
-license = { file = "LICENSE" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -148,18 +148,9 @@ dev = [
     "uvicorn[standard]<1.0.0",
 ]
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/crawlee"]
-
-[tool.hatch.build.targets.sdist]
-only-include = [
-    "src/crawlee",
-    "CHANGELOG.md",
-    "CONTRIBUTING.md",
-    "LICENSE",
-    "README.md",
-    "pyproject.toml",
-]
+# The module, pyproject.toml, README, and LICENSE are included in the sdist by default.
+[tool.uv.build-backend]
+source-include = ["CHANGELOG.md", "CONTRIBUTING.md"]
 
 [tool.ruff]
 line-length = 120
