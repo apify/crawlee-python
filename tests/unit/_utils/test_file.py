@@ -178,7 +178,8 @@ async def test_export_csv_to_stream_rejects_invalid_writer_options_for_empty_ite
     *, collect_all_keys: bool
 ) -> None:
     """Writer options are validated up front, so a misconfigured export fails even when there is nothing to write."""
-    with pytest.raises(TypeError, match='must be a 1-character string'):
+    # Match only the option name: the rest of the message is CPython's wording and it changed in 3.14.
+    with pytest.raises(TypeError, match='"delimiter"'):
         await export_csv_to_stream(async_iter([]), StringIO(), delimiter='ab', collect_all_keys=collect_all_keys)
 
 
