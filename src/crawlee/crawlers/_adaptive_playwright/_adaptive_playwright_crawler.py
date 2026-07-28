@@ -233,7 +233,7 @@ class AdaptivePlaywrightCrawler(
         self._static_parser = static_parser
 
     @classmethod
-    def with_beautifulsoup_static_parser(  # noqa: PLR0917  # Keyword-only params would be a breaking change.
+    def with_beautifulsoup_static_parser(  # noqa: PLR0917
         cls,
         rendering_type_predictor: RenderingTypePredictor | None = None,
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
