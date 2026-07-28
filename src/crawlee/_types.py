@@ -828,5 +828,5 @@ class ExportDataKwargs(ExportDataJsonKwargs, ExportDataCsvKwargs):
 
     Combines all `ExportDataJsonKwargs` and `ExportDataCsvKwargs` fields, since the export format is
     determined dynamically from the file extension at call time. Only the kwargs relevant to the selected
-    format are forwarded to the underlying exporter.
+    format are forwarded to the underlying exporter, the rest are ignored and named in a warning.
     """

@@ -799,23 +799,32 @@ async def test_crawler_export_data_csv_collect_all_keys(tmp_path: Path) -> None:
     assert all_keys_path.read_text() == 'a,b\n1,\n2,3\n'
 
 
-async def test_crawler_export_data_ignores_kwargs_of_the_other_format(tmp_path: Path) -> None:
-    """Each exporter receives only the kwargs of its own format, since the format is inferred from the path."""
+async def test_crawler_export_data_warns_about_kwargs_of_the_other_format(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Each exporter receives only the kwargs of its own format, and the ones left out are named in a warning."""
     crawler = BasicCrawler()
     dataset = await Dataset.open()
 
-    await dataset.push_data([{'a': 1}, {'a': 2, 'b': 3}])
+    await dataset.push_data([{'a': 1}, {'a': 2}])
 
     json_path = tmp_path / 'dataset.json'
     csv_path = tmp_path / 'dataset.csv'
 
     # `collect_all_keys` is CSV-only and `separators` is JSON-only, so each call passes one kwarg the selected
     # format does not understand.
-    await crawler.export_data(path=json_path, separators=(',', ':'), collect_all_keys=True)
-    await crawler.export_data(path=csv_path, separators=(',', ':'), lineterminator='\n')
+    with caplog.at_level('WARNING', logger='crawlee.crawlers._basic._basic_crawler'):
+        await crawler.export_data(path=json_path, separators=(',', ':'), collect_all_keys=True)
+        await crawler.export_data(path=csv_path, separators=(',', ':'), lineterminator='\n')
 
-    assert json_path.read_text() == '[{"a":1},{"a":2,"b":3}]'
+    assert json_path.read_text() == '[{"a":1},{"a":2}]'
     assert csv_path.read_text() == 'a\n1\n2\n'
+
+    messages = [record.message for record in caplog.records if record.name == 'crawlee.crawlers._basic._basic_crawler']
+    assert len(messages) == 2
+    assert 'JSON export does not support: collect_all_keys' in messages[0]
+    assert 'CSV export does not support: separators' in messages[1]
 
 
 async def test_context_push_and_export_data(tmp_path: Path) -> None:

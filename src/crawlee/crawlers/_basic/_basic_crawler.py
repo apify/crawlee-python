@@ -947,22 +947,35 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if path.suffix == '.csv':
             dst = StringIO()
-            csv_kwargs = cast(
-                'ExportDataCsvKwargs',
-                {key: value for key, value in additional_kwargs.items() if key in _CSV_EXPORT_KEYS},
-            )
+            csv_kwargs = cast('ExportDataCsvKwargs', self._select_export_kwargs(additional_kwargs, 'CSV'))
             await export_csv_to_stream(dataset.iterate_items(), dst, **csv_kwargs)
             await atomic_write(path, dst.getvalue())
         elif path.suffix == '.json':
             dst = StringIO()
-            json_kwargs = cast(
-                'ExportDataJsonKwargs',
-                {key: value for key, value in additional_kwargs.items() if key in _JSON_EXPORT_KEYS},
-            )
+            json_kwargs = cast('ExportDataJsonKwargs', self._select_export_kwargs(additional_kwargs, 'JSON'))
             await export_json_to_stream(dataset.iterate_items(), dst, **json_kwargs)
             await atomic_write(path, dst.getvalue())
         else:
             raise ValueError(f'Unsupported file extension: {path.suffix}')
+
+    def _select_export_kwargs(self, kwargs: Mapping[str, Any], export_format: Literal['CSV', 'JSON']) -> dict[str, Any]:
+        """Pick the kwargs the chosen export format understands, reporting the ones that are left out.
+
+        `export_data` accepts the kwargs of both formats, because the format is only known once the destination
+        path is inspected, so passing one that belongs to the other format is a plausible mistake. Forwarding it
+        would make the underlying exporter raise, and dropping it without a word would hide the mistake.
+        """
+        supported_keys = _CSV_EXPORT_KEYS if export_format == 'CSV' else _JSON_EXPORT_KEYS
+
+        if ignored_keys := sorted(key for key in kwargs if key not in supported_keys):
+            self._logger.warning(
+                'Ignoring %d keyword argument(s) of `export_data` that the %s export does not support: %s.',
+                len(ignored_keys),
+                export_format,
+                ', '.join(ignored_keys),
+            )
+
+        return {key: value for key, value in kwargs.items() if key in supported_keys}
 
     async def _push_data(
         self,
