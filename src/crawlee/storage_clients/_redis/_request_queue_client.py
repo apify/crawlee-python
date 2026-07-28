@@ -117,7 +117,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         self._reclaim_stale_script: AsyncScript | None = None
         self._add_requests_script: AsyncScript | None = None
 
-        self._next_reclaim_stale: None | datetime = None
+        self._next_reclaim_stale: datetime | None = None
 
     @property
     def _added_filter_key(self) -> str:

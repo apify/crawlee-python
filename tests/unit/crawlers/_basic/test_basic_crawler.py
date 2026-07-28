@@ -373,7 +373,7 @@ async def test_handles_error_in_failed_request_handler() -> None:
         pytest.param('POST', 'post', b'Hello, world!', id='post send_request'),
     ],
 )
-async def test_send_request_works(server_url: URL, method: HttpMethod, path: str, payload: None | bytes) -> None:
+async def test_send_request_works(server_url: URL, method: HttpMethod, path: str, payload: bytes | None) -> None:
     response_data: dict[str, Any] = {}
 
     crawler = BasicCrawler(max_request_retries=3)
@@ -2030,7 +2030,7 @@ async def _run_crawler(crawler_id: int | None, requests: list[str], storage_dir:
 @dataclass
 class _CrawlerInput:
     requests: list[str]
-    id: None | int = None
+    id: int | None = None
 
 
 def _process_run_crawlers(crawler_inputs: list[_CrawlerInput], storage_dir: str) -> list[StatisticsState]:

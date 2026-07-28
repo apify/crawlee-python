@@ -264,6 +264,7 @@ class HttpxHttpClient(HttpClient):
 
     def _build_request(
         self,
+        *,
         client: httpx.AsyncClient,
         url: str,
         method: HttpMethod,
