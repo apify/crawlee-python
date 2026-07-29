@@ -281,7 +281,7 @@ crawler_2 = BasicCrawler(
     configuration=custom_configuration_2,
     event_manager=custom_event_manager_2,
     storage_client=custom_storage_client_2,
-  )
+)
 
 # use crawlers without runtime crash...
 ```
@@ -311,6 +311,7 @@ The method `HttpResponse.read` is now asynchronous. This affects all HTTP-based 
 ```python
 from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
 
+
 async def main() -> None:
     crawler = ParselCrawler()
 
@@ -327,6 +328,7 @@ async def main() -> None:
 
 ```python
 from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
+
 
 async def main() -> None:
     crawler = ParselCrawler()
