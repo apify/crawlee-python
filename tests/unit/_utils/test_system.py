@@ -6,6 +6,7 @@ from multiprocessing import get_context, synchronize
 from multiprocessing.shared_memory import SharedMemory
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
+from unittest.mock import Mock
 
 import psutil
 import pytest
@@ -138,20 +139,14 @@ def test_get_used_memory_stops_asking_for_pss_once_it_is_known_to_be_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A system without PSS is asked for it only once, not on every sample of every process."""
-    call_count = 0
-
-    def memory_full_info(_process: psutil.Process) -> object:
-        nonlocal call_count
-        call_count += 1
-        return SimpleNamespace(rss=1024)
-
+    memory_full_info = Mock(return_value=SimpleNamespace(rss=1024))
     monkeypatch.setattr(psutil.Process, 'memory_full_info', memory_full_info)
     monkeypatch.setattr(psutil.Process, 'memory_info', lambda _process: SimpleNamespace(rss=1024))
 
     for _ in range(3):
         assert system._get_used_memory(psutil.Process()) == 1024
 
-    assert call_count == 1
+    memory_full_info.assert_called_once()
 
 
 @pytest.mark.parametrize(

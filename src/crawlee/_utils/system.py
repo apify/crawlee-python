@@ -54,8 +54,9 @@ if sys.platform == 'linux':
                 # A system that does not expose `smaps` at all makes psutil alias `memory_full_info` to
                 # `memory_info`, whose result has no `pss` field.
                 memory = process.memory_full_info()
-            except (psutil.NoSuchProcess, psutil.ZombieProcess):
+            except psutil.NoSuchProcess:
                 # A process that is gone is not refusing inspection, so let the RSS read below fail for it as usual.
+                # `ZombieProcess` is a subclass of `NoSuchProcess`, so a zombie lands here too.
                 pass
             except _METRIC_ERRORS:
                 # A restricted environment may deny `/proc/<pid>/smaps`, which is a property of the single process, so
