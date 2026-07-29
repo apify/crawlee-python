@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock
 
@@ -77,7 +78,9 @@ async def test_new_page_with_each_plugin(server_url: URL) -> None:
     plugin_chromium = PlaywrightBrowserPlugin(browser_type='chromium')
     plugin_firefox = PlaywrightBrowserPlugin(browser_type='firefox')
 
-    async with BrowserPool([plugin_chromium, plugin_firefox]) as browser_pool:
+    # Launching Chromium and Firefox concurrently is resource-heavy and can exceed the default
+    # operation timeout on slow CI runners. Use a generous timeout to keep the test stable.
+    async with BrowserPool([plugin_chromium, plugin_firefox], operation_timeout=timedelta(seconds=180)) as browser_pool:
         pages = await browser_pool.new_page_with_each_plugin()
 
         assert len(pages) == 2
