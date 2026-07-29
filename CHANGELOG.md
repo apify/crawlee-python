@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - **cli:** Migrate CLI to `typer` &gt;=0.26 ([#2080](https://github.com/apify/crawlee-python/pull/2080)) ([c864b96](https://github.com/apify/crawlee-python/commit/c864b96d71e18649ab34e18cc6303beee2ff44e9)) by [@Mantisus](https://github.com/Mantisus), closes [#2063](https://github.com/apify/crawlee-python/issues/2063)
+- **system:** Do not fail memory snapshots on inaccessible processes ([#2078](https://github.com/apify/crawlee-python/pull/2078)) ([5ad4e53](https://github.com/apify/crawlee-python/commit/5ad4e53ba9bfbaa0147dd9535bfcadf0c89ce3ff)) by [@anxkhn](https://github.com/anxkhn)
 
 
 <!-- git-cliff-unreleased-end -->
