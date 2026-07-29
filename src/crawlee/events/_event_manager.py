@@ -266,18 +266,14 @@ class EventManager:
         if waiting_task is not None:
             self._waiting_listener_tasks.add(waiting_task)
 
-        async def wait_for_listeners() -> None:
-            """Gathers all listener tasks and awaits their completion, logging any exceptions encountered."""
-            listener_tasks = [task for task in self._listener_tasks if task not in self._waiting_listener_tasks]
-            results = await asyncio.gather(*listener_tasks, return_exceptions=True)
-            for result in results:
-                if isinstance(result, Exception):
-                    logger.error('Event listener raised an exception.', exc_info=result)
+        # `emit` only schedules the listener wrappers; each registers its listener task once it starts running,
+        # so yield first - otherwise listeners of a just-emitted event are missed and the wait is a no-op.
+        await asyncio.sleep(0)
 
-        tasks = [asyncio.create_task(wait_for_listeners(), name=f'Task-{wait_for_listeners.__name__}')]
+        listener_tasks = [task for task in self._listener_tasks if task not in self._waiting_listener_tasks]
 
         try:
-            await wait_for_all_tasks_for_finish(tasks=tasks, logger=logger, timeout=timeout)
+            await wait_for_all_tasks_for_finish(tasks=listener_tasks, logger=logger, timeout=timeout)
         finally:
             if waiting_task is not None:
                 self._waiting_listener_tasks.discard(waiting_task)
