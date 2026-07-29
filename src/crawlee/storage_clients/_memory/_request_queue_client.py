@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections import deque
-from contextlib import suppress
+from collections import OrderedDict
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -42,17 +41,21 @@ class MemoryRequestQueueClient(RequestQueueClient):
         """
         self._metadata = metadata
 
-        self._pending_requests = deque[Request]()
-        """Pending requests are those that have been added to the queue but not yet fetched for processing."""
+        # The three stores below are keyed by unique key and disjoint - a request known to the queue lives in
+        # exactly one of them, so together they also serve as the lookup by unique key.
+
+        self._pending_requests = OrderedDict[str, Request]()
+        """Pending requests are those that have been added to the queue but not yet fetched for processing.
+
+        Ordered from the front of the queue to its end, which keeps both fetching and repositioning a request
+        to the forefront O(1).
+        """
 
         self._handled_requests = dict[str, Request]()
         """Handled requests are those that have been processed and marked as handled."""
 
         self._in_progress_requests = dict[str, Request]()
         """In-progress requests are those that have been fetched but not yet marked as handled or reclaimed."""
-
-        self._requests_by_unique_key = dict[str, Request]()
-        """Unique key -> Request mapping for fast lookup by unique key."""
 
     @override
     async def get_metadata(self) -> RequestQueueMetadata:
@@ -111,7 +114,6 @@ class MemoryRequestQueueClient(RequestQueueClient):
     async def drop(self) -> None:
         self._pending_requests.clear()
         self._handled_requests.clear()
-        self._requests_by_unique_key.clear()
         self._in_progress_requests.clear()
 
         await self._update_metadata(
@@ -126,7 +128,6 @@ class MemoryRequestQueueClient(RequestQueueClient):
     async def purge(self) -> None:
         self._pending_requests.clear()
         self._handled_requests.clear()
-        self._requests_by_unique_key.clear()
         self._in_progress_requests.clear()
 
         await self._update_metadata(
@@ -145,13 +146,14 @@ class MemoryRequestQueueClient(RequestQueueClient):
         forefront: bool = False,
     ) -> AddRequestsResponse:
         processed_requests = []
-        for request in requests:
-            # Check if the request is already in the queue by unique_key.
-            existing_request = self._requests_by_unique_key.get(request.unique_key)
+        new_total_request_count = self._metadata.total_request_count
+        new_pending_request_count = self._metadata.pending_request_count
 
-            was_already_present = existing_request is not None
-            was_already_handled = was_already_present and existing_request and existing_request.handled_at is not None
+        for request in requests:
+            # Check which of the stores, if any, the request is already in.
+            was_already_handled = request.unique_key in self._handled_requests
             is_in_progress = request.unique_key in self._in_progress_requests
+            was_already_present = was_already_handled or is_in_progress or request.unique_key in self._pending_requests
 
             # If the request is already in the queue and handled, don't add it again.
             if was_already_handled:
@@ -175,35 +177,17 @@ class MemoryRequestQueueClient(RequestQueueClient):
                 )
                 continue
 
-            # If the request is already in the queue but not handled, update it.
-            if was_already_present and existing_request:
-                # Update indexes.
-                self._requests_by_unique_key[request.unique_key] = request
+            # A new request is appended to the end of the queue. A re-add of a still-pending request keeps the
+            # originally enqueued object: the incoming duplicate is typically a freshly built one that lost the
+            # state accumulated so far (e.g. `retry_count`).
+            if not was_already_present:
+                self._pending_requests[request.unique_key] = request
+                new_total_request_count += 1
+                new_pending_request_count += 1
 
-                # We only update `forefront` by updating its position by shifting it to the left.
-                if forefront:
-                    # Update the existing request with any new data and
-                    # remove old request from pending queue if it's there.
-                    with suppress(ValueError):
-                        self._pending_requests.remove(existing_request)
-
-                    # Add updated request back to queue.
-                    self._pending_requests.appendleft(request)
-
-            # Add the new request to the queue.
-            else:
-                if forefront:
-                    self._pending_requests.appendleft(request)
-                else:
-                    self._pending_requests.append(request)
-
-                # Update indexes.
-                self._requests_by_unique_key[request.unique_key] = request
-
-                await self._update_metadata(
-                    new_total_request_count=self._metadata.total_request_count + 1,
-                    new_pending_request_count=self._metadata.pending_request_count + 1,
-                )
+            # The only effect a re-add may have is repositioning the request to the front of the queue.
+            if forefront:
+                self._pending_requests.move_to_end(request.unique_key, last=False)
 
             processed_requests.append(
                 ProcessedRequest(
@@ -213,7 +197,12 @@ class MemoryRequestQueueClient(RequestQueueClient):
                 )
             )
 
-        await self._update_metadata(update_accessed_at=True, update_modified_at=True)
+        await self._update_metadata(
+            update_accessed_at=True,
+            update_modified_at=True,
+            new_total_request_count=new_total_request_count,
+            new_pending_request_count=new_pending_request_count,
+        )
 
         return AddRequestsResponse(
             processed_requests=processed_requests,
@@ -222,27 +211,23 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
     @override
     async def fetch_next_request(self) -> Request | None:
-        while self._pending_requests:
-            request = self._pending_requests.popleft()
+        if not self._pending_requests:
+            return None
 
-            # Skip if already handled (shouldn't happen, but safety check).
-            if request.was_already_handled:
-                continue
+        _, request = self._pending_requests.popitem(last=False)
 
-            # Skip if already in progress (shouldn't happen, but safety check).
-            if request.unique_key in self._in_progress_requests:
-                continue
-
-            # Mark as in progress.
-            self._in_progress_requests[request.unique_key] = request
-            return request
-
-        return None
+        # Mark as in progress.
+        self._in_progress_requests[request.unique_key] = request
+        return request
 
     @override
     async def get_request(self, unique_key: str) -> Request | None:
         await self._update_metadata(update_accessed_at=True)
-        return self._requests_by_unique_key.get(unique_key)
+        return (
+            self._pending_requests.get(unique_key)
+            or self._in_progress_requests.get(unique_key)
+            or self._handled_requests.get(unique_key)
+        )
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
@@ -256,9 +241,6 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
         # Move request to handled storage.
         self._handled_requests[request.unique_key] = request
-
-        # Update index (keep the request in indexes for get_request to work).
-        self._requests_by_unique_key[request.unique_key] = request
 
         # Remove from in-progress.
         del self._in_progress_requests[request.unique_key]
@@ -290,11 +272,11 @@ class MemoryRequestQueueClient(RequestQueueClient):
         # Remove from in-progress.
         del self._in_progress_requests[request.unique_key]
 
-        # Add request back to pending queue.
+        # Add the request back to the pending queue. Unlike a re-add, a reclaim carries the state accumulated
+        # while the request was in progress, so the reclaimed object supersedes the one that was fetched.
+        self._pending_requests[request.unique_key] = request
         if forefront:
-            self._pending_requests.appendleft(request)
-        else:
-            self._pending_requests.append(request)
+            self._pending_requests.move_to_end(request.unique_key, last=False)
 
         # Update metadata timestamps.
         await self._update_metadata(update_modified_at=True)
