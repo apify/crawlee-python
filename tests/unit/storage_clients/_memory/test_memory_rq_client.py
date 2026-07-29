@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 
@@ -288,28 +289,17 @@ async def test_regular_readd_does_not_reorder_pending_queue(rq_client: MemoryReq
     ]
 
 
-async def test_forefront_readd_does_not_compare_pending_requests(
-    rq_client: MemoryRequestQueueClient,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_forefront_readd_does_not_compare_pending_requests(rq_client: MemoryRequestQueueClient) -> None:
     """Test that a forefront re-add repositions pending requests without comparing them pair by pair."""
     requests = [Request.from_url(f'https://example.com/{i}') for i in range(20)]
     await rq_client.add_batch_of_requests(requests)
 
     # Locating a pending request by equality means scanning the whole queue, which is what makes a batch of K
     # forefront re-adds against N pending requests cost O(K*N). Repositioning must be a keyed lookup instead.
-    comparison_count = 0
-    original_eq = Request.__eq__
+    with patch.object(Request, '__eq__', autospec=True, side_effect=Request.__eq__) as eq_counter:
+        await rq_client.add_batch_of_requests(requests, forefront=True)
 
-    def counting_eq(self: Request, other: object) -> bool:
-        nonlocal comparison_count
-        comparison_count += 1
-        return original_eq(self, other)
-
-    monkeypatch.setattr(Request, '__eq__', counting_eq)
-    await rq_client.add_batch_of_requests(requests, forefront=True)
-
-    assert comparison_count == 0
+    eq_counter.assert_not_called()
 
 
 async def test_reclaim_stores_the_modified_request(rq_client: MemoryRequestQueueClient) -> None:

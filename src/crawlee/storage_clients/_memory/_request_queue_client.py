@@ -41,11 +41,14 @@ class MemoryRequestQueueClient(RequestQueueClient):
         """
         self._metadata = metadata
 
+        # The three stores below are keyed by unique key and disjoint - a request known to the queue lives in
+        # exactly one of them, so together they also serve as the lookup by unique key.
+
         self._pending_requests = OrderedDict[str, Request]()
         """Pending requests are those that have been added to the queue but not yet fetched for processing.
 
-        Keyed by unique key and ordered from the front of the queue to its end, which keeps both fetching and
-        repositioning a request to the forefront O(1).
+        Ordered from the front of the queue to its end, which keeps both fetching and repositioning a request
+        to the forefront O(1).
         """
 
         self._handled_requests = dict[str, Request]()
@@ -53,9 +56,6 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
         self._in_progress_requests = dict[str, Request]()
         """In-progress requests are those that have been fetched but not yet marked as handled or reclaimed."""
-
-        self._requests_by_unique_key = dict[str, Request]()
-        """Unique key -> Request mapping for fast lookup by unique key."""
 
     @override
     async def get_metadata(self) -> RequestQueueMetadata:
@@ -114,7 +114,6 @@ class MemoryRequestQueueClient(RequestQueueClient):
     async def drop(self) -> None:
         self._pending_requests.clear()
         self._handled_requests.clear()
-        self._requests_by_unique_key.clear()
         self._in_progress_requests.clear()
 
         await self._update_metadata(
@@ -129,7 +128,6 @@ class MemoryRequestQueueClient(RequestQueueClient):
     async def purge(self) -> None:
         self._pending_requests.clear()
         self._handled_requests.clear()
-        self._requests_by_unique_key.clear()
         self._in_progress_requests.clear()
 
         await self._update_metadata(
@@ -152,12 +150,10 @@ class MemoryRequestQueueClient(RequestQueueClient):
         new_pending_request_count = self._metadata.pending_request_count
 
         for request in requests:
-            # Check if the request is already in the queue by unique_key.
-            existing_request = self._requests_by_unique_key.get(request.unique_key)
-
-            was_already_present = existing_request is not None
-            was_already_handled = was_already_present and existing_request and existing_request.handled_at is not None
+            # Check which of the stores, if any, the request is already in.
+            was_already_handled = request.unique_key in self._handled_requests
             is_in_progress = request.unique_key in self._in_progress_requests
+            was_already_present = was_already_handled or is_in_progress or request.unique_key in self._pending_requests
 
             # If the request is already in the queue and handled, don't add it again.
             if was_already_handled:
@@ -181,11 +177,10 @@ class MemoryRequestQueueClient(RequestQueueClient):
                 )
                 continue
 
-            # A new request is registered and appended to the end of the queue. A re-add of a still-pending
-            # request keeps the originally enqueued object: the incoming duplicate is typically a freshly built
-            # one that lost the state accumulated so far (e.g. `retry_count`).
+            # A new request is appended to the end of the queue. A re-add of a still-pending request keeps the
+            # originally enqueued object: the incoming duplicate is typically a freshly built one that lost the
+            # state accumulated so far (e.g. `retry_count`).
             if not was_already_present:
-                self._requests_by_unique_key[request.unique_key] = request
                 self._pending_requests[request.unique_key] = request
                 new_total_request_count += 1
                 new_pending_request_count += 1
@@ -228,7 +223,11 @@ class MemoryRequestQueueClient(RequestQueueClient):
     @override
     async def get_request(self, unique_key: str) -> Request | None:
         await self._update_metadata(update_accessed_at=True)
-        return self._requests_by_unique_key.get(unique_key)
+        return (
+            self._pending_requests.get(unique_key)
+            or self._in_progress_requests.get(unique_key)
+            or self._handled_requests.get(unique_key)
+        )
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
@@ -242,9 +241,6 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
         # Move request to handled storage.
         self._handled_requests[request.unique_key] = request
-
-        # Update index (keep the request in indexes for get_request to work).
-        self._requests_by_unique_key[request.unique_key] = request
 
         # Remove from in-progress.
         del self._in_progress_requests[request.unique_key]
@@ -277,8 +273,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
         del self._in_progress_requests[request.unique_key]
 
         # Add the request back to the pending queue. Unlike a re-add, a reclaim carries the state accumulated
-        # while the request was in progress, so both stores are updated with the reclaimed object.
-        self._requests_by_unique_key[request.unique_key] = request
+        # while the request was in progress, so the reclaimed object supersedes the one that was fetched.
         self._pending_requests[request.unique_key] = request
         if forefront:
             self._pending_requests.move_to_end(request.unique_key, last=False)
