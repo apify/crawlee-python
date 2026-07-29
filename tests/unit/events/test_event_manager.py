@@ -265,6 +265,36 @@ async def test_wait_from_within_multiple_listeners_does_not_deadlock(
     assert second_done.is_set()
 
 
+async def test_wait_from_outside_awaits_a_listener_that_is_itself_waiting(
+    event_manager: EventManager,
+    event_system_info_data: EventSystemInfoData,
+) -> None:
+    """A caller that is not a listener is outside the deadlock cycle, so it must await even waiting listeners."""
+    parked = asyncio.Event()
+    waiting_listener_done = asyncio.Event()
+
+    async def other_listener(_: Any) -> None:
+        await asyncio.sleep(0.1)
+
+    async def waiting_listener(_: Any) -> None:
+        parked.set()
+        await event_manager.wait_for_all_listeners_to_complete()
+        # Work done after the inner wait returns - the outer wait must not return before it finishes.
+        await asyncio.sleep(0.1)
+        waiting_listener_done.set()
+
+    event_manager.on(event=Event.SYSTEM_INFO, listener=other_listener)
+    event_manager.on(event=Event.SYSTEM_INFO, listener=waiting_listener)
+    event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
+
+    # `parked` is set right before the listener registers itself as a waiter, without yielding in between.
+    await asyncio.wait_for(parked.wait(), timeout=5)
+
+    await asyncio.wait_for(event_manager.wait_for_all_listeners_to_complete(), timeout=5)
+
+    assert waiting_listener_done.is_set()
+
+
 async def test_close_from_within_a_listener_does_not_deadlock_or_error(
     event_system_info_data: EventSystemInfoData,
 ) -> None:

@@ -261,21 +261,25 @@ class EventManager:
                 the specified timeout, they will be canceled.
         """
         # A waiter can't finish until the listeners it awaits do, so waiters must never await each other or
-        # themselves - this is what happens when a listener waits or closes from within itself.
+        # themselves - this is what happens when a listener waits or closes from within itself. Only a waiter
+        # that is a listener itself can be awaited this way, so only such waiters are tracked and excluded.
         waiting_task = asyncio.current_task()
-        if waiting_task is not None:
+        is_listener_waiter = waiting_task is not None and waiting_task in self._listener_tasks
+        if is_listener_waiter and waiting_task is not None:
             self._waiting_listener_tasks.add(waiting_task)
 
         # `emit` only schedules the listener wrappers; each registers its listener task once it starts running,
         # so yield first - otherwise listeners of a just-emitted event are missed and the wait is a no-op.
         await asyncio.sleep(0)
 
-        listener_tasks = [task for task in self._listener_tasks if task not in self._waiting_listener_tasks]
+        # Any other caller is outside the cycle, so it must await every listener, waiting ones included.
+        excluded = self._waiting_listener_tasks if is_listener_waiter else frozenset[asyncio.Task]()
+        listener_tasks = [task for task in self._listener_tasks if task not in excluded]
 
         try:
             await wait_for_all_tasks_for_finish(tasks=listener_tasks, logger=logger, timeout=timeout)
         finally:
-            if waiting_task is not None:
+            if is_listener_waiter and waiting_task is not None:
                 self._waiting_listener_tasks.discard(waiting_task)
 
     async def _emit_persist_state_event(self) -> None:
