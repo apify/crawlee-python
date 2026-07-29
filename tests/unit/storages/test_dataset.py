@@ -338,16 +338,8 @@ async def test_list_items_with_options(dataset: Dataset) -> None:
     # Test with descending order - skip empty items to avoid KeyError
     collected_items = await dataset.list_items(desc=True, skip_empty=True)
 
-    # Filter items that have an 'id' field
-    items_with_ids = [item for item in collected_items if 'id' in item]
-    id_values = [item['id'] for item in items_with_ids]
-
-    # Verify the list is sorted in descending order
-    assert sorted(id_values, reverse=True) == id_values, f'IDs should be in descending order. Got {id_values}'
-
-    # Verify key IDs are present and in the right order
-    if 5 in id_values and 3 in id_values:
-        assert id_values.index(5) < id_values.index(3), 'ID 5 should come before ID 3 in descending order'
+    id_values = [item['id'] for item in collected_items]
+    assert id_values == [5, 3, 2, 1], f'IDs should be in descending order. Got {id_values}'
 
     # Test with skip_empty
     collected_items = await dataset.list_items(skip_empty=True)
@@ -476,6 +468,46 @@ async def test_export_to_csv(
     assert '1,Item 1' in record
     assert '2,Item 2' in record
     assert '3,Item 3' in record
+
+    await kvs.drop()
+
+
+async def test_export_to_csv_columns(
+    dataset: Dataset,
+    storage_client: StorageClient,
+) -> None:
+    """Test the CSV columns come from the first item by default, and from all items with `collect_all_keys`."""
+    kvs = await KeyValueStore.open(
+        name='export-kvs',
+        storage_client=storage_client,
+    )
+
+    await dataset.push_data(
+        [
+            {'name': 'Alice', 'age': 30},
+            {'name': 'Bob', 'city': 'NYC', 'age': 25},
+            {'age': 40, 'name': 'Carol'},
+        ]
+    )
+
+    await dataset.export_to(
+        key='first_item_keys.csv',
+        content_type='csv',
+        to_kvs_name='export-kvs',
+        to_kvs_storage_client=storage_client,
+        lineterminator='\n',
+    )
+    await dataset.export_to(
+        key='all_keys.csv',
+        content_type='csv',
+        to_kvs_name='export-kvs',
+        to_kvs_storage_client=storage_client,
+        collect_all_keys=True,
+        lineterminator='\n',
+    )
+
+    assert await kvs.get_value(key='first_item_keys.csv') == 'name,age\nAlice,30\nBob,25\nCarol,40\n'
+    assert await kvs.get_value(key='all_keys.csv') == 'name,age,city\nAlice,30,\nBob,25,NYC\nCarol,40,\n'
 
     await kvs.drop()
 

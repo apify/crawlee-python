@@ -137,7 +137,7 @@ dev = [
     "pytest-timeout<3.0.0",
     "pytest-xdist<4.0.0",
     "pytest<10.0.0",
-    "ruff~=0.15.0",
+    "ruff~=0.16.0",
     "setuptools", # setuptools are used by pytest, but not explicitly required
     "ty~=0.0.0",
     "types-beautifulsoup4<5.0.0",
@@ -183,6 +183,7 @@ ignore = [
     "BLE001",   # Do not catch blind exception
     "C901",     # `{name}` is too complex
     "COM812",   # This rule may cause conflicts when used with the formatter
+    "CPY001",   # Missing copyright notice at top of file
     "D100",     # Missing docstring in public module
     "D104",     # Missing docstring in public package
     "D107",     # Missing docstring in `__init__`

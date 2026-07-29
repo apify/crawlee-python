@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import tempfile
+from logging import getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING, overload
 
@@ -16,6 +17,8 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs, JsonSerializable
+
+logger = getLogger(__name__)
 
 if sys.platform == 'win32':
 
@@ -194,25 +197,59 @@ async def export_json_to_stream(
 async def export_csv_to_stream(
     iterator: AsyncIterator[Mapping[str, JsonSerializable]],
     dst: TextIO,
-    **kwargs: Unpack[ExportDataCsvKwargs],
+    *,
+    collect_all_keys: bool = False,
+    **writer_kwargs: Unpack[ExportDataCsvKwargs],
 ) -> None:
-    # Set lineterminator to '\n' if not explicitly provided. This prevents double line endings on Windows.
-    # The csv.writer default is '\r\n', which when written to a file in text mode on Windows gets converted
-    # to '\r\r\n' due to newline translation. By using '\n', we let the platform handle the line ending
-    # conversion: '\n' stays as '\n' on Unix, and becomes '\r\n' on Windows.
-    if 'lineterminator' not in kwargs:
-        kwargs['lineterminator'] = '\n'
+    # Set lineterminator to '\n' if not explicitly provided. This prevents double line endings on Windows. The
+    # `csv.DictWriter` default is '\r\n', which when written to a file in text mode on Windows gets converted to
+    # '\r\r\n' due to newline translation. By using '\n', we let the platform handle the line ending conversion:
+    # '\n' stays as '\n' on Unix, and becomes '\r\n' on Windows.
+    if 'lineterminator' not in writer_kwargs:
+        writer_kwargs['lineterminator'] = '\n'
 
-    writer = csv.writer(dst, **kwargs)
-    write_header = True
+    # The real writer cannot be built until the first item's keys are known, so construct a throwaway one up front
+    # to validate the options. Without this, an export configured with e.g. `delimiter='ab'` would raise only when
+    # the dataset happens to contain an item, and silently succeed on a run that scraped nothing.
+    csv.DictWriter(dst, fieldnames=[], extrasaction='ignore', **writer_kwargs)
 
-    # Iterate over the dataset and write to CSV.
+    if collect_all_keys:
+        items = [item async for item in iterator if item]
+        if not items:
+            return
+
+        fieldnames = list(dict.fromkeys(key for item in items for key in item))
+        writer = csv.DictWriter(dst, fieldnames=fieldnames, extrasaction='ignore', **writer_kwargs)
+        writer.writeheader()
+        for item in items:
+            writer.writerow(item)
+        return
+
+    writer = None
+    header_keys: set[str] = set()
+    dropped_keys: set[str] = set()
+
     async for item in iterator:
         if not item:
             continue
 
-        if write_header:
-            writer.writerow(item.keys())
-            write_header = False
+        if writer is None:
+            writer = csv.DictWriter(dst, fieldnames=list(item), extrasaction='ignore', **writer_kwargs)
+            writer.writeheader()
+            header_keys = set(writer.fieldnames)
 
-        writer.writerow(item.values())
+        dropped_keys.update(item.keys() - header_keys)
+        writer.writerow(item)
+
+    # The header comes from the first item, so any key introduced by a later item is dropped. Dropping them is
+    # intentional and matches Crawlee for JS. Doing it silently is not, so report it once for the whole export.
+    if dropped_keys:
+        logger.warning(
+            'CSV export dropped %d key(s) not present in the first item: %s. '
+            'Pass collect_all_keys=True to include keys from all items as columns.',
+            len(dropped_keys),
+            # The keys are annotated as `str`, but nothing enforces that at runtime, and a storage client that
+            # does not round-trip items through JSON hands them over as pushed. Stringify them so building the
+            # message cannot fail on a key that is not a string, or on a set mixing several key types.
+            ', '.join(sorted(str(key) for key in dropped_keys)),
+        )

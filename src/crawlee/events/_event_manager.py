@@ -169,7 +169,7 @@ class EventManager:
         """
         signature = inspect.signature(listener)
 
-        @wraps(cast('Callable[..., None | Awaitable[None]]', listener))
+        @wraps(cast('Callable[..., Awaitable[None] | None]', listener))
         async def listener_wrapper(event_data: EventData) -> None:
             try:
                 bound_args = signature.bind(event_data)
@@ -272,7 +272,7 @@ class EventManager:
             results = await asyncio.gather(*listener_tasks, return_exceptions=True)
             for result in results:
                 if isinstance(result, Exception):
-                    logger.exception('Event listener raised an exception.', exc_info=result)
+                    logger.error('Event listener raised an exception.', exc_info=result)
 
         tasks = [asyncio.create_task(wait_for_listeners(), name=f'Task-{wait_for_listeners.__name__}')]
 

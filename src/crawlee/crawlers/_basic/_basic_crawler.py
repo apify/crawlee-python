@@ -913,6 +913,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
+        *,
+        collect_all_keys: bool = False,
         **additional_kwargs: Unpack[ExportDataKwargs],
     ) -> None:
         """Export all items from a Dataset to a JSON or CSV file.
@@ -926,6 +928,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             dataset_id: The ID of the Dataset to export from.
             dataset_name: The name of the Dataset to export from (global scope, named storage).
             dataset_alias: The alias of the Dataset to export from (run scope, unnamed storage).
+            collect_all_keys: CSV only. When True, the columns are the keys of all items combined, so no value is
+                dropped. When False, the columns are the keys of the first non-empty item, and keys introduced by
+                later items are dropped with a warning.
             additional_kwargs: Extra keyword arguments forwarded to the JSON/CSV exporter depending on the file format.
         """
         dataset = await Dataset.open(
@@ -941,7 +946,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if path.suffix == '.csv':
             dst = StringIO()
             csv_kwargs = cast('ExportDataCsvKwargs', additional_kwargs)
-            await export_csv_to_stream(dataset.iterate_items(), dst, **csv_kwargs)
+            await export_csv_to_stream(dataset.iterate_items(), dst, collect_all_keys=collect_all_keys, **csv_kwargs)
             await atomic_write(path, dst.getvalue())
         elif path.suffix == '.json':
             dst = StringIO()
@@ -1152,7 +1157,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         request = context.request
 
         if self._abort_on_error:
-            self._logger.exception('Aborting crawler run due to error (abort_on_error=True)', exc_info=error)
+            self._logger.error('Aborting crawler run due to error (abort_on_error=True)', exc_info=error)
             self._failed = True
 
         if self._should_retry_request(context, error):

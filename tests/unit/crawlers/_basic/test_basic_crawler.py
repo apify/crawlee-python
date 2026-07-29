@@ -373,7 +373,7 @@ async def test_handles_error_in_failed_request_handler() -> None:
         pytest.param('POST', 'post', b'Hello, world!', id='post send_request'),
     ],
 )
-async def test_send_request_works(server_url: URL, method: HttpMethod, path: str, payload: None | bytes) -> None:
+async def test_send_request_works(server_url: URL, method: HttpMethod, path: str, payload: bytes | None) -> None:
     response_data: dict[str, Any] = {}
 
     crawler = BasicCrawler(max_request_retries=3)
@@ -781,6 +781,22 @@ async def test_crawler_export_data_additional_kwargs(tmp_path: Path) -> None:
 
     assert json_path.read_text() == '[{"a":2,"z":1}]'
     assert csv_path.read_text() == 'z;a\n1;2\n'
+
+
+async def test_crawler_export_data_csv_collect_all_keys(tmp_path: Path) -> None:
+    crawler = BasicCrawler()
+    dataset = await Dataset.open()
+
+    await dataset.push_data([{'a': 1}, {'a': 2, 'b': 3}])
+
+    default_path = tmp_path / 'default.csv'
+    all_keys_path = tmp_path / 'all_keys.csv'
+
+    await crawler.export_data(path=default_path, lineterminator='\n')
+    await crawler.export_data(path=all_keys_path, collect_all_keys=True, lineterminator='\n')
+
+    assert default_path.read_text() == 'a\n1\n2\n'
+    assert all_keys_path.read_text() == 'a,b\n1,\n2,3\n'
 
 
 async def test_context_push_and_export_data(tmp_path: Path) -> None:
@@ -1995,7 +2011,7 @@ async def _run_crawler(crawler_id: int | None, requests: list[str], storage_dir:
 @dataclass
 class _CrawlerInput:
     requests: list[str]
-    id: None | int = None
+    id: int | None = None
 
 
 def _process_run_crawlers(crawler_inputs: list[_CrawlerInput], storage_dir: str) -> list[StatisticsState]:
