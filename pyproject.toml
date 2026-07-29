@@ -155,16 +155,17 @@ source-include = ["CHANGELOG.md", "CONTRIBUTING.md"]
 [tool.ruff]
 line-length = 120
 include = [
-    "src/**/*.py",
-    "tests/**/*.py",
-    "scripts/**/*.py",
-    "docs/**/*.py",
-    "website/**/*.py",
+    "**/*.py",
+    # Ruff formats Python code blocks embedded in Markdown files.
+    "**/*.md",
+    "**/*.mdx",
 ]
 exclude = [
     "website/versioned_docs/**",
 ]
 extend-exclude = ["src/crawlee/project_template"]
+# MDX is Markdown; without this mapping Ruff would try to parse `.mdx` files as Python.
+extension = { mdx = "markdown" }
 
 [tool.ruff.lint]
 select = ["ALL"]
