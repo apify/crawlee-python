@@ -1,4 +1,3 @@
-# settings.py
 # Rotation needs the third-party `scrapy-rotating-proxies` package. The built-in
 # `HttpProxyMiddleware` reads a single proxy from `request.meta` or the environment.
 ROTATING_PROXY_LIST = [
