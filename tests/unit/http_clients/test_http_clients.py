@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import json
 import os
 import sys
 from typing import TYPE_CHECKING
@@ -12,8 +13,11 @@ from curl_cffi import CurlHttpVersion
 from pydantic import ValidationError
 
 from crawlee import Request
+from crawlee._types import HttpHeaders
 from crawlee.errors import ProxyError
+from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpClient, HttpxHttpClient, ImpitHttpClient
+from crawlee.sessions import Session
 from crawlee.statistics import Statistics
 from tests.unit.server import generate_file_content
 from tests.unit.server_endpoints import HELLO_WORLD
@@ -323,3 +327,98 @@ def test_import_error_handled(optional_module_name: str, import_path: str) -> No
                 sys.modules.pop(mod_name, None)
         with pytest.raises(ImportError):
             importlib.import_module(import_path)
+
+
+async def test_send_request_sends_session_cookies(http_client: HttpClient, server_url: URL) -> None:
+    """`send_request` must attach existing session cookies (same as `crawl`)."""
+    session = Session()
+    session.cookies.set('auth', 'token-1', domain=server_url.host or '127.0.0.1', path='/')
+
+    response = await http_client.send_request(str(server_url / 'cookies'), session=session)
+    body = json.loads(await response.read())
+
+    assert body['cookies'] == {'auth': 'token-1'}
+
+
+async def test_stream_sends_session_cookies(http_client: HttpClient, server_url: URL) -> None:
+    """`stream` must attach existing session cookies (same as `crawl`)."""
+    session = Session()
+    session.cookies.set('auth', 'token-2', domain=server_url.host or '127.0.0.1', path='/')
+
+    content = b''
+    async with http_client.stream(str(server_url / 'cookies'), session=session) as response:
+        async for chunk in response.read_stream():
+            content += chunk
+
+    assert json.loads(content)['cookies'] == {'auth': 'token-2'}
+
+
+@pytest.mark.parametrize(
+    'custom_http_client',
+    [
+        pytest.param(CurlImpersonateHttpClient(persist_cookies_per_session=False), id='curl'),
+        pytest.param(HttpxHttpClient(persist_cookies_per_session=False), id='httpx'),
+        pytest.param(ImpitHttpClient(persist_cookies_per_session=False), id='impit'),
+    ],
+    indirect=['custom_http_client'],
+)
+async def test_persist_cookies_per_session_false(custom_http_client: HttpClient, server_url: URL) -> None:
+    """When persistence is disabled, response Set-Cookie must not update the session jar."""
+    session = Session()
+    request = Request.from_url(str(server_url.with_path('set_cookies').extend_query(a=1)))
+
+    await custom_http_client.crawl(request, session=session)
+
+    assert {cookie['name']: cookie['value'] for cookie in session.cookies.get_cookies_as_dicts()} == {}
+
+
+@pytest.mark.parametrize(
+    'custom_http_client',
+    [
+        pytest.param(CurlImpersonateHttpClient(persist_cookies_per_session=True), id='curl'),
+        pytest.param(HttpxHttpClient(persist_cookies_per_session=True), id='httpx'),
+        pytest.param(ImpitHttpClient(persist_cookies_per_session=True), id='impit'),
+    ],
+    indirect=['custom_http_client'],
+)
+async def test_persist_cookies_per_session_true(custom_http_client: HttpClient, server_url: URL) -> None:
+    """When persistence is enabled, response Set-Cookie must update the session jar."""
+    session = Session()
+    request = Request.from_url(str(server_url.with_path('set_cookies').extend_query(a=1)))
+
+    await custom_http_client.crawl(request, session=session)
+
+    assert {cookie['name']: cookie['value'] for cookie in session.cookies.get_cookies_as_dicts()} == {'a': '1'}
+
+
+async def test_httpx_headers_come_from_single_fingerprint() -> None:
+    """Accept and User-Agent must come from the same generated fingerprint profile."""
+    header_generator = HeaderGenerator()
+    fingerprint = {'Accept': 'text/html', 'Accept-Language': 'en-US', 'User-Agent': 'TestAgent/1.0'}
+
+    with patch.object(header_generator, 'get_specific_headers', return_value=HttpHeaders(fingerprint)) as mocked:
+        client = HttpxHttpClient(header_generator=header_generator)
+        combined = client._combine_headers(None)
+
+    mocked.assert_called_once_with(header_names={'Accept', 'Accept-Language', 'User-Agent'})
+    assert combined is not None
+    assert combined['accept'] == 'text/html'
+    assert combined['accept-language'] == 'en-US'
+    assert combined['user-agent'] == 'TestAgent/1.0'
+
+
+async def test_impit_cleanup_clears_client_cache(server_url: URL) -> None:
+    """`ImpitHttpClient.cleanup` must drop cached clients so the next request creates a fresh one."""
+    client = ImpitHttpClient()
+    async with client:
+        await client.send_request(str(server_url))
+        assert len(client._client_cache) == 1
+        first_client = next(iter(client._client_cache.values()))['client']
+
+        await client.cleanup()
+        assert len(client._client_cache) == 0
+
+        await client.send_request(str(server_url))
+        assert len(client._client_cache) == 1
+        second_client = next(iter(client._client_cache.values()))['client']
+        assert second_client is not first_client

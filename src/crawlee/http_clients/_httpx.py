@@ -284,6 +284,7 @@ class HttpxHttpClient(HttpClient):
             method=method,
             headers=dict(headers) if headers else None,
             content=payload,
+            cookies=session.cookies.jar if session else None,
             extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
             timeout=timeout or httpx.USE_CLIENT_DEFAULT,
         )
@@ -333,15 +334,19 @@ class HttpxHttpClient(HttpClient):
     def _combine_headers(self, explicit_headers: HttpHeaders | None) -> HttpHeaders | None:
         """Merge default headers with explicit headers for an HTTP request.
 
-        Generate a final set of request headers by combining default headers, a random User-Agent header,
-        and any explicitly provided headers.
+        Generate a final set of request headers by combining default headers from a single fingerprint
+        (Accept, Accept-Language, User-Agent) and any explicitly provided headers. Using one fingerprint
+        avoids mixing Accept headers from one browser profile with a User-Agent from another.
         """
-        common_headers = self._header_generator.get_common_headers() if self._header_generator else HttpHeaders()
-        user_agent_header = (
-            self._header_generator.get_random_user_agent_header() if self._header_generator else HttpHeaders()
-        )
+        if self._header_generator:
+            generated_headers = self._header_generator.get_specific_headers(
+                header_names={'Accept', 'Accept-Language', 'User-Agent'},
+            )
+        else:
+            generated_headers = HttpHeaders()
+
         explicit_headers = explicit_headers or HttpHeaders()
-        headers = common_headers | user_agent_header | explicit_headers
+        headers = generated_headers | explicit_headers
         return headers or None
 
     @staticmethod

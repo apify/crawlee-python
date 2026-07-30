@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+from copy import deepcopy
+from http.cookiejar import CookieJar
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, TypedDict
 
@@ -20,7 +22,6 @@ from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, AsyncIterator
     from datetime import timedelta
-    from http.cookiejar import CookieJar
 
     from crawlee import Request
     from crawlee._types import HttpMethod, HttpPayload
@@ -29,6 +30,9 @@ if TYPE_CHECKING:
     from crawlee.statistics import Statistics
 
 logger = getLogger(__name__)
+
+# Cache key: (proxy_url, id(cookie_jar) or None)
+_ClientCacheKey = tuple[str | None, int | None]
 
 
 class _ClientCacheEntry(TypedDict):
@@ -116,7 +120,26 @@ class ImpitHttpClient(HttpClient):
 
         self._async_client_kwargs = async_client_kwargs
 
-        self._client_by_proxy_url = LRUCache[str | None, _ClientCacheEntry](maxsize=10)
+        self._client_cache = LRUCache[_ClientCacheKey, _ClientCacheEntry](maxsize=10)
+
+    def _resolve_cookie_jar(self, session: Session | None) -> CookieJar | None:
+        """Resolve the cookie jar to use for a request.
+
+        When cookie persistence is enabled, Impit mutates the session jar in place (same as attaching the jar
+        directly). When persistence is disabled, return a deep-copied jar so existing cookies are still sent
+        outbound, but response `Set-Cookie` values do not update the session.
+        """
+        if session is None:
+            return None
+
+        if self._persist_cookies_per_session:
+            return session.cookies.jar
+
+        # Copy cookies so Impit can attach a jar for outbound Cookie headers without mutating the session.
+        jar = CookieJar()
+        for cookie in session.cookies.jar:
+            jar.set_cookie(deepcopy(cookie))
+        return jar
 
     @override
     async def crawl(
@@ -128,7 +151,7 @@ class ImpitHttpClient(HttpClient):
         statistics: Statistics | None = None,
         timeout: timedelta | None = None,
     ) -> HttpCrawlingResult:
-        client = self._get_client(proxy_info.url if proxy_info else None, session.cookies.jar if session else None)
+        client = self._get_client(proxy_info.url if proxy_info else None, self._resolve_cookie_jar(session))
 
         try:
             response = await client.request(
@@ -169,7 +192,7 @@ class ImpitHttpClient(HttpClient):
         if isinstance(headers, dict) or headers is None:
             headers = HttpHeaders(headers or {})
 
-        client = self._get_client(proxy_info.url if proxy_info else None, session.cookies.jar if session else None)
+        client = self._get_client(proxy_info.url if proxy_info else None, self._resolve_cookie_jar(session))
 
         try:
             response = await client.request(
@@ -203,7 +226,7 @@ class ImpitHttpClient(HttpClient):
     ) -> AsyncGenerator[HttpResponse]:
         validate_http_url(url)
 
-        client = self._get_client(proxy_info.url if proxy_info else None, session.cookies.jar if session else None)
+        client = self._get_client(proxy_info.url if proxy_info else None, self._resolve_cookie_jar(session))
 
         try:
             response = await client.request(
@@ -222,18 +245,31 @@ class ImpitHttpClient(HttpClient):
         finally:
             response.close()
 
-    def _get_client(self, proxy_url: str | None, cookie_jar: CookieJar | None) -> AsyncClient:
-        """Retrieve or create an HTTP client for the given proxy URL.
+    @staticmethod
+    def _make_cache_key(proxy_url: str | None, cookie_jar: CookieJar | None) -> _ClientCacheKey:
+        return (proxy_url, id(cookie_jar) if cookie_jar is not None else None)
 
-        If a client for the specified proxy URL does not exist, create and store a new one.
+    async def _close_client(self, client: AsyncClient) -> None:
+        # Impit exposes cleanup via the async context manager protocol.
+        result = client.__aexit__(None, None, None)
+        if hasattr(result, '__await__'):
+            await result  # type: ignore[misc]
+
+    def _get_client(self, proxy_url: str | None, cookie_jar: CookieJar | None) -> AsyncClient:
+        """Retrieve or create an HTTP client for the given proxy URL and cookie jar.
+
+        Clients are cached by `(proxy_url, cookie_jar identity)` so sessions with different jars do not share
+        a client. When cookie persistence is disabled, each request uses a fresh jar copy and therefore a
+        short-lived client that is not retained in the cache.
         """
-        cached_data = self._client_by_proxy_url.get(proxy_url)
-        if cached_data:
-            client = cached_data['client']
-            client_cookie_jar = cached_data['cookie_jar']
-            if client_cookie_jar is cookie_jar:
-                # If the cookie jar matches, return the existing client.
-                return client
+        # Ephemeral jars (persist_cookies_per_session=False) must not pollute / thrash the LRU cache.
+        cacheable = cookie_jar is None or self._persist_cookies_per_session
+        cache_key = self._make_cache_key(proxy_url, cookie_jar) if cacheable else None
+
+        if cache_key is not None:
+            cached_data = self._client_cache.get(cache_key)
+            if cached_data and cached_data['cookie_jar'] is cookie_jar:
+                return cached_data['client']
 
         # Prepare a default kwargs for the new client.
         kwargs: dict[str, Any] = {
@@ -249,7 +285,13 @@ class ImpitHttpClient(HttpClient):
 
         client = AsyncClient(**kwargs, cookie_jar=cookie_jar)
 
-        self._client_by_proxy_url[proxy_url] = _ClientCacheEntry(client=client, cookie_jar=cookie_jar)
+        if cache_key is not None:
+            # Close the client being evicted when the LRU is full, to avoid leaking connections.
+            if len(self._client_cache) >= self._client_cache.maxsize:
+                _evicted_key, evicted_entry = next(iter(self._client_cache.items()))
+                asyncio.get_running_loop().create_task(self._close_client(evicted_entry['client']))
+
+            self._client_cache[cache_key] = _ClientCacheEntry(client=client, cookie_jar=cookie_jar)
 
         return client
 
@@ -270,4 +312,6 @@ class ImpitHttpClient(HttpClient):
     @override
     async def cleanup(self) -> None:
         """Clean up resources used by the HTTP client."""
-        self._client_by_proxy_url.clear()
+        for entry in list(self._client_cache.values()):
+            await self._close_client(entry['client'])
+        self._client_cache.clear()
