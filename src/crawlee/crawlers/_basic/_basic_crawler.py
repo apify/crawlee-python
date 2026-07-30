@@ -1180,7 +1180,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                         await self._mark_request_as_handled(request)
                         return
 
-            await request_manager.reclaim_request(request)
+            await request_manager.reclaim_request(request, forefront=request.forefront)
         else:
             request.state = RequestState.ERROR
             await self._mark_request_as_handled(request)
@@ -1474,22 +1474,33 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             if not session:
                 raise RuntimeError('SessionError raised in a crawling context without a session') from session_error
 
+            new_request = None
             if self._error_handler:
-                await self._error_handler(context, session_error)
+                try:
+                    new_request = await self._error_handler(context, session_error)
+                except Exception as e:
+                    raise UserDefinedErrorHandlerError('Exception thrown in user-defined request error handler') from e
+
+            if new_request is not None and new_request != request:
+                await request_manager.add_request(new_request)
+                await self._mark_request_as_handled(request)
+                session.retire()
+                return
 
             if self._should_retry_request(context, session_error):
                 exc_only = ''.join(traceback.format_exception_only(session_error)).strip()
                 self._logger.warning('Encountered "%s", rotating session and retrying...', exc_only)
 
-                if session:
-                    session.retire()
+                session.retire()
 
                 # Increment session rotation count.
                 request.session_rotation_count = (request.session_rotation_count or 0) + 1
 
-                await request_manager.reclaim_request(request)
+                await request_manager.reclaim_request(request, forefront=request.forefront)
                 await self._statistics.error_tracker_retry.add(error=session_error, context=context)
             else:
+                # Exhausted rotations: retire the blocked session so it is not reused from the pool.
+                session.retire()
                 await self._mark_request_as_handled(request)
 
                 await self._handle_failed_request(context, session_error)

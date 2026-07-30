@@ -30,6 +30,7 @@ from crawlee.crawlers import (
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
 from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.crawlers._playwright._playwright_crawler import _PlaywrightCrawlerAdditionalOptions
+from crawlee.errors import SessionError
 from crawlee.statistics import Statistics, StatisticsState
 
 from ._adaptive_playwright_crawler_statistics import AdaptivePlaywrightCrawlerStatisticState
@@ -396,6 +397,10 @@ class AdaptivePlaywrightCrawler(
                     self._context_result_map[context] = static_run.result
                     return
                 if static_run.exception:
+                    # SessionError means the session is blocked. Falling through to the browser with the same
+                    # session would keep using a bad session; re-raise so BasicCrawler can rotate/retire it.
+                    if isinstance(static_run.exception, SessionError):
+                        raise static_run.exception
                     context.log.error(
                         msg=f'Static crawler: failed for {context.request.url}', exc_info=static_run.exception
                     )

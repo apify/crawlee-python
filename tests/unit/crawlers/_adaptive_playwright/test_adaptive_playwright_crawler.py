@@ -6,7 +6,7 @@ import sys
 from dataclasses import dataclass
 from datetime import timedelta
 from itertools import cycle
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import Mock, call, patch
 
 import pytest
@@ -25,10 +25,12 @@ from crawlee.crawlers import (
     RenderingTypePrediction,
     RenderingTypePredictor,
 )
+from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler import SubCrawlerRun
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
     AdaptivePlaywrightCrawlerStatisticState,
 )
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import AdaptiveContextError
+from crawlee.errors import SessionError
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storage_clients import SqlStorageClient
@@ -949,3 +951,44 @@ def test_import_error_handled(optional_module_name: str) -> None:
 
         with pytest.raises(ImportError):
             from crawlee.crawlers import AdaptivePlaywrightCrawler  # noqa: F401 PLC0415
+
+
+async def test_static_session_error_propagates_for_rotation(server_url: URL) -> None:
+    """SessionError from the static path must propagate so BasicCrawler can rotate the session.
+
+    Other static exceptions still fall through to the browser; SessionError specifically means the
+    session is blocked and must not be reused for a browser fallback.
+    """
+    predictor = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=predictor,
+        max_session_rotations=3,
+    )
+
+    session_ids: list[str] = []
+    original_crawl_one = crawler._crawl_one
+
+    async def crawl_one_raising_session_error(
+        *,
+        rendering_type: RenderingType,
+        context: Any,
+        **kwargs: Any,
+    ) -> Any:
+        if rendering_type == 'static':
+            if context.session:
+                session_ids.append(context.session.id)
+            return SubCrawlerRun(exception=SessionError('static blocked'))
+        return await original_crawl_one(rendering_type=rendering_type, context=context, **kwargs)
+
+    crawler._crawl_one = crawl_one_raising_session_error  # type: ignore[method-assign]
+
+    @crawler.router.default_handler
+    async def handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        pass
+
+    stats = await crawler.run([str(server_url)])
+
+    assert len(session_ids) == 3
+    assert len(set(session_ids)) == 3
+    assert crawler.statistics.state.browser_request_handler_runs == 0
+    assert stats.requests_failed == 1
