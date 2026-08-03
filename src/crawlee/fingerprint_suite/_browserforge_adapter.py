@@ -296,8 +296,9 @@ def _pick_interchangeable_user_agent(generated_user_agent: str, allowed_user_age
 def _get_user_agent_traits(user_agent: str) -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
     """Get browser names, operating systems and devices the header network links to the `user_agent`.
 
-    `browserforge` derives exactly these from its `user_agent` argument, so user agents sharing them are
-    interchangeable as its input.
+    `browserforge` derives the browser name and version, the operating system and the device from its `user_agent`
+    argument. Only the name is compared here, because the caller constrains the browser by name, so an allowed user
+    agent differing just in the browser version is a valid substitute.
     """
     possible_values: dict[str, Any] = {}
     # The header network holds the user agent under a different node name for each HTTP version.
@@ -307,7 +308,7 @@ def _get_user_agent_traits(user_agent: str) -> tuple[frozenset[str], frozenset[s
         )
 
     return (
-        # `*BROWSER` values are `{name}/{version}` and only the version may differ.
+        # `*BROWSER` values are `{name}/{version}`, keep just the name.
         frozenset(browser.split('/', maxsplit=1)[0] for browser in possible_values.get('*BROWSER', ())),
         frozenset(possible_values.get('*OPERATING_SYSTEM', ())),
         frozenset(possible_values.get('*DEVICE', ())),
