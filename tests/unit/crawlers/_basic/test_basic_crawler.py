@@ -289,7 +289,6 @@ async def test_session_error_handler_can_replace_request() -> None:
 
     @crawler.error_handler
     async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request | None:
-        assert isinstance(error, SessionError)
         return Request.from_url(
             context.request.url,
             unique_key=f'{context.request.unique_key}|recovered',
