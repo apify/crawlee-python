@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from collections.abc import Iterable
 from copy import deepcopy
-from functools import lru_cache, reduce
+from functools import cache, reduce
 from operator import or_
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -292,7 +292,8 @@ def _pick_interchangeable_user_agent(generated_user_agent: str, allowed_user_age
     return random.choice(candidates) if candidates else None
 
 
-@lru_cache
+# Unbounded - only a few hundred user agents exist, and the default 128 entries would thrash on the allow list scan.
+@cache
 def _get_user_agent_traits(user_agent: str) -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
     """Get browser names, operating systems and devices the header network links to the `user_agent`.
 
