@@ -35,6 +35,30 @@ def test_fingerprint_generator_some_options_stress_test() -> None:
         assert fingerprint.screen.availWidth > 500
 
 
+def test_fingerprint_generator_respects_screen_options_without_strict() -> None:
+    """Test that screen constraints are respected without `strict`, where `browserforge` silently drops them."""
+    min_width = 300
+    max_width = 600
+    min_height = 500
+    max_height = 1200
+
+    fingerprint_generator = DefaultFingerprintGenerator(
+        header_options=HeaderGeneratorOptions(browsers=['firefox'], operating_systems=['android']),
+        screen_options=ScreenOptions(
+            min_width=min_width,
+            max_width=max_width,
+            min_height=min_height,
+            max_height=max_height,
+        ),
+    )
+
+    for _ in range(20):
+        fingerprint = fingerprint_generator.generate()
+
+        assert min_width <= fingerprint.screen.width <= max_width
+        assert min_height <= fingerprint.screen.height <= max_height
+
+
 def test_fingerprint_generator_all_options() -> None:
     """Test that header generator can work with all the options. Some most basic checks of fingerprint.
 
