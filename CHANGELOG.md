@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.8.4 - **not yet released**
+## [1.9.0](https://github.com/apify/crawlee-python/releases/tag/v1.9.0) (2026-08-03)
 
 ### 🚀 Features
 
@@ -17,7 +16,6 @@ All notable changes to this project will be documented in this file.
 - **memory-storage:** Stop re-adds from duplicating and resetting pending requests ([#2074](https://github.com/apify/crawlee-python/pull/2074)) ([fae204b](https://github.com/apify/crawlee-python/commit/fae204bc2c4557072fe9e13c3ec0cfaf49aa4717)) by [@anxkhn](https://github.com/anxkhn)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.8.3](https://github.com/apify/crawlee-python/releases/tag/v1.8.3) (2026-07-20)
 
 ### 🐛 Bug Fixes
