@@ -128,7 +128,7 @@ class ImpitHttpClient(HttpClient):
         session: Session | None,
         url: str,
         headers: HttpHeaders | dict[str, str] | None,
-    ) -> tuple[CookieJar | None, HttpHeaders | None]:
+    ) -> tuple[CookieJar | None, HttpHeaders]:
         """Resolve cookie jar / Cookie header based on `persist_cookies_per_session`.
 
         When persistence is enabled, attach the session jar to Impit so response cookies update it.
@@ -139,16 +139,15 @@ class ImpitHttpClient(HttpClient):
             headers = HttpHeaders(headers or {})
 
         if session is None:
-            return None, headers or None
+            return None, headers
 
         if self._persist_cookies_per_session:
-            return session.cookies.jar, headers or None
+            return session.cookies.jar, headers
 
-        cookie_header = self._get_cookie_header(session.cookies.jar, url, headers)
-        if cookie_header and 'cookie' not in headers:
+        if cookie_header := self._get_cookie_header(session.cookies.jar, url, headers):
             headers = headers | HttpHeaders({'Cookie': cookie_header})
 
-        return None, headers or None
+        return None, headers
 
     @staticmethod
     def _get_cookie_header(jar: CookieJar, url: str, headers: HttpHeaders | None = None) -> str:
@@ -156,7 +155,7 @@ class ImpitHttpClient(HttpClient):
         # UrllibRequest is only used to format Cookie headers via CookieJar; it never opens a connection.
         request = UrllibRequest(url, headers=dict(headers) if headers else {})  # noqa: S310
         jar.add_cookie_header(request)
-        return request.get_header('Cookie') or ''
+        return request.get_header('Cookie', '')
 
     @override
     async def crawl(
@@ -296,10 +295,6 @@ class ImpitHttpClient(HttpClient):
         kwargs.update(self._async_client_kwargs)
 
         client = AsyncClient(**kwargs, cookie_jar=cookie_jar)
-
-        # Evict the least-recently-used entry explicitly before inserting.
-        if cache_key not in self._client_cache and len(self._client_cache) >= self._client_cache.maxsize:
-            self._client_cache.popitem()
 
         self._client_cache[cache_key] = _ClientCacheEntry(client=client, cookie_jar=cookie_jar)
 

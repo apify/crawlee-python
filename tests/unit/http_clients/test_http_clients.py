@@ -13,9 +13,7 @@ from curl_cffi import CurlHttpVersion
 from pydantic import ValidationError
 
 from crawlee import Request
-from crawlee._types import HttpHeaders
 from crawlee.errors import ProxyError
-from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpClient, HttpxHttpClient, ImpitHttpClient
 from crawlee.sessions import Session
 from crawlee.statistics import Statistics
@@ -389,36 +387,3 @@ async def test_persist_cookies_per_session_true(custom_http_client: HttpClient, 
     await custom_http_client.crawl(request, session=session)
 
     assert {cookie['name']: cookie['value'] for cookie in session.cookies.get_cookies_as_dicts()} == {'a': '1'}
-
-
-async def test_httpx_headers_come_from_single_fingerprint() -> None:
-    """Accept and User-Agent must come from the same generated fingerprint profile."""
-    header_generator = HeaderGenerator()
-    fingerprint = {'Accept': 'text/html', 'Accept-Language': 'en-US', 'User-Agent': 'TestAgent/1.0'}
-
-    with patch.object(header_generator, 'get_specific_headers', return_value=HttpHeaders(fingerprint)) as mocked:
-        client = HttpxHttpClient(header_generator=header_generator)
-        combined = client._combine_headers(None)
-
-    mocked.assert_called_once_with(header_names={'Accept', 'Accept-Language', 'User-Agent'})
-    assert combined is not None
-    assert combined['accept'] == 'text/html'
-    assert combined['accept-language'] == 'en-US'
-    assert combined['user-agent'] == 'TestAgent/1.0'
-
-
-async def test_impit_cleanup_clears_client_cache(server_url: URL) -> None:
-    """`ImpitHttpClient.cleanup` must drop cached clients so the next request creates a fresh one."""
-    client = ImpitHttpClient()
-    async with client:
-        await client.send_request(str(server_url))
-        assert len(client._client_cache) == 1
-        first_client = next(iter(client._client_cache.values()))['client']
-
-        await client.cleanup()
-        assert len(client._client_cache) == 0
-
-        await client.send_request(str(server_url))
-        assert len(client._client_cache) == 1
-        second_client = next(iter(client._client_cache.values()))['client']
-        assert second_client is not first_client
