@@ -275,7 +275,7 @@ async def test_calls_error_handler_for_session_errors() -> None:
 
 
 async def test_session_error_handler_can_replace_request() -> None:
-    """`error_handler` return value must be honored for SessionError, same as for regular errors."""
+    """`error_handler` return value must be honored for SessionError while rotations remain."""
     queue = await RequestQueue.open()
     crawler = BasicCrawler(request_manager=queue, max_session_rotations=3)
 
@@ -309,50 +309,59 @@ async def test_session_error_handler_can_replace_request() -> None:
     await queue.drop()
 
 
-async def test_session_retired_when_rotations_exhausted() -> None:
-    """When session rotations are exhausted, the blocked session must be retired."""
-    retired_sessions: list[Session] = []
+async def test_session_error_handler_replacement_ignored_when_rotations_exhausted() -> None:
+    """When rotations are exhausted, replacement requests must not skip failed_request_handler."""
+    queue = await RequestQueue.open()
+    failed_handler_mock = AsyncMock()
+    crawler = BasicCrawler(request_manager=queue, max_session_rotations=1)
 
-    crawler = BasicCrawler(max_session_rotations=2)
+    request = Request.from_url('https://a.placeholder.com')
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        assert context.session is not None
         raise SessionError('blocked')
+
+    @crawler.error_handler
+    async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request | None:
+        return Request.from_url(
+            context.request.url,
+            unique_key=f'{context.request.unique_key}|should-not-run',
+        )
 
     @crawler.failed_request_handler
     async def failed_request_handler(context: BasicCrawlingContext, error: Exception) -> None:
-        assert context.session is not None
-        retired_sessions.append(context.session)
+        await failed_handler_mock(context, error)
 
-    await crawler.run(['https://a.placeholder.com'])
+    await crawler.run([request])
 
-    assert len(retired_sessions) == 1
-    assert not retired_sessions[0].is_usable
+    failed_handler_mock.assert_awaited_once()
+    assert await queue.get_request(f'{request.unique_key}|should-not-run') is None
+    original_request = await queue.get_request(request.unique_key)
+    assert original_request is not None
+    assert original_request.state == RequestState.ERROR
+    assert original_request.was_already_handled
+
+    await queue.drop()
 
 
 async def test_reclaim_uses_request_forefront_flag() -> None:
     """Retries must reclaim with `request.forefront` so tiered-proxy priority retries stay at the front."""
     queue = await RequestQueue.open()
-    reclaim_calls: list[bool] = []
-    original_reclaim = queue.reclaim_request
-
-    async def tracking_reclaim(request: Request, *, forefront: bool = False) -> Any:
-        reclaim_calls.append(forefront)
-        return await original_reclaim(request, forefront=forefront)
-
-    queue.reclaim_request = tracking_reclaim  # type: ignore[method-assign]
-
     crawler = BasicCrawler(request_manager=queue, max_request_retries=1)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
         context.request.forefront = True
-        raise RuntimeError('retry me')
+        raise RuntimeError('Arbitrary crash for testing purposes')
 
-    await crawler.run([Request.from_url('https://a.placeholder.com')])
+    with patch.object(queue, 'reclaim_request', wraps=queue.reclaim_request) as reclaim_mock:
+        await crawler.run(['https://a.placeholder.com'])
 
-    assert reclaim_calls == [True]
+    reclaim_mock.assert_awaited_once()
+
+    (reclaimed_request,), reclaim_kwargs = reclaim_mock.await_args_list[0]
+    assert reclaimed_request.url == 'https://a.placeholder.com'
+    assert reclaim_kwargs == {'forefront': True}
 
     await queue.drop()
 
