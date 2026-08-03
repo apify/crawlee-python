@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.9.1 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **fingerprints:** Enforce the user agent allow list so screen constraints are respected ([#2110](https://github.com/apify/crawlee-python/pull/2110)) ([017dd1c](https://github.com/apify/crawlee-python/commit/017dd1c86c636ddfb7f64bd91a22e345dcd4cd33)) by [@vdusek](https://github.com/vdusek), closes [#2108](https://github.com/apify/crawlee-python/issues/2108)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.9.0](https://github.com/apify/crawlee-python/releases/tag/v1.9.0) (2026-08-03)
 
 ### 🚀 Features
