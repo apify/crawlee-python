@@ -87,18 +87,15 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
             # headers without `sec-...` headers are valid.
             max_attempts += 50
 
-        # `browserforge` treats `user_agent` only as a hint. It derives browser, operating system and device from it,
-        # but the user agent of the generated header is then sampled without that restriction, so it can end up outside
-        # of the requested allow list. Keep the allow list to be able to enforce it below.
+        # `browserforge` takes `user_agent` only as a hint - it derives browser, operating system and device from it,
+        # but samples the generated user agent freely. Keep the allow list to enforce it below.
         allowed_user_agents = frozenset([user_agent] if isinstance(user_agent, str) else user_agent or [])
 
         if allowed_user_agents:
-            # Pinning the input to a single allowed user agent narrows the sampling down to one browser version, but
-            # user agents that differ only in the operating system version stay indistinguishable for `browserforge`.
-            # Increase max attempts to make hitting the allow list reliable even in that case.
+            # Pinning narrows the sampling to one browser version, but not to one operating system version.
             max_attempts += 50
 
-        # Header that satisfies everything but the user agent allow list, used as a last resort below.
+        # Header satisfying everything but the allow list, used as a last resort below.
         fallback_header: dict[str, str] | None = None
 
         # Use browserforge to generate headers until it satisfies our additional requirements.
@@ -133,8 +130,7 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
                         generated_header['User-Agent'], allowed_user_agents
                     )
                     if pinned_user_agent is None:
-                        # The allow list contains no interchangeable user agent, so the requirements cannot be
-                        # satisfied any better than by the header generated from the wider input.
+                        # Nothing interchangeable in the allow list, so no better header can be generated.
                         return generated_header
 
                     fallback_header = generated_header
@@ -144,8 +140,7 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
                 return generated_header
 
         if fallback_header is not None:
-            # No allowed user agent was generated within the attempt budget. The allow list is only a preference of the
-            # caller, so returning a header that satisfies all the other requirements is still better than failing.
+            # The allow list is only a preference, so a header satisfying everything else beats failing.
             return fallback_header
 
         raise RuntimeError('Failed to generate header.')
@@ -284,11 +279,7 @@ class BrowserforgeHeaderGenerator:
 
 
 def _pick_interchangeable_user_agent(generated_user_agent: str, allowed_user_agents: frozenset[str]) -> str | None:
-    """Pick a user agent from the allow list that is interchangeable with the generated one.
-
-    Returns `None` if the allow list contains no user agent with the same traits as the generated one, because swapping
-    the generated user agent for such a user agent would break the other requested constraints.
-    """
+    """Pick a user agent from the allow list interchangeable with the generated one, `None` if there is none."""
     generated_traits = _get_user_agent_traits(generated_user_agent)
     if not all(generated_traits):
         return None
@@ -303,10 +294,10 @@ def _pick_interchangeable_user_agent(generated_user_agent: str, allowed_user_age
 
 @lru_cache
 def _get_user_agent_traits(user_agent: str) -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
-    """Get browser names, operating systems and devices that the header network links to the `user_agent`.
+    """Get browser names, operating systems and devices the header network links to the `user_agent`.
 
-    User agents sharing all three are interchangeable as an input of the header generator - `browserforge` derives
-    exactly these traits from the `user_agent` argument and samples the resulting user agent from them.
+    `browserforge` derives exactly these from its `user_agent` argument, so user agents sharing them are
+    interchangeable as its input.
     """
     possible_values: dict[str, Any] = {}
     # The header network holds the user agent under a different node name for each HTTP version.
@@ -316,7 +307,7 @@ def _get_user_agent_traits(user_agent: str) -> tuple[frozenset[str], frozenset[s
         )
 
     return (
-        # `*BROWSER` values are of the `{name}/{version}` form and only the version may differ.
+        # `*BROWSER` values are `{name}/{version}` and only the version may differ.
         frozenset(browser.split('/', maxsplit=1)[0] for browser in possible_values.get('*BROWSER', ())),
         frozenset(possible_values.get('*OPERATING_SYSTEM', ())),
         frozenset(possible_values.get('*DEVICE', ())),
