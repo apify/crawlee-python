@@ -55,6 +55,11 @@ class _EmptyCookies(CurlCookies):
     def update_cookies_from_curl(self, morsels: list[CurlMorsel]) -> None:
         return None
 
+    @override
+    def update_cookies_from_curl_changes(self, changes: list[bytes]) -> None:
+        # The write path `curl_cffi` uses since 0.16.0; the one above is kept for older versions.
+        return None
+
 
 class _AsyncSession(AsyncSession):
     @override
