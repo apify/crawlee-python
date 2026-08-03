@@ -3,12 +3,12 @@ from __future__ import annotations
 import random
 from collections.abc import Iterable
 from copy import deepcopy
-from functools import reduce
+from functools import cache, reduce
 from operator import or_
 from typing import TYPE_CHECKING, Any, Literal
 
 import apify_fingerprint_datapoints
-from browserforge.bayesian_network import extract_json
+from browserforge.bayesian_network import extract_json, get_possible_values
 from browserforge.fingerprints import Fingerprint as bf_Fingerprint
 from browserforge.fingerprints import FingerprintGenerator as bf_FingerprintGenerator
 from browserforge.fingerprints import Screen
@@ -87,6 +87,17 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
             # headers without `sec-...` headers are valid.
             max_attempts += 50
 
+        # `browserforge` takes `user_agent` only as a hint - it derives browser, operating system and device from it,
+        # but samples the generated user agent freely. Keep the allow list to enforce it below.
+        allowed_user_agents = frozenset([user_agent] if isinstance(user_agent, str) else user_agent or [])
+
+        if allowed_user_agents:
+            # Pinning narrows the sampling to one browser version, but not to one operating system version.
+            max_attempts += 50
+
+        # Header satisfying everything but the allow list, used as a last resort below.
+        fallback_header: dict[str, str] | None = None
+
         # Use browserforge to generate headers until it satisfies our additional requirements.
         for _attempt in range(max_attempts):
             generated_header: dict[str, str] = super().generate(
@@ -114,7 +125,24 @@ class PatchedHeaderGenerator(bf_HeaderGenerator):
                     # Accept chromium header only with all sec headers.
                     continue
 
+                if allowed_user_agents and generated_header['User-Agent'] not in allowed_user_agents:
+                    pinned_user_agent = _pick_interchangeable_user_agent(
+                        generated_header['User-Agent'], allowed_user_agents
+                    )
+                    if pinned_user_agent is None:
+                        # Nothing interchangeable in the allow list, so no better header can be generated.
+                        return generated_header
+
+                    fallback_header = generated_header
+                    user_agent = [pinned_user_agent]
+                    continue
+
                 return generated_header
+
+        if fallback_header is not None:
+            # The allow list is only a preference, so a header satisfying everything else beats failing.
+            return fallback_header
+
         raise RuntimeError('Failed to generate header.')
 
     def _contains_all_sec_headers(self, headers: dict[str, str]) -> bool:
@@ -248,6 +276,44 @@ class BrowserforgeHeaderGenerator:
     def generate(self, browser_type: SupportedBrowserType = 'chrome') -> dict[str, str]:
         """Generate headers."""
         return self._generator.generate(browser=[browser_type])
+
+
+def _pick_interchangeable_user_agent(generated_user_agent: str, allowed_user_agents: frozenset[str]) -> str | None:
+    """Pick a user agent from the allow list interchangeable with the generated one, `None` if there is none."""
+    generated_traits = _get_user_agent_traits(generated_user_agent)
+    if not all(generated_traits):
+        return None
+
+    candidates = [
+        allowed_user_agent
+        for allowed_user_agent in allowed_user_agents
+        if _get_user_agent_traits(allowed_user_agent) == generated_traits
+    ]
+    return random.choice(candidates) if candidates else None
+
+
+# Unbounded - only a few hundred user agents exist, and the default 128 entries would thrash on the allow list scan.
+@cache
+def _get_user_agent_traits(user_agent: str) -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
+    """Get browser names, operating systems and devices the header network links to the `user_agent`.
+
+    `browserforge` derives the browser name and version, the operating system and the device from its `user_agent`
+    argument. Only the name is compared here, because the caller constrains the browser by name, so an allowed user
+    agent differing just in the browser version is a valid substitute.
+    """
+    possible_values: dict[str, Any] = {}
+    # The header network holds the user agent under a different node name for each HTTP version.
+    for node_name in ('user-agent', 'User-Agent'):
+        possible_values.update(
+            get_possible_values(bf_HeaderGenerator.header_generator_network, {node_name: (user_agent,)})
+        )
+
+    return (
+        # `*BROWSER` values are `{name}/{version}`, keep just the name.
+        frozenset(browser.split('/', maxsplit=1)[0] for browser in possible_values.get('*BROWSER', ())),
+        frozenset(possible_values.get('*OPERATING_SYSTEM', ())),
+        frozenset(possible_values.get('*DEVICE', ())),
+    )
 
 
 def get_available_header_network() -> dict:

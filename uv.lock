@@ -98,11 +98,11 @@ wheels = [
 
 [[package]]
 name = "apify-fingerprint-datapoints"
-version = "0.13.0"
+version = "0.14.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f9/f1/b74f95767581372ab849c8b13e384b62f60d034584892c60c4a3442d9312/apify_fingerprint_datapoints-0.13.0.tar.gz", hash = "sha256:263141c19e9bc90a821e6b4e2b845925f17e0b8fbd53a897fc71546bd50df7f1", size = 934827, upload-time = "2026-05-04T09:08:45.036Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a9/d4/17a1e60b45ffe06de88ab184e6f7e4509f86239cb619f3b2dcbf97a5c648/apify_fingerprint_datapoints-0.14.0.tar.gz", hash = "sha256:96ee062787740530c0dc10231e6370e227e2bb2009677a3e175942476021dc8a", size = 823427, upload-time = "2026-08-01T01:00:55.142Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fc/58/8402442bf6af5a3a8068fe5431c42ea4f73c1eb18f621f9bf7c5de80caf5/apify_fingerprint_datapoints-0.13.0-py3-none-any.whl", hash = "sha256:0213d42297be19e8035202b41fb2e840a1e5d79874c99c882a5027a7d0b1a0eb", size = 761652, upload-time = "2026-05-04T09:08:43.347Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/b2/c5347a8568da062a7421ec7c746345f6ef62e8d45ef6ea9028c7b74c0ffa/apify_fingerprint_datapoints-0.14.0-py3-none-any.whl", hash = "sha256:b18626d8440e104aa7b34abade1af211d307fad7fdb66b423bff90cf4fbcc65d", size = 650335, upload-time = "2026-08-01T01:00:53.803Z" },
 ]
 
 [[package]]
@@ -927,10 +927,10 @@ dev = [
 requires-dist = [
     { name = "aiomysql", marker = "extra == 'sql-mysql'", specifier = ">=0.3.2" },
     { name = "aiosqlite", marker = "extra == 'sql-sqlite'", specifier = ">=0.21.0" },
-    { name = "apify-fingerprint-datapoints", marker = "extra == 'adaptive-crawler'", specifier = ">=0.0.3,<0.14.0" },
-    { name = "apify-fingerprint-datapoints", marker = "extra == 'httpx'", specifier = ">=0.0.2,<0.14.0" },
-    { name = "apify-fingerprint-datapoints", marker = "extra == 'playwright'", specifier = ">=0.0.2,<0.14.0" },
-    { name = "apify-fingerprint-datapoints", marker = "extra == 'stagehand'", specifier = ">=0.0.2,<0.14.0" },
+    { name = "apify-fingerprint-datapoints", marker = "extra == 'adaptive-crawler'", specifier = ">=0.0.3" },
+    { name = "apify-fingerprint-datapoints", marker = "extra == 'httpx'", specifier = ">=0.0.2" },
+    { name = "apify-fingerprint-datapoints", marker = "extra == 'playwright'", specifier = ">=0.0.2" },
+    { name = "apify-fingerprint-datapoints", marker = "extra == 'stagehand'", specifier = ">=0.0.2" },
     { name = "async-timeout", specifier = ">=5.0.1" },
     { name = "asyncpg", marker = "extra == 'sql-postgres'", specifier = ">=0.24.0" },
     { name = "beautifulsoup4", extras = ["lxml"], marker = "extra == 'beautifulsoup'", specifier = ">=4.12.0" },
