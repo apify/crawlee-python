@@ -82,7 +82,8 @@ async def test_client_cache_is_shared_across_sessions(server_url: URL) -> None:
     host = server_url.host
     assert host is not None
 
-    async with HttpxHttpClient(http2=False) as client:
+    client = HttpxHttpClient(http2=False)
+    async with client:
         for i in range(5):
             session = Session()
             session.cookies.set(f'k{i}', f'v{i}', domain=host, path='/')
