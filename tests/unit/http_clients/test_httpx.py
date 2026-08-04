@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from crawlee._types import HttpHeaders
+from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 from crawlee.fingerprint_suite._consts import COMMON_ACCEPT_LANGUAGE
 from crawlee.http_clients import HttpxHttpClient
@@ -57,19 +57,19 @@ async def test_common_headers_and_user_agent(server_url: URL, header_network: di
     assert response_headers['user-agent'] in get_available_header_values(header_network, {'User-Agent', 'user-agent'})
 
 
-async def test_headers_come_from_single_fingerprint() -> None:
-    """Accept and User-Agent must come from the same generated fingerprint profile."""
+def test_headers_come_from_single_fingerprint() -> None:
+    """Accept and User-Agent must come from one `generate()` call, not mixed profiles."""
     fingerprint = {'Accept': 'text/html', 'Accept-Language': 'en-US', 'User-Agent': 'TestAgent/1.0'}
 
-    header_generator = Mock()
-    header_generator.get_specific_headers = Mock(return_value=HttpHeaders(fingerprint))
+    # Avoid HeaderGenerator.__init__ loading browserforge; only exercise get_specific_headers.
+    header_generator = HeaderGenerator.__new__(HeaderGenerator)
+    header_generator._generator = Mock()
+    header_generator._generator.generate = Mock(return_value=fingerprint)
 
     client = HttpxHttpClient(header_generator=header_generator)
     combined = client._combine_headers(None)
 
-    header_generator.get_specific_headers.assert_called_once_with(
-        header_names={'Accept', 'Accept-Language', 'User-Agent'}
-    )
+    header_generator._generator.generate.assert_called_once()
     assert combined is not None
     assert combined['accept'] == 'text/html'
     assert combined['accept-language'] == 'en-US'
