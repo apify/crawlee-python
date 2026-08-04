@@ -10,13 +10,12 @@ authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -34,7 +33,6 @@ keywords = [
     "scraping",
 ]
 dependencies = [
-    "async-timeout>=5.0.1",
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
     "impit>=0.8.0",
@@ -280,7 +278,7 @@ filterwarnings = [
 ]
 
 [tool.ty.environment]
-python-version = "3.10"
+python-version = "3.11"
 
 [tool.ty.src]
 include = ["src", "tests", "scripts", "docs", "website"]

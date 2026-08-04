@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING
-
-from async_timeout import Timeout, timeout
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -46,7 +45,7 @@ class SharedTimeout:
 
     def __init__(self, timeout: timedelta) -> None:
         self._remaining_timeout = timeout
-        self._active_timeout: Timeout | None = None
+        self._active_timeout: asyncio.Timeout | None = None
         self._activation_timestamp: float | None = None
 
     async def __aenter__(self) -> timedelta:
@@ -54,7 +53,7 @@ class SharedTimeout:
             raise RuntimeError('A shared timeout context cannot be entered twice at the same time')
 
         self._activation_timestamp = time.monotonic()
-        self._active_timeout = new_timeout = timeout(self._remaining_timeout.total_seconds())
+        self._active_timeout = new_timeout = asyncio.timeout(self._remaining_timeout.total_seconds())
         await new_timeout.__aenter__()
         return self._remaining_timeout
 
