@@ -11,6 +11,7 @@ from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 from crawlee.fingerprint_suite._consts import COMMON_ACCEPT_LANGUAGE
 from crawlee.http_clients import HttpxHttpClient
+from crawlee.sessions import Session
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -74,3 +75,17 @@ def test_headers_come_from_single_fingerprint() -> None:
     assert combined['accept'] == 'text/html'
     assert combined['accept-language'] == 'en-US'
     assert combined['user-agent'] == 'TestAgent/1.0'
+
+
+async def test_client_cache_is_shared_across_sessions(server_url: URL) -> None:
+    """Distinct sessions must reuse one AsyncClient per proxy, not one client per cookie jar."""
+    host = server_url.host
+    assert host is not None
+
+    async with HttpxHttpClient(http2=False) as client:
+        for i in range(5):
+            session = Session()
+            session.cookies.set(f'k{i}', f'v{i}', domain=host, path='/')
+            await client.send_request(str(server_url / 'cookies'), session=session)
+
+        assert len(client._client_by_proxy_url) == 1
