@@ -25,7 +25,7 @@ This guide covers how to read and set cookies, seed them on new sessions, handle
 
 ## Reading and setting cookies
 
-Access the jar through <ApiLink to="class/Session#cookies">`context.session.cookies`</ApiLink>. Use <ApiLink to="class/SessionCookies#set">`set`</ApiLink> to add a cookie, iterate the jar to read all cookies, and index by name to read one value.
+Access the jar through <ApiLink to="class/Session#cookies">`context.session.cookies`</ApiLink>. Use <ApiLink to="class/SessionCookies#set">`set`</ApiLink> to add a cookie, iterate the jar to read all cookies, and index by name to read one value. Indexing raises `KeyError` when the cookie isn't in the jar.
 
 <RunnableCodeBlock className="language-python" language="python">
     {ReadWriteCookies}
@@ -37,7 +37,7 @@ Access the jar through <ApiLink to="class/Session#cookies">`context.session.cook
 
 :::
 
-A cookie has a `name`, a `value`, and optional parameters such as `domain`. If a cookie has no `domain`, it applies to any domain. For the full set of parameters, see <ApiLink to="class/CookieParam">`CookieParam`</ApiLink>. To dump the whole jar, use <ApiLink to="class/SessionCookies#get_cookies_as_dicts">`get_cookies_as_dicts()`</ApiLink>, and to load several cookies at once, use <ApiLink to="class/SessionCookies#set_cookies">`set_cookies()`</ApiLink>.
+A cookie has a `name`, a `value`, and optional parameters such as `domain`. If a cookie has no `domain`, it applies to any domain, so a login cookie set that way is sent to every host you crawl. Set `domain` on anything sensitive. For the full set of parameters, see <ApiLink to="class/CookieParam">`CookieParam`</ApiLink>. To dump the whole jar, use <ApiLink to="class/SessionCookies#get_cookies_as_dicts">`get_cookies_as_dicts()`</ApiLink>, and to load several cookies at once, use <ApiLink to="class/SessionCookies#set_cookies">`set_cookies()`</ApiLink>.
 
 ## Seeding cookies on new sessions
 
@@ -85,7 +85,7 @@ Keeps rotation for the rest of the crawl. Instead of raising, create a new reque
 
 ### Re-apply cookies in a pre-navigation hook
 
-Keeps rotation and the raise-to-retry flow, and shares the cookies across every session. Snapshot the cookies after the setup step into the crawler-wide <ApiLink to="class/UseStateFunction">`use_state`</ApiLink> store. Then re-apply them onto whichever session handles the request in a <ApiLink to="class/AbstractHttpCrawler#pre_navigation_hook">`pre_navigation_hook`</ApiLink>, which runs before navigation and receives `context.session`.
+Keeps rotation and the raise-to-retry flow. It also shares the cookies across every session. Snapshot the cookies after the setup step into the crawler-wide <ApiLink to="class/UseStateFunction">`use_state`</ApiLink> store. Then re-apply them onto whichever session handles the request in a <ApiLink to="class/AbstractHttpCrawler#pre_navigation_hook">`pre_navigation_hook`</ApiLink>, which runs before navigation and receives `context.session`.
 
 Use it when the cookies belong to the whole crawl rather than one request, for example a consent cookie you obtain once.
 
