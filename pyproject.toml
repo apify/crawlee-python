@@ -67,8 +67,7 @@ cli = [
     "rich>=13.9.0",
     "typer>=0.26.0",
 ]
-# TODO: Remove the upper bound, see #2108.
-curl-impersonate = ["curl-cffi>=0.9.0,<0.16.0"]
+curl-impersonate = ["curl-cffi>=0.9.0"]
 httpx = ["httpx[brotli,http2,zstd]>=0.27.0", "apify_fingerprint_datapoints>=0.0.2", "browserforge>=1.2.3"]
 parsel = ["parsel>=1.10.0"]
 playwright = ["playwright>=1.27.0", "apify_fingerprint_datapoints>=0.0.2", "browserforge>=1.2.3"]

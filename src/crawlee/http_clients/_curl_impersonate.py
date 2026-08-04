@@ -39,6 +39,13 @@ if TYPE_CHECKING:
     from crawlee.statistics import Statistics
 
 
+_CURL_PROXY_ERRORS = [
+    # Raised as a plain `ConnectionError` by `curl_cffi`, which maps only some tunnel failures to `CurlProxyError`.
+    'CONNECT tunnel failed',
+]
+"""Content of `libcurl` proxy errors that `curl_cffi` does not report as `CurlProxyError`."""
+
+
 class _EmptyCookies(CurlCookies):
     @override
     def get_cookies_for_curl(self, request: CurlRequest) -> list[CurlMorsel]:
@@ -46,6 +53,11 @@ class _EmptyCookies(CurlCookies):
 
     @override
     def update_cookies_from_curl(self, morsels: list[CurlMorsel]) -> None:
+        return None
+
+    @override
+    def update_cookies_from_curl_changes(self, changes: list[bytes]) -> None:
+        # The write path `curl_cffi` uses since 0.16.0; the one above is kept for older versions.
         return None
 
 
@@ -347,7 +359,7 @@ class CurlImpersonateHttpClient(HttpClient):
         Check if the error message contains known proxy-related error keywords or if it is an instance
         of `CurlProxyError`.
         """
-        if any(needle in str(error) for needle in ROTATE_PROXY_ERRORS):
+        if any(needle in str(error) for needle in (*ROTATE_PROXY_ERRORS, *_CURL_PROXY_ERRORS)):
             return True
 
         if isinstance(error, CurlProxyError):  # noqa: SIM103
