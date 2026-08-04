@@ -20,6 +20,7 @@ from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, AsyncIterator
     from datetime import timedelta
+    from http.cookiejar import CookieJar
     from ssl import SSLContext
 
     from crawlee import Request
@@ -145,7 +146,7 @@ class HttpxHttpClient(HttpClient):
 
         self._transport: _HttpxTransport | None = None
 
-        self._client_by_proxy_url = dict[str | None, httpx.AsyncClient]()
+        self._client_cache = dict[tuple[str | None, int | None], httpx.AsyncClient]()
 
     @override
     async def crawl(
@@ -157,17 +158,17 @@ class HttpxHttpClient(HttpClient):
         statistics: Statistics | None = None,
         timeout: timedelta | None = None,
     ) -> HttpCrawlingResult:
-        client = self._get_client(proxy_info.url if proxy_info else None)
-        headers = self._combine_headers(request.headers)
+        cookie_jar = session.cookies.jar if session else None
+        client = self._get_client(proxy_info.url if proxy_info else None, cookie_jar)
 
-        http_request = client.build_request(
+        http_request = self._build_request(
+            client=client,
             url=request.url,
             method=request.method,
-            headers=headers,
-            content=request.payload,
-            cookies=session.cookies.jar if session else None,
-            extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
-            timeout=timeout.total_seconds() if timeout is not None else httpx.USE_CLIENT_DEFAULT,
+            headers=request.headers,
+            payload=request.payload,
+            session=session,
+            timeout=httpx.Timeout(timeout.total_seconds()) if timeout is not None else None,
         )
 
         try:
@@ -202,7 +203,8 @@ class HttpxHttpClient(HttpClient):
     ) -> HttpResponse:
         validate_http_url(url)
 
-        client = self._get_client(proxy_info.url if proxy_info else None)
+        cookie_jar = session.cookies.jar if session else None
+        client = self._get_client(proxy_info.url if proxy_info else None, cookie_jar)
 
         http_request = self._build_request(
             client=client,
@@ -240,7 +242,8 @@ class HttpxHttpClient(HttpClient):
     ) -> AsyncGenerator[HttpResponse]:
         validate_http_url(url)
 
-        client = self._get_client(proxy_info.url if proxy_info else None)
+        cookie_jar = session.cookies.jar if session else None
+        client = self._get_client(proxy_info.url if proxy_info else None, cookie_jar)
 
         http_request = self._build_request(
             client=client,
@@ -289,13 +292,13 @@ class HttpxHttpClient(HttpClient):
             timeout=timeout or httpx.USE_CLIENT_DEFAULT,
         )
 
-    def _get_client(self, proxy_url: str | None) -> httpx.AsyncClient:
-        """Retrieve or create an HTTP client for the given proxy URL.
+    def _get_client(self, proxy_url: str | None, cookie_jar: CookieJar | None = None) -> httpx.AsyncClient:
+        """Retrieve or create an HTTP client for the given proxy URL and cookie jar.
 
-        If a client for the specified proxy URL does not exist, create and store a new one.
+        Clients are cached by `(proxy_url, id(cookie_jar))` so that redirects use the session cookie jar
+        attached to the client rather than per-request `cookies=` which httpx strips on redirect.
         """
         if not self._transport:
-            # Configure connection pool limits and keep-alive connections for transport
             limits = self._async_client_kwargs.get(
                 'limits', httpx.Limits(max_connections=1000, max_keepalive_connections=200)
             )
@@ -307,8 +310,9 @@ class HttpxHttpClient(HttpClient):
                 limits=limits,
             )
 
-        if proxy_url not in self._client_by_proxy_url:
-            # Prepare a default kwargs for the new client.
+        cache_key = (proxy_url, id(cookie_jar) if cookie_jar is not None else None)
+
+        if cache_key not in self._client_cache:
             kwargs: dict[str, Any] = {
                 'proxy': proxy_url,
                 'http1': self._http1,
@@ -316,7 +320,6 @@ class HttpxHttpClient(HttpClient):
                 'follow_redirects': True,
             }
 
-            # Update the default kwargs with any additional user-provided kwargs.
             kwargs.update(self._async_client_kwargs)
 
             kwargs.update(
@@ -326,10 +329,13 @@ class HttpxHttpClient(HttpClient):
                 }
             )
 
-            client = httpx.AsyncClient(**kwargs)
-            self._client_by_proxy_url[proxy_url] = client
+            if cookie_jar is not None:
+                kwargs['cookies'] = cookie_jar
 
-        return self._client_by_proxy_url[proxy_url]
+            client = httpx.AsyncClient(**kwargs)
+            self._client_cache[cache_key] = client
+
+        return self._client_cache[cache_key]
 
     def _combine_headers(self, explicit_headers: HttpHeaders | None) -> HttpHeaders | None:
         """Merge default headers with explicit headers for an HTTP request.
@@ -365,9 +371,9 @@ class HttpxHttpClient(HttpClient):
         return False
 
     async def cleanup(self) -> None:
-        for client in self._client_by_proxy_url.values():
+        for client in self._client_cache.values():
             await client.aclose()
-        self._client_by_proxy_url.clear()
+        self._client_cache.clear()
         if self._transport:
             await self._transport.aclose()
             self._transport = None

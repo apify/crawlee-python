@@ -387,3 +387,26 @@ async def test_persist_cookies_per_session_true(custom_http_client: HttpClient, 
     await custom_http_client.crawl(request, session=session)
 
     assert {cookie['name']: cookie['value'] for cookie in session.cookies.get_cookies_as_dicts()} == {'a': '1'}
+
+
+@pytest.mark.parametrize(
+    'custom_http_client',
+    [
+        pytest.param(CurlImpersonateHttpClient(persist_cookies_per_session=True), id='curl'),
+        pytest.param(HttpxHttpClient(persist_cookies_per_session=True), id='httpx'),
+        pytest.param(ImpitHttpClient(persist_cookies_per_session=True), id='impit'),
+    ],
+    indirect=['custom_http_client'],
+)
+async def test_session_cookies_survive_redirect(custom_http_client: HttpClient, server_url: URL) -> None:
+    """Pre-seeded session cookies must be present after a redirect (not stripped on the second hop)."""
+    session = Session()
+    session.cookies.set('tracker', 'abc', domain=server_url.host or '127.0.0.1', path='/')
+
+    cookies_url = str(server_url / 'cookies')
+    redirect_url = str((server_url / 'redirect').update_query(url=cookies_url))
+
+    response = await custom_http_client.send_request(redirect_url, session=session)
+    body = json.loads(await response.read())
+
+    assert body['cookies']['tracker'] == 'abc'

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+from http.cookiejar import CookieJar
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any
 from urllib.request import Request as UrllibRequest
 
 from cachetools import LRUCache
@@ -21,7 +22,6 @@ from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, AsyncIterator
     from datetime import timedelta
-    from http.cookiejar import CookieJar
 
     from crawlee import Request
     from crawlee._types import HttpMethod, HttpPayload
@@ -30,16 +30,6 @@ if TYPE_CHECKING:
     from crawlee.statistics import Statistics
 
 logger = getLogger(__name__)
-
-# Cache key: (proxy_url, id(cookie_jar) or None)
-_ClientCacheKey = tuple[str | None, int | None]
-
-
-class _ClientCacheEntry(TypedDict):
-    """Type definition for client cache entries."""
-
-    client: AsyncClient
-    cookie_jar: CookieJar | None
 
 
 class _ImpitResponse:
@@ -120,7 +110,7 @@ class ImpitHttpClient(HttpClient):
 
         self._async_client_kwargs = async_client_kwargs
 
-        self._client_cache = LRUCache[_ClientCacheKey, _ClientCacheEntry](maxsize=10)
+        self._client_cache = LRUCache[tuple[str | None, CookieJar | None], AsyncClient](maxsize=10)
 
     def _prepare_cookies_and_headers(
         self,
@@ -131,9 +121,9 @@ class ImpitHttpClient(HttpClient):
     ) -> tuple[CookieJar | None, HttpHeaders]:
         """Resolve cookie jar / Cookie header based on `persist_cookies_per_session`.
 
-        When persistence is enabled, attach the session jar to Impit so response cookies update it.
-        When persistence is disabled, send existing cookies via the `Cookie` header and keep the
-        shared client (no jar) so clients stay cached and reusable.
+        When persistence is enabled, attach the session jar to impit so response cookies update it. When persistence
+        is disabled, send existing cookies via the Cookie header and keep the shared client (no jar) so clients stay
+        cached and reusable.
         """
         if isinstance(headers, dict) or headers is None:
             headers = HttpHeaders(headers or {})
@@ -150,10 +140,9 @@ class ImpitHttpClient(HttpClient):
         return None, headers
 
     @staticmethod
-    def _get_cookie_header(jar: CookieJar, url: str, headers: HttpHeaders | None = None) -> str:
+    def _get_cookie_header(jar: CookieJar, url: str, headers: HttpHeaders) -> str:
         """Build a Cookie request header from a jar without attaching the jar to the client."""
-        # UrllibRequest is only used to format Cookie headers via CookieJar; it never opens a connection.
-        request = UrllibRequest(url, headers=dict(headers) if headers else {})  # noqa: S310
+        request = UrllibRequest(url, headers=dict(headers))  # noqa: S310
         jar.add_cookie_header(request)
         return request.get_header('Cookie', '')
 
@@ -265,24 +254,18 @@ class ImpitHttpClient(HttpClient):
         finally:
             response.close()
 
-    @staticmethod
-    def _make_cache_key(proxy_url: str | None, cookie_jar: CookieJar | None) -> _ClientCacheKey:
-        return (proxy_url, id(cookie_jar) if cookie_jar is not None else None)
-
     def _get_client(self, proxy_url: str | None, cookie_jar: CookieJar | None) -> AsyncClient:
         """Retrieve or create an HTTP client for the given proxy URL and cookie jar.
 
-        Clients are cached by `(proxy_url, cookie_jar identity)` so sessions with different jars do not share
-        a client. When cookie persistence is disabled, cookies are sent via headers and `cookie_jar` is `None`,
-        so a shared client can be reused for the proxy.
+        Clients are cached by `(proxy_url, cookie_jar)` — CookieJar hashes by identity so sessions with different
+        jars get separate clients. When cookie persistence is disabled, `cookie_jar` is `None` and a shared client
+        is reused for the proxy.
         """
-        cache_key = self._make_cache_key(proxy_url, cookie_jar)
+        cache_key = (proxy_url, cookie_jar)
 
-        cached_data = self._client_cache.get(cache_key)
-        if cached_data and cached_data['cookie_jar'] is cookie_jar:
-            return cached_data['client']
+        if cache_key in self._client_cache:
+            return self._client_cache[cache_key]
 
-        # Prepare a default kwargs for the new client.
         kwargs: dict[str, Any] = {
             'proxy': proxy_url,
             'http3': self._http3,
@@ -291,12 +274,10 @@ class ImpitHttpClient(HttpClient):
             'browser': self._browser,
         }
 
-        # Update the default kwargs with any additional user-provided kwargs.
         kwargs.update(self._async_client_kwargs)
 
         client = AsyncClient(**kwargs, cookie_jar=cookie_jar)
-
-        self._client_cache[cache_key] = _ClientCacheEntry(client=client, cookie_jar=cookie_jar)
+        self._client_cache[cache_key] = client
 
         return client
 
