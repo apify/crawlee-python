@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - **fingerprints:** Enforce the user agent allow list so screen constraints are respected ([#2110](https://github.com/apify/crawlee-python/pull/2110)) ([017dd1c](https://github.com/apify/crawlee-python/commit/017dd1c86c636ddfb7f64bd91a22e345dcd4cd33)) by [@vdusek](https://github.com/vdusek), closes [#2108](https://github.com/apify/crawlee-python/issues/2108)
+- Honor error_handler replacement requests on SessionError and preserve forefront on retries  ([#2105](https://github.com/apify/crawlee-python/pull/2105)) ([c731597](https://github.com/apify/crawlee-python/commit/c73159737825f587e2bdfcb7cd70f2a6c6c7fd3f)) by [@Ayush7614](https://github.com/Ayush7614)
 
 
 <!-- git-cliff-unreleased-end -->
