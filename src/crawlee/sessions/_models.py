@@ -13,6 +13,7 @@ from pydantic import (
     PlainSerializer,
     computed_field,
 )
+from pydantic.alias_generators import to_camel
 
 from crawlee._types import JsonSerializable
 
@@ -23,27 +24,31 @@ from ._session import Session
 class SessionModel(BaseModel):
     """Model for a Session object."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, populate_by_name=True, validate_by_name=True, validate_by_alias=True
+    )
 
-    id: Annotated[str, Field(alias='id')]
-    max_age: Annotated[timedelta, Field(alias='maxAge')]
-    user_data: Annotated[MutableMapping[str, JsonSerializable], Field(alias='userData')]
-    max_error_score: Annotated[float, Field(alias='maxErrorScore')]
-    error_score_decrement: Annotated[float, Field(alias='errorScoreDecrement')]
-    created_at: Annotated[datetime, Field(alias='createdAt')]
-    usage_count: Annotated[int, Field(alias='usageCount')]
-    max_usage_count: Annotated[int, Field(alias='maxUsageCount')]
-    error_score: Annotated[float, Field(alias='errorScore')]
-    cookies: Annotated[list[CookieParam], Field(alias='cookies')]
-    blocked_status_codes: Annotated[list[int], Field(alias='blockedStatusCodes')]
+    id: Annotated[str, Field()]
+    max_age: Annotated[timedelta, Field()]
+    user_data: Annotated[MutableMapping[str, JsonSerializable], Field()]
+    max_error_score: Annotated[float, Field()]
+    error_score_decrement: Annotated[float, Field()]
+    created_at: Annotated[datetime, Field()]
+    usage_count: Annotated[int, Field()]
+    max_usage_count: Annotated[int, Field()]
+    error_score: Annotated[float, Field()]
+    cookies: Annotated[list[CookieParam], Field()]
+    blocked_status_codes: Annotated[list[int], Field()]
 
 
 class SessionPoolModel(BaseModel):
     """Model for a SessionPool object."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, populate_by_name=True, validate_by_name=True, validate_by_alias=True
+    )
 
-    max_pool_size: Annotated[int, Field(alias='maxPoolSize')]
+    max_pool_size: Annotated[int, Field()]
 
     sessions: Annotated[
         dict[

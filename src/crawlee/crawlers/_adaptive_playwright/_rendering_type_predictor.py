@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 from jaro import jaro_winkler_metric
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
+from pydantic.alias_generators import to_camel
 from sklearn.linear_model import LogisticRegression
 from typing_extensions import override
 
@@ -32,7 +33,9 @@ FeatureVector = tuple[float, float]
 
 
 class RenderingTypePredictorState(BaseModel):
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, populate_by_name=True, validate_by_name=True, validate_by_alias=True
+    )
 
     model: Annotated[
         LogisticRegression,
@@ -41,7 +44,7 @@ class RenderingTypePredictorState(BaseModel):
         PlainSerializer(sklearn_model_serializer),
     ]
 
-    labels_coefficients: Annotated[defaultdict[str, float], Field(alias='labelsCoefficients')]
+    labels_coefficients: Annotated[defaultdict[str, float], Field()]
 
 
 @docs_group('Other')

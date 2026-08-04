@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import psutil
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
+from pydantic.alias_generators import to_camel
 
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.log import LoggerOnce
@@ -124,9 +125,11 @@ def _get_child_used_memory(child: psutil.Process) -> int:
 class CpuInfo(BaseModel):
     """Information about the CPU usage."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, populate_by_name=True, validate_by_name=True, validate_by_alias=True
+    )
 
-    used_ratio: Annotated[float, Field(alias='usedRatio')]
+    used_ratio: Annotated[float, Field()]
     """The ratio of CPU currently in use, represented as a float between 0 and 1."""
 
     # Workaround for Pydantic and type checkers when using Annotated with default_factory
@@ -147,7 +150,9 @@ class CpuInfo(BaseModel):
 class MemoryUsageInfo(BaseModel):
     """Information about the memory usage."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, populate_by_name=True, validate_by_name=True, validate_by_alias=True
+    )
 
     current_size: Annotated[
         ByteSize,
@@ -180,7 +185,9 @@ class MemoryUsageInfo(BaseModel):
 class MemoryInfo(MemoryUsageInfo):
     """Information about system memory."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, populate_by_name=True, validate_by_name=True, validate_by_alias=True
+    )
 
     total_size: Annotated[
         ByteSize, PlainValidator(ByteSize.validate), PlainSerializer(lambda size: size.bytes), Field(alias='totalSize')

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator, computed_field
+from pydantic.alias_generators import to_camel
 from typing_extensions import override
 
 from crawlee._utils.console import make_table
@@ -58,14 +59,20 @@ class FinalStatistics:
 class StatisticsState(BaseModel):
     """Statistic data about a crawler run."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, ser_json_inf_nan='constants')
-    stats_id: Annotated[int | None, Field(alias='statsId')] = None
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        validate_by_name=True,
+        validate_by_alias=True,
+        ser_json_inf_nan='constants',
+    )
+    stats_id: Annotated[int | None, Field()] = None
 
-    requests_finished: Annotated[int, Field(alias='requestsFinished')] = 0
-    requests_failed: Annotated[int, Field(alias='requestsFailed')] = 0
-    requests_retries: Annotated[int, Field(alias='requestsRetries')] = 0
-    requests_failed_per_minute: Annotated[float, Field(alias='requestsFailedPerMinute')] = 0
-    requests_finished_per_minute: Annotated[float, Field(alias='requestsFinishedPerMinute')] = 0
+    requests_finished: Annotated[int, Field()] = 0
+    requests_failed: Annotated[int, Field()] = 0
+    requests_retries: Annotated[int, Field()] = 0
+    requests_failed_per_minute: Annotated[float, Field()] = 0
+    requests_finished_per_minute: Annotated[float, Field()] = 0
     request_min_duration: Annotated[timedelta_ms | None, Field(alias='requestMinDurationMillis')] = None
     request_max_duration: Annotated[timedelta_ms | None, Field(alias='requestMaxDurationMillis')] = None
     request_total_failed_duration: Annotated[timedelta_ms, Field(alias='requestTotalFailedDurationMillis')] = (
@@ -74,9 +81,9 @@ class StatisticsState(BaseModel):
     request_total_finished_duration: Annotated[timedelta_ms, Field(alias='requestTotalFinishedDurationMillis')] = (
         timedelta()
     )
-    crawler_started_at: Annotated[datetime | None, Field(alias='crawlerStartedAt')] = None
+    crawler_started_at: Annotated[datetime | None, Field()] = None
     crawler_last_started_at: Annotated[datetime | None, Field(alias='crawlerLastStartTimestamp')] = None
-    crawler_finished_at: Annotated[datetime | None, Field(alias='crawlerFinishedAt')] = None
+    crawler_finished_at: Annotated[datetime | None, Field()] = None
 
     # Workaround for Pydantic and type checkers when using Annotated with default_factory
     if TYPE_CHECKING:
@@ -85,7 +92,7 @@ class StatisticsState(BaseModel):
         requests_with_status_code: dict[str, int] = {}
     else:
         errors: Annotated[dict[str, Any], Field(default_factory=dict)]
-        retry_errors: Annotated[dict[str, Any], Field(alias='retryErrors', default_factory=dict)]
+        retry_errors: Annotated[dict[str, Any], Field(default_factory=dict)]
         requests_with_status_code: Annotated[
             dict[str, int],
             Field(alias='requestsWithStatusCode', default_factory=dict),
