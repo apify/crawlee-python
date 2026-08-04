@@ -1,0 +1,47 @@
+---
+id: export-entire-dataset-to-file
+title: Export entire dataset to file
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import JsonExample from '!!raw-loader!roa-loader!./code_examples/export_entire_dataset_to_file_json.py';
+import CsvExample from '!!raw-loader!roa-loader!./code_examples/export_entire_dataset_to_file_csv.py';
+
+This example demonstrates how to use the <ApiLink to="class/BasicCrawler#export_data">`BasicCrawler.export_data`</ApiLink> method of the crawler to export the entire default dataset to a single file. This method supports exporting data in either CSV or JSON format and also accepts additional keyword arguments so you can fine-tune the underlying `json.dump` or `csv.DictWriter` behavior.
+
+:::note
+
+For these examples, we are using the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>. However, the same method is available for other crawlers as well. You can use it in exactly the same way.
+
+:::
+
+<Tabs groupId="main">
+    <TabItem value="json" label="JSON">
+        <RunnableCodeBlock className="language-python" language="python">
+            {JsonExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="csv" label="CSV">
+        <RunnableCodeBlock className="language-python" language="python">
+            {CsvExample}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>
+
+## CSV columns
+
+Dataset items don't have to share a schema. Different handlers can push different fields, so the items of one dataset often have different keys.
+
+By default, the CSV columns are the keys of the first non-empty item. When a later item has a key the first one doesn't, its value isn't written, and Crawlee logs a warning naming the dropped keys. To use the keys of all items as columns instead, pass `collect_all_keys=True`:
+
+```python
+await crawler.export_data(path='results.csv', collect_all_keys=True)
+```
+
+No value is dropped in that mode. Collecting all keys means reading the whole dataset before the first row can be written, so only the default mode writes rows as it goes.
+
+In both modes, cells for columns an item doesn't have stay empty, or hold the `restval` value if you pass one.

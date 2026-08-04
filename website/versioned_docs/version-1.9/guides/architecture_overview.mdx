@@ -51,6 +51,8 @@ class BeautifulSoupCrawler
 
 class PydanticAiCrawler
 
+class FileDownloadCrawler
+
 class PlaywrightCrawler
 
 class AdaptivePlaywrightCrawler
@@ -68,6 +70,7 @@ AbstractHttpCrawler --|> HttpCrawler
 AbstractHttpCrawler --|> ParselCrawler
 AbstractHttpCrawler --|> BeautifulSoupCrawler
 AbstractHttpCrawler --|> PydanticAiCrawler
+AbstractHttpCrawler --|> FileDownloadCrawler
 PlaywrightCrawler --|> StagehandCrawler
 ```
 
@@ -75,12 +78,13 @@ PlaywrightCrawler --|> StagehandCrawler
 
 HTTP crawlers use HTTP clients to fetch pages and parse them with HTML parsing libraries. They are fast and efficient for sites that do not require JavaScript rendering. HTTP clients are Crawlee components that wrap around HTTP libraries like [httpx](https://www.python-httpx.org/), [curl-impersonate](https://github.com/lwthiker/curl-impersonate) or [impit](https://github.com/apify/impit) and handle HTTP communication for requests and responses. You can learn more about them in the [HTTP clients guide](./http-clients).
 
-HTTP crawlers inherit from <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> and there are four crawlers that belong to this category:
+HTTP crawlers inherit from <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> and there are five crawlers that belong to this category:
 
 - <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> utilizes the [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) HTML parser.
 - <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> utilizes [Parsel](https://github.com/scrapy/parsel) for parsing HTML.
 - <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> does not parse HTTP responses at all and is used when no content parsing is required.
 - <ApiLink to="class/PydanticAiCrawler">`PydanticAiCrawler`</ApiLink> parses HTML with Parsel and uses an LLM to extract structured data into a validated Pydantic model.
+- <ApiLink to="class/FileDownloadCrawler">`FileDownloadCrawler`</ApiLink> downloads files of any content type, optionally streaming large bodies in chunks.
 
 You can learn more about HTTP crawlers in the [HTTP crawlers guide](./http-crawlers).
 
@@ -126,6 +130,8 @@ class BeautifulSoupCrawlingContext
 
 class PydanticAiCrawlingContext
 
+class FileDownloadCrawlingContext
+
 class PlaywrightPreNavCrawlingContext
 
 class PlaywrightCrawlingContext
@@ -156,6 +162,8 @@ ParsedHttpCrawlingContext --|> BeautifulSoupCrawlingContext
 
 ParselCrawlingContext --|> PydanticAiCrawlingContext
 
+HttpCrawlingContext --|> FileDownloadCrawlingContext
+
 BasicCrawlingContext --|> PlaywrightPreNavCrawlingContext
 
 PlaywrightPreNavCrawlingContext --|> PlaywrightCrawlingContext
@@ -178,6 +186,7 @@ They have a similar inheritance structure as the crawlers, with the base class b
 - <ApiLink to="class/ParselCrawlingContext">`ParselCrawlingContext`</ApiLink> for HTTP crawlers that use [Parsel](https://github.com/scrapy/parsel) for parsing.
 - <ApiLink to="class/BeautifulSoupCrawlingContext">`BeautifulSoupCrawlingContext`</ApiLink> for HTTP crawlers that use [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) for parsing.
 - <ApiLink to="class/PydanticAiCrawlingContext">`PydanticAiCrawlingContext`</ApiLink> for the AI crawler, extending the Parsel context with an `extract` helper.
+- <ApiLink to="class/FileDownloadCrawlingContext">`FileDownloadCrawlingContext`</ApiLink> for the file download crawler.
 - <ApiLink to="class/PlaywrightPreNavCrawlingContext">`PlaywrightPreNavCrawlingContext`</ApiLink> for Playwright crawlers before the page is navigated.
 - <ApiLink to="class/PlaywrightCrawlingContext">`PlaywrightCrawlingContext`</ApiLink> for Playwright crawlers.
 - <ApiLink to="class/AdaptivePlaywrightPreNavCrawlingContext">`AdaptivePlaywrightPreNavCrawlingContext`</ApiLink> for Adaptive Playwright crawlers before the page is navigated.

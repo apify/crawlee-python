@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "crawlee"
-version = "1.8.4"
+version = "1.9.1"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = "Apache-2.0"
@@ -56,8 +56,7 @@ adaptive-crawler = [
     "jaro-winkler>=2.0.3",
     "playwright>=1.27.0",
     "scikit-learn>=1.6.0",
-    # TODO: Remove the upper bound, see #2108.
-    "apify_fingerprint_datapoints>=0.0.3,<0.14.0",
+    "apify_fingerprint_datapoints>=0.0.3",
     "browserforge>=1.2.4"
 ]
 pydantic-ai = ["pydantic-ai-slim[openai]>=2.1.0", "parsel>=1.10.0", "lxml[html_clean]>=5.2.0"]
@@ -69,10 +68,9 @@ cli = [
     "typer>=0.26.0",
 ]
 curl-impersonate = ["curl-cffi>=0.9.0"]
-# TODO: Remove the upper bounds, see #2108.
-httpx = ["httpx[brotli,http2,zstd]>=0.27.0", "apify_fingerprint_datapoints>=0.0.2,<0.14.0", "browserforge>=1.2.3"]
+httpx = ["httpx[brotli,http2,zstd]>=0.27.0", "apify_fingerprint_datapoints>=0.0.2", "browserforge>=1.2.3"]
 parsel = ["parsel>=1.10.0"]
-playwright = ["playwright>=1.27.0", "apify_fingerprint_datapoints>=0.0.2,<0.14.0", "browserforge>=1.2.3"]
+playwright = ["playwright>=1.27.0", "apify_fingerprint_datapoints>=0.0.2", "browserforge>=1.2.3"]
 otel = [
     "opentelemetry-api>=1.34.1",
     "opentelemetry-distro[otlp]>=0.54",
@@ -89,8 +87,7 @@ sql_postgres = [
 stagehand = [
     "stagehand>=3.19.5",
     "playwright>=1.27.0",
-    # TODO: Remove the upper bound, see #2108.
-    "apify_fingerprint_datapoints>=0.0.2,<0.14.0",
+    "apify_fingerprint_datapoints>=0.0.2",
     "browserforge>=1.2.3",
 ]
 sql_sqlite = [

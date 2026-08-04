@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from itertools import product
 from typing import TYPE_CHECKING, Any, Literal, cast
-from unittest.mock import AsyncMock, Mock, call, patch
+from unittest.mock import ANY, AsyncMock, Mock, call, patch
 
 import pytest
 
@@ -272,6 +272,131 @@ async def test_calls_error_handler_for_session_errors() -> None:
     await crawler.run(['https://crawlee.dev'])
 
     assert error_handler_mock.call_count == 1
+
+
+async def test_session_error_handler_can_replace_request() -> None:
+    """`error_handler` return value must be honored for SessionError while rotations remain."""
+    queue = await RequestQueue.open()
+    crawler = BasicCrawler(request_manager=queue, max_session_rotations=3)
+
+    request = Request.from_url('https://a.placeholder.com')
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        if '|recovered' in context.request.unique_key:
+            return
+        raise SessionError('blocked')
+
+    @crawler.error_handler
+    async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request | None:
+        return Request.from_url(
+            context.request.url,
+            unique_key=f'{context.request.unique_key}|recovered',
+        )
+
+    await crawler.run([request])
+
+    original_request = await queue.get_request(request.unique_key)
+    recovered_request = await queue.get_request(f'{request.unique_key}|recovered')
+
+    assert original_request is not None
+    assert original_request.was_already_handled
+    assert recovered_request is not None
+    assert recovered_request.state == RequestState.DONE
+    assert recovered_request.was_already_handled
+
+
+async def test_session_error_handler_same_unique_key_rotates() -> None:
+    """Returning a request with the same unique_key must rotate, not drop the original."""
+    handler_calls = 0
+    failed_calls = 0
+    crawler = BasicCrawler(max_session_rotations=3)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        nonlocal handler_calls
+        handler_calls += 1
+        raise SessionError('blocked')
+
+    @crawler.error_handler
+    async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request | None:
+        return Request.from_url(context.request.url)
+
+    @crawler.failed_request_handler
+    async def failed_request_handler(context: BasicCrawlingContext, error: Exception) -> None:
+        nonlocal failed_calls
+        failed_calls += 1
+
+    stats = await crawler.run(['https://a.placeholder.com'])
+
+    assert handler_calls == 3
+    assert failed_calls == 1
+    assert stats.requests_failed == 1
+
+
+async def test_session_error_handler_replacement_ignored_when_rotations_exhausted() -> None:
+    """When rotations are exhausted, replacement requests must not skip failed_request_handler."""
+    queue = await RequestQueue.open()
+    failed_handler_mock = AsyncMock()
+    crawler = BasicCrawler(request_manager=queue, max_session_rotations=1)
+
+    request = Request.from_url('https://a.placeholder.com')
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        raise SessionError('blocked')
+
+    @crawler.error_handler
+    async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request | None:
+        return Request.from_url(
+            context.request.url,
+            unique_key=f'{context.request.unique_key}|should-not-run',
+        )
+
+    @crawler.failed_request_handler
+    async def failed_request_handler(context: BasicCrawlingContext, error: Exception) -> None:
+        await failed_handler_mock(context, error)
+
+    await crawler.run([request])
+
+    failed_handler_mock.assert_awaited_once()
+    assert await queue.get_request(f'{request.unique_key}|should-not-run') is None
+    original_request = await queue.get_request(request.unique_key)
+    assert original_request is not None
+    assert original_request.state == RequestState.ERROR
+    assert original_request.was_already_handled
+
+
+async def test_session_error_handler_exception_is_wrapped() -> None:
+    """Exceptions from error_handler on SessionError path become UserDefinedErrorHandlerError."""
+    crawler = BasicCrawler(max_session_rotations=2)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        raise SessionError('blocked')
+
+    @crawler.error_handler
+    async def error_handler(context: BasicCrawlingContext, error: Exception) -> None:
+        raise RuntimeError('Crash in session error handler')
+
+    with pytest.raises(UserDefinedErrorHandlerError):
+        await crawler.run(['https://a.placeholder.com'])
+
+
+async def test_reclaim_uses_request_forefront_flag() -> None:
+    """Retries must reclaim with `request.forefront` so tiered-proxy priority retries stay at the front."""
+    queue = await RequestQueue.open()
+    crawler = BasicCrawler(request_manager=queue, max_request_retries=1)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        context.request.forefront = True
+        raise RuntimeError('Arbitrary crash for testing purposes')
+
+    with patch.object(queue, 'reclaim_request', wraps=queue.reclaim_request) as reclaim_mock:
+        await crawler.run(['https://a.placeholder.com'])
+
+    reclaim_mock.assert_awaited_once_with(ANY, forefront=True)
 
 
 async def test_handles_error_in_error_handler() -> None:

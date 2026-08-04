@@ -46,7 +46,7 @@ When you're just testing your code or when your crawler could potentially find m
 crawler = BeautifulSoupCrawler(max_requests_per_crawl=10)
 ```
 
-This means that no new requests will be started after the 20th request is finished. The actual number of processed requests might be a little higher thanks to parallelization, because the running requests won't be forcefully aborted. It's not even possible in most cases.
+This means that no new requests will be started after the 10th request is finished. The actual number of processed requests might be a little higher thanks to parallelization, because the running requests won't be forcefully aborted. It's not even possible in most cases.
 
 ## Finding new links
 

@@ -3,7 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 1.8.4 - **not yet released**
+## 1.9.1 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **fingerprints:** Enforce the user agent allow list so screen constraints are respected ([#2110](https://github.com/apify/crawlee-python/pull/2110)) ([017dd1c](https://github.com/apify/crawlee-python/commit/017dd1c86c636ddfb7f64bd91a22e345dcd4cd33)) by [@vdusek](https://github.com/vdusek), closes [#2108](https://github.com/apify/crawlee-python/issues/2108)
+- Honor error_handler replacement requests on SessionError and preserve forefront on retries  ([#2105](https://github.com/apify/crawlee-python/pull/2105)) ([c731597](https://github.com/apify/crawlee-python/commit/c73159737825f587e2bdfcb7cd70f2a6c6c7fd3f)) by [@Ayush7614](https://github.com/Ayush7614)
+
+
+<!-- git-cliff-unreleased-end -->
+## [1.9.0](https://github.com/apify/crawlee-python/releases/tag/v1.9.0) (2026-08-03)
 
 ### 🚀 Features
 
@@ -17,7 +26,6 @@ All notable changes to this project will be documented in this file.
 - **memory-storage:** Stop re-adds from duplicating and resetting pending requests ([#2074](https://github.com/apify/crawlee-python/pull/2074)) ([fae204b](https://github.com/apify/crawlee-python/commit/fae204bc2c4557072fe9e13c3ec0cfaf49aa4717)) by [@anxkhn](https://github.com/anxkhn)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.8.3](https://github.com/apify/crawlee-python/releases/tag/v1.8.3) (2026-07-20)
 
 ### 🐛 Bug Fixes

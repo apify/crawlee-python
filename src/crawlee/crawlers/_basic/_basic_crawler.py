@@ -1148,6 +1148,56 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # The URL does not match any `include` pattern - reject it
         return False
 
+    async def _handle_error_handler_replacement(
+        self,
+        context: TCrawlingContext | BasicCrawlingContext,
+        error: Exception,
+        *,
+        request_manager: RequestManager,
+        retire_session: bool = False,
+    ) -> bool:
+        """Invoke the user `error_handler` and enqueue a replacement request when appropriate.
+
+        A returned request with the same `unique_key` as the original is treated as no
+        replacement: `add_request` would be a no-op while the original is still in progress,
+        and marking the original handled would drop the work.
+
+        Args:
+            context: Current crawling context.
+            error: Exception that triggered the error handler.
+            request_manager: Request manager used to enqueue the replacement.
+            retire_session: When True, retire `context.session` before awaiting I/O so a
+                known-blocked session cannot stay in the pool if a later await fails.
+
+        Returns:
+            True if the original request was replaced and marked handled; False to continue
+            with the normal retry or failure path.
+        """
+        if not self._error_handler:
+            return False
+
+        try:
+            new_request = await self._error_handler(context, error)
+        except Exception as e:
+            context.request.state = RequestState.ERROR
+            raise UserDefinedErrorHandlerError('Exception thrown in user-defined request error handler') from e
+
+        if new_request is None or new_request.unique_key == context.request.unique_key:
+            return False
+
+        # Preserve counters so a handler minting a fresh unique_key each time cannot loop forever.
+        new_request.retry_count = context.request.retry_count
+        if context.request.session_rotation_count is not None:
+            new_request.session_rotation_count = context.request.session_rotation_count
+
+        if retire_session and context.session:
+            context.session.retire()
+
+        await request_manager.add_request(new_request, forefront=new_request.forefront)
+        await self._mark_request_as_handled(context.request)
+        self._statistics.record_request_processing_finish(context.request.unique_key)
+        return True
+
     async def _handle_request_retries(
         self,
         context: TCrawlingContext | BasicCrawlingContext,
@@ -1169,18 +1219,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             )
             await self._statistics.error_tracker.add(error=error, context=context)
 
-            if self._error_handler:
-                try:
-                    new_request = await self._error_handler(context, error)
-                except Exception as e:
-                    raise UserDefinedErrorHandlerError('Exception thrown in user-defined request error handler') from e
-                else:
-                    if new_request is not None and new_request != request:
-                        await request_manager.add_request(new_request)
-                        await self._mark_request_as_handled(request)
-                        return
+            if await self._handle_error_handler_replacement(context, error, request_manager=request_manager):
+                return
 
-            await request_manager.reclaim_request(request)
+            await request_manager.reclaim_request(request, forefront=request.forefront)
         else:
             request.state = RequestState.ERROR
             await self._mark_request_as_handled(request)
@@ -1474,22 +1516,42 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             if not session:
                 raise RuntimeError('SessionError raised in a crawling context without a session') from session_error
 
-            if self._error_handler:
-                await self._error_handler(context, session_error)
+            request.state = RequestState.ERROR_HANDLER
 
             if self._should_retry_request(context, session_error):
+                await self._statistics.error_tracker_retry.add(error=session_error, context=context)
+
+                # Replacement requests are only honored while rotations remain, so exhausted rotations
+                # still go through failed_request_handler instead of being silently replaced.
+                if await self._handle_error_handler_replacement(
+                    context,
+                    session_error,
+                    request_manager=request_manager,
+                    retire_session=True,
+                ):
+                    return
+
                 exc_only = ''.join(traceback.format_exception_only(session_error)).strip()
                 self._logger.warning('Encountered "%s", rotating session and retrying...', exc_only)
 
-                if session:
-                    session.retire()
+                session.retire()
 
                 # Increment session rotation count.
                 request.session_rotation_count = (request.session_rotation_count or 0) + 1
 
-                await request_manager.reclaim_request(request)
-                await self._statistics.error_tracker_retry.add(error=session_error, context=context)
+                await request_manager.reclaim_request(request, forefront=request.forefront)
             else:
+                # Still invoke the error_handler for side effects, but never replace once rotations are exhausted.
+                if self._error_handler:
+                    try:
+                        await self._error_handler(context, session_error)
+                    except Exception as e:
+                        request.state = RequestState.ERROR
+                        raise UserDefinedErrorHandlerError(
+                            'Exception thrown in user-defined request error handler'
+                        ) from e
+
+                request.state = RequestState.ERROR
                 await self._mark_request_as_handled(request)
 
                 await self._handle_failed_request(context, session_error)

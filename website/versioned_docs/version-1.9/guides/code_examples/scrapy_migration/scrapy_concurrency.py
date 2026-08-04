@@ -1,3 +1,2 @@
-# settings.py
 CONCURRENT_REQUESTS = 20
 DOWNLOAD_DELAY = 0.5
