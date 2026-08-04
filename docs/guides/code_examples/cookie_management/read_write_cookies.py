@@ -28,7 +28,7 @@ async def main() -> None:
         token = context.session.cookies['csrf_token']
         context.log.info(f'CSRF token: {token}')
 
-    # The server sets a `session_id` cookie and echoes the request cookies back.
+    # The server sets a `session_id` cookie on the response.
     await crawler.run(['https://httpbingo.org/cookies/set?session_id=42'])
 
 
