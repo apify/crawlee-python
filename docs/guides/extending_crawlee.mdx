@@ -27,6 +27,8 @@ class BasicCrawler {
     <<abstract>>
 }
 
+class PlaywrightCrawler
+
 class HttpClient {
     <<abstract>>
 }
@@ -35,13 +37,17 @@ class StorageClient {
     <<abstract>>
 }
 
+class BrowserPool
+
 class BrowserPlugin {
     <<abstract>>
 }
 
 BasicCrawler --> HttpClient : uses
 BasicCrawler --> StorageClient : uses
-BasicCrawler --> BrowserPlugin : uses
+BasicCrawler --|> PlaywrightCrawler
+PlaywrightCrawler --> BrowserPool : uses
+BrowserPool --> BrowserPlugin : manages
 ```
 
 ### Crawlers
