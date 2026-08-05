@@ -307,7 +307,9 @@ async def test_close_from_within_a_listener_does_not_deadlock_or_error(
     emitter_errors: list[BaseException] = []
     event_manager._event_emitter.add_listener('error', emitter_errors.append)
     loop_errors: list[dict[str, Any]] = []
-    asyncio.get_running_loop().set_exception_handler(lambda _loop, context: loop_errors.append(context))
+    loop = asyncio.get_running_loop()
+    original_exception_handler = loop.get_exception_handler()
+    loop.set_exception_handler(lambda _loop, context: loop_errors.append(context))
 
     closed = asyncio.Event()
     other_listener_done = asyncio.Event()
@@ -320,20 +322,19 @@ async def test_close_from_within_a_listener_does_not_deadlock_or_error(
         await event_manager.__aexit__(None, None, None)
         closed.set()
 
-    # A second listener makes close await a concurrently-running listener - the real `Actor.exit()` shape.
-    event_manager.on(event=Event.SYSTEM_INFO, listener=other_listener)
-    event_manager.on(event=Event.SYSTEM_INFO, listener=closing_listener)
-
-    tasks_before = asyncio.all_tasks()
-    event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
-
     try:
+        # A second listener makes close await a concurrently-running listener - the real `Actor.exit()` shape.
+        event_manager.on(event=Event.SYSTEM_INFO, listener=other_listener)
+        event_manager.on(event=Event.SYSTEM_INFO, listener=closing_listener)
+
+        event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_info_data)
+
         await asyncio.wait_for(closed.wait(), timeout=5)
-        # Drain the wrapper tasks so their `finally` blocks run before we assert - no arbitrary sleep.
-        spawned = asyncio.all_tasks() - tasks_before - {asyncio.current_task()}
-        if spawned:
-            await asyncio.wait(spawned)
+        # Drain the wrapper tasks so their `finally` blocks run before we assert - no arbitrary sleep. The
+        # emitter tracks exactly its own wrappers, unlike an `asyncio.all_tasks()` diff.
+        await asyncio.wait_for(event_manager._event_emitter.wait_for_complete(), timeout=5)
     finally:
+        loop.set_exception_handler(original_exception_handler)
         # Cap the cleanup so a regressed deadlock surfaces the real failure instead of hanging.
         if event_manager.active:
             with suppress(Exception):
