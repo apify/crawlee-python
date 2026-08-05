@@ -9,7 +9,7 @@ from typing_extensions import override
 
 from crawlee import Request, service_locator
 from crawlee._utils.docs import docs_group
-from crawlee._utils.wait import wait_for_all_tasks_for_finish
+from crawlee._utils.wait import wait_for_all_tasks_to_finish
 from crawlee.request_loaders import RequestManager
 from crawlee.storage_clients.models import AddRequestsResponse
 
@@ -242,7 +242,7 @@ class RequestQueue(Storage, RequestManager):
 
         # Wait for all tasks to finish if requested
         if wait_for_all_requests_to_be_added:
-            await wait_for_all_tasks_for_finish(
+            await wait_for_all_tasks_to_finish(
                 (remaining_batches_task,),
                 logger=logger,
                 timeout=wait_for_all_requests_to_be_added_timeout,
