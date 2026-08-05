@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - **fingerprints:** Enforce the user agent allow list so screen constraints are respected ([#2110](https://github.com/apify/crawlee-python/pull/2110)) ([017dd1c](https://github.com/apify/crawlee-python/commit/017dd1c86c636ddfb7f64bd91a22e345dcd4cd33)) by [@vdusek](https://github.com/vdusek), closes [#2108](https://github.com/apify/crawlee-python/issues/2108)
 - Honor error_handler replacement requests on SessionError and preserve forefront on retries  ([#2105](https://github.com/apify/crawlee-python/pull/2105)) ([c731597](https://github.com/apify/crawlee-python/commit/c73159737825f587e2bdfcb7cd70f2a6c6c7fd3f)) by [@Ayush7614](https://github.com/Ayush7614)
 - **curl-impersonate:** Treat a refused CONNECT tunnel as a proxy error ([#2109](https://github.com/apify/crawlee-python/pull/2109)) ([54b7602](https://github.com/apify/crawlee-python/commit/54b7602f015e8a08fabf36b31505667350a2b329)) by [@vdusek](https://github.com/vdusek), closes [#2111](https://github.com/apify/crawlee-python/issues/2111)
+- **events:** Prevent deadlock when closing or waiting for listeners from within a listener ([#2088](https://github.com/apify/crawlee-python/pull/2088)) ([92ab97a](https://github.com/apify/crawlee-python/commit/92ab97a926a644b064d78e6a406b670a9c0b47f8)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->
