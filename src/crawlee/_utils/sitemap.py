@@ -9,6 +9,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from hashlib import sha256
+from http import HTTPStatus
 from logging import getLogger
 from typing import TYPE_CHECKING, Literal, TypedDict
 from xml.sax import SAXParseException
@@ -20,7 +21,9 @@ from yarl import URL
 
 from crawlee._utils.urls import filter_url
 from crawlee._utils.web import is_status_code_successful
-from crawlee.errors import ProxyError
+from crawlee.errors import HttpStatusCodeError, ProxyError
+
+_HTTP_STATUS_UPPER_BOUND = 600
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -29,6 +32,12 @@ if TYPE_CHECKING:
     from crawlee import EnqueueStrategy
     from crawlee.http_clients import HttpClient
     from crawlee.proxy_configuration import ProxyInfo
+
+
+def _raise_for_sitemap_status(status_code: int) -> None:
+    if not is_status_code_successful(status_code):
+        raise HttpStatusCodeError('Error status code returned while fetching sitemap', status_code)
+
 
 logger = getLogger(__name__)
 
@@ -372,6 +381,8 @@ async def _fetch_and_process_sitemap(
             async with http_client.stream(
                 sitemap_url, method='GET', headers=SITEMAP_HEADERS, proxy_info=proxy_info, timeout=timeout
             ) as response:
+                _raise_for_sitemap_status(response.status_code)
+
                 # Determine content type and compression
                 content_type = response.headers.get('content-type', '')
 
@@ -455,6 +466,11 @@ async def _fetch_and_process_sitemap(
             break
 
         except Exception as e:
+            if isinstance(e, HttpStatusCodeError) and not (
+                e.status_code in (HTTPStatus.REQUEST_TIMEOUT, HTTPStatus.TOO_MANY_REQUESTS)
+                or HTTPStatus.INTERNAL_SERVER_ERROR <= e.status_code < _HTTP_STATUS_UPPER_BOUND
+            ):
+                raise
             if retries_left > 0:
                 logger.warning(f'Error fetching sitemap {sitemap_url}: {e}. Retries left: {retries_left}')
                 await asyncio.sleep(1)  # Brief pause before retry
