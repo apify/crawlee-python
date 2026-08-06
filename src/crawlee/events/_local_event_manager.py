@@ -1,5 +1,3 @@
-# Inspiration: https://github.com/apify/crawlee/blob/v3.7.3/packages/core/src/events/local_event_manager.ts
-
 from __future__ import annotations
 
 import asyncio
@@ -17,7 +15,7 @@ from crawlee.events._types import Event, EventSystemInfoData
 if TYPE_CHECKING:
     from types import TracebackType
 
-    from typing_extensions import Unpack
+    from typing_extensions import Self, Unpack
 
 logger = getLogger(__name__)
 
@@ -45,15 +43,16 @@ class LocalEventManager(EventManager):
             system_info_interval: Interval at which `SystemInfo` events are emitted.
             event_manager_options: Additional options for the parent class.
         """
-        self._system_info_interval = system_info_interval
+        super().__init__(**event_manager_options)
 
-        # Recurring task for emitting system info events.
+        self._system_info_interval = system_info_interval
+        """Interval between the emitted `SystemInfo` events."""
+
         self._emit_system_info_event_rec_task = RecurringTask(
             func=self._emit_system_info_event,
             delay=self._system_info_interval,
         )
-
-        super().__init__(**event_manager_options)
+        """Recurring task emitting the `SystemInfo` events."""
 
     @classmethod
     def from_config(cls, config: Configuration | None = None) -> LocalEventManager:
@@ -69,7 +68,7 @@ class LocalEventManager(EventManager):
             persist_state_interval=config.persist_state_interval,
         )
 
-    async def __aenter__(self) -> LocalEventManager:
+    async def __aenter__(self) -> Self:
         """Initialize the local event manager upon entering the async context.
 
         It starts emitting system info events at regular intervals.
@@ -91,15 +90,20 @@ class LocalEventManager(EventManager):
 
         It stops emitting system info events and closes the event manager.
         """
-        if self._active_ref_count == 1:
-            await self._emit_system_info_event_rec_task.stop()
-
-        await super().__aexit__(exc_type, exc_value, exc_traceback)
+        try:
+            if self._active_ref_count == 1:
+                await self._emit_system_info_event_rec_task.stop()
+        finally:
+            await super().__aexit__(exc_type, exc_value, exc_traceback)
 
     async def _emit_system_info_event(self) -> None:
         """Emit a system info event with the current CPU and memory usage."""
-        cpu_info = await asyncio.to_thread(get_cpu_info)
-        memory_info = await asyncio.to_thread(get_memory_info)
+        # Both readings block the thread they run in - `get_cpu_info` even samples the CPU utilization over a short
+        # interval - so run them concurrently instead of one after the other.
+        cpu_info, memory_info = await asyncio.gather(
+            asyncio.to_thread(get_cpu_info),
+            asyncio.to_thread(get_memory_info),
+        )
 
         event_data = EventSystemInfoData(cpu_info=cpu_info, memory_info=memory_info)
         self.emit(event=Event.SYSTEM_INFO, event_data=event_data)

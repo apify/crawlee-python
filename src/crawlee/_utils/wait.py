@@ -46,7 +46,7 @@ async def wait_for(
     raise RuntimeError('Unreachable code')
 
 
-async def wait_for_all_tasks_for_finish(
+async def wait_for_all_tasks_to_finish(
     tasks: Sequence[asyncio.Task],
     *,
     logger: Logger,
