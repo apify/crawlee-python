@@ -333,6 +333,11 @@ def _read_hierarchies() -> tuple[_Hierarchy | None, dict[str, _Hierarchy]]:
         except ValueError:
             continue
 
+        # `/proc/self/cgroup` spells the same paths unescaped, so without this the two cannot be compared, and the
+        # mount point cannot be opened either.
+        mount_root = _unescape(mount_root)
+        mount_point = _unescape(mount_point)
+
         if filesystem == 'cgroup2' and unified_path is not None:
             # The same hierarchy can be bind-mounted a second time, for instance by an agent that watches the host
             # from inside a container. Mounts are listed in the order they were made, so the first one is ours.
@@ -375,14 +380,22 @@ def _read_own_paths() -> tuple[str | None, dict[str, str]]:
     return unified, controllers
 
 
+def _unescape(field: str) -> str:
+    """Decode the octal sequences a path field of `/proc/self/mountinfo` escapes special characters as."""
+    # The backslash goes last. Undoing it first would decode `\134040`, an escaped backslash followed by `040`,
+    # into a space.
+    return field.replace('\\040', ' ').replace('\\011', '\t').replace('\\012', '\n').replace('\\134', '\\')
+
+
 def _count_cpu_list(cpu_list: str) -> int | None:
     """Count the CPUs a control file lists as a mix of ranges and single numbers, e.g. `0-3,8`."""
     count = 0
 
     try:
         for part in cpu_list.split(','):
-            first, separator, last = part.partition('-')
-            count += int(last) - int(first) + 1 if separator else 1
+            start, _separator, end = part.partition('-')
+            # A single core carries no end, so it counts as a range of one.
+            count += int(end or start) - int(start) + 1
     except ValueError:
         return None
 
