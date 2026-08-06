@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.9.1 - **not yet released**
+## [1.9.1](https://github.com/apify/crawlee-python/releases/tag/v1.9.1) (2026-08-06)
 
 ### 🐛 Bug Fixes
 
@@ -14,7 +13,6 @@ All notable changes to this project will be documented in this file.
 - **events:** Correct the listener invocation, removal, and context release ([#2100](https://github.com/apify/crawlee-python/pull/2100)) ([ccc2b89](https://github.com/apify/crawlee-python/commit/ccc2b89540a49206ac74704bcb6616438b7a9ef4)) by [@vdusek](https://github.com/vdusek)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.9.0](https://github.com/apify/crawlee-python/releases/tag/v1.9.0) (2026-08-03)
 
 ### 🚀 Features
