@@ -140,6 +140,7 @@ class EventManager:
             if last_exit:
                 self._listener_tasks.clear()
                 self._listeners_to_wrappers.clear()
+                self._waiting_listener_tasks.clear()
 
             self._active_ref_count -= 1
 

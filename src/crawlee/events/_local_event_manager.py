@@ -90,10 +90,11 @@ class LocalEventManager(EventManager):
 
         It stops emitting system info events and closes the event manager.
         """
-        if self._active_ref_count == 1:
-            await self._emit_system_info_event_rec_task.stop()
-
-        await super().__aexit__(exc_type, exc_value, exc_traceback)
+        try:
+            if self._active_ref_count == 1:
+                await self._emit_system_info_event_rec_task.stop()
+        finally:
+            await super().__aexit__(exc_type, exc_value, exc_traceback)
 
     async def _emit_system_info_event(self) -> None:
         """Emit a system info event with the current CPU and memory usage."""
