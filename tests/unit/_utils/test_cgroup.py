@@ -139,6 +139,33 @@ def test_read_hierarchies_bad_lines(fake_cgroup: Callable[..., Path]) -> None:
 
 
 @pytest.mark.parametrize(
+    ('escaped', 'expected'),
+    [
+        pytest.param('/plain/path', '/plain/path', id='nothing to decode'),
+        pytest.param('/mnt\\040point', '/mnt point', id='space'),
+        pytest.param('/tab\\011here', '/tab\there', id='tab'),
+        pytest.param('/back\\134slash', '/back\\slash', id='backslash'),
+        pytest.param('/literal\\134040', '/literal\\040', id='escaped backslash in front of an octal sequence'),
+    ],
+)
+def test_unescape(escaped: str, expected: str) -> None:
+    """Decodes the octal sequences a path field of the mount table escapes special characters as."""
+    assert cgroup._unescape(escaped) == expected
+
+
+def test_read_hierarchies_escaped_paths(fake_cgroup: Callable[..., Path]) -> None:
+    """Decodes both path fields, which `/proc/self/cgroup` spells unescaped and so cannot be compared against."""
+    mountinfo = '25 30 0:22 /docker\\040abc {root}/mnt\\040point rw shared:4 - cgroup2 cgroup2 rw'
+    root = fake_cgroup(mountinfo=mountinfo, self_cgroup=V2_SELF_CGROUP.format(path='/docker abc'), files={})
+
+    unified, _controllers = cgroup._read_hierarchies()
+
+    assert unified is not None
+    assert unified.point == root / 'mnt point'
+    assert unified.root == '/docker abc'
+
+
+@pytest.mark.parametrize(
     ('self_cgroup', 'expected_unified', 'expected_controllers'),
     [
         pytest.param('0::/init.scope\n', '/init.scope', {}, id='unified only'),
@@ -522,6 +549,13 @@ def test_get_cpu_quota(
             {'cpuset/cpuset.cpus': '0-3\n'},
             4,
             id='v1',
+        ),
+        pytest.param(
+            V2_MOUNTINFO,
+            V2_SELF_CGROUP.format(path='/'),
+            {'cpuset.cpus.effective': '0-1,nonsense\n'},
+            None,
+            id='every entry has to parse, not just the ranges',
         ),
     ],
 )
