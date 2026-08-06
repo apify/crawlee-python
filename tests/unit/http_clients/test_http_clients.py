@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import json
 import os
 import sys
 from typing import TYPE_CHECKING
@@ -14,6 +15,7 @@ from pydantic import ValidationError
 from crawlee import Request
 from crawlee.errors import ProxyError
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpClient, HttpxHttpClient, ImpitHttpClient
+from crawlee.sessions import Session
 from crawlee.statistics import Statistics
 from tests.unit.server import generate_file_content
 from tests.unit.server_endpoints import HELLO_WORLD
@@ -323,3 +325,88 @@ def test_import_error_handled(optional_module_name: str, import_path: str) -> No
                 sys.modules.pop(mod_name, None)
         with pytest.raises(ImportError):
             importlib.import_module(import_path)
+
+
+async def test_send_request_sends_session_cookies(http_client: HttpClient, server_url: URL) -> None:
+    """`send_request` must attach existing session cookies (same as `crawl`)."""
+    session = Session()
+    session.cookies.set('auth', 'token-1', domain=server_url.host or '127.0.0.1', path='/')
+
+    response = await http_client.send_request(str(server_url / 'cookies'), session=session)
+    body = json.loads(await response.read())
+
+    assert body['cookies'] == {'auth': 'token-1'}
+
+
+async def test_stream_sends_session_cookies(http_client: HttpClient, server_url: URL) -> None:
+    """`stream` must attach existing session cookies (same as `crawl`)."""
+    session = Session()
+    session.cookies.set('auth', 'token-2', domain=server_url.host or '127.0.0.1', path='/')
+
+    content = b''
+    async with http_client.stream(str(server_url / 'cookies'), session=session) as response:
+        async for chunk in response.read_stream():
+            content += chunk
+
+    assert json.loads(content)['cookies'] == {'auth': 'token-2'}
+
+
+@pytest.mark.parametrize(
+    'custom_http_client',
+    [
+        pytest.param(CurlImpersonateHttpClient(persist_cookies_per_session=False), id='curl'),
+        pytest.param(HttpxHttpClient(persist_cookies_per_session=False), id='httpx'),
+        pytest.param(ImpitHttpClient(persist_cookies_per_session=False), id='impit'),
+    ],
+    indirect=['custom_http_client'],
+)
+async def test_persist_cookies_per_session_false(custom_http_client: HttpClient, server_url: URL) -> None:
+    """When persistence is disabled, response Set-Cookie must not update the session jar."""
+    session = Session()
+    request = Request.from_url(str(server_url.with_path('set_cookies').extend_query(a=1)))
+
+    await custom_http_client.crawl(request, session=session)
+
+    assert {cookie['name']: cookie['value'] for cookie in session.cookies.get_cookies_as_dicts()} == {}
+
+
+@pytest.mark.parametrize(
+    'custom_http_client',
+    [
+        pytest.param(CurlImpersonateHttpClient(persist_cookies_per_session=True), id='curl'),
+        pytest.param(HttpxHttpClient(persist_cookies_per_session=True), id='httpx'),
+        pytest.param(ImpitHttpClient(persist_cookies_per_session=True), id='impit'),
+    ],
+    indirect=['custom_http_client'],
+)
+async def test_persist_cookies_per_session_true(custom_http_client: HttpClient, server_url: URL) -> None:
+    """When persistence is enabled, response Set-Cookie must update the session jar."""
+    session = Session()
+    request = Request.from_url(str(server_url.with_path('set_cookies').extend_query(a=1)))
+
+    await custom_http_client.crawl(request, session=session)
+
+    assert {cookie['name']: cookie['value'] for cookie in session.cookies.get_cookies_as_dicts()} == {'a': '1'}
+
+
+@pytest.mark.parametrize(
+    'custom_http_client',
+    [
+        pytest.param(CurlImpersonateHttpClient(persist_cookies_per_session=True), id='curl'),
+        pytest.param(HttpxHttpClient(persist_cookies_per_session=True), id='httpx'),
+        pytest.param(ImpitHttpClient(persist_cookies_per_session=True), id='impit'),
+    ],
+    indirect=['custom_http_client'],
+)
+async def test_session_cookies_survive_redirect(custom_http_client: HttpClient, server_url: URL) -> None:
+    """Pre-seeded session cookies must be present after a redirect (not stripped on the second hop)."""
+    session = Session()
+    session.cookies.set('tracker', 'abc', domain=server_url.host or '127.0.0.1', path='/')
+
+    cookies_url = str(server_url / 'cookies')
+    redirect_url = str((server_url / 'redirect').update_query(url=cookies_url))
+
+    response = await custom_http_client.send_request(redirect_url, session=session)
+    body = json.loads(await response.read())
+
+    assert body['cookies']['tracker'] == 'abc'

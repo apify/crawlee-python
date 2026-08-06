@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Literal
 
 from crawlee._types import HttpHeaders
@@ -50,12 +51,29 @@ class HeaderGenerator:
 
         We do not modify the "Accept-Encoding", "Connection" and other headers. They should be included and handled
         by the HTTP client or browser.
+
+        .. deprecated::
+            Use `get_specific_headers` instead.
         """
+        warnings.warn(
+            'get_common_headers is deprecated, use get_specific_headers instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
         all_headers = self._generator.generate()
         return self._select_specific_headers(all_headers, header_names={'Accept', 'Accept-Language'})
 
     def get_random_user_agent_header(self) -> HttpHeaders:
-        """Get a random User-Agent header."""
+        """Get a random User-Agent header.
+
+        .. deprecated::
+            Use `get_specific_headers` instead.
+        """
+        warnings.warn(
+            'get_random_user_agent_header is deprecated, use get_specific_headers instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
         all_headers = self._generator.generate()
         return self._select_specific_headers(all_headers, header_names={'User-Agent'})
 

@@ -4,6 +4,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from logging import DEBUG, WARNING, getLogger
 from typing import TYPE_CHECKING, Any, cast
+from urllib.request import Request as UrllibRequest
 
 import httpx
 from typing_extensions import override
@@ -20,6 +21,7 @@ from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, AsyncIterator
     from datetime import timedelta
+    from http.cookiejar import CookieJar
     from ssl import SSLContext
 
     from crawlee import Request
@@ -63,25 +65,40 @@ class _HttpxResponse:
 
 
 class _HttpxTransport(httpx.AsyncHTTPTransport):
-    """HTTP transport adapter that stores response cookies in a `Session`.
+    """HTTP transport adapter that keeps session cookies off the shared `httpx` client.
 
-    This transport adapter modifies the handling of HTTP requests to update the session cookies
-    based on the response cookies, ensuring that the cookies are stored in the session object
-    rather than the `HTTPX` client itself.
+    Outbound cookies are applied per hop (including redirects) from the jar in request extensions,
+    because httpx strips the `Cookie` header on redirect and rebuilds it from the client jar. Response
+    `Set-Cookie` values are stored on the session and removed from the response so the shared client
+    jar stays empty and reusable across sessions.
     """
 
     @override
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        if cookie_jar := cast('CookieJar | None', request.extensions.get('crawlee_cookie_jar')):
+            self._apply_cookie_header(request, cookie_jar)
+
         response = await super().handle_async_request(request)
         response.request = request
 
-        if session := cast('Session', request.extensions.get('crawlee_session')):
+        if session := cast('Session | None', request.extensions.get('crawlee_session')):
             session.cookies.store_cookies(list(response.cookies.jar))
 
         if 'Set-Cookie' in response.headers:
             del response.headers['Set-Cookie']
 
         return response
+
+    @staticmethod
+    def _apply_cookie_header(request: httpx.Request, jar: CookieJar) -> None:
+        """Set the Cookie header from a jar for the current request URL."""
+        urllib_request = UrllibRequest(str(request.url), headers=dict(request.headers))  # noqa: S310
+        jar.add_cookie_header(urllib_request)
+        cookie_header = urllib_request.get_header('Cookie')
+        if cookie_header:
+            request.headers['cookie'] = cookie_header
+        else:
+            request.headers.pop('cookie', None)
 
 
 @docs_group('HTTP clients')
@@ -158,16 +175,15 @@ class HttpxHttpClient(HttpClient):
         timeout: timedelta | None = None,
     ) -> HttpCrawlingResult:
         client = self._get_client(proxy_info.url if proxy_info else None)
-        headers = self._combine_headers(request.headers)
 
-        http_request = client.build_request(
+        http_request = self._build_request(
+            client=client,
             url=request.url,
             method=request.method,
-            headers=headers,
-            content=request.payload,
-            cookies=session.cookies.jar if session else None,
-            extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
-            timeout=timeout.total_seconds() if timeout is not None else httpx.USE_CLIENT_DEFAULT,
+            headers=request.headers,
+            payload=request.payload,
+            session=session,
+            timeout=httpx.Timeout(timeout.total_seconds()) if timeout is not None else None,
         )
 
         try:
@@ -284,17 +300,22 @@ class HttpxHttpClient(HttpClient):
             method=method,
             headers=dict(headers) if headers else None,
             content=payload,
-            extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
+            cookies=session.cookies.jar if session else None,
+            extensions={
+                # Used by the transport to re-apply cookies on every hop (httpx strips Cookie on redirect).
+                'crawlee_cookie_jar': session.cookies.jar if session else None,
+                'crawlee_session': session if self._persist_cookies_per_session else None,
+            },
             timeout=timeout or httpx.USE_CLIENT_DEFAULT,
         )
 
     def _get_client(self, proxy_url: str | None) -> httpx.AsyncClient:
         """Retrieve or create an HTTP client for the given proxy URL.
 
-        If a client for the specified proxy URL does not exist, create and store a new one.
+        Clients are shared per proxy (not per session). Session cookies stay on the request /
+        transport path so concurrent sessions can reuse one client and its connection pool.
         """
         if not self._transport:
-            # Configure connection pool limits and keep-alive connections for transport
             limits = self._async_client_kwargs.get(
                 'limits', httpx.Limits(max_connections=1000, max_keepalive_connections=200)
             )
@@ -307,7 +328,6 @@ class HttpxHttpClient(HttpClient):
             )
 
         if proxy_url not in self._client_by_proxy_url:
-            # Prepare a default kwargs for the new client.
             kwargs: dict[str, Any] = {
                 'proxy': proxy_url,
                 'http1': self._http1,
@@ -315,7 +335,6 @@ class HttpxHttpClient(HttpClient):
                 'follow_redirects': True,
             }
 
-            # Update the default kwargs with any additional user-provided kwargs.
             kwargs.update(self._async_client_kwargs)
 
             kwargs.update(
@@ -333,15 +352,19 @@ class HttpxHttpClient(HttpClient):
     def _combine_headers(self, explicit_headers: HttpHeaders | None) -> HttpHeaders | None:
         """Merge default headers with explicit headers for an HTTP request.
 
-        Generate a final set of request headers by combining default headers, a random User-Agent header,
-        and any explicitly provided headers.
+        Generate a final set of request headers by combining default headers from a single fingerprint
+        (Accept, Accept-Language, User-Agent) and any explicitly provided headers. Using one fingerprint
+        avoids mixing Accept headers from one browser profile with a User-Agent from another.
         """
-        common_headers = self._header_generator.get_common_headers() if self._header_generator else HttpHeaders()
-        user_agent_header = (
-            self._header_generator.get_random_user_agent_header() if self._header_generator else HttpHeaders()
-        )
+        if self._header_generator:
+            generated_headers = self._header_generator.get_specific_headers(
+                header_names={'Accept', 'Accept-Language', 'User-Agent'},
+            )
+        else:
+            generated_headers = HttpHeaders()
+
         explicit_headers = explicit_headers or HttpHeaders()
-        headers = common_headers | user_agent_header | explicit_headers
+        headers = generated_headers | explicit_headers
         return headers or None
 
     @staticmethod
