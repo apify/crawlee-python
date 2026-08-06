@@ -105,9 +105,7 @@ async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> No
 
 async def test_sitemap_http_error_is_retried_before_loading_requests() -> None:
     """The loader retries transient HTTP errors and loads the eventual sitemap response."""
-    client, attempts = _make_status_stream_client(
-        [(503, b''), (503, b''), (200, get_basic_sitemap().encode())]
-    )
+    client, attempts = _make_status_stream_client([(503, b''), (503, b''), (200, get_basic_sitemap().encode())])
     loader = SitemapRequestLoader([f'{DEFAULT_URL}sitemap.xml'], http_client=client)
 
     while not await loader.is_finished():

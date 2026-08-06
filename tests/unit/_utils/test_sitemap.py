@@ -368,9 +368,7 @@ async def test_sitemap_fetch_raises_after_retries_exhausted() -> None:
 
 async def test_sitemap_fetch_retries_retryable_http_status() -> None:
     """Retryable HTTP errors are retried before parsing a successful response."""
-    client, attempts = _make_status_stream_client(
-        [(503, b''), (503, b''), (200, get_basic_sitemap().encode())]
-    )
+    client, attempts = _make_status_stream_client([(503, b''), (503, b''), (200, get_basic_sitemap().encode())])
 
     items = [item async for item in parse_sitemap([{'type': 'url', 'url': f'{DEFAULT_URL}sitemap.xml'}], client)]
 
