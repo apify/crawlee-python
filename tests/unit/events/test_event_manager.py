@@ -526,7 +526,9 @@ async def test_close_from_within_a_listener_does_not_deadlock_or_error(
 
     # A listener task finalizing after the close cleared the task set must not report a stray exception.
     loop_errors: list[dict[str, Any]] = []
-    asyncio.get_running_loop().set_exception_handler(lambda _loop, context: loop_errors.append(context))
+    loop = asyncio.get_running_loop()
+    original_exception_handler = loop.get_exception_handler()
+    loop.set_exception_handler(lambda _loop, context: loop_errors.append(context))
 
     closed = asyncio.Event()
     release_other_listener = asyncio.Event()
@@ -559,6 +561,7 @@ async def test_close_from_within_a_listener_does_not_deadlock_or_error(
         assert closing_task is not None
         await asyncio.wait_for(closing_task, timeout=5)
     finally:
+        loop.set_exception_handler(original_exception_handler)
         # Cap the cleanup so a regressed deadlock surfaces the real failure instead of hanging.
         if event_manager.active:
             with suppress(Exception):
