@@ -21,6 +21,7 @@ from crawlee._utils.sitemap import (
     discover_valid_sitemaps,
     parse_sitemap,
 )
+from crawlee.errors import HttpStatusCodeError
 from crawlee.http_clients._base import HttpClient, HttpResponse
 from tests.unit.utils import DEFAULT_URL, get_basic_results, get_basic_sitemap
 
@@ -60,6 +61,7 @@ def _make_flaky_stream_client(body: bytes, *, fail_times: int) -> tuple[AsyncMoc
             yield body
 
         response = MagicMock(spec=HttpResponse)
+        response.status_code = 200
         response.headers = {'content-type': 'application/xml; charset=utf-8'}
         response.read_stream = read_stream
         yield cast('HttpResponse', response)
@@ -81,6 +83,7 @@ def _make_stream_client(body_for_url: 'Callable[[str], bytes]') -> tuple[AsyncMo
             yield body_for_url(url)
 
         response = MagicMock(spec=HttpResponse)
+        response.status_code = 200
         response.headers = {'content-type': 'application/xml; charset=utf-8'}
         response.read_stream = read_stream
         yield cast('HttpResponse', response)
@@ -88,6 +91,30 @@ def _make_stream_client(body_for_url: 'Callable[[str], bytes]') -> tuple[AsyncMo
     client = AsyncMock(spec=HttpClient)
     client.stream = stream
     return client, fetched
+
+
+def _make_status_stream_client(responses: list[tuple[int, bytes]]) -> tuple[AsyncMock, list[int]]:
+    """Create a mock client returning the provided status and body sequence."""
+    attempts: list[int] = []
+
+    @asynccontextmanager
+    async def stream(_url: str, **_kwargs: Any) -> 'AsyncIterator[HttpResponse]':
+        status, body = responses[min(len(attempts), len(responses) - 1)]
+        attempts.append(status)
+
+        async def read_stream() -> 'AsyncIterator[bytes]':
+            if body:
+                yield body
+
+        response = MagicMock(spec=HttpResponse)
+        response.status_code = status
+        response.headers = {'content-type': 'application/xml; charset=utf-8'}
+        response.read_stream = read_stream
+        yield cast('HttpResponse', response)
+
+    client = AsyncMock(spec=HttpClient)
+    client.stream = stream
+    return client, attempts
 
 
 def compress_gzip(data: str) -> bytes:
@@ -357,6 +384,38 @@ async def test_sitemap_fetch_raises_after_retries_exhausted() -> None:
     assert len(attempts) == 3
 
 
+async def test_sitemap_fetch_retries_retryable_http_status() -> None:
+    """Retryable HTTP errors are retried before parsing a successful response."""
+    client, attempts = _make_status_stream_client(
+        [(503, b''), (503, b''), (200, get_basic_sitemap().encode())]
+    )
+
+    items = [item async for item in parse_sitemap([{'type': 'url', 'url': f'{DEFAULT_URL}sitemap.xml'}], client)]
+
+    assert attempts == [503, 503, 200]
+    assert {item.loc for item in items} == get_basic_results()
+
+
+async def test_sitemap_fetch_rejects_http_error_after_retries_exhausted() -> None:
+    """A persistent retryable HTTP error is raised once retries are exhausted."""
+    client, attempts = _make_status_stream_client([(503, b'')])
+
+    with pytest.raises(HttpStatusCodeError, match='503'):
+        _ = [item async for item in parse_sitemap([{'type': 'url', 'url': f'{DEFAULT_URL}sitemap.xml'}], client)]
+
+    assert attempts == [503, 503, 503]
+
+
+async def test_sitemap_fetch_does_not_retry_terminal_http_status() -> None:
+    """Terminal HTTP errors are raised without parsing their response body or retrying."""
+    client, attempts = _make_status_stream_client([(404, get_basic_sitemap().encode())])
+
+    with pytest.raises(HttpStatusCodeError, match='404'):
+        _ = [item async for item in parse_sitemap([{'type': 'url', 'url': f'{DEFAULT_URL}sitemap.xml'}], client)]
+
+    assert attempts == [404]
+
+
 async def test_gzip_bomb_sitemap_truncated_at_size_cap(monkeypatch: pytest.MonkeyPatch) -> None:
     """A gzip sitemap inflating past the size cap is truncated instead of being decompressed without bound."""
     monkeypatch.setattr('crawlee._utils.sitemap.MAX_SITEMAP_SIZE', 64 * 1024)
@@ -388,6 +447,7 @@ async def test_gzip_sitemap_stops_reading_after_member_end() -> None:
                 yield b'\x00' * 65536
 
         response = MagicMock(spec=HttpResponse)
+        response.status_code = 200
         response.headers = {'content-type': 'application/gzip'}
         response.read_stream = read_stream
         yield cast('HttpResponse', response)
@@ -413,6 +473,7 @@ async def test_gzip_text_sitemap_parsed_by_extension_when_served_as_gzip() -> No
             yield body
 
         response = MagicMock(spec=HttpResponse)
+        response.status_code = 200
         response.headers = {'content-type': 'application/gzip'}
         response.read_stream = read_stream
         yield cast('HttpResponse', response)
