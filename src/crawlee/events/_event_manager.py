@@ -201,7 +201,7 @@ class EventManager:
     def emit(self, *, event: Event, event_data: Any) -> None: ...
 
     @ensure_context
-    def emit(self, *, event: Event, event_data: Any) -> None:
+    def emit(self, *, event: Event, event_data: EventData) -> None:
         """Emit an event with the associated data to all registered listeners.
 
         Each listener is invoked in its own task, so this method only starts them. Use
