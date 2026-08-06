@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Honor error_handler replacement requests on SessionError and preserve forefront on retries  ([#2105](https://github.com/apify/crawlee-python/pull/2105)) ([c731597](https://github.com/apify/crawlee-python/commit/c73159737825f587e2bdfcb7cd70f2a6c6c7fd3f)) by [@Ayush7614](https://github.com/Ayush7614)
 - **curl-impersonate:** Treat a refused CONNECT tunnel as a proxy error ([#2109](https://github.com/apify/crawlee-python/pull/2109)) ([54b7602](https://github.com/apify/crawlee-python/commit/54b7602f015e8a08fabf36b31505667350a2b329)) by [@vdusek](https://github.com/vdusek), closes [#2111](https://github.com/apify/crawlee-python/issues/2111)
 - **events:** Prevent deadlock when closing or waiting for listeners from within a listener ([#2088](https://github.com/apify/crawlee-python/pull/2088)) ([92ab97a](https://github.com/apify/crawlee-python/commit/92ab97a926a644b064d78e6a406b670a9c0b47f8)) by [@vdusek](https://github.com/vdusek)
+- **events:** Correct the listener invocation, removal, and context release ([#2100](https://github.com/apify/crawlee-python/pull/2100)) ([ccc2b89](https://github.com/apify/crawlee-python/commit/ccc2b89540a49206ac74704bcb6616438b7a9ef4)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->
