@@ -4,10 +4,12 @@ from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from yarl import URL
 
 from crawlee import RequestOptions, RequestTransformAction
 from crawlee._utils.sitemap import DEFAULT_MAX_DEPTH
+from crawlee.errors import HttpStatusCodeError
 from crawlee.http_clients._base import HttpClient, HttpResponse
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
 from crawlee.storages import KeyValueStore
@@ -27,6 +29,30 @@ def compress_gzip(data: str) -> bytes:
 def encode_base64(data: bytes) -> str:
     """Encode bytes to a base64 string."""
     return base64.b64encode(data).decode('utf-8')
+
+
+def _make_status_stream_client(responses: list[tuple[int, bytes]]) -> tuple[AsyncMock, list[int]]:
+    """Create a mock client returning the provided status and body sequence."""
+    attempts: list[int] = []
+
+    @asynccontextmanager
+    async def stream(_url: str, **_kwargs: Any) -> 'AsyncIterator[HttpResponse]':
+        status, body = responses[min(len(attempts), len(responses) - 1)]
+        attempts.append(status)
+
+        async def read_stream() -> 'AsyncIterator[bytes]':
+            if body:
+                yield body
+
+        response = MagicMock(spec=HttpResponse)
+        response.status_code = status
+        response.headers = {'content-type': 'application/xml; charset=utf-8'}
+        response.read_stream = read_stream
+        yield cast('HttpResponse', response)
+
+    client = AsyncMock(spec=HttpClient)
+    client.stream = stream
+    return client, attempts
 
 
 async def test_nested_sitemap_chain_bounded_by_max_depth() -> None:
@@ -75,6 +101,31 @@ async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> No
     assert await sitemap_loader.is_finished()
     assert await sitemap_loader.get_total_count() == 5
     assert await sitemap_loader.get_handled_count() == 5
+
+
+async def test_sitemap_http_error_is_retried_before_loading_requests() -> None:
+    """The loader retries transient HTTP errors and loads the eventual sitemap response."""
+    client, attempts = _make_status_stream_client([(503, b''), (503, b''), (200, get_basic_sitemap().encode())])
+    loader = SitemapRequestLoader([f'{DEFAULT_URL}sitemap.xml'], http_client=client)
+
+    while not await loader.is_finished():
+        request = await loader.fetch_next_request()
+        if request:
+            await loader.mark_request_as_handled(request)
+
+    assert attempts == [503, 503, 200]
+    assert await loader.get_total_count() == 5
+
+
+async def test_sitemap_http_error_is_propagated_after_retries_exhausted() -> None:
+    """The loader exposes an exhausted sitemap fetch instead of reporting successful completion."""
+    client, attempts = _make_status_stream_client([(503, b'')])
+    loader = SitemapRequestLoader([f'{DEFAULT_URL}sitemap.xml'], http_client=client)
+
+    with pytest.raises(HttpStatusCodeError, match='503'):
+        await loader.fetch_next_request()
+
+    assert attempts == [503, 503, 503]
 
 
 async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL, http_client: HttpClient) -> None:

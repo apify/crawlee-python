@@ -214,6 +214,8 @@ class SitemapRequestLoader(RequestLoader):
     async def is_finished(self) -> bool:
         """Check if all URLs have been processed."""
         state = await self._get_state()
+        if self._loading_task.done() and not self._loading_task.cancelled():
+            self._loading_task.result()
         return not state.url_queue and len(state.in_progress) == 0 and self._loading_task.done()
 
     @override
