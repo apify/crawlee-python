@@ -126,6 +126,8 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         'get': get_echo,
         'post': post_echo,
         'redirect': redirect_to_url,
+        'redirect_loop': redirect_loop,
+        'method': echo_method,
         'json': hello_world_json,
         'xml': hello_world_xml,
         'robots.txt': robots_txt,
@@ -268,6 +270,35 @@ async def echo_headers(scope: dict[str, Any], _receive: Receive, send: Send) -> 
     """Echo back the request headers as JSON."""
     headers = get_headers_dict(scope)
     await send_json_response(send, headers)
+
+
+async def echo_method(scope: dict[str, Any], receive: Receive, send: Send) -> None:
+    """Echo back the method and the body of the request."""
+    body = b''
+    more_body = True
+
+    while more_body:
+        message = await receive()
+        if message['type'] == 'http.request':
+            body += message.get('body', b'')
+            more_body = message.get('more_body', False)
+
+    await send_json_response(send, {'method': scope['method'], 'body': body.decode()})
+
+
+async def redirect_loop(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Handle requests that endlessly redirect back to the same endpoint."""
+    await send(
+        {
+            'type': 'http.response.start',
+            'status': 302,
+            'headers': [
+                [b'content-type', b'text/plain; charset=utf-8'],
+                [b'location', str(scope['path']).encode()],
+            ],
+        }
+    )
+    await send({'type': 'http.response.body', 'body': b'Redirecting...'})
 
 
 async def start_enqueue_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:

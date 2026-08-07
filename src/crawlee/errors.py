@@ -18,6 +18,7 @@ __all__ = [
     'RequestHandlerError',
     'ServiceConflictError',
     'SessionError',
+    'TooManyRedirectsError',
     'UserDefinedErrorHandlerError',
 ]
 
@@ -55,6 +56,16 @@ class ServiceConflictError(Exception):
 @docs_group('Errors')
 class ProxyError(SessionError):
     """Raised when a proxy is being blocked or malfunctions."""
+
+
+@docs_group('Errors')
+class TooManyRedirectsError(Exception):
+    """Raised when a request exceeds the maximum number of redirects allowed by the HTTP client."""
+
+    def __init__(self, url: str, max_redirects: int) -> None:
+        super().__init__(f'Exceeded the limit of {max_redirects} redirects while requesting {url}.')
+        self.url = url
+        self.max_redirects = max_redirects
 
 
 @docs_group('Errors')
