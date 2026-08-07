@@ -48,8 +48,9 @@ _HTTP_SCHEMES = frozenset({'http', 'https'})
 # Headers scoped to a single origin, dropped as soon as a redirect leaves it.
 _CROSS_ORIGIN_HEADERS = frozenset({'authorization', 'cookie', 'proxy-authorization'})
 
-# Headers describing a request body, dropped when a redirect turns the request into a bodyless `GET`.
-_REQUEST_BODY_HEADERS = frozenset({'content-encoding', 'content-language', 'content-location', 'content-type'})
+_REQUEST_BODY_HEADERS = frozenset(
+    {'content-encoding', 'content-language', 'content-location', 'content-type', 'content-length'}
+)
 
 
 def _is_cross_origin(url: URL, next_url: URL) -> bool:
