@@ -1,9 +1,10 @@
 import base64
 import gzip
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from xml.sax.expatreader import ExpatParser
 
 import pytest
@@ -16,6 +17,7 @@ from crawlee._utils.sitemap import (
     SitemapUrl,
     _TxtSitemapParser,
     _XMLSaxSitemapHandler,
+    _XmlSitemapParser,
     discover_valid_sitemaps,
     parse_sitemap,
 )
@@ -560,6 +562,34 @@ async def test_txt_parser_flush_clears_buffer() -> None:
     items += [item async for item in parser.process_chunk('https://c.com/\n')]
 
     assert [item['loc'] for item in items] == ['https://a.com/', 'https://b.com/', 'https://c.com/']
+
+
+async def test_xml_parser_skips_missing_flush(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A parser without `flush` is flushed silently, as on CPython before 3.10.14, 3.11.9 and 3.12.3."""
+    monkeypatch.delattr(ExpatParser, 'flush', raising=False)
+    parser = _XmlSitemapParser()
+
+    with caplog.at_level(logging.WARNING, logger='crawlee._utils.sitemap'):
+        items = [item async for item in parser.process_chunk(get_basic_sitemap())]
+        items += [item async for item in parser.flush()]
+
+    assert {item['loc'] for item in items} == get_basic_results()
+    assert caplog.records == []
+
+
+async def test_xml_parser_yields_items_when_flush_fails() -> None:
+    """A failing `flush()` must not discard the items already collected by the handler."""
+    parser = _XmlSitemapParser()
+    parser._handler.items.append({'type': 'url', 'loc': f'{DEFAULT_URL}page'})
+
+    # `create=True` covers interpreters where `ExpatParser` has no `flush` to replace.
+    with patch.object(parser._parser, 'flush', side_effect=RuntimeError('Broken parser'), create=True):
+        items = [item async for item in parser.flush()]
+
+    assert items == [{'type': 'url', 'loc': f'{DEFAULT_URL}page'}]
+    assert parser._handler.items == []
 
 
 async def test_discover_sitemap_url_without_host_skipped() -> None:
