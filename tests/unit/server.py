@@ -144,6 +144,15 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         await hello_world(scope, receive, send)
 
 
+async def no_robots_app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
+    """ASGI application handler that behaves like `app`, except that it serves no robots.txt file."""
+    assert scope['type'] == 'http'
+    if scope['path'] == '/robots.txt':
+        await send_html_response(send, b'Not Found', status=404)
+        return
+    await app(scope, receive, send)
+
+
 async def get_cookies(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle requests to retrieve cookies sent in the request."""
     headers = get_headers_dict(scope)
@@ -302,11 +311,20 @@ async def generic_response_endpoint(_scope: dict[str, Any], _receive: Receive, s
     )
 
 
-async def problematic_links_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
-    """Handle requests with a page containing problematic links."""
+async def problematic_links_endpoint(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Handle requests with a page containing problematic links.
+
+    The links themselves are supplied by the caller through the `unreachable_url` and `no_robots_url` query
+    parameters, because they point at other test servers whose ports are only known at runtime.
+    """
+    query_params = get_query_params(scope.get('query_string', b''))
+    content = PROBLEMATIC_LINKS.format(
+        unreachable_url=query_params['unreachable_url'],
+        no_robots_url=query_params['no_robots_url'],
+    ).encode()
     await send_html_response(
         send,
-        PROBLEMATIC_LINKS,
+        content,
     )
 
 

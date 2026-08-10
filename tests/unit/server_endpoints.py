@@ -59,14 +59,14 @@ INCAPSULA = b"""\
     </iframe>
 </body></html>"""
 
-PROBLEMATIC_LINKS = b"""\
+PROBLEMATIC_LINKS = """\
 <html><head>
     <title>Hello</title>
 </head>
 <body>
-    <a href="https://budplaceholder.com/">Placeholder</a>
+    <a href="{unreachable_url}">Unreachable</a>
     <a href="mailto:test@test.com">test@test.com</a>
-    <a href=https://avatars.githubusercontent.com/apify>Apify avatar/a>
+    <a href={no_robots_url}>No robots.txt/a>
 </body></html>"""
 
 NON_HREF_LINKS = b"""\

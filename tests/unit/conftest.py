@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import socket
 import warnings
 from typing import TYPE_CHECKING, Any, cast
 
@@ -18,7 +19,7 @@ from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient, Imp
 from crawlee.proxy_configuration import ProxyInfo
 from crawlee.statistics import Statistics
 from crawlee.storages import KeyValueStore
-from tests.unit.server import TestServer, app, serve_in_thread
+from tests.unit.server import TestServer, app, no_robots_app, serve_in_thread
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable, Iterator
@@ -172,6 +173,32 @@ def http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator[TestServ
 def server_url(http_server: TestServer) -> URL:
     """Provide the base URL of the test server."""
     return http_server.url
+
+
+@pytest.fixture(scope='session')
+def no_robots_http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator[TestServer]:
+    """Create and start an HTTP test server that responds with 404 to robots.txt requests."""
+    config = Config(app=no_robots_app, lifespan='off', loop='asyncio', port=unused_tcp_port_factory())
+    server = TestServer(config=config)
+    yield from serve_in_thread(server)
+
+
+@pytest.fixture(scope='session')
+def no_robots_server_url(no_robots_http_server: TestServer) -> URL:
+    """Provide the base URL of the test server that has no robots.txt file."""
+    return no_robots_http_server.url
+
+
+@pytest.fixture(scope='session')
+def unreachable_url() -> Iterator[str]:
+    """Provide a URL that can never be connected to.
+
+    The port is bound for the whole session but never listened on, so nothing else can take it and every
+    connection attempt is refused immediately, without any DNS lookup or external traffic.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(('127.0.0.1', 0))
+        yield f'http://127.0.0.1:{sock.getsockname()[1]}/'
 
 
 # It is needed only in some tests, so we use the standard `scope=function`
