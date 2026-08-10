@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Mapping
+    from collections.abc import AsyncIterator, Mapping, Sequence
 
     from crawlee._types import JsonSerializable
     from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
@@ -92,13 +91,3 @@ class DatasetClient(ABC):
         raise NotImplementedError
         if False:
             yield {}
-
-    @staticmethod
-    def _normalize_items(
-        data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable],
-    ) -> Sequence[Mapping[str, JsonSerializable]]:
-        """Wrap a single item accepted by `push_data` into a sequence, passing a sequence of items through."""
-        if isinstance(data, Sequence):
-            return data
-
-        return [data]
