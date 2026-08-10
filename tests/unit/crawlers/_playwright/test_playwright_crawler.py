@@ -721,8 +721,16 @@ async def test_respect_robots_txt(server_url: URL) -> None:
     visit.assert_has_calls(expected_visit_calls, any_order=True)
 
 
-async def test_respect_robots_txt_with_problematic_links(server_url: URL) -> None:
+async def test_respect_robots_txt_with_problematic_links(
+    server_url: URL,
+    no_robots_server_url: URL,
+    unreachable_url: str,
+) -> None:
     """Test checks the crawler behavior with links that may cause problems when attempting to retrieve robots.txt."""
+    no_robots_url = str(no_robots_server_url / 'page')
+    start_url = str(
+        (server_url / 'problematic_links').with_query(unreachable_url=unreachable_url, no_robots_url=no_robots_url)
+    )
     visit = mock.Mock()
     fail = mock.Mock()
     crawler = PlaywrightCrawler(respect_robots_txt_file=True)
@@ -736,19 +744,19 @@ async def test_respect_robots_txt_with_problematic_links(server_url: URL) -> Non
     async def error_handler(context: BasicCrawlingContext, _error: Exception) -> None:
         fail(context.request.url)
 
-    await crawler.run([str(server_url / 'problematic_links')])
+    await crawler.run([start_url])
 
-    # Email must be skipped
-    # https://avatars.githubusercontent.com/apify does not get robots.txt, but is correct for the crawler.
+    # Email must be skipped.
+    # An origin without robots.txt is still crawled, an unavailable file means unrestricted crawling.
     expected_visit_calls = [
-        mock.call(str(server_url / 'problematic_links')),
-        mock.call('https://avatars.githubusercontent.com/apify'),
+        mock.call(start_url),
+        mock.call(no_robots_url),
     ]
     visit.assert_has_calls(expected_visit_calls, any_order=True)
 
-    # The budplaceholder.com does not exist.
+    # The unreachable URL cannot be connected to.
     expected_fail_calls = [
-        mock.call('https://budplaceholder.com/'),
+        mock.call(unreachable_url),
     ]
     fail.assert_has_calls(expected_fail_calls, any_order=True)
 
