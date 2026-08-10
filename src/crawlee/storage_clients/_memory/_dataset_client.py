@@ -120,13 +120,9 @@ class MemoryDatasetClient(DatasetClient):
         metadata = await self.get_metadata()
         new_item_count = metadata.item_count
 
-        if self._is_sequence_of_items(data):
-            for item in data:
-                new_item_count += 1
-                await self._push_item(item)
-        else:
+        for item in self._normalize_items(data):
             new_item_count += 1
-            await self._push_item(data)
+            await self._push_item(item)
 
         await self._update_metadata(
             update_accessed_at=True,

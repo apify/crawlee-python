@@ -224,13 +224,9 @@ class FileSystemDatasetClient(DatasetClient):
     async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
         async with self._lock:
             new_item_count = self._metadata.item_count
-            if self._is_sequence_of_items(data):
-                for item in data:
-                    new_item_count += 1
-                    await self._push_item(item, new_item_count)
-            else:
+            for item in self._normalize_items(data):
                 new_item_count += 1
-                await self._push_item(data, new_item_count)
+                await self._push_item(item, new_item_count)
 
             # now update metadata under the same lock
             await self._update_metadata(

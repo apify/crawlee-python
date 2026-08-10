@@ -147,16 +147,15 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
     @retry_on_error(SQLAlchemyError)
     @override
     async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
-        if not self._is_sequence_of_items(data):
-            data = [data]
+        items = self._normalize_items(data)
 
-        db_items = [{'dataset_id': self._id, 'data': item} for item in data]
+        db_items = [{'dataset_id': self._id, 'data': item} for item in items]
         stmt = insert(self._ITEM_TABLE).values(db_items)
 
         async with self.get_session(with_simple_commit=True) as session:
             await session.execute(stmt)
 
-            await self._add_buffer_record(session, update_modified_at=True, delta_item_count=len(data))
+            await self._add_buffer_record(session, update_modified_at=True, delta_item_count=len(items))
 
     @retry_on_error(SQLAlchemyError)
     @override

@@ -129,15 +129,14 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
     @retry_on_error(RedisError)
     @override
     async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
-        if not self._is_sequence_of_items(data):
-            data = [data]
+        items = self._normalize_items(data)
 
         async with self._get_pipeline() as pipe:
-            pipe.json().arrappend(self._items_key, '$', *data)
+            pipe.json().arrappend(self._items_key, '$', *items)
             await self._update_metadata(
                 pipe,
                 **_DatasetMetadataUpdateParams(
-                    update_accessed_at=True, update_modified_at=True, delta_item_count=len(data)
+                    update_accessed_at=True, update_modified_at=True, delta_item_count=len(items)
                 ),
             )
 
