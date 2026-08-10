@@ -247,7 +247,7 @@ class SessionCookies:
         self._jar.add_cookie_header(url_request)
         return url_request.get_header('Cookie', '')
 
-    def extract_cookie_from_header(self, url: str, set_cookie_headers: list[str]) -> None:
+    def extract_cookies_from_headers(self, url: str, set_cookie_headers: list[str]) -> None:
         """Store cookies from the raw `Set-Cookie` headers of a response.
 
         Attributes omitted from a header, such as domain and path, are derived from the URL. It must therefore be

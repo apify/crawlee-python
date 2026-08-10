@@ -339,10 +339,10 @@ class ImpitHttpClient(HttpClient):
             if next_method != method:
                 method = next_method
                 content = None
-                headers = {key: value for key, value in headers.items() if key.lower() not in _REQUEST_BODY_HEADERS}
+                headers = {key: value for key, value in headers.items() if key not in _REQUEST_BODY_HEADERS}
 
             if _is_cross_origin(current_url, next_url):
-                headers = {key: value for key, value in headers.items() if key.lower() not in _CROSS_ORIGIN_HEADERS}
+                headers = {key: value for key, value in headers.items() if key not in _CROSS_ORIGIN_HEADERS}
 
             if stream:
                 response.close()
@@ -370,7 +370,7 @@ class ImpitHttpClient(HttpClient):
         # Update the default kwargs with any additional user-provided kwargs.
         kwargs.update(self._async_client_kwargs)
 
-        # Redirects are followed hop by hop by this client.
+        # Redirects are followed hop by hop by `_request_with_redirects`.
         client = AsyncClient(**kwargs, follow_redirects=False)
 
         self._client_by_proxy_url[proxy_url] = client
