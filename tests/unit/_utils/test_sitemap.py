@@ -321,6 +321,22 @@ async def test_sitemap_from_string() -> None:
     assert set(sitemap.urls) == get_basic_results()
 
 
+async def test_malformed_sitemap_keeps_urls() -> None:
+    """A parse error must not discard the URLs collected before it."""
+    malformed = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f'<url><loc>{DEFAULT_URL}first</loc></url>\n'
+        f'<url><loc>{DEFAULT_URL}second</loc></url>\n'
+        f'<url><loc>{DEFAULT_URL}third</loc></mismatched>\n'
+        '</urlset>'
+    )
+
+    sitemap = await Sitemap.from_xml_string(malformed)
+
+    assert sitemap.urls == [f'{DEFAULT_URL}first', f'{DEFAULT_URL}second']
+
+
 async def test_sitemap_fetch_retries_on_transient_error() -> None:
     """Transient fetch errors are retried up to `sitemap_retries` times before giving up."""
     client, attempts = _make_flaky_stream_client(get_basic_sitemap().encode(), fail_times=2)
@@ -579,8 +595,8 @@ async def test_xml_parser_skips_missing_flush(
     assert caplog.records == []
 
 
-async def test_xml_parser_yields_items_when_flush_fails(caplog: pytest.LogCaptureFixture) -> None:
-    """A failing `flush()` must not discard the items already collected by the handler."""
+async def test_xml_parser_keeps_items_on_flush_error(caplog: pytest.LogCaptureFixture) -> None:
+    """A failing `flush()` must not discard the items already collected."""
     parser = _XmlSitemapParser()
     parser._handler.items.append({'type': 'url', 'loc': f'{DEFAULT_URL}page'})
 
