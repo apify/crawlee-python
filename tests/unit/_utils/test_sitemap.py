@@ -579,17 +579,21 @@ async def test_xml_parser_skips_missing_flush(
     assert caplog.records == []
 
 
-async def test_xml_parser_yields_items_when_flush_fails() -> None:
+async def test_xml_parser_yields_items_when_flush_fails(caplog: pytest.LogCaptureFixture) -> None:
     """A failing `flush()` must not discard the items already collected by the handler."""
     parser = _XmlSitemapParser()
     parser._handler.items.append({'type': 'url', 'loc': f'{DEFAULT_URL}page'})
 
     # `create=True` covers interpreters where `ExpatParser` has no `flush` to replace.
-    with patch.object(parser._parser, 'flush', side_effect=RuntimeError('Broken parser'), create=True):
+    with (
+        caplog.at_level(logging.WARNING, logger='crawlee._utils.sitemap'),
+        patch.object(parser._parser, 'flush', side_effect=RuntimeError('Broken parser'), create=True),
+    ):
         items = [item async for item in parser.flush()]
 
     assert items == [{'type': 'url', 'loc': f'{DEFAULT_URL}page'}]
     assert parser._handler.items == []
+    assert 'Failed to parse remaining XML data: Broken parser' in caplog.text
 
 
 async def test_discover_sitemap_url_without_host_skipped() -> None:

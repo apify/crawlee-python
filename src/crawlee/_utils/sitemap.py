@@ -202,7 +202,7 @@ class _XmlSitemapParser:
         """Process any remaining data in the buffer, yielding items one by one."""
         try:
             # `ExpatParser.flush` isn't part of the `IncrementalParser` interface and is missing before CPython
-            # 3.10.14, 3.11.9 and 3.12.3. Those interpreters don't defer reparsing either, so nothing stays buffered.
+            # 3.10.14, 3.11.9 and 3.12.3, whose bundled expat predates reparse deferral, so nothing stays buffered.
             if (flush := getattr(self._parser, 'flush', None)) is not None:
                 flush()
 
