@@ -322,7 +322,7 @@ class ImpitHttpClient(HttpClient):
             )
 
             if session and self._persist_cookies_per_session:
-                session.cookies.extract_cookie_from_header(str(current_url), response.headers.get_list('set-cookie'))
+                session.cookies.extract_cookies_from_headers(str(current_url), response.headers.get_list('set-cookie'))
 
             if not self._follow_redirects or response.status_code not in _REDIRECT_STATUS_CODES:
                 return response
