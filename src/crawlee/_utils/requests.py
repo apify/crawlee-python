@@ -44,7 +44,7 @@ def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:
         yarl_new_url.path.removesuffix('/'), keep_query=True, keep_fragment=keep_url_fragment
     )
 
-    return str(yarl_new_url).lower()
+    return str(yarl_new_url)
 
 
 def compute_unique_key(
