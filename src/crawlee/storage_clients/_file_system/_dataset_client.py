@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from logging import getLogger
 from pathlib import Path
@@ -21,7 +21,7 @@ from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Sequence
+    from collections.abc import AsyncIterator
 
     from crawlee.configuration import Configuration
 
@@ -224,13 +224,10 @@ class FileSystemDatasetClient(DatasetClient):
     async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
         async with self._lock:
             new_item_count = self._metadata.item_count
-            if self._is_sequence_of_items(data):
-                for item in data:
-                    new_item_count += 1
-                    await self._push_item(item, new_item_count)
-            else:
+            items = data if isinstance(data, Sequence) else [data]
+            for item in items:
                 new_item_count += 1
-                await self._push_item(data, new_item_count)
+                await self._push_item(item, new_item_count)
 
             # now update metadata under the same lock
             await self._update_metadata(

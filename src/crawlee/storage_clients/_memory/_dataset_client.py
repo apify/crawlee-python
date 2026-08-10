@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
@@ -14,7 +14,7 @@ from crawlee.storage_clients._base import DatasetClient
 from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Sequence
+    from collections.abc import AsyncIterator
 
 
 logger = getLogger(__name__)
@@ -120,13 +120,10 @@ class MemoryDatasetClient(DatasetClient):
         metadata = await self.get_metadata()
         new_item_count = metadata.item_count
 
-        if self._is_sequence_of_items(data):
-            for item in data:
-                new_item_count += 1
-                await self._push_item(item)
-        else:
+        items = data if isinstance(data, Sequence) else [data]
+        for item in items:
             new_item_count += 1
-            await self._push_item(data)
+            await self._push_item(item)
 
         await self._update_metadata(
             update_accessed_at=True,

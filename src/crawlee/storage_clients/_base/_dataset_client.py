@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Mapping
-
-    from typing_extensions import TypeIs
+    from collections.abc import AsyncIterator, Mapping, Sequence
 
     from crawlee._types import JsonSerializable
     from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
@@ -94,9 +91,3 @@ class DatasetClient(ABC):
         raise NotImplementedError
         if False:
             yield {}
-
-    @staticmethod
-    def _is_sequence_of_items(
-        data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable],
-    ) -> TypeIs[Sequence[Mapping[str, JsonSerializable]]]:
-        return isinstance(data, Sequence)
