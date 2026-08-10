@@ -4,10 +4,11 @@ import json
 from typing import TYPE_CHECKING
 
 import pytest
+from impit import TooManyRedirects
 
-from crawlee.errors import TooManyRedirectsError
+from crawlee import Request
 from crawlee.http_clients import ImpitHttpClient
-from crawlee.sessions import Session
+from crawlee.sessions import CookieParam, Session
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -38,7 +39,7 @@ async def test_sessions_share_one_client(http_client: ImpitHttpClient, server_ur
     assert len(http_client._client_by_proxy_url) == 1
 
 
-async def test_cookies_are_kept_apart_per_session(http_client: ImpitHttpClient, server_url: URL) -> None:
+async def test_cookies_isolated_per_session(http_client: ImpitHttpClient, server_url: URL) -> None:
     """Test that sessions sharing a client don't see cookies of each other."""
     first_session = Session()
     second_session = Session()
@@ -56,7 +57,7 @@ async def test_cookies_are_kept_apart_per_session(http_client: ImpitHttpClient, 
     assert (await read_json(second_response))['cookies'] == {'b': '2'}
 
 
-async def test_cookies_are_collected_on_every_hop(http_client: ImpitHttpClient, server_url: URL) -> None:
+async def test_cookies_collected_on_redirect(http_client: ImpitHttpClient, server_url: URL) -> None:
     """Test that a cookie set by a redirecting response is sent on the following hop."""
     session = Session()
 
@@ -68,7 +69,7 @@ async def test_cookies_are_collected_on_every_hop(http_client: ImpitHttpClient, 
     assert (await read_json(response))['cookies'] == {'a': '1'}
 
 
-async def test_cookies_are_not_stored_without_persistence(server_url: URL) -> None:
+async def test_cookies_not_persisted(server_url: URL) -> None:
     """Test that `persist_cookies_per_session` keeps the session jar untouched."""
     session = Session()
 
@@ -91,7 +92,7 @@ async def test_cookies_are_not_stored_without_persistence(server_url: URL) -> No
         pytest.param(308, 'PUT', 'PUT', 'payload', id='308-put'),
     ],
 )
-async def test_redirect_method_follows_fetch_algorithm(
+async def test_redirect_method(
     http_client: ImpitHttpClient,
     server_url: URL,
     *,
@@ -115,7 +116,7 @@ async def test_redirect_method_follows_fetch_algorithm(
     assert echo['body'] == expected_body
 
 
-async def test_body_headers_dropped_when_method_changes(http_client: ImpitHttpClient, server_url: URL) -> None:
+async def test_body_headers_dropped(http_client: ImpitHttpClient, server_url: URL) -> None:
     """Test that headers describing the request body are dropped once a redirect turns the request into a `GET`."""
     redirect_url = (server_url / 'redirect').with_query(url=str(server_url / 'headers'), status=302)
 
@@ -132,7 +133,7 @@ async def test_body_headers_dropped_when_method_changes(http_client: ImpitHttpCl
     assert headers['x-custom'] == 'kept'
 
 
-async def test_authorization_kept_within_origin(http_client: ImpitHttpClient, server_url: URL) -> None:
+async def test_auth_kept_same_origin(http_client: ImpitHttpClient, server_url: URL) -> None:
     """Test that credentials survive a redirect that stays on the same origin."""
     redirect_url = (server_url / 'redirect').with_query(url=str(server_url / 'headers'), status=302)
 
@@ -142,7 +143,7 @@ async def test_authorization_kept_within_origin(http_client: ImpitHttpClient, se
     assert headers['authorization'] == 'Bearer token'
 
 
-async def test_authorization_dropped_across_origins(
+async def test_auth_dropped_cross_origin(
     http_client: ImpitHttpClient,
     server_url: URL,
     redirect_server_url: URL,
@@ -160,7 +161,7 @@ async def test_authorization_dropped_across_origins(
     assert headers['x-custom'] == 'kept'
 
 
-async def test_explicit_cookie_header_kept_within_origin(http_client: ImpitHttpClient, server_url: URL) -> None:
+async def test_cookie_header_kept_same_origin(http_client: ImpitHttpClient, server_url: URL) -> None:
     """Test that a `Cookie` header set by the caller survives a redirect within the origin."""
     redirect_url = (server_url / 'redirect').with_query(url=str(server_url / 'cookies'), status=302)
 
@@ -169,10 +170,22 @@ async def test_explicit_cookie_header_kept_within_origin(http_client: ImpitHttpC
     assert (await read_json(response))['cookies'] == {'manual': 'value'}
 
 
-async def test_session_cookies_replace_explicit_cookie_header(http_client: ImpitHttpClient, server_url: URL) -> None:
-    """Test that cookies of a session take over the `Cookie` header instead of being sent next to it."""
-    session = Session()
-    session.cookies.set('from_jar', '1', domain=server_url.host or '')
+async def test_cookie_header_rebuilt_per_hop(http_client: ImpitHttpClient, server_url: URL) -> None:
+    """Test that the `Cookie` header of one hop does not reach a hop whose URL the cookie does not match."""
+    session = Session(
+        cookies=[CookieParam(name='scoped', value='value', domain=server_url.host or '', path='/redirect')]
+    )
+
+    redirect_url = (server_url / 'redirect').with_query(url=str(server_url / 'cookies'), status=302)
+    response = await http_client.send_request(str(redirect_url), session=session)
+
+    assert (await read_json(response))['cookies'] == {}
+    assert {item['name'] for item in session.cookies.get_cookies_as_dicts()} == {'scoped'}
+
+
+async def test_cookie_header_wins_over_session(http_client: ImpitHttpClient, server_url: URL) -> None:
+    """Test that a `Cookie` header passed by the caller replaces the cookies of the session, as `impit` does."""
+    session = Session(cookies=[CookieParam(name='from_jar', value='1', domain=server_url.host or '')])
 
     response = await http_client.send_request(
         str(server_url / 'cookies'),
@@ -180,19 +193,15 @@ async def test_session_cookies_replace_explicit_cookie_header(http_client: Impit
         headers={'cookie': 'manual=value'},
     )
 
-    assert (await read_json(response))['cookies'] == {'from_jar': '1'}
+    assert (await read_json(response))['cookies'] == {'manual': 'value'}
 
 
-async def test_explicit_cookie_header_dropped_across_origins(
+async def test_cookie_header_dropped_cross_origin(
     http_client: ImpitHttpClient,
     server_url: URL,
     redirect_server_url: URL,
 ) -> None:
-    """Test that a `Cookie` header set by the caller is dropped once a redirect leaves the origin.
-
-    Cookies stored in a session jar are not affected, as they are matched by domain on every hop. Ports give no
-    isolation of their own, see RFC 6265, section 8.5.
-    """
+    """Test that a `Cookie` header set by the caller is dropped once a redirect leaves the origin."""
     redirect_url = (server_url / 'redirect').with_query(url=str(redirect_server_url / 'cookies'), status=302)
 
     response = await http_client.send_request(str(redirect_url), headers={'cookie': 'manual=value'})
@@ -203,10 +212,8 @@ async def test_explicit_cookie_header_dropped_across_origins(
 async def test_too_many_redirects(server_url: URL) -> None:
     """Test that an endless redirect chain is cut off by `max_redirects`."""
     async with ImpitHttpClient(max_redirects=2) as client:
-        with pytest.raises(TooManyRedirectsError) as exc_info:
+        with pytest.raises(TooManyRedirects, match='limit of 2 redirects'):
             await client.send_request(str(server_url / 'redirect_loop'))
-
-    assert exc_info.value.max_redirects == 2
 
 
 async def test_stream_follows_redirects(http_client: ImpitHttpClient, server_url: URL) -> None:
@@ -221,3 +228,23 @@ async def test_stream_follows_redirects(http_client: ImpitHttpClient, server_url
 
     assert json.loads(content.decode())['cookies'] == {'a': '1'}
     assert {item['name'] for item in session.cookies.get_cookies_as_dicts()} == {'a'}
+
+
+async def test_crawl_keeps_cookies_and_encoding(http_client: ImpitHttpClient, server_url: URL) -> None:
+    """Test that `crawl` carries session cookies through a redirect and sends signed URLs without re-encoding."""
+    session = Session(cookies=[CookieParam(name='preset', value='value', domain=server_url.host or '')])
+
+    signed_query = 'X-Amz-Credential=AKIA%2F20240101%2Fus-east-1&X-Amz-Date=2024-01-01T00%3A00%3A00Z'
+    target_url = f'{server_url / "cookies"}?{signed_query}'
+
+    direct_request = Request.from_url(target_url)
+    direct_result = await http_client.crawl(direct_request, session=session)
+
+    assert json.loads((await direct_result.http_response.read()).decode())['cookies'] == {'preset': 'value'}
+    assert direct_request.loaded_url == target_url
+
+    redirected_request = Request.from_url(str((server_url / 'redirect').with_query(url=target_url, status=302)))
+    redirected_result = await http_client.crawl(redirected_request, session=session)
+
+    assert json.loads((await redirected_result.http_response.read()).decode())['cookies'] == {'preset': 'value'}
+    assert redirected_request.loaded_url == target_url

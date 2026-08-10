@@ -69,6 +69,24 @@ def get_cookies_from_headers(headers: dict[str, Any]) -> dict[str, str]:
     return cookies
 
 
+async def read_body(receive: Receive) -> bytes:
+    """Read the whole body of a request, stopping early if the client disconnects."""
+    body = b''
+    more_body = True
+
+    while more_body:
+        message = await receive()
+
+        if message['type'] == 'http.disconnect':
+            break
+
+        if message['type'] == 'http.request':
+            body += message.get('body', b'')
+            more_body = message.get('more_body', False)
+
+    return body
+
+
 async def send_json_response(send: Send, data: Any, status: int = 200) -> None:
     """Send a JSON response to the client."""
     await send(
@@ -214,16 +232,9 @@ async def post_echo(scope: dict[str, Any], receive: Receive, send: Send) -> None
     headers = get_headers_dict(scope)
 
     # Read the request body
-    body = b''
     form = {}
     json_data = None
-    more_body = True
-
-    while more_body:
-        message = await receive()
-        if message['type'] == 'http.request':
-            body += message.get('body', b'')
-            more_body = message.get('more_body', False)
+    body = await read_body(receive)
 
     # Parse body based on content type
     content_type = headers.get('content-type', '').lower()
@@ -274,14 +285,7 @@ async def echo_headers(scope: dict[str, Any], _receive: Receive, send: Send) -> 
 
 async def echo_method(scope: dict[str, Any], receive: Receive, send: Send) -> None:
     """Echo back the method and the body of the request."""
-    body = b''
-    more_body = True
-
-    while more_body:
-        message = await receive()
-        if message['type'] == 'http.request':
-            body += message.get('body', b'')
-            more_body = message.get('more_body', False)
+    body = await read_body(receive)
 
     await send_json_response(send, {'method': scope['method'], 'body': body.decode()})
 

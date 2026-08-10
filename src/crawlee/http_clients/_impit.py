@@ -4,9 +4,10 @@ import asyncio
 from contextlib import asynccontextmanager
 from http import HTTPStatus
 from logging import getLogger
+from time import monotonic
 from typing import TYPE_CHECKING, Any
 
-from impit import AsyncClient, Browser, HTTPError, Response, TimeoutException, TransportError
+from impit import AsyncClient, Browser, HTTPError, Response, TimeoutException, TooManyRedirects, TransportError
 from impit import ProxyError as ImpitProxyError
 from typing_extensions import override
 from yarl import URL
@@ -15,7 +16,7 @@ from crawlee._types import HttpHeaders
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee._utils.docs import docs_group
 from crawlee._utils.urls import validate_http_url
-from crawlee.errors import ProxyError, TooManyRedirectsError
+from crawlee.errors import ProxyError
 from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
 
 if TYPE_CHECKING:
@@ -145,7 +146,7 @@ class ImpitHttpClient(HttpClient):
             verify: SSL certificates used to verify the identity of requested hosts.
             browser: Browser to impersonate.
             follow_redirects: Whether to follow HTTP redirects.
-            max_redirects: Maximum number of redirects to follow before raising `TooManyRedirectsError`.
+            max_redirects: Maximum number of redirects to follow before raising `impit.TooManyRedirects`.
             async_client_kwargs: Additional keyword arguments for `impit.AsyncClient`.
         """
         super().__init__(
@@ -297,27 +298,39 @@ class ImpitHttpClient(HttpClient):
             stream: Whether the body of the final response should be streamed.
 
         Raises:
-            TooManyRedirectsError: If the number of redirects exceeds `max_redirects`.
+            TooManyRedirects: If the number of redirects exceeds `max_redirects`.
 
         Returns:
             The final response of the redirect chain.
         """
         client = self._get_client(proxy_info.url if proxy_info else None)
-        current_url = URL(url)
+        # `encoded=True` keeps the URL byte for byte and safe `%2F` in query.
+        current_url = URL(url, encoded=True)
         content = payload
+        # The timeout bounds the whole chain rather than each hop, which is how `impit` treats it as well.
+        deadline = monotonic() + timeout.total_seconds() if timeout else None
 
         for _ in range(self._max_redirects + 1):
-            # Header names are normalized to lowercase by `HttpHeaders`, so this replaces any `Cookie` header
-            # passed by the caller instead of adding a second one.
-            if session and (cookie_string := session.cookies.get_cookie_string(str(current_url))):
-                headers['cookie'] = cookie_string
+            remaining = deadline - monotonic() if deadline is not None else None
+            if remaining is not None and remaining <= 0:
+                raise asyncio.TimeoutError
+
+            # Rebuilt per hop, so that the `Cookie` header never reaches a URL its cookies do not match. A header
+            # passed by the caller wins over the session, which is how `impit` treats its own cookie jar.
+            request_headers = dict(headers)
+            if (
+                session
+                and 'cookie' not in request_headers
+                and (cookie_string := session.cookies.get_cookie_string(str(current_url)))
+            ):
+                request_headers['cookie'] = cookie_string
 
             response = await client.request(
                 method=method,
                 url=str(current_url),
                 content=content,
-                headers=headers or None,
-                timeout=timeout.total_seconds() if timeout else None,
+                headers=request_headers or None,
+                timeout=remaining,
                 stream=stream,
             )
 
@@ -331,7 +344,7 @@ class ImpitHttpClient(HttpClient):
             if not location:
                 return response
 
-            next_url = current_url.join(URL(location))
+            next_url = current_url.join(URL(location, encoded=True))
             if next_url.scheme not in _HTTP_SCHEMES:
                 return response
 
@@ -349,7 +362,7 @@ class ImpitHttpClient(HttpClient):
 
             current_url = next_url
 
-        raise TooManyRedirectsError(url, self._max_redirects)
+        raise TooManyRedirects(f'Exceeded the limit of {self._max_redirects} redirects while requesting {url}.')
 
     def _get_client(self, proxy_url: str | None) -> AsyncClient:
         """Retrieve or create an HTTP client for the given proxy URL.
