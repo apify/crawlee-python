@@ -630,6 +630,7 @@ async def test_launch_with_user_data_dir_and_fingerprint(tmp_path: Path, server_
     assert 'headless' not in fingerprints['window.navigator.userAgent'].lower()
 
 
+@pytest.mark.run_alone
 async def test_get_snapshot(server_url: URL) -> None:
     crawler = PlaywrightCrawler()
 
