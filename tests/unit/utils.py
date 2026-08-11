@@ -4,18 +4,52 @@ import asyncio
 import inspect
 import sys
 import time
-from typing import TYPE_CHECKING, TypeVar, cast, overload
+from asyncio import sleep as asyncio_sleep
+from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import AsyncIterator, Awaitable, Callable
 
     from yarl import URL
+
+from crawlee.http_clients._base import HttpClient, HttpResponse
 
 T = TypeVar('T')
 
 run_alone_on_mac = pytest.mark.run_alone if sys.platform == 'darwin' else lambda x: x
+
+
+async def sleep_without_delay(_delay: float) -> None:
+    """Yield to the event loop without waiting for a requested test delay."""
+    await asyncio_sleep(0)
+
+
+def make_status_stream_client(responses: list[tuple[int, bytes]]) -> tuple[AsyncMock, list[int]]:
+    """Create a mock client returning the provided status and body sequence."""
+    attempts: list[int] = []
+
+    @asynccontextmanager
+    async def stream(_url: str, **_kwargs: Any) -> AsyncIterator[HttpResponse]:
+        status, body = responses[min(len(attempts), len(responses) - 1)]
+        attempts.append(status)
+
+        async def read_stream() -> AsyncIterator[bytes]:
+            if body:
+                yield body
+
+        response = MagicMock(spec=HttpResponse)
+        response.status_code = status
+        response.headers = {'content-type': 'application/xml; charset=utf-8'}
+        response.read_stream = read_stream
+        yield cast('HttpResponse', response)
+
+    client = AsyncMock(spec=HttpClient)
+    client.stream = stream
+    return client, attempts
 
 
 async def maybe_await(value: Awaitable[T] | T) -> T:

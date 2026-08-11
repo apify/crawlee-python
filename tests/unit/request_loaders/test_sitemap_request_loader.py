@@ -9,11 +9,17 @@ from yarl import URL
 
 from crawlee import RequestOptions, RequestTransformAction
 from crawlee._utils.sitemap import DEFAULT_MAX_DEPTH
-from crawlee.errors import HttpStatusCodeError
 from crawlee.http_clients._base import HttpClient, HttpResponse
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
 from crawlee.storages import KeyValueStore
-from tests.unit.utils import DEFAULT_URL, get_basic_results, get_basic_sitemap, poll_until_condition
+from tests.unit.utils import (
+    DEFAULT_URL,
+    get_basic_results,
+    get_basic_sitemap,
+    make_status_stream_client,
+    poll_until_condition,
+    sleep_without_delay,
+)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -29,30 +35,6 @@ def compress_gzip(data: str) -> bytes:
 def encode_base64(data: bytes) -> str:
     """Encode bytes to a base64 string."""
     return base64.b64encode(data).decode('utf-8')
-
-
-def _make_status_stream_client(responses: list[tuple[int, bytes]]) -> tuple[AsyncMock, list[int]]:
-    """Create a mock client returning the provided status and body sequence."""
-    attempts: list[int] = []
-
-    @asynccontextmanager
-    async def stream(_url: str, **_kwargs: Any) -> 'AsyncIterator[HttpResponse]':
-        status, body = responses[min(len(attempts), len(responses) - 1)]
-        attempts.append(status)
-
-        async def read_stream() -> 'AsyncIterator[bytes]':
-            if body:
-                yield body
-
-        response = MagicMock(spec=HttpResponse)
-        response.status_code = status
-        response.headers = {'content-type': 'application/xml; charset=utf-8'}
-        response.read_stream = read_stream
-        yield cast('HttpResponse', response)
-
-    client = AsyncMock(spec=HttpClient)
-    client.stream = stream
-    return client, attempts
 
 
 async def test_nested_sitemap_chain_bounded_by_max_depth() -> None:
@@ -103,9 +85,10 @@ async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> No
     assert await sitemap_loader.get_handled_count() == 5
 
 
-async def test_sitemap_http_error_is_retried_before_loading_requests() -> None:
+async def test_sitemap_http_error_is_retried_before_loading_requests(monkeypatch: pytest.MonkeyPatch) -> None:
     """The loader retries transient HTTP errors and loads the eventual sitemap response."""
-    client, attempts = _make_status_stream_client([(503, b''), (503, b''), (200, get_basic_sitemap().encode())])
+    monkeypatch.setattr('crawlee._utils.sitemap.asyncio.sleep', AsyncMock(side_effect=sleep_without_delay))
+    client, attempts = make_status_stream_client([(503, b''), (503, b''), (200, get_basic_sitemap().encode())])
     loader = SitemapRequestLoader([f'{DEFAULT_URL}sitemap.xml'], http_client=client)
 
     while not await loader.is_finished():
@@ -117,15 +100,54 @@ async def test_sitemap_http_error_is_retried_before_loading_requests() -> None:
     assert await loader.get_total_count() == 5
 
 
-async def test_sitemap_http_error_is_propagated_after_retries_exhausted() -> None:
-    """The loader exposes an exhausted sitemap fetch instead of reporting successful completion."""
-    client, attempts = _make_status_stream_client([(503, b'')])
+async def test_sitemap_http_error_is_skipped_after_retries_exhausted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The loader finishes empty after an exhausted sitemap HTTP error."""
+    monkeypatch.setattr('crawlee._utils.sitemap.asyncio.sleep', AsyncMock(side_effect=sleep_without_delay))
+    client, attempts = make_status_stream_client([(503, b'')])
     loader = SitemapRequestLoader([f'{DEFAULT_URL}sitemap.xml'], http_client=client)
 
-    with pytest.raises(HttpStatusCodeError, match='503'):
-        await loader.fetch_next_request()
+    assert await loader.fetch_next_request() is None
 
     assert attempts == [503, 503, 503]
+
+
+async def test_sitemap_loader_drains_requests_before_propagating_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A later sitemap failure is exposed only after requests from healthy sources drain."""
+    monkeypatch.setattr('crawlee._utils.sitemap.asyncio.sleep', AsyncMock(side_effect=sleep_without_delay))
+
+    @asynccontextmanager
+    async def stream(url: str, **_kwargs: Any) -> 'AsyncIterator[HttpResponse]':
+        if url.endswith('broken.xml'):
+            raise ConnectionError('Network error')
+
+        async def read_stream() -> 'AsyncIterator[bytes]':
+            yield get_basic_sitemap().encode()
+
+        response = MagicMock(spec=HttpResponse)
+        response.status_code = 200
+        response.headers = {'content-type': 'application/xml; charset=utf-8'}
+        response.read_stream = read_stream
+        yield cast('HttpResponse', response)
+
+    client = AsyncMock(spec=HttpClient)
+    client.stream = stream
+    loader = SitemapRequestLoader(
+        [f'{DEFAULT_URL}sitemap.xml', f'{DEFAULT_URL}broken.xml'], http_client=client, max_buffer_size=10
+    )
+
+    requests = []
+    for _ in range(5):
+        request = await loader.fetch_next_request()
+        assert request is not None
+        requests.append(request)
+
+    assert not await loader.is_finished()
+    for request in requests:
+        await loader.mark_request_as_handled(request)
+
+    assert await poll_until_condition(loader._loading_task.done)
+    with pytest.raises(ConnectionError, match='Network error'):
+        await loader.is_finished()
 
 
 async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL, http_client: HttpClient) -> None:
