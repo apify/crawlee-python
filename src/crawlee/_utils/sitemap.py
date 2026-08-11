@@ -201,15 +201,19 @@ class _XmlSitemapParser:
     async def flush(self) -> AsyncGenerator[_SitemapItem, None]:
         """Process any remaining data in the buffer, yielding items one by one."""
         try:
-            self._parser.flush()
+            # `ExpatParser.flush` isn't part of the `IncrementalParser` interface and is missing before CPython
+            # 3.10.14, 3.11.9 and 3.12.3, whose bundled expat predates reparse deferral, so nothing stays buffered.
+            if (flush := getattr(self._parser, 'flush', None)) is not None:
+                flush()
 
+        except Exception as e:
+            logger.warning(f'Failed to parse remaining XML data: {e}')
+
+        finally:
             for item in self._handler.items:
                 yield item
 
             self._handler.items.clear()
-
-        except Exception as e:
-            logger.warning(f'Failed to parse remaining XML data: {e}')
 
     def close(self) -> None:
         """Clean up resources."""

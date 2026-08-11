@@ -1,9 +1,10 @@
 import base64
 import gzip
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from xml.sax.expatreader import ExpatParser
 
 import pytest
@@ -16,6 +17,7 @@ from crawlee._utils.sitemap import (
     SitemapUrl,
     _TxtSitemapParser,
     _XMLSaxSitemapHandler,
+    _XmlSitemapParser,
     discover_valid_sitemaps,
     parse_sitemap,
 )
@@ -319,6 +321,22 @@ async def test_sitemap_from_string() -> None:
     assert set(sitemap.urls) == get_basic_results()
 
 
+async def test_malformed_sitemap_keeps_urls() -> None:
+    """A parse error must not discard the URLs collected before it."""
+    malformed = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f'<url><loc>{DEFAULT_URL}first</loc></url>\n'
+        f'<url><loc>{DEFAULT_URL}second</loc></url>\n'
+        f'<url><loc>{DEFAULT_URL}third</loc></mismatched>\n'
+        '</urlset>'
+    )
+
+    sitemap = await Sitemap.from_xml_string(malformed)
+
+    assert sitemap.urls == [f'{DEFAULT_URL}first', f'{DEFAULT_URL}second']
+
+
 async def test_sitemap_fetch_retries_on_transient_error() -> None:
     """Transient fetch errors are retried up to `sitemap_retries` times before giving up."""
     client, attempts = _make_flaky_stream_client(get_basic_sitemap().encode(), fail_times=2)
@@ -560,6 +578,38 @@ async def test_txt_parser_flush_clears_buffer() -> None:
     items += [item async for item in parser.process_chunk('https://c.com/\n')]
 
     assert [item['loc'] for item in items] == ['https://a.com/', 'https://b.com/', 'https://c.com/']
+
+
+async def test_xml_parser_skips_missing_flush(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A parser without `flush` is flushed silently, as on CPython before 3.10.14, 3.11.9 and 3.12.3."""
+    monkeypatch.delattr(ExpatParser, 'flush', raising=False)
+    parser = _XmlSitemapParser()
+
+    with caplog.at_level(logging.WARNING, logger='crawlee._utils.sitemap'):
+        items = [item async for item in parser.process_chunk(get_basic_sitemap())]
+        items += [item async for item in parser.flush()]
+
+    assert {item['loc'] for item in items} == get_basic_results()
+    assert caplog.records == []
+
+
+async def test_xml_parser_keeps_items_on_flush_error(caplog: pytest.LogCaptureFixture) -> None:
+    """A failing `flush()` must not discard the items already collected."""
+    parser = _XmlSitemapParser()
+    parser._handler.items.append({'type': 'url', 'loc': f'{DEFAULT_URL}page'})
+
+    # `create=True` covers interpreters where `ExpatParser` has no `flush` to replace.
+    with (
+        caplog.at_level(logging.WARNING, logger='crawlee._utils.sitemap'),
+        patch.object(parser._parser, 'flush', side_effect=RuntimeError('Broken parser'), create=True),
+    ):
+        items = [item async for item in parser.flush()]
+
+    assert items == [{'type': 'url', 'loc': f'{DEFAULT_URL}page'}]
+    assert parser._handler.items == []
+    assert 'Failed to parse remaining XML data: Broken parser' in caplog.text
 
 
 async def test_discover_sitemap_url_without_host_skipped() -> None:
