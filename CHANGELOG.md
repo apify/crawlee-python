@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.9.2 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **sitemap:** Guard the unavailable `ExpatParser.flush` on older `CPython` patch releases ([#2141](https://github.com/apify/crawlee-python/pull/2141)) ([7f75295](https://github.com/apify/crawlee-python/commit/7f75295ca96a7e06bf794e30b999109a9b93c538)) by [@Mantisus](https://github.com/Mantisus), closes [#2119](https://github.com/apify/crawlee-python/issues/2119)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.9.1](https://github.com/apify/crawlee-python/releases/tag/v1.9.1) (2026-08-06)
 
 ### 🐛 Bug Fixes
