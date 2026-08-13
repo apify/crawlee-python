@@ -28,7 +28,7 @@ logger = getLogger(__name__)
 TRequestManager = TypeVar('TRequestManager', bound=RequestManager)
 
 _NEVER_THROTTLED = datetime.min.replace(tzinfo=timezone.utc)
-"""Sentinel `throttled_until` value meaning the domain has no active backoff."""
+"""Sentinel timestamp meaning a dispatch clock has never been armed."""
 
 
 @docs_group('Request loaders')
@@ -120,13 +120,12 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """Empty the inner manager and all sub-managers, and reset transient per-domain throttle state.
 
         The configured domain list and any robots.txt-derived `crawl_delay` are preserved; only the dynamic backoff
-        state (consecutive 429 counter and `throttled_until`) is cleared. Sub-managers are kept around so they don't
-        need to be re-opened on the next request — they're just emptied.
+        state (consecutive 429 counter and the two dispatch clocks) is cleared. Sub-managers are kept around so they
+        don't need to be re-opened on the next request — they're just emptied.
         """
         await asyncio.gather(self._inner.purge(), *(sm.purge() for sm in self._sub_managers.values()))
         for state in self._domain_states.values():
-            state.consecutive_429_count = 0
-            state.throttled_until = _NEVER_THROTTLED
+            state.reset_throttling()
 
     @override
     async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest | None:
@@ -258,9 +257,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         manager = self._select_manager(request.url)
-        result = await manager.mark_request_as_handled(request)
-        self.record_success(request.url)
-        return result
+        return await manager.mark_request_as_handled(request)
 
     @override
     async def get_handled_count(self) -> int:
@@ -291,33 +288,54 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     def record_domain_delay(self, url: str, *, retry_after: timedelta | None = None) -> bool:
         """Record a 429 Too Many Requests response for the domain of the given URL.
 
-        Increments the consecutive 429 count and calculates the next allowed request time using exponential backoff or
-        the `Retry-After` value.
+        Advances the consecutive 429 count and calculates the next allowed request time using exponential backoff or
+        the `Retry-After` value. Only the first 429 of a burst advances the count, so the delay tracks how hard the
+        domain pushes back, not how many requests were in flight.
 
         Args:
             url: The URL that received a 429 response.
-            retry_after: Optional delay from the `Retry-After` header. If provided, it takes priority over the
-                calculated exponential backoff.
+            retry_after: Optional delay from the `Retry-After` header. If it describes a positive delay, it takes
+                priority over the calculated exponential backoff.
 
         Returns:
-            True if the URL's domain is configured for throttling and the delay was applied; False if the domain is not
+            True if the URL's domain is configured for throttling and the 429 was recorded; False if the domain is not
             in the configured `domains` list, in which case the call is a no-op.
         """
         state = self._get_domain_state(url)
         if state is None:
             return False
 
+        now = datetime.now(timezone.utc)
+
+        # Requests in flight when the limit was hit all come back 429. That is one rate-limit event, so only the first
+        # advances the exponent. Checking `crawl_delay_until` too would swallow every 429, as it is armed on every
+        # dispatch.
+        if now < state.backoff_until:
+            return True
+
+        # The domain has been quiet for a full extra window, so this 429 opens a new run instead of continuing the old.
+        if now >= state.backoff_decays_at:
+            state.consecutive_429_count = 0
+
         state.consecutive_429_count += 1
-        delay = retry_after if retry_after is not None else self._base_delay * (2 ** (state.consecutive_429_count - 1))
+
+        # A non-positive `Retry-After` is no delay at all, so fall back to the backoff and let it engage.
+        if retry_after is not None and retry_after > timedelta(0):
+            delay = retry_after
+            source = 'Retry-After header'
+        else:
+            delay = self._base_delay * (2 ** (state.consecutive_429_count - 1))
+            source = 'exponential backoff'
+
         if delay > self._max_delay:
-            source = 'Retry-After header' if retry_after is not None else 'exponential backoff'
             logger.warning(
                 f'Capping {source} delay of {delay.total_seconds():.1f}s for domain "{state.domain}" '
                 f'to max_delay ({self._max_delay.total_seconds():.1f}s); the domain may continue to rate-limit. '
                 f'Consider increasing max_delay if this recurs.'
             )
             delay = self._max_delay
-        state.throttled_until = datetime.now(timezone.utc) + delay
+
+        state.apply_backoff(now, delay)
 
         logger.info(
             f'Rate limit (429) detected for domain "{state.domain}" '
@@ -398,11 +416,11 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     def _mark_domain_dispatched(self, domain: str) -> None:
         """Record that a request to this domain was just dispatched.
 
-        If a crawl-delay is configured, push throttled_until forward by that amount.
+        If a crawl-delay is configured, push `crawl_delay_until` forward by that amount.
         """
         state = self._domain_states.get(domain)
-        if state is not None and state.crawl_delay is not None:
-            state.throttled_until = datetime.now(timezone.utc) + state.crawl_delay
+        if state is not None:
+            state.apply_crawl_delay(datetime.now(timezone.utc))
 
     def _signal_new_work(self) -> None:
         """Wake `fetch_next_request` if it is sleeping inside a throttle wait."""
@@ -450,11 +468,41 @@ class _DomainState:
     domain: str
     """The domain being tracked."""
 
-    throttled_until: datetime = _NEVER_THROTTLED
-    """Earliest time the next request to this domain is allowed."""
+    backoff_until: datetime = _NEVER_THROTTLED
+    """Earliest time the next request is allowed by the 429 backoff. Kept apart from `crawl_delay_until`, which is
+    armed on every dispatch and would otherwise pass for an active backoff.
+    """
+
+    crawl_delay_until: datetime = _NEVER_THROTTLED
+    """Earliest time the next request is allowed by the domain's crawl-delay."""
+
+    backoff_decays_at: datetime = _NEVER_THROTTLED
+    """Time after which an incoming 429 is treated as a fresh burst rather than a continuation of the current one."""
 
     consecutive_429_count: int = 0
     """Number of consecutive 429 responses (for exponential backoff)."""
 
     crawl_delay: timedelta | None = None
-    """Minimum interval between requests, used to push `throttled_until` on dispatch."""
+    """Minimum interval between requests, used to push `crawl_delay_until` on dispatch."""
+
+    @property
+    def throttled_until(self) -> datetime:
+        """Earliest time the next request to this domain is allowed by either of its two independent clocks."""
+        return max(self.backoff_until, self.crawl_delay_until)
+
+    def apply_backoff(self, now: datetime, delay: timedelta) -> None:
+        """Block the domain for `delay`. If no 429 arrives for another `delay` after that, the exponent resets."""
+        self.backoff_until = now + delay
+        self.backoff_decays_at = self.backoff_until + delay
+
+    def apply_crawl_delay(self, now: datetime) -> None:
+        """Block the domain for its crawl-delay, if it declared one."""
+        if self.crawl_delay is not None:
+            self.crawl_delay_until = now + self.crawl_delay
+
+    def reset_throttling(self) -> None:
+        """Clear the transient throttle state."""
+        self.consecutive_429_count = 0
+        self.backoff_until = _NEVER_THROTTLED
+        self.crawl_delay_until = _NEVER_THROTTLED
+        self.backoff_decays_at = _NEVER_THROTTLED

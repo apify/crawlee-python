@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any
-from unittest.mock import AsyncMock, patch
+from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -16,9 +17,15 @@ from crawlee.request_loaders._throttling_request_manager import ThrottlingReques
 from crawlee.storage_clients import MemoryStorageClient
 from crawlee.storages import RequestQueue
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 THROTTLED_DOMAIN = 'throttled.com'
 NON_THROTTLED_DOMAIN = 'free.com'
 TEST_DOMAINS = [THROTTLED_DOMAIN]
+
+_MANAGER_MODULE = 'crawlee.request_loaders._throttling_request_manager'
+_CLOCK_START = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
 @pytest.fixture
@@ -53,6 +60,14 @@ async def manager(inner_queue: RequestQueue, service_locator: ServiceLocator) ->
 def _make_request(url: str) -> Request:
     """Helper to create a Request object."""
     return Request.from_url(url)
+
+
+@contextmanager
+def _frozen_clock(start: datetime = _CLOCK_START) -> Iterator[MagicMock]:
+    """Freeze the manager's clock at `start`. Move it by reassigning `clock.now.return_value`."""
+    with patch(f'{_MANAGER_MODULE}.datetime') as clock:
+        clock.now.return_value = start
+        yield clock
 
 
 # ── Request Routing Tests ─────────────────────────────────
@@ -163,32 +178,67 @@ async def test_different_domains_independent(manager: ThrottlingRequestManager[R
 
 
 async def test_exponential_backoff(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """Consecutive 429s should increase delay exponentially."""
+    """429s in successive backoff windows should increase the delay exponentially."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
-
-    manager.record_domain_delay(url)
     state = manager._domain_states[THROTTLED_DOMAIN]
-    first_until = state.throttled_until
 
-    manager.record_domain_delay(url)
-    second_until = state.throttled_until
+    with _frozen_clock() as clock:
+        manager.record_domain_delay(url)
+        assert state.backoff_until == clock.now.return_value + manager._base_delay
 
-    assert second_until > first_until
-    assert state.consecutive_429_count == 2
+        # Past the first window, but well before it decays.
+        clock.now.return_value += manager._base_delay + timedelta(seconds=1)
+        manager.record_domain_delay(url)
+
+        assert state.consecutive_429_count == 2
+        assert state.backoff_until == clock.now.return_value + manager._base_delay * 2
+
+
+async def test_burst_of_429s_counts_once(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """Requests in flight when the limit was hit all return 429, but they are a single rate-limit event."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    state = manager._domain_states[THROTTLED_DOMAIN]
+
+    with _frozen_clock() as clock:
+        for _ in range(8):
+            assert manager.record_domain_delay(url) is True
+
+        assert state.consecutive_429_count == 1
+        assert state.backoff_until == clock.now.return_value + manager._base_delay
+
+
+async def test_backoff_decays_when_quiet(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A domain that stops rate-limiting for a full extra window should start the exponent over."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    state = manager._domain_states[THROTTLED_DOMAIN]
+
+    with _frozen_clock() as clock:
+        manager.record_domain_delay(url)
+        clock.now.return_value += manager._base_delay + timedelta(seconds=1)
+        manager.record_domain_delay(url)
+        assert state.consecutive_429_count == 2
+
+        clock.now.return_value = state.backoff_decays_at
+        manager.record_domain_delay(url)
+
+        assert state.consecutive_429_count == 1
+        assert state.backoff_until == clock.now.return_value + manager._base_delay
 
 
 async def test_max_delay_cap(manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """Backoff should cap at max_delay (60s)."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
-
-    for _ in range(20):
-        manager.record_domain_delay(url)
-
     state = manager._domain_states[THROTTLED_DOMAIN]
-    now = datetime.now(timezone.utc)
-    actual_delay = state.throttled_until - now
 
-    assert actual_delay <= manager._max_delay + timedelta(seconds=1)
+    with _frozen_clock() as clock:
+        for _ in range(20):
+            armed_at = clock.now.return_value
+            manager.record_domain_delay(url)
+            # Step just past the window, staying short of its decay deadline.
+            clock.now.return_value = state.backoff_until + timedelta(milliseconds=1)
+
+    assert state.consecutive_429_count == 20
+    assert state.backoff_until - armed_at == manager._max_delay
 
 
 async def test_retry_after_header_priority(manager: ThrottlingRequestManager[RequestQueue]) -> None:
@@ -225,16 +275,62 @@ async def test_retry_after_exceeding_max_delay_logs_warning(
     assert THROTTLED_DOMAIN in warnings[0].message
 
 
-async def test_success_resets_backoff(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """Successful request should reset the consecutive 429 count."""
+async def test_retry_after_zero_falls_back_to_backoff(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A zero Retry-After is no delay at all, so the exponential backoff should still engage."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
+    state = manager._domain_states[THROTTLED_DOMAIN]
 
-    manager.record_domain_delay(url)
-    manager.record_domain_delay(url)
-    assert manager._domain_states[THROTTLED_DOMAIN].consecutive_429_count == 2
+    with _frozen_clock() as clock:
+        manager.record_domain_delay(url, retry_after=timedelta(0))
+
+        assert state.backoff_until == clock.now.return_value + manager._base_delay
+        assert manager._is_domain_throttled(THROTTLED_DOMAIN)
+
+
+async def test_capping_warning_names_the_backoff_on_zero_retry_after(
+    manager: ThrottlingRequestManager[RequestQueue],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A zero Retry-After falls through to the backoff, so the capping warning must not blame the header."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    state = manager._domain_states[THROTTLED_DOMAIN]
+
+    with caplog.at_level('WARNING', logger=_MANAGER_MODULE), _frozen_clock() as clock:
+        for _ in range(20):
+            manager.record_domain_delay(url, retry_after=timedelta(0))
+            clock.now.return_value = state.backoff_until + timedelta(milliseconds=1)
+
+    warnings = [r for r in caplog.records if r.levelname == 'WARNING']
+    assert warnings
+    assert all('exponential backoff' in r.message for r in warnings)
+
+
+async def test_success_resets_backoff(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """An explicit record_success should reset the consecutive 429 count."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    state = manager._domain_states[THROTTLED_DOMAIN]
+
+    with _frozen_clock() as clock:
+        manager.record_domain_delay(url)
+        clock.now.return_value += manager._base_delay + timedelta(seconds=1)
+        manager.record_domain_delay(url)
+        assert state.consecutive_429_count == 2
 
     manager.record_success(url)
-    assert manager._domain_states[THROTTLED_DOMAIN].consecutive_429_count == 0
+    assert state.consecutive_429_count == 0
+
+
+async def test_handled_request_keeps_backoff(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """Marking a request as handled must not reset the backoff, since failed requests are marked handled too."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await manager.add_request(url)
+    manager.record_domain_delay(url)
+
+    request = await manager._sub_managers[THROTTLED_DOMAIN].fetch_next_request()
+    assert request is not None
+    await manager.mark_request_as_handled(request)
+
+    assert manager._domain_states[THROTTLED_DOMAIN].consecutive_429_count == 1
 
 
 # ── Crawl-Delay Integration Tests ─────────────────────────
@@ -320,9 +416,9 @@ async def test_sleep_when_all_throttled(manager: ThrottlingRequestManager[Reques
     with patch(target, new_callable=AsyncMock) as mock_wait:
 
         async def wait_side_effect(*_args: Any, **_kwargs: Any) -> None:
-            # Set throttled_until firmly in the past so the next iteration reliably unblocks the domain regardless of
+            # Set the backoff firmly in the past so the next iteration reliably unblocks the domain regardless of
             # clock resolution or scheduling jitter on slow CI runners.
-            manager._domain_states[THROTTLED_DOMAIN].throttled_until = datetime.now(timezone.utc) - timedelta(seconds=1)
+            manager._domain_states[THROTTLED_DOMAIN].backoff_until = datetime.now(timezone.utc) - timedelta(seconds=1)
 
         mock_wait.side_effect = wait_side_effect
 
@@ -544,8 +640,8 @@ def test_parse_retry_after_integer_seconds() -> None:
 
 
 def test_parse_retry_after_zero_seconds() -> None:
-    """A delay of `0` ("retry immediately") is valid and must yield a zero delta, not None."""
-    assert parse_retry_after_header('0') == timedelta(0)
+    """A delay of `0` carries no back-off, so it must be reported as a missing header."""
+    assert parse_retry_after_header('0') is None
 
 
 def test_parse_retry_after_negative_seconds() -> None:
