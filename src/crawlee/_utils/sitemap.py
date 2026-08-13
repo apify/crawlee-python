@@ -21,7 +21,7 @@ from yarl import URL
 
 from crawlee._utils.urls import filter_url
 from crawlee._utils.web import is_status_code_server_error, is_status_code_successful
-from crawlee.errors import HttpStatusCodeError, ProxyError
+from crawlee.errors import ProxyError
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -47,20 +47,23 @@ CONTENT_CHUNK_SIZE = 1024 * 1024
 DEFAULT_MAX_DEPTH = 10
 """Default maximum depth of nested sitemaps to follow, guarding against malicious infinite sitemap chains."""
 
+SITEMAP_RETRY_DELAY = 1
+"""Seconds to wait before retrying a failed sitemap fetch."""
 
-def _raise_for_sitemap_status(status_code: int) -> None:
-    """Raise `HttpStatusCodeError` if the sitemap response status is not 2xx."""
-    if not HTTPStatus.OK <= status_code < HTTPStatus.MULTIPLE_CHOICES:
-        raise HttpStatusCodeError('Error status code returned while fetching sitemap', status_code)
+
+def _is_successful_sitemap_status(status_code: int) -> bool:
+    """Return whether a sitemap response status is a successful 2xx."""
+    return HTTPStatus.OK <= status_code < HTTPStatus.MULTIPLE_CHOICES
 
 
 def _is_retryable_sitemap_status(status_code: int) -> bool:
     """Return whether a sitemap response status should be retried."""
-    return (
-        HTTPStatus.MULTIPLE_CHOICES <= status_code < HTTPStatus.BAD_REQUEST
-        or status_code in (HTTPStatus.REQUEST_TIMEOUT, HTTPStatus.TOO_MANY_REQUESTS)
-        or is_status_code_server_error(status_code)
-    )
+    return status_code == HTTPStatus.REQUEST_TIMEOUT or is_status_code_server_error(status_code)
+
+
+async def _sleep_before_sitemap_retry() -> None:
+    """Pause briefly before retrying a failed sitemap fetch."""
+    await asyncio.sleep(SITEMAP_RETRY_DELAY)
 
 
 @dataclass()
@@ -379,6 +382,7 @@ async def _fetch_and_process_sitemap(
     timeout: timedelta | None = None,
     emit_nested_sitemaps: bool,
     enqueue_strategy: EnqueueStrategy,
+    parsed_ok: list[bool],
 ) -> AsyncGenerator[SitemapUrl | NestedSitemap, None]:
     """Fetch a sitemap from a URL and process its content."""
     if 'url' not in source:
@@ -392,7 +396,22 @@ async def _fetch_and_process_sitemap(
             async with http_client.stream(
                 sitemap_url, method='GET', headers=SITEMAP_HEADERS, proxy_info=proxy_info, timeout=timeout
             ) as response:
-                _raise_for_sitemap_status(response.status_code)
+                status_code = response.status_code
+                if not _is_successful_sitemap_status(status_code):
+                    if not _is_retryable_sitemap_status(status_code):
+                        logger.warning(f'Skipping sitemap {sitemap_url} due to HTTP status code {status_code}.')
+                        return
+                    if retries_left > 0:
+                        logger.warning(
+                            f'Error fetching sitemap {sitemap_url}: HTTP status {status_code}. '
+                            f'Retries left: {retries_left}'
+                        )
+                        await _sleep_before_sitemap_retry()
+                    else:
+                        logger.warning(
+                            f'Failed to fetch sitemap {sitemap_url}, no retries left: HTTP status {status_code}'
+                        )
+                    continue
 
                 # Determine content type and compression
                 content_type = response.headers.get('content-type', '')
@@ -474,20 +493,17 @@ async def _fetch_and_process_sitemap(
                                 yield result
                 finally:
                     parser.close()
-            break
+            parsed_ok.append(True)
 
         except Exception as e:
-            if isinstance(e, HttpStatusCodeError) and not _is_retryable_sitemap_status(e.status_code):
-                logger.warning(f'Skipping sitemap {sitemap_url} due to HTTP status code {e.status_code}.')
-                break
             if retries_left > 0:
                 logger.warning(f'Error fetching sitemap {sitemap_url}: {e}. Retries left: {retries_left}')
-                await asyncio.sleep(1)  # Brief pause before retry
-            elif isinstance(e, HttpStatusCodeError):
-                logger.warning(f'Failed to fetch sitemap {sitemap_url}, no retries left: {e}')
+                await _sleep_before_sitemap_retry()
             else:
                 logger.exception(f'Failed to fetch sitemap {sitemap_url}, no retries left.')
                 raise
+        else:
+            return
 
 
 class Sitemap:
@@ -584,7 +600,6 @@ async def parse_sitemap(
                 enqueue_strategy=enqueue_strategy,
             ):
                 yield result
-            successful_sources += 1
 
         elif source['type'] == 'url' and 'url' in source:
             # Add to visited set before processing to avoid duplicates
@@ -592,6 +607,7 @@ async def parse_sitemap(
                 raise RuntimeError('HttpClient must be provided for URL-based sitemap sources.')
 
             visited_sitemap_urls.add(source['url'])
+            parsed_ok: list[bool] = []
 
             try:
                 async for result in _fetch_and_process_sitemap(
@@ -605,9 +621,11 @@ async def parse_sitemap(
                     enqueue_strategy=enqueue_strategy,
                     proxy_info=proxy_info,
                     timeout=timeout,
+                    parsed_ok=parsed_ok,
                 ):
                     yield result
-                successful_sources += 1
+                if parsed_ok:
+                    successful_sources += 1
             except Exception as e:
                 source_errors.append(e)
                 logger.warning(f'Failed to process sitemap source {source["url"]}: {e}')
@@ -615,7 +633,7 @@ async def parse_sitemap(
             logger.warning(f'Invalid source configuration: {source}')
 
     if source_errors and successful_sources == 0:
-        raise source_errors[-1]
+        raise source_errors[0]
 
 
 async def _merge_async_generators(*generators: AsyncGenerator) -> AsyncGenerator:

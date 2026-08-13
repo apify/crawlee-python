@@ -39,14 +39,14 @@ class RequestLoader(ABC):
 
     @abstractmethod
     async def is_finished(self) -> bool:
-        """Return True if all requests have been handled, or raise if loading failed after pending requests drain."""
+        """Return True if all requests have been handled."""
 
     @abstractmethod
     async def fetch_next_request(self) -> Request | None:
         """Return the next request to be processed, or `None` if there are no more pending requests.
 
         The method should return `None` if and only if `is_finished` would return `True`. In other cases, the method
-        should wait until a request appears. It can raise a loading error after all pending requests have been handled.
+        should wait until a request appears.
         """
 
     @abstractmethod

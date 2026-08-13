@@ -8,7 +8,9 @@ import pytest
 from yarl import URL
 
 from crawlee import RequestOptions, RequestTransformAction
+from crawlee._types import BasicCrawlingContext
 from crawlee._utils.sitemap import DEFAULT_MAX_DEPTH
+from crawlee.crawlers import BasicCrawler
 from crawlee.http_clients._base import HttpClient, HttpResponse
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
 from crawlee.storages import KeyValueStore
@@ -18,7 +20,6 @@ from tests.unit.utils import (
     get_basic_sitemap,
     make_status_stream_client,
     poll_until_condition,
-    sleep_without_delay,
 )
 
 if TYPE_CHECKING:
@@ -87,9 +88,12 @@ async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> No
 
 async def test_sitemap_http_error_is_retried_before_loading_requests(monkeypatch: pytest.MonkeyPatch) -> None:
     """The loader retries transient HTTP errors and loads the eventual sitemap response."""
-    monkeypatch.setattr('crawlee._utils.sitemap.asyncio.sleep', AsyncMock(side_effect=sleep_without_delay))
-    client, attempts = make_status_stream_client([(503, b''), (503, b''), (200, get_basic_sitemap().encode())])
-    loader = SitemapRequestLoader([f'{DEFAULT_URL}sitemap.xml'], http_client=client)
+    monkeypatch.setattr('crawlee._utils.sitemap._sleep_before_sitemap_retry', AsyncMock())
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    client, attempts = make_status_stream_client(
+        {sitemap_url: [(503, b''), (503, b''), (200, get_basic_sitemap().encode())]}
+    )
+    loader = SitemapRequestLoader([sitemap_url], http_client=client)
 
     while not await loader.is_finished():
         request = await loader.fetch_next_request()
@@ -102,18 +106,19 @@ async def test_sitemap_http_error_is_retried_before_loading_requests(monkeypatch
 
 async def test_sitemap_http_error_is_skipped_after_retries_exhausted(monkeypatch: pytest.MonkeyPatch) -> None:
     """The loader finishes empty after an exhausted sitemap HTTP error."""
-    monkeypatch.setattr('crawlee._utils.sitemap.asyncio.sleep', AsyncMock(side_effect=sleep_without_delay))
-    client, attempts = make_status_stream_client([(503, b'')])
-    loader = SitemapRequestLoader([f'{DEFAULT_URL}sitemap.xml'], http_client=client)
+    monkeypatch.setattr('crawlee._utils.sitemap._sleep_before_sitemap_retry', AsyncMock())
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    client, attempts = make_status_stream_client({sitemap_url: [(503, b'')]})
+    loader = SitemapRequestLoader([sitemap_url], http_client=client)
 
     assert await loader.fetch_next_request() is None
 
     assert attempts == [503, 503, 503]
 
 
-async def test_sitemap_loader_drains_requests_before_propagating_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A later sitemap failure is exposed only after requests from healthy sources drain."""
-    monkeypatch.setattr('crawlee._utils.sitemap.asyncio.sleep', AsyncMock(side_effect=sleep_without_delay))
+async def test_sitemap_loader_drains_requests_after_later_source_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Already loaded URLs are still handed out after a later sitemap fails."""
+    monkeypatch.setattr('crawlee._utils.sitemap._sleep_before_sitemap_retry', AsyncMock())
 
     @asynccontextmanager
     async def stream(url: str, **_kwargs: Any) -> 'AsyncIterator[HttpResponse]':
@@ -145,9 +150,29 @@ async def test_sitemap_loader_drains_requests_before_propagating_failure(monkeyp
     for request in requests:
         await loader.mark_request_as_handled(request)
 
-    assert await poll_until_condition(loader._loading_task.done)
-    with pytest.raises(ConnectionError, match='Network error'):
-        await loader.is_finished()
+    assert await poll_until_condition(loader.is_finished)
+
+
+async def test_crawler_tandem_continues_when_sitemap_is_dead(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A dead sitemap plus seeded requests still crawls the seeded work."""
+    monkeypatch.setattr('crawlee._utils.sitemap._sleep_before_sitemap_retry', AsyncMock())
+    broken_url = f'{DEFAULT_URL}broken.xml'
+    client, _ = make_status_stream_client({broken_url: [ConnectionError('Network error')]})
+    loader = SitemapRequestLoader([broken_url], http_client=client)
+    request_manager = await loader.to_tandem()
+
+    crawler = BasicCrawler(request_manager=request_manager)
+    visited: list[str] = []
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+
+    stats = await crawler.run([f'{DEFAULT_URL}seeded-a', f'{DEFAULT_URL}seeded-b'])
+
+    assert set(visited) == {f'{DEFAULT_URL}seeded-a', f'{DEFAULT_URL}seeded-b'}
+    assert stats.requests_finished == 2
+    assert stats.requests_failed == 0
 
 
 async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL, http_client: HttpClient) -> None:
