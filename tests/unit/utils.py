@@ -23,9 +23,13 @@ run_alone_on_mac = pytest.mark.run_alone if sys.platform == 'darwin' else lambda
 
 
 def make_status_stream_client(
-    responses: dict[str, list[tuple[int, bytes] | BaseException]],
+    responses: dict[str, list[tuple[int, bytes] | Exception]],
 ) -> tuple[AsyncMock, list[int]]:
-    """Create a mock client returning the provided per-URL status and body sequence."""
+    """Create a mock client that answers each URL with its next `(status, body)` response or raised exception.
+
+    The last entry of a URL's sequence repeats for any further requests. The returned list records the status of
+    every response served (exception entries are not recorded).
+    """
     attempts: list[int] = []
     indexes: dict[str, int] = {}
 
@@ -35,7 +39,7 @@ def make_status_stream_client(
         index = indexes.get(url, 0)
         indexes[url] = index + 1
         spec = sequence[min(index, len(sequence) - 1)]
-        if isinstance(spec, BaseException):
+        if isinstance(spec, Exception):
             raise spec
 
         status, body = spec

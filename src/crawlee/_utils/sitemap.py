@@ -56,14 +56,21 @@ def _is_successful_sitemap_status(status_code: int) -> bool:
     return HTTPStatus.OK <= status_code < HTTPStatus.MULTIPLE_CHOICES
 
 
-def _is_retryable_sitemap_status(status_code: int) -> bool:
-    """Return whether a sitemap response status should be retried."""
-    return status_code == HTTPStatus.REQUEST_TIMEOUT or is_status_code_server_error(status_code)
+class _RetryableSitemapStatusError(Exception):
+    """Internal signal that a sitemap fetch returned a retryable HTTP status.
+
+    Raised inside the response context manager so the stream is closed before the retry delay.
+    """
+
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f'HTTP status {status_code}')
+        self.status_code = status_code
 
 
-async def _sleep_before_sitemap_retry() -> None:
-    """Pause briefly before retrying a failed sitemap fetch."""
-    await asyncio.sleep(SITEMAP_RETRY_DELAY)
+def _raise_for_retryable_sitemap_status(status_code: int) -> None:
+    """Raise `_RetryableSitemapStatusError` for HTTP statuses that warrant a fetch retry (408 and 5xx)."""
+    if status_code == HTTPStatus.REQUEST_TIMEOUT or is_status_code_server_error(status_code):
+        raise _RetryableSitemapStatusError(status_code)
 
 
 @dataclass()
@@ -398,20 +405,10 @@ async def _fetch_and_process_sitemap(
             ) as response:
                 status_code = response.status_code
                 if not _is_successful_sitemap_status(status_code):
-                    if not _is_retryable_sitemap_status(status_code):
-                        logger.warning(f'Skipping sitemap {sitemap_url} due to HTTP status code {status_code}.')
-                        return
-                    if retries_left > 0:
-                        logger.warning(
-                            f'Error fetching sitemap {sitemap_url}: HTTP status {status_code}. '
-                            f'Retries left: {retries_left}'
-                        )
-                        await _sleep_before_sitemap_retry()
-                    else:
-                        logger.warning(
-                            f'Failed to fetch sitemap {sitemap_url}, no retries left: HTTP status {status_code}'
-                        )
-                    continue
+                    # Retryable statuses raise and route to the retry handler below; the rest skip this source.
+                    _raise_for_retryable_sitemap_status(status_code)
+                    logger.warning(f'Skipping sitemap {sitemap_url} due to HTTP status code {status_code}.')
+                    return
 
                 # Determine content type and compression
                 content_type = response.headers.get('content-type', '')
@@ -495,10 +492,18 @@ async def _fetch_and_process_sitemap(
                     parser.close()
             parsed_ok.append(True)
 
+        except _RetryableSitemapStatusError as e:
+            if retries_left > 0:
+                logger.warning(
+                    f'Error fetching sitemap {sitemap_url}: HTTP status {e.status_code}. Retries left: {retries_left}'
+                )
+                await asyncio.sleep(SITEMAP_RETRY_DELAY)
+            else:
+                logger.warning(f'Failed to fetch sitemap {sitemap_url}, no retries left: HTTP status {e.status_code}.')
         except Exception as e:
             if retries_left > 0:
                 logger.warning(f'Error fetching sitemap {sitemap_url}: {e}. Retries left: {retries_left}')
-                await _sleep_before_sitemap_retry()
+                await asyncio.sleep(SITEMAP_RETRY_DELAY)
             else:
                 logger.exception(f'Failed to fetch sitemap {sitemap_url}, no retries left.')
                 raise
@@ -564,6 +569,10 @@ async def parse_sitemap(
 
     Default `ParseSitemapOptions.enqueue_strategy` is `same-hostname` which will skip cross-host URLs.
     Use strategy `all` to process all links.
+
+    URL sources answering with a non-2xx status are skipped: retryable statuses (408 and 5xx) are retried first,
+    others are skipped immediately. If at least one source fails with a fetch error after all retries and no source
+    succeeds, the first such error is raised once all sources have been processed.
     """
     # Set default options
     options = options or {}
@@ -600,6 +609,8 @@ async def parse_sitemap(
                 enqueue_strategy=enqueue_strategy,
             ):
                 yield result
+            # Raw sources cannot fetch-fail, so they always count as successful for the all-sources-failed check.
+            successful_sources += 1
 
         elif source['type'] == 'url' and 'url' in source:
             # Add to visited set before processing to avoid duplicates
@@ -627,8 +638,8 @@ async def parse_sitemap(
                 if parsed_ok:
                     successful_sources += 1
             except Exception as e:
+                # Already logged by `_fetch_and_process_sitemap`; raised below only if no source succeeds.
                 source_errors.append(e)
-                logger.warning(f'Failed to process sitemap source {source["url"]}: {e}')
         else:
             logger.warning(f'Invalid source configuration: {source}')
 

@@ -347,7 +347,7 @@ async def test_malformed_sitemap_keeps_urls() -> None:
 
 async def test_sitemap_fetch_retries_on_transient_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """Transient fetch errors are retried up to `sitemap_retries` times before giving up."""
-    monkeypatch.setattr('crawlee._utils.sitemap._sleep_before_sitemap_retry', AsyncMock())
+    monkeypatch.setattr('crawlee._utils.sitemap.SITEMAP_RETRY_DELAY', 0)
     client, attempts = _make_flaky_stream_client(get_basic_sitemap().encode(), fail_times=2)
 
     items = [item async for item in parse_sitemap([{'type': 'url', 'url': f'{DEFAULT_URL}sitemap.xml'}], client)]
@@ -358,7 +358,7 @@ async def test_sitemap_fetch_retries_on_transient_error(monkeypatch: pytest.Monk
 
 async def test_sitemap_fetch_raises_after_retries_exhausted(monkeypatch: pytest.MonkeyPatch) -> None:
     """A persistent fetch error is raised to the caller once all retries are exhausted."""
-    monkeypatch.setattr('crawlee._utils.sitemap._sleep_before_sitemap_retry', AsyncMock())
+    monkeypatch.setattr('crawlee._utils.sitemap.SITEMAP_RETRY_DELAY', 0)
     client, attempts = _make_flaky_stream_client(get_basic_sitemap().encode(), fail_times=10)
 
     with pytest.raises(ConnectionError):
@@ -369,7 +369,7 @@ async def test_sitemap_fetch_raises_after_retries_exhausted(monkeypatch: pytest.
 
 async def test_sitemap_fetch_retries_retryable_http_status(monkeypatch: pytest.MonkeyPatch) -> None:
     """Retryable HTTP errors are retried before parsing a successful response."""
-    monkeypatch.setattr('crawlee._utils.sitemap._sleep_before_sitemap_retry', AsyncMock())
+    monkeypatch.setattr('crawlee._utils.sitemap.SITEMAP_RETRY_DELAY', 0)
     sitemap_url = f'{DEFAULT_URL}sitemap.xml'
     client, attempts = make_status_stream_client(
         {sitemap_url: [(503, b''), (503, b''), (200, get_basic_sitemap().encode())]}
@@ -383,7 +383,7 @@ async def test_sitemap_fetch_retries_retryable_http_status(monkeypatch: pytest.M
 
 async def test_sitemap_fetch_skips_http_error_after_retries_exhausted(monkeypatch: pytest.MonkeyPatch) -> None:
     """A persistent retryable HTTP error is skipped once retries are exhausted."""
-    monkeypatch.setattr('crawlee._utils.sitemap._sleep_before_sitemap_retry', AsyncMock())
+    monkeypatch.setattr('crawlee._utils.sitemap.SITEMAP_RETRY_DELAY', 0)
     sitemap_url = f'{DEFAULT_URL}sitemap.xml'
     client, attempts = make_status_stream_client({sitemap_url: [(503, b'')]})
 
@@ -449,7 +449,7 @@ async def test_sitemap_partial_http_failure_keeps_healthy_source() -> None:
 
 async def test_sitemap_partial_fetch_failure_keeps_healthy_source(monkeypatch: pytest.MonkeyPatch) -> None:
     """A fetch exception in one source is suppressed when another source succeeds."""
-    monkeypatch.setattr('crawlee._utils.sitemap._sleep_before_sitemap_retry', AsyncMock())
+    monkeypatch.setattr('crawlee._utils.sitemap.SITEMAP_RETRY_DELAY', 0)
     client, attempts = _make_flaky_stream_client(get_basic_sitemap().encode(), fail_times=3)
     sources: list[SitemapSource] = [
         {'type': 'url', 'url': f'{DEFAULT_URL}broken.xml'},
@@ -462,9 +462,24 @@ async def test_sitemap_partial_fetch_failure_keeps_healthy_source(monkeypatch: p
     assert {item.loc for item in items} == get_basic_results()
 
 
+async def test_sitemap_raw_source_success_suppresses_url_fetch_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failing URL source does not discard the URLs from a successful raw sibling source."""
+    monkeypatch.setattr('crawlee._utils.sitemap.SITEMAP_RETRY_DELAY', 0)
+    broken_url = f'{DEFAULT_URL}broken.xml'
+    client, _ = make_status_stream_client({broken_url: [ConnectionError('Network error')]})
+    sources: list[SitemapSource] = [
+        {'type': 'raw', 'content': get_basic_sitemap()},
+        {'type': 'url', 'url': broken_url},
+    ]
+
+    items = [item async for item in parse_sitemap(sources, client)]
+
+    assert {item.loc for item in items} == get_basic_results()
+
+
 async def test_sitemap_skipped_source_does_not_hide_fetch_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """A skipped HTTP source does not count as success, so a sibling fetch error still raises."""
-    monkeypatch.setattr('crawlee._utils.sitemap._sleep_before_sitemap_retry', AsyncMock())
+    monkeypatch.setattr('crawlee._utils.sitemap.SITEMAP_RETRY_DELAY', 0)
     missing_url = f'{DEFAULT_URL}missing.xml'
     broken_url = f'{DEFAULT_URL}broken.xml'
     client, attempts = make_status_stream_client(
@@ -486,7 +501,7 @@ async def test_sitemap_skipped_source_does_not_hide_fetch_error(monkeypatch: pyt
 
 async def test_sitemap_raises_first_source_error_when_all_fail(monkeypatch: pytest.MonkeyPatch) -> None:
     """If every source fails with a real error, the first error is raised."""
-    monkeypatch.setattr('crawlee._utils.sitemap._sleep_before_sitemap_retry', AsyncMock())
+    monkeypatch.setattr('crawlee._utils.sitemap.SITEMAP_RETRY_DELAY', 0)
     first_url = f'{DEFAULT_URL}first.xml'
     second_url = f'{DEFAULT_URL}second.xml'
     client, _ = make_status_stream_client(
