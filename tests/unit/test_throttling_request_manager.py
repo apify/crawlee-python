@@ -120,6 +120,48 @@ async def test_domain_matching_is_case_insensitive(
     assert manager._is_domain_throttled('example.com')
 
 
+@pytest.mark.parametrize(
+    ('configured', 'url'),
+    [
+        pytest.param('xn--hky-ela4t.cz', 'https://háčky.cz/page', id='punycode_configured'),
+        pytest.param('háčky.cz', 'https://xn--hky-ela4t.cz/page', id='punycode_url'),
+        pytest.param('example.com', 'http://example.com./page', id='root_dot_url'),
+        pytest.param('example.com.', 'http://example.com/page', id='root_dot_configured'),
+        pytest.param('[::1]', 'http://[::1]:8080/page', id='ipv6_literal'),
+        pytest.param('https://example.com/products', 'https://example.com/page', id='full_url'),
+    ],
+)
+async def test_domain_matching_normalizes_spelling(
+    configured: str,
+    url: str,
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> None:
+    """A configured domain and a crawled URL must land on the same key however each of them is spelled."""
+    manager = ThrottlingRequestManager(
+        inner_queue,
+        domains=[configured],
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+    assert manager.record_domain_delay(url) is True
+
+
+async def test_unreadable_domain_is_rejected(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> None:
+    """An entry the URL parser cannot read is rejected at construction instead of never matching anything."""
+    with pytest.raises(ValueError, match='not a valid hostname'):
+        ThrottlingRequestManager(
+            inner_queue,
+            domains=['::1'],
+            request_manager_opener=RequestQueue.open,
+            service_locator=service_locator,
+        )
+
+
 async def test_add_requests_routes_mixed_domains(
     manager: ThrottlingRequestManager[RequestQueue],
     inner_queue: RequestQueue,

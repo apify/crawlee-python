@@ -93,13 +93,17 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 locator, ensuring consistency with the crawler's storage backend.
             base_delay: Initial delay after the first 429 response from a domain.
             max_delay: Maximum delay between requests to a rate-limited domain.
+
+        Raises:
+            ValueError: If an entry of `domains` is not a hostname the URL parser can read.
         """
         self._inner: TRequestManager = inner
         self._service_locator = service_locator if service_locator is not None else global_service_locator
         self._base_delay = base_delay
         self._max_delay = max_delay
         self._request_manager_opener = request_manager_opener
-        self._domain_states: dict[str, _DomainState] = {d.lower(): _DomainState(domain=d.lower()) for d in domains if d}
+        domain_keys = [self._parse_configured_domain(d) for d in domains if d]
+        self._domain_states: dict[str, _DomainState] = {key: _DomainState(domain=key) for key in domain_keys}
         self._sub_managers: dict[str, TRequestManager] = {}
         self._new_work_event = asyncio.Event()
         """Set whenever a request is added or reclaimed. Lets `fetch_next_request` wake from a throttle
@@ -354,9 +358,31 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         logger.debug(f'Set crawl-delay for domain "{state.domain}" to {delay_seconds}s')
 
     @staticmethod
-    def _extract_domain(url: str) -> str:
-        """Extract the domain (hostname) from a URL."""
-        return URL(url).host or ''
+    def _normalize_domain(hostname: str) -> str:
+        """Bring a parsed hostname to the form domain keys are stored in, root dot and all casing gone."""
+        return hostname.lower().removesuffix('.')
+
+    @classmethod
+    def _parse_configured_domain(cls, domain: str) -> str:
+        """Turn one `domains` entry, a bare hostname or a URL, into the key its requests are looked up under."""
+        try:
+            # A bare hostname reaches the parser, and with it IDNA and IPv6 handling, only through a synthetic URL.
+            host = (URL(domain) if '://' in domain else URL(f'https://{domain}')).host
+        except ValueError:
+            host = None
+
+        if not host:
+            raise ValueError(
+                f'"{domain}" is not a valid hostname. The `domains` option takes bare hostnames such as '
+                f'"example.com"; an IPv6 address has to be bracketed, as in "[::1]".'
+            )
+
+        return cls._normalize_domain(host)
+
+    @classmethod
+    def _extract_domain(cls, url: str) -> str:
+        """Extract the domain key from a URL."""
+        return cls._normalize_domain(URL(url).host or '')
 
     @staticmethod
     def _get_url_from_request(request: str | Request) -> str:
