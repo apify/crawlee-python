@@ -9,6 +9,7 @@ import pytest
 
 from crawlee import ConcurrencySettings, Request, RequestState
 from crawlee.crawlers import HttpCrawler
+from crawlee.request_loaders import ThrottlingRequestManager
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storages import RequestQueue
@@ -686,3 +687,38 @@ async def test_request_state(server_url: URL) -> None:
     }
 
     await queue.drop()
+
+
+@pytest.mark.parametrize(
+    'retry_on_blocked',
+    [
+        pytest.param(True, id='retry_on_blocked'),
+        pytest.param(False, id='no_retry_on_blocked'),
+    ],
+)
+async def test_records_429_regardless_of_retry_on_blocked(
+    mock_request_handler: AsyncMock,
+    server_url: URL,
+    *,
+    retry_on_blocked: bool,
+) -> None:
+    """Rate limiting is a separate concern from session blocking, so a 429 must be recorded either way."""
+    domain = server_url.host or ''
+    inner = await RequestQueue.open(alias=f'throttle-429-{retry_on_blocked}')
+    throttler = ThrottlingRequestManager(
+        inner,
+        domains=[domain],
+        request_manager_opener=RequestQueue.open,
+    )
+    crawler = HttpCrawler(
+        request_handler=mock_request_handler,
+        request_manager=throttler,
+        retry_on_blocked=retry_on_blocked,
+        max_request_retries=0,
+        # Without this, a 429 retires the session and the retries walk the backoff up to `max_delay`.
+        use_session_pool=False,
+    )
+
+    await crawler.run([str(server_url / 'status/429')])
+
+    assert throttler._is_domain_throttled(domain)

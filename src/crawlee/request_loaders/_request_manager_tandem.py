@@ -32,6 +32,11 @@ class RequestManagerTandem(RequestManager):
         self._read_only_loader = request_loader
         self._read_write_manager = request_manager
 
+    @property
+    def request_manager(self) -> RequestManager:
+        """The wrapped manager that stores the requests, both its own and those handed over by the loader."""
+        return self._read_write_manager
+
     @override
     async def get_handled_count(self) -> int:
         return await self._read_write_manager.get_handled_count()
