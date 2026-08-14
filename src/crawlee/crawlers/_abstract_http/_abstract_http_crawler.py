@@ -303,13 +303,13 @@ class AbstractHttpCrawler(
             The original crawling context if no errors are detected.
         """
         status_code = context.http_response.status_code
+        self._record_rate_limit_status_code(
+            status_code,
+            request_url=context.request.url,
+            retry_after_header=context.http_response.headers.get('retry-after'),
+        )
         if self._retry_on_blocked:
-            self._raise_for_session_blocked_status_code(
-                context.session,
-                status_code,
-                request_url=context.request.url,
-                retry_after_header=context.http_response.headers.get('retry-after'),
-            )
+            self._raise_for_session_blocked_status_code(context.session, status_code)
         self._raise_for_error_status_code(status_code)
         yield context
 
