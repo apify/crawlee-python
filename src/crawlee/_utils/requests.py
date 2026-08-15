@@ -17,10 +17,11 @@ def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:
     """Normalize a URL.
 
     This function cleans and standardizes a URL by removing leading and trailing whitespaces,
-    converting the scheme and netloc to lower case, stripping unwanted tracking parameters
+    converting the scheme and host to lower case, stripping unwanted tracking parameters
     (specifically those beginning with 'utm_'), sorting the remaining query parameters alphabetically,
-    and optionally retaining the URL fragment. The goal is to ensure that URLs that are functionally
-    identical but differ in trivial ways (such as parameter order or casing) are treated as the same.
+    and optionally retaining the URL fragment. Per RFC 3986 only the scheme and host are
+    case-insensitive: the path, query, and fragment keep their original casing, so case-distinct
+    pages are not silently deduplicated.
 
     Args:
         url: The URL to be normalized.
@@ -29,7 +30,8 @@ def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:
     Returns:
         A string containing the normalized URL.
     """
-    # Parse the URL
+    # Parse the URL. yarl already lowercases the scheme and host per RFC 3986 while
+    # preserving the casing of the path, query, and fragment.
     parsed_url = URL(url.strip())
 
     # Remove any 'utm_' parameters
@@ -44,7 +46,7 @@ def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:
         yarl_new_url.path.removesuffix('/'), keep_query=True, keep_fragment=keep_url_fragment
     )
 
-    return str(yarl_new_url).lower()
+    return str(yarl_new_url)
 
 
 def compute_unique_key(

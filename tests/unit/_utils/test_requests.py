@@ -15,27 +15,52 @@ from crawlee._utils.requests import compute_unique_key, normalize_url
             'http://example.com/?another_key=another_value&key=value',
             False,
         ),
-        ('HTTPS://EXAMPLE.COM/?KEY=VALUE', 'https://example.com/?key=value', False),
+        ('HTTPS://EXAMPLE.COM/?KEY=VALUE', 'https://example.com/?KEY=VALUE', False),
         ('', '', False),
         ('http://example.com/#fragment', 'http://example.com/#fragment', True),
         ('http://example.com/#fragment', 'http://example.com', False),
         ('  https://example.com/  ', 'https://example.com', False),
         ('http://example.com/?b=2&a=1', 'http://example.com/?a=1&b=2', False),
+        # RFC 3986: only the scheme and host are case-insensitive. Path, query,
+        # and fragment casing is significant and must survive normalization, so
+        # case-distinct pages are not silently deduplicated (#2008).
+        ('https://example.com/Product/ABC', 'https://example.com/Product/ABC', False),
+        ('https://example.com/Product/ABC/', 'https://example.com/Product/ABC', False),
+        ('https://example.com/?token=SeCrEt', 'https://example.com/?token=SeCrEt', False),
+        (
+            'https://example.com/Path?Token=SeCrEt#Frag',
+            'https://example.com/Path?Token=SeCrEt#Frag',
+            True,
+        ),
     ],
     ids=[
         'remove_utm_params',
         'retain_sort_non_utm_params',
-        'convert_scheme_netloc_to_lowercase',
+        'lowercase_scheme_and_host_only',
         'handle_empty_url',
         'retain_fragment',
         'remove_fragment',
         'trim_whitespace',
         'sort_query_params',
+        'preserve_path_case',
+        'preserve_path_case_with_trailing_slash',
+        'preserve_query_value_case',
+        'preserve_path_query_fragment_case',
     ],
 )
 def test_normalize_url(url: str, expected_output: str, *, keep_url_fragment: bool) -> None:
     output = normalize_url(url, keep_url_fragment=keep_url_fragment)
     assert output == expected_output
+
+
+def test_normalize_url_does_not_collapse_case_distinct_paths() -> None:
+    # Two URLs differing only in path casing must normalize to different URLs,
+    # so compute_unique_key does not silently deduplicate case-distinct pages.
+    upper = normalize_url('https://example.com/Product/ABC')
+    lower = normalize_url('https://example.com/product/abc')
+    assert upper != lower
+    assert upper == 'https://example.com/Product/ABC'
+    assert lower == 'https://example.com/product/abc'
 
 
 def test_compute_unique_key_basic() -> None:
