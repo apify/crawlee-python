@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, ClassVar, Literal, overload
+from typing import TYPE_CHECKING, Literal, overload
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
@@ -30,9 +30,6 @@ class Session:
     usage count, and expiration.
     """
 
-    _DEFAULT_BLOCKED_STATUS_CODES: ClassVar = [401, 403, 429]
-    """Default status codes that indicate a session is blocked."""
-
     def __init__(
         self,
         *,
@@ -46,7 +43,6 @@ class Session:
         max_usage_count: int = 50,
         error_score: float = 0.0,
         cookies: SessionCookies | CookieJar | dict[str, str] | list[CookieParam] | None = None,
-        blocked_status_codes: list | None = None,
     ) -> None:
         """Initialize a new instance.
 
@@ -61,7 +57,6 @@ class Session:
             max_usage_count: Maximum allowable uses of the session before it is considered expired.
             error_score: Current error score of the session.
             cookies: Cookies associated with the session.
-            blocked_status_codes: HTTP status codes that indicate a session should be blocked.
         """
         self._id = id or crypto_random_object_id(length=10)
         self._max_age = max_age
@@ -73,7 +68,6 @@ class Session:
         self._max_usage_count = max_usage_count
         self._error_score = error_score
         self._cookies = SessionCookies(cookies) or SessionCookies()
-        self._blocked_status_codes = set(blocked_status_codes or self._DEFAULT_BLOCKED_STATUS_CODES)
 
     @classmethod
     def from_model(cls, model: SessionModel) -> Session:
@@ -184,7 +178,6 @@ class Session:
             max_usage_count=self._max_usage_count,
             error_score=self._error_score,
             cookies=self._cookies.get_cookies_as_dicts(),
-            blocked_status_codes=list(self._blocked_status_codes),
         )
         if as_dict:
             return model.model_dump()
@@ -219,21 +212,3 @@ class Session:
         to use `mark_bad` method.
         """
         self._error_score += self._max_error_score
-
-    def is_blocked_status_code(
-        self,
-        *,
-        status_code: int,
-        ignore_http_error_status_codes: set[int] | None = None,
-    ) -> bool:
-        """Evaluate whether a session should be retired based on the received HTTP status code.
-
-        Args:
-            status_code: The HTTP status code received from a server response.
-            ignore_http_error_status_codes: Optional status codes to allow suppression of
-            codes from `blocked_status_codes`.
-
-        Returns:
-            True if the session should be retired, False otherwise.
-        """
-        return status_code in (self._blocked_status_codes - (ignore_http_error_status_codes or set()))

@@ -35,7 +35,6 @@ class SessionModel(BaseModel):
     max_usage_count: Annotated[int, Field(alias='maxUsageCount')]
     error_score: Annotated[float, Field(alias='errorScore')]
     cookies: Annotated[list[CookieParam], Field(alias='cookies')]
-    blocked_status_codes: Annotated[list[int], Field(alias='blockedStatusCodes')]
 
 
 class SessionPoolModel(BaseModel):

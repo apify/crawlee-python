@@ -21,7 +21,6 @@ def session() -> Session:
         max_usage_count=10,
         error_score=0.0,
         cookies={'cookie_key': 'cookie_value'},
-        blocked_status_codes=[401, 403, 429],
     )
 
 
@@ -103,20 +102,6 @@ def test_mark_bad_at_usage_limit_no_double_increment() -> None:
     session.mark_bad()
     assert session.usage_count == 5
     assert not session.is_usable
-
-
-def test_retire_on_blocked_status_code(session: Session) -> None:
-    """Test retiring the session based on specific HTTP status codes."""
-    status_code = 403
-    result = session.is_blocked_status_code(status_code=status_code)
-    assert result is True
-
-
-def test_not_retire_on_not_block_status_code(session: Session) -> None:
-    """Test that the session is not retired on a non-blocked status code."""
-    status_code = 200
-    result = session.is_blocked_status_code(status_code=status_code)
-    assert result is False
 
 
 def test_session_expiration() -> None:

@@ -17,7 +17,7 @@ from functools import partial
 from http import HTTPStatus
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, ParamSpec, cast
 from weakref import WeakKeyDictionary
 
 from cachetools import LRUCache
@@ -168,6 +168,12 @@ class _BasicCrawlerOptions(TypedDict):
     retry_on_blocked: NotRequired[bool]
     """If True, the crawler attempts to bypass bot protections automatically."""
 
+    blocked_status_codes: NotRequired[Iterable[int]]
+    """HTTP status codes that indicate the session should be retired/rotated.
+
+    The default is ``[401, 403, 429]``.
+    """
+
     concurrency_settings: NotRequired[ConcurrencySettings]
     """Settings to fine-tune concurrency levels."""
 
@@ -273,6 +279,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
     _request_handler_timeout_text = 'Request handler timed out after'
+    _DEFAULT_BLOCKED_STATUS_CODES: ClassVar = [401, 403, 429]
+    """Default status codes that indicate a session is blocked."""
     __next_id = 0
 
     def __init__(
@@ -292,6 +300,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         max_crawl_depth: int | None = None,
         use_session_pool: bool = True,
         retry_on_blocked: bool = True,
+        blocked_status_codes: Iterable[int] | None = None,
         additional_http_error_status_codes: Iterable[int] | None = None,
         ignore_http_error_status_codes: Iterable[int] | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
@@ -339,6 +348,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 from those requests. If not set, crawling continues without depth restrictions.
             use_session_pool: Enable the use of a session pool for managing sessions during crawling.
             retry_on_blocked: If True, the crawler attempts to bypass bot protections automatically.
+            blocked_status_codes: HTTP status codes that indicate the session should be retired.
+                Defaults to ``[401, 403, 429]``.
             additional_http_error_status_codes: Additional HTTP status codes to treat as errors,
                 triggering automatic retries when encountered.
             ignore_http_error_status_codes: HTTP status codes that are typically considered errors but should be treated
@@ -403,6 +414,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._ignore_http_error_status_codes = (
             set(ignore_http_error_status_codes) if ignore_http_error_status_codes else set()
         )
+        self._blocked_status_codes = set(blocked_status_codes or self._DEFAULT_BLOCKED_STATUS_CODES)
 
         self._http_client = http_client or ImpitHttpClient()
 
@@ -1664,10 +1676,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     level=logging.WARNING,
                 )
 
-        if session is not None and session.is_blocked_status_code(
-            status_code=status_code,
-            ignore_http_error_status_codes=self._ignore_http_error_status_codes,
-        ):
+        if session is not None and status_code in (self._blocked_status_codes - self._ignore_http_error_status_codes):
             raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
     def _check_request_collision(self, request: Request, session: Session | None) -> None:

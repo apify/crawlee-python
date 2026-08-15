@@ -4,7 +4,6 @@ import json
 from crawlee import HttpHeaders
 from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
 from crawlee.errors import HttpStatusCodeError
-from crawlee.sessions import SessionPool
 
 # Using a placeholder refresh token for this example
 REFRESH_TOKEN = 'PLACEHOLDER'
@@ -15,7 +14,7 @@ async def main() -> None:
     crawler = HttpCrawler(
         max_request_retries=2,
         # Only treat 403 as a blocking status code, not 401
-        session_pool=SessionPool(create_session_settings={'blocked_status_codes': [403]}),
+        blocked_status_codes=[403],
         # Don't treat 401 responses as errors
         ignore_http_error_status_codes=[UNAUTHORIZED_CODE],
     )

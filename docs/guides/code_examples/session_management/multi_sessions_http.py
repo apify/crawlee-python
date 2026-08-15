@@ -21,7 +21,6 @@ def create_session_function() -> Callable[[], Session]:
             max_usage_count=999_999,
             max_age=timedelta(hours=999_999),
             max_error_score=100,
-            blocked_status_codes=[403],
         )
 
     return create_session
@@ -33,6 +32,8 @@ async def main() -> None:
         concurrency_settings=ConcurrencySettings(max_tasks_per_minute=500),
         # Requests are bound to specific sessions, no rotation needed
         max_session_rotations=0,
+        # A 403 status usually indicates we're already blocked; retire the session
+        blocked_status_codes=[403],
         session_pool=SessionPool(
             max_pool_size=10, create_session_function=create_session_function()
         ),

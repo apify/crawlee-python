@@ -13,6 +13,8 @@ async def main() -> None:
         concurrency_settings=ConcurrencySettings(max_tasks_per_minute=50),
         # Disable session rotation
         max_session_rotations=0,
+        # A 403 status usually indicates we're already blocked; retire the session
+        blocked_status_codes=[403],
         session_pool=SessionPool(
             # Only one session in the pool
             max_pool_size=1,
@@ -25,8 +27,6 @@ async def main() -> None:
                 # before crawlee decides the session is blocked
                 # Make sure you know how to handle these errors
                 'max_error_score': 100,
-                # 403 status usually indicates you're already blocked
-                'blocked_status_codes': [403],
             },
         ),
     )

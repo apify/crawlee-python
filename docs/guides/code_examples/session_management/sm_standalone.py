@@ -7,7 +7,7 @@ async def main() -> None:
     # Override the default Session pool configuration.
     async with SessionPool(
         max_pool_size=100,
-        create_session_settings={'max_usage_count': 10, 'blocked_status_codes': [403]},
+        create_session_settings={'max_usage_count': 10},
     ) as session_pool:
         session = await session_pool.get_session()
 

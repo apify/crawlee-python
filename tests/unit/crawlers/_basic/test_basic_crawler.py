@@ -2460,6 +2460,45 @@ async def test_global_and_local_event_manager_in_crawler_run() -> None:
     assert global_event_manager.active is False
 
 
+async def test_blocked_status_codes_default() -> None:
+    """The crawler defaults to the canonical [401, 403, 429] blocked status codes."""
+    crawler = BasicCrawler()
+    assert crawler._blocked_status_codes == {401, 403, 429}
+
+    custom = BasicCrawler(blocked_status_codes=[403, 451])
+    assert custom._blocked_status_codes == {403, 451}
+
+
+async def test_blocked_status_codes_retire_session_on_matching_response() -> None:
+    """A custom `blocked_status_codes` value raises SessionError on a matching response."""
+
+    crawler = BasicCrawler(blocked_status_codes=[418])
+    session = Session(id='test_session')
+
+    # 418 is not blocked by default, but is with the custom config.
+    with pytest.raises(SessionError):
+        crawler._raise_for_session_blocked_status_code(session, 418, request_url='https://crawlee.dev/')
+
+    crawler_default = BasicCrawler()
+    with pytest.raises(SessionError):
+        crawler_default._raise_for_session_blocked_status_code(session, 403, request_url='https://crawlee.dev/')
+
+    # No session -> no check performed.
+    crawler._raise_for_session_blocked_status_code(None, 418, request_url='https://crawlee.dev/')
+
+
+async def test_blocked_status_codes_respect_ignore_http_error_codes() -> None:
+    """Codes in `ignore_http_error_status_codes` are excluded from the blocked set."""
+
+    crawler = BasicCrawler(blocked_status_codes=[401, 403], ignore_http_error_status_codes=[401])
+    session = Session(id='test_session')
+
+    # 401 is ignored -> no SessionError; 403 still blocks.
+    crawler._raise_for_session_blocked_status_code(session, 401, request_url='https://crawlee.dev/')
+    with pytest.raises(SessionError):
+        crawler._raise_for_session_blocked_status_code(session, 403, request_url='https://crawlee.dev/')
+
+
 async def test_warn_no_throttling_manager_once_on_429(caplog: pytest.LogCaptureFixture) -> None:
     """A 429 from a crawler without ThrottlingRequestManager logs a recommendation, only once per instance."""
     crawler = BasicCrawler(configure_logging=False)
