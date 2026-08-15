@@ -523,6 +523,25 @@ async def test_send_request_works(server_url: URL, method: HttpMethod, path: str
     assert content_type == 'application/json'
 
 
+async def test_send_request_respects_timeout(server_url: URL) -> None:
+    request_timed_out = asyncio.Event()
+
+    crawler = BasicCrawler(max_request_retries=3)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        with pytest.raises(asyncio.TimeoutError):
+            await context.send_request(
+                str(server_url / 'slow') + '?delay=2',
+                timeout=timedelta(milliseconds=100),
+            )
+        request_timed_out.set()
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    assert request_timed_out.is_set()
+
+
 @dataclass
 class AddRequestsTestInput:
     start_url: str
