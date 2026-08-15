@@ -321,6 +321,37 @@ async def test_sitemap_from_string() -> None:
     assert set(sitemap.urls) == get_basic_results()
 
 
+async def test_sitemap_from_string_keeps_same_host_with_sitemap_url() -> None:
+    """URLs on the sitemap's own host survive the default `same-hostname` filter."""
+    sitemap = await Sitemap.from_xml_string(
+        get_basic_sitemap(),
+        sitemap_url=f'{DEFAULT_URL}sitemap.xml',
+    )
+
+    assert set(sitemap.urls) == get_basic_results()
+
+
+async def test_sitemap_from_string_filters_cross_host_with_sitemap_url() -> None:
+    """`from_xml_string` opts into host filtering when `sitemap_url` is given."""
+    sitemap = await Sitemap.from_xml_string(
+        get_basic_sitemap(url='https://other.com/'),
+        sitemap_url=f'{DEFAULT_URL}sitemap.xml',
+    )
+
+    assert sitemap.urls == []
+
+
+async def test_sitemap_from_string_allows_cross_host_with_strategy_all() -> None:
+    """`enqueue_strategy='all'` disables host filtering for raw string sitemaps too."""
+    sitemap = await Sitemap.from_xml_string(
+        get_basic_sitemap(url='https://other.com/'),
+        sitemap_url=f'{DEFAULT_URL}sitemap.xml',
+        parse_sitemap_options={'enqueue_strategy': 'all'},
+    )
+
+    assert set(sitemap.urls) == get_basic_results('https://other.com/')
+
+
 async def test_malformed_sitemap_keeps_urls() -> None:
     """A parse error must not discard the URLs collected before it."""
     malformed = (

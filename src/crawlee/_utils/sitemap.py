@@ -496,8 +496,17 @@ class Sitemap:
         )
 
     @classmethod
-    async def from_xml_string(cls, content: str) -> Sitemap:
-        return await cls.parse([SitemapSource(type='raw', content=content)])
+    async def from_xml_string(
+        cls,
+        content: str,
+        *,
+        sitemap_url: str | None = None,
+        parse_sitemap_options: ParseSitemapOptions | None = None,
+    ) -> Sitemap:
+        source: SitemapSource = {'type': 'raw', 'content': content}
+        if sitemap_url is not None:
+            source['url'] = sitemap_url
+        return await cls.parse([source], parse_sitemap_options=parse_sitemap_options)
 
     @classmethod
     async def parse(
