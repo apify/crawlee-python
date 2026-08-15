@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import sys
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from async_timeout import Timeout, timeout
+if sys.version_info >= (3, 11):
+    # `asyncio.timeout` was added in Python 3.11 and is the recommended replacement
+    # for the deprecated `async-timeout` package (#2052).
+    from asyncio import Timeout, timeout
+else:
+    # Python 3.10: `async-timeout` is the official backport of the same API.
+    from async_timeout import Timeout, timeout
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

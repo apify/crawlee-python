@@ -34,7 +34,8 @@ keywords = [
     "scraping",
 ]
 dependencies = [
-    "async-timeout>=5.0.1",
+    # Only needed for Python 3.10; 3.11+ uses stdlib `asyncio.timeout` (#2052).
+    "async-timeout>=5.0.1; python_version < '3.11'",
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
     "impit>=0.8.0",
