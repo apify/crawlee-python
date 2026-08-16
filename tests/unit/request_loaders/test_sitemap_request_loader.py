@@ -1,5 +1,6 @@
 import base64
 import gzip
+import re
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -359,6 +360,30 @@ async def test_sitemap_loader_filters_cross_host_urls(server_url: URL, http_clie
             await loader.mark_request_as_handled(request)
 
     assert fetched == [same_host_url]
+
+
+async def test_sitemap_loader_regex_patterns_are_unanchored(server_url: URL, http_client: HttpClient) -> None:
+    """Regex `include`/`exclude` patterns match anywhere in the URL, like `url.match` in crawlee-js."""
+    kept_url = str(server_url / 'catalog/page')
+    filtered_url = str(server_url / 'archive/page')
+    sitemap_content = _make_urlset([kept_url, filtered_url])
+    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(sitemap_content.encode()))
+
+    loader = SitemapRequestLoader(
+        [str(sitemap_url)],
+        http_client=http_client,
+        include=[re.compile(r'/catalog/')],
+        exclude=[re.compile(r'/archive/')],
+    )
+
+    fetched: list[str] = []
+    while not await loader.is_finished():
+        request = await loader.fetch_next_request()
+        if request is not None:
+            fetched.append(request.url)
+            await loader.mark_request_as_handled(request)
+
+    assert fetched == [kept_url]
 
 
 async def test_sitemap_loader_filters_cross_host_nested_sitemap(server_url: URL, http_client: HttpClient) -> None:

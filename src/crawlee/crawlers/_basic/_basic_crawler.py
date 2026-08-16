@@ -1075,8 +1075,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     def _enqueue_links_filter_iterator(
         self, request_iterator: Iterator[TRequestIterator], origin_url: str, **kwargs: Unpack[EnqueueLinksKwargs]
     ) -> Iterator[TRequestIterator]:
-        """Filter requests based on the enqueue strategy and URL patterns."""
-        limit = kwargs.get('limit')
+        """Filter requests based on the enqueue strategy and URL patterns.
+
+        The `limit` kwarg is intentionally not applied here - it counts enqueued requests, so it is
+        enforced after `transform_request_function` (and any other pre-enqueue skipping) runs, aligned
+        with crawlee-js, where the limit is applied to the final request list.
+        """
         parsed_origin_url = URL(origin_url)
         strategy = kwargs.get('strategy', 'all')
 
@@ -1113,24 +1117,22 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             if self._check_url_patterns(target_url, kwargs.get('include'), kwargs.get('exclude')):
                 yield request
 
-                if limit is not None:
-                    limit -= 1
-                    if limit <= 0:
-                        break
-
     def _check_url_patterns(
         self,
         target_url: str,
         include: Sequence[re.Pattern[Any] | Glob] | None,
         exclude: Sequence[re.Pattern[Any] | Glob] | None,
     ) -> bool:
-        """Check if a URL matches configured include/exclude patterns."""
+        """Check if a URL matches configured include/exclude patterns.
+
+        Patterns are matched with `search` (unanchored), aligned with crawlee-js (`regexp.test`).
+        """
         # If the URL matches any `exclude` pattern, reject it
         for pattern in exclude or ():
             if isinstance(pattern, Glob):
                 pattern = pattern.regexp  # noqa: PLW2901
 
-            if pattern.match(target_url) is not None:
+            if pattern.search(target_url) is not None:
                 return False
 
         # If there are no `include` patterns and the URL passed all `exclude` patterns, accept the URL
@@ -1142,7 +1144,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             if isinstance(pattern, Glob):
                 pattern = pattern.regexp  # noqa: PLW2901
 
-            if pattern.match(target_url) is not None:
+            if pattern.search(target_url) is not None:
                 return True
 
         # The URL does not match any `include` pattern - reject it
@@ -1377,6 +1379,20 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             if self._max_crawl_depth is None or dst_request.crawl_depth <= self._max_crawl_depth:
                 context_aware_requests.append(dst_request)
+
+        # The `limit` counts requests actually enqueued (i.e. newly added to the request manager), so it is
+        # applied as the last step, after all filters and `transform_request_function` skipping, aligned with
+        # crawlee-js, where the budget is decremented only for requests that were not in the queue already.
+        limit = kwargs.get('limit')
+        if limit is not None:
+            remaining_budget = limit
+            for dst_request in context_aware_requests:
+                if remaining_budget <= 0:
+                    break
+                processed_request = await request_manager.add_request(dst_request)
+                if processed_request is not None and not processed_request.was_already_present:
+                    remaining_budget -= 1
+            return None
 
         return await request_manager.add_requests(context_aware_requests)
 

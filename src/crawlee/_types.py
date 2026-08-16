@@ -168,10 +168,16 @@ class EnqueueLinksKwargs(TypedDict):
     """
 
     include: NotRequired[Sequence[re.Pattern | Glob]]
-    """List of regular expressions or globs that URLs must match to be enqueued."""
+    """List of regular expressions or globs that URLs must match to be enqueued.
+
+    Regexes match anywhere in the URL and globs are case-insensitive, aligned with crawlee-js.
+    """
 
     exclude: NotRequired[Sequence[re.Pattern | Glob]]
-    """List of regular expressions or globs that URLs must not match to be enqueued."""
+    """List of regular expressions or globs that URLs must not match to be enqueued.
+
+    Regexes match anywhere in the URL and globs are case-insensitive, aligned with crawlee-js.
+    """
 
 
 class AddRequestsKwargs(EnqueueLinksKwargs):

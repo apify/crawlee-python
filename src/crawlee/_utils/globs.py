@@ -9,11 +9,16 @@ if TYPE_CHECKING:
 
 
 class Glob:
-    """Wraps a glob pattern (supports the `*`, `**`, `?` wildcards)."""
+    """Wraps a glob pattern (supports the `*`, `**`, `?` wildcards).
+
+    Matching is case-insensitive, aligned with crawlee-js (`Minimatch` with `nocase: true`).
+    """
 
     def __init__(self, glob: str) -> None:
         self.glob = glob
-        self.regexp = re.compile(_translate(self.glob, recursive=True))
+        # `re.IGNORECASE` mirrors Minimatch's `nocase: true`. The `\A` anchor keeps the pattern a
+        # full-string match, so `search()` (like JS `regexp.test`) cannot match a substring only.
+        self.regexp = re.compile(rf'\A{_translate(self.glob, recursive=True)}', re.IGNORECASE)
 
 
 def _translate(

@@ -703,6 +703,36 @@ INCLUDE_TEST_URLS = (
             ),
             id='include_exclude_3',
         ),
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=INCLUDE_TEST_URLS[0],
+                loaded_url=INCLUDE_TEST_URLS[0],
+                requests=INCLUDE_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(include=[Glob('https://SOMEPLACE.com/**/cats')]),
+                expected_urls=[INCLUDE_TEST_URLS[1], INCLUDE_TEST_URLS[4]],
+            ),
+            id='include_glob_case_insensitive',
+        ),
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=INCLUDE_TEST_URLS[0],
+                loaded_url=INCLUDE_TEST_URLS[0],
+                requests=INCLUDE_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(include=[re.compile(r'/category/cats')]),
+                expected_urls=[INCLUDE_TEST_URLS[1]],
+            ),
+            id='include_regex_unanchored',
+        ),
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=INCLUDE_TEST_URLS[0],
+                loaded_url=INCLUDE_TEST_URLS[0],
+                requests=INCLUDE_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(exclude=[re.compile(r'/archive/')]),
+                expected_urls=[INCLUDE_TEST_URLS[1], INCLUDE_TEST_URLS[2]],
+            ),
+            id='exclude_regex_unanchored',
+        ),
     ],
 )
 async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:
@@ -727,6 +757,46 @@ async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:
 
     visited = {call[0][0] for call in visit.call_args_list}
     assert visited == set(test_input.expected_urls)
+
+
+async def test_add_requests_limit_skips_duplicates_before_counting() -> None:
+    """`limit` counts only requests newly added to the request manager, not duplicate candidates.
+
+    Requests already present in the queue must not consume the limit, so unique requests later in
+    the list are still enqueued (aligned with crawlee-js, where the budget is decremented only for
+    requests that were not already in the queue).
+    """
+    visited = Mock()
+
+    crawler = BasicCrawler()
+
+    @crawler.router.handler('start')
+    async def start_handler(context: BasicCrawlingContext) -> None:
+        await context.add_requests(['https://someplace.com/first'])
+        # The list contains the URL enqueued above (already in the queue), a duplicate of it, and
+        # two new ones. With `limit=2` the two new URLs must both be enqueued.
+        await context.add_requests(
+            [
+                'https://someplace.com/first',
+                'https://someplace.com/first',
+                'https://someplace.com/second',
+                'https://someplace.com/third',
+            ],
+            limit=2,
+        )
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited(context.request.url)
+
+    await crawler.run([Request.from_url('https://someplace.com/', label='start')])
+
+    visited_urls = {call[0][0] for call in visited.call_args_list}
+    assert visited_urls == {
+        'https://someplace.com/first',
+        'https://someplace.com/second',
+        'https://someplace.com/third',
+    }
 
 
 async def test_session_rotation(server_url: URL) -> None:

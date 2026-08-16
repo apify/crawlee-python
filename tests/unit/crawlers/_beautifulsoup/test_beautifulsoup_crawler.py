@@ -171,6 +171,31 @@ async def test_enqueue_links_with_transform_request_function(server_url: URL, ht
     assert headers[3]['transform-header'] == 'my-header'
 
 
+async def test_enqueue_links_limit_counts_enqueued_requests(server_url: URL, http_client: HttpClient) -> None:
+    crawler = BeautifulSoupCrawler(http_client=http_client)
+    visited: list[str] = []
+
+    def transform_skip_two(
+        request_options: RequestOptions,
+    ) -> RequestOptions | RequestTransformAction:
+        if 'page_2' in request_options['url'] or 'page_3' in request_options['url']:
+            return 'skip'
+        return request_options
+
+    @crawler.router.default_handler
+    async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
+        visited.append(context.request.url)
+        if 'sub_index' in context.request.url:
+            # `/sub_index` links to `/page_3`, `/page_2` and `/base_page`. The transform skips
+            # the first two, so with `limit=2` the remaining `/base_page` must still be enqueued -
+            # the limit counts enqueued requests, not extracted ones (aligned with crawlee-js).
+            await context.enqueue_links(transform_request_function=transform_skip_two, limit=2)
+
+    await crawler.run([str(server_url / 'sub_index')])
+
+    assert str(server_url / 'base_page') in visited
+
+
 async def test_handle_blocked_request(server_url: URL, http_client: HttpClient) -> None:
     crawler = BeautifulSoupCrawler(max_session_rotations=1, http_client=http_client)
     stats = await crawler.run([str(server_url / 'incapsula')])

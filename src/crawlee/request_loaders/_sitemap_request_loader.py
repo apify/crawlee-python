@@ -326,13 +326,16 @@ class SitemapRequestLoader(RequestLoader):
         include: Sequence[re.Pattern[Any] | Glob] | None,
         exclude: Sequence[re.Pattern[Any] | Glob] | None,
     ) -> bool:
-        """Check if a URL matches configured include/exclude patterns."""
+        """Check if a URL matches configured include/exclude patterns.
+
+        Patterns are matched with `search` (unanchored), aligned with crawlee-js (`url.match`).
+        """
         # If the URL matches any `exclude` pattern, reject it
         for pattern in exclude or ():
             if isinstance(pattern, Glob):
                 pattern = pattern.regexp  # noqa: PLW2901
 
-            if pattern.match(target_url) is not None:
+            if pattern.search(target_url) is not None:
                 return False
 
         # If there are no `include` patterns and the URL passed all `exclude` patterns, accept the URL
@@ -344,7 +347,7 @@ class SitemapRequestLoader(RequestLoader):
             if isinstance(pattern, Glob):
                 pattern = pattern.regexp  # noqa: PLW2901
 
-            if pattern.match(target_url) is not None:
+            if pattern.search(target_url) is not None:
                 return True
 
         # The URL does not match any `include` pattern - reject it
