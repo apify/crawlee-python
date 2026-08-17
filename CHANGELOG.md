@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.9.2 - **not yet released**
+## [1.9.2](https://github.com/apify/crawlee-python/releases/tag/v1.9.2) (2026-08-17)
 
 ### 🐛 Bug Fixes
 
@@ -11,9 +10,13 @@ All notable changes to this project will be documented in this file.
 - **dataset:** Preserve push_data compatibility with the released Apify SDK ([#2152](https://github.com/apify/crawlee-python/pull/2152)) ([091410f](https://github.com/apify/crawlee-python/commit/091410f36cec8ef795d29b6d89428069525a4dbf)) by [@vdusek](https://github.com/vdusek)
 - **stagehand:** Cap the stagehand dependency below the breaking 4.x API ([#2153](https://github.com/apify/crawlee-python/pull/2153)) ([263fff4](https://github.com/apify/crawlee-python/commit/263fff4a1f279098dc6026f45646c278891cb53d)) by [@vdusek](https://github.com/vdusek)
 - **sitemaps:** Validate HTTP status when fetching sitemaps ([#2123](https://github.com/apify/crawlee-python/pull/2123)) ([c5c1072](https://github.com/apify/crawlee-python/commit/c5c1072776e243b38f1448d3156759e864867cca)) by [@anxkhn](https://github.com/anxkhn)
+- **browsers:** Do not close a browser as inactive while a page opening is in flight ([#2156](https://github.com/apify/crawlee-python/pull/2156)) ([3485535](https://github.com/apify/crawlee-python/commit/3485535749ae5b6075e87860bc82304c483aad21)) by [@vdusek](https://github.com/vdusek)
+
+### ⚡ Performance
+
+- **impit:** Optimize client and connection reuse across Sessions ([#2140](https://github.com/apify/crawlee-python/pull/2140)) ([cd7ab2b](https://github.com/apify/crawlee-python/commit/cd7ab2b7020f0d6d0c7091db6ca1729bd0883f0f)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.9.1](https://github.com/apify/crawlee-python/releases/tag/v1.9.1) (2026-08-06)
 
 ### 🐛 Bug Fixes
