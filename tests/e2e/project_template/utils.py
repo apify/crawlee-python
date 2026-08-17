@@ -1,6 +1,5 @@
 import re
 import shutil
-import subprocess
 from pathlib import Path
 from typing import Literal
 
@@ -68,36 +67,33 @@ def _patch_crawlee_version_in_pyproject_toml_based_project(project_path: Path, w
     with dockerfile_path.open() as f:
         modified_lines = []
         for line in f:
-            modified_lines.append(line)
-            if line.startswith('COPY pyproject.toml'):
-                if 'uv.lock' in line:
-                    package_manager = 'uv'
-                elif 'poetry.lock' in line:
-                    package_manager = 'poetry'
-                else:
-                    raise RuntimeError('This does not look like a uv or poetry based project.')
+            if not line.startswith('COPY pyproject.toml'):
+                modified_lines.append(line)
+                continue
 
-                # Create lock file that is expected by the docker to exist (even though it will be patched
-                # in the docker).
-                subprocess.run(  # noqa: S603
-                    args=[package_manager, 'lock'],
-                    cwd=str(project_path),
-                    check=True,
-                    capture_output=True,
-                )
+            if 'uv.lock' in line:
+                package_manager = 'uv'
+            elif 'poetry.lock' in line:
+                package_manager = 'poetry'
+            else:
+                raise RuntimeError('This does not look like a uv or poetry based project.')
 
-                # Add command to copy .whl to the docker image and update project with it.
-                # Patching in docker file due to the poetry not properly supporting relative paths for wheel packages
-                # and so the absolute path (in the container) is generated when running `add` command in the container.
-                modified_lines.extend(
-                    [
-                        f'COPY {wheel_path.name} ./\n',
-                        # If no crawlee version bump, poetry might be lazy and take existing pre-installed crawlee
-                        # version, make sure that one is patched as well.
-                        f'RUN pip install ./{wheel_path.name}{crawlee_extras} --force-reinstall\n',
-                        f'RUN {package_manager} add ./{wheel_path.name}{crawlee_extras}\n',
-                        f'RUN {package_manager} lock\n',
-                    ]
-                )
+            # Copy only `pyproject.toml`. The generated project has no lock file, and the `add` and `lock`
+            # commands appended below create one in the image anyway.
+            modified_lines.append('COPY pyproject.toml ./\n')
+
+            # Add command to copy .whl to the docker image and update project with it.
+            # Patching in docker file due to the poetry not properly supporting relative paths for wheel packages
+            # and so the absolute path (in the container) is generated when running `add` command in the container.
+            modified_lines.extend(
+                [
+                    f'COPY {wheel_path.name} ./\n',
+                    # If no crawlee version bump, poetry might be lazy and take existing pre-installed crawlee
+                    # version, make sure that one is patched as well.
+                    f'RUN pip install ./{wheel_path.name}{crawlee_extras} --force-reinstall\n',
+                    f'RUN {package_manager} add ./{wheel_path.name}{crawlee_extras}\n',
+                    f'RUN {package_manager} lock\n',
+                ]
+            )
     with dockerfile_path.open('w') as f:
         f.write(''.join(modified_lines))
