@@ -9,6 +9,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from hashlib import sha256
+from http import HTTPStatus
 from logging import getLogger
 from typing import TYPE_CHECKING, Literal, TypedDict
 from xml.sax import SAXParseException
@@ -19,7 +20,7 @@ from typing_extensions import NotRequired, override
 from yarl import URL
 
 from crawlee._utils.urls import filter_url
-from crawlee._utils.web import is_status_code_successful
+from crawlee._utils.web import is_status_code_server_error, is_status_code_successful
 from crawlee.errors import ProxyError
 
 if TYPE_CHECKING:
@@ -45,6 +46,31 @@ CONTENT_CHUNK_SIZE = 1024 * 1024
 
 DEFAULT_MAX_DEPTH = 10
 """Default maximum depth of nested sitemaps to follow, guarding against malicious infinite sitemap chains."""
+
+SITEMAP_RETRY_DELAY = 1
+"""Seconds to wait before retrying a failed sitemap fetch."""
+
+
+def _is_successful_sitemap_status(status_code: int) -> bool:
+    """Return whether a sitemap response status is a successful 2xx."""
+    return HTTPStatus.OK <= status_code < HTTPStatus.MULTIPLE_CHOICES
+
+
+class _RetryableSitemapStatusError(Exception):
+    """Internal signal that a sitemap fetch returned a retryable HTTP status.
+
+    Raised inside the response context manager so the stream is closed before the retry delay.
+    """
+
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f'HTTP status {status_code}')
+        self.status_code = status_code
+
+
+def _raise_for_retryable_sitemap_status(status_code: int) -> None:
+    """Raise `_RetryableSitemapStatusError` for HTTP statuses that warrant a fetch retry (408 and 5xx)."""
+    if status_code == HTTPStatus.REQUEST_TIMEOUT or is_status_code_server_error(status_code):
+        raise _RetryableSitemapStatusError(status_code)
 
 
 @dataclass()
@@ -201,15 +227,19 @@ class _XmlSitemapParser:
     async def flush(self) -> AsyncGenerator[_SitemapItem, None]:
         """Process any remaining data in the buffer, yielding items one by one."""
         try:
-            self._parser.flush()
+            # `ExpatParser.flush` isn't part of the `IncrementalParser` interface and is missing before CPython
+            # 3.10.14, 3.11.9 and 3.12.3, whose bundled expat predates reparse deferral, so nothing stays buffered.
+            if (flush := getattr(self._parser, 'flush', None)) is not None:
+                flush()
 
+        except Exception as e:
+            logger.warning(f'Failed to parse remaining XML data: {e}')
+
+        finally:
             for item in self._handler.items:
                 yield item
 
             self._handler.items.clear()
-
-        except Exception as e:
-            logger.warning(f'Failed to parse remaining XML data: {e}')
 
     def close(self) -> None:
         """Clean up resources."""
@@ -359,6 +389,7 @@ async def _fetch_and_process_sitemap(
     timeout: timedelta | None = None,
     emit_nested_sitemaps: bool,
     enqueue_strategy: EnqueueStrategy,
+    parsed_ok: list[bool],
 ) -> AsyncGenerator[SitemapUrl | NestedSitemap, None]:
     """Fetch a sitemap from a URL and process its content."""
     if 'url' not in source:
@@ -372,6 +403,13 @@ async def _fetch_and_process_sitemap(
             async with http_client.stream(
                 sitemap_url, method='GET', headers=SITEMAP_HEADERS, proxy_info=proxy_info, timeout=timeout
             ) as response:
+                status_code = response.status_code
+                if not _is_successful_sitemap_status(status_code):
+                    # Retryable statuses raise and route to the retry handler below; the rest skip this source.
+                    _raise_for_retryable_sitemap_status(status_code)
+                    logger.warning(f'Skipping sitemap {sitemap_url} due to HTTP status code {status_code}.')
+                    return
+
                 # Determine content type and compression
                 content_type = response.headers.get('content-type', '')
 
@@ -452,15 +490,25 @@ async def _fetch_and_process_sitemap(
                                 yield result
                 finally:
                     parser.close()
-            break
+            parsed_ok.append(True)
 
+        except _RetryableSitemapStatusError as e:
+            if retries_left > 0:
+                logger.warning(
+                    f'Error fetching sitemap {sitemap_url}: HTTP status {e.status_code}. Retries left: {retries_left}'
+                )
+                await asyncio.sleep(SITEMAP_RETRY_DELAY)
+            else:
+                logger.warning(f'Failed to fetch sitemap {sitemap_url}, no retries left: HTTP status {e.status_code}.')
         except Exception as e:
             if retries_left > 0:
                 logger.warning(f'Error fetching sitemap {sitemap_url}: {e}. Retries left: {retries_left}')
-                await asyncio.sleep(1)  # Brief pause before retry
+                await asyncio.sleep(SITEMAP_RETRY_DELAY)
             else:
                 logger.exception(f'Failed to fetch sitemap {sitemap_url}, no retries left.')
                 raise
+        else:
+            return
 
 
 class Sitemap:
@@ -521,6 +569,10 @@ async def parse_sitemap(
 
     Default `ParseSitemapOptions.enqueue_strategy` is `same-hostname` which will skip cross-host URLs.
     Use strategy `all` to process all links.
+
+    URL sources answering with a non-2xx status are skipped: retryable statuses (408 and 5xx) are retried first,
+    others are skipped immediately. If at least one source fails with a fetch error after all retries and no source
+    succeeds, the first such error is raised once all sources have been processed.
     """
     # Set default options
     options = options or {}
@@ -533,6 +585,8 @@ async def parse_sitemap(
     # Setup working state
     sources = list(initial_sources)
     visited_sitemap_urls: set[str] = set()
+    successful_sources = 0
+    source_errors: list[Exception] = []
 
     # Process sources until the queue is empty
     while sources:
@@ -555,6 +609,8 @@ async def parse_sitemap(
                 enqueue_strategy=enqueue_strategy,
             ):
                 yield result
+            # Raw sources cannot fetch-fail, so they always count as successful for the all-sources-failed check.
+            successful_sources += 1
 
         elif source['type'] == 'url' and 'url' in source:
             # Add to visited set before processing to avoid duplicates
@@ -562,22 +618,33 @@ async def parse_sitemap(
                 raise RuntimeError('HttpClient must be provided for URL-based sitemap sources.')
 
             visited_sitemap_urls.add(source['url'])
+            parsed_ok: list[bool] = []
 
-            async for result in _fetch_and_process_sitemap(
-                http_client=http_client,
-                source=source,
-                depth=depth,
-                visited_sitemap_urls=visited_sitemap_urls,
-                sources=sources,
-                retries_left=sitemap_retries,
-                emit_nested_sitemaps=emit_nested_sitemaps,
-                enqueue_strategy=enqueue_strategy,
-                proxy_info=proxy_info,
-                timeout=timeout,
-            ):
-                yield result
+            try:
+                async for result in _fetch_and_process_sitemap(
+                    http_client=http_client,
+                    source=source,
+                    depth=depth,
+                    visited_sitemap_urls=visited_sitemap_urls,
+                    sources=sources,
+                    retries_left=sitemap_retries,
+                    emit_nested_sitemaps=emit_nested_sitemaps,
+                    enqueue_strategy=enqueue_strategy,
+                    proxy_info=proxy_info,
+                    timeout=timeout,
+                    parsed_ok=parsed_ok,
+                ):
+                    yield result
+                if parsed_ok:
+                    successful_sources += 1
+            except Exception as e:
+                # Already logged by `_fetch_and_process_sitemap`; raised below only if no source succeeds.
+                source_errors.append(e)
         else:
             logger.warning(f'Invalid source configuration: {source}')
+
+    if source_errors and successful_sources == 0:
+        raise source_errors[0]
 
 
 async def _merge_async_generators(*generators: AsyncGenerator) -> AsyncGenerator:
