@@ -49,10 +49,10 @@ jobs:
     outputs:
       version_number: ${{ steps.release_prepare.outputs.version_number }}
       tag_name: ${{ steps.release_prepare.outputs.tag_name }}
-      changelog: ${{ steps.release_prepare.outputs.changelog }}
       release_notes: ${{ steps.release_prepare.outputs.release_notes }}
+      changelog_artifact_name: ${{ steps.release_prepare.outputs.changelog_artifact_name }}
     steps:
-      - uses: apify/actions/git-cliff-release@v1.4.0
+      - uses: apify/actions/git-cliff-release@v1.5.0
         name: Release prepare
         id: release_prepare
         with:
@@ -68,7 +68,7 @@ jobs:
     uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
     with:
       version_number: ${{ needs.release_prepare.outputs.version_number }}
-      changelog: ${{ needs.release_prepare.outputs.changelog }}
+      changelog_artifact_name: ${{ needs.release_prepare.outputs.changelog_artifact_name }}
     secrets: inherit
 
   github_release:

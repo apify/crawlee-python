@@ -35,9 +35,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version_number: ${{ steps.release_prepare.outputs.version_number }}
-      changelog: ${{ steps.release_prepare.outputs.changelog }}
+      changelog_artifact_name: ${{ steps.release_prepare.outputs.changelog_artifact_name }}
     steps:
-      - uses: apify/actions/git-cliff-release@v1.4.0
+      - uses: apify/actions/git-cliff-release@v1.5.0
         id: release_prepare
         name: Release prepare
         with:
@@ -52,7 +52,7 @@ jobs:
     uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
     with:
       version_number: ${{ needs.release_prepare.outputs.version_number }}
-      changelog: ${{ needs.release_prepare.outputs.changelog }}
+      changelog_artifact_name: ${{ needs.release_prepare.outputs.changelog_artifact_name }}
     secrets: inherit
 
   pypi_publish:
