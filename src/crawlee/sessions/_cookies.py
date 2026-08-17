@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from email.message import Message
 from http.cookiejar import Cookie, CookieJar
 from typing import TYPE_CHECKING, Any, Literal
+from urllib.request import Request as UrlRequest
 
 from typing_extensions import NotRequired, Required, TypedDict
 
@@ -11,6 +13,18 @@ from crawlee._utils.docs import docs_group
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from typing import TypeGuard
+
+
+class _SetCookieResponse:
+    """Minimal response adapter exposing `Set-Cookie` headers to `CookieJar.extract_cookies`."""
+
+    def __init__(self, set_cookie_headers: list[str]) -> None:
+        self._message = Message()
+        for header in set_cookie_headers:
+            self._message['Set-Cookie'] = header
+
+    def info(self) -> Message:
+        return self._message
 
 
 @docs_group('Session management')
@@ -215,6 +229,36 @@ class SessionCookies:
         """
         for cookie_dict in cookie_dicts:
             self.set(**cookie_dict)
+        self._jar.clear_expired_cookies()
+
+    def get_cookie_string(self, url: str) -> str:
+        """Build the value of the `Cookie` header for the given URL.
+
+        Only cookies matching the domain, path and security requirements of the URL are included.
+
+        Args:
+            url: The URL the header is built for.
+
+        Returns:
+            The `Cookie` header value, or an empty string if no stored cookie matches the URL.
+        """
+        # `UrlRequest` is only used as a carrier of the URL and headers for the jar, it never opens a connection.
+        url_request = UrlRequest(url)  # noqa: S310
+        self._jar.add_cookie_header(url_request)
+        return url_request.get_header('Cookie', '')
+
+    def extract_cookies_from_headers(self, url: str, set_cookie_headers: list[str]) -> None:
+        """Store cookies from the raw `Set-Cookie` headers of a response.
+
+        Attributes omitted from a header, such as domain and path, are derived from the URL. It must therefore be
+        the URL that produced the given headers, not the URL the request started from.
+
+        Args:
+            url: The URL of the response carrying the headers.
+            set_cookie_headers: Raw values of the `Set-Cookie` response headers.
+        """
+        response = _SetCookieResponse(set_cookie_headers)
+        self._jar.extract_cookies(response, UrlRequest(url))  # noqa: S310 # ty: ignore[invalid-argument-type]
         self._jar.clear_expired_cookies()
 
     def get_cookies_as_playwright_format(self) -> list[PlaywrightCookieParam]:

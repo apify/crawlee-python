@@ -4,18 +4,60 @@ import asyncio
 import inspect
 import sys
 import time
-from typing import TYPE_CHECKING, TypeVar, cast, overload
+from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from crawlee.http_clients._base import HttpClient, HttpResponse
+
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import AsyncIterator, Awaitable, Callable
 
     from yarl import URL
 
 T = TypeVar('T')
 
 run_alone_on_mac = pytest.mark.run_alone if sys.platform == 'darwin' else lambda x: x
+
+
+def make_status_stream_client(
+    responses: dict[str, list[tuple[int, bytes] | Exception]],
+) -> tuple[AsyncMock, list[int]]:
+    """Create a mock client that answers each URL with its next `(status, body)` response or raised exception.
+
+    The last entry of a URL's sequence repeats for any further requests. The returned list records the status of
+    every response served (exception entries are not recorded).
+    """
+    attempts: list[int] = []
+    indexes: dict[str, int] = {}
+
+    @asynccontextmanager
+    async def stream(url: str, **_kwargs: Any) -> AsyncIterator[HttpResponse]:
+        sequence = responses[url]
+        index = indexes.get(url, 0)
+        indexes[url] = index + 1
+        spec = sequence[min(index, len(sequence) - 1)]
+        if isinstance(spec, Exception):
+            raise spec
+
+        status, body = spec
+        attempts.append(status)
+
+        async def read_stream() -> AsyncIterator[bytes]:
+            if body:
+                yield body
+
+        response = MagicMock(spec=HttpResponse)
+        response.status_code = status
+        response.headers = {'content-type': 'application/xml; charset=utf-8'}
+        response.read_stream = read_stream
+        yield cast('HttpResponse', response)
+
+    client = AsyncMock(spec=HttpClient)
+    client.stream = stream
+    return client, attempts
 
 
 async def maybe_await(value: Awaitable[T] | T) -> T:
