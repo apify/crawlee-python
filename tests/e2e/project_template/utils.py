@@ -79,7 +79,7 @@ def _patch_crawlee_version_in_pyproject_toml_based_project(project_path: Path, w
 
                 # Create lock file that is expected by the docker to exist (even though it will be patched
                 # in the docker).
-                subprocess.run(
+                subprocess.run(  # noqa: S603
                     args=[package_manager, 'lock'],
                     cwd=str(project_path),
                     check=True,
