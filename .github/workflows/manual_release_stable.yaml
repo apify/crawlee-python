@@ -52,7 +52,7 @@ jobs:
       release_notes: ${{ steps.release_prepare.outputs.release_notes }}
       changelog_artifact_name: ${{ steps.release_prepare.outputs.changelog_artifact_name }}
     steps:
-      - uses: apify/actions/git-cliff-release@v1.5.0
+      - uses: apify/actions/git-cliff-release@v1.4.1
         name: Release prepare
         id: release_prepare
         with:

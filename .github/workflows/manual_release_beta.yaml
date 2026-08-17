@@ -37,7 +37,7 @@ jobs:
       version_number: ${{ steps.release_prepare.outputs.version_number }}
       changelog_artifact_name: ${{ steps.release_prepare.outputs.changelog_artifact_name }}
     steps:
-      - uses: apify/actions/git-cliff-release@v1.5.0
+      - uses: apify/actions/git-cliff-release@v1.4.1
         id: release_prepare
         name: Release prepare
         with:
