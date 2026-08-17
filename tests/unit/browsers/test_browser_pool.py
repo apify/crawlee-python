@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock
 
 import pytest
 
-from crawlee.browsers import BrowserPool, PlaywrightBrowserPlugin
+from crawlee.browsers import BrowserPool, PlaywrightBrowserController, PlaywrightBrowserPlugin
 from crawlee.browsers._browser_controller import BrowserController
 from crawlee.browsers._types import CrawleePage
 
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from typing import Any
 
+    from playwright.async_api import BrowserContext, Page
     from yarl import URL
 
     from crawlee.browsers._browser_plugin import BrowserPlugin
@@ -157,6 +159,51 @@ async def test_resource_management(server_url: URL) -> None:
 
     # All pages should be closed in __aexit__
     assert page.page.is_closed()
+
+
+async def test_reaper_does_not_close_browser_with_page_opening_in_flight(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The inactive-browser reaper leaves a browser alone while its `new_page` call is still in flight."""
+    opening_in_flight = asyncio.Event()
+    resume_opening = asyncio.Event()
+    original_create_context = PlaywrightBrowserController._create_browser_context
+
+    async def create_context_with_gated_first_page(
+        self: PlaywrightBrowserController, *args: Any, **kwargs: Any
+    ) -> BrowserContext:
+        context = await original_create_context(self, *args, **kwargs)
+        original_new_page = context.new_page
+
+        async def gated_new_page(*new_page_args: Any, **new_page_kwargs: Any) -> Page:
+            opening_in_flight.set()
+            await resume_opening.wait()
+            return await original_new_page(*new_page_args, **new_page_kwargs)
+
+        monkeypatch.setattr(context, 'new_page', gated_new_page)
+        return context
+
+    monkeypatch.setattr(PlaywrightBrowserController, '_create_browser_context', create_context_with_gated_first_page)
+
+    # Long reaper intervals so that only the manual calls below drive the reaping; a zero inactivity
+    # threshold makes the freshly launched browser eligible for it right away.
+    async with BrowserPool(
+        browser_inactive_threshold=timedelta(seconds=0),
+        identify_inactive_browsers_interval=timedelta(hours=1),
+        close_inactive_browsers_interval=timedelta(hours=1),
+    ) as browser_pool:
+        new_page_task = asyncio.create_task(browser_pool.new_page())
+        await asyncio.wait_for(opening_in_flight.wait(), timeout=60)
+
+        # Run one reaper cycle, exactly as the recurring tasks would, while the page opening is pending.
+        browser_pool._identify_inactive_browsers()
+        await browser_pool._close_inactive_browsers()
+
+        resume_opening.set()
+        page = await new_page_task
+
+        assert not page.page.is_closed()
+        assert browser_pool.total_pages_count == 1
+
+        await page.page.close()
 
 
 async def test_methods_raise_error_when_not_active() -> None:

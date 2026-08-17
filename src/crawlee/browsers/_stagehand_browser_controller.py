@@ -107,6 +107,11 @@ class StagehandBrowserController(BrowserController):
 
     @property
     @override
+    def is_opening_pages(self) -> bool:
+        return self._opening_pages_count > 0
+
+    @property
+    @override
     def is_browser_connected(self) -> bool:
         # If browser not yet started - controller is available for new pages.
         return self._browser is None or self._browser.is_connected()
