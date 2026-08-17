@@ -146,3 +146,88 @@ def test_store_multidomain_cookies() -> None:
 
     assert check_cookies['test.io'] == ('a', '1')
     assert check_cookies['notest.io'] == ('a', '2')
+
+
+def test_extract_cookies_from_headers() -> None:
+    """Test that cookies are parsed from raw `Set-Cookie` headers with attributes taken from the URL."""
+    session_cookies = SessionCookies()
+    session_cookies.extract_cookies_from_headers(
+        'https://example.com/login',
+        [
+            'sid=abc123; Path=/; Secure; HttpOnly; SameSite=Lax',
+            'theme=dark; Domain=example.com; Path=/settings',
+        ],
+    )
+    cookies = {item['name']: item for item in session_cookies.get_cookies_as_dicts()}
+
+    assert cookies['sid']['domain'] == 'example.com'
+    assert cookies['sid']['path'] == '/'
+    assert cookies['sid']['secure']
+    assert cookies['sid']['http_only']
+    assert cookies['sid']['same_site'] == 'Lax'
+
+    assert cookies['theme']['domain'] == '.example.com'
+    assert cookies['theme']['path'] == '/settings'
+    assert not cookies['theme']['secure']
+
+
+def test_extract_cookies_from_headers_uses_url_for_defaults() -> None:
+    """Test that the domain of a cookie without the `Domain` attribute comes from the URL of the response."""
+    session_cookies = SessionCookies()
+    session_cookies.extract_cookies_from_headers('https://first.example.com/', ['a=1; Path=/'])
+    session_cookies.extract_cookies_from_headers('https://second.example.com/', ['b=2; Path=/'])
+    domains = {item['name']: item.get('domain') for item in session_cookies.get_cookies_as_dicts()}
+
+    assert domains == {'a': 'first.example.com', 'b': 'second.example.com'}
+
+
+def test_extract_cookies_from_headers_with_empty_headers() -> None:
+    """Test that a response without `Set-Cookie` headers leaves the jar untouched."""
+    session_cookies = SessionCookies()
+    session_cookies.set('existing', 'value', domain='example.com')
+    session_cookies.extract_cookies_from_headers('https://example.com/', [])
+
+    assert len(session_cookies) == 1
+
+
+def test_get_cookie_string() -> None:
+    """Test that the `Cookie` header contains all cookies matching the URL."""
+    session_cookies = SessionCookies()
+    session_cookies.set('a', '1', domain='example.com')
+    session_cookies.set('b', '2', domain='example.com')
+
+    cookie_string = session_cookies.get_cookie_string('https://example.com/page')
+
+    assert set(cookie_string.split('; ')) == {'a=1', 'b=2'}
+
+
+def test_get_cookie_string_respects_domain_path_and_secure() -> None:
+    """Test that cookies not matching the URL are left out of the `Cookie` header."""
+    session_cookies = SessionCookies()
+    session_cookies.set('same_domain', '1', domain='example.com')
+    session_cookies.set('other_domain', '2', domain='other.com')
+    session_cookies.set('other_path', '3', domain='example.com', path='/admin')
+    session_cookies.set('secure_only', '4', domain='example.com', secure=True)
+
+    assert session_cookies.get_cookie_string('http://example.com/page') == 'same_domain=1'
+    assert set(session_cookies.get_cookie_string('https://example.com/admin').split('; ')) == {
+        'same_domain=1',
+        'other_path=3',
+        'secure_only=4',
+    }
+
+
+def test_get_cookie_string_without_matching_cookies() -> None:
+    """Test that an empty string is returned when no cookie matches the URL."""
+    session_cookies = SessionCookies()
+    session_cookies.set('a', '1', domain='example.com')
+
+    assert session_cookies.get_cookie_string('https://other.com/') == ''
+
+
+def test_get_cookie_string_round_trip() -> None:
+    """Test that cookies extracted from a response are sent back to the same URL."""
+    session_cookies = SessionCookies()
+    session_cookies.extract_cookies_from_headers('https://example.com/login', ['sid=abc123; Path=/'])
+
+    assert session_cookies.get_cookie_string('https://example.com/dashboard') == 'sid=abc123'
