@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - **sitemap:** Guard the unavailable `ExpatParser.flush` on older `CPython` patch releases ([#2141](https://github.com/apify/crawlee-python/pull/2141)) ([7f75295](https://github.com/apify/crawlee-python/commit/7f75295ca96a7e06bf794e30b999109a9b93c538)) by [@Mantisus](https://github.com/Mantisus), closes [#2119](https://github.com/apify/crawlee-python/issues/2119)
 - **dataset:** Preserve push_data compatibility with the released Apify SDK ([#2152](https://github.com/apify/crawlee-python/pull/2152)) ([091410f](https://github.com/apify/crawlee-python/commit/091410f36cec8ef795d29b6d89428069525a4dbf)) by [@vdusek](https://github.com/vdusek)
 - **stagehand:** Cap the stagehand dependency below the breaking 4.x API ([#2153](https://github.com/apify/crawlee-python/pull/2153)) ([263fff4](https://github.com/apify/crawlee-python/commit/263fff4a1f279098dc6026f45646c278891cb53d)) by [@vdusek](https://github.com/vdusek)
+- **sitemaps:** Validate HTTP status when fetching sitemaps ([#2123](https://github.com/apify/crawlee-python/pull/2123)) ([c5c1072](https://github.com/apify/crawlee-python/commit/c5c1072776e243b38f1448d3156759e864867cca)) by [@anxkhn](https://github.com/anxkhn)
 
 
 <!-- git-cliff-unreleased-end -->
