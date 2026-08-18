@@ -321,6 +321,13 @@ async def test_sitemap_from_string() -> None:
     assert set(sitemap.urls) == get_basic_results()
 
 
+async def test_sitemap_from_string_keeps_cross_host_without_sitemap_url() -> None:
+    """Without `sitemap_url` there is no origin to filter against, so all URLs are kept."""
+    sitemap = await Sitemap.from_xml_string(get_basic_sitemap(url='https://other.com/'))
+
+    assert set(sitemap.urls) == get_basic_results('https://other.com/')
+
+
 async def test_sitemap_from_string_keeps_same_host_with_sitemap_url() -> None:
     """URLs on the sitemap's own host survive the default `same-hostname` filter."""
     sitemap = await Sitemap.from_xml_string(
@@ -350,6 +357,17 @@ async def test_sitemap_from_string_allows_cross_host_with_strategy_all() -> None
     )
 
     assert set(sitemap.urls) == get_basic_results('https://other.com/')
+
+
+async def test_raw_source_with_url_uses_it_as_origin() -> None:
+    """A raw source with a known URL reports it as `origin_sitemap_url` instead of a `raw://` identifier."""
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    items = [
+        item async for item in parse_sitemap([{'type': 'raw', 'content': get_basic_sitemap(), 'url': sitemap_url}])
+    ]
+
+    assert len(items) == 5
+    assert all(item.origin_sitemap_url == sitemap_url for item in items)
 
 
 async def test_malformed_sitemap_keeps_urls() -> None:

@@ -234,10 +234,10 @@ def _get_parser(content_type: str = '', url: str | None = None) -> _XmlSitemapPa
 
 def _get_origin_url(source: SitemapSource) -> str:
     """Determine the origin URL for a sitemap source."""
-    if source['type'] == 'url' and 'url' in source:
-        return source['url']
+    if url := source.get('url'):
+        return url
     if source['type'] == 'raw' and 'content' in source:
-        # For raw content sources, create a consistent identifier
+        # Raw sources without a known URL get a consistent content-derived identifier.
         return f'raw://{sha256(source["content"].encode()).hexdigest()}'
     return ''
 
@@ -503,7 +503,16 @@ class Sitemap:
         sitemap_url: str | None = None,
         parse_sitemap_options: ParseSitemapOptions | None = None,
     ) -> Sitemap:
-        source: SitemapSource = {'type': 'raw', 'content': content}
+        """Parse a sitemap from a raw XML string.
+
+        Args:
+            content: The sitemap XML content.
+            sitemap_url: URL the content was retrieved from. Providing it enables the same URL filtering as for
+                URL-loaded sitemaps: entries are kept only if they match the enqueue strategy (`same-hostname` by
+                default) relative to this URL. Without it, no filtering is applied.
+            parse_sitemap_options: Options for parsing, see `ParseSitemapOptions`.
+        """
+        source = SitemapSource(type='raw', content=content)
         if sitemap_url is not None:
             source['url'] = sitemap_url
         return await cls.parse([source], parse_sitemap_options=parse_sitemap_options)
