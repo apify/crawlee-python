@@ -47,6 +47,7 @@ from tests.unit.server_endpoints import GENERIC_RESPONSE, HELLO_WORLD
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from playwright.async_api import Request as PlaywrightRequest
     from yarl import URL
 
     from crawlee._request import RequestOptions
@@ -314,6 +315,37 @@ async def test_custom_headers(server_url: URL) -> None:
     assert response_headers.get('power-header') == request_headers['Power-Header']
     assert response_headers.get('library') == request_headers['Library']
     assert response_headers.get('my-test-header') == request_headers['My-Test-Header']
+
+
+async def test_custom_headers_not_sent_with_cross_origin_requests(server_url: URL, redirect_server_url: URL) -> None:
+    """Request headers are sent with the main navigation only, not with cross-origin requests made by the page."""
+    crawler = PlaywrightCrawler()
+
+    subresource_url = str(redirect_server_url / 'headers')
+    page_html = f'<html><body><img src="{subresource_url}"></body></html>'
+    start_url = str((server_url / 'echo_content').with_query(content=page_html))
+
+    navigation_headers = dict[str, str]()
+    subresource_headers = dict[str, str]()
+
+    @crawler.pre_navigation_hook
+    async def capture_subresource_headers(context: PlaywrightPreNavCrawlingContext) -> None:
+        def capture(request: PlaywrightRequest) -> None:
+            if request.url == subresource_url:
+                subresource_headers.update(request.headers)
+
+        context.page.on('request', capture)
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        await context.page.wait_for_load_state()
+        navigation_headers.update(await context.response.request.all_headers())
+
+    await crawler.run([Request.from_url(start_url, headers={'authorization': 'Bearer secret-token'})])
+
+    assert navigation_headers.get('authorization') == 'Bearer secret-token'
+    assert subresource_headers
+    assert 'authorization' not in subresource_headers
 
 
 async def test_pre_navigation_hook() -> None:

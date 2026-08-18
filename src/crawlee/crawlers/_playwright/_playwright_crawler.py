@@ -356,18 +356,18 @@ class PlaywrightCrawler(
         headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
     ) -> Callable:
-        """Create a request interceptor for Playwright to support non-GET methods with custom parameters.
-
-        The interceptor modifies requests by adding custom headers and payload before they are sent.
+        """Create a request interceptor that applies a custom method, headers, and payload to matching requests.
 
         Args:
             method: HTTP method to use for the request.
-            headers: Custom HTTP headers to send with the request.
+            headers: Custom HTTP headers to send with the request. They are merged into the headers the browser
+                would send on its own (e.g. `User-Agent` or fingerprint headers), with the custom ones winning.
             payload: Request body data for POST/PUT requests.
         """
 
-        async def route_handler(route: Route, _: PlaywrightRequest) -> None:
-            await route.continue_(method=method, headers=dict(headers) if headers else None, post_data=payload)
+        async def route_handler(route: Route, request: PlaywrightRequest) -> None:
+            merged_headers = {**request.headers, **dict(headers)} if headers else None
+            await route.continue_(method=method, headers=merged_headers, post_data=payload)
 
         return route_handler
 
@@ -399,9 +399,6 @@ class PlaywrightCrawler(
             session_cookies = context.session.cookies.get_cookies_as_playwright_format()
             await self._update_cookies(context.page, session_cookies)
 
-        if context.request.headers:
-            await context.page.set_extra_http_headers(context.request.headers.model_dump())
-        # Navigate to the URL and get response.
         if context.request.method != 'GET':
             # Call the notification only once
             warnings.warn(
@@ -411,6 +408,9 @@ class PlaywrightCrawler(
                 stacklevel=2,
             )
 
+        # Apply custom headers via a route scoped to the navigation URL; page-wide `set_extra_http_headers`
+        # would leak sensitive values like `Authorization` to every subresource request the page makes.
+        if context.request.headers or context.request.method != 'GET':
             route_handler = self._prepare_request_interceptor(
                 method=context.request.method,
                 headers=context.request.headers,
