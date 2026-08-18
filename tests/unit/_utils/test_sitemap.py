@@ -370,6 +370,17 @@ async def test_raw_source_with_url_uses_it_as_origin() -> None:
     assert all(item.origin_sitemap_url == sitemap_url for item in items)
 
 
+async def test_raw_source_without_url_uses_content_hash_as_origin() -> None:
+    """A raw source without a URL reports a consistent content-derived `raw://` identifier as `origin_sitemap_url`."""
+    items = [item async for item in parse_sitemap([{'type': 'raw', 'content': get_basic_sitemap()}])]
+
+    assert len(items) == 5
+    origin = items[0].origin_sitemap_url
+    assert origin is not None
+    assert origin.startswith('raw://')
+    assert all(item.origin_sitemap_url == origin for item in items)
+
+
 async def test_malformed_sitemap_keeps_urls() -> None:
     """A parse error must not discard the URLs collected before it."""
     malformed = (
