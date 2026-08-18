@@ -232,24 +232,20 @@ class _CgroupCpu:
     previous: _CpuReading | None = None
 
 
-def _get_cpu_set_size() -> float | None:
-    """Get the number of cores the cgroup of this process is pinned to, or `None` when that is not a restriction."""
-    host_cores = psutil.cpu_count()
-    cpu_set_cores = cgroup.get_cpu_set_size()
-
-    if host_cores is None or cpu_set_cores is None or cpu_set_cores >= host_cores:
-        return None
-
-    return float(cpu_set_cores)
-
-
 def _get_allowed_cpu_cores() -> float | None:
     """Get the number of CPU cores this process may use, or `None` when nothing restricts it.
 
     A bandwidth quota and a CPU set restrict it independently, and the tighter one wins. Both are read from the cgroup
     of this process, so they cover the same scope as the CPU time they get paired with.
     """
-    limits = [limit for limit in (cgroup.get_cpu_quota(), _get_cpu_set_size()) if limit is not None]
+    host_cores = psutil.cpu_count()
+
+    # A restriction covering the whole machine caps nothing.
+    limits = [
+        float(cores)
+        for cores in (cgroup.get_cpu_quota(), cgroup.get_cpu_set_size())
+        if cores is not None and (host_cores is None or cores < host_cores)
+    ]
 
     return min(limits) if limits else None
 

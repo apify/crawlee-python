@@ -36,6 +36,7 @@ V1_SELF_CGROUP = '4:cpuset:{path}\n3:cpu,cpuacct:{path}\n2:memory:{path}\n1:name
 
 HOST_TOTAL_BYTES = 8 * 1024**3
 HOST_AVAILABLE_BYTES = 3 * 1024**3
+HOST_CORES = 8
 
 
 @pytest.fixture(autouse=True)
@@ -90,6 +91,12 @@ def _fixed_host_memory(monkeypatch: pytest.MonkeyPatch) -> None:
         'virtual_memory',
         lambda: SimpleNamespace(total=HOST_TOTAL_BYTES, available=HOST_AVAILABLE_BYTES),
     )
+
+
+@pytest.fixture
+def _fixed_host_cores(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the core count `psutil` reports, so a limit stays a limit whatever machine runs the tests."""
+    monkeypatch.setattr(psutil, 'cpu_count', lambda: HOST_CORES)
 
 
 @pytest.fixture
@@ -690,7 +697,7 @@ def test_get_memory_info_no_working_set(fake_cgroup: Callable[..., Path]) -> Non
     assert memory_info.system_wide_used_size == ByteSize(HOST_TOTAL_BYTES - HOST_AVAILABLE_BYTES)
 
 
-@pytest.mark.usefixtures('_one_second_per_sample')
+@pytest.mark.usefixtures('_one_second_per_sample', '_fixed_host_cores')
 def test_get_cpu_info_quota(fake_cgroup: Callable[..., Path], monkeypatch: pytest.MonkeyPatch) -> None:
     """Measures the CPU against the bandwidth quota."""
     root = fake_cgroup(
@@ -710,16 +717,14 @@ def test_get_cpu_info_quota(fake_cgroup: Callable[..., Path], monkeypatch: pytes
     assert get_cpu_info().used_ratio == pytest.approx(0.5)
 
 
-@pytest.mark.usefixtures('_one_second_per_sample')
-def test_get_cpu_info_cpu_set(fake_cgroup: Callable[..., Path], monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.usefixtures('_one_second_per_sample', '_fixed_host_cores')
+def test_get_cpu_info_cpu_set(fake_cgroup: Callable[..., Path]) -> None:
     """Measures the CPU against a set that restricts the cores without setting any quota."""
     root = fake_cgroup(
         mountinfo=V2_MOUNTINFO,
         self_cgroup=V2_SELF_CGROUP.format(path='/'),
         files={'cpuset.cpus.effective': '0-1\n', 'cpu.stat': 'usage_usec 0\n'},
     )
-    monkeypatch.setattr(psutil, 'cpu_count', lambda: 8)
-
     assert get_cpu_info().used_ratio == 0.0
 
     (root / 'cpu.stat').write_text('usage_usec 2000000\n')
@@ -728,7 +733,7 @@ def test_get_cpu_info_cpu_set(fake_cgroup: Callable[..., Path], monkeypatch: pyt
     assert get_cpu_info().used_ratio == pytest.approx(1.0)
 
 
-@pytest.mark.usefixtures('_one_second_per_sample')
+@pytest.mark.usefixtures('_one_second_per_sample', '_fixed_host_cores')
 def test_get_cpu_info_counter_restart(fake_cgroup: Callable[..., Path], monkeypatch: pytest.MonkeyPatch) -> None:
     """Clamps the counter that restarts when the process is moved to another cgroup."""
     root = fake_cgroup(
@@ -744,7 +749,7 @@ def test_get_cpu_info_counter_restart(fake_cgroup: Callable[..., Path], monkeypa
     assert get_cpu_info().used_ratio == 0.0
 
 
-@pytest.mark.usefixtures('_one_second_per_sample')
+@pytest.mark.usefixtures('_one_second_per_sample', '_fixed_host_cores')
 def test_get_cpu_info_failed_reading(fake_cgroup: Callable[..., Path], monkeypatch: pytest.MonkeyPatch) -> None:
     """Keeps the earlier reading when the next one fails, because a counter that only grows stays comparable."""
     root = fake_cgroup(
@@ -765,6 +770,7 @@ def test_get_cpu_info_failed_reading(fake_cgroup: Callable[..., Path], monkeypat
     assert get_cpu_info().used_ratio == pytest.approx(0.5)
 
 
+@pytest.mark.usefixtures('_fixed_host_cores')
 def test_get_cpu_info_no_usage(
     fake_cgroup: Callable[..., Path],
     monkeypatch: pytest.MonkeyPatch,
@@ -799,15 +805,20 @@ def test_get_cpu_info_no_limit(monkeypatch: pytest.MonkeyPatch) -> None:
         pytest.param(2.0, None, 8, 2.0, id='bandwidth quota only'),
         pytest.param(None, 2, 8, 2.0, id='cpu set only'),
         pytest.param(None, 8, 8, None, id='a cpu set covering every core is not a restriction'),
+        pytest.param(8.0, None, 8, None, id='a quota covering every core is not a restriction'),
+        pytest.param(10.0, None, 8, None, id='a quota above the cores of the machine is not a restriction'),
+        pytest.param(10.0, 2, 8, 2.0, id='a quota above the machine leaves the cpu set to bind'),
         pytest.param(4.0, 2, 8, 2.0, id='cpu set is tighter than the quota'),
         pytest.param(1.0, 2, 8, 1.0, id='quota is tighter than the cpu set'),
+        pytest.param(2.0, None, None, 2.0, id='a quota counts when the cores of the machine are unknown'),
+        pytest.param(None, 2, None, 2.0, id='a cpu set counts when the cores of the machine are unknown'),
     ],
 )
 def test_get_allowed_cpu_cores(
     monkeypatch: pytest.MonkeyPatch,
     quota: float | None,
     cpu_set_cores: int | None,
-    host_cores: int,
+    host_cores: int | None,
     expected: float | None,
 ) -> None:
     """Takes the tighter of the bandwidth quota and the CPU set, which restrict the CPU independently."""
