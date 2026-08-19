@@ -109,6 +109,27 @@ The example below sets `X-Api-Key` on the client and `Accept` on one of two requ
 
 Header names are case-insensitive, and <ApiLink to="class/HttpHeaders">`HttpHeaders`</ApiLink> normalizes the casing for you, so `user-agent` and `User-Agent` refer to the same header.
 
+## Custom headers in browser-based crawlers
+
+The `headers` field of a <ApiLink to="class/Request">`Request`</ApiLink> works differently in browser-based crawlers such as <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>. The custom headers are sent with the navigation request and any redirects it goes through, merged into the headers the browser sends on its own. They aren't attached to the requests the page then makes by itself, such as images, scripts, or API calls. The scoping keeps sensitive values like `Authorization` from leaking to third-party origins that the crawled page decides to contact.
+
+There are two ways to send a header with every request the browser makes:
+
+- Set it on the browser context through `browser_new_context_options`. Context headers apply to all pages and all requests from them, so use them for values you're willing to send to every origin, and keep credentials on the request.
+- Set it on a single page with `page.set_extra_http_headers()` in a [pre-navigation hook](./request-router#pre-navigation-hooks).
+
+```python
+from crawlee.crawlers import PlaywrightCrawler
+
+crawler = PlaywrightCrawler(
+    browser_new_context_options={
+        'extra_http_headers': {
+            'X-Custom-Header': 'my-value',
+        },
+    },
+)
+```
+
 ## Header order and fingerprinting
 
 Anti-bot systems look at more than header values. They look at which headers are present, their casing, and the order they arrive in. Real browsers send a consistent, recognizable set. A request that has a browser `User-Agent` but the wrong header order, or missing client hints, still looks automated.
