@@ -33,23 +33,19 @@ from ._playwright_http_client import PlaywrightHttpClient, browser_page_context
 from ._playwright_post_nav_crawling_context import PlaywrightPostNavCrawlingContext
 from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
 from ._types import BlockRequestsFunction, GotoOptions
-from ._utils import block_requests, infinite_scroll
+from ._utils import NavigationRequestInterceptor, block_requests, infinite_scroll
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator, Mapping
     from pathlib import Path
 
-    from playwright.async_api import Page, Response, Route
-    from playwright.async_api import Request as PlaywrightRequest
+    from playwright.async_api import Page, Response
     from typing_extensions import Unpack
 
     from crawlee import RequestTransformAction
     from crawlee._types import (
         EnqueueLinksKwargs,
         ExtractLinksFunction,
-        HttpHeaders,
-        HttpMethod,
-        HttpPayload,
         JsonSerializable,
     )
     from crawlee.browsers._types import BrowserType
@@ -350,27 +346,6 @@ class PlaywrightCrawler(
             # Yield should be inside the browser_page_context.
             yield pre_navigation_context
 
-    def _prepare_request_interceptor(
-        self,
-        method: HttpMethod = 'GET',
-        headers: HttpHeaders | dict[str, str] | None = None,
-        payload: HttpPayload | None = None,
-    ) -> Callable:
-        """Create a request interceptor that applies a custom method, headers, and payload to matching requests.
-
-        Args:
-            method: HTTP method to use for the request.
-            headers: Custom HTTP headers to send with the request. They are merged into the headers the browser
-                would send on its own (e.g. `User-Agent` or fingerprint headers), with the custom ones winning.
-            payload: Request body data for POST/PUT requests.
-        """
-
-        async def route_handler(route: Route, request: PlaywrightRequest) -> None:
-            merged_headers = {**request.headers, **dict(headers)} if headers else None
-            await route.continue_(method=method, headers=merged_headers, post_data=payload)
-
-        return route_handler
-
     async def _navigate(
         self,
         context: TPreNavContext,
@@ -408,30 +383,16 @@ class PlaywrightCrawler(
                 stacklevel=2,
             )
 
-        # Apply custom headers via a route scoped to the navigation request; page-wide `set_extra_http_headers`
-        # would leak sensitive values like `Authorization` to every subresource request the page makes.
+        # Apply the custom method, headers, and payload to the navigation request only; the details of doing
+        # that correctly live in `NavigationRequestInterceptor`.
         if context.request.headers or context.request.method != 'GET':
-            route_handler = self._prepare_request_interceptor(
+            interceptor = NavigationRequestInterceptor(
+                context.page,
                 method=context.request.method,
                 headers=context.request.headers,
                 payload=context.request.payload,
             )
-            applied = False
-
-            async def navigation_route_handler(route: Route, request: PlaywrightRequest) -> None:
-                nonlocal applied
-                # Match the main-frame navigation request itself rather than its URL; the browser normalizes
-                # URLs (adds the root path, strips fragments), so a string comparison with `request.url` can
-                # silently miss. Redirect hops bypass routing and inherit the header overrides.
-                if not applied and request.is_navigation_request() and request.frame == context.page.main_frame:
-                    applied = True
-                    await route_handler(route, request)
-                else:
-                    await route.fallback()
-
-            # Once the overrides are applied, the predicate stops matching, so subresource requests
-            # skip the handler entirely.
-            await context.page.route(lambda _: not applied, navigation_route_handler)
+            await interceptor.register()
 
         try:
             async with self._shared_navigation_timeouts[id(context.request)] as remaining_timeout:
