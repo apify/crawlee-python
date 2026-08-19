@@ -408,7 +408,7 @@ class PlaywrightCrawler(
                 stacklevel=2,
             )
 
-        # Apply custom headers via a route scoped to the navigation URL; page-wide `set_extra_http_headers`
+        # Apply custom headers via a route scoped to the navigation request; page-wide `set_extra_http_headers`
         # would leak sensitive values like `Authorization` to every subresource request the page makes.
         if context.request.headers or context.request.method != 'GET':
             route_handler = self._prepare_request_interceptor(
@@ -416,9 +416,22 @@ class PlaywrightCrawler(
                 headers=context.request.headers,
                 payload=context.request.payload,
             )
+            applied = False
 
-            # Set route_handler only for current request
-            await context.page.route(context.request.url, route_handler)
+            async def navigation_route_handler(route: Route, request: PlaywrightRequest) -> None:
+                nonlocal applied
+                # Match the main-frame navigation request itself rather than its URL; the browser normalizes
+                # URLs (adds the root path, strips fragments), so a string comparison with `request.url` can
+                # silently miss. Redirect hops bypass routing and inherit the header overrides.
+                if not applied and request.is_navigation_request() and request.frame == context.page.main_frame:
+                    applied = True
+                    await route_handler(route, request)
+                else:
+                    await route.fallback()
+
+            # Once the overrides are applied, the predicate stops matching, so subresource requests
+            # skip the handler entirely.
+            await context.page.route(lambda _: not applied, navigation_route_handler)
 
         try:
             async with self._shared_navigation_timeouts[id(context.request)] as remaining_timeout:
