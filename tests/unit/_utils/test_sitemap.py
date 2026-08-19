@@ -329,6 +329,66 @@ async def test_sitemap_from_string() -> None:
     assert set(sitemap.urls) == get_basic_results()
 
 
+async def test_sitemap_from_string_keeps_cross_host_without_sitemap_url() -> None:
+    """Without `sitemap_url` there is no origin to filter against, so all URLs are kept."""
+    sitemap = await Sitemap.from_xml_string(get_basic_sitemap(url='https://other.com/'))
+
+    assert set(sitemap.urls) == get_basic_results('https://other.com/')
+
+
+async def test_sitemap_from_string_keeps_same_host_with_sitemap_url() -> None:
+    """URLs on the sitemap's own host survive the default `same-hostname` filter."""
+    sitemap = await Sitemap.from_xml_string(
+        get_basic_sitemap(),
+        sitemap_url=f'{DEFAULT_URL}sitemap.xml',
+    )
+
+    assert set(sitemap.urls) == get_basic_results()
+
+
+async def test_sitemap_from_string_filters_cross_host_with_sitemap_url() -> None:
+    """`from_xml_string` opts into host filtering when `sitemap_url` is given."""
+    sitemap = await Sitemap.from_xml_string(
+        get_basic_sitemap(url='https://other.com/'),
+        sitemap_url=f'{DEFAULT_URL}sitemap.xml',
+    )
+
+    assert sitemap.urls == []
+
+
+async def test_sitemap_from_string_allows_cross_host_with_strategy_all() -> None:
+    """`enqueue_strategy='all'` disables host filtering for raw string sitemaps too."""
+    sitemap = await Sitemap.from_xml_string(
+        get_basic_sitemap(url='https://other.com/'),
+        sitemap_url=f'{DEFAULT_URL}sitemap.xml',
+        parse_sitemap_options={'enqueue_strategy': 'all'},
+    )
+
+    assert set(sitemap.urls) == get_basic_results('https://other.com/')
+
+
+async def test_raw_source_with_url_uses_it_as_origin() -> None:
+    """A raw source with a known URL reports it as `origin_sitemap_url` instead of a `raw://` identifier."""
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    items = [
+        item async for item in parse_sitemap([{'type': 'raw', 'content': get_basic_sitemap(), 'url': sitemap_url}])
+    ]
+
+    assert len(items) == 5
+    assert all(item.origin_sitemap_url == sitemap_url for item in items)
+
+
+async def test_raw_source_without_url_uses_content_hash_as_origin() -> None:
+    """A raw source without a URL reports a consistent content-derived `raw://` identifier as `origin_sitemap_url`."""
+    items = [item async for item in parse_sitemap([{'type': 'raw', 'content': get_basic_sitemap()}])]
+
+    assert len(items) == 5
+    origin = items[0].origin_sitemap_url
+    assert origin is not None
+    assert origin.startswith('raw://')
+    assert all(item.origin_sitemap_url == origin for item in items)
+
+
 async def test_malformed_sitemap_keeps_urls() -> None:
     """A parse error must not discard the URLs collected before it."""
     malformed = (
