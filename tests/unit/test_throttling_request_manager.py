@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
-from typing import Any
-from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -17,6 +15,7 @@ from crawlee.storage_clients import MemoryStorageClient
 from crawlee.storages import RequestQueue
 
 THROTTLED_DOMAIN = 'throttled.com'
+SECOND_THROTTLED_DOMAIN = 'slow.com'
 NON_THROTTLED_DOMAIN = 'free.com'
 TEST_DOMAINS = [THROTTLED_DOMAIN]
 
@@ -45,6 +44,20 @@ async def manager(inner_queue: RequestQueue, service_locator: ServiceLocator) ->
     return ThrottlingRequestManager(
         inner_queue,
         domains=TEST_DOMAINS,
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+
+@pytest.fixture
+async def two_domain_manager(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> ThrottlingRequestManager[RequestQueue]:
+    """Create a ThrottlingRequestManager with two throttled domains."""
+    return ThrottlingRequestManager(
+        inner_queue,
+        domains=[THROTTLED_DOMAIN, SECOND_THROTTLED_DOMAIN],
         request_manager_opener=RequestQueue.open,
         service_locator=service_locator,
     )
@@ -307,66 +320,73 @@ async def test_fetch_skips_throttled_sub_manager(
     assert result.url == free_url
 
 
-async def test_sleep_when_all_throttled(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """When all domains are throttled and inner is empty, should wait and retry."""
+async def test_fetch_returns_none_when_all_throttled(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A throttled domain must release the caller's concurrency slot instead of waiting out its cooldown."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     await manager.add_request(url)
+    manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
 
-    manager.record_domain_delay(url, retry_after=timedelta(seconds=10))
-
-    target = (
-        'crawlee.request_loaders._throttling_request_manager.ThrottlingRequestManager._wait_for_new_work_or_timeout'
-    )
-    with patch(target, new_callable=AsyncMock) as mock_wait:
-
-        async def wait_side_effect(*_args: Any, **_kwargs: Any) -> None:
-            # Set throttled_until firmly in the past so the next iteration reliably unblocks the domain regardless of
-            # clock resolution or scheduling jitter on slow CI runners.
-            manager._domain_states[THROTTLED_DOMAIN].throttled_until = datetime.now(timezone.utc) - timedelta(seconds=1)
-
-        mock_wait.side_effect = wait_side_effect
-
-        result = await manager.fetch_next_request()
-
-        mock_wait.assert_called()
-        assert result is not None
-        assert result.url == url
+    assert await asyncio.wait_for(manager.fetch_next_request(), timeout=1.0) is None
 
 
-async def test_fetch_wakes_when_request_added_during_throttle_wait(
+async def test_throttled_domain_reads_as_empty_but_not_finished(
     manager: ThrottlingRequestManager[RequestQueue],
 ) -> None:
-    """When all sub-managers are throttled and inner is empty, fetch should wake up immediately
-    when a new request is added rather than blocking until the throttle expires."""
-    # Throttle the only configured domain for a long time so a naive sleep would block here.
-    throttled_url = f'https://{THROTTLED_DOMAIN}/page1'
-    await manager.add_request(throttled_url)
-    manager.record_domain_delay(throttled_url, retry_after=timedelta(seconds=60))
+    """Requests waiting out a cooldown are nothing to dispatch, but the crawl must not end on them either."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await manager.add_request(url)
+    manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
 
-    free_url = f'https://{NON_THROTTLED_DOMAIN}/page1'
+    assert await manager.is_empty() is True
+    assert await manager.is_finished() is False
 
-    # Wrap the wait helper so we can synchronize with the moment fetch enters the wait state.
-    wait_entered = asyncio.Event()
-    original_wait = manager._wait_for_new_work_or_timeout
 
-    async def signaling_wait(timeout: float) -> None:
-        wait_entered.set()
-        await original_wait(timeout)
+async def test_crawl_delay_hides_queued_requests(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A crawl-delay armed on dispatch keeps the domain's remaining requests out of `is_empty`."""
+    manager.set_crawl_delay(f'https://{THROTTLED_DOMAIN}/', 30)
+    await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+    await manager.add_request(f'https://{THROTTLED_DOMAIN}/page2')
 
-    manager._wait_for_new_work_or_timeout = signaling_wait  # ty: ignore[invalid-assignment]
+    assert await manager.fetch_next_request() is not None
 
-    fetch_task = asyncio.create_task(manager.fetch_next_request())
+    assert await manager.is_empty() is True
+    assert await manager.is_finished() is False
 
-    # Wait until fetch is suspended inside the wait, then add fresh non-throttled work.
-    await wait_entered.wait()
-    await manager.add_request(free_url)
 
-    # If the wake-up signal works, fetch returns the freshly-added request well within the 2s wait_for budget; otherwise
-    # it would still be blocked on the 60s throttle.
-    result = await asyncio.wait_for(fetch_task, timeout=2.0)
+async def test_expired_throttle_makes_the_domain_fetchable_again(
+    manager: ThrottlingRequestManager[RequestQueue],
+) -> None:
+    """Once the cooldown passes, the domain counts again for both dispatching and emptiness."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await manager.add_request(url)
+    manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
+    assert await manager.is_empty() is True
+
+    manager._domain_states[THROTTLED_DOMAIN].throttled_until = datetime.now(timezone.utc) - timedelta(seconds=1)
+
+    assert await manager.is_empty() is False
+    result = await manager.fetch_next_request()
+    assert result is not None
+    assert result.url == url
+
+
+async def test_fetch_prefers_longest_overdue_domain(
+    two_domain_manager: ThrottlingRequestManager[RequestQueue],
+) -> None:
+    """With several domains free, the one whose cooldown expired earliest is dispatched first."""
+    recent_url = f'https://{THROTTLED_DOMAIN}/page1'
+    overdue_url = f'https://{SECOND_THROTTLED_DOMAIN}/page1'
+    await two_domain_manager.add_request(recent_url)
+    await two_domain_manager.add_request(overdue_url)
+
+    now = datetime.now(timezone.utc)
+    two_domain_manager._domain_states[THROTTLED_DOMAIN].throttled_until = now - timedelta(seconds=1)
+    two_domain_manager._domain_states[SECOND_THROTTLED_DOMAIN].throttled_until = now - timedelta(seconds=10)
+
+    result = await two_domain_manager.fetch_next_request()
 
     assert result is not None
-    assert result.url == free_url
+    assert result.url == overdue_url
 
 
 # ── Delegation Tests ────────────────────────────────────
