@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     import logging
     import re
     from collections.abc import Awaitable, Coroutine, MutableMapping, Sequence
+    from datetime import timedelta
 
     from typing_extensions import NotRequired, Required, Self, Unpack
 
@@ -558,6 +559,7 @@ class SendRequestFunction(Protocol):
         method: HttpMethod = 'GET',
         payload: HttpPayload | None = None,
         headers: HttpHeaders | dict[str, str] | None = None,
+        timeout: timedelta | None = None,
     ) -> Coroutine[None, None, HttpResponse]:
         """Call send request function.
 
@@ -566,6 +568,7 @@ class SendRequestFunction(Protocol):
             method: The HTTP method to use.
             headers: The headers to include in the request.
             payload: The payload to include in the request.
+            timeout: Maximum time allowed to process the request.
 
         Returns:
             The HTTP response received from the server.

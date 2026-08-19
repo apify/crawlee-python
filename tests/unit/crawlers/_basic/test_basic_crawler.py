@@ -28,6 +28,7 @@ from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
 from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
+from crawlee.http_clients import HttpClient
 from crawlee.request_loaders import RequestList, RequestManagerTandem, ThrottlingRequestManager
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics, StatisticsState
@@ -521,6 +522,58 @@ async def test_send_request_works(server_url: URL, method: HttpMethod, path: str
     content_type = response_headers.get('content-type')
     assert content_type is not None
     assert content_type == 'application/json'
+
+
+async def test_send_request_forwards_timeout_to_http_client() -> None:
+    http_client = AsyncMock(spec=HttpClient)
+    response = Mock()
+    http_client.send_request.return_value = response
+    crawler = BasicCrawler(http_client=http_client, use_session_pool=False, max_requests_per_crawl=1)
+    timeout = timedelta(seconds=12)
+    result = None
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        nonlocal result
+        result = await context.send_request(
+            'https://example.com',
+            method='POST',
+            payload=b'Hello, world!',
+            headers={'Content-Type': 'text/plain'},
+            timeout=timeout,
+        )
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    assert result is response
+    http_client.send_request.assert_awaited_once_with(
+        url='https://example.com',
+        method='POST',
+        payload=b'Hello, world!',
+        headers={'Content-Type': 'text/plain'},
+        session=None,
+        proxy_info=None,
+        timeout=timeout,
+    )
+
+
+async def test_send_request_respects_timeout(server_url: URL) -> None:
+    request_timed_out = asyncio.Event()
+
+    crawler = BasicCrawler(max_request_retries=3)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        with pytest.raises(asyncio.TimeoutError):
+            await context.send_request(
+                str(server_url / 'slow') + '?delay=2',
+                timeout=timedelta(milliseconds=100),
+            )
+        request_timed_out.set()
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    assert request_timed_out.is_set()
 
 
 @dataclass

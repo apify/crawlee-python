@@ -1321,6 +1321,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             method: HttpMethod = 'GET',
             payload: HttpPayload | None = None,
             headers: HttpHeaders | dict[str, str] | None = None,
+            timeout: timedelta | None = None,
         ) -> HttpResponse:
             return await self._http_client.send_request(
                 url=url,
@@ -1329,6 +1330,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 headers=headers,
                 session=session,
                 proxy_info=proxy_info,
+                timeout=timeout,
             )
 
         return send_request
