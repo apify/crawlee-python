@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - **sitemaps:** Allow Sitemap.from_xml_string to opt into enqueue host filtering ([#2162](https://github.com/apify/crawlee-python/pull/2162)) ([a3c20c1](https://github.com/apify/crawlee-python/commit/a3c20c15a15f7ffa5644640adde6daf1dd4c3523)) by [@aryansk](https://github.com/aryansk), closes [#2118](https://github.com/apify/crawlee-python/issues/2118)
+- **playwright:** Scope custom request headers to the navigation request ([#2173](https://github.com/apify/crawlee-python/pull/2173)) ([6f0eff4](https://github.com/apify/crawlee-python/commit/6f0eff49c7396a31754a9be3ad428ae5ed08348f)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->
