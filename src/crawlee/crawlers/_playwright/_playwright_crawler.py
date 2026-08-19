@@ -33,23 +33,19 @@ from ._playwright_http_client import PlaywrightHttpClient, browser_page_context
 from ._playwright_post_nav_crawling_context import PlaywrightPostNavCrawlingContext
 from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
 from ._types import BlockRequestsFunction, GotoOptions
-from ._utils import block_requests, infinite_scroll
+from ._utils import NavigationRequestInterceptor, block_requests, infinite_scroll
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator, Mapping
     from pathlib import Path
 
-    from playwright.async_api import Page, Response, Route
-    from playwright.async_api import Request as PlaywrightRequest
+    from playwright.async_api import Page, Response
     from typing_extensions import Unpack
 
     from crawlee import RequestTransformAction
     from crawlee._types import (
         EnqueueLinksKwargs,
         ExtractLinksFunction,
-        HttpHeaders,
-        HttpMethod,
-        HttpPayload,
         JsonSerializable,
     )
     from crawlee.browsers._types import BrowserType
@@ -350,27 +346,6 @@ class PlaywrightCrawler(
             # Yield should be inside the browser_page_context.
             yield pre_navigation_context
 
-    def _prepare_request_interceptor(
-        self,
-        method: HttpMethod = 'GET',
-        headers: HttpHeaders | dict[str, str] | None = None,
-        payload: HttpPayload | None = None,
-    ) -> Callable:
-        """Create a request interceptor for Playwright to support non-GET methods with custom parameters.
-
-        The interceptor modifies requests by adding custom headers and payload before they are sent.
-
-        Args:
-            method: HTTP method to use for the request.
-            headers: Custom HTTP headers to send with the request.
-            payload: Request body data for POST/PUT requests.
-        """
-
-        async def route_handler(route: Route, _: PlaywrightRequest) -> None:
-            await route.continue_(method=method, headers=dict(headers) if headers else None, post_data=payload)
-
-        return route_handler
-
     async def _navigate(
         self,
         context: TPreNavContext,
@@ -399,9 +374,6 @@ class PlaywrightCrawler(
             session_cookies = context.session.cookies.get_cookies_as_playwright_format()
             await self._update_cookies(context.page, session_cookies)
 
-        if context.request.headers:
-            await context.page.set_extra_http_headers(context.request.headers.model_dump())
-        # Navigate to the URL and get response.
         if context.request.method != 'GET':
             # Call the notification only once
             warnings.warn(
@@ -411,14 +383,16 @@ class PlaywrightCrawler(
                 stacklevel=2,
             )
 
-            route_handler = self._prepare_request_interceptor(
+        # Apply the custom method, headers, and payload to the navigation request only; the details of doing
+        # that correctly live in `NavigationRequestInterceptor`.
+        if context.request.headers or context.request.method != 'GET':
+            interceptor = NavigationRequestInterceptor(
+                context.page,
                 method=context.request.method,
                 headers=context.request.headers,
                 payload=context.request.payload,
             )
-
-            # Set route_handler only for current request
-            await context.page.route(context.request.url, route_handler)
+            await interceptor.register()
 
         try:
             async with self._shared_navigation_timeouts[id(context.request)] as remaining_timeout:
