@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import warnings
+from contextlib import asynccontextmanager, suppress
 from datetime import timedelta
 from functools import partial
 from typing import TYPE_CHECKING, Any, Generic, Literal, cast
@@ -36,7 +37,7 @@ from ._types import BlockRequestsFunction, GotoOptions
 from ._utils import block_requests, infinite_scroll
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator, Mapping
+    from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Iterator, Mapping
     from pathlib import Path
 
     from playwright.async_api import Page, Response, Route
@@ -54,6 +55,9 @@ if TYPE_CHECKING:
     )
     from crawlee.browsers._types import BrowserType
 
+
+_ALL_URLS_PATTERN = '**/*'
+"""Route pattern matching every URL. The route handler itself decides which requests it applies to."""
 
 TPreNavContext = TypeVar(
     'TPreNavContext', bound=PlaywrightPreNavCrawlingContext, default=PlaywrightPreNavCrawlingContext
@@ -371,6 +375,67 @@ class PlaywrightCrawler(
 
         return route_handler
 
+    @asynccontextmanager
+    async def _override_navigation_request(self, context: TPreNavContext) -> AsyncIterator[None]:
+        """Apply the request's method, headers, and payload to the navigation performed inside the block.
+
+        The overrides are applied through a route rather than through `Page.set_extra_http_headers`, which is
+        page-wide and would leak sensitive values such as `Authorization` to every request the page makes,
+        including cross-origin subresources.
+
+        The overriding route retires itself once it has served the navigation request, so that a client-side
+        navigation triggered by the page while it is still loading cannot pick the overrides up. A
+        pass-through route is left behind until the navigation is over, because the browser re-applies the
+        overridden headers to redirect hops only while request interception is on, and Playwright turns
+        interception off as soon as the last route is removed.
+
+        Args:
+            context: The pre-navigation crawling context of the request being crawled.
+        """
+        if not context.request.headers and context.request.method == 'GET':
+            yield
+            return
+
+        apply_overrides = self._prepare_request_interceptor(
+            method=context.request.method,
+            headers=context.request.headers,
+            payload=context.request.payload,
+        )
+
+        async def keep_interception_enabled(route: Route, _: PlaywrightRequest) -> None:
+            """Leave the request untouched, keeping request interception on for the redirect hops."""
+            await route.fallback()
+
+        async def override_navigation_request(route: Route, request: PlaywrightRequest) -> None:
+            # Match the navigation request itself rather than its URL. The browser normalizes URLs (adds the
+            # root path, strips the fragment) and treats glob metacharacters in them specially, so matching
+            # on `Request.url` can silently miss. Redirect hops are not routed at all - the browser carries
+            # the overridden headers over to them on its own.
+            if not (request.is_navigation_request() and request.frame == context.page.main_frame):
+                await route.fallback()
+                return
+
+            await apply_overrides(route, request)
+
+            # The overrides belong to this one navigation, so the route retires as soon as it has served it.
+            # Until then it stays registered, so a request that arrives before the navigation one - and is
+            # rejected by the check above - does not consume it.
+            await context.page.unroute(_ALL_URLS_PATTERN, override_navigation_request)
+
+        # The route registered last is matched first, so the overriding one sees requests before the
+        # pass-through one, and the pass-through one outlives it.
+        await context.page.route(_ALL_URLS_PATTERN, keep_interception_enabled)
+        await context.page.route(_ALL_URLS_PATTERN, override_navigation_request)
+
+        try:
+            yield
+        finally:
+            # Removing the overriding route is a no-op once it has retired itself, and matters only when the
+            # navigation never happened. The page may already be gone, e.g. after a browser crash.
+            for handler in (override_navigation_request, keep_interception_enabled):
+                with suppress(playwright.async_api.Error):
+                    await context.page.unroute(_ALL_URLS_PATTERN, handler)
+
     async def _navigate(
         self,
         context: TPreNavContext,
@@ -408,33 +473,11 @@ class PlaywrightCrawler(
                 stacklevel=2,
             )
 
-        # Apply custom headers via a route scoped to the navigation request; page-wide `set_extra_http_headers`
-        # would leak sensitive values like `Authorization` to every subresource request the page makes.
-        if context.request.headers or context.request.method != 'GET':
-            route_handler = self._prepare_request_interceptor(
-                method=context.request.method,
-                headers=context.request.headers,
-                payload=context.request.payload,
-            )
-            applied = False
-
-            async def navigation_route_handler(route: Route, request: PlaywrightRequest) -> None:
-                nonlocal applied
-                # Match the main-frame navigation request itself rather than its URL; the browser normalizes
-                # URLs (adds the root path, strips fragments), so a string comparison with `request.url` can
-                # silently miss. Redirect hops bypass routing and inherit the header overrides.
-                if not applied and request.is_navigation_request() and request.frame == context.page.main_frame:
-                    applied = True
-                    await route_handler(route, request)
-                else:
-                    await route.fallback()
-
-            # Once the overrides are applied, the predicate stops matching, so subresource requests
-            # skip the handler entirely.
-            await context.page.route(lambda _: not applied, navigation_route_handler)
-
         try:
-            async with self._shared_navigation_timeouts[id(context.request)] as remaining_timeout:
+            async with (
+                self._override_navigation_request(context),
+                self._shared_navigation_timeouts[id(context.request)] as remaining_timeout,
+            ):
                 response = await context.page.goto(
                     context.request.url, timeout=remaining_timeout.total_seconds() * 1000, **context.goto_options
                 )

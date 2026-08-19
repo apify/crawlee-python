@@ -383,6 +383,50 @@ async def test_custom_headers_survive_redirect(server_url: URL) -> None:
     assert received_headers.get('authorization') == 'Bearer secret-token'
 
 
+async def test_custom_headers_not_sent_with_client_side_navigation(server_url: URL, redirect_server_url: URL) -> None:
+    """Custom headers are not applied to a navigation the page triggers on its own while it is still loading."""
+    crawler = PlaywrightCrawler(max_request_retries=1)
+
+    target_url = str(redirect_server_url / 'headers')
+    # The image keeps the page loading, so the client-side navigation happens before `goto` returns.
+    page_html = (
+        f'<html><body><img src="{server_url / "slow"}">'
+        f'<script>setTimeout(() => {{ location.href = "{target_url}"; }}, 50);</script>'
+        f'</body></html>'
+    )
+    start_url = str((server_url / 'echo_content').with_query(content=page_html))
+    received_headers = dict[str, str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        await context.page.wait_for_url(target_url)
+        # The `/headers` endpoint echoes back the headers it received.
+        received_headers.update(json.loads(await context.page.evaluate('document.body.innerText')))
+
+    await crawler.run([Request.from_url(start_url, headers={'authorization': 'Bearer secret-token'})])
+
+    assert received_headers
+    assert 'authorization' not in received_headers
+
+
+async def test_custom_headers_not_sent_with_later_navigation(server_url: URL) -> None:
+    """Custom headers are applied to the crawled navigation only, not to navigations the handler makes later."""
+    crawler = PlaywrightCrawler()
+    later_navigation_headers = dict[str, str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        # The `/headers` endpoint echoes back the headers it received.
+        response = await context.page.goto(str(server_url / 'headers'))
+        assert response is not None
+        later_navigation_headers.update(json.loads(await response.text()))
+
+    await crawler.run([Request.from_url(str(server_url / 'get'), headers={'authorization': 'Bearer secret-token'})])
+
+    assert later_navigation_headers
+    assert 'authorization' not in later_navigation_headers
+
+
 async def test_pre_navigation_hook() -> None:
     crawler = PlaywrightCrawler(request_handler=mock.AsyncMock())
     visit = mock.Mock()
