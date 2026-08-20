@@ -44,7 +44,7 @@ def test_same_origin(url: str, other: str, *, expected: bool) -> None:
 async def test_proxy_kwarg_does_not_reach_the_client() -> None:
     """Test that a `proxy` kwarg cannot mount a transport that would bypass the cookie handling."""
     async with HttpxHttpClient(proxy='http://user:password@127.0.0.1:8888') as client:
-        assert client._get_client(None)._mounts == {}
+        assert client._get_client(None)._mounts == {}  # ty: ignore[unresolved-attribute]
 
 
 def test_silences_httpx_request_logging() -> None:

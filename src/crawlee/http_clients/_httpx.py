@@ -86,7 +86,7 @@ class _HttpxTransport(httpx.AsyncHTTPTransport):
         original_url, user_cookie = request.extensions.get('crawlee_caller_cookie', (None, None))
 
         # `httpx` drops the `Cookie` header on every redirect, so it is set here before every hop.
-        if user_cookie is not None and _same_origin(original_url, request.url):
+        if original_url is not None and _same_origin(original_url, request.url):
             request.headers['cookie'] = user_cookie
         elif session and (cookies := session.cookies.get_cookie_string(str(request.url))):
             request.headers['cookie'] = cookies
@@ -303,7 +303,8 @@ class HttpxHttpClient(HttpClient):
         extensions: dict[str, Any] = {'crawlee_session': session}
 
         # `httpx` drops the `Cookie` header on every redirect but keeps the extensions, so the header of the caller
-        # travels there. An empty header is kept as well, it means the caller wants no cookies sent at all.
+        # travels there. An empty header is kept as well, it suppresses the session cookies while the chain stays
+        # on the origin the header was meant for.
         if (caller_cookie := headers.get('cookie')) is not None:
             extensions['crawlee_caller_cookie'] = (httpx.URL(url), caller_cookie)
 
