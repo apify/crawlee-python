@@ -375,6 +375,20 @@ async def test_crawl_delay_throttles_after_dispatch(manager: ThrottlingRequestMa
     assert manager._is_domain_throttled(THROTTLED_DOMAIN)
 
 
+async def test_dispatch_does_not_shorten_active_backoff(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A short crawl-delay armed on dispatch must not cut an active 429 backoff short."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    manager.set_crawl_delay(url, 1)
+    state = manager._domain_states[THROTTLED_DOMAIN]
+
+    with _frozen_clock() as clock:
+        manager.record_domain_delay(url, retry_after=timedelta(seconds=30))
+        manager._mark_domain_dispatched(THROTTLED_DOMAIN)
+
+        assert state.crawl_delay_until == clock.now.return_value + timedelta(seconds=1)
+        assert state.throttled_until == clock.now.return_value + timedelta(seconds=30)
+
+
 async def test_backoff_escalates_under_a_long_crawl_delay(manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """A crawl-delay longer than the backoff sets the retry cadence, and the exponent must still escalate."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
