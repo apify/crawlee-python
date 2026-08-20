@@ -371,13 +371,15 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         except ValueError:
             host = None
 
-        if not host:
+        key = cls._normalize_domain(host) if host else ''
+
+        if not key:
             raise ValueError(
                 f'"{domain}" is not a valid hostname. The `domains` option takes bare hostnames such as '
                 f'"example.com"; an IPv6 address has to be bracketed, as in "[::1]".'
             )
 
-        return cls._normalize_domain(host)
+        return key
 
     @classmethod
     def _extract_domain(cls, url: str) -> str:

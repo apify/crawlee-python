@@ -148,15 +148,23 @@ async def test_domain_matching_normalizes_spelling(
     assert manager.record_domain_delay(url) is True
 
 
-async def test_unreadable_domain_is_rejected(
+@pytest.mark.parametrize(
+    'configured',
+    [
+        pytest.param('::1', id='unbracketed ipv6'),
+        pytest.param('.', id='bare root dot'),
+    ],
+)
+async def test_unmatchable_domain_is_rejected(
+    configured: str,
     inner_queue: RequestQueue,
     service_locator: ServiceLocator,
 ) -> None:
-    """An entry the URL parser cannot read is rejected at construction instead of never matching anything."""
+    """An entry that cannot yield a matchable hostname is rejected at construction, not silently kept."""
     with pytest.raises(ValueError, match='not a valid hostname'):
         ThrottlingRequestManager(
             inner_queue,
-            domains=['::1'],
+            domains=[configured],
             request_manager_opener=RequestQueue.open,
             service_locator=service_locator,
         )
