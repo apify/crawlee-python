@@ -24,8 +24,8 @@ THROTTLED_DOMAIN = 'throttled.com'
 NON_THROTTLED_DOMAIN = 'free.com'
 TEST_DOMAINS = [THROTTLED_DOMAIN]
 
-_MANAGER_MODULE = 'crawlee.request_loaders._throttling_request_manager'
-_CLOCK_START = datetime(2026, 1, 1, tzinfo=timezone.utc)
+MANAGER_MODULE = 'crawlee.request_loaders._throttling_request_manager'
+CLOCK_START = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
 @pytest.fixture
@@ -63,10 +63,10 @@ def _make_request(url: str) -> Request:
 
 
 @contextmanager
-def _frozen_clock(start: datetime = _CLOCK_START) -> Iterator[MagicMock]:
-    """Freeze the manager's clock at `start`. Move it by reassigning `clock.now.return_value`."""
-    with patch(f'{_MANAGER_MODULE}.datetime') as clock:
-        clock.now.return_value = start
+def _frozen_clock() -> Iterator[MagicMock]:
+    """Freeze the manager's clock at `CLOCK_START`. Move it by reassigning `clock.now.return_value`."""
+    with patch(f'{MANAGER_MODULE}.datetime') as clock:
+        clock.now.return_value = CLOCK_START
         yield clock
 
 
@@ -315,7 +315,7 @@ async def test_capping_warning_names_the_backoff_on_zero_retry_after(
     url = f'https://{THROTTLED_DOMAIN}/page1'
     state = manager._domain_states[THROTTLED_DOMAIN]
 
-    with caplog.at_level('WARNING', logger=_MANAGER_MODULE), _frozen_clock() as clock:
+    with caplog.at_level('WARNING', logger=MANAGER_MODULE), _frozen_clock() as clock:
         for _ in range(20):
             manager.record_domain_delay(url, retry_after=timedelta(0))
             clock.now.return_value = state.backoff_until + timedelta(milliseconds=1)
