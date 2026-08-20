@@ -31,8 +31,8 @@ def parse_retry_after_header(value: str | None) -> timedelta | None:
         pass  # Not an integer, fall through to the HTTP-date form below.
     else:
         if seconds <= 0:
-            # A negative delay is malformed, a zero one carries no back-off. Reject both, so the caller falls back to
-            # its own back-off instead of silently losing it.
+            # A negative delay is malformed and a zero one carries no backoff, so reject both and let the caller
+            # apply its own backoff instead.
             logger.debug(f'Retry-After delay-seconds {value!r} is not positive; ignoring.')
             return None
         return timedelta(seconds=seconds)

@@ -326,7 +326,7 @@ async def test_capping_warning_names_the_backoff_on_zero_retry_after(
 
 
 async def test_success_resets_backoff(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """An explicit record_success should reset the consecutive 429 count."""
+    """An explicit `record_success` should reset the consecutive 429 count."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     state = manager._domain_states[THROTTLED_DOMAIN]
 
@@ -693,7 +693,7 @@ def test_parse_retry_after_integer_seconds() -> None:
 
 
 def test_parse_retry_after_zero_seconds() -> None:
-    """A delay of `0` carries no back-off, so it must be reported as a missing header."""
+    """A delay of `0` carries no backoff, so it must be reported as a missing header."""
     assert parse_retry_after_header('0') is None
 
 

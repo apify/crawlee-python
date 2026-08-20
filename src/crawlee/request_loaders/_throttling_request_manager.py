@@ -28,7 +28,7 @@ logger = getLogger(__name__)
 TRequestManager = TypeVar('TRequestManager', bound=RequestManager)
 
 _NEVER_THROTTLED = datetime.min.replace(tzinfo=timezone.utc)
-"""Sentinel timestamp meaning a dispatch clock has never been armed."""
+"""Sentinel timestamp meaning one of a domain's throttle clocks has never been armed."""
 
 _MAX_BACKOFF_EXPONENT = 20
 """Highest exponent the 429 backoff doubles to. `max_delay` caps the delay far below this, while an unbounded exponent
@@ -126,8 +126,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """Empty the inner manager and all sub-managers, and reset transient per-domain throttle state.
 
         The configured domain list and any robots.txt-derived `crawl_delay` are preserved; only the dynamic backoff
-        state (consecutive 429 counter and the two dispatch clocks) is cleared. Sub-managers are kept around so they
-        don't need to be re-opened on the next request — they're just emptied.
+        state (consecutive 429 counter and the throttle clocks) is cleared. Sub-managers are kept around so they don't
+        need to be re-opened on the next request — they're just emptied.
         """
         await asyncio.gather(self._inner.purge(), *(sm.purge() for sm in self._sub_managers.values()))
         for state in self._domain_states.values():
@@ -304,8 +304,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 priority over the calculated exponential backoff.
 
         Returns:
-            True if the URL's domain is configured for throttling and the 429 was recorded; False if the domain is not
-            in the configured `domains` list, in which case the call is a no-op.
+            True if the URL's domain is configured for throttling, whether or not this 429 advanced the backoff; False
+            if the domain is not in the configured `domains` list, in which case the call is a no-op.
         """
         state = self._get_domain_state(url)
         if state is None:
@@ -354,7 +354,10 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         return True
 
     def record_success(self, url: str) -> None:
-        """Record a successful request, resetting the backoff state for that domain.
+        """Reset a domain's consecutive 429 count, so the next 429 starts the backoff over at `base_delay`.
+
+        An active backoff window is not lifted. The manager does not call this itself; the count decays on its own once
+        the domain has stopped rate-limiting for a full extra window.
 
         Args:
             url: The URL that received a successful response.
