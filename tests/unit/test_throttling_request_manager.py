@@ -489,7 +489,7 @@ async def test_get_total_count_aggregates(manager: ThrottlingRequestManager[Requ
 
 
 async def test_is_empty_aggregates(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """is_empty should return False if any manager has requests."""
+    """is_empty should return False if any manager that is not in a cooldown has requests."""
     assert await manager.is_empty() is True
 
     await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
