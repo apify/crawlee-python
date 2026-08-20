@@ -225,20 +225,40 @@ async def test_backoff_decays_when_quiet(manager: ThrottlingRequestManager[Reque
         assert state.backoff_until == clock.now.return_value + manager._base_delay
 
 
-async def test_max_delay_cap(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """Backoff should cap at max_delay (60s)."""
+@pytest.mark.parametrize(
+    ('base_delay', 'windows'),
+    [
+        pytest.param(timedelta(seconds=2), 20, id='default base delay'),
+        pytest.param(timedelta(seconds=2), 60, id='sustained rate limiting'),
+        pytest.param(timedelta(hours=6), 40, id='base delay in hours'),
+    ],
+)
+async def test_max_delay_cap(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+    base_delay: timedelta,
+    windows: int,
+) -> None:
+    """Backoff caps at `max_delay` and keeps the doubling representable however long the domain rate-limits."""
+    manager = ThrottlingRequestManager(
+        inner_queue,
+        domains=TEST_DOMAINS,
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+        base_delay=base_delay,
+    )
     url = f'https://{THROTTLED_DOMAIN}/page1'
     state = manager._domain_states[THROTTLED_DOMAIN]
 
     with _frozen_clock() as clock:
-        for _ in range(20):
+        for _ in range(windows):
             armed_at = clock.now.return_value
             manager.record_domain_delay(url)
             # Step just past the window, staying short of its decay deadline.
             clock.now.return_value = state.backoff_until + timedelta(milliseconds=1)
 
-    assert state.consecutive_429_count == 20
-    assert state.backoff_until - armed_at == manager._max_delay
+        assert state.consecutive_429_count == windows
+        assert state.backoff_until - armed_at == manager._max_delay
 
 
 async def test_retry_after_header_priority(manager: ThrottlingRequestManager[RequestQueue]) -> None:

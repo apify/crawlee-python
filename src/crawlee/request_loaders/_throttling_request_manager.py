@@ -30,6 +30,12 @@ TRequestManager = TypeVar('TRequestManager', bound=RequestManager)
 _NEVER_THROTTLED = datetime.min.replace(tzinfo=timezone.utc)
 """Sentinel timestamp meaning a dispatch clock has never been armed."""
 
+_MAX_BACKOFF_EXPONENT = 20
+"""Highest exponent the 429 backoff doubles to. `max_delay` caps the delay far below this, while an unbounded exponent
+eventually overflows the `timedelta` multiplication. Low enough that the doubling stays representable for any
+`base_delay` up to a year.
+"""
+
 
 @docs_group('Request loaders')
 class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
@@ -324,7 +330,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             delay = retry_after
             source = 'Retry-After header'
         else:
-            delay = self._base_delay * (2 ** (state.consecutive_429_count - 1))
+            delay = self._base_delay * 2 ** min(state.consecutive_429_count - 1, _MAX_BACKOFF_EXPONENT)
             source = 'exponential backoff'
 
         if delay > self._max_delay:
