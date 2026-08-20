@@ -702,6 +702,40 @@ async def test_sub_managers_opened_once(
     assert opener.await_count == len(domains)
 
 
+async def test_failed_open_keeps_successful_sub_managers(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> None:
+    """A failing opener leaves the sub-managers that did open in place, so a retry opens only what is missing."""
+    domains = [THROTTLED_DOMAIN, SECOND_THROTTLED_DOMAIN]
+    failing_alias = f'throttled-{SECOND_THROTTLED_DOMAIN}'
+    pending_failures = {failing_alias}
+
+    async def open_once_failing(*, alias: str, **kwargs: Any) -> RequestQueue:
+        if alias in pending_failures:
+            pending_failures.discard(alias)
+            raise RuntimeError('storage unavailable')
+        return await RequestQueue.open(alias=alias, **kwargs)
+
+    opener = AsyncMock(side_effect=open_once_failing)
+    manager: ThrottlingRequestManager[RequestQueue] = ThrottlingRequestManager(
+        inner_queue,
+        domains=domains,
+        request_manager_opener=opener,
+        service_locator=service_locator,
+    )
+
+    with pytest.raises(RuntimeError, match='storage unavailable'):
+        await manager.is_empty()
+
+    assert await manager.is_empty() is True
+
+    # The domain that opened before its sibling failed is reused, not opened a second time.
+    opened_aliases = [call.kwargs['alias'] for call in opener.await_args_list]
+    assert opened_aliases.count(f'throttled-{THROTTLED_DOMAIN}') == 1
+    assert opened_aliases.count(failing_alias) == 2
+
+
 async def test_read_path_after_drop_reopens_sub_managers(
     manager: ThrottlingRequestManager[RequestQueue],
 ) -> None:

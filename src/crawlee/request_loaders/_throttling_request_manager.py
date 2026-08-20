@@ -403,14 +403,29 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         )
 
     async def _ensure_sub_managers(self) -> None:
-        """Open a sub-manager for every configured domain, once."""
+        """Open a sub-manager for every configured domain, once.
+
+        Sub-managers that opened before a sibling failed are kept, so a retry after a failure opens only what is
+        still missing.
+        """
         if self._sub_managers_ready:
             return
 
         async with self._sub_managers_lock:
             if self._sub_managers_ready:
                 return
-            await asyncio.gather(*(self._open_sub_manager(domain) for domain in self._domain_states))
+
+            # Every attempt has to settle before the lock is released. A propagating error would leave the remaining
+            # openers running unawaited, free to write into `_sub_managers` after a retry has already replaced the
+            # manager for that domain - stranding whatever the loser of that race holds.
+            missing = [domain for domain in self._domain_states if domain not in self._sub_managers]
+            results = await asyncio.gather(
+                *(self._open_sub_manager(domain) for domain in missing), return_exceptions=True
+            )
+            for result in results:
+                if isinstance(result, BaseException):
+                    raise result
+
             self._sub_managers_ready = True
 
     def _is_domain_throttled(self, domain: str) -> bool:
