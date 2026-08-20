@@ -317,6 +317,10 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         # advances the exponent. Checking `crawl_delay_until` too would swallow every 429, as it is armed on every
         # dispatch.
         if now < state.backoff_until:
+            logger.debug(
+                f'Ignoring an HTTP 429 from domain "{state.domain}" received during an active backoff '
+                f'(consecutive: {state.consecutive_429_count}).'
+            )
             return True
 
         # The domain has been quiet for a full extra window, so this 429 opens a new run instead of continuing the old.
