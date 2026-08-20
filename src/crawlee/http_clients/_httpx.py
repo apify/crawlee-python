@@ -62,20 +62,39 @@ class _HttpxResponse:
                 yield chunk
 
 
-class _HttpxTransport(httpx.AsyncHTTPTransport):
-    """HTTP transport adapter that stores response cookies in a `Session`.
+def _same_origin(url: httpx.URL, other: httpx.URL) -> bool:
+    """Check whether two URLs share an origin."""
+    return url.scheme == other.scheme and url.host == other.host and url.port == other.port
 
-    This transport adapter modifies the handling of HTTP requests to update the session cookies
-    based on the response cookies, ensuring that the cookies are stored in the session object
-    rather than the `HTTPX` client itself.
+
+class _HttpxTransport(httpx.AsyncHTTPTransport):
+    """HTTP transport adapter that keeps cookies in a `Session` instead of in the `HTTPX` client.
+
+    Response cookies are stored in the session and the `Cookie` header is rebuilt from it before every hop, so
+    one client can be shared by all sessions. A `Cookie` header passed by the caller wins for as long as the
+    redirect chain stays on its origin.
     """
+
+    def __init__(self, *args: Any, persist_cookies_per_session: bool, **kwargs: Any) -> None:
+        """Initialize a new instance. Extra arguments are passed to `httpx.AsyncHTTPTransport`."""
+        self._persist_cookies_per_session = persist_cookies_per_session
+        super().__init__(*args, **kwargs)
 
     @override
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        session = cast('Session | None', request.extensions.get('crawlee_session'))
+        original_url, user_cookie = request.extensions.get('crawlee_caller_cookie', (None, None))
+
+        # `httpx` drops the `Cookie` header on every redirect, so it is set here before every hop.
+        if user_cookie is not None and _same_origin(original_url, request.url):
+            request.headers['cookie'] = user_cookie
+        elif session and (cookies := session.cookies.get_cookie_string(str(request.url))):
+            request.headers['cookie'] = cookies
+
         response = await super().handle_async_request(request)
         response.request = request
 
-        if session := cast('Session', request.extensions.get('crawlee_session')):
+        if self._persist_cookies_per_session and session:
             session.cookies.store_cookies(list(response.cookies.jar))
 
         if 'Set-Cookie' in response.headers:
@@ -124,7 +143,9 @@ class HttpxHttpClient(HttpClient):
             http2: Whether to enable HTTP/2 support.
             verify: SSL certificates used to verify the identity of requested hosts.
             header_generator: Header generator instance to use for generating common headers.
-            async_client_kwargs: Additional keyword arguments for `httpx.AsyncClient`.
+            async_client_kwargs: Additional keyword arguments for `httpx.AsyncClient`. The `proxy` argument is
+                ignored, proxies are configured through `ProxyConfiguration`. The `limits` argument applies per
+                proxy, because every proxy gets a connection pool of its own.
         """
         super().__init__(
             persist_cookies_per_session=persist_cookies_per_session,
@@ -138,12 +159,13 @@ class HttpxHttpClient(HttpClient):
         self._http1 = http1
         self._http2 = http2
 
+        # A `proxy=` kwarg would mount a transport of its own and bypass the cookie handling.
+        async_client_kwargs.pop('proxy', None)
+
         self._async_client_kwargs = async_client_kwargs
         self._header_generator = header_generator
 
         self._ssl_context = httpx.create_ssl_context(verify=verify)
-
-        self._transport: _HttpxTransport | None = None
 
         self._client_by_proxy_url = dict[str | None, httpx.AsyncClient]()
 
@@ -158,16 +180,15 @@ class HttpxHttpClient(HttpClient):
         timeout: timedelta | None = None,
     ) -> HttpCrawlingResult:
         client = self._get_client(proxy_info.url if proxy_info else None)
-        headers = self._combine_headers(request.headers)
 
-        http_request = client.build_request(
+        http_request = self._build_request(
+            client=client,
+            session=session,
             url=request.url,
             method=request.method,
-            headers=headers,
-            content=request.payload,
-            cookies=session.cookies.jar if session else None,
-            extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
-            timeout=timeout.total_seconds() if timeout is not None else httpx.USE_CLIENT_DEFAULT,
+            headers=request.headers,
+            payload=request.payload,
+            timeout=httpx.Timeout(timeout.total_seconds()) if timeout is not None else None,
         )
 
         try:
@@ -279,12 +300,19 @@ class HttpxHttpClient(HttpClient):
 
         headers = self._combine_headers(headers)
 
+        extensions: dict[str, Any] = {'crawlee_session': session}
+
+        # `httpx` drops the `Cookie` header on every redirect but keeps the extensions, so the header of the caller
+        # travels there. An empty header is kept as well, it means the caller wants no cookies sent at all.
+        if (caller_cookie := headers.get('cookie')) is not None:
+            extensions['crawlee_caller_cookie'] = (httpx.URL(url), caller_cookie)
+
         return client.build_request(
             url=url,
             method=method,
             headers=dict(headers) if headers else None,
             content=payload,
-            extensions={'crawlee_session': session if self._persist_cookies_per_session else None},
+            extensions=extensions,
             timeout=timeout or httpx.USE_CLIENT_DEFAULT,
         )
 
@@ -293,23 +321,25 @@ class HttpxHttpClient(HttpClient):
 
         If a client for the specified proxy URL does not exist, create and store a new one.
         """
-        if not self._transport:
-            # Configure connection pool limits and keep-alive connections for transport
-            limits = self._async_client_kwargs.get(
-                'limits', httpx.Limits(max_connections=1000, max_keepalive_connections=200)
-            )
-
-            self._transport = _HttpxTransport(
-                http1=self._http1,
-                http2=self._http2,
-                verify=self._ssl_context,
-                limits=limits,
-            )
-
         if proxy_url not in self._client_by_proxy_url:
+            # A client built with `proxy=` mounts a transport of its own for proxied URLs and never calls the one
+            # passed in `transport=`, so the proxy has to be handled by the transport to keep the cookie handling.
+            transport_kwargs: dict[str, Any] = {
+                'http1': self._http1,
+                'http2': self._http2,
+                'verify': self._ssl_context,
+                'proxy': proxy_url,
+                'persist_cookies_per_session': self._persist_cookies_per_session,
+            }
+
+            # Every proxy gets a pool of its own, so the `httpx` limits are left at their defaults.
+            if 'limits' in self._async_client_kwargs:
+                transport_kwargs['limits'] = self._async_client_kwargs['limits']
+
+            transport = _HttpxTransport(**transport_kwargs)
+
             # Prepare a default kwargs for the new client.
             kwargs: dict[str, Any] = {
-                'proxy': proxy_url,
                 'http1': self._http1,
                 'http2': self._http2,
                 'follow_redirects': True,
@@ -320,7 +350,7 @@ class HttpxHttpClient(HttpClient):
 
             kwargs.update(
                 {
-                    'transport': self._transport,
+                    'transport': transport,
                     'verify': self._ssl_context,
                 }
             )
@@ -330,19 +360,21 @@ class HttpxHttpClient(HttpClient):
 
         return self._client_by_proxy_url[proxy_url]
 
-    def _combine_headers(self, explicit_headers: HttpHeaders | None) -> HttpHeaders | None:
-        """Merge default headers with explicit headers for an HTTP request.
+    def _combine_headers(self, explicit_headers: HttpHeaders | None) -> HttpHeaders:
+        """Merge generated headers with explicit headers for an HTTP request.
 
-        Generate a final set of request headers by combining default headers, a random User-Agent header,
-        and any explicitly provided headers.
+        The generated headers come from a single browser profile, so that the set stays consistent. Explicit
+        headers win over the generated ones.
         """
-        common_headers = self._header_generator.get_common_headers() if self._header_generator else HttpHeaders()
-        user_agent_header = (
-            self._header_generator.get_random_user_agent_header() if self._header_generator else HttpHeaders()
-        )
+        if self._header_generator:
+            generated_headers = self._header_generator.get_specific_headers(
+                header_names={'Accept', 'Accept-Language', 'User-Agent'},
+            )
+        else:
+            generated_headers = HttpHeaders()
+
         explicit_headers = explicit_headers or HttpHeaders()
-        headers = common_headers | user_agent_header | explicit_headers
-        return headers or None
+        return generated_headers | explicit_headers
 
     @staticmethod
     def _is_proxy_error(error: httpx.TransportError) -> bool:
@@ -363,6 +395,3 @@ class HttpxHttpClient(HttpClient):
         for client in self._client_by_proxy_url.values():
             await client.aclose()
         self._client_by_proxy_url.clear()
-        if self._transport:
-            await self._transport.aclose()
-            self._transport = None
