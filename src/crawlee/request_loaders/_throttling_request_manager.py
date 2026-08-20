@@ -48,9 +48,11 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     - HTTP 429 responses (via `record_domain_delay`)
     - robots.txt crawl-delay directives (via `set_crawl_delay`)
 
-    The class is generic over the wrapped manager type. On first use, the `request_manager_opener` callback opens one
-    sub-manager per configured domain, so every sub-manager shares the same `RequestManager` subclass and backing store
-    as `inner`. The opener must accept `alias`, `storage_client`, and `configuration` keyword arguments (as
+    The class is generic over the wrapped manager type. The first asynchronous operation - adding, fetching,
+    completing, counting, purging, or dropping - makes the `request_manager_opener` callback open one sub-manager per
+    configured domain, so every sub-manager shares the same `RequestManager` subclass and backing store as `inner`. The
+    synchronous delay methods (`record_domain_delay`, `record_success`, `set_crawl_delay`) only touch in-memory state
+    and never open anything. The opener must accept `alias`, `storage_client`, and `configuration` keyword arguments (as
     `RequestQueue.open` does) and return the same concrete subclass as `inner`.
 
     Opening the sub-managers up front also makes requests left over in a persistent store by a previous run visible
@@ -115,7 +117,14 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         manager. Such a request can live in `inner` if it was added before its domain was listed, and it must be given
         back to the manager it came from. Requests for unconfigured domains need no record, as they route to `inner` by
         default. The URL is part of the key because `unique_key` may be set explicitly and is only unique per store, so
-        a key alone could match a same-key request held by a sub-manager."""
+        a key alone could match a same-key request held by a sub-manager.
+
+        The pair identifies a request by value, not by object. One URL can be in flight from both `inner` and its
+        sub-manager at once - deduplication is per store, so both may hold it - and the two completions can then be
+        routed to each other's manager. Both stores hold the key, so each completion still lands: the cost is a
+        duplicate crawl of that URL and a retry that skips the domain's delay, not a stalled queue. Telling the two
+        copies apart would take per-request identity, which `Request` cannot offer as it is unhashable and compares
+        by value."""
         self._new_work_event = asyncio.Event()
         """Set whenever a request is added or reclaimed. Lets `fetch_next_request` wake from a throttle
         wait early when fresh work appears, instead of sleeping for the full computed cooldown."""
