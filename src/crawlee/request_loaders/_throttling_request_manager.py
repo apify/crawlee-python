@@ -84,9 +84,11 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         Args:
             inner: The underlying request manager to wrap (typically a `RequestQueue`). Requests for non-throttled
                 domains are stored here.
-            domains: Explicit list of domain hostnames to throttle. Only requests matching these domains will be routed
-                to per-domain sub-managers. Matching is case-insensitive (hostnames are lowercased) and exact: subdomain
-                wildcards such as `*.example.com` are not supported — list each subdomain explicitly if needed.
+            domains: Domains to throttle, each given as a bare hostname such as `api.example.com`, or as any URL on
+                the domain, of which only the hostname is used. Only requests matching these domains will be routed
+                to per-domain sub-managers. Matching is exact but spelling-insensitive: casing, punycode versus
+                Unicode, and a trailing root dot are all normalized away. Subdomain wildcards such as
+                `*.example.com` are not supported — list each subdomain explicitly if needed.
             request_manager_opener: Async callable used to create per-domain sub-managers at insertion time. Must
                 accept `alias`, `storage_client`, and `configuration` keyword arguments and return the same concrete
                 subclass as `inner` (e.g. `RequestQueue.open` when `inner` is a `RequestQueue`).
@@ -96,7 +98,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             max_delay: Maximum delay between requests to a rate-limited domain.
 
         Raises:
-            ValueError: If an entry of `domains` is not a hostname the URL parser can read.
+            ValueError: If an entry of `domains` does not yield a hostname a crawled URL could match.
         """
         self._inner: TRequestManager = inner
         self._service_locator = service_locator if service_locator is not None else global_service_locator
@@ -361,7 +363,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
     @staticmethod
     def _normalize_domain(hostname: str) -> str:
-        """Bring a parsed hostname to the form domain keys are stored in, root dot and all casing gone."""
+        """Reduce a parsed hostname to the form domain keys are stored in: lowercase, without the root dot."""
         return hostname.lower().removesuffix('.')
 
     @classmethod
