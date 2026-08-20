@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import ipaddress
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
@@ -365,9 +366,20 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     @classmethod
     def _parse_configured_domain(cls, domain: str) -> str:
         """Turn one `domains` entry, a bare hostname or a URL, into the key its requests are looked up under."""
+        if '://' in domain:
+            url_text = domain
+        else:
+            # A bare hostname reaches the parser's IDNA handling only through a synthetic URL, and a bare IPv6
+            # literal has to be bracketed there, or the parser reads its last group as a port.
+            try:
+                ipaddress.IPv6Address(domain)
+            except ValueError:
+                url_text = f'https://{domain}'
+            else:
+                url_text = f'https://[{domain}]'
+
         try:
-            # A bare hostname reaches the parser, and with it IDNA and IPv6 handling, only through a synthetic URL.
-            host = (URL(domain) if '://' in domain else URL(f'https://{domain}')).host
+            host = URL(url_text).host
         except ValueError:
             host = None
 
@@ -376,7 +388,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         if not key:
             raise ValueError(
                 f'"{domain}" is not a valid hostname. The `domains` option takes bare hostnames such as '
-                f'"example.com"; an IPv6 address has to be bracketed, as in "[::1]".'
+                '"example.com", or any URL on the domain.'
             )
 
         return key

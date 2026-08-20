@@ -128,7 +128,9 @@ async def test_domain_matching_is_case_insensitive(
         pytest.param('example.com', 'http://example.com./page', id='root_dot_url'),
         pytest.param('example.com.', 'http://example.com/page', id='root_dot_configured'),
         pytest.param('[::1]', 'http://[::1]:8080/page', id='ipv6_literal'),
+        pytest.param('::1', 'http://[::1]:8080/page', id='bare ipv6'),
         pytest.param('https://example.com/products', 'https://example.com/page', id='full_url'),
+        pytest.param('example.com:8080/path:1', 'https://example.com:8080/page', id='scheme-less url with colons'),
     ],
 )
 async def test_domain_matching_normalizes_spelling(
@@ -151,8 +153,9 @@ async def test_domain_matching_normalizes_spelling(
 @pytest.mark.parametrize(
     'configured',
     [
-        pytest.param('::1', id='unbracketed ipv6'),
         pytest.param('.', id='bare root dot'),
+        pytest.param('[::1', id='unclosed ipv6 bracket'),
+        pytest.param('example.com:8080:9090', id='stray colons'),
     ],
 )
 async def test_unmatchable_domain_is_rejected(
