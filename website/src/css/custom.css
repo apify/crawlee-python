@@ -629,8 +629,6 @@ html[data-theme='dark'] .runnable-code-block svg .apify-logo {
     min-width: 1.5rem;
     display: inline-block;
     opacity: .3;
-    position: sticky;
-    left: var(--ifm-pre-padding);
 }
 
 div[class^="announcementBar_"] {
