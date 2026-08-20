@@ -35,8 +35,10 @@ _NEVER_THROTTLED = datetime.min.replace(tzinfo=timezone.utc)
 class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     """A request manager that wraps another and enforces per-domain delays.
 
-    Requests for explicitly configured domains are routed into dedicated sub-managers. Each request lives in exactly
-    one manager, eliminating duplication and simplifying deduplication.
+    Requests for explicitly configured domains are routed into dedicated sub-managers. A request added through this
+    manager lives in exactly one of them, which keeps deduplication within a single store. A request that reached
+    `inner` before its domain was configured stays there, and is fetched and completed against `inner` without the
+    domain's delay applied.
 
     When `fetch_next_request()` is called, it returns requests from the sub-manager whose domain has been waiting the
     longest. If all configured domains are throttled, it falls back to the inner manager for non-throttled domains. If
@@ -46,11 +48,15 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     - HTTP 429 responses (via `record_domain_delay`)
     - robots.txt crawl-delay directives (via `set_crawl_delay`)
 
-    The class is generic over the wrapped manager type. On the first call to any of its methods, the
-    `request_manager_opener` callback opens one sub-manager per configured domain, so every sub-manager shares the same
-    `RequestManager` subclass and backing store as `inner`, and requests left over in a persistent store by a previous
-    run are picked up again. The opener must accept `alias`, `storage_client`, and `configuration` keyword arguments
-    (as `RequestQueue.open` does) and return the same concrete subclass as `inner`.
+    The class is generic over the wrapped manager type. On first use, the `request_manager_opener` callback opens one
+    sub-manager per configured domain, so every sub-manager shares the same `RequestManager` subclass and backing store
+    as `inner`. The opener must accept `alias`, `storage_client`, and `configuration` keyword arguments (as
+    `RequestQueue.open` does) and return the same concrete subclass as `inner`.
+
+    Opening the sub-managers up front also makes requests left over in a persistent store by a previous run visible
+    again. With the default `purge_on_start=True` those leftovers are purged at open, so resuming them requires
+    `purge_on_start=False`. Aliased stores are not exempt from that purge but named ones are, so a named `inner` keeps
+    its requests across a restart while the per-domain stores are emptied.
 
     ### Usage
 
@@ -132,7 +138,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """Empty the inner manager and all sub-managers, and reset transient per-domain throttle state.
 
         The configured domain list and any robots.txt-derived `crawl_delay` are preserved. Only the dynamic backoff
-        state (consecutive 429 counter and `throttled_until`) is cleared. Sub-managers stay open, they're just emptied.
+        state (consecutive 429 counter and `throttled_until`) is cleared. Sub-managers stay open; they're just emptied.
         """
         await self._ensure_sub_managers()
         await asyncio.gather(self._inner.purge(), *(sm.purge() for sm in self._sub_managers.values()))
