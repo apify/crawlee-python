@@ -441,12 +441,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         if key in self._in_flight_from_inner:
             self._in_flight_from_inner.remove(key)
             return self._inner
-        return self._select_manager(request.url)
-
-    def _select_manager(self, url: str) -> TRequestManager:
-        """Return the manager that owns the given URL: its sub-manager if one exists, otherwise the inner."""
-        domain = self._extract_domain(url)
-        return self._sub_managers.get(domain, self._inner)
+        return self._sub_managers.get(self._extract_domain(request.url), self._inner)
 
     async def _wait_for_new_work_or_timeout(self, timeout: float) -> None:
         """Wait until new work is signaled or `timeout` seconds elapse, whichever comes first.
