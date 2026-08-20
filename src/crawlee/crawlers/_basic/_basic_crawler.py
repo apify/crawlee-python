@@ -1645,7 +1645,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             if isinstance(self._request_manager, ThrottlingRequestManager):
                 retry_after = parse_retry_after_header(retry_after_header)
                 if not self._request_manager.record_domain_delay(request_url, retry_after=retry_after):
-                    domain = (URL(request_url).host or '').lower()
+                    domain = (URL(request_url).host or '').lower().removesuffix('.')
                     if domain:
                         self._logger_once.log(
                             f'Received an HTTP 429 (Too Many Requests) response from domain "{domain}", but it is '
