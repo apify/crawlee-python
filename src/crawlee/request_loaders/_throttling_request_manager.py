@@ -386,7 +386,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         key = cls._normalize_domain(host) if host else ''
 
-        if not key:
+        # A wildcard passes through the parser untouched, so it would become a key no crawled hostname can match.
+        if not key or '*' in key:
             raise ValueError(
                 f'"{domain}" is not a valid hostname. The `domains` option takes bare hostnames such as '
                 '"example.com", or any URL on the domain.'

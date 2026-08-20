@@ -156,6 +156,7 @@ async def test_domain_matching_normalizes_spelling(
     [
         pytest.param('.', id='bare root dot'),
         pytest.param('[::1', id='unclosed ipv6 bracket'),
+        pytest.param('*.example.com', id='subdomain wildcard'),
         pytest.param('example.com:8080:9090', id='stray colons'),
     ],
 )
