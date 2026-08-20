@@ -6,7 +6,7 @@ from crawlee.http_clients import HttpxHttpClient
 
 async def main() -> None:
     http_client = HttpxHttpClient(
-        # Optional additional keyword arguments for `httpx.AsyncClient`.
+        # Optional additional keyword arguments for `httpx2.AsyncClient`.
         timeout=10,
         follow_redirects=True,
     )
