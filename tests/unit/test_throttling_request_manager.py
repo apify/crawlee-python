@@ -705,7 +705,24 @@ async def test_read_paths_reopen_persisted_sub_queues(fs_service_locator: Servic
     assert request.url in urls
 
 
-async def test_purge_empties_unopened_sub_queues(fs_service_locator: ServiceLocator) -> None:
+async def test_default_purge_on_start_empties_persisted_sub_queues(fs_service_locator: ServiceLocator) -> None:
+    """With the default `purge_on_start`, opening the sub-queues empties what a previous run left in them."""
+    manager = await _open_fs_manager(fs_service_locator)
+    await manager.add_requests([f'https://{THROTTLED_DOMAIN}/page1', f'https://{THROTTLED_DOMAIN}/page2'])
+
+    # Restart under the default configuration, which purges an aliased store as it opens.
+    fs_service_locator.storage_instance_manager.clear_cache()
+    purging_locator = ServiceLocator(configuration=Configuration(), storage_client=FileSystemStorageClient())
+    purged = await _open_fs_manager(purging_locator)
+    assert await purged.is_empty() is True
+
+    # Reopen without purging, so an empty queue proves the requests were deleted rather than just hidden.
+    restarted = await _restart_fs_manager(fs_service_locator)
+    assert await restarted.get_total_count() == 0
+    assert await restarted.is_finished() is True
+
+
+async def test_purge_empties_sub_queues_from_a_previous_run(fs_service_locator: ServiceLocator) -> None:
     """purge() empties sub-queues left behind by a previous run."""
     manager = await _open_fs_manager(fs_service_locator)
     await manager.add_requests([f'https://{THROTTLED_DOMAIN}/page1', f'https://{THROTTLED_DOMAIN}/page2'])
@@ -721,7 +738,7 @@ async def test_purge_empties_unopened_sub_queues(fs_service_locator: ServiceLoca
     assert await sub_queue.get_total_count() == 0
 
 
-async def test_drop_removes_unopened_sub_queues(fs_service_locator: ServiceLocator) -> None:
+async def test_drop_removes_sub_queues_from_a_previous_run(fs_service_locator: ServiceLocator) -> None:
     """drop() removes the on-disk sub-queues left behind by a previous run."""
     manager = await _open_fs_manager(fs_service_locator)
     await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
