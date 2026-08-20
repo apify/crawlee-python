@@ -104,10 +104,12 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         self._sub_managers: dict[str, TRequestManager] = {}
         self._sub_managers_ready = False
         self._sub_managers_lock = asyncio.Lock()
-        self._in_flight_from_inner: set[str] = set()
-        """Unique keys of requests handed out by `fetch_next_request` from the inner manager. A request whose domain is
-        configured can still live in `inner` if it was added before the domain was listed, and it must be given back to
-        the manager it came from."""
+        self._in_flight_from_inner: set[tuple[str, str]] = set()
+        """`(unique_key, url)` pairs of configured-domain requests handed out by `fetch_next_request` from the inner
+        manager. Such a request can live in `inner` if it was added before its domain was listed, and it must be given
+        back to the manager it came from. Requests for unconfigured domains need no record, as they route to `inner` by
+        default. The URL is part of the key because `unique_key` may be set explicitly and is only unique per store, so
+        a key alone could match a same-key request held by a sub-manager."""
         self._new_work_event = asyncio.Event()
         """Set whenever a request is added or reclaimed. Lets `fetch_next_request` wake from a throttle
         wait early when fresh work appears, instead of sleeping for the full computed cooldown."""
@@ -239,7 +241,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
             request = await self._inner.fetch_next_request()
             if request is not None:
-                self._in_flight_from_inner.add(request.unique_key)
+                if self._extract_domain(request.url) in self._domain_states:
+                    self._in_flight_from_inner.add((request.unique_key, request.url))
                 return request
 
             sub_managers_empty = await asyncio.gather(*(sm.is_empty() for sm in self._sub_managers.values()))
@@ -434,8 +437,9 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
     def _take_fetch_owner(self, request: Request) -> TRequestManager:
         """Return the manager the request must be given back to, clearing its in-flight record."""
-        if request.unique_key in self._in_flight_from_inner:
-            self._in_flight_from_inner.discard(request.unique_key)
+        key = (request.unique_key, request.url)
+        if key in self._in_flight_from_inner:
+            self._in_flight_from_inner.remove(key)
             return self._inner
         return self._select_manager(request.url)
 

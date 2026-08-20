@@ -520,6 +520,33 @@ async def test_purge_forgets_in_flight_inner_requests(
     assert await manager._sub_managers[THROTTLED_DOMAIN].is_finished() is True
 
 
+async def test_shared_unique_key_does_not_reroute_sub_manager_request(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+) -> None:
+    """A unique key shared with an in-flight inner request must not send a sub-manager request back to inner."""
+    shared_key = 'shared-unique-key'
+    # A leftover from before the domain was configured, sharing an explicit unique key with a freshly added request.
+    await inner_queue.add_request(
+        Request.from_url(f'https://{THROTTLED_DOMAIN}/page1', unique_key=shared_key),
+    )
+    await manager.add_request(Request.from_url(f'https://{THROTTLED_DOMAIN}/page2', unique_key=shared_key))
+
+    # Sub-managers are drained before inner, so the first fetch is the sub-manager's request.
+    sub_request = await manager.fetch_next_request()
+    inner_request = await manager.fetch_next_request()
+    assert sub_request is not None
+    assert inner_request is not None
+    assert sub_request.url == f'https://{THROTTLED_DOMAIN}/page2'
+    assert inner_request.url == f'https://{THROTTLED_DOMAIN}/page1'
+
+    await manager.reclaim_request(sub_request)
+
+    # The reclaim has to land in the sub-manager; inner keeps its own request in flight.
+    assert not await manager._sub_managers[THROTTLED_DOMAIN].is_empty()
+    assert await inner_queue.is_empty() is True
+
+
 async def test_get_handled_count_aggregates(manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """get_handled_count should sum inner and all sub-managers."""
     throttled_url = f'https://{THROTTLED_DOMAIN}/page1'
