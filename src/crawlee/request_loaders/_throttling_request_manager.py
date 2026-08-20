@@ -35,10 +35,9 @@ _NEVER_THROTTLED = datetime.min.replace(tzinfo=timezone.utc)
 class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     """A request manager that wraps another and enforces per-domain delays.
 
-    Requests for explicitly configured domains are routed into dedicated sub-managers. A request added through this
-    manager lives in exactly one of them, which keeps deduplication within a single store. A request that reached
-    `inner` before its domain was configured stays there, and is fetched and completed against `inner` without the
-    domain's delay applied.
+    Requests for explicitly configured domains are routed into dedicated sub-managers, so each request lives in exactly
+    one store and is deduplicated there. A request that reached `inner` before its domain was configured stays and is
+    completed there, without the domain's delay.
 
     When `fetch_next_request()` is called, it returns requests from the sub-manager whose domain has been waiting the
     longest. If all configured domains are throttled, it falls back to the inner manager for non-throttled domains. If
@@ -48,17 +47,14 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     - HTTP 429 responses (via `record_domain_delay`)
     - robots.txt crawl-delay directives (via `set_crawl_delay`)
 
-    The class is generic over the wrapped manager type. The first asynchronous operation - adding, fetching,
-    completing, counting, purging, or dropping - makes the `request_manager_opener` callback open one sub-manager per
-    configured domain, so every sub-manager shares the same `RequestManager` subclass and backing store as `inner`. The
-    synchronous delay methods (`record_domain_delay`, `record_success`, `set_crawl_delay`) only touch in-memory state
-    and never open anything. The opener must accept `alias`, `storage_client`, and `configuration` keyword arguments (as
-    `RequestQueue.open` does) and return the same concrete subclass as `inner`.
+    The class is generic over the wrapped manager type. The first asynchronous operation opens one sub-manager per
+    configured domain through `request_manager_opener`, so all of them share the subclass and backing store of `inner`;
+    the synchronous delay methods never open anything. The opener must accept `alias`, `storage_client`, and
+    `configuration` keyword arguments (as `RequestQueue.open` does) and return the same concrete subclass as `inner`.
 
-    Opening the sub-managers up front also makes requests left over in a persistent store by a previous run visible
-    again. With the default `purge_on_start=True` those leftovers are purged at open, so resuming them requires
-    `purge_on_start=False`. Aliased stores are not exempt from that purge but named ones are, so a named `inner` keeps
-    its requests across a restart while the per-domain stores are emptied.
+    Requests a previous run left in a persistent store become visible again at open. The default `purge_on_start=True`
+    empties them; `purge_on_start=False` resumes them. Named stores are exempt from that purge and aliased ones are not,
+    so a named `inner` keeps its requests while the per-domain stores are emptied.
 
     ### Usage
 
@@ -113,18 +109,11 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         self._sub_managers_ready = False
         self._sub_managers_lock = asyncio.Lock()
         self._in_flight_from_inner: set[tuple[str, str]] = set()
-        """`(unique_key, url)` pairs of configured-domain requests handed out by `fetch_next_request` from the inner
-        manager. Such a request can live in `inner` if it was added before its domain was listed, and it must be given
-        back to the manager it came from. Requests for unconfigured domains need no record, as they route to `inner` by
-        default. The URL is part of the key because `unique_key` may be set explicitly and is only unique per store, so
-        a key alone could match a same-key request held by a sub-manager.
-
-        The pair identifies a request by value, not by object. One URL can be in flight from both `inner` and its
-        sub-manager at once - deduplication is per store, so both may hold it - and the two completions can then be
-        routed to each other's manager. Both stores hold the key, so each completion still lands: the cost is a
-        duplicate crawl of that URL and a retry that skips the domain's delay, not a stalled queue. Telling the two
-        copies apart would take per-request identity, which `Request` cannot offer as it is unhashable and compares
-        by value."""
+        """`(unique_key, url)` pairs of configured-domain requests that `fetch_next_request` took from `inner`, where
+        they live if they were added before their domain was listed, and where they must be completed. The URL is part
+        of the key because an explicit `unique_key` is only unique per store. Identical pairs held by `inner` and by a
+        sub-manager are indistinguishable, so their completions can cross; both stores hold the key, so the cost is a
+        duplicate crawl and a retry without the domain's delay."""
         self._new_work_event = asyncio.Event()
         """Set whenever a request is added or reclaimed. Lets `fetch_next_request` wake from a throttle
         wait early when fresh work appears, instead of sleeping for the full computed cooldown."""
@@ -412,11 +401,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         )
 
     async def _ensure_sub_managers(self) -> None:
-        """Open a sub-manager for every configured domain, once.
-
-        Sub-managers that opened before a sibling failed are kept, so a retry after a failure opens only what is
-        still missing.
-        """
+        """Open a sub-manager for every configured domain, once; a retry opens only what is still missing."""
         if self._sub_managers_ready:
             return
 
@@ -424,9 +409,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             if self._sub_managers_ready:
                 return
 
-            # Every attempt has to settle before the lock is released. A propagating error would leave the remaining
-            # openers running unawaited, free to write into `_sub_managers` after a retry has already replaced the
-            # manager for that domain - stranding whatever the loser of that race holds.
+            # All attempts must settle before the lock is released: openers left running would write into
+            # `_sub_managers` after a retry has already replaced that domain's manager.
             missing = [domain for domain in self._domain_states if domain not in self._sub_managers]
             results = await asyncio.gather(
                 *(self._open_sub_manager(domain) for domain in missing), return_exceptions=True
@@ -470,15 +454,14 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     def _fetch_owner(self, request: Request) -> TRequestManager:
         """Return the manager the request must be given back to, leaving its in-flight record in place.
 
-        The record is dropped by `_clear_fetch_owner` only once the owning manager has accepted the completion, so a
-        completion retried after a transient storage failure still resolves to the same manager.
+        `_clear_fetch_owner` drops the record only once the completion is accepted, so a retry resolves the same way.
         """
         if (request.unique_key, request.url) in self._in_flight_from_inner:
             return self._inner
         return self._sub_managers.get(self._extract_domain(request.url), self._inner)
 
     def _clear_fetch_owner(self, request: Request) -> None:
-        """Drop the in-flight record of a request whose completion the owning manager has accepted."""
+        """Drop the in-flight record of a request whose completion was accepted."""
         self._in_flight_from_inner.discard((request.unique_key, request.url))
 
     async def _wait_for_new_work_or_timeout(self, timeout: float) -> None:

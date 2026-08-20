@@ -472,7 +472,7 @@ async def test_reclaim_returns_inner_request_to_inner(
     inner_queue: RequestQueue,
 ) -> None:
     """A request fetched from inner is reclaimed back into inner, even when its domain is configured."""
-    # Simulate a domain that was added to the configured list only after the request had been stored in inner.
+    # A domain configured only after the request had already been stored in inner.
     await inner_queue.add_request(f'https://{THROTTLED_DOMAIN}/page1')
 
     request = await manager.fetch_next_request()
@@ -530,7 +530,7 @@ async def test_failed_completion_keeps_its_inner_routing_for_the_retry(
     request = await manager.fetch_next_request()
     assert request is not None
 
-    # `BasicCrawler` retries `mark_request_as_handled`, so a failed attempt must not consume the routing record.
+    # `BasicCrawler` retries this, so a failed attempt must not consume the routing record.
     monkeypatch.setattr(
         inner_queue,
         'mark_request_as_handled',
@@ -552,7 +552,7 @@ async def test_shared_unique_key_does_not_reroute_sub_manager_request(
 ) -> None:
     """A unique key shared with an in-flight inner request must not send a sub-manager request back to inner."""
     shared_key = 'shared-unique-key'
-    # A leftover from before the domain was configured, sharing an explicit unique key with a freshly added request.
+    # A leftover from before the domain was configured, sharing its explicit unique key with a fresh request.
     await inner_queue.add_request(
         Request.from_url(f'https://{THROTTLED_DOMAIN}/page1', unique_key=shared_key),
     )
@@ -776,7 +776,7 @@ async def test_default_purge_on_start_empties_persisted_sub_queues(fs_service_lo
     purged = await _open_fs_manager(purging_locator)
     assert await purged.is_empty() is True
 
-    # Reopen without purging, so an empty queue proves the requests were deleted rather than just hidden.
+    # Reopen without purging: an empty queue proves the requests were deleted, not just hidden.
     restarted = await _restart_fs_manager(fs_service_locator)
     assert await restarted.get_total_count() == 0
     assert await restarted.is_finished() is True
