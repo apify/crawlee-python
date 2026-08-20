@@ -39,7 +39,9 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
     `fetch_next_request()` takes from the sub-manager whose domain has been waiting the longest, skipping domains in a
     cooldown, and falls back to the inner manager when no sub-manager yields a request. If nothing can be dispatched
-    right now, it returns `None` rather than waiting, so the caller's task slot is released.
+    right now, it returns `None` rather than waiting, so the caller's task slot is released. `is_empty()` reports the
+    same view and reads as empty while every remaining request sits in a cooldown, whereas `is_finished()` counts those
+    requests, so the crawl idles until they are dispatchable instead of ending early.
 
     Delay sources:
     - HTTP 429 responses (via `record_domain_delay`)
@@ -189,12 +191,18 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     async def fetch_next_request(self) -> Request | None:
         """Fetch the next request, respecting per-domain delays.
 
-        Sub-managers are checked in order of longest-overdue domain first, then the inner manager. Throttled domains
-        are skipped rather than waited for, so a caller holding a concurrency slot gets it back instead of sleeping.
+        Sub-managers are checked in order of longest-overdue domain first, then the inner manager. Domains in a
+        cooldown are skipped, so the call returns `None` when nothing is dispatchable right now.
+
+        Note:
+            Unlike the `RequestLoader.fetch_next_request` contract, a `None` result does not imply that `is_finished()`
+            is `True` - it only means nothing is dispatchable right now. Since the manager never waits out a cooldown
+            itself, the dispatch cadence is only as precise as the caller's polling interval: a cooldown expiring
+            between two polls is picked up on the next one.
         """
         for domain in self._fetchable_domains():
             request = await self._sub_managers[domain].fetch_next_request()
-            if request:
+            if request is not None:
                 self._mark_domain_dispatched(domain)
                 return request
 
@@ -233,8 +241,9 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         Requests queued for a domain in a cooldown do not count. They still count towards `is_finished`, so the crawl
         waits for them.
         """
-        fetchable = (self._sub_managers[domain] for domain in self._fetchable_domains())
-        results = await asyncio.gather(self._inner.is_empty(), *(sm.is_empty() for sm in fetchable))
+        results = await asyncio.gather(
+            self._inner.is_empty(), *(self._sub_managers[d].is_empty() for d in self._fetchable_domains())
+        )
         return all(results)
 
     @override
@@ -347,8 +356,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         available = [
             domain
             for domain, state in self._domain_states.items()
-            # The sub-manager check guards the lookups in the callers: a domain can be given throttle state before its
-            # first request creates the sub-manager.
+            # Every configured domain has state from construction, but sub-managers are created lazily on first
+            # insertion, so this check keeps the `_sub_managers[domain]` lookups in the callers safe.
             if domain in self._sub_managers and now >= state.throttled_until
         ]
         available.sort(key=lambda domain: self._domain_states[domain].throttled_until)
