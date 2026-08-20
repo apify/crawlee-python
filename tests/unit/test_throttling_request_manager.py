@@ -175,6 +175,21 @@ async def test_unmatchable_domain_is_rejected(
         )
 
 
+async def test_blank_domain_entries_are_ignored(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> None:
+    """Blank entries are dropped rather than rejected, so a list built by splitting a string needs no pruning."""
+    manager = ThrottlingRequestManager(
+        inner_queue,
+        domains=['', '   ', 'example.com'],
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+    assert set(manager._domain_states) == {'example.com'}
+
+
 async def test_add_requests_routes_mixed_domains(
     manager: ThrottlingRequestManager[RequestQueue],
     inner_queue: RequestQueue,

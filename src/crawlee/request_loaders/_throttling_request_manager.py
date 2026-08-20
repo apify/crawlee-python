@@ -85,10 +85,11 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             inner: The underlying request manager to wrap (typically a `RequestQueue`). Requests for non-throttled
                 domains are stored here.
             domains: Domains to throttle, each given as a bare hostname such as `api.example.com`, or as any URL on
-                the domain, of which only the hostname is used. Only requests matching these domains will be routed
-                to per-domain sub-managers. Matching is exact but spelling-insensitive: casing, punycode versus
-                Unicode, and a trailing root dot are all normalized away. Subdomain wildcards such as
-                `*.example.com` are not supported — list each subdomain explicitly if needed.
+                the domain, of which only the hostname is used. Blank entries are ignored, so a list built by
+                splitting a string needs no pruning. Only requests matching these domains will be routed to
+                per-domain sub-managers. Matching is exact but spelling-insensitive: casing, punycode versus Unicode,
+                and a trailing root dot are all normalized away. Subdomain wildcards such as `*.example.com` are not
+                supported — list each subdomain explicitly if needed.
             request_manager_opener: Async callable used to create per-domain sub-managers at insertion time. Must
                 accept `alias`, `storage_client`, and `configuration` keyword arguments and return the same concrete
                 subclass as `inner` (e.g. `RequestQueue.open` when `inner` is a `RequestQueue`).
@@ -98,7 +99,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             max_delay: Maximum delay between requests to a rate-limited domain.
 
         Raises:
-            ValueError: If an entry of `domains` does not yield a hostname a crawled URL could match.
+            ValueError: If a non-blank entry of `domains` does not yield a hostname a crawled URL could match.
         """
         self._inner: TRequestManager = inner
         self._service_locator = service_locator if service_locator is not None else global_service_locator
