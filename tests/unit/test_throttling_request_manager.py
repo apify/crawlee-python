@@ -355,6 +355,25 @@ async def test_crawl_delay_throttles_after_dispatch(manager: ThrottlingRequestMa
     assert manager._is_domain_throttled(THROTTLED_DOMAIN)
 
 
+async def test_backoff_escalates_under_a_long_crawl_delay(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A crawl-delay longer than the backoff sets the retry cadence, and the exponent must still escalate."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    manager.set_crawl_delay(url, 10)
+    state = manager._domain_states[THROTTLED_DOMAIN]
+    latency = timedelta(milliseconds=200)
+
+    with _frozen_clock() as clock:
+        for _ in range(5):
+            # Dispatch as soon as both clocks allow it, then let the request come back 429.
+            clock.now.return_value = max(clock.now.return_value, state.throttled_until)
+            manager._mark_domain_dispatched(THROTTLED_DOMAIN)
+            clock.now.return_value += latency
+            manager.record_domain_delay(url)
+
+        assert state.consecutive_429_count == 5
+        assert state.backoff_until == clock.now.return_value + manager._base_delay * 2**4
+
+
 # ── Fetch Scheduling Tests ────────────────────────────
 
 

@@ -491,9 +491,15 @@ class _DomainState:
         return max(self.backoff_until, self.crawl_delay_until)
 
     def apply_backoff(self, now: datetime, delay: timedelta) -> None:
-        """Block the domain for `delay`. If no 429 arrives for another `delay` after that, the exponent resets."""
+        """Block the domain for `delay`.
+
+        If no 429 arrives for another `delay` after the domain becomes dispatchable again, the exponent resets.
+        """
         self.backoff_until = now + delay
-        self.backoff_decays_at = self.backoff_until + delay
+        # The quiet period runs from the moment the domain becomes dispatchable again, not from `backoff_until`. A
+        # crawl-delay longer than `delay` sets the retry cadence, and measuring from `backoff_until` would expire the
+        # window before the domain is even retried, making every 429 look like a fresh burst.
+        self.backoff_decays_at = self.throttled_until + delay
 
     def apply_crawl_delay(self, now: datetime) -> None:
         """Block the domain for its crawl-delay, if it declared one."""
