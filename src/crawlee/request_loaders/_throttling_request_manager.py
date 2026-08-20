@@ -269,16 +269,18 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     @override
     async def reclaim_request(self, request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
         await self._ensure_sub_managers()
-        manager = self._take_fetch_owner(request)
+        manager = self._fetch_owner(request)
         result = await manager.reclaim_request(request, forefront=forefront)
+        self._clear_fetch_owner(request)
         self._signal_new_work()
         return result
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         await self._ensure_sub_managers()
-        manager = self._take_fetch_owner(request)
+        manager = self._fetch_owner(request)
         result = await manager.mark_request_as_handled(request)
+        self._clear_fetch_owner(request)
         self.record_success(request.url)
         return result
 
@@ -441,13 +443,19 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """Wake `fetch_next_request` if it is sleeping inside a throttle wait."""
         self._new_work_event.set()
 
-    def _take_fetch_owner(self, request: Request) -> TRequestManager:
-        """Return the manager the request must be given back to, clearing its in-flight record."""
-        key = (request.unique_key, request.url)
-        if key in self._in_flight_from_inner:
-            self._in_flight_from_inner.remove(key)
+    def _fetch_owner(self, request: Request) -> TRequestManager:
+        """Return the manager the request must be given back to, leaving its in-flight record in place.
+
+        The record is dropped by `_clear_fetch_owner` only once the owning manager has accepted the completion, so a
+        completion retried after a transient storage failure still resolves to the same manager.
+        """
+        if (request.unique_key, request.url) in self._in_flight_from_inner:
             return self._inner
         return self._sub_managers.get(self._extract_domain(request.url), self._inner)
+
+    def _clear_fetch_owner(self, request: Request) -> None:
+        """Drop the in-flight record of a request whose completion the owning manager has accepted."""
+        self._in_flight_from_inner.discard((request.unique_key, request.url))
 
     async def _wait_for_new_work_or_timeout(self, timeout: float) -> None:
         """Wait until new work is signaled or `timeout` seconds elapse, whichever comes first.

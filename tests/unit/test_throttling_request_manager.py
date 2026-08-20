@@ -520,6 +520,32 @@ async def test_purge_forgets_in_flight_inner_requests(
     assert await manager._sub_managers[THROTTLED_DOMAIN].is_finished() is True
 
 
+async def test_failed_completion_keeps_its_inner_routing_for_the_retry(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A completion that fails keeps its inner routing, so a retried completion is not diverted to the sub-manager."""
+    await inner_queue.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+    request = await manager.fetch_next_request()
+    assert request is not None
+
+    # `BasicCrawler` retries `mark_request_as_handled`, so a failed attempt must not consume the routing record.
+    monkeypatch.setattr(
+        inner_queue,
+        'mark_request_as_handled',
+        AsyncMock(side_effect=RuntimeError('transient storage failure')),
+    )
+    with pytest.raises(RuntimeError, match='transient storage failure'):
+        await manager.mark_request_as_handled(request)
+
+    monkeypatch.undo()
+    await manager.mark_request_as_handled(request)
+
+    assert await inner_queue.is_finished() is True
+    assert await manager.is_finished() is True
+
+
 async def test_shared_unique_key_does_not_reroute_sub_manager_request(
     manager: ThrottlingRequestManager[RequestQueue],
     inner_queue: RequestQueue,
