@@ -131,6 +131,7 @@ async def test_domain_matching_is_case_insensitive(
         pytest.param('::1', 'http://[::1]:8080/page', id='bare ipv6'),
         pytest.param('https://example.com/products', 'https://example.com/page', id='full_url'),
         pytest.param('example.com:8080/path:1', 'https://example.com:8080/page', id='scheme-less url with colons'),
+        pytest.param(' example.com ', 'https://example.com/page', id='padded entry'),
     ],
 )
 async def test_domain_matching_normalizes_spelling(

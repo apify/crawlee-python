@@ -103,7 +103,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         self._base_delay = base_delay
         self._max_delay = max_delay
         self._request_manager_opener = request_manager_opener
-        domain_keys = [self._parse_configured_domain(d) for d in domains if d]
+        # Padding on an entry would otherwise survive parsing into a key no crawled hostname can match.
+        domain_keys = [self._parse_configured_domain(entry) for d in domains if (entry := d.strip())]
         self._domain_states: dict[str, _DomainState] = {key: _DomainState(domain=key) for key in domain_keys}
         self._sub_managers: dict[str, TRequestManager] = {}
         self._new_work_event = asyncio.Event()
