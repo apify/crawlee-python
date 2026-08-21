@@ -487,6 +487,24 @@ async def test_cookie_header_dropped_cross_origin(
     assert (await read_json(response))['cookies'] == {}
 
 
+async def test_session_cookies_take_over_cross_origin(
+    http_client: HttpClient,
+    server_url: URL,
+    redirect_server_url: URL,
+) -> None:
+    """Test that the session cookies of the new origin take over once a redirect leaves the origin of the caller."""
+    session = Session(cookies=[CookieParam(name='from_jar', value='1', domain=redirect_server_url.host or '')])
+    redirect_url = (server_url / 'redirect').with_query(url=str(redirect_server_url / 'cookies'), status=302)
+
+    response = await http_client.send_request(
+        str(redirect_url),
+        session=session,
+        headers={'cookie': 'manual=value'},
+    )
+
+    assert (await read_json(response))['cookies'] == {'from_jar': '1'}
+
+
 async def test_cookie_header_wins_over_session_on_redirect(http_client: HttpClient, server_url: URL) -> None:
     """Test that a `Cookie` header of the caller keeps beating the session cookies after a redirect."""
     session = Session(cookies=[CookieParam(name='from_jar', value='1', domain=server_url.host or '')])
