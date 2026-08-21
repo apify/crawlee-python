@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from logging import DEBUG, WARNING, getLogger
 from typing import TYPE_CHECKING, Any, cast
 
-import httpx
+import httpx2
 from typing_extensions import override
 
 from crawlee._log_config import get_configured_log_level
@@ -33,9 +33,9 @@ logger = getLogger(__name__)
 
 
 class _HttpxResponse:
-    """Adapter class for `httpx.Response` to conform to the `HttpResponse` protocol."""
+    """Adapter class for `httpx2.Response` to conform to the `HttpResponse` protocol."""
 
-    def __init__(self, response: httpx.Response) -> None:
+    def __init__(self, response: httpx2.Response) -> None:
         self._response = response
 
     @property
@@ -63,13 +63,13 @@ class _HttpxResponse:
                 yield chunk
 
 
-def _same_origin(url: httpx.URL, other: httpx.URL) -> bool:
+def _same_origin(url: httpx2.URL, other: httpx2.URL) -> bool:
     """Check whether two URLs share an origin."""
     return url.scheme == other.scheme and url.host == other.host and url.port == other.port
 
 
-class _HttpxTransport(httpx.AsyncHTTPTransport):
-    """HTTP transport adapter that keeps cookies in a `Session` instead of in the `HTTPX` client.
+class _HttpxTransport(httpx2.AsyncHTTPTransport):
+    """HTTP transport adapter that keeps cookies in a `Session` instead of in the `HTTPX2` client.
 
     Response cookies are stored in the session when `persist_cookies_per_session` is enabled, and the `Cookie`
     header is rebuilt from it before every hop, so one client can be shared by all sessions. A `Cookie` header
@@ -77,16 +77,16 @@ class _HttpxTransport(httpx.AsyncHTTPTransport):
     """
 
     def __init__(self, *, persist_cookies_per_session: bool, **kwargs: Any) -> None:
-        """Initialize a new instance. Extra arguments are passed to `httpx.AsyncHTTPTransport`."""
+        """Initialize a new instance. Extra arguments are passed to `httpx2.AsyncHTTPTransport`."""
         self._persist_cookies_per_session = persist_cookies_per_session
         super().__init__(**kwargs)
 
     @override
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+    async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
         session = cast('Session | None', request.extensions.get('crawlee_session'))
         original_url, user_cookie = request.extensions.get('crawlee_caller_cookie', (None, None))
 
-        # The transport owns the `Cookie` header. Anything already on the request came from the `httpx` jar,
+        # The transport owns the `Cookie` header. Anything already on the request came from the `httpx2` jar,
         # which is scoped to no session and no origin, so it is always replaced or dropped.
         if original_url is not None and _same_origin(original_url, request.url):
             request.headers['cookie'] = user_cookie
@@ -109,9 +109,9 @@ class _HttpxTransport(httpx.AsyncHTTPTransport):
 
 @docs_group('HTTP clients')
 class HttpxHttpClient(HttpClient):
-    """HTTP client based on the `HTTPX` library.
+    """HTTP client based on the `HTTPX2` library.
 
-    This client uses the `HTTPX` library to perform HTTP requests in crawlers (`BasicCrawler` subclasses)
+    This client uses the `HTTPX2` library to perform HTTP requests in crawlers (`BasicCrawler` subclasses)
     and to manage sessions, proxies, and error handling.
 
     See the `HttpClient` class for more common information about HTTP clients.
@@ -147,7 +147,7 @@ class HttpxHttpClient(HttpClient):
             http2: Whether to enable HTTP/2 support.
             verify: SSL certificates used to verify the identity of requested hosts.
             header_generator: Header generator instance to use for generating browser-like headers.
-            async_client_kwargs: Additional keyword arguments for `httpx.AsyncClient`. The `mounts` and `transport`
+            async_client_kwargs: Additional keyword arguments for `httpx2.AsyncClient`. The `mounts` and `transport`
                 arguments are ignored, they would bypass the cookie handling. The `proxy` argument covers only the
                 requests made without a `ProxyInfo`, a `ProxyConfiguration` takes precedence over it. The `limits`
                 argument applies per proxy, because every proxy gets a connection pool of its own.
@@ -156,15 +156,15 @@ class HttpxHttpClient(HttpClient):
             persist_cookies_per_session=persist_cookies_per_session,
         )
 
-        # `httpx` logs one INFO line per request, which is too noisy for the default log level. Silence it down to
+        # `httpx2` logs one INFO line per request, which is too noisy for the default log level. Silence it down to
         # WARNING unless the user has explicitly opted into DEBUG.
-        httpx_logger = getLogger('httpx')
+        httpx_logger = getLogger('httpx2')
         httpx_logger.setLevel(DEBUG if get_configured_log_level() <= DEBUG else WARNING)
 
         self._http1 = http1
         self._http2 = http2
 
-        # `httpx.AsyncClient` turns a `proxy` into a mount that bypasses the cookie handling, so it is handed to
+        # `httpx2.AsyncClient` turns a `proxy` into a mount that bypasses the cookie handling, so it is handed to
         # the transport instead. It covers the requests that carry no `ProxyInfo` of their own.
         self._proxy = async_client_kwargs.pop('proxy', None)
 
@@ -181,9 +181,9 @@ class HttpxHttpClient(HttpClient):
         self._async_client_kwargs = async_client_kwargs
         self._header_generator = header_generator
 
-        self._ssl_context = httpx.create_ssl_context(verify=verify)
+        self._ssl_context = httpx2.create_ssl_context(verify=verify)
 
-        self._client_by_proxy_url = dict[str | None, httpx.AsyncClient]()
+        self._client_by_proxy_url = dict[str | None, httpx2.AsyncClient]()
 
     @override
     async def crawl(
@@ -204,14 +204,14 @@ class HttpxHttpClient(HttpClient):
             method=request.method,
             headers=request.headers,
             payload=request.payload,
-            timeout=httpx.Timeout(timeout.total_seconds()) if timeout is not None else None,
+            timeout=httpx2.Timeout(timeout.total_seconds()) if timeout is not None else None,
         )
 
         try:
             response = await client.send(http_request)
-        except httpx.TimeoutException as exc:
+        except httpx2.TimeoutException as exc:
             raise asyncio.TimeoutError from exc
-        except httpx.TransportError as exc:
+        except httpx2.TransportError as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
             raise
@@ -248,14 +248,14 @@ class HttpxHttpClient(HttpClient):
             headers=headers,
             payload=payload,
             session=session,
-            timeout=httpx.Timeout(timeout.total_seconds()) if timeout is not None else None,
+            timeout=httpx2.Timeout(timeout.total_seconds()) if timeout is not None else None,
         )
 
         try:
             response = await client.send(http_request)
-        except httpx.TimeoutException as exc:
+        except httpx2.TimeoutException as exc:
             raise asyncio.TimeoutError from exc
-        except httpx.TransportError as exc:
+        except httpx2.TransportError as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
             raise
@@ -286,12 +286,12 @@ class HttpxHttpClient(HttpClient):
             headers=headers,
             payload=payload,
             session=session,
-            timeout=httpx.Timeout(None, connect=timeout.total_seconds()) if timeout else None,
+            timeout=httpx2.Timeout(None, connect=timeout.total_seconds()) if timeout else None,
         )
 
         try:
             response = await client.send(http_request, stream=True)
-        except httpx.TimeoutException as exc:
+        except httpx2.TimeoutException as exc:
             raise asyncio.TimeoutError from exc
 
         try:
@@ -302,15 +302,15 @@ class HttpxHttpClient(HttpClient):
     def _build_request(
         self,
         *,
-        client: httpx.AsyncClient,
+        client: httpx2.AsyncClient,
         url: str,
         method: HttpMethod,
         headers: HttpHeaders | dict[str, str] | None,
         payload: HttpPayload | None,
         session: Session | None = None,
-        timeout: httpx.Timeout | None = None,
-    ) -> httpx.Request:
-        """Build an `httpx.Request` using the provided parameters."""
+        timeout: httpx2.Timeout | None = None,
+    ) -> httpx2.Request:
+        """Build an `httpx2.Request` using the provided parameters."""
         if isinstance(headers, dict) or headers is None:
             headers = HttpHeaders(headers or {})
 
@@ -322,7 +322,7 @@ class HttpxHttpClient(HttpClient):
             headers=dict(headers) if headers else None,
             content=payload,
             extensions={'crawlee_session': session},
-            timeout=timeout or httpx.USE_CLIENT_DEFAULT,
+            timeout=timeout or httpx2.USE_CLIENT_DEFAULT,
         )
 
         # Extensions survive a redirect, the `Cookie` header does not, so the caller's value rides along there.
@@ -332,7 +332,7 @@ class HttpxHttpClient(HttpClient):
 
         return request
 
-    def _get_client(self, proxy_url: str | None) -> httpx.AsyncClient:
+    def _get_client(self, proxy_url: str | None) -> httpx2.AsyncClient:
         """Retrieve or create an HTTP client for the given proxy URL.
 
         If a client for the specified proxy URL does not exist, create and store a new one.
@@ -346,10 +346,10 @@ class HttpxHttpClient(HttpClient):
                 verify=self._ssl_context,
                 proxy=proxy_url or self._proxy,
                 persist_cookies_per_session=self._persist_cookies_per_session,
-                # Above the `httpx` default of 20 kept-alive connections every request pays a TCP and TLS handshake.
+                # Above the `httpx2` default of 20 kept-alive connections every request pays a TCP and TLS handshake.
                 limits=self._async_client_kwargs.get(
                     'limits',
-                    httpx.Limits(max_connections=1000, max_keepalive_connections=200),
+                    httpx2.Limits(max_connections=1000, max_keepalive_connections=200),
                 ),
             )
 
@@ -370,7 +370,7 @@ class HttpxHttpClient(HttpClient):
                 }
             )
 
-            client = httpx.AsyncClient(**kwargs)
+            client = httpx2.AsyncClient(**kwargs)
             self._client_by_proxy_url[proxy_url] = client
 
         return self._client_by_proxy_url[proxy_url]
@@ -392,13 +392,13 @@ class HttpxHttpClient(HttpClient):
         return generated_headers | explicit_headers
 
     @staticmethod
-    def _is_proxy_error(error: httpx.TransportError) -> bool:
+    def _is_proxy_error(error: httpx2.TransportError) -> bool:
         """Determine whether the given error is related to a proxy issue.
 
-        Check if the error is an instance of `httpx.ProxyError` or if its message contains known proxy-related
+        Check if the error is an instance of `httpx2.ProxyError` or if its message contains known proxy-related
         error keywords.
         """
-        if isinstance(error, httpx.ProxyError):
+        if isinstance(error, httpx2.ProxyError):
             return True
 
         if any(needle in str(error) for needle in ROTATE_PROXY_ERRORS):  # noqa: SIM103

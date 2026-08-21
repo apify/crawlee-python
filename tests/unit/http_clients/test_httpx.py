@@ -5,7 +5,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock
 
-import httpx
+import httpx2
 import pytest
 
 from crawlee import HttpHeaders
@@ -40,14 +40,14 @@ async def read_json(response: HttpResponse) -> dict:
 )
 def test_same_origin(url: str, other: str, *, expected: bool) -> None:
     """Test that two URLs share an origin only when their scheme, host and port match."""
-    assert _same_origin(httpx.URL(url), httpx.URL(other)) is expected
+    assert _same_origin(httpx2.URL(url), httpx2.URL(other)) is expected
 
 
 @pytest.mark.parametrize(
     ('client_kwargs', 'expected_warning'),
     [
-        pytest.param({'mounts': {'all://': httpx.AsyncHTTPTransport()}}, '`mounts` argument', id='mounts'),
-        pytest.param({'transport': httpx.AsyncHTTPTransport()}, '`transport` argument', id='transport'),
+        pytest.param({'mounts': {'all://': httpx2.AsyncHTTPTransport()}}, '`mounts` argument', id='mounts'),
+        pytest.param({'transport': httpx2.AsyncHTTPTransport()}, '`transport` argument', id='transport'),
     ],
 )
 async def test_transport_kwargs_do_not_reach_the_client(client_kwargs: dict[str, Any], expected_warning: str) -> None:
@@ -64,7 +64,7 @@ async def test_proxy_kwarg_routes_requests(server_url: URL) -> None:
     """Test that a `proxy` kwarg routes the requests that carry no `ProxyInfo` of their own."""
     # Port 1 refuses every connection, so the request can only reach the server if the proxy is not used.
     async with HttpxHttpClient(proxy='http://127.0.0.1:1') as client:
-        with pytest.raises(httpx.ConnectError):
+        with pytest.raises(httpx2.ConnectError):
             await client.send_request(str(server_url / 'status/222'))
 
 
@@ -86,8 +86,8 @@ async def test_proxy_info_wins_over_the_proxy_kwarg(proxy: ProxyInfo, server_url
 
 
 def test_silences_httpx_request_logging() -> None:
-    """Instantiating the client lowers the noisy per-request `httpx` INFO logs to WARNING by default."""
-    httpx_logger = logging.getLogger('httpx')
+    """Instantiating the client lowers the noisy per-request `httpx2` INFO logs to WARNING by default."""
+    httpx_logger = logging.getLogger('httpx2')
     httpx_logger.setLevel(logging.NOTSET)
 
     HttpxHttpClient()
@@ -96,9 +96,9 @@ def test_silences_httpx_request_logging() -> None:
 
 
 async def test_common_headers_and_user_agent(server_url: URL, header_network: dict) -> None:
-    """Test that the relevant headers use header values from header generator instead of default Httpx headers.
+    """Test that the relevant headers use header values from header generator instead of default HTTPX2 headers.
 
-    Httpx uses own headers by default which is not desired as it could increase blocking chances.
+    HTTPX2 uses own headers by default which is not desired as it could increase blocking chances.
     """
     client = HttpxHttpClient()
 
@@ -111,7 +111,7 @@ async def test_common_headers_and_user_agent(server_url: URL, header_network: di
     assert 'accept-language' in response_headers
     assert response_headers['accept-language'] == COMMON_ACCEPT_LANGUAGE
 
-    # By default, HTTPX uses its own User-Agent, which should be replaced by the one from the header generator.
+    # By default, HTTPX2 uses its own User-Agent, which should be replaced by the one from the header generator.
     assert 'user-agent' in response_headers
     assert 'python-httpx' not in response_headers['user-agent']
     assert response_headers['user-agent'] in get_available_header_values(header_network, {'User-Agent', 'user-agent'})
