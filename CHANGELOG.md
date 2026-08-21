@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - **throttling-manager:** Normalize configured domains the same way as crawled hostnames ([#2157](https://github.com/apify/crawlee-python/pull/2157)) ([eb91fa7](https://github.com/apify/crawlee-python/commit/eb91fa757126629806186f2fecd7b5b677cb8079)) by [@Mantisus](https://github.com/Mantisus), closes [#2144](https://github.com/apify/crawlee-python/issues/2144)
 - **throttling-manager:** Stop holding a concurrency slot while a domain is throttled ([#2176](https://github.com/apify/crawlee-python/pull/2176)) ([5c1fa09](https://github.com/apify/crawlee-python/commit/5c1fa09cc36e2a3c042740767cfc974743267ee3)) by [@Mantisus](https://github.com/Mantisus), closes [#2127](https://github.com/apify/crawlee-python/issues/2127)
 - **throttling-manager:** Open the per-domain sub-queues on first use instead of on insert ([#2177](https://github.com/apify/crawlee-python/pull/2177)) ([991502f](https://github.com/apify/crawlee-python/commit/991502f61e6313d22ccdf140f0cdb012287b53f3)) by [@Mantisus](https://github.com/Mantisus), closes [#2142](https://github.com/apify/crawlee-python/issues/2142)
+- **httpx:** Scope cookies to the session and origin on every request ([#2179](https://github.com/apify/crawlee-python/pull/2179)) ([fbecef1](https://github.com/apify/crawlee-python/commit/fbecef182c7bee1a8930e9e4dfb37e617707e6c8)) by [@Mantisus](https://github.com/Mantisus)
 
 
 <!-- git-cliff-unreleased-end -->
