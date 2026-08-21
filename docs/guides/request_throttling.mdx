@@ -18,7 +18,7 @@ The <ApiLink to="class/ThrottlingRequestManager">`ThrottlingRequestManager`</Api
 - **Routes requests** for listed domains into dedicated sub-managers at insertion time.
 - **Enforces delays** from HTTP 429 responses (exponential backoff) and `robots.txt` crawl-delay directives.
 - **Schedules fairly** by fetching from the domain that has been waiting the longest.
-- **Sleeps intelligently** when all configured domains are throttled, instead of busy-waiting.
+- **Releases the concurrency slot** when all configured domains are throttled, instead of holding it for the whole cooldown.
 
 Requests for domains **not** in the configured list pass through to the main queue without any throttling.
 
@@ -39,6 +39,8 @@ To use request throttling, create a <ApiLink to="class/ThrottlingRequestManager"
 3. **Crawl-delay**: If `robots.txt` specifies a `crawl-delay`, the manager enforces a minimum interval between requests to that domain.
 
 4. **Fair scheduling**: `fetch_next_request` sorts available sub-managers by how long each domain has been waiting, ensuring no domain is starved.
+
+5. **Cooldown handling**: While a domain is in a cooldown, its queued requests don't count as dispatchable, so the crawler's autoscaled pool idles instead of keeping a worker slot blocked. The requests still count towards completion, so the crawl waits for them and finishes only once every one has been handled.
 
 ## Sub-manager storage
 
