@@ -71,9 +71,9 @@ def _same_origin(url: httpx.URL, other: httpx.URL) -> bool:
 class _HttpxTransport(httpx.AsyncHTTPTransport):
     """HTTP transport adapter that keeps cookies in a `Session` instead of in the `HTTPX` client.
 
-    Response cookies are stored in the session and the `Cookie` header is rebuilt from it before every hop, so
-    one client can be shared by all sessions. A `Cookie` header passed by the caller wins for as long as the
-    redirect chain stays on its origin.
+    Response cookies are stored in the session when `persist_cookies_per_session` is enabled, and the `Cookie`
+    header is rebuilt from it before every hop, so one client can be shared by all sessions. A `Cookie` header
+    passed by the caller wins for as long as the redirect chain stays on its origin.
     """
 
     def __init__(self, *, persist_cookies_per_session: bool, **kwargs: Any) -> None:
@@ -146,7 +146,7 @@ class HttpxHttpClient(HttpClient):
             http1: Whether to enable HTTP/1.1 support.
             http2: Whether to enable HTTP/2 support.
             verify: SSL certificates used to verify the identity of requested hosts.
-            header_generator: Header generator instance to use for generating common headers.
+            header_generator: Header generator instance to use for generating browser-like headers.
             async_client_kwargs: Additional keyword arguments for `httpx.AsyncClient`. The `proxy`, `mounts` and
                 `transport` arguments are ignored, proxies are configured through `ProxyConfiguration`. The `limits`
                 argument applies per proxy, because every proxy gets a connection pool of its own.
