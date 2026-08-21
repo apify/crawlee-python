@@ -32,7 +32,7 @@ To use request throttling, create a <ApiLink to="class/ThrottlingRequestManager"
 
 ## How it works
 
-1. **Insertion-time routing**: When you add requests via `add_request` or `add_requests`, each request is checked against the configured domain list. Matching requests go directly into a per-domain sub-manager; all others go to the inner manager. This eliminates request duplication entirely.
+1. **Insertion-time routing**: When you add requests via `add_request` or `add_requests`, each request is checked against the configured domain list. Matching requests go directly into a per-domain sub-manager; all others go to the inner manager. Each request added this way lives in exactly one store, so it is deduplicated there.
 
 2. **429 backoff**: When the crawler detects an HTTP 429 response, the `ThrottlingRequestManager` records an exponential backoff delay for that domain (starting at 2s, doubling up to 60s). If the response includes a `Retry-After` header, that value takes priority.
 
