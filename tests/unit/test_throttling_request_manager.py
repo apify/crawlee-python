@@ -120,6 +120,76 @@ async def test_domain_matching_is_case_insensitive(
     assert manager._is_domain_throttled('example.com')
 
 
+@pytest.mark.parametrize(
+    ('configured', 'url'),
+    [
+        pytest.param('xn--hky-ela4t.cz', 'https://háčky.cz/page', id='punycode entry'),
+        pytest.param('háčky.cz', 'https://xn--hky-ela4t.cz/page', id='punycode url'),
+        pytest.param('example.com', 'http://example.com./page', id='root dot in url'),
+        pytest.param('example.com.', 'http://example.com/page', id='root dot in entry'),
+        pytest.param('[::1]', 'http://[::1]:8080/page', id='bracketed ipv6'),
+        pytest.param('::1', 'http://[::1]:8080/page', id='bare ipv6'),
+        pytest.param('https://example.com/products', 'https://example.com/page', id='full url'),
+        pytest.param('example.com:8080/path:1', 'https://example.com:8080/page', id='scheme-less url with colons'),
+        pytest.param(' example.com ', 'https://example.com/page', id='padded entry'),
+    ],
+)
+async def test_domain_matching_normalizes_spelling(
+    configured: str,
+    url: str,
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> None:
+    """A configured domain and a crawled URL must land on the same key however each of them is spelled."""
+    manager = ThrottlingRequestManager(
+        inner_queue,
+        domains=[configured],
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+    assert manager.record_domain_delay(url) is True
+
+
+@pytest.mark.parametrize(
+    'configured',
+    [
+        pytest.param('.', id='bare root dot'),
+        pytest.param('[::1', id='unclosed ipv6 bracket'),
+        pytest.param('*.example.com', id='subdomain wildcard'),
+        pytest.param('example.com:8080:9090', id='stray colons'),
+    ],
+)
+async def test_unmatchable_domain_is_rejected(
+    configured: str,
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> None:
+    """An entry that cannot yield a matchable hostname is rejected at construction, not silently kept."""
+    with pytest.raises(ValueError, match='not a valid hostname'):
+        ThrottlingRequestManager(
+            inner_queue,
+            domains=[configured],
+            request_manager_opener=RequestQueue.open,
+            service_locator=service_locator,
+        )
+
+
+async def test_blank_domain_entries_are_ignored(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> None:
+    """Blank entries are dropped rather than rejected, so a list built by splitting a string needs no pruning."""
+    manager = ThrottlingRequestManager(
+        inner_queue,
+        domains=['', '   ', 'example.com'],
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+    assert set(manager._domain_states) == {'example.com'}
+
+
 async def test_add_requests_routes_mixed_domains(
     manager: ThrottlingRequestManager[RequestQueue],
     inner_queue: RequestQueue,
