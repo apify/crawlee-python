@@ -65,7 +65,7 @@ from crawlee.errors import (
 )
 from crawlee.events._types import Event, EventCrawlerStatusData
 from crawlee.http_clients import ImpitHttpClient
-from crawlee.request_loaders import ThrottlingRequestManager
+from crawlee.request_loaders import RequestManagerTandem, ThrottlingRequestManager
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics, StatisticsState
@@ -705,7 +705,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         self._running = True
 
-        if self._respect_robots_txt_file and not isinstance(self._request_manager, ThrottlingRequestManager):
+        if self._respect_robots_txt_file and self._get_throttling_manager() is None:
             self._logger.warning(
                 'The `respect_robots_txt_file` option is enabled, but the crawler is not using '
                 '`ThrottlingRequestManager`. Crawl-delay directives from robots.txt will not be enforced. To enable '
@@ -1619,51 +1619,69 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if is_status_code_server_error(status_code) and not is_ignored_status:
             raise HttpStatusCodeError('Error status code returned', status_code)
 
-    def _raise_for_session_blocked_status_code(
+    def _get_throttling_manager(self) -> ThrottlingRequestManager | None:
+        """Return the crawler's `ThrottlingRequestManager`, unwrapping any `RequestManagerTandem` around it."""
+        manager = self._request_manager
+        while isinstance(manager, RequestManagerTandem):
+            manager = manager.request_manager
+
+        return manager if isinstance(manager, ThrottlingRequestManager) else None
+
+    def _record_rate_limit_status_code(
         self,
-        session: Session | None,
         status_code: int,
         *,
         request_url: str,
         retry_after_header: str | None = None,
     ) -> None:
-        """Raise an exception if the given status code indicates the session is blocked.
+        """Record a 429 Too Many Requests response so the domain gets a per-domain backoff.
 
-        If the status code is 429 (Too Many Requests), the domain is recorded as rate-limited in the
-        `ThrottlingRequestManager` for per-domain backoff.
+        Other status codes are ignored. Rate limiting is independent of `retry_on_blocked`, so this runs for every
+        response, not only for those checked against the session's blocking rules.
+
+        Args:
+            status_code: The HTTP status code to check.
+            request_url: The request URL, used for per-domain rate limit tracking.
+            retry_after_header: The value of the `Retry-After` response header, if present.
+        """
+        if status_code != HTTPStatus.TOO_MANY_REQUESTS:
+            return
+
+        throttling_manager = self._get_throttling_manager()
+
+        if throttling_manager is None:
+            self._logger_once.log(
+                'Received an HTTP 429 (Too Many Requests) response, but the crawler is not using '
+                '`ThrottlingRequestManager`. Per-domain backoff and `Retry-After` headers will not be honored. '
+                'To enable per-domain rate limiting, configure the crawler to use `ThrottlingRequestManager` '
+                'as the request manager.',
+                key='no_throttling_manager_on_429',
+                level=logging.WARNING,
+            )
+            return
+
+        retry_after = parse_retry_after_header(retry_after_header)
+        if not throttling_manager.record_domain_delay(request_url, retry_after=retry_after):
+            domain = (URL(request_url).host or '').lower().removesuffix('.')
+            if domain:
+                self._logger_once.log(
+                    f'Received an HTTP 429 (Too Many Requests) response from domain "{domain}", but it is '
+                    f'not in the `ThrottlingRequestManager.domains` list. Per-domain backoff will not be '
+                    f'applied for this domain. Add it to `domains=` to enable throttling.',
+                    key=f'unconfigured_throttle_domain:{domain}',
+                    level=logging.WARNING,
+                )
+
+    def _raise_for_session_blocked_status_code(self, session: Session | None, status_code: int) -> None:
+        """Raise an exception if the given status code indicates the session is blocked.
 
         Args:
             session: The session used for the request. If `None`, no check is performed.
             status_code: The HTTP status code to check.
-            request_url: The request URL, used for per-domain rate limit tracking.
-            retry_after_header: The value of the `Retry-After` response header, if present.
 
         Raises:
             SessionError: If the status code indicates the session is blocked.
         """
-        if status_code == HTTPStatus.TOO_MANY_REQUESTS:
-            if isinstance(self._request_manager, ThrottlingRequestManager):
-                retry_after = parse_retry_after_header(retry_after_header)
-                if not self._request_manager.record_domain_delay(request_url, retry_after=retry_after):
-                    domain = (URL(request_url).host or '').lower().removesuffix('.')
-                    if domain:
-                        self._logger_once.log(
-                            f'Received an HTTP 429 (Too Many Requests) response from domain "{domain}", but it is '
-                            f'not in the `ThrottlingRequestManager.domains` list. Per-domain backoff will not be '
-                            f'applied for this domain. Add it to `domains=` to enable throttling.',
-                            key=f'unconfigured_throttle_domain:{domain}',
-                            level=logging.WARNING,
-                        )
-            else:
-                self._logger_once.log(
-                    'Received an HTTP 429 (Too Many Requests) response, but the crawler is not using '
-                    '`ThrottlingRequestManager`. Per-domain backoff and `Retry-After` headers will not be honored. '
-                    'To enable per-domain rate limiting, configure the crawler to use `ThrottlingRequestManager` '
-                    'as the request manager.',
-                    key='no_throttling_manager_on_429',
-                    level=logging.WARNING,
-                )
-
         if session is not None and session.is_blocked_status_code(
             status_code=status_code,
             ignore_http_error_status_codes=self._ignore_http_error_status_codes,
@@ -1697,10 +1715,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if not robots_txt_file:
             return True
 
-        if isinstance(self._request_manager, ThrottlingRequestManager):
+        throttling_manager = self._get_throttling_manager()
+        if throttling_manager is not None:
             crawl_delay = robots_txt_file.get_crawl_delay()
             if crawl_delay is not None:
-                self._request_manager.set_crawl_delay(url, crawl_delay)
+                throttling_manager.set_crawl_delay(url, crawl_delay)
 
         return robots_txt_file.is_allowed(url)
 

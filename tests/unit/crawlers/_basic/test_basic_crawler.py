@@ -28,7 +28,7 @@ from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
 from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
-from crawlee.request_loaders import RequestList, RequestManagerTandem, ThrottlingRequestManager
+from crawlee.request_loaders import RequestList, RequestManager, RequestManagerTandem, ThrottlingRequestManager
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics, StatisticsState
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
@@ -2464,8 +2464,8 @@ async def test_warn_no_throttling_manager_once_on_429(caplog: pytest.LogCaptureF
     """A 429 from a crawler without ThrottlingRequestManager logs a recommendation, only once per instance."""
     crawler = BasicCrawler(configure_logging=False)
     with caplog.at_level(logging.WARNING, logger='crawlee'):
-        crawler._raise_for_session_blocked_status_code(session=None, status_code=429, request_url='https://a.test/')
-        crawler._raise_for_session_blocked_status_code(session=None, status_code=429, request_url='https://b.test/')
+        crawler._record_rate_limit_status_code(429, request_url='https://a.test/')
+        crawler._record_rate_limit_status_code(429, request_url='https://b.test/')
 
     matching = [
         r for r in caplog.records if 'ThrottlingRequestManager' in r.getMessage() and 'HTTP 429' in r.getMessage()
@@ -2484,15 +2484,9 @@ async def test_warn_unconfigured_throttle_domain_once_per_domain(caplog: pytest.
     crawler = BasicCrawler(configure_logging=False, request_manager=throttler)
 
     with caplog.at_level(logging.WARNING, logger='crawlee'):
-        crawler._raise_for_session_blocked_status_code(
-            session=None, status_code=429, request_url='https://A.example.com/page1'
-        )
-        crawler._raise_for_session_blocked_status_code(
-            session=None, status_code=429, request_url='https://a.example.com/page2'
-        )
-        crawler._raise_for_session_blocked_status_code(
-            session=None, status_code=429, request_url='https://other.example.com/page1'
-        )
+        crawler._record_rate_limit_status_code(429, request_url='https://A.example.com/page1')
+        crawler._record_rate_limit_status_code(429, request_url='https://a.example.com/page2')
+        crawler._record_rate_limit_status_code(429, request_url='https://other.example.com/page1')
 
     matching = [
         r
@@ -2537,3 +2531,49 @@ async def test_throttled_domain_waits_out_backoff_without_ending_the_crawl() -> 
     assert empty_during_cooldown == [True]
     assert len(dispatched_at) == 2
     assert dispatched_at[1] - dispatched_at[0] >= 0.5
+
+
+@pytest.mark.parametrize(
+    'tandem_depth',
+    [
+        pytest.param(1, id='single_tandem'),
+        pytest.param(2, id='nested_tandems'),
+    ],
+)
+async def test_records_429_through_tandem(tandem_depth: int, caplog: pytest.LogCaptureFixture) -> None:
+    """A throttler reached through a tandem still gets the 429, and the crawler stops claiming there is no throttler."""
+    inner = await RequestQueue.open(alias=f'tandem-429-{tandem_depth}', storage_client=MemoryStorageClient())
+    throttler = ThrottlingRequestManager(
+        inner,
+        domains=['throttled.test'],
+        request_manager_opener=RequestQueue.open,
+    )
+
+    manager: RequestManager = throttler
+    for depth in range(tandem_depth):
+        manager = await RequestList([f'https://loader{depth}.test/']).to_tandem(manager)
+
+    crawler = BasicCrawler(configure_logging=False, request_manager=manager)
+
+    with caplog.at_level(logging.WARNING, logger='crawlee'):
+        crawler._record_rate_limit_status_code(429, request_url='https://throttled.test/page1')
+
+    assert throttler._is_domain_throttled('throttled.test')
+    assert not [r for r in caplog.records if 'not using' in r.getMessage()]
+
+
+async def test_no_crawl_delay_warning_for_tandem_wrapped_throttler(caplog: pytest.LogCaptureFixture) -> None:
+    """The robots.txt crawl-delay warning must not fire when the throttler is wrapped in a tandem."""
+    inner = await RequestQueue.open(alias='tandem-crawl-delay', storage_client=MemoryStorageClient())
+    throttler = ThrottlingRequestManager(
+        inner,
+        domains=['throttled.test'],
+        request_manager_opener=RequestQueue.open,
+    )
+    tandem = await RequestList([]).to_tandem(throttler)
+    crawler = BasicCrawler(configure_logging=False, request_manager=tandem, respect_robots_txt_file=True)
+
+    with caplog.at_level(logging.WARNING, logger='crawlee'):
+        await crawler.run()
+
+    assert not [r for r in caplog.records if 'Crawl-delay directives' in r.getMessage()]
