@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee.http_clients import HttpResponse
+    from crawlee.proxy_configuration import ProxyInfo
 
 
 async def read_json(response: HttpResponse) -> dict:
@@ -45,7 +46,6 @@ def test_same_origin(url: str, other: str, *, expected: bool) -> None:
 @pytest.mark.parametrize(
     ('client_kwargs', 'expected_warning'),
     [
-        pytest.param({'proxy': 'http://user:password@127.0.0.1:8888'}, '`proxy` argument', id='proxy'),
         pytest.param({'mounts': {'all://': httpx.AsyncHTTPTransport()}}, '`mounts` argument', id='mounts'),
         pytest.param({'transport': httpx.AsyncHTTPTransport()}, '`transport` argument', id='transport'),
     ],
@@ -58,6 +58,31 @@ async def test_transport_kwargs_do_not_reach_the_client(client_kwargs: dict[str,
     async with client:
         assert client._get_client(None)._mounts == {}
         assert isinstance(client._get_client(None)._transport, _HttpxTransport)
+
+
+async def test_proxy_kwarg_routes_requests(server_url: URL) -> None:
+    """Test that a `proxy` kwarg routes the requests that carry no `ProxyInfo` of their own."""
+    # Port 1 refuses every connection, so the request can only reach the server if the proxy is not used.
+    async with HttpxHttpClient(proxy='http://127.0.0.1:1') as client:
+        with pytest.raises(httpx.ConnectError):
+            await client.send_request(str(server_url / 'status/222'))
+
+
+async def test_proxy_kwarg_works_against_a_real_proxy(proxy: ProxyInfo, server_url: URL) -> None:
+    """Test that a `proxy` kwarg still gets the response through once the proxy accepts the connection."""
+    async with HttpxHttpClient(proxy=proxy.url) as client:
+        response = await client.send_request(str(server_url / 'status/222'))
+
+    assert response.status_code == 222
+
+
+async def test_proxy_info_wins_over_the_proxy_kwarg(proxy: ProxyInfo, server_url: URL) -> None:
+    """Test that the `ProxyInfo` of a request takes precedence over the `proxy` kwarg of the client."""
+    # Port 1 refuses every connection, so the request only succeeds if the `ProxyInfo` is the one being used.
+    async with HttpxHttpClient(proxy='http://127.0.0.1:1') as client:
+        response = await client.send_request(str(server_url / 'status/222'), proxy_info=proxy)
+
+    assert response.status_code == 222
 
 
 def test_silences_httpx_request_logging() -> None:

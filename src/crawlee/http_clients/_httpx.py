@@ -147,8 +147,9 @@ class HttpxHttpClient(HttpClient):
             http2: Whether to enable HTTP/2 support.
             verify: SSL certificates used to verify the identity of requested hosts.
             header_generator: Header generator instance to use for generating browser-like headers.
-            async_client_kwargs: Additional keyword arguments for `httpx.AsyncClient`. The `proxy`, `mounts` and
-                `transport` arguments are ignored, proxies are configured through `ProxyConfiguration`. The `limits`
+            async_client_kwargs: Additional keyword arguments for `httpx.AsyncClient`. The `mounts` and `transport`
+                arguments are ignored, they would bypass the cookie handling. The `proxy` argument covers only the
+                requests made without a `ProxyInfo`, a `ProxyConfiguration` takes precedence over it. The `limits`
                 argument applies per proxy, because every proxy gets a connection pool of its own.
         """
         super().__init__(
@@ -163,15 +164,11 @@ class HttpxHttpClient(HttpClient):
         self._http1 = http1
         self._http2 = http2
 
-        # Each of these kwargs would put a transport of its own in front of the one that handles the cookies.
-        if async_client_kwargs.pop('proxy', None) is not None:
-            warnings.warn(
-                'The `proxy` argument of `HttpxHttpClient` is ignored, it does not route any request. '
-                'Configure proxies through `ProxyConfiguration`.',
-                UserWarning,
-                stacklevel=2,
-            )
+        # `httpx.AsyncClient` turns a `proxy` into a mount that bypasses the cookie handling, so it is handed to
+        # the transport instead. It covers the requests that carry no `ProxyInfo` of their own.
+        self._proxy = async_client_kwargs.pop('proxy', None)
 
+        # These two would put a transport of their own in front of the one that handles the cookies.
         for ignored_kwarg in ('mounts', 'transport'):
             if async_client_kwargs.pop(ignored_kwarg, None) is not None:
                 warnings.warn(
@@ -347,7 +344,7 @@ class HttpxHttpClient(HttpClient):
                 http1=self._http1,
                 http2=self._http2,
                 verify=self._ssl_context,
-                proxy=proxy_url,
+                proxy=proxy_url or self._proxy,
                 persist_cookies_per_session=self._persist_cookies_per_session,
                 # Above the `httpx` default of 20 kept-alive connections every request pays a TCP and TLS handshake.
                 limits=self._async_client_kwargs.get(
