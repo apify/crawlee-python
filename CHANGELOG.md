@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - **sitemaps:** Allow Sitemap.from_xml_string to opt into enqueue host filtering ([#2162](https://github.com/apify/crawlee-python/pull/2162)) ([a3c20c1](https://github.com/apify/crawlee-python/commit/a3c20c15a15f7ffa5644640adde6daf1dd4c3523)) by [@aryansk](https://github.com/aryansk), closes [#2118](https://github.com/apify/crawlee-python/issues/2118)
 - **playwright:** Scope custom request headers to the navigation request ([#2173](https://github.com/apify/crawlee-python/pull/2173)) ([6f0eff4](https://github.com/apify/crawlee-python/commit/6f0eff49c7396a31754a9be3ad428ae5ed08348f)) by [@vdusek](https://github.com/vdusek)
+- **throttling-manager:** Normalize configured domains the same way as crawled hostnames ([#2157](https://github.com/apify/crawlee-python/pull/2157)) ([eb91fa7](https://github.com/apify/crawlee-python/commit/eb91fa757126629806186f2fecd7b5b677cb8079)) by [@Mantisus](https://github.com/Mantisus), closes [#2144](https://github.com/apify/crawlee-python/issues/2144)
 
 
 <!-- git-cliff-unreleased-end -->
