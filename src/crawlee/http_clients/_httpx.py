@@ -76,10 +76,10 @@ class _HttpxTransport(httpx.AsyncHTTPTransport):
     redirect chain stays on its origin.
     """
 
-    def __init__(self, *args: Any, persist_cookies_per_session: bool, **kwargs: Any) -> None:
+    def __init__(self, *, persist_cookies_per_session: bool, **kwargs: Any) -> None:
         """Initialize a new instance. Extra arguments are passed to `httpx.AsyncHTTPTransport`."""
         self._persist_cookies_per_session = persist_cookies_per_session
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
     @override
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
