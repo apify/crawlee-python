@@ -55,6 +55,11 @@ class BrowserController(ABC):
         """Return if the browser has free capacity to open a new page."""
 
     @property
+    def is_opening_pages(self) -> bool:
+        """Return if the browser has any `new_page` calls currently in flight."""
+        return False
+
+    @property
     @abstractmethod
     def is_browser_connected(self) -> bool:
         """Return if the browser is closed."""

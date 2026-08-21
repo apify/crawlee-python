@@ -5,8 +5,10 @@ from contextlib import suppress
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from playwright.async_api import Page
+    from playwright.async_api import Page, Route
     from playwright.async_api import Request as PlaywrightRequest
+
+    from crawlee._types import HttpHeaders, HttpMethod, HttpPayload
 
 _DEFAULT_BLOCK_REQUEST_URL_PATTERNS = [
     '.css',
@@ -20,6 +22,51 @@ _DEFAULT_BLOCK_REQUEST_URL_PATTERNS = [
     '.pdf',
     '.zip',
 ]
+
+
+class NavigationRequestInterceptor:
+    """One-shot page route that applies a custom method, headers, and payload to the main-frame navigation request.
+
+    Scoping the overrides to the navigation request is the point: applying headers page-wide via
+    `Page.set_extra_http_headers` would leak sensitive values like `Authorization` to every subresource request
+    the page makes, including cross-origin ones. The navigation request is matched by its role (a main-frame
+    navigation) rather than by its URL, because the browser normalizes URLs (adds the root path, strips
+    fragments), so a URL comparison can silently miss. Redirect hops bypass routing and inherit the overrides.
+
+    Custom headers are merged into the headers the browser would send on its own (e.g. `User-Agent` or
+    fingerprint headers), with the custom ones winning.
+    """
+
+    def __init__(
+        self,
+        page: Page,
+        *,
+        method: HttpMethod = 'GET',
+        headers: HttpHeaders | dict[str, str] | None = None,
+        payload: HttpPayload | None = None,
+    ) -> None:
+        self._page = page
+        self._method = method
+        self._headers = headers
+        self._payload = payload
+        self._applied = False
+
+    async def register(self) -> None:
+        """Start routing the page's requests through this interceptor.
+
+        Once the overrides are applied, the route's predicate stops matching, so any later request
+        (subresources, XHRs, client-side navigations) skips the handler entirely.
+        """
+        await self._page.route(lambda _: not self._applied, self._handle_route)
+
+    async def _handle_route(self, route: Route, request: PlaywrightRequest) -> None:
+        if self._applied or not request.is_navigation_request() or request.frame != self._page.main_frame:
+            await route.fallback()
+            return
+
+        self._applied = True
+        merged_headers = {**request.headers, **dict(self._headers)} if self._headers else None
+        await route.continue_(method=self._method, headers=merged_headers, post_data=self._payload)
 
 
 async def infinite_scroll(page: Page) -> None:

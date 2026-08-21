@@ -3,15 +3,32 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 1.9.2 - **not yet released**
+## 1.9.3 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **sitemaps:** Allow Sitemap.from_xml_string to opt into enqueue host filtering ([#2162](https://github.com/apify/crawlee-python/pull/2162)) ([a3c20c1](https://github.com/apify/crawlee-python/commit/a3c20c15a15f7ffa5644640adde6daf1dd4c3523)) by [@aryansk](https://github.com/aryansk), closes [#2118](https://github.com/apify/crawlee-python/issues/2118)
+- **playwright:** Scope custom request headers to the navigation request ([#2173](https://github.com/apify/crawlee-python/pull/2173)) ([6f0eff4](https://github.com/apify/crawlee-python/commit/6f0eff49c7396a31754a9be3ad428ae5ed08348f)) by [@vdusek](https://github.com/vdusek)
+- **throttling-manager:** Normalize configured domains the same way as crawled hostnames ([#2157](https://github.com/apify/crawlee-python/pull/2157)) ([eb91fa7](https://github.com/apify/crawlee-python/commit/eb91fa757126629806186f2fecd7b5b677cb8079)) by [@Mantisus](https://github.com/Mantisus), closes [#2144](https://github.com/apify/crawlee-python/issues/2144)
+- **throttling-manager:** Stop holding a concurrency slot while a domain is throttled ([#2176](https://github.com/apify/crawlee-python/pull/2176)) ([5c1fa09](https://github.com/apify/crawlee-python/commit/5c1fa09cc36e2a3c042740767cfc974743267ee3)) by [@Mantisus](https://github.com/Mantisus), closes [#2127](https://github.com/apify/crawlee-python/issues/2127)
+
+
+<!-- git-cliff-unreleased-end -->
+## [1.9.2](https://github.com/apify/crawlee-python/releases/tag/v1.9.2) (2026-08-17)
 
 ### 🐛 Bug Fixes
 
 - **sitemap:** Guard the unavailable `ExpatParser.flush` on older `CPython` patch releases ([#2141](https://github.com/apify/crawlee-python/pull/2141)) ([7f75295](https://github.com/apify/crawlee-python/commit/7f75295ca96a7e06bf794e30b999109a9b93c538)) by [@Mantisus](https://github.com/Mantisus), closes [#2119](https://github.com/apify/crawlee-python/issues/2119)
 - **dataset:** Preserve push_data compatibility with the released Apify SDK ([#2152](https://github.com/apify/crawlee-python/pull/2152)) ([091410f](https://github.com/apify/crawlee-python/commit/091410f36cec8ef795d29b6d89428069525a4dbf)) by [@vdusek](https://github.com/vdusek)
+- **stagehand:** Cap the stagehand dependency below the breaking 4.x API ([#2153](https://github.com/apify/crawlee-python/pull/2153)) ([263fff4](https://github.com/apify/crawlee-python/commit/263fff4a1f279098dc6026f45646c278891cb53d)) by [@vdusek](https://github.com/vdusek)
+- **sitemaps:** Validate HTTP status when fetching sitemaps ([#2123](https://github.com/apify/crawlee-python/pull/2123)) ([c5c1072](https://github.com/apify/crawlee-python/commit/c5c1072776e243b38f1448d3156759e864867cca)) by [@anxkhn](https://github.com/anxkhn)
+- **browsers:** Do not close a browser as inactive while a page opening is in flight ([#2156](https://github.com/apify/crawlee-python/pull/2156)) ([3485535](https://github.com/apify/crawlee-python/commit/3485535749ae5b6075e87860bc82304c483aad21)) by [@vdusek](https://github.com/vdusek)
+
+### ⚡ Performance
+
+- **impit:** Optimize client and connection reuse across Sessions ([#2140](https://github.com/apify/crawlee-python/pull/2140)) ([cd7ab2b](https://github.com/apify/crawlee-python/commit/cd7ab2b7020f0d6d0c7091db6ca1729bd0883f0f)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.9.1](https://github.com/apify/crawlee-python/releases/tag/v1.9.1) (2026-08-06)
 
 ### 🐛 Bug Fixes

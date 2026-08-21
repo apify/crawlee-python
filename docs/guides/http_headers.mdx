@@ -8,6 +8,7 @@ import ApiLink from '@site/src/components/ApiLink';
 import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
 import SetHeadersExample from '!!raw-loader!roa-loader!./code_examples/http_headers/set_headers.py';
+import BrowserPageHeadersExample from '!!raw-loader!roa-loader!./code_examples/http_headers/browser_page_headers.py';
 
 Every request a crawler sends includes [HTTP headers](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers). These headers tell the server who is making the request, what content is acceptable, and in what language. The server reads them and decides what to return. The same URL can return different content, a different status code, or a blocked page depending on the headers it sees. This guide covers the headers that shape a scraping request, like `User-Agent`, `Accept-Language`, and `Content-Type`, what Crawlee sends by default, and how to change them.
 
@@ -108,6 +109,21 @@ The example below sets `X-Api-Key` on the client and `Accept` on one of two requ
 <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink> and <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink> take the same `headers` argument.
 
 Header names are case-insensitive, and <ApiLink to="class/HttpHeaders">`HttpHeaders`</ApiLink> normalizes the casing for you, so `user-agent` and `User-Agent` refer to the same header.
+
+## Custom headers in browser-based crawlers
+
+The `headers` field of a <ApiLink to="class/Request">`Request`</ApiLink> works differently in browser-based crawlers such as <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>. The custom headers are sent with the navigation request and any redirects it goes through, merged into the headers the browser sends on its own. They aren't attached to the requests the page then makes by itself, such as images, scripts, or API calls. The scoping keeps sensitive values like `Authorization` from leaking to third-party origins that the crawled page decides to contact.
+
+There are two ways to send a header with every request the browser makes:
+
+- Set it on a single page with `page.set_extra_http_headers()` in a [pre-navigation hook](./request-router#pre-navigation-hooks).
+- Set it on the browser context through `browser_new_context_options={'extra_http_headers': {...}}`. The default fingerprint generator replaces context-level headers with its own, so context headers only take effect with fingerprinting turned off (`fingerprint_generator=None`).
+
+Either way, the header goes to every origin the page contacts, so use these options for values you're willing to send anywhere, and keep credentials on the request. The following example sets a page header in a pre-navigation hook, which works with the default fingerprinting:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {BrowserPageHeadersExample}
+</RunnableCodeBlock>
 
 ## Header order and fingerprinting
 

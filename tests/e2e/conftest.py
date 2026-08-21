@@ -1,4 +1,5 @@
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -41,9 +42,8 @@ def crawlee_wheel_path(tmp_path_factory: pytest.TempPathFactory, testrun_uid: st
         was_wheel_built_this_test_run_file = tmp_path_factory.getbasetemp() / f'wheel_was_built_in_run_{testrun_uid}'
         if not was_wheel_built_this_test_run_file.exists():
             subprocess.run(
-                args='python -m build',
+                args=[sys.executable, '-m', 'build'],
                 cwd=_CRAWLEE_ROOT_PATH,
-                shell=True,
                 check=True,
                 capture_output=True,
             )

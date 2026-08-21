@@ -141,6 +141,11 @@ class PlaywrightBrowserController(BrowserController):
 
     @property
     @override
+    def is_opening_pages(self) -> bool:
+        return self._opening_pages_count > 0
+
+    @property
+    @override
     def is_browser_connected(self) -> bool:
         return self._browser.is_connected()
 

@@ -2502,3 +2502,38 @@ async def test_warn_unconfigured_throttle_domain_once_per_domain(caplog: pytest.
     assert len(matching) == 2
     assert any('a.example.com' in r.getMessage() for r in matching)
     assert any('other.example.com' in r.getMessage() for r in matching)
+
+
+async def test_throttled_domain_waits_out_backoff_without_ending_the_crawl() -> None:
+    """A domain in a cooldown reads as empty to the autoscaled pool, yet its queued requests are still crawled."""
+    storage_client = MemoryStorageClient()
+    # The throttler opens its sub-managers through the global service locator, so point that at the same client.
+    service_locator.set_storage_client(storage_client)
+    inner = await RequestQueue.open(name='test-inner-backoff', storage_client=storage_client)
+    throttler = ThrottlingRequestManager(
+        inner,
+        domains=['throttled.placeholder.com'],
+        request_manager_opener=RequestQueue.open,
+    )
+    # A single worker slot makes the ordering deterministic: the second dispatch cannot start before the first
+    # handler has armed the backoff.
+    crawler = BasicCrawler(
+        request_manager=throttler,
+        configure_logging=False,
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+    )
+    dispatched_at = list[float]()
+    empty_during_cooldown = list[bool]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        dispatched_at.append(time.monotonic())
+        if len(dispatched_at) == 1:
+            throttler.record_domain_delay(context.request.url, retry_after=timedelta(milliseconds=500))
+            empty_during_cooldown.append(await throttler.is_empty())
+
+    await crawler.run(['https://throttled.placeholder.com/a', 'https://throttled.placeholder.com/b'])
+
+    assert empty_during_cooldown == [True]
+    assert len(dispatched_at) == 2
+    assert dispatched_at[1] - dispatched_at[0] >= 0.5
