@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import warnings
 from contextlib import asynccontextmanager
 from logging import DEBUG, WARNING, getLogger
 from typing import TYPE_CHECKING, Any, cast
@@ -146,9 +147,9 @@ class HttpxHttpClient(HttpClient):
             http2: Whether to enable HTTP/2 support.
             verify: SSL certificates used to verify the identity of requested hosts.
             header_generator: Header generator instance to use for generating common headers.
-            async_client_kwargs: Additional keyword arguments for `httpx.AsyncClient`. The `proxy` argument is
-                ignored, proxies are configured through `ProxyConfiguration`. The `limits` argument applies per
-                proxy, because every proxy gets a connection pool of its own.
+            async_client_kwargs: Additional keyword arguments for `httpx.AsyncClient`. The `proxy`, `mounts` and
+                `transport` arguments are ignored, proxies are configured through `ProxyConfiguration`. The `limits`
+                argument applies per proxy, because every proxy gets a connection pool of its own.
         """
         super().__init__(
             persist_cookies_per_session=persist_cookies_per_session,
@@ -162,8 +163,23 @@ class HttpxHttpClient(HttpClient):
         self._http1 = http1
         self._http2 = http2
 
-        # A `proxy=` kwarg would mount a transport of its own and bypass the cookie handling.
-        async_client_kwargs.pop('proxy', None)
+        # Each of these kwargs would put a transport of its own in front of the one that handles the cookies.
+        if async_client_kwargs.pop('proxy', None) is not None:
+            warnings.warn(
+                'The `proxy` argument of `HttpxHttpClient` is ignored, it does not route any request. '
+                'Configure proxies through `ProxyConfiguration`.',
+                UserWarning,
+                stacklevel=2,
+            )
+
+        for ignored_kwarg in ('mounts', 'transport'):
+            if async_client_kwargs.pop(ignored_kwarg, None) is not None:
+                warnings.warn(
+                    f'The `{ignored_kwarg}` argument of `HttpxHttpClient` is ignored, requests are sent through '
+                    'the transport that handles the cookies.',
+                    UserWarning,
+                    stacklevel=2,
+                )
 
         self._async_client_kwargs = async_client_kwargs
         self._header_generator = header_generator

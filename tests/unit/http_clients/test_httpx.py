@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock
 
 import httpx
@@ -13,7 +13,7 @@ from crawlee.fingerprint_suite import HeaderGenerator
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_values
 from crawlee.fingerprint_suite._consts import COMMON_ACCEPT_LANGUAGE
 from crawlee.http_clients import HttpxHttpClient
-from crawlee.http_clients._httpx import _same_origin
+from crawlee.http_clients._httpx import _HttpxTransport, _same_origin
 from crawlee.sessions import CookieParam, Session
 
 if TYPE_CHECKING:
@@ -42,10 +42,22 @@ def test_same_origin(url: str, other: str, *, expected: bool) -> None:
     assert _same_origin(httpx.URL(url), httpx.URL(other)) is expected
 
 
-async def test_proxy_kwarg_does_not_reach_the_client() -> None:
-    """Test that a `proxy` kwarg cannot mount a transport that would bypass the cookie handling."""
-    async with HttpxHttpClient(proxy='http://user:password@127.0.0.1:8888') as client:
-        assert client._get_client(None)._mounts == {}  # ty: ignore[unresolved-attribute]
+@pytest.mark.parametrize(
+    ('client_kwargs', 'expected_warning'),
+    [
+        pytest.param({'proxy': 'http://user:password@127.0.0.1:8888'}, '`proxy` argument', id='proxy'),
+        pytest.param({'mounts': {'all://': httpx.AsyncHTTPTransport()}}, '`mounts` argument', id='mounts'),
+        pytest.param({'transport': httpx.AsyncHTTPTransport()}, '`transport` argument', id='transport'),
+    ],
+)
+async def test_transport_kwargs_do_not_reach_the_client(client_kwargs: dict[str, Any], expected_warning: str) -> None:
+    """Test that kwargs mounting a transport of their own are rejected with a warning, so the cookies keep working."""
+    with pytest.warns(UserWarning, match=expected_warning):
+        client = HttpxHttpClient(**client_kwargs)
+
+    async with client:
+        assert client._get_client(None)._mounts == {}
+        assert isinstance(client._get_client(None)._transport, _HttpxTransport)
 
 
 def test_silences_httpx_request_logging() -> None:
