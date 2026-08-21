@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import ipaddress
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -39,9 +38,11 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     Requests for explicitly configured domains are routed into dedicated sub-managers at insertion time — each request
     lives in exactly one manager, eliminating duplication and simplifying deduplication.
 
-    When `fetch_next_request()` is called, it returns requests from the sub-manager whose domain has been waiting the
-    longest. If all configured domains are throttled, it falls back to the inner manager for non-throttled domains. If
-    the inner manager is also empty and all sub-managers are throttled, it sleeps until the earliest cooldown expires.
+    `fetch_next_request()` takes from the sub-manager whose domain has been waiting the longest, skipping domains in a
+    cooldown, and falls back to the inner manager when no sub-manager yields a request. If nothing can be dispatched
+    right now, it returns `None` rather than waiting, so the caller's task slot is released. `is_empty()` reports the
+    same view and reads as empty while every remaining request sits in a cooldown, whereas `is_finished()` counts those
+    requests, so the crawl idles until they are dispatchable instead of ending early.
 
     Delay sources:
     - HTTP 429 responses (via `record_domain_delay`)
@@ -110,9 +111,6 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         domain_keys = [self._parse_configured_domain(entry) for d in domains if (entry := d.strip())]
         self._domain_states: dict[str, _DomainState] = {key: _DomainState(domain=key) for key in domain_keys}
         self._sub_managers: dict[str, TRequestManager] = {}
-        self._new_work_event = asyncio.Event()
-        """Set whenever a request is added or reclaimed. Lets `fetch_next_request` wake from a throttle
-        wait early when fresh work appears, instead of sleeping for the full computed cooldown."""
 
     @property
     def inner(self) -> TRequestManager:
@@ -149,12 +147,9 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         if domain in self._domain_states:
             sm = await self._get_or_create_sub_manager(domain)
-            result = await sm.add_request(request, forefront=forefront)
-        else:
-            result = await self._inner.add_request(request, forefront=forefront)
+            return await sm.add_request(request, forefront=forefront)
 
-        self._signal_new_work()
-        return result
+        return await self._inner.add_request(request, forefront=forefront)
 
     @override
     async def add_requests(
@@ -201,68 +196,31 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
             )
 
-        if inner_requests or domain_requests:
-            self._signal_new_work()
-
     @override
     async def fetch_next_request(self) -> Request | None:
         """Fetch the next request, respecting per-domain delays.
 
-        Sub-managers are checked in order of longest-overdue domain first (sorted by `throttled_until` ascending). If
-        all configured domains are throttled, falls back to the inner manager for non-throttled domains. If the inner
-        manager is also empty and all sub-managers are throttled, waits until either the earliest domain becomes
-        available or new work is added (whichever comes first).
+        Sub-managers are checked in order of longest-overdue domain first, then the inner manager. Domains in a
+        cooldown are skipped, so the call returns `None` when nothing is dispatchable right now.
+
+        Note:
+            Unlike the `RequestLoader.fetch_next_request` contract, a `None` result does not imply that `is_finished()`
+            is `True` - it only means nothing is dispatchable right now. Since the manager never waits out a cooldown
+            itself, the dispatch cadence is only as precise as the caller's polling interval: a cooldown expiring
+            between two polls is picked up on the next one.
         """
-        while True:
-            # Clear the event before checking the queues. Any add/reclaim that races with this iteration will set the
-            # event again, so the wait at the end of the loop returns immediately rather than blocking until the
-            # throttle expires.
-            self._new_work_event.clear()
-
-            now = datetime.now(timezone.utc)
-            available_domains = sorted(
-                (
-                    domain
-                    for domain, state in self._domain_states.items()
-                    if domain in self._sub_managers and now >= state.throttled_until
-                ),
-                key=lambda d: self._domain_states[d].throttled_until,
-            )
-
-            for domain in available_domains:
-                req = await self._sub_managers[domain].fetch_next_request()
-                if req:
-                    self._mark_domain_dispatched(domain)
-                    return req
-
-            request = await self._inner.fetch_next_request()
+        for domain in self._fetchable_domains():
+            request = await self._sub_managers[domain].fetch_next_request()
             if request is not None:
+                self._mark_domain_dispatched(domain)
                 return request
 
-            if not self._sub_managers:
-                return None
-
-            sub_managers_empty = await asyncio.gather(*(sm.is_empty() for sm in self._sub_managers.values()))
-            if all(sub_managers_empty):
-                return None
-
-            earliest = self._get_earliest_available_time(now)
-            sleep_duration = max(
-                (earliest - now).total_seconds(),
-                0.1,  # Avoid tight loops if a throttle expired during the previous iteration.
-            )
-            logger.debug(
-                f'All configured domains are throttled and inner manager is empty. '
-                f'Waiting up to {sleep_duration:.1f}s for earliest domain to become available or new work.'
-            )
-            await self._wait_for_new_work_or_timeout(sleep_duration)
+        return await self._inner.fetch_next_request()
 
     @override
     async def reclaim_request(self, request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
         manager = self._select_manager(request.url)
-        result = await manager.reclaim_request(request, forefront=forefront)
-        self._signal_new_work()
-        return result
+        return await manager.reclaim_request(request, forefront=forefront)
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
@@ -287,7 +245,14 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
     @override
     async def is_empty(self) -> bool:
-        results = await asyncio.gather(self._inner.is_empty(), *(sm.is_empty() for sm in self._sub_managers.values()))
+        """Report whether anything can be dispatched right now.
+
+        Requests queued for a domain in a cooldown do not count. They still count towards `is_finished`, so the crawl
+        waits for them.
+        """
+        results = await asyncio.gather(
+            self._inner.is_empty(), *(self._sub_managers[d].is_empty() for d in self._fetchable_domains())
+        )
         return all(results)
 
     @override
@@ -430,15 +395,18 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             return False
         return datetime.now(timezone.utc) < state.throttled_until
 
-    def _get_earliest_available_time(self, now: datetime) -> datetime:
-        """Get the earliest time any throttled domain becomes available."""
-        earliest = now + self._max_delay
-
-        for state in self._domain_states.values():
-            if now < state.throttled_until < earliest:
-                earliest = state.throttled_until
-
-        return earliest
+    def _fetchable_domains(self) -> list[str]:
+        """Return the configured domains that are not in a cooldown right now, longest-overdue first."""
+        now = datetime.now(timezone.utc)
+        available = [
+            domain
+            for domain, state in self._domain_states.items()
+            # Every configured domain has state from construction, but sub-managers are created lazily on first
+            # insertion, so this check keeps the `_sub_managers[domain]` lookups in the callers safe.
+            if domain in self._sub_managers and now >= state.throttled_until
+        ]
+        available.sort(key=lambda domain: self._domain_states[domain].throttled_until)
+        return available
 
     def _mark_domain_dispatched(self, domain: str) -> None:
         """Record that a request to this domain was just dispatched.
@@ -449,26 +417,12 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         if state is not None and state.crawl_delay is not None:
             state.throttled_until = datetime.now(timezone.utc) + state.crawl_delay
 
-    def _signal_new_work(self) -> None:
-        """Wake `fetch_next_request` if it is sleeping inside a throttle wait."""
-        self._new_work_event.set()
-
     def _select_manager(self, url: str) -> TRequestManager:
         """Return the manager that owns the given URL — its sub-manager if one exists, otherwise the inner."""
         domain = self._extract_domain(url)
         if domain in self._sub_managers:
             return self._sub_managers[domain]
         return self._inner
-
-    async def _wait_for_new_work_or_timeout(self, timeout: float) -> None:
-        """Wait until new work is signaled or `timeout` seconds elapse, whichever comes first.
-
-        The signal is set by `add_request`, `add_requests`, and `reclaim_request`, allowing `fetch_next_request` to wake
-        up immediately when fresh work appears during a throttle wait instead of sleeping for the full computed cooldown
-        (up to `max_delay`).
-        """
-        with contextlib.suppress(asyncio.TimeoutError):
-            await asyncio.wait_for(self._new_work_event.wait(), timeout=timeout)
 
 
 class _RequestManagerOpener(Protocol[TRequestManager]):
