@@ -85,11 +85,14 @@ class _HttpxTransport(httpx.AsyncHTTPTransport):
         session = cast('Session | None', request.extensions.get('crawlee_session'))
         original_url, user_cookie = request.extensions.get('crawlee_caller_cookie', (None, None))
 
-        # `httpx` drops the `Cookie` header on every redirect, so it is set here before every hop.
+        # The transport owns the `Cookie` header. Anything already on the request came from the `httpx` jar,
+        # which is scoped to no session and no origin, so it is always replaced or dropped.
         if original_url is not None and _same_origin(original_url, request.url):
             request.headers['cookie'] = user_cookie
         elif session and (cookies := session.cookies.get_cookie_string(str(request.url))):
             request.headers['cookie'] = cookies
+        else:
+            request.headers.pop('cookie', None)
 
         response = await super().handle_async_request(request)
         response.request = request

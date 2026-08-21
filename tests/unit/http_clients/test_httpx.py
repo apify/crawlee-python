@@ -96,6 +96,18 @@ async def test_headers_come_from_one_sample(server_url: URL) -> None:
     generator.get_specific_headers.assert_called_once_with(header_names={'Accept', 'Accept-Language', 'User-Agent'})
 
 
+async def test_client_cookies_dropped_cross_origin(server_url: URL, redirect_server_url: URL) -> None:
+    """Test that cookies of the underlying client reach their origin but not the target of a cross-origin redirect."""
+    redirect_url = (server_url / 'redirect').with_query(url=str(redirect_server_url / 'cookies'), status=302)
+
+    async with HttpxHttpClient(cookies={'from_client': '1'}) as client:
+        direct = await client.send_request(str(server_url / 'cookies'))
+        redirected = await client.send_request(str(redirect_url))
+
+    assert (await read_json(direct))['cookies'] == {'from_client': '1'}
+    assert (await read_json(redirected))['cookies'] == {}
+
+
 async def test_no_headers_without_generator(server_url: URL) -> None:
     """Test that no browser-like headers are sent once the header generator is turned off."""
     async with HttpxHttpClient(header_generator=None) as client:
