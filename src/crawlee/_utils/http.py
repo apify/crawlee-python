@@ -19,7 +19,7 @@ def parse_retry_after_header(value: str | None) -> timedelta | None:
         value: The raw Retry-After header value.
 
     Returns:
-        A timedelta representing the delay, or None if the header is missing or unparsable.
+        A timedelta representing the delay, or None if the header is missing, unparsable, or not a positive delay.
     """
     if not value:
         return None
@@ -30,10 +30,10 @@ def parse_retry_after_header(value: str | None) -> timedelta | None:
     except ValueError:
         pass  # Not an integer, fall through to the HTTP-date form below.
     else:
-        if seconds < 0:
-            # A negative delay is malformed. Reject it instead of returning a negative `timedelta`, which would
-            # push `throttled_until` into the past and silently disable the 429 back-off downstream.
-            logger.debug(f'Retry-After delay-seconds {value!r} is negative; ignoring.')
+        if seconds <= 0:
+            # A negative delay is malformed and a zero one carries no backoff, so reject both and let the caller
+            # apply its own backoff instead.
+            logger.debug(f'Retry-After delay-seconds {value!r} is not positive; ignoring.')
             return None
         return timedelta(seconds=seconds)
 
