@@ -303,22 +303,21 @@ class HttpxHttpClient(HttpClient):
 
         headers = self._combine_headers(headers)
 
-        extensions: dict[str, Any] = {'crawlee_session': session}
-
-        # `httpx` drops the `Cookie` header on every redirect but keeps the extensions, so the header of the caller
-        # travels there. An empty header is kept as well, it suppresses the session cookies while the chain stays
-        # on the origin the header was meant for.
-        if (caller_cookie := headers.get('cookie')) is not None:
-            extensions['crawlee_caller_cookie'] = (httpx.URL(url), caller_cookie)
-
-        return client.build_request(
+        request = client.build_request(
             url=url,
             method=method,
             headers=dict(headers) if headers else None,
             content=payload,
-            extensions=extensions,
+            extensions={'crawlee_session': session},
             timeout=timeout or httpx.USE_CLIENT_DEFAULT,
         )
+
+        # Extensions survive a redirect, the `Cookie` header does not, so the caller's value rides along there.
+        # An empty value is kept too: it means "no cookies" and outranks the session on the origin it came from.
+        if (caller_cookie := request.headers.get('cookie')) is not None:
+            request.extensions['crawlee_caller_cookie'] = (request.url, caller_cookie)
+
+        return request
 
     def _get_client(self, proxy_url: str | None) -> httpx.AsyncClient:
         """Retrieve or create an HTTP client for the given proxy URL.

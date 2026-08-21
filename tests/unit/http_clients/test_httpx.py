@@ -14,6 +14,7 @@ from crawlee.fingerprint_suite._browserforge_adapter import get_available_header
 from crawlee.fingerprint_suite._consts import COMMON_ACCEPT_LANGUAGE
 from crawlee.http_clients import HttpxHttpClient
 from crawlee.http_clients._httpx import _same_origin
+from crawlee.sessions import CookieParam, Session
 
 if TYPE_CHECKING:
     from yarl import URL
@@ -94,6 +95,16 @@ async def test_headers_come_from_one_sample(server_url: URL) -> None:
     assert headers['accept-language'] == 'en-GB'
     assert headers['user-agent'] == 'Mozilla/5.0 (Test)'
     generator.get_specific_headers.assert_called_once_with(header_names={'Accept', 'Accept-Language', 'User-Agent'})
+
+
+async def test_client_cookie_header_wins_over_session(server_url: URL) -> None:
+    """Test that a `Cookie` header set on the underlying client replaces the cookies of the session."""
+    session = Session(cookies=[CookieParam(name='from_jar', value='1', domain=server_url.host or '')])
+
+    async with HttpxHttpClient(headers={'cookie': 'from_client=1'}) as client:
+        response = await client.send_request(str(server_url / 'cookies'), session=session)
+
+    assert (await read_json(response))['cookies'] == {'from_client': '1'}
 
 
 async def test_client_cookies_dropped_cross_origin(server_url: URL, redirect_server_url: URL) -> None:
