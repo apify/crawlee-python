@@ -95,7 +95,7 @@ jobs:
 
       # Publish the package to PyPI using PyPA official GitHub action with OIDC authentication.
       - name: Publish package to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
 
   doc_release_post_publish:
     name: Doc release post publish
