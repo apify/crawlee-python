@@ -32,7 +32,7 @@ To use request throttling, create a <ApiLink to="class/ThrottlingRequestManager"
 
 ## How it works
 
-1. **Insertion-time routing**: When you add requests via `add_request` or `add_requests`, each request is checked against the configured domain list. Matching requests go directly into a per-domain sub-manager; all others go to the inner manager. This eliminates request duplication entirely.
+1. **Insertion-time routing**: When you add requests via `add_request` or `add_requests`, each request is checked against the configured domain list. Matching requests go directly into a per-domain sub-manager; all others go to the inner manager. Each request added this way lives in exactly one store, so it is deduplicated there.
 
 2. **429 backoff**: When the crawler detects an HTTP 429 response, the `ThrottlingRequestManager` records an exponential backoff delay for that domain (starting at 2s, doubling up to 60s). If the response includes a `Retry-After` header, that value takes priority.
 
@@ -41,6 +41,21 @@ To use request throttling, create a <ApiLink to="class/ThrottlingRequestManager"
 4. **Fair scheduling**: `fetch_next_request` sorts available sub-managers by how long each domain has been waiting, ensuring no domain is starved.
 
 5. **Cooldown handling**: While a domain is in a cooldown, its queued requests don't count as dispatchable, so the crawler's autoscaled pool idles instead of keeping a worker slot blocked. The requests still count towards completion, so the crawl waits for them and finishes only once every one has been handled.
+
+## Sub-manager storage
+
+Each configured domain gets its own sub-manager, opened through the `request_manager_opener` callback under the alias `throttled-<domain>`. All of them are opened the first time you use the manager, so a domain that never receives a request still gets an empty store.
+
+Opening the sub-managers up front also makes requests that a previous run left behind visible again. Whether they're resumed or discarded depends on <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink>:
+
+- With the default `purge_on_start=True`, the leftover requests are purged when the sub-manager opens, just like the requests in an unnamed inner queue.
+- With `purge_on_start=False`, the leftover requests are picked up and crawled.
+
+:::warning
+
+Named storages are exempt from `purge_on_start`, but aliased ones aren't. If you give the inner <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> a `name` to make it persistent, the inner queue keeps its requests across a restart while the per-domain stores are still purged. To keep the requests in both, set `purge_on_start=False`.
+
+:::
 
 :::tip
 
