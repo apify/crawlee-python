@@ -341,21 +341,20 @@ class HttpxHttpClient(HttpClient):
         If a client for the specified proxy URL does not exist, create and store a new one.
         """
         if proxy_url not in self._client_by_proxy_url:
-            # A client built with `proxy=` mounts a transport of its own for proxied URLs and never calls the one
-            # passed in `transport=`, so the proxy has to be handled by the transport to keep the cookie handling.
-            transport_kwargs: dict[str, Any] = {
-                'http1': self._http1,
-                'http2': self._http2,
-                'verify': self._ssl_context,
-                'proxy': proxy_url,
-                'persist_cookies_per_session': self._persist_cookies_per_session,
-            }
-
-            # Every proxy gets a pool of its own, so the `httpx` limits are left at their defaults.
-            if 'limits' in self._async_client_kwargs:
-                transport_kwargs['limits'] = self._async_client_kwargs['limits']
-
-            transport = _HttpxTransport(**transport_kwargs)
+            # A client built with `proxy=` mounts its own transport and never calls the one given to `transport=`,
+            # so the proxy has to go on the transport for the cookie handling to run.
+            transport = _HttpxTransport(
+                http1=self._http1,
+                http2=self._http2,
+                verify=self._ssl_context,
+                proxy=proxy_url,
+                persist_cookies_per_session=self._persist_cookies_per_session,
+                # Above the `httpx` default of 20 kept-alive connections every request pays a TCP and TLS handshake.
+                limits=self._async_client_kwargs.get(
+                    'limits',
+                    httpx.Limits(max_connections=1000, max_keepalive_connections=200),
+                ),
+            )
 
             # Prepare a default kwargs for the new client.
             kwargs: dict[str, Any] = {
