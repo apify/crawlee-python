@@ -31,3 +31,26 @@ async def test_send_request_converts_timeout_to_milliseconds() -> None:
         timeout=12_000,
     )
     from_playwright_response.assert_awaited_once_with(playwright_response, protocol='')
+
+
+async def test_send_request_preserves_zero_timeout() -> None:
+    playwright_response = Mock()
+    page = Mock()
+    page.request.fetch = AsyncMock(return_value=playwright_response)
+    client = PlaywrightHttpClient()
+
+    with patch.object(
+        PlaywrightHttpResponse,
+        'from_playwright_response',
+        new=AsyncMock(return_value=Mock()),
+    ):
+        async with browser_page_context(page):
+            await client.send_request('https://example.com', timeout=timedelta(0))
+
+    page.request.fetch.assert_awaited_once_with(
+        url_or_request='https://example.com',
+        method='get',
+        headers=None,
+        data=None,
+        timeout=0,
+    )

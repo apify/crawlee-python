@@ -96,7 +96,7 @@ class PlaywrightHttpClient(HttpClient):
             method=method.lower(),
             headers=dict(headers) if headers else None,
             data=payload,
-            timeout=timeout.total_seconds() * 1000 if timeout else None,
+            timeout=timeout.total_seconds() * 1000 if timeout is not None else None,
         )
 
         return await PlaywrightHttpResponse.from_playwright_response(response, protocol='')
