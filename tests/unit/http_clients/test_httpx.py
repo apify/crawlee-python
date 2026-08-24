@@ -162,6 +162,6 @@ async def test_no_headers_without_generator(server_url: URL) -> None:
         response = await client.send_request(str(server_url / 'headers'))
         headers = await read_json(response)
 
-    assert 'python-httpx' in headers['user-agent']
+    assert 'python-httpx2' in headers['user-agent']
     assert headers['accept'] == '*/*'
     assert 'accept-language' not in headers
