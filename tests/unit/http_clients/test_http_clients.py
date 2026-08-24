@@ -387,7 +387,7 @@ async def test_stream_rejects_non_http_scheme(http_client: HttpClient) -> None:
     ('optional_module_name', 'import_path'),
     [
         pytest.param('curl_cffi', 'crawlee.http_clients._curl_impersonate', id='curl_impersonate'),
-        pytest.param('httpx', 'crawlee.http_clients._httpx', id='httpx'),
+        pytest.param('httpx2', 'crawlee.http_clients._httpx', id='httpx'),
     ],
 )
 def test_import_error_handled(optional_module_name: str, import_path: str) -> None:
