@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.9.4 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **http-clients:** Reject a non-positive timeout instead of silently ignoring it ([#2187](https://github.com/apify/crawlee-python/pull/2187)) ([b4c59c6](https://github.com/apify/crawlee-python/commit/b4c59c65239cb067f9607701b6ff3c12b043161d)) by [@vdusek](https://github.com/vdusek)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.9.3](https://github.com/apify/crawlee-python/releases/tag/v1.9.3) (2026-08-24)
 
 ### 🐛 Bug Fixes
