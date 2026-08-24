@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 1.9.4 - **not yet released**
 
+### 🚀 Features
+
+- **httpx:** Build HttpxHttpClient on httpx2 instead of httpx ([#2182](https://github.com/apify/crawlee-python/pull/2182)) ([6deabad](https://github.com/apify/crawlee-python/commit/6deabad9ae69b863a8586364230b40756682c3a4)) by [@Mantisus](https://github.com/Mantisus)
+
 ### 🐛 Bug Fixes
 
 - **http-clients:** Reject a non-positive timeout instead of silently ignoring it ([#2187](https://github.com/apify/crawlee-python/pull/2187)) ([b4c59c6](https://github.com/apify/crawlee-python/commit/b4c59c65239cb067f9607701b6ff3c12b043161d)) by [@vdusek](https://github.com/vdusek)
