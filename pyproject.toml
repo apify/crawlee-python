@@ -138,11 +138,7 @@ dev = [
     "pytest<10.0.0",
     "ruff~=0.16.0",
     "setuptools", # setuptools are used by pytest, but not explicitly required
-    # TODO: Remove this constraint once ty fixes its Unpack[TypedDict] regressions from 0.0.74.
-    # It no longer treats a specialized generic TypedDict as a mapping, so forwarding
-    # `**kwargs: Unpack[BasicCrawlerOptions[...]]` to `super().__init__` is rejected, and it
-    # synthesizes a trailing `**kwargs: object` that breaks the `EnqueueLinksFunction` overloads.
-    "ty~=0.0.0,<0.0.74",
+    "ty~=0.0.0",
     "types-beautifulsoup4<5.0.0",
     "types-cachetools<8.0.0",
     "types-colorama<1.0.0",
