@@ -5,7 +5,7 @@
 {# The Playwright version baked into the Apify Playwright base images. Keep this in sync with the
    `playwright` version resolved by the lockfile so the installed package matches the browser
    binaries shipped in the base image. #}
-# % set playwright_version = '1.60.0'
+# % set playwright_version = '1.62.0'
 {# Camoufox ships its own Firefox build and caps the Playwright version it supports, so it keeps
    an explicit compatible version instead of following the automatically updated shared pin. #}
 # % set camoufox_playwright_version = '1.60.0'
