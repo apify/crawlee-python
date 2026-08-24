@@ -1,0 +1,106 @@
+---
+id: cookie-management
+title: Cookie management
+description: How to read, set, and persist cookies across requests, retries, and runs in Crawlee.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import ReadWriteCookies from '!!raw-loader!roa-loader!./code_examples/cookie_management/read_write_cookies.py';
+import InitialCookies from '!!raw-loader!roa-loader!./code_examples/cookie_management/initial_cookies.py';
+import PlaywrightCookies from '!!raw-loader!roa-loader!./code_examples/cookie_management/playwright_cookies.py';
+import RetrySingleSession from '!!raw-loader!roa-loader!./code_examples/cookie_management/retry_single_session.py';
+import RetryPinnedSession from '!!raw-loader!roa-loader!./code_examples/cookie_management/retry_pinned_session.py';
+import RetryRestoreCookies from '!!raw-loader!roa-loader!./code_examples/cookie_management/retry_restore_cookies.py';
+import PersistCookies from '!!raw-loader!roa-loader!./code_examples/cookie_management/persist_cookies.py';
+
+Cookies carry login state, consent flags, CSRF tokens, and other per-user data that a site expects to see on every request.
+
+In Crawlee, cookies are stored on the <ApiLink to="class/Session">`Session`</ApiLink> that handles a request, in a <ApiLink to="class/SessionCookies">`SessionCookies`</ApiLink> jar. When a request runs on a session, the HTTP client sends the session's cookies with the request and writes any `Set-Cookie` from the response back onto the same jar. The next request on that session carries the updated cookies.
+
+Cookies follow the session, not the URL. Two requests share cookies when they run on the same session. For how sessions are created and rotated, see the [Session management](./session-management) guide.
+
+This page covers how to read and set cookies, seed them on new sessions, handle them with <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, and keep them across retries and runs.
+
+## Reading and setting cookies
+
+Access the jar through <ApiLink to="class/Session#cookies">`context.session.cookies`</ApiLink>. Use <ApiLink to="class/SessionCookies#set">`set`</ApiLink> to add a cookie, iterate the jar to read all cookies, and index by name to read one value. Indexing raises `KeyError` when the cookie isn't in the jar.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {ReadWriteCookies}
+</RunnableCodeBlock>
+
+:::note
+
+`context.session` is `None` only when the crawler runs without a session pool (<ApiLink to="class/BasicCrawler#__init__">`use_session_pool`</ApiLink> set to `False`). With the default pool it's always set. The examples guard with `if context.session is None: return` to cover that case.
+
+:::
+
+A cookie has a `name`, a `value`, and optional parameters such as `domain`. If a cookie has no `domain`, it applies to any domain, so a login cookie set that way is sent to every host you crawl. Set `domain` on anything sensitive. For the full set of parameters, see <ApiLink to="class/CookieParam">`CookieParam`</ApiLink>. To dump the whole jar, use <ApiLink to="class/SessionCookies#get_cookies_as_dicts">`get_cookies_as_dicts()`</ApiLink>, and to load several cookies at once, use <ApiLink to="class/SessionCookies#set_cookies">`set_cookies()`</ApiLink>.
+
+## Seeding cookies on new sessions
+
+To start every session with a known set of cookies, for example a consent flag or a pre-obtained token, pass them through <ApiLink to="class/SessionPool#__init__">`create_session_settings`</ApiLink> on the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink>. Each new session in the pool is created with these cookies already in its jar.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {InitialCookies}
+</RunnableCodeBlock>
+
+## Cookies with PlaywrightCrawler
+
+<ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> keeps the session jar and the browser context in sync. Before navigation, the session's cookies are loaded into the browser context. After the handler returns, cookies from the browser context are merged back onto the session. The merge captures whatever the page picked up through `Set-Cookie`, JavaScript, or redirects.
+
+The first request receives a cookie in the browser. Crawlee merges it onto the session, so a later request on the same session sees it.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {PlaywrightCookies}
+</RunnableCodeBlock>
+
+By default all pages share one browser context, so cookies from different sessions can mix in it. To keep each session's cookies isolated, set <ApiLink to="class/PlaywrightCrawler#__init__">`use_incognito_pages`</ApiLink> to `True`, which gives each page its own context.
+
+## Keeping cookies across retries
+
+By default, a request that isn't pinned to a session draws a new random session from the pool on every attempt. When a handler establishes cookies and then raises to trigger a retry, the retry runs on a different, cookie-less session. The cookies aren't lost. They're still on the first session. The retry just isn't using it.
+
+Establish the cookies with <ApiLink to="class/SendRequestFunction">`send_request`</ApiLink>. It runs on the current request's session, so cookies the server sets on that call land on `context.session`. An HTTP call made outside Crawlee doesn't touch the session, so those cookies never reach it.
+
+There are three ways to carry the cookies over.
+
+### Use a single-session pool
+
+Drops session rotation. One session for the whole crawl, so cookies set on the first attempt are still there on the retry. The raise-to-retry flow stays unchanged. It's the simplest fix, and it suits sites you crawl as a single identity.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {RetrySingleSession}
+</RunnableCodeBlock>
+
+### Pin the request to its session
+
+Keeps rotation for the rest of the crawl. Instead of raising, create a new request for the same URL with its session bound through the `session_id` parameter of <ApiLink to="class/Request#from_url">`Request.from_url`</ApiLink>. Setting `always_enqueue=True` re-queues the URL despite deduplication.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {RetryPinnedSession}
+</RunnableCodeBlock>
+
+### Re-apply cookies in a pre-navigation hook
+
+Keeps rotation and the raise-to-retry flow. It also shares the cookies across every session. Snapshot the cookies after the setup step into the crawler-wide <ApiLink to="class/UseStateFunction">`use_state`</ApiLink> store. Then re-apply them onto whichever session handles the request in a <ApiLink to="class/AbstractHttpCrawler#pre_navigation_hook">`pre_navigation_hook`</ApiLink>, which runs before navigation and receives `context.session`.
+
+Use it when the cookies belong to the whole crawl rather than one request, for example a consent cookie you obtain once.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {RetryRestoreCookies}
+</RunnableCodeBlock>
+
+## Persisting cookies across runs
+
+The session pool can persist its state, including each session's cookies, to a <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>. Persistence is off by default. Enable it with <ApiLink to="class/SessionPool#__init__">`persistence_enabled`</ApiLink> set to `True` on the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink>, and give the store a name with `persist_state_kvs_name`. Persistence across restarts needs a named store. An unnamed one is purged on start, so cookies silently won't survive a restart.
+
+To see restoration in action, define the pool outside the crawler and read a session from it before the run. On the first run the jar is empty. On later runs the cookies from the previous run are already there.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {PersistCookies}
+</RunnableCodeBlock>
+
+With persistence enabled, a login you performed on a previous run can carry over, so you skip re-authenticating on every start. For a full walkthrough of logging in, see the [Logging in with a crawler](../guides/logging-in-with-a-crawler) guide.

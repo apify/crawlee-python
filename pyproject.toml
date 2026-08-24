@@ -232,16 +232,16 @@ indent-style = "space"
     "N999",   # Invalid module name
     "T201",   # `print` found
 ]
-"**/docs/examples/code_examples/*crawler_with_error_snapshotter.py" = [
+"**/docs/03_concepts/code_examples/error_handling/*crawler_with_error_snapshotter.py" = [
     "PLR2004", # Magic value used in comparison. Ignored for simplicity and readability of example code.
 ]
-"**/docs/guides/code_examples/running_in_web_server/server.py" = [
+"**/docs/04_guides/code_examples/running_in_web_server/server.py" = [
     "TC002", # ruff false positive. Import actually needed during runtime.
 ]
-"**/docs/guides/code_examples/creating_web_archive/*.*" = [
+"**/docs/04_guides/code_examples/creating_web_archive/*.*" = [
     "ASYNC230", # Ignore for simplicity of the example.
 ]
-"**/docs/guides/code_examples/scrapy_migration/scrapy_*.py" = [
+"**/docs/04_guides/code_examples/scrapy_migration/scrapy_*.py" = [
     "ANN",    # Idiomatic Scrapy tutorial snippets are untyped; shown for comparison, not executed.
     "RUF012", # Scrapy declares `start_urls` as a plain class-level list.
 ]
@@ -285,7 +285,7 @@ python-version = "3.10"
 include = ["src", "tests", "scripts", "docs", "website"]
 exclude = [
     "src/crawlee/project_template",
-    "docs/guides/code_examples/storage_clients/custom_storage_client_example.py",
+    "docs/03_concepts/code_examples/storage_clients/custom_storage_client_example.py",
     "website/versioned_docs",
 ]
 

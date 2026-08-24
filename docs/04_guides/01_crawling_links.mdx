@@ -1,0 +1,141 @@
+---
+id: crawling-links
+title: Crawling links
+description: How to crawl a list of URLs, discover and enqueue new links on the fly, and control which links get followed.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import MultipleUrlsBeautifulSoupExample from '!!raw-loader!roa-loader!./code_examples/crawling_links/crawl_multiple_urls_bs.py';
+import MultipleUrlsPlaywrightExample from '!!raw-loader!roa-loader!./code_examples/crawling_links/crawl_multiple_urls_pw.py';
+
+import AllLinksBeautifulSoupExample from '!!raw-loader!roa-loader!./code_examples/crawling_links/crawl_all_links_on_website_bs.py';
+import AllLinksPlaywrightExample from '!!raw-loader!roa-loader!./code_examples/crawling_links/crawl_all_links_on_website_pw.py';
+
+import SpecificLinksBeautifulSoupExample from '!!raw-loader!roa-loader!./code_examples/crawling_links/crawl_specific_links_on_website_bs.py';
+import SpecificLinksPlaywrightExample from '!!raw-loader!roa-loader!./code_examples/crawling_links/crawl_specific_links_on_website_pw.py';
+
+import ExtractAndAddBeautifulSoupExample from '!!raw-loader!roa-loader!./code_examples/crawling_links/extract_and_add_specific_links_on_website_bs.py';
+import ExtractAndAddPlaywrightExample from '!!raw-loader!roa-loader!./code_examples/crawling_links/extract_and_add_specific_links_on_website_pw.py';
+
+import StrategyAllLinksExample from '!!raw-loader!roa-loader!./code_examples/crawling_links/crawl_website_with_relative_links_all_links.py';
+import StrategySameDomainExample from '!!raw-loader!roa-loader!./code_examples/crawling_links/crawl_website_with_relative_links_same_domain.py';
+import StrategySameHostnameExample from '!!raw-loader!roa-loader!./code_examples/crawling_links/crawl_website_with_relative_links_same_hostname.py';
+import StrategySameOriginExample from '!!raw-loader!roa-loader!./code_examples/crawling_links/crawl_website_with_relative_links_same_origin.py';
+
+Most crawls start from a handful of URLs and grow by following links discovered on the visited pages. This guide shows how to crawl a fixed list of URLs, how to enqueue newly discovered links with the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> helper, and how to control which links end up in the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>.
+
+## Crawling a list of URLs
+
+The simplest case is crawling a known list of URLs. Pass the list to <ApiLink to="class/BasicCrawler#run">`crawler.run`</ApiLink> and the request handler is invoked for each of them.
+
+<Tabs groupId="main">
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {MultipleUrlsBeautifulSoupExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {MultipleUrlsPlaywrightExample}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>
+
+## Crawling all links on a website
+
+To crawl a whole website, call the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> helper in the request handler. It finds the links on the current page and adds them to the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, so the crawler systematically works through the site page by page.
+
+:::tip
+
+If no options are given, by default the method will only add links that are under the same hostname. This behavior can be controlled with the `strategy` option - see [Enqueue strategies](#enqueue-strategies) below.
+
+:::
+
+<Tabs groupId="main">
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {AllLinksBeautifulSoupExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {AllLinksPlaywrightExample}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>
+
+## Crawling specific links
+
+You will often want to follow only links that match certain patterns. Pass the `include` or `exclude` parameters to <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> - both accept lists of globs or regular expressions - and only the matching links are added to the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>. This keeps the crawl focused on the relevant sections of a website and avoids scraping unnecessary content.
+
+<Tabs groupId="first-example">
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {SpecificLinksBeautifulSoupExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {SpecificLinksPlaywrightExample}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>
+
+### Even more control over the enqueued links
+
+<ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> is a convenience helper - internally it calls <ApiLink to="class/ExtractLinksFunction">`extract_links`</ApiLink> to find the links and <ApiLink to="class/AddRequestsFunction">`add_requests`</ApiLink> to add them to the queue. If you need custom filtering of the extracted links before enqueuing them, use <ApiLink to="class/ExtractLinksFunction">`extract_links`</ApiLink> and <ApiLink to="class/AddRequestsFunction">`add_requests`</ApiLink> directly:
+
+<Tabs groupId="second-example">
+    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {ExtractAndAddBeautifulSoupExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {ExtractAndAddPlaywrightExample}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>
+
+## Enqueue strategies
+
+<ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> automatically resolves relative links based on the page's context and decides which of them to follow according to the `strategy` option (the `EnqueueStrategy` type alias). Four strategies are available:
+
+- `all` - Enqueues all links found, regardless of the domain they point to. Useful when you want to follow every link, including those that navigate to external websites.
+- `same-domain` - Enqueues all links found that share the same domain name, including any possible subdomains.
+- `same-hostname` - Enqueues all links found for the exact same hostname. This is the **default** strategy - it restricts the crawl to links with the same hostname as the current page and excludes subdomains.
+- `same-origin` - Enqueues all links found that share the same origin - the same protocol, domain, and port - ensuring a strict scope for the crawl.
+
+:::note
+
+These examples use the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, but the same method is available for all crawlers and works exactly the same way.
+
+:::
+
+<Tabs groupId="main">
+    <TabItem value="all_links" label="All links">
+        <RunnableCodeBlock className="language-python" language="python">
+            {StrategyAllLinksExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="same-domain" label="Same domain">
+        <RunnableCodeBlock className="language-python" language="python">
+            {StrategySameDomainExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="same-hostname" label="Same hostname">
+        <RunnableCodeBlock className="language-python" language="python">
+            {StrategySameHostnameExample}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="same-origin" label="Same origin">
+        <RunnableCodeBlock className="language-python" language="python">
+            {StrategySameOriginExample}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>
