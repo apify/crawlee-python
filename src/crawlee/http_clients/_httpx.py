@@ -286,7 +286,7 @@ class HttpxHttpClient(HttpClient):
             headers=headers,
             payload=payload,
             session=session,
-            timeout=httpx.Timeout(None, connect=timeout.total_seconds()) if timeout else None,
+            timeout=httpx.Timeout(None, connect=timeout.total_seconds()) if timeout is not None else None,
         )
 
         try:

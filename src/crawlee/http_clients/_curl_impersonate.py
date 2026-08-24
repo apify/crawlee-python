@@ -175,6 +175,7 @@ class CurlImpersonateHttpClient(HttpClient):
         timeout: timedelta | None = None,
     ) -> HttpCrawlingResult:
         client = self._get_client(proxy_info.url if proxy_info else None)
+        self._raise_if_non_positive_timeout(timeout)
 
         try:
             response = await client.request(
@@ -183,7 +184,7 @@ class CurlImpersonateHttpClient(HttpClient):
                 headers=request.headers,
                 data=request.payload,
                 cookies=session.cookies.jar if session else None,
-                timeout=timeout.total_seconds() if timeout else None,
+                timeout=timeout.total_seconds() if timeout is not None else None,
             )
         except Timeout as exc:
             raise asyncio.TimeoutError from exc
@@ -224,6 +225,7 @@ class CurlImpersonateHttpClient(HttpClient):
 
         proxy_url = proxy_info.url if proxy_info else None
         client = self._get_client(proxy_url)
+        self._raise_if_non_positive_timeout(timeout)
 
         try:
             response = await client.request(
@@ -232,7 +234,7 @@ class CurlImpersonateHttpClient(HttpClient):
                 headers=dict(headers) if headers else None,
                 data=payload,
                 cookies=session.cookies.jar if session else None,
-                timeout=timeout.total_seconds() if timeout else None,
+                timeout=timeout.total_seconds() if timeout is not None else None,
             )
         except Timeout as exc:
             raise asyncio.TimeoutError from exc
@@ -267,6 +269,7 @@ class CurlImpersonateHttpClient(HttpClient):
 
         proxy_url = proxy_info.url if proxy_info else None
         client = self._get_client(proxy_url)
+        self._raise_if_non_positive_timeout(timeout)
 
         try:
             response = await client.request(
@@ -276,7 +279,7 @@ class CurlImpersonateHttpClient(HttpClient):
                 data=payload,
                 cookies=session.cookies.jar if session else None,
                 stream=True,
-                timeout=timeout.total_seconds() if timeout else None,
+                timeout=timeout.total_seconds() if timeout is not None else None,
             )
         except Timeout as exc:
             raise asyncio.TimeoutError from exc
@@ -317,6 +320,16 @@ class CurlImpersonateHttpClient(HttpClient):
             self._client_by_proxy_url[proxy_url] = _AsyncSession(**kwargs)
 
         return self._client_by_proxy_url[proxy_url]
+
+    @staticmethod
+    def _raise_if_non_positive_timeout(timeout: timedelta | None) -> None:
+        """Raise `asyncio.TimeoutError` for a non-positive timeout.
+
+        `curl_cffi` (like `libcurl`) treats an explicit `0` timeout as "no timeout", so a non-positive timeout
+        must be rejected here instead of being forwarded as-is.
+        """
+        if timeout is not None and timeout.total_seconds() <= 0:
+            raise asyncio.TimeoutError
 
     def _convert_method(self, method: HttpMethod) -> CurlHttpMethod:
         """Convert from Crawlee HTTP method to curl-cffi HTTP method.

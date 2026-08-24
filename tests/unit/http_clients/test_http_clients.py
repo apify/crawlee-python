@@ -5,6 +5,8 @@ import importlib
 import json
 import os
 import sys
+import time
+from datetime import timedelta
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
@@ -44,6 +46,40 @@ async def custom_http_client(request: SubRequest) -> AsyncGenerator[HttpClient]:
 
 async def read_json(response: HttpResponse) -> dict:
     return json.loads((await response.read()).decode())
+
+
+async def test_send_request_zero_timeout_expires_immediately(http_client: HttpClient, server_url: URL) -> None:
+    """A `timedelta(0)` timeout must expire immediately rather than being silently treated as no timeout."""
+    slow_url = str((server_url / 'slow').with_query(delay=2))
+    start = time.monotonic()
+
+    with pytest.raises(asyncio.TimeoutError):
+        await http_client.send_request(slow_url, timeout=timedelta(0))
+
+    assert time.monotonic() - start < 1
+
+
+async def test_crawl_zero_timeout_expires_immediately(http_client: HttpClient, server_url: URL) -> None:
+    """A `timedelta(0)` timeout must expire immediately rather than being silently treated as no timeout."""
+    slow_url = str((server_url / 'slow').with_query(delay=2))
+    start = time.monotonic()
+
+    with pytest.raises(asyncio.TimeoutError):
+        await http_client.crawl(Request.from_url(slow_url), timeout=timedelta(0))
+
+    assert time.monotonic() - start < 1
+
+
+async def test_stream_zero_timeout_expires_immediately(http_client: HttpClient, server_url: URL) -> None:
+    """A `timedelta(0)` timeout must expire immediately rather than being silently treated as no timeout."""
+    slow_url = str((server_url / 'slow').with_query(delay=2))
+    start = time.monotonic()
+
+    with pytest.raises(asyncio.TimeoutError):
+        async with http_client.stream(slow_url, timeout=timedelta(0)):
+            pass
+
+    assert time.monotonic() - start < 1
 
 
 async def test_http_1(http_client: HttpClient, server_url: URL) -> None:

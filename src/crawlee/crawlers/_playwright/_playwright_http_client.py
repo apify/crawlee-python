@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextvars
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import TYPE_CHECKING
@@ -90,13 +91,15 @@ class PlaywrightHttpClient(HttpClient):
         if browser_context is None:
             raise RuntimeError('Unable to create an `APIRequestContext` outside the browser context')
 
+        self._raise_if_non_positive_timeout(timeout)
+
         # Proxies appropriate to the browser context are used
         response = await browser_context.request.fetch(
             url_or_request=url,
             method=method.lower(),
             headers=dict(headers) if headers else None,
             data=payload,
-            timeout=timeout.total_seconds() if timeout else None,
+            timeout=timeout.total_seconds() if timeout is not None else None,
         )
 
         return await PlaywrightHttpResponse.from_playwright_response(response, protocol='')
@@ -114,6 +117,16 @@ class PlaywrightHttpClient(HttpClient):
         timeout: timedelta | None = None,
     ) -> AbstractAsyncContextManager[HttpResponse]:
         raise NotImplementedError('The `stream` method should not be used for `PlaywrightHttpClient`')
+
+    @staticmethod
+    def _raise_if_non_positive_timeout(timeout: timedelta | None) -> None:
+        """Raise `asyncio.TimeoutError` for a non-positive timeout.
+
+        Playwright treats an explicit `0` timeout as "disable timeout", so a non-positive timeout must be
+        rejected here instead of being forwarded as-is.
+        """
+        if timeout is not None and timeout.total_seconds() <= 0:
+            raise asyncio.TimeoutError
 
     async def cleanup(self) -> None:
         # The `browser_page_context` is responsible for resource cleanup

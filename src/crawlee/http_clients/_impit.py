@@ -308,7 +308,7 @@ class ImpitHttpClient(HttpClient):
         current_url = URL(url, encoded=True)
         content = payload
         # The timeout bounds the whole chain rather than each hop, which is how `impit` treats it as well.
-        deadline = monotonic() + timeout.total_seconds() if timeout else None
+        deadline = monotonic() + timeout.total_seconds() if timeout is not None else None
 
         for _ in range(self._max_redirects + 1):
             remaining = deadline - monotonic() if deadline is not None else None
