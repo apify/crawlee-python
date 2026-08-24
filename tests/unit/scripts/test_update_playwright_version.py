@@ -14,9 +14,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
     from pathlib import Path
 
-# Tags served by the fake Docker Hub. The plain, Firefox and WebKit images already publish
-# `1.62.0`, Chrome only reaches `1.61.0`, and Camoufox publishes `1.61.0` even though its package
-# requires Playwright below 1.61.
+# Tags served by the fake Docker Hub, varying per repository so the tests can exercise which
+# published version ends up shared across all four standard images.
 TAGS_BY_REPOSITORY = {
     'actor-python-playwright': ['3.13-1.60.0', '3.13-1.61.0', '3.13-1.62.0'],
     'actor-python-playwright-chrome': ['3.13-1.60.0', '3.13-1.61.0'],
@@ -89,13 +88,13 @@ def render_dockerfile(content: str, crawler_type: str) -> str:
 
 
 def test_pins_track_the_image_repositories_they_select(template_copy: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The shared pin advances to the newest version common to every image it selects, while Camoufox keeps its own,
+    separately pinned version."""
     monkeypatch.setattr(update_playwright_version.urllib.request, 'urlopen', make_urlopen(TAGS_BY_REPOSITORY))
 
     update_playwright_version.main()
 
     content = template_copy.read_text(encoding='utf-8')
-    # The shared pin stops at the newest tag every image it selects has, not at the newest tag of
-    # the plain image; Camoufox keeps its own, older pin.
     assert f"# % set {SHARED_VERSION_VARIABLE} = '{EXPECTED_SHARED_VERSION}'" in content
     assert f"# % set {CAMOUFOX_VERSION_VARIABLE} = '{EXPECTED_CAMOUFOX_VERSION}'" in content
 
@@ -103,6 +102,7 @@ def test_pins_track_the_image_repositories_they_select(template_copy: Path, monk
 def test_reports_when_the_shared_pin_is_current(
     template_copy: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """Prints an up-to-date message, instead of bumping, when the shared pin matches the latest shared version."""
     content = template_copy.read_text(encoding='utf-8')
     shared_line = re.compile(rf"(# % set {SHARED_VERSION_VARIABLE} = ')[^']+(')")
     template_copy.write_text(shared_line.sub(rf'\g<1>{EXPECTED_SHARED_VERSION}\g<2>', content), encoding='utf-8')
@@ -116,6 +116,7 @@ def test_reports_when_the_shared_pin_is_current(
 def test_generated_dockerfile_pins_camoufox_to_its_own_version(
     template_copy: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """The rendered Dockerfile pins Camoufox to its own version and every other crawler type to the shared version."""
     monkeypatch.setattr(update_playwright_version.urllib.request, 'urlopen', make_urlopen(TAGS_BY_REPOSITORY))
     update_playwright_version.main()
     content = template_copy.read_text(encoding='utf-8')
@@ -132,6 +133,7 @@ def test_generated_dockerfile_pins_camoufox_to_its_own_version(
 def test_fails_when_the_shared_pinned_version_line_is_missing(
     template_copy: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Exits when the Dockerfile has no pinned shared version line to read or update."""
     content = template_copy.read_text(encoding='utf-8')
     shared_line = re.compile(rf"# % set {SHARED_VERSION_VARIABLE} = '[^']+'\n")
     template_copy.write_text(shared_line.sub('', content), encoding='utf-8')
@@ -144,6 +146,7 @@ def test_fails_when_the_shared_pinned_version_line_is_missing(
 def test_fails_when_the_python_base_image_prefix_is_missing(
     template_copy: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Exits when the Dockerfile has no Python base image prefix to resolve tags for."""
     content = template_copy.read_text(encoding='utf-8')
     template_copy.write_text(content.replace('python-playwright', 'python-standard'), encoding='utf-8')
     monkeypatch.setattr(update_playwright_version.urllib.request, 'urlopen', make_urlopen(TAGS_BY_REPOSITORY))
@@ -155,6 +158,7 @@ def test_fails_when_the_python_base_image_prefix_is_missing(
 def test_fails_when_the_camoufox_pinned_version_line_is_missing(
     template_copy: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Exits when the Dockerfile has no pinned Camoufox version line to validate."""
     content = template_copy.read_text(encoding='utf-8')
     camoufox_line = re.compile(rf"# % set {CAMOUFOX_VERSION_VARIABLE} = '[^']+'\n")
     template_copy.write_text(camoufox_line.sub('', content), encoding='utf-8')
@@ -164,17 +168,25 @@ def test_fails_when_the_camoufox_pinned_version_line_is_missing(
         update_playwright_version.main()
 
 
-@pytest.mark.usefixtures('template_copy')
-def test_fails_when_the_camoufox_pinned_tag_is_not_published(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fails_when_the_camoufox_pinned_tag_is_not_published(
+    template_copy: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Exits when Camoufox's pinned tag is not published, even if the shared pin would bump."""
+    original = template_copy.read_text(encoding='utf-8')
     tags = {**TAGS_BY_REPOSITORY, CAMOUFOX_REPOSITORY: ['3.13-1.61.0']}
     monkeypatch.setattr(update_playwright_version.urllib.request, 'urlopen', make_urlopen(tags))
 
     with pytest.raises(SystemExit, match=f'{CAMOUFOX_REPOSITORY}.*3.13-{EXPECTED_CAMOUFOX_VERSION}'):
         update_playwright_version.main()
 
+    # The shared pin's bump must not be persisted, nor reported, when the later Camoufox validation fails.
+    assert template_copy.read_text(encoding='utf-8') == original
+    assert capsys.readouterr().out == ''
+
 
 @pytest.mark.usefixtures('template_copy')
 def test_fails_when_an_image_has_no_stable_tag(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Exits identifying the image that publishes no stable tag for the Python line."""
     # Chrome publishes no stable tag at all, so the shared pin cannot be resolved.
     tags = {**TAGS_BY_REPOSITORY, CHROME_REPOSITORY: UNSTABLE_TAGS}
     monkeypatch.setattr(update_playwright_version.urllib.request, 'urlopen', make_urlopen(tags))
@@ -183,9 +195,21 @@ def test_fails_when_an_image_has_no_stable_tag(monkeypatch: pytest.MonkeyPatch) 
         update_playwright_version.main()
 
 
+@pytest.mark.usefixtures('template_copy')
+def test_fails_when_no_version_is_shared_by_every_image(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Exits when every image publishes a stable tag but no version is common to all of them."""
+    # Chrome only publishes a version none of the other images have, so no version overlaps.
+    tags = {**TAGS_BY_REPOSITORY, CHROME_REPOSITORY: ['3.13-1.63.0']}
+    monkeypatch.setattr(update_playwright_version.urllib.request, 'urlopen', make_urlopen(tags))
+
+    with pytest.raises(SystemExit, match=f'No 3.13-<version> tag is shared by all of.*{CHROME_REPOSITORY}'):
+        update_playwright_version.main()
+
+
 def test_fails_when_the_shared_pin_is_ahead_of_every_published_image(
     template_copy: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Exits, without persisting anything, when the shared pin is newer than any published tag."""
     content = template_copy.read_text(encoding='utf-8')
     shared_line = re.compile(rf"(# % set {SHARED_VERSION_VARIABLE} = ')[^']+(')")
     template_copy.write_text(shared_line.sub(rf'\g<1>{UNPUBLISHED_VERSION}\g<2>', content), encoding='utf-8')

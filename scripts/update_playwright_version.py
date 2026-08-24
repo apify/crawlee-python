@@ -58,19 +58,24 @@ def resolve_latest_version(repositories: tuple[str, ...], python_prefix: str) ->
     """Return the highest stable version that every one of the given repositories publishes."""
     # Keep only stable `MAJOR.MINOR.PATCH` versions built for the template's current Python line.
     tag_re = re.compile(rf'^{re.escape(python_prefix)}-(\d+\.\d+\.\d+)$')
-    published = [
-        {
+    published = {
+        repository: {
             tuple(int(part) for part in match.group(1).split('.'))
             for tag in fetch_tags(repository)
             if (match := tag_re.match(tag))
         }
         for repository in repositories
-    ]
+    }
 
-    shared = set.intersection(*published)
+    without_stable_tag = [repository for repository, versions in published.items() if not versions]
+    if without_stable_tag:
+        images = ', '.join(f'apify/{repository}' for repository in without_stable_tag)
+        raise SystemExit(f'No stable {python_prefix}-<version> tag is published by: {images}.')
+
+    shared = set.intersection(*published.values())
     if not shared:
         images = ', '.join(f'apify/{repository}' for repository in repositories)
-        raise SystemExit(f'No stable {python_prefix}-<version> tag is published by all of: {images}.')
+        raise SystemExit(f'No {python_prefix}-<version> tag is shared by all of: {images}.')
     return max(shared)
 
 
@@ -102,9 +107,9 @@ def main() -> None:
     updated = content
     if latest > pinned:
         updated = shared_version_line.sub(rf'\g<1>{latest_str}\g<3>', content)
-        print(f'Bumped {SHARED_VERSION_VARIABLE}: {current} -> {latest_str}')
+        message = f'Bumped {SHARED_VERSION_VARIABLE}: {current} -> {latest_str}'
     elif latest == pinned:
-        print(f'{SHARED_VERSION_VARIABLE} is already up to date ({current}).')
+        message = f'{SHARED_VERSION_VARIABLE} is already up to date ({current}).'
     else:
         # The pin is ahead of what the images publish, so the template would emit a `FROM`
         # line for a tag that does not exist. Fail here rather than hours later in an e2e job.
@@ -120,8 +125,11 @@ def main() -> None:
         raise SystemExit(f'Pinned {CAMOUFOX_VERSION_VARIABLE} line not found in {DOCKERFILE}.')
     validate_pinned_version(CAMOUFOX_REPOSITORY, python_prefix, camoufox_version_match.group(2))
 
+    # Only report the outcome once every validation has passed, so a failed run never prints a
+    # bump or an up-to-date message it did not actually persist.
     if updated != content:
         DOCKERFILE.write_text(updated, encoding='utf-8')
+    print(message)
 
 
 if __name__ == '__main__':

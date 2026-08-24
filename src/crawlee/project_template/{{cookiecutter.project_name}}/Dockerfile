@@ -6,8 +6,8 @@
    `playwright` version resolved by the lockfile so the installed package matches the browser
    binaries shipped in the base image. #}
 # % set playwright_version = '1.60.0'
-{# Camoufox ships its own Firefox build and requires `playwright<1.61`, so it keeps an explicit
-   compatible version instead of following the automatically updated shared pin. #}
+{# Camoufox ships its own Firefox build and caps the Playwright version it supports, so it keeps
+   an explicit compatible version instead of following the automatically updated shared pin. #}
 # % set camoufox_playwright_version = '1.60.0'
 
 # % if cookiecutter.crawler_type == 'playwright' or cookiecutter.crawler_type.startswith('adaptive-') or cookiecutter.crawler_type == 'stagehand'
