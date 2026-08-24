@@ -128,6 +128,12 @@ async def proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, None]:
             str(proxy_info.port),
             '--basic-auth',
             f'{proxy_info.username}:{proxy_info.password}',
+            # Without this, `Proxy` spawns one acceptor and one executor process per CPU core, which is
+            # unnecessary for a single-test proxy and crashes xdist workers under parallel CI load.
+            '--num-workers',
+            '1',
+            '--num-acceptors',
+            '1',
         ]
     ):
         yield proxy_info
@@ -144,6 +150,10 @@ async def disabled_proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, Non
             '--basic-auth',
             f'{proxy_info.username}:{proxy_info.password}',
             '--disable-http-proxy',
+            '--num-workers',
+            '1',
+            '--num-acceptors',
+            '1',
         ]
     ):
         yield proxy_info
