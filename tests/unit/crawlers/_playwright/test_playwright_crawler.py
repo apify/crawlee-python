@@ -47,6 +47,7 @@ from tests.unit.server_endpoints import GENERIC_RESPONSE, HELLO_WORLD
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from playwright.async_api import Request as PlaywrightRequest
     from yarl import URL
 
     from crawlee._request import RequestOptions
@@ -314,6 +315,72 @@ async def test_custom_headers(server_url: URL) -> None:
     assert response_headers.get('power-header') == request_headers['Power-Header']
     assert response_headers.get('library') == request_headers['Library']
     assert response_headers.get('my-test-header') == request_headers['My-Test-Header']
+
+
+async def test_custom_headers_not_sent_with_cross_origin_requests(server_url: URL, redirect_server_url: URL) -> None:
+    """Request headers are sent with the main navigation only, not with cross-origin requests made by the page."""
+    crawler = PlaywrightCrawler()
+
+    subresource_url = str(redirect_server_url / 'headers')
+    page_html = f'<html><body><img src="{subresource_url}"></body></html>'
+    start_url = str((server_url / 'echo_content').with_query(content=page_html))
+
+    navigation_headers = dict[str, str]()
+    subresource_headers = dict[str, str]()
+
+    @crawler.pre_navigation_hook
+    async def capture_subresource_headers(context: PlaywrightPreNavCrawlingContext) -> None:
+        def capture(request: PlaywrightRequest) -> None:
+            if request.url == subresource_url:
+                subresource_headers.update(request.headers)
+
+        context.page.on('request', capture)
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        await context.page.wait_for_load_state()
+        navigation_headers.update(await context.response.request.all_headers())
+
+    await crawler.run([Request.from_url(start_url, headers={'authorization': 'Bearer secret-token'})])
+
+    assert navigation_headers.get('authorization') == 'Bearer secret-token'
+    # Custom headers are merged into the browser-generated ones, not replacing them.
+    assert 'user-agent' in navigation_headers
+    assert subresource_headers
+    assert 'authorization' not in subresource_headers
+
+
+async def test_custom_headers_sent_when_browser_normalizes_url(server_url: URL) -> None:
+    """Custom headers are applied even when the browser normalizes the request URL (e.g. adds the root path)."""
+    crawler = PlaywrightCrawler()
+    navigation_headers = dict[str, str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        navigation_headers.update(await context.response.request.all_headers())
+
+    # A bare origin without the trailing slash; the browser requests `/`.
+    bare_url = f'http://{server_url.host}:{server_url.port}'
+    await crawler.run([Request.from_url(bare_url, headers={'authorization': 'Bearer secret-token'})])
+
+    assert navigation_headers.get('authorization') == 'Bearer secret-token'
+
+
+async def test_custom_headers_survive_redirect(server_url: URL) -> None:
+    """Custom headers applied to the navigation request are inherited by redirect hops."""
+    crawler = PlaywrightCrawler()
+    received_headers = dict[str, str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        # The `/headers` endpoint echoes what the server actually received after the redirect hop.
+        received_headers.update(json.loads(await context.response.text()))
+
+    target_url = str(server_url / 'headers')
+    start_url = str((server_url / 'redirect').with_query(url=target_url))
+    await crawler.run([Request.from_url(start_url, headers={'authorization': 'Bearer secret-token'})])
+
+    assert received_headers.get('authorization') == 'Bearer secret-token'
 
 
 async def test_pre_navigation_hook() -> None:
@@ -652,6 +719,7 @@ async def test_get_snapshot(server_url: URL) -> None:
     assert snapshot.html == HELLO_WORLD.decode('utf-8')
 
 
+@pytest.mark.run_alone
 async def test_error_snapshot_through_statistics(server_url: URL) -> None:
     """Test correct use of error snapshotter by the Playwright crawler.
 

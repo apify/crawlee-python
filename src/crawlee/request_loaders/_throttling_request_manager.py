@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
+import ipaddress
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
@@ -35,21 +35,28 @@ _NEVER_THROTTLED = datetime.min.replace(tzinfo=timezone.utc)
 class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     """A request manager that wraps another and enforces per-domain delays.
 
-    Requests for explicitly configured domains are routed into dedicated sub-managers at insertion time — each request
-    lives in exactly one manager, eliminating duplication and simplifying deduplication.
+    Requests for explicitly configured domains are routed into dedicated sub-managers, so each request lives in exactly
+    one store and is deduplicated there. A request that reached `inner` before its domain was configured stays and is
+    completed there, without the domain's delay.
 
-    When `fetch_next_request()` is called, it returns requests from the sub-manager whose domain has been waiting the
-    longest. If all configured domains are throttled, it falls back to the inner manager for non-throttled domains. If
-    the inner manager is also empty and all sub-managers are throttled, it sleeps until the earliest cooldown expires.
+    `fetch_next_request()` takes from the sub-manager whose domain has been waiting the longest, skipping domains in a
+    cooldown, and falls back to the inner manager when no sub-manager yields a request. If nothing can be dispatched
+    right now, it returns `None` rather than waiting, so the caller's task slot is released. `is_empty()` reports the
+    same view and reads as empty while every remaining request sits in a cooldown, whereas `is_finished()` counts those
+    requests, so the crawl idles until they are dispatchable instead of ending early.
 
     Delay sources:
     - HTTP 429 responses (via `record_domain_delay`)
     - robots.txt crawl-delay directives (via `set_crawl_delay`)
 
-    The class is generic over the wrapped manager type. The `request_manager_opener` callback is used to construct
-    per-domain sub-managers at insertion time, so every sub-manager shares the same `RequestManager` subclass and
-    backing store as `inner`. The opener must accept `alias`, `storage_client`, and `configuration` keyword arguments
-    (as `RequestQueue.open` does) and return the same concrete subclass as `inner`.
+    The class is generic over the wrapped manager type. The first asynchronous operation opens one sub-manager per
+    configured domain through `request_manager_opener`, so all of them share the subclass and backing store of `inner`;
+    the synchronous delay methods never open anything. The opener must accept `alias`, `storage_client`, and
+    `configuration` keyword arguments (as `RequestQueue.open` does) and return the same concrete subclass as `inner`.
+
+    Requests a previous run left in a persistent store become visible again at open. The default `purge_on_start=True`
+    empties them; `purge_on_start=False` resumes them. Named stores are exempt from that purge and aliased ones are not,
+    so a named `inner` keeps its requests while the per-domain stores are emptied.
 
     ### Usage
 
@@ -83,27 +90,40 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         Args:
             inner: The underlying request manager to wrap (typically a `RequestQueue`). Requests for non-throttled
                 domains are stored here.
-            domains: Explicit list of domain hostnames to throttle. Only requests matching these domains will be routed
-                to per-domain sub-managers. Matching is case-insensitive (hostnames are lowercased) and exact: subdomain
-                wildcards such as `*.example.com` are not supported — list each subdomain explicitly if needed.
-            request_manager_opener: Async callable used to create per-domain sub-managers at insertion time. Must
-                accept `alias`, `storage_client`, and `configuration` keyword arguments and return the same concrete
-                subclass as `inner` (e.g. `RequestQueue.open` when `inner` is a `RequestQueue`).
+            domains: Domains to throttle, each given as a bare hostname such as `api.example.com`, or as any URL on
+                the domain, of which only the hostname is used. Blank entries are ignored, so a list built by
+                splitting a string needs no pruning. Only requests matching these domains will be routed to
+                per-domain sub-managers. Matching is exact but spelling-insensitive: casing, punycode versus Unicode,
+                and a trailing root dot are all normalized away. Subdomain wildcards such as `*.example.com` are not
+                supported — list each subdomain explicitly if needed.
+            request_manager_opener: Async callable used to open one sub-manager per configured domain on first use.
+                Must accept `alias`, `storage_client`, and `configuration` keyword arguments and return the same
+                concrete subclass as `inner` (e.g. `RequestQueue.open` when `inner` is a `RequestQueue`).
             service_locator: Service locator for creating sub-managers. If not provided, defaults to the global service
                 locator, ensuring consistency with the crawler's storage backend.
             base_delay: Initial delay after the first 429 response from a domain.
             max_delay: Maximum delay between requests to a rate-limited domain.
+
+        Raises:
+            ValueError: If a non-blank entry of `domains` does not yield a hostname a crawled URL could match.
         """
         self._inner: TRequestManager = inner
         self._service_locator = service_locator if service_locator is not None else global_service_locator
         self._base_delay = base_delay
         self._max_delay = max_delay
         self._request_manager_opener = request_manager_opener
-        self._domain_states: dict[str, _DomainState] = {d.lower(): _DomainState(domain=d.lower()) for d in domains if d}
+        # Padding on an entry would otherwise survive parsing into a key no crawled hostname can match.
+        domain_keys = [self._parse_configured_domain(entry) for d in domains if (entry := d.strip())]
+        self._domain_states: dict[str, _DomainState] = {key: _DomainState(domain=key) for key in domain_keys}
         self._sub_managers: dict[str, TRequestManager] = {}
-        self._new_work_event = asyncio.Event()
-        """Set whenever a request is added or reclaimed. Lets `fetch_next_request` wake from a throttle
-        wait early when fresh work appears, instead of sleeping for the full computed cooldown."""
+        self._sub_managers_ready = False
+        self._sub_managers_lock = asyncio.Lock()
+        self._in_flight_from_inner: set[tuple[str, str]] = set()
+        """`(unique_key, url)` pairs of configured-domain requests that `fetch_next_request` took from `inner`, where
+        they live if they were added before their domain was listed, and where they must be completed. The URL is part
+        of the key because an explicit `unique_key` is only unique per store. Identical pairs held by `inner` and by a
+        sub-manager are indistinguishable, so their completions can cross; both stores hold the key, so the cost is a
+        duplicate crawl and a retry without the domain's delay."""
 
     @property
     def inner(self) -> TRequestManager:
@@ -112,18 +132,22 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
     @override
     async def drop(self) -> None:
+        await self._ensure_sub_managers()
         await asyncio.gather(self._inner.drop(), *(sm.drop() for sm in self._sub_managers.values()))
         self._sub_managers.clear()
+        self._sub_managers_ready = False
+        self._in_flight_from_inner.clear()
 
     @override
     async def purge(self) -> None:
         """Empty the inner manager and all sub-managers, and reset transient per-domain throttle state.
 
-        The configured domain list and any robots.txt-derived `crawl_delay` are preserved; only the dynamic backoff
-        state (consecutive 429 counter and `throttled_until`) is cleared. Sub-managers are kept around so they don't
-        need to be re-opened on the next request — they're just emptied.
+        The configured domain list and any robots.txt-derived `crawl_delay` are preserved. Only the dynamic backoff
+        state (consecutive 429 counter and `throttled_until`) is cleared. Sub-managers stay open; they're just emptied.
         """
+        await self._ensure_sub_managers()
         await asyncio.gather(self._inner.purge(), *(sm.purge() for sm in self._sub_managers.values()))
+        self._in_flight_from_inner.clear()
         for state in self._domain_states.values():
             state.consecutive_429_count = 0
             state.throttled_until = _NEVER_THROTTLED
@@ -135,17 +159,15 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         Requests for explicitly configured domains are routed directly to their per-domain sub-manager. All other
         requests go to the inner manager.
         """
+        await self._ensure_sub_managers()
+
         url = self._get_url_from_request(request)
         domain = self._extract_domain(url)
 
         if domain in self._domain_states:
-            sm = await self._get_or_create_sub_manager(domain)
-            result = await sm.add_request(request, forefront=forefront)
-        else:
-            result = await self._inner.add_request(request, forefront=forefront)
+            return await self._sub_managers[domain].add_request(request, forefront=forefront)
 
-        self._signal_new_work()
-        return result
+        return await self._inner.add_request(request, forefront=forefront)
 
     @override
     async def add_requests(
@@ -159,6 +181,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         wait_for_all_requests_to_be_added_timeout: timedelta | None = None,
     ) -> None:
         """Add multiple requests, routing each to the appropriate manager."""
+        await self._ensure_sub_managers()
+
         inner_requests: list[str | Request] = []
         domain_requests: dict[str, list[str | Request]] = {}
 
@@ -182,8 +206,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             )
 
         for domain, reqs in domain_requests.items():
-            sm = await self._get_or_create_sub_manager(domain)
-            await sm.add_requests(
+            await self._sub_managers[domain].add_requests(
                 reqs,
                 forefront=forefront,
                 batch_size=batch_size,
@@ -192,78 +215,52 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 wait_for_all_requests_to_be_added_timeout=wait_for_all_requests_to_be_added_timeout,
             )
 
-        if inner_requests or domain_requests:
-            self._signal_new_work()
-
     @override
     async def fetch_next_request(self) -> Request | None:
         """Fetch the next request, respecting per-domain delays.
 
-        Sub-managers are checked in order of longest-overdue domain first (sorted by `throttled_until` ascending). If
-        all configured domains are throttled, falls back to the inner manager for non-throttled domains. If the inner
-        manager is also empty and all sub-managers are throttled, waits until either the earliest domain becomes
-        available or new work is added (whichever comes first).
+        Sub-managers are checked in order of longest-overdue domain first, then the inner manager. Domains in a
+        cooldown are skipped, so the call returns `None` when nothing is dispatchable right now.
+
+        Note:
+            Unlike the `RequestLoader.fetch_next_request` contract, a `None` result does not imply that `is_finished()`
+            is `True` - it only means nothing is dispatchable right now. Since the manager never waits out a cooldown
+            itself, the dispatch cadence is only as precise as the caller's polling interval: a cooldown expiring
+            between two polls is picked up on the next one.
         """
-        while True:
-            # Clear the event before checking the queues. Any add/reclaim that races with this iteration will set the
-            # event again, so the wait at the end of the loop returns immediately rather than blocking until the
-            # throttle expires.
-            self._new_work_event.clear()
+        await self._ensure_sub_managers()
 
-            now = datetime.now(timezone.utc)
-            available_domains = sorted(
-                (
-                    domain
-                    for domain, state in self._domain_states.items()
-                    if domain in self._sub_managers and now >= state.throttled_until
-                ),
-                key=lambda d: self._domain_states[d].throttled_until,
-            )
-
-            for domain in available_domains:
-                req = await self._sub_managers[domain].fetch_next_request()
-                if req:
-                    self._mark_domain_dispatched(domain)
-                    return req
-
-            request = await self._inner.fetch_next_request()
+        for domain in self._fetchable_domains():
+            request = await self._sub_managers[domain].fetch_next_request()
             if request is not None:
+                self._mark_domain_dispatched(domain)
                 return request
 
-            if not self._sub_managers:
-                return None
-
-            sub_managers_empty = await asyncio.gather(*(sm.is_empty() for sm in self._sub_managers.values()))
-            if all(sub_managers_empty):
-                return None
-
-            earliest = self._get_earliest_available_time(now)
-            sleep_duration = max(
-                (earliest - now).total_seconds(),
-                0.1,  # Avoid tight loops if a throttle expired during the previous iteration.
-            )
-            logger.debug(
-                f'All configured domains are throttled and inner manager is empty. '
-                f'Waiting up to {sleep_duration:.1f}s for earliest domain to become available or new work.'
-            )
-            await self._wait_for_new_work_or_timeout(sleep_duration)
+        request = await self._inner.fetch_next_request()
+        if request is not None and self._extract_domain(request.url) in self._domain_states:
+            self._in_flight_from_inner.add((request.unique_key, request.url))
+        return request
 
     @override
     async def reclaim_request(self, request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
-        manager = self._select_manager(request.url)
+        await self._ensure_sub_managers()
+        manager = self._fetch_owner(request)
         result = await manager.reclaim_request(request, forefront=forefront)
-        self._signal_new_work()
+        self._clear_fetch_owner(request)
         return result
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
-        manager = self._select_manager(request.url)
+        await self._ensure_sub_managers()
+        manager = self._fetch_owner(request)
         result = await manager.mark_request_as_handled(request)
+        self._clear_fetch_owner(request)
         self.record_success(request.url)
         return result
 
     @override
     async def get_handled_count(self) -> int:
+        await self._ensure_sub_managers()
         counts = await asyncio.gather(
             self._inner.get_handled_count(), *(sm.get_handled_count() for sm in self._sub_managers.values())
         )
@@ -271,6 +268,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
     @override
     async def get_total_count(self) -> int:
+        await self._ensure_sub_managers()
         counts = await asyncio.gather(
             self._inner.get_total_count(), *(sm.get_total_count() for sm in self._sub_managers.values())
         )
@@ -278,11 +276,20 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
     @override
     async def is_empty(self) -> bool:
-        results = await asyncio.gather(self._inner.is_empty(), *(sm.is_empty() for sm in self._sub_managers.values()))
+        """Report whether anything can be dispatched right now.
+
+        Requests queued for a domain in a cooldown do not count. They still count towards `is_finished`, so the crawl
+        waits for them.
+        """
+        await self._ensure_sub_managers()
+        results = await asyncio.gather(
+            self._inner.is_empty(), *(self._sub_managers[d].is_empty() for d in self._fetchable_domains())
+        )
         return all(results)
 
     @override
     async def is_finished(self) -> bool:
+        await self._ensure_sub_managers()
         results = await asyncio.gather(
             self._inner.is_finished(), *(sm.is_finished() for sm in self._sub_managers.values())
         )
@@ -354,9 +361,45 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         logger.debug(f'Set crawl-delay for domain "{state.domain}" to {delay_seconds}s')
 
     @staticmethod
-    def _extract_domain(url: str) -> str:
-        """Extract the domain (hostname) from a URL."""
-        return URL(url).host or ''
+    def _normalize_domain(hostname: str) -> str:
+        """Reduce a parsed hostname to the form domain keys are stored in: lowercase, without the root dot."""
+        return hostname.lower().removesuffix('.')
+
+    @classmethod
+    def _parse_configured_domain(cls, domain: str) -> str:
+        """Turn one `domains` entry, a bare hostname or a URL, into the key its requests are looked up under."""
+        if '://' in domain:
+            url_text = domain
+        else:
+            # A bare hostname reaches the parser's IDNA handling only through a synthetic URL, and a bare IPv6
+            # literal has to be bracketed there, or the parser reads its last group as a port.
+            try:
+                ipaddress.IPv6Address(domain)
+            except ValueError:
+                url_text = f'https://{domain}'
+            else:
+                url_text = f'https://[{domain}]'
+
+        try:
+            host = URL(url_text).host
+        except ValueError:
+            host = None
+
+        key = cls._normalize_domain(host) if host else ''
+
+        # A wildcard passes through the parser untouched, so it would become a key no crawled hostname can match.
+        if not key or '*' in key:
+            raise ValueError(
+                f'"{domain}" is not a valid hostname. The `domains` option takes bare hostnames such as '
+                '"example.com", or any URL on the domain.'
+            )
+
+        return key
+
+    @classmethod
+    def _extract_domain(cls, url: str) -> str:
+        """Extract the domain key from a URL."""
+        return cls._normalize_domain(URL(url).host or '')
 
     @staticmethod
     def _get_url_from_request(request: str | Request) -> str:
@@ -368,15 +411,34 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         domain = self._extract_domain(url)
         return self._domain_states.get(domain) if domain else None
 
-    async def _get_or_create_sub_manager(self, domain: str) -> TRequestManager:
-        """Get or create a per-domain sub-manager using the configured `request_manager_opener`."""
-        if domain not in self._sub_managers:
-            self._sub_managers[domain] = await self._request_manager_opener(
-                alias=f'throttled-{domain}',
-                storage_client=self._service_locator.get_storage_client(),
-                configuration=self._service_locator.get_configuration(),
+    async def _open_sub_manager(self, domain: str) -> None:
+        """Open the sub-manager for a single domain using the configured `request_manager_opener`."""
+        self._sub_managers[domain] = await self._request_manager_opener(
+            alias=f'throttled-{domain}',
+            storage_client=self._service_locator.get_storage_client(),
+            configuration=self._service_locator.get_configuration(),
+        )
+
+    async def _ensure_sub_managers(self) -> None:
+        """Open a sub-manager for every configured domain, once; a retry opens only what is still missing."""
+        if self._sub_managers_ready:
+            return
+
+        async with self._sub_managers_lock:
+            if self._sub_managers_ready:
+                return
+
+            # All attempts must settle before the lock is released: openers left running would write into
+            # `_sub_managers` after a retry has already replaced that domain's manager.
+            missing = [domain for domain in self._domain_states if domain not in self._sub_managers]
+            results = await asyncio.gather(
+                *(self._open_sub_manager(domain) for domain in missing), return_exceptions=True
             )
-        return self._sub_managers[domain]
+            for result in results:
+                if isinstance(result, BaseException):
+                    raise result
+
+            self._sub_managers_ready = True
 
     def _is_domain_throttled(self, domain: str) -> bool:
         """Check if a domain is currently throttled."""
@@ -385,15 +447,12 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             return False
         return datetime.now(timezone.utc) < state.throttled_until
 
-    def _get_earliest_available_time(self, now: datetime) -> datetime:
-        """Get the earliest time any throttled domain becomes available."""
-        earliest = now + self._max_delay
-
-        for state in self._domain_states.values():
-            if now < state.throttled_until < earliest:
-                earliest = state.throttled_until
-
-        return earliest
+    def _fetchable_domains(self) -> list[str]:
+        """Return the configured domains that are not in a cooldown right now, longest-overdue first."""
+        now = datetime.now(timezone.utc)
+        available = [domain for domain, state in self._domain_states.items() if now >= state.throttled_until]
+        available.sort(key=lambda domain: self._domain_states[domain].throttled_until)
+        return available
 
     def _mark_domain_dispatched(self, domain: str) -> None:
         """Record that a request to this domain was just dispatched.
@@ -404,26 +463,18 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         if state is not None and state.crawl_delay is not None:
             state.throttled_until = datetime.now(timezone.utc) + state.crawl_delay
 
-    def _signal_new_work(self) -> None:
-        """Wake `fetch_next_request` if it is sleeping inside a throttle wait."""
-        self._new_work_event.set()
+    def _fetch_owner(self, request: Request) -> TRequestManager:
+        """Return the manager the request must be given back to, leaving its in-flight record in place.
 
-    def _select_manager(self, url: str) -> TRequestManager:
-        """Return the manager that owns the given URL — its sub-manager if one exists, otherwise the inner."""
-        domain = self._extract_domain(url)
-        if domain in self._sub_managers:
-            return self._sub_managers[domain]
-        return self._inner
-
-    async def _wait_for_new_work_or_timeout(self, timeout: float) -> None:
-        """Wait until new work is signaled or `timeout` seconds elapse, whichever comes first.
-
-        The signal is set by `add_request`, `add_requests`, and `reclaim_request`, allowing `fetch_next_request` to wake
-        up immediately when fresh work appears during a throttle wait instead of sleeping for the full computed cooldown
-        (up to `max_delay`).
+        `_clear_fetch_owner` drops the record only once the completion is accepted, so a retry resolves the same way.
         """
-        with contextlib.suppress(asyncio.TimeoutError):
-            await asyncio.wait_for(self._new_work_event.wait(), timeout=timeout)
+        if (request.unique_key, request.url) in self._in_flight_from_inner:
+            return self._inner
+        return self._sub_managers.get(self._extract_domain(request.url), self._inner)
+
+    def _clear_fetch_owner(self, request: Request) -> None:
+        """Drop the in-flight record of a request whose completion was accepted."""
+        self._in_flight_from_inner.discard((request.unique_key, request.url))
 
 
 class _RequestManagerOpener(Protocol[TRequestManager]):

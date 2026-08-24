@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Literal
 
 from crawlee._types import HttpHeaders
@@ -48,9 +49,17 @@ class HeaderGenerator:
     def get_common_headers(self) -> HttpHeaders:
         """Get common HTTP headers ("Accept", "Accept-Language").
 
+        Deprecated, use `get_specific_headers` instead.
+
         We do not modify the "Accept-Encoding", "Connection" and other headers. They should be included and handled
         by the HTTP client or browser.
         """
+        warnings.warn(
+            '`HeaderGenerator.get_common_headers` is deprecated and will be removed in v2.0.0. '
+            'Use `get_specific_headers` instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
         all_headers = self._generator.generate()
         return self._select_specific_headers(all_headers, header_names={'Accept', 'Accept-Language'})
 

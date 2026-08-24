@@ -16,7 +16,9 @@ if TYPE_CHECKING:
 
 def test_get_common_headers(header_network: dict) -> None:
     header_generator = HeaderGenerator()
-    headers = header_generator.get_common_headers()
+
+    with pytest.warns(DeprecationWarning, match='get_common_headers'):
+        headers = header_generator.get_common_headers()
 
     assert 'Accept' in headers
     assert headers['Accept'] in get_available_header_values(header_network, {'Accept', 'accept'})

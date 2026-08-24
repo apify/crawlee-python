@@ -37,7 +37,7 @@ jobs:
       checks: read
     steps:
       - name: Wait for checks
-        uses: apify/actions/wait-for-checks@v1.4.0
+        uses: apify/actions/wait-for-checks@v1.4.1
         with:
           ref: ${{ github.sha }}
           check-regexp: '^Checks'
@@ -49,10 +49,10 @@ jobs:
     outputs:
       version_number: ${{ steps.release_prepare.outputs.version_number }}
       tag_name: ${{ steps.release_prepare.outputs.tag_name }}
-      changelog: ${{ steps.release_prepare.outputs.changelog }}
       release_notes: ${{ steps.release_prepare.outputs.release_notes }}
+      changelog_artifact_name: ${{ steps.release_prepare.outputs.changelog_artifact_name }}
     steps:
-      - uses: apify/actions/git-cliff-release@v1.4.0
+      - uses: apify/actions/git-cliff-release@v1.4.1
         name: Release prepare
         id: release_prepare
         with:
@@ -68,7 +68,7 @@ jobs:
     uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
     with:
       version_number: ${{ needs.release_prepare.outputs.version_number }}
-      changelog: ${{ needs.release_prepare.outputs.changelog }}
+      changelog_artifact_name: ${{ needs.release_prepare.outputs.changelog_artifact_name }}
     secrets: inherit
 
   github_release:
@@ -81,7 +81,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: GitHub release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           tag_name: ${{ needs.release_prepare.outputs.tag_name }}
           name: ${{ needs.release_prepare.outputs.version_number }}
@@ -100,7 +100,7 @@ jobs:
       url: https://pypi.org/project/crawlee
     steps:
       - name: Prepare distribution
-        uses: apify/actions/prepare-pypi-distribution@v1.4.0
+        uses: apify/actions/prepare-pypi-distribution@v1.4.1
         with:
           package_name: crawlee
           is_prerelease: ""
@@ -108,7 +108,7 @@ jobs:
           ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
 
       - name: Verify built package
-        uses: apify/actions/python-package-check@v1.4.0
+        uses: apify/actions/python-package-check@v1.4.1
         with:
           package_name: crawlee
           dist_dir: dist
@@ -128,7 +128,7 @@ jobs:
 
       # Publish the package to PyPI using PyPA official GitHub action with OIDC authentication.
       - name: Publish package to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
 
       # TODO: add job for publish package to Conda
       # https://github.com/apify/crawlee-python/issues/104

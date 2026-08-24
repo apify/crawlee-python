@@ -4,19 +4,22 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
 from crawlee._request import Request
 from crawlee._service_locator import ServiceLocator
 from crawlee._utils.http import parse_retry_after_header
+from crawlee.configuration import Configuration
 from crawlee.request_loaders._throttling_request_manager import ThrottlingRequestManager
-from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import RequestQueue
 
 THROTTLED_DOMAIN = 'throttled.com'
+SECOND_THROTTLED_DOMAIN = 'slow.com'
 NON_THROTTLED_DOMAIN = 'free.com'
 TEST_DOMAINS = [THROTTLED_DOMAIN]
 
@@ -50,9 +53,50 @@ async def manager(inner_queue: RequestQueue, service_locator: ServiceLocator) ->
     )
 
 
+@pytest.fixture
+def fs_service_locator() -> ServiceLocator:
+    """Create a ServiceLocator backed by the file system, so storages survive a simulated restart."""
+    return ServiceLocator(configuration=Configuration(purge_on_start=False), storage_client=FileSystemStorageClient())
+
+
+@pytest.fixture
+async def two_domain_manager(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> ThrottlingRequestManager[RequestQueue]:
+    """Create a ThrottlingRequestManager with two throttled domains."""
+    return ThrottlingRequestManager(
+        inner_queue,
+        domains=[THROTTLED_DOMAIN, SECOND_THROTTLED_DOMAIN],
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+
 def _make_request(url: str) -> Request:
     """Helper to create a Request object."""
     return Request.from_url(url)
+
+
+async def _open_fs_manager(service_locator: ServiceLocator) -> ThrottlingRequestManager[RequestQueue]:
+    """Open a throttling manager over the persistent storage directory, as a fresh process would."""
+    inner_queue = await RequestQueue.open(
+        name='persistent-inner',
+        storage_client=service_locator.get_storage_client(),
+        configuration=service_locator.get_configuration(),
+    )
+    return ThrottlingRequestManager(
+        inner_queue,
+        domains=TEST_DOMAINS,
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+
+async def _restart_fs_manager(service_locator: ServiceLocator) -> ThrottlingRequestManager[RequestQueue]:
+    """Simulate a process restart by dropping cached storage instances and reopening the manager."""
+    service_locator.storage_instance_manager.clear_cache()
+    return await _open_fs_manager(service_locator)
 
 
 # ── Request Routing Tests ─────────────────────────────────
@@ -118,6 +162,76 @@ async def test_domain_matching_is_case_insensitive(
     # 429 bookkeeping must also flow through the lowercased state.
     manager.record_domain_delay('https://Example.Com/page2')
     assert manager._is_domain_throttled('example.com')
+
+
+@pytest.mark.parametrize(
+    ('configured', 'url'),
+    [
+        pytest.param('xn--hky-ela4t.cz', 'https://háčky.cz/page', id='punycode entry'),
+        pytest.param('háčky.cz', 'https://xn--hky-ela4t.cz/page', id='punycode url'),
+        pytest.param('example.com', 'http://example.com./page', id='root dot in url'),
+        pytest.param('example.com.', 'http://example.com/page', id='root dot in entry'),
+        pytest.param('[::1]', 'http://[::1]:8080/page', id='bracketed ipv6'),
+        pytest.param('::1', 'http://[::1]:8080/page', id='bare ipv6'),
+        pytest.param('https://example.com/products', 'https://example.com/page', id='full url'),
+        pytest.param('example.com:8080/path:1', 'https://example.com:8080/page', id='scheme-less url with colons'),
+        pytest.param(' example.com ', 'https://example.com/page', id='padded entry'),
+    ],
+)
+async def test_domain_matching_normalizes_spelling(
+    configured: str,
+    url: str,
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> None:
+    """A configured domain and a crawled URL must land on the same key however each of them is spelled."""
+    manager = ThrottlingRequestManager(
+        inner_queue,
+        domains=[configured],
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+    assert manager.record_domain_delay(url) is True
+
+
+@pytest.mark.parametrize(
+    'configured',
+    [
+        pytest.param('.', id='bare root dot'),
+        pytest.param('[::1', id='unclosed ipv6 bracket'),
+        pytest.param('*.example.com', id='subdomain wildcard'),
+        pytest.param('example.com:8080:9090', id='stray colons'),
+    ],
+)
+async def test_unmatchable_domain_is_rejected(
+    configured: str,
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> None:
+    """An entry that cannot yield a matchable hostname is rejected at construction, not silently kept."""
+    with pytest.raises(ValueError, match='not a valid hostname'):
+        ThrottlingRequestManager(
+            inner_queue,
+            domains=[configured],
+            request_manager_opener=RequestQueue.open,
+            service_locator=service_locator,
+        )
+
+
+async def test_blank_domain_entries_are_ignored(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> None:
+    """Blank entries are dropped rather than rejected, so a list built by splitting a string needs no pruning."""
+    manager = ThrottlingRequestManager(
+        inner_queue,
+        domains=['', '   ', 'example.com'],
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+    assert set(manager._domain_states) == {'example.com'}
 
 
 async def test_add_requests_routes_mixed_domains(
@@ -307,66 +421,73 @@ async def test_fetch_skips_throttled_sub_manager(
     assert result.url == free_url
 
 
-async def test_sleep_when_all_throttled(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """When all domains are throttled and inner is empty, should wait and retry."""
+async def test_fetch_returns_none_when_all_throttled(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A throttled domain must release the caller's concurrency slot instead of waiting out its cooldown."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     await manager.add_request(url)
+    manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
 
-    manager.record_domain_delay(url, retry_after=timedelta(seconds=10))
-
-    target = (
-        'crawlee.request_loaders._throttling_request_manager.ThrottlingRequestManager._wait_for_new_work_or_timeout'
-    )
-    with patch(target, new_callable=AsyncMock) as mock_wait:
-
-        async def wait_side_effect(*_args: Any, **_kwargs: Any) -> None:
-            # Set throttled_until firmly in the past so the next iteration reliably unblocks the domain regardless of
-            # clock resolution or scheduling jitter on slow CI runners.
-            manager._domain_states[THROTTLED_DOMAIN].throttled_until = datetime.now(timezone.utc) - timedelta(seconds=1)
-
-        mock_wait.side_effect = wait_side_effect
-
-        result = await manager.fetch_next_request()
-
-        mock_wait.assert_called()
-        assert result is not None
-        assert result.url == url
+    assert await asyncio.wait_for(manager.fetch_next_request(), timeout=1.0) is None
 
 
-async def test_fetch_wakes_when_request_added_during_throttle_wait(
+async def test_throttled_domain_reads_as_empty_but_not_finished(
     manager: ThrottlingRequestManager[RequestQueue],
 ) -> None:
-    """When all sub-managers are throttled and inner is empty, fetch should wake up immediately
-    when a new request is added rather than blocking until the throttle expires."""
-    # Throttle the only configured domain for a long time so a naive sleep would block here.
-    throttled_url = f'https://{THROTTLED_DOMAIN}/page1'
-    await manager.add_request(throttled_url)
-    manager.record_domain_delay(throttled_url, retry_after=timedelta(seconds=60))
+    """Requests waiting out a cooldown are nothing to dispatch, but the crawl must not end on them either."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await manager.add_request(url)
+    manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
 
-    free_url = f'https://{NON_THROTTLED_DOMAIN}/page1'
+    assert await manager.is_empty() is True
+    assert await manager.is_finished() is False
 
-    # Wrap the wait helper so we can synchronize with the moment fetch enters the wait state.
-    wait_entered = asyncio.Event()
-    original_wait = manager._wait_for_new_work_or_timeout
 
-    async def signaling_wait(timeout: float) -> None:
-        wait_entered.set()
-        await original_wait(timeout)
+async def test_crawl_delay_hides_queued_requests(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A crawl-delay armed on dispatch keeps the domain's remaining requests out of `is_empty`."""
+    manager.set_crawl_delay(f'https://{THROTTLED_DOMAIN}/', 30)
+    await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+    await manager.add_request(f'https://{THROTTLED_DOMAIN}/page2')
 
-    manager._wait_for_new_work_or_timeout = signaling_wait  # ty: ignore[invalid-assignment]
+    assert await manager.fetch_next_request() is not None
 
-    fetch_task = asyncio.create_task(manager.fetch_next_request())
+    assert await manager.is_empty() is True
+    assert await manager.is_finished() is False
 
-    # Wait until fetch is suspended inside the wait, then add fresh non-throttled work.
-    await wait_entered.wait()
-    await manager.add_request(free_url)
 
-    # If the wake-up signal works, fetch returns the freshly-added request well within the 2s wait_for budget; otherwise
-    # it would still be blocked on the 60s throttle.
-    result = await asyncio.wait_for(fetch_task, timeout=2.0)
+async def test_expired_throttle_makes_the_domain_fetchable_again(
+    manager: ThrottlingRequestManager[RequestQueue],
+) -> None:
+    """Once the cooldown passes, the domain counts again for both dispatching and emptiness."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await manager.add_request(url)
+    manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
+    assert await manager.is_empty() is True
+
+    manager._domain_states[THROTTLED_DOMAIN].throttled_until = datetime.now(timezone.utc) - timedelta(seconds=1)
+
+    assert await manager.is_empty() is False
+    result = await manager.fetch_next_request()
+    assert result is not None
+    assert result.url == url
+
+
+async def test_fetch_prefers_longest_overdue_domain(
+    two_domain_manager: ThrottlingRequestManager[RequestQueue],
+) -> None:
+    """With several domains free, the one whose cooldown expired earliest is dispatched first."""
+    recent_url = f'https://{THROTTLED_DOMAIN}/page1'
+    overdue_url = f'https://{SECOND_THROTTLED_DOMAIN}/page1'
+    await two_domain_manager.add_request(recent_url)
+    await two_domain_manager.add_request(overdue_url)
+
+    now = datetime.now(timezone.utc)
+    two_domain_manager._domain_states[THROTTLED_DOMAIN].throttled_until = now - timedelta(seconds=1)
+    two_domain_manager._domain_states[SECOND_THROTTLED_DOMAIN].throttled_until = now - timedelta(seconds=10)
+
+    result = await two_domain_manager.fetch_next_request()
 
     assert result is not None
-    assert result.url == free_url
+    assert result.url == overdue_url
 
 
 # ── Delegation Tests ────────────────────────────────────
@@ -437,6 +558,112 @@ async def test_mark_request_as_handled_routes_to_inner(
     assert await inner_queue.get_handled_count() == 1
 
 
+async def test_reclaim_returns_inner_request_to_inner(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+) -> None:
+    """A request fetched from inner is reclaimed back into inner, even when its domain is configured."""
+    # A domain configured only after the request had already been stored in inner.
+    await inner_queue.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+
+    request = await manager.fetch_next_request()
+    assert request is not None
+
+    await manager.reclaim_request(request)
+
+    assert not await inner_queue.is_empty()
+    assert await manager._sub_managers[THROTTLED_DOMAIN].is_empty()
+
+
+async def test_handled_inner_request_finishes_inner(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+) -> None:
+    """A request fetched from inner is marked as handled in inner, so inner can finish."""
+    await inner_queue.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+
+    request = await manager.fetch_next_request()
+    assert request is not None
+
+    await manager.mark_request_as_handled(request)
+
+    assert await inner_queue.is_finished() is True
+    assert await manager.is_finished() is True
+
+
+async def test_purge_forgets_in_flight_inner_requests(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+) -> None:
+    """A purge drops the requests still in flight, so their routing must not outlive it."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await inner_queue.add_request(url)
+    assert await manager.fetch_next_request() is not None
+
+    await manager.purge()
+
+    # The same URL yields the same unique key, so a stale record would send it back to inner.
+    await manager.add_request(url)
+    request = await manager.fetch_next_request()
+    assert request is not None
+    await manager.mark_request_as_handled(request)
+
+    assert await manager._sub_managers[THROTTLED_DOMAIN].is_finished() is True
+
+
+async def test_failed_completion_keeps_its_inner_routing_for_the_retry(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A completion that fails keeps its inner routing, so a retried completion is not diverted to the sub-manager."""
+    await inner_queue.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+    request = await manager.fetch_next_request()
+    assert request is not None
+
+    # `BasicCrawler` retries this, so a failed attempt must not consume the routing record.
+    monkeypatch.setattr(
+        inner_queue,
+        'mark_request_as_handled',
+        AsyncMock(side_effect=RuntimeError('transient storage failure')),
+    )
+    with pytest.raises(RuntimeError, match='transient storage failure'):
+        await manager.mark_request_as_handled(request)
+
+    monkeypatch.undo()
+    await manager.mark_request_as_handled(request)
+
+    assert await inner_queue.is_finished() is True
+    assert await manager.is_finished() is True
+
+
+async def test_shared_unique_key_does_not_reroute_sub_manager_request(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+) -> None:
+    """A unique key shared with an in-flight inner request must not send a sub-manager request back to inner."""
+    shared_key = 'shared-unique-key'
+    # A leftover from before the domain was configured, sharing its explicit unique key with a fresh request.
+    await inner_queue.add_request(
+        Request.from_url(f'https://{THROTTLED_DOMAIN}/page1', unique_key=shared_key),
+    )
+    await manager.add_request(Request.from_url(f'https://{THROTTLED_DOMAIN}/page2', unique_key=shared_key))
+
+    # Sub-managers are drained before inner, so the first fetch is the sub-manager's request.
+    sub_request = await manager.fetch_next_request()
+    inner_request = await manager.fetch_next_request()
+    assert sub_request is not None
+    assert inner_request is not None
+    assert sub_request.url == f'https://{THROTTLED_DOMAIN}/page2'
+    assert inner_request.url == f'https://{THROTTLED_DOMAIN}/page1'
+
+    await manager.reclaim_request(sub_request)
+
+    # The reclaim has to land in the sub-manager; inner keeps its own request in flight.
+    assert not await manager._sub_managers[THROTTLED_DOMAIN].is_empty()
+    assert await inner_queue.is_empty() is True
+
+
 async def test_get_handled_count_aggregates(manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """get_handled_count should sum inner and all sub-managers."""
     throttled_url = f'https://{THROTTLED_DOMAIN}/page1'
@@ -469,7 +696,7 @@ async def test_get_total_count_aggregates(manager: ThrottlingRequestManager[Requ
 
 
 async def test_is_empty_aggregates(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """is_empty should return False if any manager has requests."""
+    """is_empty should return False if any manager that is not in a cooldown has requests."""
     assert await manager.is_empty() is True
 
     await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
@@ -525,6 +752,172 @@ async def test_purge_clears_requests_and_resets_throttle_state(
     # Transient backoff state is reset.
     assert state.consecutive_429_count == 0
     assert not manager._is_domain_throttled(THROTTLED_DOMAIN)
+
+
+async def test_sub_managers_opened_for_every_configured_domain(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> None:
+    """Every configured domain gets a sub-manager on first use, not during construction."""
+    domains = [THROTTLED_DOMAIN, SECOND_THROTTLED_DOMAIN]
+    manager = ThrottlingRequestManager(
+        inner_queue,
+        domains=domains,
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+    assert manager._sub_managers == {}
+
+    await manager.is_empty()
+
+    assert set(manager._sub_managers) == set(domains)
+
+
+async def test_sub_managers_opened_once(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> None:
+    """Concurrent first calls open each sub-manager exactly once."""
+    domains = [THROTTLED_DOMAIN, SECOND_THROTTLED_DOMAIN]
+    opener = AsyncMock(side_effect=RequestQueue.open)
+    manager: ThrottlingRequestManager[RequestQueue] = ThrottlingRequestManager(
+        inner_queue,
+        domains=domains,
+        request_manager_opener=opener,
+        service_locator=service_locator,
+    )
+
+    await asyncio.gather(manager.is_empty(), manager.is_finished(), manager.fetch_next_request())
+
+    assert opener.await_count == len(domains)
+
+
+async def test_failed_open_keeps_successful_sub_managers(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> None:
+    """A failing opener leaves the sub-managers that did open in place, so a retry opens only what is missing."""
+    domains = [THROTTLED_DOMAIN, SECOND_THROTTLED_DOMAIN]
+    failing_alias = f'throttled-{SECOND_THROTTLED_DOMAIN}'
+    pending_failures = {failing_alias}
+
+    async def open_once_failing(*, alias: str, **kwargs: Any) -> RequestQueue:
+        if alias in pending_failures:
+            pending_failures.discard(alias)
+            raise RuntimeError('storage unavailable')
+        return await RequestQueue.open(alias=alias, **kwargs)
+
+    opener = AsyncMock(side_effect=open_once_failing)
+    manager: ThrottlingRequestManager[RequestQueue] = ThrottlingRequestManager(
+        inner_queue,
+        domains=domains,
+        request_manager_opener=opener,
+        service_locator=service_locator,
+    )
+
+    with pytest.raises(RuntimeError, match='storage unavailable'):
+        await manager.is_empty()
+
+    assert await manager.is_empty() is True
+
+    # The domain that opened before its sibling failed is reused, not opened a second time.
+    opened_aliases = [call.kwargs['alias'] for call in opener.await_args_list]
+    assert opened_aliases.count(f'throttled-{THROTTLED_DOMAIN}') == 1
+    assert opened_aliases.count(failing_alias) == 2
+
+
+async def test_read_path_after_drop_reopens_sub_managers(
+    manager: ThrottlingRequestManager[RequestQueue],
+) -> None:
+    """After drop(), the next read reopens the sub-managers."""
+    await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+    await manager.drop()
+    assert manager._sub_managers == {}
+
+    assert await manager.is_empty() is True
+    assert set(manager._sub_managers) == set(TEST_DOMAINS)
+
+
+async def test_read_paths_reopen_persisted_sub_queues(fs_service_locator: ServiceLocator) -> None:
+    """A restarted manager sees the requests a previous run left in a persisted sub-queue."""
+    urls = [f'https://{THROTTLED_DOMAIN}/page1', f'https://{THROTTLED_DOMAIN}/page2']
+    manager = await _open_fs_manager(fs_service_locator)
+    await manager.add_requests(urls)
+
+    restarted = await _restart_fs_manager(fs_service_locator)
+
+    assert await restarted.is_finished() is False
+    assert await restarted.is_empty() is False
+    assert await restarted.get_total_count() == 2
+
+    request = await restarted.fetch_next_request()
+    assert request is not None
+    assert request.url in urls
+
+
+async def test_default_purge_on_start_empties_persisted_sub_queues(fs_service_locator: ServiceLocator) -> None:
+    """With the default `purge_on_start`, opening the sub-queues empties what a previous run left in them."""
+    manager = await _open_fs_manager(fs_service_locator)
+    await manager.add_requests([f'https://{THROTTLED_DOMAIN}/page1', f'https://{THROTTLED_DOMAIN}/page2'])
+
+    # Restart under the default configuration, which purges an aliased store as it opens.
+    fs_service_locator.storage_instance_manager.clear_cache()
+    purging_locator = ServiceLocator(configuration=Configuration(), storage_client=FileSystemStorageClient())
+    purged = await _open_fs_manager(purging_locator)
+    assert await purged.is_empty() is True
+
+    # Reopen without purging: an empty queue proves the requests were deleted, not just hidden.
+    restarted = await _restart_fs_manager(fs_service_locator)
+    assert await restarted.get_total_count() == 0
+    assert await restarted.is_finished() is True
+
+
+async def test_purge_empties_sub_queues_from_a_previous_run(fs_service_locator: ServiceLocator) -> None:
+    """purge() empties sub-queues left behind by a previous run."""
+    manager = await _open_fs_manager(fs_service_locator)
+    await manager.add_requests([f'https://{THROTTLED_DOMAIN}/page1', f'https://{THROTTLED_DOMAIN}/page2'])
+
+    restarted = await _restart_fs_manager(fs_service_locator)
+    await restarted.purge()
+
+    sub_queue = await RequestQueue.open(
+        alias=f'throttled-{THROTTLED_DOMAIN}',
+        storage_client=fs_service_locator.get_storage_client(),
+        configuration=fs_service_locator.get_configuration(),
+    )
+    assert await sub_queue.get_total_count() == 0
+
+
+async def test_drop_removes_sub_queues_from_a_previous_run(fs_service_locator: ServiceLocator) -> None:
+    """drop() removes the on-disk sub-queues left behind by a previous run."""
+    manager = await _open_fs_manager(fs_service_locator)
+    await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+
+    sub_queue_path = (
+        Path(fs_service_locator.get_configuration().storage_dir) / 'request_queues' / f'throttled-{THROTTLED_DOMAIN}'
+    )
+    assert sub_queue_path.exists()
+
+    restarted = await _restart_fs_manager(fs_service_locator)
+    await restarted.drop()
+
+    assert not sub_queue_path.exists()
+
+
+async def test_reclaim_routes_to_sub_manager_after_restart(fs_service_locator: ServiceLocator) -> None:
+    """After a restart, a reclaimed request goes back to its sub-manager rather than to inner."""
+    manager = await _open_fs_manager(fs_service_locator)
+    await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+
+    restarted = await _restart_fs_manager(fs_service_locator)
+    request = await restarted.fetch_next_request()
+    assert request is not None
+
+    await restarted.reclaim_request(request)
+
+    assert not await restarted._sub_managers[THROTTLED_DOMAIN].is_empty()
+    assert await restarted.inner.is_empty()
 
 
 # ── Utility Tests ──────────────────────────────────────

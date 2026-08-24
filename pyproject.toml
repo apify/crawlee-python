@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "crawlee"
-version = "1.9.2"
+version = "1.9.3"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = "Apache-2.0"
@@ -37,7 +37,7 @@ dependencies = [
     "async-timeout>=5.0.1",
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
-    "impit>=0.8.0",
+    "impit>=0.13.2",
     "more-itertools>=10.2.0",
     "protego>=0.5.0",
     "psutil>=6.0.0",

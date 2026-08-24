@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 from crawlee.crawlers._playwright._playwright_http_client import PlaywrightHttpClient, browser_page_context
 from crawlee.crawlers._playwright._types import PlaywrightHttpResponse
@@ -33,24 +36,14 @@ async def test_send_request_converts_timeout_to_milliseconds() -> None:
     from_playwright_response.assert_awaited_once_with(playwright_response, protocol='')
 
 
-async def test_send_request_preserves_zero_timeout() -> None:
-    playwright_response = Mock()
+async def test_send_request_zero_timeout_expires_immediately() -> None:
+    """A `timedelta(0)` timeout must expire immediately rather than being forwarded as "disable timeout"."""
     page = Mock()
-    page.request.fetch = AsyncMock(return_value=playwright_response)
+    page.request.fetch = AsyncMock()
     client = PlaywrightHttpClient()
 
-    with patch.object(
-        PlaywrightHttpResponse,
-        'from_playwright_response',
-        new=AsyncMock(return_value=Mock()),
-    ):
-        async with browser_page_context(page):
+    async with browser_page_context(page):
+        with pytest.raises(asyncio.TimeoutError):
             await client.send_request('https://example.com', timeout=timedelta(0))
 
-    page.request.fetch.assert_awaited_once_with(
-        url_or_request='https://example.com',
-        method='get',
-        headers=None,
-        data=None,
-        timeout=0,
-    )
+    page.request.fetch.assert_not_awaited()
