@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - **httpx:** Build HttpxHttpClient on httpx2 instead of httpx ([#2182](https://github.com/apify/crawlee-python/pull/2182)) ([6deabad](https://github.com/apify/crawlee-python/commit/6deabad9ae69b863a8586364230b40756682c3a4)) by [@Mantisus](https://github.com/Mantisus)
+- Support timeouts in the `send_request` context helper ([#2174](https://github.com/apify/crawlee-python/pull/2174)) ([c2013a0](https://github.com/apify/crawlee-python/commit/c2013a00d04d0c67e7ab8afde34e8ab7e203a5bd)) by [@Battleplus](https://github.com/Battleplus), closes [#2138](https://github.com/apify/crawlee-python/issues/2138)
 
 ### 🐛 Bug Fixes
 
