@@ -123,7 +123,7 @@ dev = [
     "anyio<5.0.0",
     # Pin below 3.0, which drops Python 3.10 support and introduces a breaking API. Once Crawlee
     # drops Python 3.10 (https://github.com/apify/crawlee-python/issues/1721), remove this constraint.
-    "apify_client<3.0.0", # For e2e tests.
+    "apify_client<3.1.4", # For e2e tests.
     "build<2.0.0", # For e2e tests.
     "fakeredis[probabilistic,json,lua]<3.0.0",
     "poethepoet<1.0.0",
