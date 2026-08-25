@@ -19,7 +19,7 @@ import RlBasicPersistExample from '!!raw-loader!roa-loader!./code_examples/reque
 import SitemapPersistExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/sitemap_example_with_persist.py';
 import SitemapTransformExample from '!!raw-loader!roa-loader!./code_examples/request_loaders/using_sitemap_request_loader.py';
 
-The [`request_loaders`](https://github.com/apify/crawlee-python/tree/master/src/crawlee/request_loaders) sub-package extends the functionality of the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, providing additional tools for managing URLs and requests. If you are new to Crawlee and unfamiliar with the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, consider starting with the [Storages](./storages) guide first. Request loaders define how requests are fetched and stored, enabling various use cases such as reading URLs from files, external APIs, or combining multiple sources together.
+The [`request_loaders`](https://github.com/apify/crawlee-python/tree/master/src/crawlee/request_loaders) sub-package extends the functionality of the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, providing additional tools for managing URLs and requests. If you are new to Crawlee and unfamiliar with the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, consider starting with the [Storages](./storages) page first. Request loaders define how requests are fetched and stored, enabling various use cases such as reading URLs from files, external APIs, or combining multiple sources together.
 
 ## Overview
 
@@ -155,7 +155,7 @@ When using persistence with `SitemapRequestLoader`, make sure to use the context
 
 ### Transforming loaded requests
 
-The `transform_request_function` parameter lets you adjust request options based on the URL before the request is enqueued. This allows you to modify request properties such as labels and user data based on the source URL, enabling different handling logic for different websites or sections. The following example loads sitemaps from two different domains, assigns each request a label based on its host, and routes the requests to the corresponding handlers.
+The `transform_request_function` parameter lets you adjust request properties, such as labels and user data, based on the source URL before the request is enqueued, enabling different handling logic for different websites or sections. The following example loads sitemaps from two different domains, assigns each request a label based on its host, and routes the requests to the corresponding handlers.
 
 <RunnableCodeBlock className="language-python" language="python">
     {SitemapTransformExample}

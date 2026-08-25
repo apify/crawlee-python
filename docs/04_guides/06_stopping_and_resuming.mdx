@@ -11,13 +11,13 @@ import CrawlerStopExample from '!!raw-loader!roa-loader!./code_examples/stopping
 import CrawlerKeepAliveExample from '!!raw-loader!roa-loader!./code_examples/stopping_and_resuming/beautifulsoup_crawler_keep_alive.py';
 import ResumeCrawlExample from '!!raw-loader!roa-loader!./code_examples/stopping_and_resuming/resuming_paused_crawl.py';
 
-A crawler normally runs until its request queue is empty. This guide covers the cases where you want to change that: stopping the crawl early once you found what you were looking for, keeping the crawler alive while it waits for more requests, and resuming an interrupted crawl from where it stopped.
+A crawler normally runs until its request queue is empty. This guide covers the cases where you want to change that: stopping the crawl early once you've found what you're looking for, keeping the crawler alive while it waits for more requests, and resuming an interrupted crawl from where it stopped.
 
-All the options below are available to every crawler that inherits from <ApiLink to="class/BasicCrawler">`BasicCrawler`</ApiLink>. The examples use <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, but they work the same with any other crawler.
+All the options on this page are available to every crawler that inherits from <ApiLink to="class/BasicCrawler">`BasicCrawler`</ApiLink>. The examples use <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, but they work the same with any other crawler.
 
 ## Stopping a crawler
 
-Call <ApiLink to="class/BasicCrawler#stop">`crawler.stop()`</ApiLink> to stop the crawler - for example, once it finds what it was looking for. The crawler won't pick up any new requests, but requests that are already being processed concurrently are finished. The optional `reason` argument is a string that appears in the logs, which can improve their readability, especially when multiple conditions can trigger the stop.
+Call <ApiLink to="class/BasicCrawler#stop">`crawler.stop()`</ApiLink> to stop the crawler, for example once it finds what it's looking for. The crawler won't pick up any new requests, but requests that are already being processed concurrently are finished. The optional `reason` argument is a string that appears in the logs, which can improve their readability, especially when multiple conditions can trigger the stop.
 
 <RunnableCodeBlock className="language-python" language="python">
     {CrawlerStopExample}
@@ -25,7 +25,7 @@ Call <ApiLink to="class/BasicCrawler#stop">`crawler.stop()`</ApiLink> to stop th
 
 ## Keeping a crawler alive
 
-To keep the crawler running even when there are no requests to process at the moment, pass `keep_alive=True` to the crawler's constructor (see <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>). The crawler then waits for more requests to be added instead of finishing - useful, for instance, when another component adds requests over time, as in the [Running in web server](./running-in-web-server) guide. A crawler started with `keep_alive=True` is stopped by calling `crawler.stop()`.
+To keep the crawler running even when there are no requests to process at the moment, pass `keep_alive=True` to the crawler's constructor (see <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>). The crawler then waits for more requests to be added instead of finishing. This setup is useful when another component adds requests over time, as in the [Running in web server](./running-in-web-server) guide. A crawler started with `keep_alive=True` is stopped by calling `crawler.stop()`.
 
 <RunnableCodeBlock className="language-python" language="python">
     {CrawlerKeepAliveExample}
@@ -35,7 +35,7 @@ To keep the crawler running even when there are no requests to process at the mo
 
 When a local crawler run is interrupted - say with `CTRL+C` - the default behavior is to start over on the next run, because Crawlee purges the storage on start. To continue from the previous state instead, disable `purge_on_start` in the <ApiLink to="class/Configuration">`Configuration`</ApiLink>.
 
-Use the code below and perform two sequential runs. During the first run, stop the crawler by pressing `CTRL+C`, and the second run will resume crawling from where it stopped.
+Use the following code and perform two sequential runs. During the first run, stop the crawler by pressing `CTRL+C`, and the second run will resume crawling from where it stopped.
 
 <RunnableCodeBlock className="language-python" language="python">
     {ResumeCrawlExample}
@@ -52,5 +52,5 @@ Now resume crawling after the pause to process the remaining 3 links.
 Alternatively, set the environment variable `CRAWLEE_PURGE_ON_START=0` instead of `configuration.purge_on_start = False`:
 
 ```bash
-CRAWLEE_PURGE_ON_START=0 python -m best_crawler
+CRAWLEE_PURGE_ON_START=0 python your_crawler.py
 ```

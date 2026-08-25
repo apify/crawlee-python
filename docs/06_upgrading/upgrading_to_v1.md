@@ -53,13 +53,13 @@ client = HttpxHttpClient()
 crawler = HttpCrawler(http_client=client)
 ```
 
-See the [HTTP clients guide](../concepts/http-clients) for all options.
+See the [HTTP clients](../concepts/http-clients) page for all options.
 
 ## Changes in storages
 
 In Crawlee v1.0, the `Dataset`, `KeyValueStore`, and `RequestQueue` storage APIs have been updated for consistency and simplicity. Below is a detailed overview of what's new, what's changed, and what's been removed.
 
-See the [Storages guide](../concepts/storages) for more details.
+See the [Storages](../concepts/storages) page for more details.
 
 ### Dataset
 
@@ -116,7 +116,7 @@ Some changes in the related model classes:
 
 In v1.0, the storage client system has been completely reworked to simplify implementation and make custom storage clients easier to write.
 
-See the [Storage clients guide](../concepts/storage-clients) for more details.
+See the [Storage clients](../concepts/storage-clients) page for more details.
 
 ### New dedicated storage clients
 

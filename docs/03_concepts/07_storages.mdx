@@ -40,7 +40,7 @@ Crawlee's storage system consists of two main layers:
 - **Storages** (<ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>): High-level interfaces for interacting with different storage types.
 - **Storage clients** (<ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink>, <ApiLink to="class/FileSystemStorageClient">`FileSystemStorageClient`</ApiLink>, etc.): Backend implementations that handle the actual data persistence and management.
 
-For more information about storage clients and their configuration, see the [Storage clients guide](./storage-clients).
+For more information about storage clients and their configuration, see the [Storage clients](./storage-clients) page.
 
 ```mermaid
 ---
@@ -143,7 +143,7 @@ The <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> implements the <Ap
 
 If you need custom functionality, you can create your own request storage by subclassing the <ApiLink to="class/RequestManager">`RequestManager`</ApiLink> class and implementing its required methods.
 
-For a detailed explanation of the <ApiLink to="class/RequestManager">`RequestManager`</ApiLink> and other related components, refer to the [Request loaders guide](./request-loaders).
+For a detailed explanation of the <ApiLink to="class/RequestManager">`RequestManager`</ApiLink> and other related components, refer to the [Request loaders](./request-loaders) page.
 
 ## Dataset
 
@@ -260,5 +260,5 @@ Purge on start behavior just triggers the storage's `purge` method, which remove
     {CleaningPurgeExplicitlyExample}
 </RunnableCodeBlock>
 
-Note that purging behavior may vary between storage client implementations. For more details on storage configuration and client implementations, see the [Storage clients guide](./storage-clients).
+Note that purging behavior may vary between storage client implementations. For more details on storage configuration and client implementations, see the [Storage clients](./storage-clients) page.
 

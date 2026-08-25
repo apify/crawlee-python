@@ -37,7 +37,7 @@ import PlaywrightExample from '!!raw-loader!roa-loader!./code_examples/scrapy_mi
 
 [Scrapy](https://scrapy.org/) and Crawlee solve the same problem, so most of what you know carries over. The concepts line up almost one to one, and the selector code often moves across without changes. Scrapy parses HTML with [Parsel](https://parsel.readthedocs.io/), and so does Crawlee's <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>. Your `response.css()` and `response.xpath()` queries keep working on <ApiLink to="class/ParselCrawlingContext#selector">`context.selector`</ApiLink>.
 
-This guide maps Scrapy concepts to their Crawlee equivalents and rewrites a small spider step by step. The examples use <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> because it's the closest match for a Scrapy spider. The other HTTP option is <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, and the choice between them is covered in the [HTTP crawlers guide](../concepts/http-crawlers). For pages that need a browser, Crawlee has <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, covered in the [Playwright crawler guide](../concepts/playwright-crawler).
+This guide maps Scrapy concepts to their Crawlee equivalents and rewrites a small spider step by step. The examples use <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> because it's the closest match for a Scrapy spider. The other HTTP option is <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, and the choice between them is covered on the [HTTP crawlers](../concepts/http-crawlers) page. For pages that need a browser, Crawlee has <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, covered on the [Playwright crawler](../concepts/playwright-crawler) page.
 
 The Crawlee examples cap each run with <ApiLink to="class/BasicCrawler#__init__">`max_requests_per_crawl`</ApiLink> to keep the demos short. The Scrapy equivalent is the `CLOSESPIDER_PAGECOUNT` setting from the built-in `CloseSpider` extension.
 
@@ -123,7 +123,7 @@ Note that:
 
 ## Routing with labels
 
-Scrapy routes pages by passing a `callback` to each request. A listing page hands its links to `parse_author`. In Crawlee you attach a `label` to the enqueued requests, then register a handler for that label. Each request goes to the matching handler, and unlabeled requests fall through to the default one. For details, see the [Request router guide](../concepts/request-router).
+Scrapy routes pages by passing a `callback` to each request. A listing page hands its links to `parse_author`. In Crawlee you attach a `label` to the enqueued requests, then register a handler for that label. Each request goes to the matching handler, and unlabeled requests fall through to the default one. For details, see the [Request router](../concepts/request-router) page.
 
 <Tabs groupId="scrapy-migration-labels">
     <TabItem value="scrapy" label="Scrapy">
@@ -191,11 +191,11 @@ Scrapy writes results through the `FEEDS` setting or the `-O` command-line flag.
     </TabItem>
 </Tabs>
 
-The default (unnamed) <ApiLink to="class/Dataset">`Dataset`</ApiLink> stays on disk after the run finishes, but the next run clears it before starting, since <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink> defaults to `True`. To keep data across runs, use a named dataset or turn that option off. For details, see the [Storages guide](../concepts/storages). To continue an interrupted crawl from where it stopped, see the [Resuming a paused crawl](./stopping-and-resuming-crawlers#resuming-a-paused-crawl) example.
+The default (unnamed) <ApiLink to="class/Dataset">`Dataset`</ApiLink> stays on disk after the run finishes, but the next run clears it before starting, since <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink> defaults to `True`. To keep data across runs, use a named dataset or turn that option off. For details, see the [Storages](../concepts/storages) page. To continue an interrupted crawl from where it stopped, see the [Resuming a paused crawl](./stopping-and-resuming-crawlers#resuming-a-paused-crawl) example.
 
 ## Concurrency and throttling
 
-Both Scrapy and Crawlee have settings to influence the scraping throughput, but they differ in their approach. Crawlee reads <ApiLink to="class/ConcurrencySettings">`ConcurrencySettings`</ApiLink> and scales concurrency automatically based on system resources, as described in the [Scaling crawlers guide](../concepts/scaling-crawlers). Use <ApiLink to="class/ConcurrencySettings#__init__">`max_tasks_per_minute`</ApiLink> to cap the request rate. It's close to `DOWNLOAD_DELAY`, but it limits the whole pool rather than adding a fixed delay per domain.
+Both Scrapy and Crawlee have settings to influence the scraping throughput, but they differ in their approach. Crawlee reads <ApiLink to="class/ConcurrencySettings">`ConcurrencySettings`</ApiLink> and scales concurrency automatically based on system resources, as described on the [Scaling crawlers](../concepts/scaling-crawlers) page. Use <ApiLink to="class/ConcurrencySettings#__init__">`max_tasks_per_minute`</ApiLink> to cap the request rate. It's close to `DOWNLOAD_DELAY`, but it limits the whole pool rather than adding a fixed delay per domain.
 
 <Tabs groupId="scrapy-migration-concurrency">
     <TabItem value="scrapy" label="Scrapy">
@@ -210,7 +210,7 @@ Both Scrapy and Crawlee have settings to influence the scraping throughput, but 
     </TabItem>
 </Tabs>
 
-The closest built-in analog to the `AutoThrottle` extension is the <ApiLink to="class/ThrottlingRequestManager">`ThrottlingRequestManager`</ApiLink>, covered in the [Request throttling guide](../concepts/request-throttling). It differs in what drives the backoff. Scrapy's `AutoThrottle` adapts to measured latency, while Crawlee's manager reacts to explicit signals: HTTP 429 replies and `robots.txt` crawl-delay directives. It wraps a <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> and applies the backoff per domain. You list the domains to watch, and the crawler reports the signals to the manager on its own.
+The closest built-in analog to the `AutoThrottle` extension is the <ApiLink to="class/ThrottlingRequestManager">`ThrottlingRequestManager`</ApiLink>, covered on the [Request throttling](../concepts/request-throttling) page. It differs in what drives the backoff. Scrapy's `AutoThrottle` adapts to measured latency, while Crawlee's manager reacts to explicit signals: HTTP 429 replies and `robots.txt` crawl-delay directives. It wraps a <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> and applies the backoff per domain. You list the domains to watch, and the crawler reports the signals to the manager on its own.
 
 Crawl-delay works only when the crawler fetches `robots.txt`. Projects generated by `scrapy startproject` obey `robots.txt` out of the box, but the default for Crawlee is to ignore it. Passing <ApiLink to="class/BasicCrawler#__init__">`respect_robots_txt_file=True`</ApiLink> tells Crawlee to enforce the `Disallow` rules. Together with <ApiLink to="class/ThrottlingRequestManager">`ThrottlingRequestManager`</ApiLink> it also reads crawl-delay, otherwise it logs a warning.
 
@@ -229,7 +229,7 @@ Crawl-delay works only when the crawler fetches `robots.txt`. Projects generated
 
 ## Proxies
 
-Scrapy rotates proxies through a middleware or a third-party package. Crawlee takes a <ApiLink to="class/ProxyConfiguration">`ProxyConfiguration`</ApiLink> and rotates the URLs for you. For tiered proxies, session-bound proxies, and integration with the Apify Proxy, see the [Proxy management guide](../concepts/proxy-management).
+Scrapy rotates proxies through a middleware or a third-party package. Crawlee takes a <ApiLink to="class/ProxyConfiguration">`ProxyConfiguration`</ApiLink> and rotates the URLs for you. For tiered proxies, session-bound proxies, and integration with the Apify Proxy, see the [Proxy management](../concepts/proxy-management) page.
 
 <Tabs groupId="scrapy-migration-proxy">
     <TabItem value="scrapy" label="Scrapy">
@@ -246,7 +246,7 @@ Scrapy rotates proxies through a middleware or a third-party package. Crawlee ta
 
 ## Error handling
 
-Scrapy retries failed requests with `RetryMiddleware` and reports terminal failures through `errback`. Crawlee retries with <ApiLink to="class/BasicCrawler#__init__">`max_request_retries`</ApiLink>, runs an <ApiLink to="class/BasicCrawler#error_handler">`error_handler`</ApiLink> between attempts, and calls a <ApiLink to="class/BasicCrawler#failed_request_handler">`failed_request_handler`</ApiLink> once the retries run out. For details, see the [Error handling guide](../concepts/error-handling).
+Scrapy retries failed requests with `RetryMiddleware` and reports terminal failures through `errback`. Crawlee retries with <ApiLink to="class/BasicCrawler#__init__">`max_request_retries`</ApiLink>, runs an <ApiLink to="class/BasicCrawler#error_handler">`error_handler`</ApiLink> between attempts, and calls a <ApiLink to="class/BasicCrawler#failed_request_handler">`failed_request_handler`</ApiLink> once the retries run out. For details, see the [Error handling](../concepts/error-handling) page.
 
 <Tabs groupId="scrapy-migration-errors">
     <TabItem value="scrapy" label="Scrapy">
@@ -280,7 +280,7 @@ Scrapy submits forms with `FormRequest`, which encodes `formdata` as `form-urlen
 
 ## JavaScript rendering
 
-For pages that need a browser, Scrapy users add the `scrapy-playwright` package, which requires extra settings to register its download handlers and the asyncio reactor. Crawlee has browser support built in through the <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>. The handler receives a [Playwright `Page`](https://playwright.dev/python/docs/api/class-page) on <ApiLink to="class/PlaywrightCrawlingContext#page">`context.page`</ApiLink>, so you query the rendered DOM instead of a static response. For details, see the [Playwright crawler guide](../concepts/playwright-crawler).
+For pages that need a browser, Scrapy users add the `scrapy-playwright` package, which requires extra settings to register its download handlers and the asyncio reactor. Crawlee has browser support built in through the <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>. The handler receives a [Playwright `Page`](https://playwright.dev/python/docs/api/class-page) on <ApiLink to="class/PlaywrightCrawlingContext#page">`context.page`</ApiLink>, so you query the rendered DOM instead of a static response. For details, see the [Playwright crawler](../concepts/playwright-crawler) page.
 
 <Tabs groupId="scrapy-migration-playwright">
     <TabItem value="scrapy" label="Scrapy">
@@ -298,7 +298,7 @@ For pages that need a browser, Scrapy users add the `scrapy-playwright` package,
     </TabItem>
 </Tabs>
 
-<ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> renders every request. In Scrapy you flag individual requests with `meta={'playwright': True}` and leave the rest on the plain downloader. For that mix in Crawlee, use <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink>, which renders in a browser only when the page needs it. For details, see the [Adaptive Playwright crawler guide](../concepts/adaptive-playwright-crawler).
+<ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> renders every request. In Scrapy you flag individual requests with `meta={'playwright': True}` and leave the rest on the plain downloader. For that mix in Crawlee, use <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink>, which renders in a browser only when the page needs it. For details, see the [Adaptive Playwright crawler](../concepts/adaptive-playwright-crawler) page.
 
 ## Conclusion
 

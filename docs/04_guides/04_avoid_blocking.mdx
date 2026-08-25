@@ -38,7 +38,7 @@ If you do not want to use fingerprints, then pass `fingerprint_generator=None` a
 
 In some cases even <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> with fingerprints is not enough. You can try using <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> together with [Camoufox](https://camoufox.com/), a stealthy, minimalistic build of Firefox. The example below integrates Camoufox into <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> using <ApiLink to="class/BrowserPool">`BrowserPool`</ApiLink> with a custom <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink>.
 
-Camoufox is an external tool and is not part of Crawlee - [install it separately](https://pypi.org/project/camoufox/). Note that Camoufox uses a custom build of Firefox which can be hundreds of MB large. You can pre-download it with `python3 -m camoufox fetch`; otherwise Camoufox downloads it automatically on first run. See the [Camoufox Python interface documentation](https://github.com/daijro/camoufox/tree/main/pythonlib#camoufox-python-interface) for details.
+Camoufox is an external tool and is not part of Crawlee, so [install it separately](https://pypi.org/project/camoufox/). Note that Camoufox uses a custom build of Firefox which can be hundreds of MB large. You can pre-download it with `python3 -m camoufox fetch`. Otherwise Camoufox downloads it automatically on first run. See the [Camoufox Python interface documentation](https://github.com/daijro/camoufox/tree/main/pythonlib#camoufox-python-interface) for details.
 
 :::tip
 

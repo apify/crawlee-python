@@ -107,6 +107,8 @@ function BenefitsSection() {
     );
 }
 
+// The /docs/next prefix on the concepts links is temporary: the Concepts section exists only in the
+// next (unreleased) docs until the first post-restructure version snapshot. Drop the prefix then.
 function OtherFeaturesSection() {
     return (
         <section className={styles.otherFeaturesSection}>

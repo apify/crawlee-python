@@ -76,7 +76,7 @@ PlaywrightCrawler --|> StagehandCrawler
 
 ### HTTP crawlers
 
-HTTP crawlers use HTTP clients to fetch pages and parse them with HTML parsing libraries. They are fast and efficient for sites that do not require JavaScript rendering. HTTP clients are Crawlee components that wrap around HTTP libraries like [httpx2](https://httpx2.pydantic.dev/), [curl-impersonate](https://github.com/lwthiker/curl-impersonate) or [impit](https://github.com/apify/impit) and handle HTTP communication for requests and responses. You can learn more about them in the [HTTP clients guide](./http-clients).
+HTTP crawlers use HTTP clients to fetch pages and parse them with HTML parsing libraries. They are fast and efficient for sites that do not require JavaScript rendering. HTTP clients are Crawlee components that wrap around HTTP libraries like [httpx2](https://httpx2.pydantic.dev/), [curl-impersonate](https://github.com/lwthiker/curl-impersonate) or [impit](https://github.com/apify/impit) and handle HTTP communication for requests and responses. You can learn more about them on the [HTTP clients](./http-clients) page.
 
 HTTP crawlers inherit from <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> and there are five crawlers that belong to this category:
 
@@ -86,18 +86,18 @@ HTTP crawlers inherit from <ApiLink to="class/AbstractHttpCrawler">`AbstractHttp
 - <ApiLink to="class/PydanticAiCrawler">`PydanticAiCrawler`</ApiLink> parses HTML with Parsel and uses an LLM to extract structured data into a validated Pydantic model.
 - <ApiLink to="class/FileDownloadCrawler">`FileDownloadCrawler`</ApiLink> downloads files of any content type, optionally streaming large bodies in chunks.
 
-You can learn more about HTTP crawlers in the [HTTP crawlers guide](./http-crawlers).
+You can learn more about HTTP crawlers on the [HTTP crawlers](./http-crawlers) page.
 
 ### Browser crawlers
 
 Browser crawlers use a real browser to render pages, enabling scraping of sites that require JavaScript. They manage browser instances, pages, and context lifecycles. Crawlee provides two browser crawlers:
 
-- <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> utilizes the [Playwright](https://playwright.dev/) library and provides a high-level API for controlling and navigating browsers. You can learn more about it in the [Playwright crawler guide](./playwright-crawler).
+- <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> utilizes the [Playwright](https://playwright.dev/) library and provides a high-level API for controlling and navigating browsers. You can learn more about it on the [Playwright crawler](./playwright-crawler) page.
 - <ApiLink to="class/StagehandCrawler">`StagehandCrawler`</ApiLink> extends `PlaywrightCrawler` with AI-powered browser automation via [Stagehand](https://github.com/browserbase/stagehand). It adds natural-language methods (`act`, `extract`, `observe`, `execute`) directly on the page object. You can learn more about it in the [Stagehand crawler guide](../guides/stagehand-crawler).
 
 ### Adaptive crawler
 
-The <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> sits between HTTP and browser crawlers. It can automatically decide whether to use HTTP or browser crawling for each request based on heuristics or user configuration. This allows for optimal performance and compatibility. It also provides a uniform interface for both crawling types (modes). You can learn more about adaptive crawling in the [Adaptive Playwright crawler guide](./adaptive-playwright-crawler).
+The <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> sits between HTTP and browser crawlers. It can automatically decide whether to use HTTP or browser crawling for each request based on heuristics or user configuration. This allows for optimal performance and compatibility. It also provides a uniform interface for both crawling types (modes). You can learn more about adaptive crawling on the [Adaptive Playwright crawler](./adaptive-playwright-crawler) page.
 
 ## Crawling contexts
 
@@ -208,7 +208,7 @@ Crawlee provides three built-in storage types for managing data:
 - <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink> - Storage for arbitrary data like JSON documents, images or configs. It supports get and set operations with key-value pairs; updates are only possible by replacement.
 - <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> - A managed queue for pending and completed requests, with automatic deduplication and dynamic addition of new items. It is used to track URLs for crawling.
 
-See the [Storages guide](./storages) for more details.
+See the [Storages](./storages) page for more details.
 
 ```mermaid
 ---
@@ -294,7 +294,7 @@ StorageClient --|> ApifyStorageClient
 
 Storage clients can be registered globally with the <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> (you will learn more about the <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> in the next section), passed directly to crawlers, or specified when opening individual storage instances. You can also create custom storage clients by implementing the <ApiLink to="class/StorageClient">`StorageClient`</ApiLink> interface.
 
-See the [Storage clients guide](./storage-clients) for more details.
+See the [Storage clients](./storage-clients) page for more details.
 
 ## Request router
 
@@ -312,7 +312,7 @@ The request routing in Crawlee supports:
 - Failed request handlers - Handle requests that exceed retry limits.
 - Pre-navigation hooks - Execute logic before navigating to URLs.
 
-See the [Request router guide](./request-router) for detailed information and examples.
+See the [Request router](./request-router) page for detailed information and examples.
 
 ## Service locator
 
@@ -324,7 +324,7 @@ The <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> is a central r
 
 Services can be registered globally through the `service_locator` singleton instance, passed to crawler constructors, or provided when opening individual storage instances. The service locator includes conflict prevention mechanisms to ensure configuration consistency and prevent accidental service conflicts during runtime.
 
-See the [Service locator guide](./service-locator) for detailed information about service registration and configuration options.
+See the [Service locator](./service-locator) page for detailed information about service registration and configuration options.
 
 ## Request loaders
 
@@ -342,7 +342,7 @@ Request loaders provide a subset of <ApiLink to="class/RequestQueue">`RequestQue
 
 Request loaders are useful when you need to start with a predefined set of URLs. The tandem approach allows processing requests from static sources (like files or sitemaps) while maintaining the ability to add new requests dynamically.
 
-See the [Request loaders guide](./request-loaders) for detailed information.
+See the [Request loaders](./request-loaders) page for detailed information.
 
 ## Event manager
 
@@ -356,7 +356,7 @@ Crawlee provides several implementations of the event manager:
 
 :::info
 
-You can learn more about <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> and <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink> and their configuration in the [Scaling crawlers guide](./scaling-crawlers).
+You can learn more about <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> and <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink> and their configuration on the [Scaling crawlers](./scaling-crawlers) page.
 
 :::
 
@@ -431,7 +431,7 @@ The session pool provides automated session lifecycle management:
 
 The pool operates as an async context manager, automatically initializing with sessions and cleaning up on exit. It ensures proper session management by rotating sessions based on usage count, expiration time, and custom rules while maintaining optimal pool size.
 
-See the [Session management guide](./session-management) for more information.
+See the [Session management](./session-management) page for more information.
 
 ## Statistics
 

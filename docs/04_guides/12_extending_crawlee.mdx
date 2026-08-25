@@ -124,7 +124,7 @@ The context exposes the parsed data to handlers, and the crawler ties the parser
 
 Browser crawlers use the same orchestration with a browser-backed context. Extend <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> when an integration needs crawler-level browser behavior or a different handler context. <ApiLink to="class/StagehandCrawler">`StagehandCrawler`</ApiLink> is an example. It extends `PlaywrightCrawler` with a Stagehand-specific context and browser behavior. If only browser launch or lifecycle differs, a browser plugin is the narrower extension point.
 
-See the [HTTP crawlers guide](../concepts/http-crawlers) for a worked example built on `selectolax`, and the [Stagehand crawler guide](./stagehand-crawler) for `StagehandCrawler` itself. The [Architecture overview](../concepts/architecture-overview) explains how HTTP and browser crawlers relate to the other components.
+See the [HTTP crawlers](../concepts/http-crawlers) page for a worked example built on `selectolax`, and the [Stagehand crawler guide](./stagehand-crawler) for `StagehandCrawler` itself. The [Architecture overview](../concepts/architecture-overview) explains how HTTP and browser crawlers relate to the other components.
 
 ### HTTP clients
 
@@ -139,7 +139,7 @@ The contract is <ApiLink to="class/HttpClient">`HttpClient`</ApiLink>:
 
 Crawlee ships <ApiLink to="class/ImpitHttpClient">`ImpitHttpClient`</ApiLink>, <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>, and <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>.
 
-See the [HTTP clients guide](../concepts/http-clients) for the libraries these clients wrap and their installation requirements.
+See the [HTTP clients](../concepts/http-clients) page for the libraries these clients wrap and their installation requirements.
 
 ### Storage clients
 
@@ -153,7 +153,7 @@ The <ApiLink to="class/StorageClient">`StorageClient`</ApiLink> contract defines
 
 A custom backend implements all four classes.
 
-See the [Storage clients guide](../concepts/storage-clients) for the built-in implementations and a custom client example.
+See the [Storage clients](../concepts/storage-clients) page for the built-in implementations and a custom client example.
 
 ### Browser plugins
 
@@ -170,7 +170,7 @@ Implement this base contract directly when the launch and lifecycle are too spec
 
 Most integrations should start with <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink>. Configure it when its launch and context options cover the required browser. Extend it when you need a custom Playwright-compatible launch path while preserving its standard lifecycle and context handling.
 
-See the [Playwright crawler guide](../concepts/playwright-crawler) for the responsibilities a subclass has to preserve, and the [Camoufox example](./avoid-blocking#using-camoufox) for a complete integration.
+See the [Playwright crawler](../concepts/playwright-crawler) page for the responsibilities a subclass has to preserve, and the [Camoufox example](./avoid-blocking#using-camoufox) for a complete integration.
 
 ## Choosing an extension point
 
