@@ -82,8 +82,8 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
 class _SimpleRenderingTypePredictor(RenderingTypePredictor):
     """Simplified predictor for tests.
 
-    Predictions are memoized per URL, so a request that gets retried keeps the rendering type it was first
-    assigned instead of consuming the next value from the iterators.
+    Predictions are memoized per URL, so a request that gets retried keeps the rendering type it was first assigned
+    instead of consuming the next value from the iterators.
     """
 
     def __init__(
@@ -178,8 +178,8 @@ async def test_adaptive_crawling(
         rendering_type_predictor=predictor,
     )
 
-    # Collected as URL sets rather than call counters. A sub crawler failure makes `BasicCrawler` retry the whole
-    # request, which runs the hooks and handlers for that URL again, and only the routing is under test here.
+    # `BasicCrawler` retries the whole request when a sub crawler fails, so hooks and handlers can run more than once
+    # per URL. Only the routing is under test, so sets keep the assertions insensitive to that.
     pw_handler_urls = set[str]()
     static_handler_urls = set[str]()
 
@@ -206,11 +206,15 @@ async def test_adaptive_crawling(
 
     await crawler.run(test_urls)
 
-    assert len(pw_handler_urls) == test_input.expected_pw_count
-    assert len(pw_hook_urls) == test_input.expected_pw_count
+    # Each URL must reach the hook and the handler of the same sub crawler.
+    assert pw_hook_urls == pw_handler_urls
+    assert static_hook_urls == static_handler_urls
 
+    assert len(pw_handler_urls) == test_input.expected_pw_count
     assert len(static_handler_urls) == test_input.expected_static_count
-    assert len(static_hook_urls) == test_input.expected_static_count
+
+    # The sizes alone would also be satisfied by one URL taking both routes and the other never being crawled.
+    assert pw_handler_urls | static_handler_urls == set(test_urls)
 
 
 async def test_adaptive_crawling_parsel(test_urls: list[str]) -> None:
@@ -240,6 +244,7 @@ async def test_adaptive_crawling_parsel(test_urls: list[str]) -> None:
 
     assert len(pw_handler_urls) == 1
     assert len(static_handler_urls) == 1
+    assert pw_handler_urls | static_handler_urls == set(test_urls)
 
 
 @pytest.mark.flaky(
