@@ -103,23 +103,37 @@ def _set_crawler_log_level(pytestconfig: pytest.Config, monkeypatch: pytest.Monk
         monkeypatch.setattr(_log_config, 'get_configured_log_level', lambda: getattr(logging, loglevel.upper()))
 
 
-@pytest.fixture
-async def proxy_info(unused_tcp_port: int) -> ProxyInfo:
+def _proxy_info(port: int) -> ProxyInfo:
+    """Describe a local proxy listening on `port`, authenticated with fixed throwaway credentials."""
     username = 'user'
     password = 'pass'
 
     return ProxyInfo(
-        url=f'http://{username}:{password}@127.0.0.1:{unused_tcp_port}',
+        url=f'http://{username}:{password}@127.0.0.1:{port}',
         scheme='http',
         hostname='127.0.0.1',
-        port=unused_tcp_port,
+        port=port,
         username=username,
         password=password,
     )
 
 
-@pytest.fixture
-async def proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, None]:
+# Session-scoped because a `Proxy` teardown blocks for up to a second on its acceptor's
+# `selector.select(timeout=1)`. Sync because a session-scoped async fixture is incompatible with
+# `asyncio_default_fixture_loop_scope = "function"`.
+@pytest.fixture(scope='session')
+def proxy_info(unused_tcp_port_factory: Callable[[], int]) -> ProxyInfo:
+    return _proxy_info(unused_tcp_port_factory())
+
+
+@pytest.fixture(scope='session')
+def disabled_proxy_info(unused_tcp_port_factory: Callable[[], int]) -> ProxyInfo:
+    """Describe the disabled proxy, which needs a port of its own now that both servers outlive a test."""
+    return _proxy_info(unused_tcp_port_factory())
+
+
+@pytest.fixture(scope='session')
+def proxy(proxy_info: ProxyInfo) -> Iterator[ProxyInfo]:
     with Proxy(
         [
             '--hostname',
@@ -139,16 +153,16 @@ async def proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, None]:
         yield proxy_info
 
 
-@pytest.fixture
-async def disabled_proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, None]:
+@pytest.fixture(scope='session')
+def disabled_proxy(disabled_proxy_info: ProxyInfo) -> Iterator[ProxyInfo]:
     with Proxy(
         [
             '--hostname',
-            proxy_info.hostname,
+            disabled_proxy_info.hostname,
             '--port',
-            str(proxy_info.port),
+            str(disabled_proxy_info.port),
             '--basic-auth',
-            f'{proxy_info.username}:{proxy_info.password}',
+            f'{disabled_proxy_info.username}:{disabled_proxy_info.password}',
             '--disable-http-proxy',
             '--num-workers',
             '1',
@@ -156,7 +170,7 @@ async def disabled_proxy(proxy_info: ProxyInfo) -> AsyncGenerator[ProxyInfo, Non
             '1',
         ]
     ):
-        yield proxy_info
+        yield disabled_proxy_info
 
 
 @pytest.fixture(scope='session')
