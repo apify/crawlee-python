@@ -20,12 +20,13 @@ async def test_infinite_scroll_on_dynamic_page(server_url: URL) -> None:
         # Get data with manual scrolling
         await page.goto(target_url)
 
-        manual_items = []
-        for _ in range(4):
-            items = await page.query_selector_all('.item')
-            manual_items = items
+        # The page appends one batch of items per scroll, for three batches. Wait for each batch to land
+        # instead of sleeping, so the baseline costs as long as the page takes rather than a fixed 4 seconds.
+        manual_items = await page.query_selector_all('.item')
+        for _ in range(3):
             await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
-            await page.wait_for_timeout(1000)
+            await page.wait_for_function(f'document.querySelectorAll(".item").length > {len(manual_items)}')
+            manual_items = await page.query_selector_all('.item')
 
         # Reset page
         await page.close()
