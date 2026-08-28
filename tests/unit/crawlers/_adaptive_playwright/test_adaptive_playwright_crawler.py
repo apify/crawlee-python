@@ -80,7 +80,11 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
 
 
 class _SimpleRenderingTypePredictor(RenderingTypePredictor):
-    """Simplified predictor for tests."""
+    """Simplified predictor for tests.
+
+    Predictions are memoized per URL, so a request that gets retried keeps the rendering type it was first assigned
+    instead of consuming the next value from the iterators.
+    """
 
     def __init__(
         self,
@@ -92,10 +96,15 @@ class _SimpleRenderingTypePredictor(RenderingTypePredictor):
         default_rendering_types: list[RenderingType] = ['static']
         self._rendering_types = rendering_types or cycle(default_rendering_types)
         self._detection_probability_recommendation = detection_probability_recommendation or cycle([1])
+        self._predictions = dict[str, RenderingTypePrediction]()
 
     @override
     def predict(self, request: Request) -> RenderingTypePrediction:
-        return RenderingTypePrediction(next(self._rendering_types), next(self._detection_probability_recommendation))
+        if request.url not in self._predictions:
+            self._predictions[request.url] = RenderingTypePrediction(
+                next(self._rendering_types), next(self._detection_probability_recommendation)
+            )
+        return self._predictions[request.url]
 
     @override
     def store_result(self, request: Request, rendering_type: RenderingType) -> None:
@@ -169,43 +178,43 @@ async def test_adaptive_crawling(
         rendering_type_predictor=predictor,
     )
 
-    pw_handler_count = 0
-    static_handler_count = 0
+    # `BasicCrawler` retries the whole request when a sub crawler fails, so hooks and handlers can run more than once
+    # per URL. Only the routing is under test, so sets keep the assertions insensitive to that.
+    pw_handler_urls = set[str]()
+    static_handler_urls = set[str]()
 
-    pw_hook_count = 0
-    static_hook_count = 0
+    pw_hook_urls = set[str]()
+    static_hook_urls = set[str]()
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        nonlocal pw_handler_count
-        nonlocal static_handler_count
-
         try:
             # page is available only if it was crawled by PlaywrightCrawler.
             context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
-            pw_handler_count += 1
+            pw_handler_urls.add(context.request.url)
         except AdaptiveContextError:
-            static_handler_count += 1
+            static_handler_urls.add(context.request.url)
 
     @crawler.pre_navigation_hook
-    async def pre_nav_hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:  # Intentionally unused arg
-        nonlocal static_hook_count
-        nonlocal pw_hook_count
-
+    async def pre_nav_hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
         try:
             # page is available only if it was crawled by PlaywrightCrawler.
             context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
-            pw_hook_count += 1
+            pw_hook_urls.add(context.request.url)
         except AdaptiveContextError:
-            static_hook_count += 1
+            static_hook_urls.add(context.request.url)
 
     await crawler.run(test_urls)
 
-    assert pw_handler_count == test_input.expected_pw_count
-    assert pw_hook_count == test_input.expected_pw_count
+    # Each URL must reach the hook and the handler of the same sub crawler.
+    assert pw_hook_urls == pw_handler_urls
+    assert static_hook_urls == static_handler_urls
 
-    assert static_handler_count == test_input.expected_static_count
-    assert static_hook_count == test_input.expected_static_count
+    assert len(pw_handler_urls) == test_input.expected_pw_count
+    assert len(static_handler_urls) == test_input.expected_static_count
+
+    # The sizes alone would also be satisfied by one URL taking both routes and the other never being crawled.
+    assert pw_handler_urls | static_handler_urls == set(test_urls)
 
 
 async def test_adaptive_crawling_parsel(test_urls: list[str]) -> None:
@@ -219,25 +228,23 @@ async def test_adaptive_crawling_parsel(test_urls: list[str]) -> None:
         rendering_type_predictor=predictor,
     )
 
-    pw_handler_count = 0
-    static_handler_count = 0
+    pw_handler_urls = set[str]()
+    static_handler_urls = set[str]()
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        nonlocal pw_handler_count
-        nonlocal static_handler_count
-
         try:
             # page is available only if it was crawled by PlaywrightCrawler.
             context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
-            pw_handler_count += 1
+            pw_handler_urls.add(context.request.url)
         except AdaptiveContextError:
-            static_handler_count += 1
+            static_handler_urls.add(context.request.url)
 
     await crawler.run(test_urls)
 
-    assert pw_handler_count == 1
-    assert static_handler_count == 1
+    assert len(pw_handler_urls) == 1
+    assert len(static_handler_urls) == 1
+    assert pw_handler_urls | static_handler_urls == set(test_urls)
 
 
 @pytest.mark.flaky(
