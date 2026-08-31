@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.9.4 - **not yet released**
+## [1.10.0](https://github.com/apify/crawlee-python/releases/tag/v1.10.0) (2026-08-31)
 
 ### 🚀 Features
 
@@ -17,7 +16,6 @@ All notable changes to this project will be documented in this file.
 - **throttling-manager:** Correct the backoff for concurrent 429s and zero Retry-After ([#2159](https://github.com/apify/crawlee-python/pull/2159)) ([142ec58](https://github.com/apify/crawlee-python/commit/142ec58855c1823968d9638938eb6ef545db107f)) by [@Mantisus](https://github.com/Mantisus), closes [#2125](https://github.com/apify/crawlee-python/issues/2125)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.9.3](https://github.com/apify/crawlee-python/releases/tag/v1.9.3) (2026-08-24)
 
 ### 🐛 Bug Fixes

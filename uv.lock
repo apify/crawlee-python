@@ -968,7 +968,7 @@ toml = [
 
 [[package]]
 name = "crawlee"
-version = "1.9.4"
+version = "1.10.0"
 source = { editable = "." }
 dependencies = [
     { name = "async-timeout" },
