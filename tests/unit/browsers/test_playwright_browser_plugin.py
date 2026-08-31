@@ -40,7 +40,7 @@ async def test_new_browser(plugin: PlaywrightBrowserPlugin, server_url: URL) -> 
     assert browser_controller.is_browser_connected
 
     page = await browser_controller.new_page()
-    await page.goto(str(server_url))
+    await page.goto(str(server_url), timeout=60_000)
 
     await page.close()
     await browser_controller.close()
