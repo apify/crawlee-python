@@ -235,7 +235,6 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
         children_count = 4
         # Memory calculation is not exact, so allow for some tolerance.
         test_tolerance = 0.3
-        # How many times the whole measurement is attempted before the expectation is declared unmet.
         measurement_rounds = 3
 
         def no_extra_memory_child(ready: synchronize.Barrier, measured: synchronize.Barrier) -> None:
@@ -256,10 +255,8 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
             ready: synchronize.Barrier, measured: synchronize.Barrier, memory: SharedMemory
         ) -> None:
             assert memory.buf is not None
-            # Fault every page of the shared segment into this child before the measurement. A child that only maps
-            # the segment does not count it in either memory metric: untouched pages never enter its RSS, which would
-            # hide the very overcount this test guards against, and they are the coldest pages in the tree, so memory
-            # pressure makes the kernel reclaim them first, which pulls them out of the PSS of every mapper.
+            # Fault every page in: untouched pages never enter the RSS (hiding the overcount this test guards
+            # against) and are reclaimed first under memory pressure, which drops them from every mapper's PSS.
             page_sum = sum(memory.buf[::4096])
             print(f'Using the memory... {page_sum}')
             ready.wait()
@@ -300,11 +297,9 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
 
             return (memory_during - memory_before).to_mb() / count
 
-        # A PSS reading moves with the state of the whole machine: under memory pressure the kernel reclaims the
-        # coldest pages, and a reclaimed page leaves the PSS of every process mapping it, which skews each phase's
-        # delta differently. A distorted round is re-measured instead of failing outright - transient reclaim does
-        # not repeat identically, while a genuine overcount of shared memory misses the expectation several times
-        # over in every round, so the retries cannot mask it.
+        # Under memory pressure the kernel reclaims cold pages, which silently leave the PSS readings and skew a
+        # round's deltas, so a distorted round is re-measured. A genuine overcount of shared memory misses the
+        # expectation several times over in every round, so the retries cannot mask it.
         for _ in range(measurement_rounds):
             additional_memory_simple_child = get_additional_memory_estimation_while_running_processes(
                 target=no_extra_memory_child, count=children_count
