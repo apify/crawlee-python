@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 
 - **http-clients:** Reject a non-positive timeout instead of silently ignoring it ([#2187](https://github.com/apify/crawlee-python/pull/2187)) ([b4c59c6](https://github.com/apify/crawlee-python/commit/b4c59c65239cb067f9607701b6ff3c12b043161d)) by [@vdusek](https://github.com/vdusek)
 - **templates:** Decouple the Camoufox Playwright version from other images ([#2189](https://github.com/apify/crawlee-python/pull/2189)) ([da16f2c](https://github.com/apify/crawlee-python/commit/da16f2c945c783af178d3726098612dade9730bb)) by [@Pijukatel](https://github.com/Pijukatel), closes [#2175](https://github.com/apify/crawlee-python/issues/2175)
+- **throttling-manager:** Correct the backoff for concurrent 429s and zero Retry-After ([#2159](https://github.com/apify/crawlee-python/pull/2159)) ([142ec58](https://github.com/apify/crawlee-python/commit/142ec58855c1823968d9638938eb6ef545db107f)) by [@Mantisus](https://github.com/Mantisus), closes [#2125](https://github.com/apify/crawlee-python/issues/2125)
 
 
 <!-- git-cliff-unreleased-end -->
