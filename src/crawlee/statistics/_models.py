@@ -108,7 +108,12 @@ class StatisticsState(BaseModel):
     _runtime_offset: Annotated[timedelta, Field(exclude=True)] = timedelta()
 
     def model_post_init(self, /, __context: Any) -> None:
-        self._runtime_offset = self.crawler_runtime or self._runtime_offset
+        # Capture the runtime accumulated by previous runs. When the state comes from a run that did not
+        # finish cleanly (migration, abort), the end of the previous run is approximated by the moment the
+        # state was last persisted, so that the downtime before this run is not counted towards the runtime.
+        if self.crawler_last_started_at:
+            finished_at = self.crawler_finished_at or self.stats_persisted_at or datetime.now(timezone.utc)
+            self._runtime_offset = max(timedelta(), finished_at - self.crawler_last_started_at)
 
     @property
     def crawler_runtime(self) -> timedelta:
