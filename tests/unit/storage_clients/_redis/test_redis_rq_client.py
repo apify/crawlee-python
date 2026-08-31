@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import timedelta
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from redis.exceptions import RedisError
 
 from crawlee import Request
 from crawlee.storage_clients import RedisStorageClient
+from crawlee.storage_clients._redis import _client_mixin
 from crawlee.storage_clients._redis._utils import await_redis_response
 
 if TYPE_CHECKING:
@@ -167,39 +169,34 @@ async def test_drop_removes_records(rq_client: RedisRequestQueueClient) -> None:
         assert handled_set_exists == 0
 
 
-async def test_metadata_file_updates(rq_client: RedisRequestQueueClient) -> None:
-    """Test that metadata file is updated correctly after operations."""
-    # Record initial timestamps
+async def test_metadata_record_updates(rq_client: RedisRequestQueueClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fetching bumps only `accessed_at`, adding requests bumps `modified_at` too, and `created_at` never changes."""
     metadata = await rq_client.get_metadata()
     initial_created = metadata.created_at
-    initial_accessed = metadata.accessed_at
     initial_modified = metadata.modified_at
 
-    # Wait a moment to ensure timestamps can change
-    await asyncio.sleep(0.01)
+    # Stamp the metadata updates from a controlled clock, so the checks don't depend on the wall clock resolution.
+    clock = Mock()
+    monkeypatch.setattr(_client_mixin, 'datetime', clock)
 
-    # Perform a read operation
-    await rq_client.is_empty()
+    read_time = metadata.accessed_at + timedelta(seconds=1)
+    clock.now.return_value = read_time
+    await rq_client.fetch_next_request()
 
-    # Verify accessed timestamp was updated
+    # `get_metadata()` reads the record before stamping its own access, so it reports the fetch's stamp.
     metadata = await rq_client.get_metadata()
     assert metadata.created_at == initial_created
-    assert metadata.accessed_at > initial_accessed
+    assert metadata.accessed_at == read_time
     assert metadata.modified_at == initial_modified
 
-    accessed_after_read = metadata.accessed_at
-
-    # Wait a moment to ensure timestamps can change
-    await asyncio.sleep(0.01)
-
-    # Perform a write operation
+    write_time = read_time + timedelta(seconds=1)
+    clock.now.return_value = write_time
     await rq_client.add_batch_of_requests([Request.from_url('https://example.com')])
 
-    # Verify modified timestamp was updated
     metadata = await rq_client.get_metadata()
     assert metadata.created_at == initial_created
-    assert metadata.modified_at > initial_modified
-    assert metadata.accessed_at > accessed_after_read
+    assert metadata.accessed_at == write_time
+    assert metadata.modified_at == write_time
 
 
 async def test_get_request(rq_client: RedisRequestQueueClient) -> None:
