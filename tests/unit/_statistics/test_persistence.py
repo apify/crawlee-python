@@ -50,7 +50,9 @@ async def test_periodic_log_after_resume_excludes_downtime(caplog: pytest.LogCap
     kvs = await KeyValueStore.open()
     stored_state = await kvs.get_value(key)
     for field in ('crawlerStartedAt', 'crawlerLastStartTimestamp', 'crawlerFinishedAt', 'statsPersistedAt'):
-        stored_state[field] = (datetime.fromisoformat(stored_state[field]) - downtime).isoformat()
+        # `datetime.fromisoformat` does not accept the 'Z' suffix until Python 3.11.
+        stored_timestamp = datetime.fromisoformat(stored_state[field].replace('Z', '+00:00'))
+        stored_state[field] = (stored_timestamp - downtime).isoformat()
     await kvs.set_value(key, stored_state)
 
     caplog.clear()
