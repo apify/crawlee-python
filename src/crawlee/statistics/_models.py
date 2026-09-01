@@ -104,23 +104,26 @@ class StatisticsState(BaseModel):
         ),
     ] = {}
 
-    # Used to track the crawler runtime, that had already been persisted. This is the runtime from previous runs.
-    _runtime_offset: Annotated[timedelta, Field(exclude=True)] = timedelta()
+    # The runtime accumulated by previous runs. Validated from the persisted `crawlerRuntimeMillis` value;
+    # excluded from serialization because `crawler_runtime_for_serialization` writes the up-to-date value
+    # under the same alias.
+    runtime_offset: Annotated[timedelta_ms, Field(alias='crawlerRuntimeMillis', exclude=True)] = timedelta()
 
     def model_post_init(self, /, __context: Any) -> None:
-        # Capture the runtime accumulated by previous runs. When the state comes from a run that did not
-        # finish cleanly (migration, abort), the end of the previous run is approximated by the moment the
-        # state was last persisted, so that the downtime before this run is not counted towards the runtime.
-        if self.crawler_last_started_at:
+        # Reconstruct the runtime accumulated by previous runs from the timestamps when validating a state
+        # persisted by an older version that did not store `crawlerRuntimeMillis`. The end of a run that did
+        # not finish cleanly (migration, abort) is approximated by the moment the state was last persisted,
+        # so that the downtime before this run is not counted towards the runtime.
+        if 'runtime_offset' not in self.model_fields_set and self.crawler_last_started_at:
             finished_at = self.crawler_finished_at or self.stats_persisted_at or datetime.now(timezone.utc)
-            self._runtime_offset = max(timedelta(), finished_at - self.crawler_last_started_at)
+            self.runtime_offset = max(timedelta(), finished_at - self.crawler_last_started_at)
 
     @property
     def crawler_runtime(self) -> timedelta:
         if self.crawler_last_started_at:
             finished_at = self.crawler_finished_at or datetime.now(timezone.utc)
-            return self._runtime_offset + finished_at - self.crawler_last_started_at
-        return self._runtime_offset
+            return self.runtime_offset + finished_at - self.crawler_last_started_at
+        return self.runtime_offset
 
     @crawler_runtime.setter
     def crawler_runtime(self, value: timedelta) -> None:
@@ -133,12 +136,10 @@ class StatisticsState(BaseModel):
             stacklevel=2,
         )
 
-    @computed_field(alias='crawlerRuntimeMillis')
+    @computed_field(alias='crawlerRuntimeMillis', return_type=timedelta_ms)
+    @property
     def crawler_runtime_for_serialization(self) -> timedelta:
-        if self.crawler_last_started_at:
-            finished_at = self.crawler_finished_at or datetime.now(timezone.utc)
-            return self._runtime_offset + finished_at - self.crawler_last_started_at
-        return self._runtime_offset
+        return self.crawler_runtime
 
     @computed_field(alias='requestTotalDurationMillis', return_type=timedelta_ms)
     @property

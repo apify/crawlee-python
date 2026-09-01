@@ -166,11 +166,11 @@ class Statistics(Generic[TStatisticsState]):
 
         await self._state.initialize()
 
-        # Update the timestamps to indicate a new run in progress. This must happen before the periodic
-        # logger starts - otherwise its first log entry would compute the runtime from the previous run's
-        # start time and include the downtime between the runs (e.g. after a migration or resurrection).
-        self.state.crawler_last_started_at = datetime.now(timezone.utc)
-        self.state.crawler_started_at = self.state.crawler_started_at or self.state.crawler_last_started_at
+        # The runtime accumulated by previous runs is restored into the state's `runtime_offset`. Reset the
+        # timestamps so that the initial periodic log prints only that accumulated runtime (zero for a fresh
+        # start), instead of measuring against the previous run's start time, which would include the
+        # downtime between the runs (e.g. after a migration or resurrection).
+        self.state.crawler_last_started_at = None
         self.state.crawler_finished_at = None
 
         # Start periodic logging and let it print initial state before activation.
@@ -178,6 +178,8 @@ class Statistics(Generic[TStatisticsState]):
         await asyncio.sleep(0.01)
         self._active = True
 
+        self.state.crawler_last_started_at = datetime.now(timezone.utc)
+        self.state.crawler_started_at = self.state.crawler_started_at or self.state.crawler_last_started_at
         return self
 
     async def __aexit__(
