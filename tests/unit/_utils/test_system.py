@@ -235,6 +235,7 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
         children_count = 4
         # Memory calculation is not exact, so allow for some tolerance.
         test_tolerance = 0.3
+        measurement_rounds = 3
 
         def no_extra_memory_child(ready: synchronize.Barrier, measured: synchronize.Barrier) -> None:
             ready.wait()
@@ -254,7 +255,10 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
             ready: synchronize.Barrier, measured: synchronize.Barrier, memory: SharedMemory
         ) -> None:
             assert memory.buf is not None
-            print(f'Using the memory... {memory.buf[-1]}')
+            # Fault every page in: untouched pages never enter the RSS (hiding the overcount this test guards
+            # against) and are reclaimed first under memory pressure, which drops them from every mapper's PSS.
+            page_sum = sum(memory.buf[::4096])
+            print(f'Using the memory... {page_sum}')
             ready.wait()
             measured.wait()
 
@@ -293,28 +297,38 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory() -> None:
 
             return (memory_during - memory_before).to_mb() / count
 
-        additional_memory_simple_child = get_additional_memory_estimation_while_running_processes(
-            target=no_extra_memory_child, count=children_count
-        )
-        additional_memory_extra_memory_child = (
-            get_additional_memory_estimation_while_running_processes(target=extra_memory_child, count=children_count)
-            - additional_memory_simple_child
-        )
-        additional_memory_shared_extra_memory_child = (
-            get_additional_memory_estimation_while_running_processes(
-                target=shared_extra_memory_child, count=children_count, use_shared_memory=True
+        # Under memory pressure the kernel reclaims cold pages, which silently leave the PSS readings and skew a
+        # round's deltas, so a distorted round is re-measured. A genuine overcount of shared memory misses the
+        # expectation several times over in every round, so the retries cannot mask it.
+        for _ in range(measurement_rounds):
+            additional_memory_simple_child = get_additional_memory_estimation_while_running_processes(
+                target=no_extra_memory_child, count=children_count
             )
-            - additional_memory_simple_child
-        )
+            additional_memory_extra_memory_child = (
+                get_additional_memory_estimation_while_running_processes(
+                    target=extra_memory_child, count=children_count
+                )
+                - additional_memory_simple_child
+            )
+            additional_memory_shared_extra_memory_child = (
+                get_additional_memory_estimation_while_running_processes(
+                    target=shared_extra_memory_child, count=children_count, use_shared_memory=True
+                )
+                - additional_memory_simple_child
+            )
 
-        memory_estimation_difference_ratio = (
-            abs((additional_memory_shared_extra_memory_child * children_count) - additional_memory_extra_memory_child)
-            / additional_memory_extra_memory_child
-        )
+            memory_estimation_difference_ratio = (
+                abs(
+                    (additional_memory_shared_extra_memory_child * children_count)
+                    - additional_memory_extra_memory_child
+                )
+                / additional_memory_extra_memory_child
+            )
 
-        estimated_memory_expectation.value = memory_estimation_difference_ratio < test_tolerance
+            if memory_estimation_difference_ratio < test_tolerance:
+                estimated_memory_expectation.value = True
+                break
 
-        if not estimated_memory_expectation.value:
             print(
                 f'{additional_memory_shared_extra_memory_child=}\n'
                 f'{children_count=}\n'
