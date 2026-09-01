@@ -601,6 +601,11 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: lis
         max_request_retries=0,
         rendering_type_predictor=static_only_predictor_no_detection,
         request_handler_timeout=request_handler_timeout,
+        # The fallback browser request navigates under its own `navigation_timeout` budget, separate from
+        # the request handler timeout relaxed in the handler below. Give it the same generous ceiling:
+        # with `max_request_retries=0`, a single navigation slower than the default budget on a loaded CI
+        # runner would fail the only attempt before the handler ever runs.
+        playwright_crawler_specific_kwargs={'navigation_timeout': timedelta(seconds=120)},
     )
     mocked_static_handler = Mock(name='static_handler')
     mocked_browser_handler = Mock(name='browser_handler')
