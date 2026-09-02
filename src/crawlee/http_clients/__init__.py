@@ -9,10 +9,10 @@ _install_import_hook(__name__)
 
 # The following imports are wrapped in try_import to handle optional dependencies,
 # ensuring the module can still function even if these dependencies are missing.
-with _try_import(__name__, 'CurlImpersonateHttpClient'):
+with _try_import(__name__, 'CurlImpersonateHttpClient', extra_name='curl-impersonate'):
     from ._curl_impersonate import CurlImpersonateHttpClient
 
-with _try_import(__name__, 'HttpxHttpClient'):
+with _try_import(__name__, 'HttpxHttpClient', extra_name='httpx'):
     from ._httpx import HttpxHttpClient
 
 
