@@ -47,3 +47,9 @@ The `desired_concurrency` option in the <ApiLink to="class/ConcurrencySettings">
 ## Autoscaled pool
 
 The <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink> manages a pool of asynchronous, resource-intensive tasks that run in parallel. It automatically starts new tasks only when there is enough free CPU and memory. To monitor system resources, it leverages the <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> and <ApiLink to="class/SystemStatus">`SystemStatus`</ApiLink> classes. If any task raises an exception, the error is propagated, and the pool is stopped. Every crawler uses an <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink> under the hood.
+
+## Running under a resource limit
+
+A crawler often gets less than the host machine has. A Docker container, a Kubernetes pod and a systemd slice each carry a limit of their own. Crawlee reads that limit from the cgroup and scales against it, so it doesn't have to be told about it. The memory budget comes from the memory limit, the CPU load is measured against the cores the process may use, and the tightest limit wins when several of them apply. Outside Linux, and without a limit, Crawlee falls back to the resources of the host machine.
+
+The budget is `available_memory_ratio` of the limit, 25% by default, and the crawler throttles once it uses `max_used_memory_ratio` of that budget, 90% by default. A container limited to 2 GB therefore throttles at around 460 MB. Both options live in the <ApiLink to="class/Configuration">`Configuration`</ApiLink>, together with `memory_mbytes` for sizing the budget in absolute terms.
