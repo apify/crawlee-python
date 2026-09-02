@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.10.1 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Name the extra to install in optional-dependency import errors ([#2208](https://github.com/apify/crawlee-python/pull/2208)) ([d57c6a0](https://github.com/apify/crawlee-python/commit/d57c6a03a74e208329990898f9a777e54599740e)) by [@vdusek](https://github.com/vdusek)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.10.0](https://github.com/apify/crawlee-python/releases/tag/v1.10.0) (2026-08-31)
 
 ### 🚀 Features
