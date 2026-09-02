@@ -5,9 +5,9 @@ _install_import_hook(__name__)
 
 # The following imports are wrapped in try_import to handle optional dependencies,
 # ensuring the module can still function even if these dependencies are missing.
-with _try_import(__name__, 'ParselCrawler'):
+with _try_import(__name__, 'ParselCrawler', extra_name='parsel'):
     from ._parsel_crawler import ParselCrawler
-with _try_import(__name__, 'ParselCrawlingContext'):
+with _try_import(__name__, 'ParselCrawlingContext', extra_name='parsel'):
     from ._parsel_crawling_context import ParselCrawlingContext
 
 __all__ = [

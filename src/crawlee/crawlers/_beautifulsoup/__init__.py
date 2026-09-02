@@ -5,11 +5,11 @@ _install_import_hook(__name__)
 
 # The following imports are wrapped in try_import to handle optional dependencies,
 # ensuring the module can still function even if these dependencies are missing.
-with _try_import(__name__, 'BeautifulSoupCrawler'):
+with _try_import(__name__, 'BeautifulSoupCrawler', extra_name='beautifulsoup'):
     from ._beautifulsoup_crawler import BeautifulSoupCrawler
-with _try_import(__name__, 'BeautifulSoupCrawlingContext'):
+with _try_import(__name__, 'BeautifulSoupCrawlingContext', extra_name='beautifulsoup'):
     from ._beautifulsoup_crawling_context import BeautifulSoupCrawlingContext
-with _try_import(__name__, 'BeautifulSoupParserType'):
+with _try_import(__name__, 'BeautifulSoupParserType', extra_name='beautifulsoup'):
     from ._beautifulsoup_parser import BeautifulSoupParserType
 
 __all__ = [

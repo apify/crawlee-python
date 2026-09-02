@@ -10,10 +10,16 @@ _install_import_hook(__name__)
 
 # The following imports use try_import to handle optional dependencies, as they may not always be available.
 
-with _try_import(__name__, 'BeautifulSoupCrawler', 'BeautifulSoupCrawlingContext', 'BeautifulSoupParserType'):
+with _try_import(
+    __name__,
+    'BeautifulSoupCrawler',
+    'BeautifulSoupCrawlingContext',
+    'BeautifulSoupParserType',
+    extra_name='beautifulsoup',
+):
     from ._beautifulsoup import BeautifulSoupCrawler, BeautifulSoupCrawlingContext, BeautifulSoupParserType
 
-with _try_import(__name__, 'ParselCrawler', 'ParselCrawlingContext'):
+with _try_import(__name__, 'ParselCrawler', 'ParselCrawlingContext', extra_name='parsel'):
     from ._parsel import ParselCrawler, ParselCrawlingContext
 
 with _try_import(
@@ -22,6 +28,7 @@ with _try_import(
     'PlaywrightCrawlingContext',
     'PlaywrightPostNavCrawlingContext',
     'PlaywrightPreNavCrawlingContext',
+    extra_name='playwright',
 ):
     from ._playwright import (
         PlaywrightCrawler,
@@ -40,6 +47,7 @@ with _try_import(
     'RenderingType',
     'RenderingTypePrediction',
     'RenderingTypePredictor',
+    extra_name='adaptive-crawler',
 ):
     from ._adaptive_playwright import (
         AdaptivePlaywrightCrawler,
@@ -58,6 +66,7 @@ with _try_import(
     'StagehandCrawlingContext',
     'StagehandPostNavCrawlingContext',
     'StagehandPreNavCrawlingContext',
+    extra_name='stagehand',
 ):
     from ._stagehand import (
         StagehandCrawler,
@@ -80,6 +89,7 @@ with _try_import(
     'BasePydanticAiHtmlDistiller',
     'BasePydanticAiHtmlExtractor',
     'get_basic_http_cleaner',
+    extra_name='pydantic-ai',
 ):
     from ._pydantic_ai import (
         BasePydanticAiHtmlDistiller,

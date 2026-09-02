@@ -8,20 +8,20 @@ _install_import_hook(__name__)
 
 # The following imports are wrapped in try_import to handle optional dependencies,
 # ensuring the module can still function even if these dependencies are missing.
-with _try_import(__name__, 'BrowserPool'):
+with _try_import(__name__, 'BrowserPool', extra_name='playwright'):
     from ._browser_pool import BrowserPool
-with _try_import(__name__, 'PlaywrightBrowserController'):
+with _try_import(__name__, 'PlaywrightBrowserController', extra_name='playwright'):
     from ._playwright_browser_controller import PlaywrightBrowserController
-with _try_import(__name__, 'PlaywrightBrowserPlugin'):
+with _try_import(__name__, 'PlaywrightBrowserPlugin', extra_name='playwright'):
     from ._playwright_browser_plugin import PlaywrightBrowserPlugin
-with _try_import(__name__, 'PlaywrightPersistentBrowser'):
+with _try_import(__name__, 'PlaywrightPersistentBrowser', extra_name='playwright'):
     from ._playwright_browser import PlaywrightPersistentBrowser
 
-with _try_import(__name__, 'StagehandBrowserController'):
+with _try_import(__name__, 'StagehandBrowserController', extra_name='stagehand'):
     from ._stagehand_browser_controller import StagehandBrowserController
-with _try_import(__name__, 'StagehandBrowserPlugin'):
+with _try_import(__name__, 'StagehandBrowserPlugin', extra_name='stagehand'):
     from ._stagehand_browser_plugin import StagehandBrowserPlugin
-with _try_import(__name__, 'StagehandOptions', 'StagehandPage'):
+with _try_import(__name__, 'StagehandOptions', 'StagehandPage', extra_name='stagehand'):
     from ._stagehand_types import StagehandOptions, StagehandPage
 
 

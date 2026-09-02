@@ -10,10 +10,10 @@ _install_import_hook(__name__)
 
 # The following imports are wrapped in try_import to handle optional dependencies,
 # ensuring the module can still function even if these dependencies are missing.
-with _try_import(__name__, 'SqlStorageClient'):
+with _try_import(__name__, 'SqlStorageClient', extra_name=['sql_sqlite', 'sql_postgres', 'sql_mysql']):
     from ._sql import SqlStorageClient
 
-with _try_import(__name__, 'RedisStorageClient'):
+with _try_import(__name__, 'RedisStorageClient', extra_name='redis'):
     from ._redis import RedisStorageClient
 
 __all__ = [

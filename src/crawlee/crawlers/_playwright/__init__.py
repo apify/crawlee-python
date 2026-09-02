@@ -5,13 +5,13 @@ _install_import_hook(__name__)
 
 # The following imports are wrapped in try_import to handle optional dependencies,
 # ensuring the module can still function even if these dependencies are missing.
-with _try_import(__name__, 'PlaywrightCrawler'):
+with _try_import(__name__, 'PlaywrightCrawler', extra_name='playwright'):
     from ._playwright_crawler import PlaywrightCrawler
-with _try_import(__name__, 'PlaywrightCrawlingContext'):
+with _try_import(__name__, 'PlaywrightCrawlingContext', extra_name='playwright'):
     from ._playwright_crawling_context import PlaywrightCrawlingContext
-with _try_import(__name__, 'PlaywrightPreNavCrawlingContext'):
+with _try_import(__name__, 'PlaywrightPreNavCrawlingContext', extra_name='playwright'):
     from ._playwright_pre_nav_crawling_context import PlaywrightPreNavCrawlingContext
-with _try_import(__name__, 'PlaywrightPostNavCrawlingContext'):
+with _try_import(__name__, 'PlaywrightPostNavCrawlingContext', extra_name='playwright'):
     from ._playwright_post_nav_crawling_context import PlaywrightPostNavCrawlingContext
 
 __all__ = [
