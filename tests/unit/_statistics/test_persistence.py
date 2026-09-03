@@ -122,3 +122,69 @@ async def test_runtime_after_unclean_shutdown_excludes_downtime() -> None:
         runtime = statistics.state.crawler_runtime
 
     assert previous_runtime <= runtime < previous_runtime + downtime
+
+
+async def test_runtime_restored_from_state_persisted_by_pre_1_1_version_clean_shutdown() -> None:
+    """Resuming from a state persisted by crawlee < 1.1.0 must not discard the previous runtime.
+
+    In every release before v1.1.0, `crawler_runtime` was a plain model field that nothing ever assigned to,
+    so the persisted state always contained `crawlerRuntimeMillis: 0` (verified against crawlee 1.0.2 from
+    PyPI) and the actual runtime was encoded only in the timestamps. Restoring the runtime offset from
+    `crawlerRuntimeMillis` whenever the key is present therefore restores zero for such states, and the
+    timestamp-based fallback, which is guarded by the key being absent, never reconstructs the real value.
+    """
+    key = 'statistics_pre_1_1_clean'
+    now = datetime.now(timezone.utc)
+    downtime = timedelta(hours=2)
+    previous_runtime = timedelta(seconds=90)
+    previous_start = now - downtime - previous_runtime
+    previous_finish = now - downtime
+
+    # State exactly as persisted by crawlee 1.0.2 after a clean 90s run that finished two hours ago.
+    kvs = await KeyValueStore.open()
+    await kvs.set_value(
+        key,
+        {
+            'requestsFinished': 5,
+            'crawlerStartedAt': previous_start.isoformat(),
+            'crawlerLastStartTimestamp': previous_start.isoformat(),
+            'crawlerFinishedAt': previous_finish.isoformat(),
+            'statsPersistedAt': previous_finish.isoformat(),
+            'crawlerRuntimeMillis': 0,
+        },
+    )
+
+    async with Statistics.with_default_state(persistence_enabled=True, persist_state_key=key) as statistics:
+        runtime = statistics.state.crawler_runtime
+
+    assert previous_runtime <= runtime < previous_runtime + timedelta(minutes=1)
+
+
+async def test_runtime_restored_from_state_persisted_by_pre_1_1_version_unclean_shutdown() -> None:
+    """Same as above, but for a state persisted mid-run (migration, abort) by crawlee < 1.1.0.
+
+    Such states also always contain `crawlerRuntimeMillis: 0`, so the `stats_persisted_at`-based
+    approximation of the previous run's end is never applied to them either.
+    """
+    key = 'statistics_pre_1_1_unclean'
+    now = datetime.now(timezone.utc)
+    downtime = timedelta(hours=2)
+    previous_runtime = timedelta(seconds=90)
+
+    kvs = await KeyValueStore.open()
+    await kvs.set_value(
+        key,
+        {
+            'requestsFinished': 5,
+            'crawlerStartedAt': (now - downtime - previous_runtime).isoformat(),
+            'crawlerLastStartTimestamp': (now - downtime - previous_runtime).isoformat(),
+            'crawlerFinishedAt': None,
+            'statsPersistedAt': (now - downtime).isoformat(),
+            'crawlerRuntimeMillis': 0,
+        },
+    )
+
+    async with Statistics.with_default_state(persistence_enabled=True, persist_state_key=key) as statistics:
+        runtime = statistics.state.crawler_runtime
+
+    assert previous_runtime <= runtime < previous_runtime + downtime
