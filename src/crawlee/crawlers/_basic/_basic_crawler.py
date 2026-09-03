@@ -65,7 +65,7 @@ from crawlee.errors import (
 )
 from crawlee.events._types import Event, EventCrawlerStatusData
 from crawlee.http_clients import ImpitHttpClient
-from crawlee.request_loaders import RequestManagerTandem, ThrottlingRequestManager
+from crawlee.request_loaders import ThrottlingRequestManager
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics, StatisticsState
@@ -705,7 +705,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         self._running = True
 
-        if self._respect_robots_txt_file and self._get_throttling_manager() is None:
+        if self._respect_robots_txt_file and not isinstance(self._request_manager, ThrottlingRequestManager):
             self._logger.warning(
                 'The `respect_robots_txt_file` option is enabled, but the crawler is not using '
                 '`ThrottlingRequestManager`. Crawl-delay directives from robots.txt will not be enforced. To enable '
@@ -1621,14 +1621,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if is_status_code_server_error(status_code) and not is_ignored_status:
             raise HttpStatusCodeError('Error status code returned', status_code)
 
-    def _get_throttling_manager(self) -> ThrottlingRequestManager | None:
-        """Return the crawler's `ThrottlingRequestManager`, unwrapping any `RequestManagerTandem` around it."""
-        manager = self._request_manager
-        while isinstance(manager, RequestManagerTandem):
-            manager = manager.request_manager
-
-        return manager if isinstance(manager, ThrottlingRequestManager) else None
-
     def _record_rate_limit_status_code(
         self,
         status_code: int,
@@ -1649,9 +1641,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if status_code != HTTPStatus.TOO_MANY_REQUESTS:
             return
 
-        throttling_manager = self._get_throttling_manager()
-
-        if throttling_manager is None:
+        if not isinstance(self._request_manager, ThrottlingRequestManager):
             self._logger_once.log(
                 'Received an HTTP 429 (Too Many Requests) response, but the crawler is not using '
                 '`ThrottlingRequestManager`. Per-domain backoff and `Retry-After` headers will not be honored. '
@@ -1663,7 +1653,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return
 
         retry_after = parse_retry_after_header(retry_after_header)
-        if not throttling_manager.record_domain_delay(request_url, retry_after=retry_after):
+        if not self._request_manager.record_domain_delay(request_url, retry_after=retry_after):
             domain = (URL(request_url).host or '').lower().removesuffix('.')
             if domain:
                 self._logger_once.log(
@@ -1717,11 +1707,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if not robots_txt_file:
             return True
 
-        throttling_manager = self._get_throttling_manager()
-        if throttling_manager is not None:
+        if isinstance(self._request_manager, ThrottlingRequestManager):
             crawl_delay = robots_txt_file.get_crawl_delay()
             if crawl_delay is not None:
-                throttling_manager.set_crawl_delay(url, crawl_delay)
+                self._request_manager.set_crawl_delay(url, crawl_delay)
 
         return robots_txt_file.is_allowed(url)
 
