@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 import json
-import warnings
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator, computed_field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    PlainValidator,
+    ValidationError,
+    ValidatorFunctionWrapHandler,
+    WrapValidator,
+    computed_field,
+    field_serializer,
+)
 from typing_extensions import override
 
 from crawlee._utils.console import make_table
@@ -54,6 +64,14 @@ class FinalStatistics:
         )
 
 
+def _runtime_offset_or_none(value: Any, handler: ValidatorFunctionWrapHandler) -> timedelta | None:
+    """Treat an invalid persisted runtime value as absent, so that it does not prevent loading the whole state."""
+    try:
+        return handler(value)
+    except ValidationError:
+        return None
+
+
 @docs_group('Statistics')
 class StatisticsState(BaseModel):
     """Statistic data about a crawler run."""
@@ -64,8 +82,6 @@ class StatisticsState(BaseModel):
     requests_finished: Annotated[int, Field(alias='requestsFinished')] = 0
     requests_failed: Annotated[int, Field(alias='requestsFailed')] = 0
     requests_retries: Annotated[int, Field(alias='requestsRetries')] = 0
-    requests_failed_per_minute: Annotated[float, Field(alias='requestsFailedPerMinute')] = 0
-    requests_finished_per_minute: Annotated[float, Field(alias='requestsFinishedPerMinute')] = 0
     request_min_duration: Annotated[timedelta_ms | None, Field(alias='requestMinDurationMillis')] = None
     request_max_duration: Annotated[timedelta_ms | None, Field(alias='requestMaxDurationMillis')] = None
     request_total_failed_duration: Annotated[timedelta_ms, Field(alias='requestTotalFailedDurationMillis')] = (
@@ -80,12 +96,8 @@ class StatisticsState(BaseModel):
 
     # Workaround for Pydantic and type checkers when using Annotated with default_factory
     if TYPE_CHECKING:
-        errors: dict[str, Any] = {}
-        retry_errors: dict[str, Any] = {}
         requests_with_status_code: dict[str, int] = {}
     else:
-        errors: Annotated[dict[str, Any], Field(default_factory=dict)]
-        retry_errors: Annotated[dict[str, Any], Field(alias='retryErrors', default_factory=dict)]
         requests_with_status_code: Annotated[
             dict[str, int],
             Field(alias='requestsWithStatusCode', default_factory=dict),
@@ -104,42 +116,39 @@ class StatisticsState(BaseModel):
         ),
     ] = {}
 
-    # The runtime accumulated by previous runs. Validated from the persisted `crawlerRuntimeMillis` value;
-    # excluded from serialization because `crawler_runtime_for_serialization` writes the up-to-date value
-    # under the same alias.
-    runtime_offset: Annotated[timedelta_ms, Field(alias='crawlerRuntimeMillis', exclude=True)] = timedelta()
+    # The runtime accumulated by previous runs, restored from the persisted `crawlerRuntimeMillis` value.
+    # When serialized, the live `crawler_runtime` is written instead, so that a persisted state always
+    # carries the total runtime accumulated so far.
+    runtime_offset: Annotated[
+        timedelta_ms | None,
+        WrapValidator(_runtime_offset_or_none),
+        Field(alias='crawlerRuntimeMillis'),
+    ] = None
 
     def model_post_init(self, /, __context: Any) -> None:
-        # Reconstruct the runtime accumulated by previous runs from the timestamps when validating a state
-        # persisted by an older version that did not store `crawlerRuntimeMillis`. The end of a run that did
-        # not finish cleanly (migration, abort) is approximated by the moment the state was last persisted,
-        # so that the downtime before this run is not counted towards the runtime.
-        if 'runtime_offset' not in self.model_fields_set and self.crawler_last_started_at:
-            finished_at = self.crawler_finished_at or self.stats_persisted_at or datetime.now(timezone.utc)
-            self.runtime_offset = max(timedelta(), finished_at - self.crawler_last_started_at)
+        # When the runtime accumulated by previous runs is not available (a state persisted by an older
+        # version, or an invalid persisted value), reconstruct it from the timestamps. The end of a run
+        # that did not finish cleanly (migration, abort) is approximated by the moment the state was last
+        # persisted, so that the downtime before this run is not counted towards the runtime.
+        if self.runtime_offset is None:
+            if self.crawler_last_started_at:
+                finished_at = self.crawler_finished_at or self.stats_persisted_at or datetime.now(timezone.utc)
+                self.runtime_offset = finished_at - self.crawler_last_started_at
+            else:
+                self.runtime_offset = timedelta()
+        self.runtime_offset = max(timedelta(), self.runtime_offset)
 
     @property
     def crawler_runtime(self) -> timedelta:
+        offset = self.runtime_offset or timedelta()
         if self.crawler_last_started_at:
             finished_at = self.crawler_finished_at or datetime.now(timezone.utc)
-            return self.runtime_offset + finished_at - self.crawler_last_started_at
-        return self.runtime_offset
+            return offset + finished_at - self.crawler_last_started_at
+        return offset
 
-    @crawler_runtime.setter
-    def crawler_runtime(self, value: timedelta) -> None:
-        # Setter for backwards compatibility only, the crawler_runtime is now computed_field, and can't be set manually.
-        # To be removed in v2 release https://github.com/apify/crawlee-python/issues/1567
-        warnings.warn(
-            f"Setting 'crawler_runtime' is deprecated and will be removed in a future version."
-            f' Value {value} will not be used.',
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    @computed_field(alias='crawlerRuntimeMillis', return_type=timedelta_ms)
-    @property
-    def crawler_runtime_for_serialization(self) -> timedelta:
-        return self.crawler_runtime
+    @field_serializer('runtime_offset')
+    def _serialize_runtime_offset(self, _value: timedelta | None) -> float:
+        return round(self.crawler_runtime.total_seconds() * 1000)
 
     @computed_field(alias='requestTotalDurationMillis', return_type=timedelta_ms)
     @property
