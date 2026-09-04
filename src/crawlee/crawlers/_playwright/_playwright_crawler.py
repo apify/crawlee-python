@@ -409,6 +409,11 @@ class PlaywrightCrawler(
         # Set the loaded URL to the actual URL after redirection.
         context.request.loaded_url = context.page.url
 
+        # Update the request headers with the actual headers used by Playwright
+        from crawlee._types import HttpHeaders
+
+        context.request.headers = HttpHeaders(await response.request.all_headers())
+
         yield self._build_post_nav_context(context, response=response)
 
     def _create_extract_links_function(self, context: TPostNavContext) -> ExtractLinksFunction:
