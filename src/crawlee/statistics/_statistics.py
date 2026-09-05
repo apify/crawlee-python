@@ -165,7 +165,12 @@ class Statistics(Generic[TStatisticsState]):
             raise RuntimeError(f'The {self.__class__.__name__} is already active.')
 
         await self._state.initialize()
-        # Reset `crawler_finished_at` to indicate a new run in progress.
+
+        # The runtime accumulated by previous runs is restored into the state's `runtime_offset`. Reset the
+        # timestamps so that the initial periodic log prints only that accumulated runtime (zero for a fresh
+        # start), instead of measuring against the previous run's start time, which would include the
+        # downtime between the runs (e.g. after a migration or resurrection).
+        self.state.crawler_last_started_at = None
         self.state.crawler_finished_at = None
 
         # Start periodic logging and let it print initial state before activation.
