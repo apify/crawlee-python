@@ -274,6 +274,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
     _request_handler_timeout_text = 'Request handler timed out after'
     __next_id = 0
+    __next_instance_id = 0
 
     def __init__(
         self,
@@ -368,6 +369,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             _logger: A logger instance, typically provided by a subclass, for consistent logging labels.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
+        self._instance_id = BasicCrawler.__next_instance_id
+        BasicCrawler.__next_instance_id += 1
+
         if id is None:
             self._id = BasicCrawler.__next_id
             BasicCrawler.__next_id += 1
@@ -615,9 +619,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
     async def get_request_manager(self) -> RequestManager:
-        """Return the configured request manager. If none is configured, open and return the default request queue."""
+        """Return the configured request manager, or open and return this crawler's default request queue."""
         if not self._request_manager:
             self._request_manager = await RequestQueue.open(
+                alias=None if self._instance_id == 0 else f'__default_{self._id}__',
                 storage_client=self._service_locator.get_storage_client(),
                 configuration=self._service_locator.get_configuration(),
             )
