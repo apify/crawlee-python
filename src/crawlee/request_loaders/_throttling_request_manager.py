@@ -27,6 +27,9 @@ logger = getLogger(__name__)
 
 TRequestManager = TypeVar('TRequestManager', bound=RequestManager)
 
+TRequestManager_co = TypeVar('TRequestManager_co', bound=RequestManager, covariant=True)
+"""Covariant counterpart of `TRequestManager`, for protocols that only ever return a request manager."""
+
 _NEVER_THROTTLED = datetime.min.replace(tzinfo=timezone.utc)
 """Sentinel timestamp meaning one of a domain's throttle clocks has never been armed."""
 
@@ -510,7 +513,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         self._in_flight_from_inner.discard((request.unique_key, request.url))
 
 
-class _RequestManagerOpener(Protocol[TRequestManager]):
+class _RequestManagerOpener(Protocol[TRequestManager_co]):
     """Callable that opens a `RequestManager` instance.
 
     Matches the keyword-only signature shared by storage `open` classmethods such as `RequestQueue.open`.
@@ -524,7 +527,7 @@ class _RequestManagerOpener(Protocol[TRequestManager]):
         alias: str | None = ...,
         storage_client: StorageClient | None = ...,
         configuration: Configuration | None = ...,
-    ) -> TRequestManager: ...
+    ) -> TRequestManager_co: ...
 
 
 @dataclass
