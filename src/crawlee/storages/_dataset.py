@@ -330,8 +330,6 @@ class Dataset(Storage):
         to_kvs_name: str | None = None,
         to_kvs_storage_client: StorageClient | None = None,
         to_kvs_configuration: Configuration | None = None,
-        *,
-        collect_all_keys: bool = False,
         **kwargs: Any,
     ) -> None:
         """Export the entire dataset into a specified file stored under a key in a key-value store.
@@ -364,7 +362,7 @@ class Dataset(Storage):
         dst = StringIO()
 
         if content_type == 'csv':
-            await export_csv_to_stream(self.iterate_items(), dst, collect_all_keys=collect_all_keys, **kwargs)
+            await export_csv_to_stream(self.iterate_items(), dst, **kwargs)
             await kvs.set_value(key, dst.getvalue(), 'text/csv')
         elif content_type == 'json':
             await export_json_to_stream(self.iterate_items(), dst, **kwargs)

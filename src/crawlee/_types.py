@@ -362,13 +362,16 @@ class EnqueueLinksFunction(Protocol):
     them for further crawling. It allows filtering through selectors and other options. You can also specify labels and
     user data to be associated with the newly created `Request` objects.
 
-    It should not be called with `selector`, `label`, `user_data` or `transform_request_function` arguments together
-    with `requests` argument.
+    It should not be called with `selector`, `attribute`, `label`, `user_data` or `transform_request_function`
+    arguments together with `requests` argument.
 
     For even more control over the enqueued links you can use combination of `ExtractLinksFunction` and
     `AddRequestsFunction`.
     """
 
+    # Each overload also names the keywords of the other mode, typed `None`. That keeps the two modes mutually
+    # exclusive, and it keeps the implementation assignable to both overloads even when a type checker lets the open
+    # `EnqueueLinksKwargs` behind `**kwargs` stand for any undeclared keyword as well.
     @overload
     def __call__(
         self,
@@ -378,6 +381,7 @@ class EnqueueLinksFunction(Protocol):
         label: str | None = None,
         user_data: Mapping[str, JsonSerializable] | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
+        requests: None = None,
         rq_id: str | None = None,
         rq_name: str | None = None,
         rq_alias: str | None = None,
@@ -388,6 +392,11 @@ class EnqueueLinksFunction(Protocol):
     def __call__(
         self,
         *,
+        selector: None = None,
+        attribute: None = None,
+        label: None = None,
+        user_data: None = None,
+        transform_request_function: None = None,
         requests: Sequence[str | Request] | None = None,
         rq_id: str | None = None,
         rq_name: str | None = None,
