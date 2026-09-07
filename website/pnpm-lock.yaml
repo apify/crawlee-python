@@ -113,8 +113,8 @@ importers:
         specifier: ^5.1.7
         version: 5.1.16(df87fd562268a6ba39302abb7db842fc)
       '@apify/utilities':
-        specifier: ^2.8.0
-        version: 2.35.11
+        specifier: ^3.0.0
+        version: 3.0.1
       '@docusaurus/core':
         specifier: ^3.9.2
         version: 3.10.2(@docusaurus/faster@3.10.2(@docusaurus/types@3.10.2(@swc/core@1.16.2)(@swc/html@1.16.2)(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.28)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)(svgo@3.3.5))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(html-minifier-terser@7.2.0)(postcss@8.5.28)(svgo@3.3.5))(@mdx-js/react@3.1.1(@types/react@19.2.18)(react@19.2.8))(@rspack/core@1.7.12)(@swc/core@1.16.2)(@swc/html@1.16.2)(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.28))(csso@5.0.5)(debug@4.4.3(supports-color@8.1.1))(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.28)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)(svgo@3.3.5)(typescript@6.0.3)
@@ -333,8 +333,9 @@ packages:
   '@antfu/install-pkg@2.0.1':
     resolution: {integrity: sha512-iCKVQcIC0e3oDxEfs3SHQGW+ovhBMZmS1TE+bTk50rVyMCBmCfClv7Qi3HQKlumYwvjb/iIMeWCW2i67q6kFfQ==}
 
-  '@apify/consts@2.58.1':
-    resolution: {integrity: sha512-pKnoPincN2eqiSANmX2u19FihJATX3f1ucMhxss7t2epUmB/UhSjGM7G4immjC7Q/CXrNmbETBbOGmR0/EH4/Q==}
+  '@apify/consts@3.0.1':
+    resolution: {integrity: sha512-ZPmfdb4qt143R+6/jFYVCQDoHGInl24Ntz8ltEAMW7tFHSdiXnQoZtDgydZYT06vw6gOtPa/jEXgSneq8FM+uA==}
+    engines: {node: '>=22'}
 
   '@apify/docusaurus-plugin-typedoc-api@5.1.16':
     resolution: {integrity: sha512-zAKTwPpXq03lvNGfw3BE6SyyVUFyzkht15YUYki15Znm25h6Tpk2/n/tphgSPooYqMo8Sh0c7ljhCsDDpkT9NQ==}
@@ -352,8 +353,9 @@ packages:
       react-dom: ^18.2.0 || >=19.0.0
       typescript: ^5.0.0
 
-  '@apify/log@2.5.54':
-    resolution: {integrity: sha512-EZRHrKCWnet0+6WaTx14Mpjxrn/PRudmRk6/N1dCTz+jtHN+Pbdvw5FFtIrCUngPhm4+bdI+kKVYUBmvTwrjvg==}
+  '@apify/log@3.0.1':
+    resolution: {integrity: sha512-lZbSxqW78S5TqEtDrE9o71MtqUnpQJ96FYaEMk2RtiAPH+/ZEAf76DUaFKP5my9KxozohyQLmmg1isbySXXu0A==}
+    engines: {node: '>=22'}
 
   '@apify/oxlint-config@0.3.0':
     resolution: {integrity: sha512-njNpYIfowurrM3+TDhhb/LLADAPzozs9+hTTMB/OiRAKrUHOqF6KIsUCYI8IGZAB1hl9vXQnFmKQzTysbAJ7mA==}
@@ -369,8 +371,9 @@ packages:
       react: 17.x || 18.x || 19.x
       react-dom: 17.x || 18.x || 19.x
 
-  '@apify/utilities@2.35.11':
-    resolution: {integrity: sha512-od9Axa/+OSZB5JO8aljAnN7lS8vDb5KqUEAkUiZZh95K5xIrC0GzN45DNcK8oItnJ3QT/oqtHdaa22TipinDvQ==}
+  '@apify/utilities@3.0.1':
+    resolution: {integrity: sha512-Py701iCY26eSLvdG45T9c9uJS2+xqI4j4rHwGqG84RUOmPD8T6Zua5MflSoWwZ+GM/+ABIJtsza/gqVvyJeESg==}
+    engines: {node: '>=22'}
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -7119,7 +7122,7 @@ snapshots:
       package-manager-detector: 1.8.0
       tinyexec: 1.3.1
 
-  '@apify/consts@2.58.1': {}
+  '@apify/consts@3.0.1': {}
 
   '@apify/docusaurus-plugin-typedoc-api@5.1.16(df87fd562268a6ba39302abb7db842fc)':
     dependencies:
@@ -7142,9 +7145,9 @@ snapshots:
       typescript: 6.0.3
       zx: 8.8.5
 
-  '@apify/log@2.5.54':
+  '@apify/log@3.0.1':
     dependencies:
-      '@apify/consts': 2.58.1
+      '@apify/consts': 3.0.1
       ansi-colors: 4.1.3
 
   '@apify/oxlint-config@0.3.0(oxlint@1.81.0)':
@@ -7159,10 +7162,10 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-  '@apify/utilities@2.35.11':
+  '@apify/utilities@3.0.1':
     dependencies:
-      '@apify/consts': 2.58.1
-      '@apify/log': 2.5.54
+      '@apify/consts': 3.0.1
+      '@apify/log': 3.0.1
 
   '@babel/code-frame@7.29.7':
     dependencies:
