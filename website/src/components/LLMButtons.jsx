@@ -113,6 +113,21 @@ const getOptionHref = (value, currentUrl) => {
     }
 };
 
+const Option = ({ label, description, showExternalIcon, icon }) => {
+    const Icon = icon ?? CopyIcon;
+
+    return (
+        <div className={styles.menuOption}>
+            <Icon size={16} className={styles.menuOptionIcon} />
+            <div className={styles.menuOptionText}>
+                <span className={styles.menuOptionLabel}>{label}</span>
+                <span className={styles.menuOptionDescription}>{description}</span>
+            </div>
+            {showExternalIcon && <ExternalLinkIcon size={16} className={styles.menuOptionExternalIcon} />}
+        </div>
+    );
+};
+
 const Menu = ({ className, components = {}, onMenuOpen, onSelect, options = [] }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [focusedIndex, setFocusedIndex] = useState(0);
@@ -372,21 +387,6 @@ const MenuBase = React.forwardRef(
     },
 );
 MenuBase.displayName = 'MenuBase';
-
-const Option = ({ label, description, showExternalIcon, icon }) => {
-    const Icon = icon ?? CopyIcon;
-
-    return (
-        <div className={styles.menuOption}>
-            <Icon size={16} className={styles.menuOptionIcon} />
-            <div className={styles.menuOptionText}>
-                <span className={styles.menuOptionLabel}>{label}</span>
-                <span className={styles.menuOptionDescription}>{description}</span>
-            </div>
-            {showExternalIcon && <ExternalLinkIcon size={16} className={styles.menuOptionExternalIcon} />}
-        </div>
-    );
-};
 
 export default function LLMButtons() {
     const [copyingStatus, setCopyingStatus] = useState('idle');
