@@ -146,9 +146,10 @@ async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: U
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        # The overloads reject this combination statically, so build the call dynamically to reach the runtime guard.
+        kwargs: dict[str, Any] = {'requests': [Request.from_url('https://www.whatever.com')], 'selector': 'a'}
         try:
-            # Testing runtime enforcement of the overloads.
-            await context.enqueue_links(requests=[Request.from_url('https://www.whatever.com')], selector='a')
+            await context.enqueue_links(**kwargs)
         except Exception as e:
             exceptions.append(e)
 
