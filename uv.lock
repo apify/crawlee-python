@@ -1162,7 +1162,7 @@ requires-dist = [
     { name = "opentelemetry-api", marker = "extra == 'otel'", specifier = ">=1.34.1" },
     { name = "opentelemetry-distro", extras = ["otlp"], marker = "extra == 'otel'", specifier = ">=0.54" },
     { name = "opentelemetry-instrumentation", marker = "extra == 'otel'", specifier = ">=0.54" },
-    { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'otel'", specifier = ">=0.54" },
+    { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'otel'", specifier = ">=0.65b0" },
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.34.1" },
     { name = "opentelemetry-semantic-conventions", marker = "extra == 'otel'", specifier = ">=0.54" },
     { name = "parsel", marker = "extra == 'parsel'", specifier = ">=1.10.0" },
