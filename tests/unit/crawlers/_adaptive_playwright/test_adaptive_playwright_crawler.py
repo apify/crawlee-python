@@ -492,9 +492,7 @@ async def test_adaptive_crawling_statistics(test_urls: list[str]) -> None:
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         rendering_type_predictor=static_only_predictor_no_detection,
         result_checker=lambda result: False,  #  noqa: ARG005  # Intentionally unused argument.
-        # Generous ceilings for the whole adaptive crawl: the handler timeout covers both sub crawler runs, while the
-        # browser sub crawler navigates under its own separate budget. Exceeding either one makes `BasicCrawler` retry
-        # the request and increment every counter below once more.
+        # Navigation has its own budget. Exceeding either one retries the request and re-increments every counter.
         request_handler_timeout=timedelta(minutes=5),
         playwright_crawler_specific_kwargs={'navigation_timeout': timedelta(minutes=5)},
     )
@@ -606,10 +604,7 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: lis
         max_request_retries=0,
         rendering_type_predictor=static_only_predictor_no_detection,
         request_handler_timeout=request_handler_timeout,
-        # The fallback browser request navigates under its own `navigation_timeout` budget, separate from
-        # the request handler timeout relaxed in the handler below. Give it the same generous ceiling:
-        # with `max_request_retries=0`, a single navigation slower than the default budget on a loaded CI
-        # runner would fail the only attempt before the handler ever runs.
+        # Navigation has its own budget, separate from the handler timeout, and no retry is left to absorb it.
         playwright_crawler_specific_kwargs={'navigation_timeout': timedelta(seconds=120)},
     )
     mocked_static_handler = Mock(name='static_handler')
