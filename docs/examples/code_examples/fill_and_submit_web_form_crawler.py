@@ -29,7 +29,9 @@ async def main() -> None:
                 'topping': ['bacon', 'cheese', 'mushroom'],
                 'delivery': '13:00',
                 'comments': 'Please ring the doorbell upon arrival.',
-            }
+            },
+            # Send `topping` as repeated fields instead of a single stringified list.
+            doseq=True,
         ).encode(),
     )
 
