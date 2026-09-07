@@ -12,6 +12,7 @@ from fakeredis import FakeAsyncRedis
 from proxy import Proxy
 from uvicorn.config import Config
 
+import crawlee.crawlers
 from crawlee import service_locator
 from crawlee.crawlers import BasicCrawler
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_network
@@ -92,6 +93,20 @@ def _isolate_test_environment(prepare_test_env: Callable[[], None]) -> None:
         prepare_test_env: Fixture to prepare the environment before each test.
     """
     prepare_test_env()
+
+
+@pytest.fixture
+def _restore_crawlers_binding(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Restore the `crawlers` attribute of the `crawlee` package for tests that re-import `crawlee.crawlers`.
+
+    Dropping `crawlee.crawlers` from `sys.modules` and importing it again binds a fresh module object onto the
+    `crawlee` package. That object has no private submodule attributes, because the submodules themselves stay
+    cached and so are never re-bound. `mock.patch.dict('sys.modules', ...)` restores the module cache but not the
+    attribute, which leaves the fresh object reachable through `crawlee.crawlers`. Targets such as
+    `crawlee.crawlers._basic._basic_crawler.X` then fail to resolve under `mock.patch` on Python 3.10, which walks
+    module attributes; 3.11 and newer go through the module cache instead and are unaffected.
+    """
+    monkeypatch.setattr(crawlee, 'crawlers', crawlee.crawlers)
 
 
 @pytest.fixture(autouse=True)

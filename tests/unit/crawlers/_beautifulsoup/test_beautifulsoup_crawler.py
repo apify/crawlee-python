@@ -501,6 +501,7 @@ async def test_enqueue_links_with_limit(server_url: URL, http_client: HttpClient
     visit.assert_has_calls(expected_visit_calls, any_order=True)
 
 
+@pytest.mark.usefixtures('_restore_crawlers_binding')
 def test_import_error_handled() -> None:
     # Simulate ImportError for BeautifulSoup
     with mock.patch.dict('sys.modules', {'bs4': None}):
