@@ -492,9 +492,9 @@ async def test_adaptive_crawling_statistics(test_urls: list[str]) -> None:
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         rendering_type_predictor=static_only_predictor_no_detection,
         result_checker=lambda result: False,  #  noqa: ARG005  # Intentionally unused argument.
-        # Generous ceiling for each sub crawler run: a slow browser launch that exceeded it would make `BasicCrawler`
-        # retry the request and increment every counter below once more.
+        # Navigation has its own budget. Exceeding either one retries the request and re-increments every counter.
         request_handler_timeout=timedelta(minutes=5),
+        playwright_crawler_specific_kwargs={'navigation_timeout': timedelta(minutes=5)},
     )
 
     @crawler.router.default_handler
@@ -604,6 +604,8 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: lis
         max_request_retries=0,
         rendering_type_predictor=static_only_predictor_no_detection,
         request_handler_timeout=request_handler_timeout,
+        # Navigation has its own budget, separate from the handler timeout, and no retry is left to absorb it.
+        playwright_crawler_specific_kwargs={'navigation_timeout': timedelta(seconds=120)},
     )
     mocked_static_handler = Mock(name='static_handler')
     mocked_browser_handler = Mock(name='browser_handler')

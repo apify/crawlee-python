@@ -630,6 +630,9 @@ class _PlaywrightCrawlerAdditionalOptions(TypedDict):
     headless: NotRequired[bool]
     """Whether to run the browser in headless mode. This option should not be used if `browser_pool` is provided."""
 
+    navigation_timeout: NotRequired[timedelta]
+    """Timeout for navigation (the process between opening a Playwright page and calling the request handler)."""
+
 
 class PlaywrightCrawlerOptions(
     _PlaywrightCrawlerAdditionalOptions,
