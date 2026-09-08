@@ -14,10 +14,11 @@ exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for 
 exclude-newer-span = "PT24H"
 
 [options.exclude-newer-package]
-apify-fingerprint-datapoints = false
-crawlee = false
-apify-shared = false
 apify-client = false
+apify-fingerprint-datapoints = false
+apify-shared = false
+cgroups-sensor = false
+crawlee = false
 
 [[package]]
 name = "aiomysql"
@@ -538,6 +539,11 @@ wheels = [
 ]
 
 [[package]]
+name = "cgroups-sensor"
+version = "0.1.0"
+source = { git = "https://github.com/apify/cgroups-sensor.git#c1772412225b47f7f1138a9107b5266881353aaf" }
+
+[[package]]
 name = "charset-normalizer"
 version = "3.5.1"
 source = { registry = "https://pypi.org/simple" }
@@ -880,6 +886,7 @@ source = { editable = "." }
 dependencies = [
     { name = "async-timeout" },
     { name = "cachetools" },
+    { name = "cgroups-sensor" },
     { name = "colorama" },
     { name = "impit" },
     { name = "more-itertools" },
@@ -1044,6 +1051,7 @@ requires-dist = [
     { name = "browserforge", marker = "extra == 'playwright'", specifier = ">=1.2.3" },
     { name = "browserforge", marker = "extra == 'stagehand'", specifier = ">=1.2.3" },
     { name = "cachetools", specifier = ">=5.5.0" },
+    { name = "cgroups-sensor", git = "https://github.com/apify/cgroups-sensor.git" },
     { name = "colorama", specifier = ">=0.4.0" },
     { name = "cookiecutter", marker = "extra == 'cli'", specifier = ">=2.6.0" },
     { name = "crawlee", extras = ["adaptive-crawler", "pydantic-ai", "beautifulsoup", "cli", "curl-impersonate", "httpx", "parsel", "playwright", "otel", "sql-sqlite", "sql-postgres", "sql-mysql", "stagehand", "redis"], marker = "extra == 'all'" },

@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import logging
 import sys
+import threading
 from multiprocessing import get_context, synchronize
 from multiprocessing.shared_memory import SharedMemory
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
+import cgroups_sensor
 import psutil
 import pytest
 
@@ -18,6 +20,9 @@ from crawlee._utils.system import get_cpu_info, get_memory_info
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+HOST_TOTAL_BYTES = 8 * 1024**3
+HOST_AVAILABLE_BYTES = 3 * 1024**3
 
 
 class FakeProcess:
@@ -65,9 +70,28 @@ def fill_buffer(buffer: memoryview, size: int) -> None:
 
 @pytest.fixture(autouse=True)
 def _isolated_module_state(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Reset the process-wide state of the module, so that dedup keys and the PSS latch do not leak between tests."""
+    """Reset the process-wide state of the module, so that dedup keys and the latches do not leak between tests."""
     monkeypatch.setattr(system, 'logger_once', LoggerOnce(system.logger))
     monkeypatch.setattr(system._PssAvailability, 'is_available', True)
+    monkeypatch.setattr(system._ResourceLimits, 'is_pending', True)
+
+
+@pytest.fixture(autouse=True)
+def cpu_load(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    """Replace the CPU readings taken against a limit, so that neither a leaked reading nor a real limit is measured."""
+    sampler = Mock(spec=cgroups_sensor.CpuLoad)
+    # What all three report where nothing restricts the CPU, which sends `get_cpu_info` to the psutil fallback.
+    sampler.sample.return_value = None
+    monkeypatch.setattr(system, '_cpu_load', sampler)
+    monkeypatch.setattr(cgroups_sensor, 'get_cpu_used_ratio', Mock(return_value=None))
+    monkeypatch.setattr(cgroups_sensor, 'get_cpu_limit', Mock(return_value=None))
+    return sampler
+
+
+@pytest.fixture
+def _cpu_limited(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Report a CPU limit, so that the load is measured against it rather than against the host machine."""
+    monkeypatch.setattr(cgroups_sensor, 'get_cpu_limit', Mock(return_value=1.0))
 
 
 @pytest.fixture
@@ -75,6 +99,23 @@ def measured_current_process(monkeypatch: pytest.MonkeyPatch) -> None:
     """Make the real current process report a fixed memory usage of 100 bytes, whichever metric is used."""
     monkeypatch.setattr(psutil.Process, 'memory_full_info', lambda _process: SimpleNamespace(pss=100))
     monkeypatch.setattr(psutil.Process, 'memory_info', lambda _process: SimpleNamespace(rss=100))
+
+
+@pytest.fixture
+def _fixed_host_memory(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the host memory `psutil` reports, so the expected values do not move with the machine running the tests."""
+    monkeypatch.setattr(
+        psutil,
+        'virtual_memory',
+        Mock(return_value=SimpleNamespace(total=HOST_TOTAL_BYTES, available=HOST_AVAILABLE_BYTES)),
+    )
+
+
+def fake_snapshot(
+    *, memory_budget: cgroups_sensor.MemoryBudget | None = None, cpu_limit: float | None = None
+) -> cgroups_sensor.Snapshot:
+    """Stand in for `cgroups_sensor.snapshot()`, describing an unrestricted process unless told otherwise."""
+    return cgroups_sensor.Snapshot(memory_budget=memory_budget, cpu_limit=cpu_limit, cpu_usage=None)
 
 
 def test_get_memory_info_returns_valid_values() -> None:
@@ -209,6 +250,174 @@ def test_get_memory_info_handles_failure_to_list_children(
 def test_get_cpu_info_returns_valid_values() -> None:
     cpu_info = get_cpu_info()
     assert 0 <= cpu_info.used_ratio <= 1
+
+
+@pytest.mark.usefixtures('_fixed_host_memory', 'measured_current_process')
+def test_get_memory_info_reports_the_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A limit applying to the process replaces the memory of the host machine."""
+    budget = cgroups_sensor.MemoryBudget(limit=512 * 1024**2, used=100 * 1024**2, available=412 * 1024**2)
+    monkeypatch.setattr(cgroups_sensor, 'get_memory_budget', Mock(return_value=budget))
+
+    memory_info = get_memory_info()
+
+    assert memory_info.total_size == ByteSize(budget.limit)
+    assert memory_info.system_wide_used_size == ByteSize(budget.used)
+
+
+@pytest.mark.usefixtures('_fixed_host_memory', 'measured_current_process')
+def test_get_memory_info_falls_back_to_the_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An unrestricted process is measured against the memory of the host machine."""
+    monkeypatch.setattr(cgroups_sensor, 'get_memory_budget', Mock(return_value=None))
+
+    memory_info = get_memory_info()
+
+    assert memory_info.total_size == ByteSize(HOST_TOTAL_BYTES)
+    assert memory_info.system_wide_used_size == ByteSize(HOST_TOTAL_BYTES - HOST_AVAILABLE_BYTES)
+
+
+@pytest.mark.usefixtures('_cpu_limited')
+def test_get_cpu_info_measures_against_the_limit(monkeypatch: pytest.MonkeyPatch, cpu_load: Mock) -> None:
+    """A sampled load is reported as it is, without measuring the host machine as well."""
+    cpu_load.sample.return_value = 0.5
+    cpu_percent = Mock(return_value=42.0)
+    monkeypatch.setattr(psutil, 'cpu_percent', cpu_percent)
+
+    assert get_cpu_info().used_ratio == 0.5
+    cpu_percent.assert_not_called()
+
+
+@pytest.mark.usefixtures('_cpu_limited')
+def test_get_cpu_info_measures_a_window_when_the_sampler_has_no_reading(
+    monkeypatch: pytest.MonkeyPatch, cpu_load: Mock
+) -> None:
+    """A sampler with nothing to report yet is covered by a short measurement against the same limit."""
+    get_cpu_used_ratio = Mock(return_value=0.25)
+    monkeypatch.setattr(cgroups_sensor, 'get_cpu_used_ratio', get_cpu_used_ratio)
+    cpu_percent = Mock(return_value=42.0)
+    monkeypatch.setattr(psutil, 'cpu_percent', cpu_percent)
+
+    assert get_cpu_info().used_ratio == 0.25
+    get_cpu_used_ratio.assert_called_once_with(system._CPU_SAMPLE_INTERVAL_SECS)
+    # The measurement is refused below 0.01 seconds and nothing on the path catches that, so a window this short
+    # would raise in every limited container while a mocked measurement stays happy with it.
+    assert system._CPU_SAMPLE_INTERVAL_SECS >= 0.01
+    cpu_percent.assert_not_called()
+    cpu_load.sample.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    ('sampled', 'measured'),
+    [
+        pytest.param(0.0, None, id='sampled'),
+        pytest.param(None, 0.0, id='measured over a window'),
+    ],
+)
+@pytest.mark.usefixtures('_cpu_limited')
+def test_get_cpu_info_reports_an_idle_limit_as_no_load(
+    monkeypatch: pytest.MonkeyPatch, cpu_load: Mock, sampled: float | None, measured: float | None
+) -> None:
+    """An idle limited container reports no load, which is a reading of zero rather than a missing one."""
+    cpu_load.sample.return_value = sampled
+    monkeypatch.setattr(cgroups_sensor, 'get_cpu_used_ratio', Mock(return_value=measured))
+    cpu_percent = Mock(return_value=42.0)
+    monkeypatch.setattr(psutil, 'cpu_percent', cpu_percent)
+
+    assert get_cpu_info().used_ratio == 0.0
+    cpu_percent.assert_not_called()
+
+
+def test_get_cpu_info_measures_the_host_without_a_limit(monkeypatch: pytest.MonkeyPatch, cpu_load: Mock) -> None:
+    """Without a limit the process competes for the whole machine, and nothing is measured against a limit."""
+    get_cpu_used_ratio = Mock(return_value=0.5)
+    monkeypatch.setattr(cgroups_sensor, 'get_cpu_used_ratio', get_cpu_used_ratio)
+    monkeypatch.setattr(psutil, 'cpu_percent', Mock(return_value=42.0))
+
+    assert get_cpu_info().used_ratio == 0.42
+    cpu_load.sample.assert_not_called()
+    get_cpu_used_ratio.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ('memory_budget', 'cpu_limit', 'expected_message'),
+    [
+        pytest.param(None, None, None, id='unrestricted'),
+        pytest.param(
+            cgroups_sensor.MemoryBudget(limit=512 * 1024**2, used=100 * 1024**2, available=412 * 1024**2),
+            1.0,
+            'memory 512.00 MB, CPU 1 core.',
+            id='single core',
+        ),
+        pytest.param(None, 2.5, 'memory unrestricted, CPU 2.5 cores.', id='fractional cores'),
+    ],
+)
+@pytest.mark.usefixtures('measured_current_process')
+def test_log_resource_limits_reports_what_applies(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    memory_budget: cgroups_sensor.MemoryBudget | None,
+    cpu_limit: float | None,
+    expected_message: str | None,
+) -> None:
+    """A limit that applies is reported as one line, and an unrestricted process is not reported at all."""
+    snapshot = fake_snapshot(memory_budget=memory_budget, cpu_limit=cpu_limit)
+    monkeypatch.setattr(cgroups_sensor, 'snapshot', Mock(return_value=snapshot))
+
+    with caplog.at_level(logging.INFO, logger=system.logger.name):
+        get_memory_info()
+
+    reported = [record.getMessage() for record in caplog.records if 'Resource limits' in record.getMessage()]
+
+    if expected_message is None:
+        assert not reported
+    else:
+        assert [message for message in reported if expected_message in message]
+
+
+@pytest.mark.usefixtures('measured_current_process')
+def test_log_resource_limits_reports_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reading the limits walks the whole hierarchy, so it is not repeated on every sample."""
+    snapshot = Mock(return_value=fake_snapshot())
+    monkeypatch.setattr(cgroups_sensor, 'snapshot', snapshot)
+
+    get_memory_info()
+    get_memory_info()
+
+    snapshot.assert_called_once()
+
+
+@pytest.mark.usefixtures('measured_current_process')
+def test_log_resource_limits_lets_a_failing_sensor_surface(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A sensor that raises is not swallowed, and the latch keeps it to the first sample."""
+    snapshot = Mock(side_effect=RuntimeError('Nothing to read here.'))
+    monkeypatch.setattr(cgroups_sensor, 'snapshot', snapshot)
+
+    with pytest.raises(RuntimeError):
+        get_memory_info()
+
+    # The latch is consumed first, so the next sample reports as usual rather than raising again.
+    assert get_memory_info().current_size >= ByteSize(100)
+    snapshot.assert_called_once()
+
+
+def test_log_resource_limits_reports_once_when_two_threads_race(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two event managers sampling in their own threads report the limits once between them, not once each."""
+    snapshot = Mock(return_value=fake_snapshot())
+    monkeypatch.setattr(cgroups_sensor, 'snapshot', snapshot)
+    barrier = threading.Barrier(parties=2)
+
+    def report() -> None:
+        barrier.wait()
+        system._log_resource_limits()
+
+    threads = [threading.Thread(target=report) for _ in range(2)]
+
+    for thread in threads:
+        thread.start()
+
+    for thread in threads:
+        thread.join()
+
+    snapshot.assert_called_once()
 
 
 # The estimation is asserted on absolute memory readings, which hold only as long as nothing else on the machine makes

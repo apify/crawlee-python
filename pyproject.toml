@@ -36,6 +36,7 @@ keywords = [
 dependencies = [
     "async-timeout>=5.0.1",
     "cachetools>=5.5.0",
+    "cgroups-sensor>=0.1.0,<1.0.0",
     "colorama>=0.4.0",
     "impit>=0.13.2",
     "more-itertools>=10.2.0",
@@ -316,7 +317,11 @@ exclude-newer = "24 hours"
 apify-client = false
 apify-shared = false
 apify_fingerprint_datapoints = false
+cgroups-sensor = false
 crawlee = false
+
+[tool.uv.sources]
+cgroups-sensor = { git = "https://github.com/apify/cgroups-sensor.git"}
 
 # Run tasks with: uv run poe <task>
 [tool.poe.tasks]

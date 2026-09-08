@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 from datetime import datetime, timezone
 from logging import WARNING, getLogger
 from typing import TYPE_CHECKING, Annotated
 
+import cgroups_sensor
 import psutil
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
 
@@ -18,6 +20,12 @@ logger_once = LoggerOnce(logger)
 # Reading a memory metric of a process that is denied or gone raises either a `psutil.Error` or a bare `OSError` -
 # psutil re-raises `FileNotFoundError` as is when a `/proc` entry is missing for a process that is still alive.
 _METRIC_ERRORS = (psutil.Error, OSError)
+
+_CPU_SAMPLE_INTERVAL_SECS = 0.1
+"""How long a CPU fallback measures for. A window shorter than 0.01 seconds is refused by the sensor."""
+
+_cpu_load = cgroups_sensor.CpuLoad()
+"""Process-wide CPU sampler, measuring across the gap between calls."""
 
 
 class _PssAvailability:
@@ -185,7 +193,10 @@ class MemoryInfo(MemoryUsageInfo):
     total_size: Annotated[
         ByteSize, PlainValidator(ByteSize.validate), PlainSerializer(lambda size: size.bytes), Field(alias='totalSize')
     ]
-    """Total memory available in the system."""
+    """Total memory available to this process.
+
+    Under a container limit this is the limit rather than the memory of the host machine.
+    """
 
     system_wide_used_size: Annotated[
         ByteSize,
@@ -193,27 +204,72 @@ class MemoryInfo(MemoryUsageInfo):
         PlainSerializer(lambda size: size.bytes),
         Field(alias='systemWideUsedSize'),
     ]
-    """Total memory used by all processes system-wide (including non-crawlee processes)."""
+    """Total memory used within the scope `total_size` covers, including memory used by non-crawlee processes.
+
+    Under a container limit this is the memory charged against that limit, as `docker stats` reports it.
+    """
+
+
+class _ResourceLimits:
+    """Process-wide latch keeping the limits report to one line per process, rather than one per sample."""
+
+    is_pending = True
+    lock = threading.Lock()
+
+
+def _log_resource_limits() -> None:
+    """Report the limits applying to this process, at most once per process and only where any apply."""
+    # The latch is consumed before the reading, so a sensor that raises costs one snapshot rather than every one.
+    with _ResourceLimits.lock:
+        if not _ResourceLimits.is_pending:
+            return
+        _ResourceLimits.is_pending = False
+
+    limits = cgroups_sensor.snapshot()
+    cores = limits.cpu_limit
+
+    # An unrestricted process is the ordinary case, and a line saying so explains nothing.
+    if limits.memory_budget is None and cores is None:
+        return
+
+    memory = str(ByteSize(limits.memory_budget.limit)) if limits.memory_budget else 'unrestricted'
+    cpu = f'{cores:g} core{"" if cores == 1 else "s"}' if cores is not None else 'unrestricted'
+    logger.info(f'Resource limits applying to this process: memory {memory}, CPU {cpu}.')
 
 
 def get_cpu_info() -> CpuInfo:
     """Retrieve the current CPU usage.
 
-    It utilizes the `psutil` library. Function `psutil.cpu_percent()` returns a float representing the current
-    system-wide CPU utilization as a percentage.
+    Under a container limit the load is measured against the cores this process may use. The sampler measures across
+    the gap between calls, so the first sample of the process falls back to a short measurement of its own. Without a
+    limit the process competes for the whole machine, and `psutil.cpu_percent()` answers instead.
     """
     logger.debug('Calling get_cpu_info()...')
-    cpu_percent = psutil.cpu_percent(interval=0.1)
-    return CpuInfo(used_ratio=cpu_percent / 100)
+
+    # Read on every sample rather than latched, because a limit can be resized while the process runs.
+    if cgroups_sensor.get_cpu_limit() is None:
+        return CpuInfo(used_ratio=psutil.cpu_percent(interval=_CPU_SAMPLE_INTERVAL_SECS) / 100)
+
+    used_ratio = _cpu_load.sample()
+
+    if used_ratio is None:
+        used_ratio = cgroups_sensor.get_cpu_used_ratio(_CPU_SAMPLE_INTERVAL_SECS)
+
+    if used_ratio is None:
+        used_ratio = psutil.cpu_percent(interval=_CPU_SAMPLE_INTERVAL_SECS) / 100
+
+    return CpuInfo(used_ratio=used_ratio)
 
 
 def get_memory_info() -> MemoryInfo:
     """Retrieve the current memory usage of the process and its children.
 
     It utilizes the `psutil` library. The reported `current_size` is best-effort - processes that cannot be inspected
-    are left out of the sum, and PSS may be substituted by RSS for some or all of the processes.
+    are left out of the sum, and PSS may be substituted by RSS for some or all of the processes. The system-wide
+    figures come from the limit applying to this process whenever one restricts how much memory it may use.
     """
     logger.debug('Calling get_memory_info()...')
+    _log_resource_limits()
     current_process = psutil.Process(os.getpid())
 
     # Retrieve estimated memory usage of the current process. Deliberately not guarded - a process can always read
@@ -237,9 +293,25 @@ def get_memory_info() -> MemoryInfo:
         current_size_bytes += _get_child_used_memory(child)
 
     vm = psutil.virtual_memory()
+    total_size_bytes, system_wide_used_size_bytes = _get_system_wide_memory(
+        host_total_bytes=vm.total,
+        host_used_bytes=vm.total - vm.available,
+    )
 
     return MemoryInfo(
-        total_size=ByteSize(vm.total),
+        total_size=ByteSize(total_size_bytes),
         current_size=ByteSize(current_size_bytes),
-        system_wide_used_size=ByteSize(vm.total - vm.available),
+        system_wide_used_size=ByteSize(system_wide_used_size_bytes),
     )
+
+
+def _get_system_wide_memory(*, host_total_bytes: int, host_used_bytes: int) -> tuple[int, int]:
+    """Get the total and the used memory to report, narrowed to the limit applying to this process."""
+    budget = cgroups_sensor.get_memory_budget()
+
+    if budget is None:
+        return host_total_bytes, host_used_bytes
+
+    # Not clamped to the memory of the machine: a Windows job limits commit, so that would pair a commit charge with
+    # a physical ceiling.
+    return budget.limit, budget.used
