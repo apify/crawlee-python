@@ -218,6 +218,7 @@ async def test_handle_blocked_status_code(server_url: URL, http_client: HttpClie
     assert crawler._statistics.error_tracker.total == 1
 
 
+@pytest.mark.usefixtures('_restore_crawlers_binding')
 def test_import_error_handled() -> None:
     # Simulate ImportError for parsel
     with mock.patch.dict('sys.modules', {'parsel': None}):

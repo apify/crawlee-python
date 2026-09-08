@@ -945,6 +945,7 @@ async def test_adaptive_playwright_crawler_with_sql_storage(test_urls: list[str]
         pytest.param('sklearn', id='sklearn'),
     ],
 )
+@pytest.mark.usefixtures('_restore_crawlers_binding')
 def test_import_error_handled(optional_module_name: str) -> None:
     # Block the package and all its cached submodules to prevent submodule cache entries
     # from bypassing the blocked top-level package.
