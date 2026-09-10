@@ -289,7 +289,7 @@ class AbstractHttpCrawler(
     async def _handle_status_code_response(
         self, context: HttpCrawlingContext
     ) -> AsyncGenerator[HttpCrawlingContext, None]:
-        """Validate the HTTP status code and raise appropriate exceptions if needed.
+        """Record rate limiting and validate the HTTP status code, raising appropriate exceptions if needed.
 
         Args:
             context: The current crawling context containing the HTTP response.
