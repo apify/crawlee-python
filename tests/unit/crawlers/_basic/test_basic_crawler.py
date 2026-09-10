@@ -2517,8 +2517,8 @@ async def test_warn_no_throttling_manager_once_on_429(caplog: pytest.LogCaptureF
     """A 429 from a crawler without ThrottlingRequestManager logs a recommendation, only once per instance."""
     crawler = BasicCrawler(configure_logging=False)
     with caplog.at_level(logging.WARNING, logger='crawlee'):
-        crawler._raise_for_session_blocked_status_code(session=None, status_code=429, request_url='https://a.test/')
-        crawler._raise_for_session_blocked_status_code(session=None, status_code=429, request_url='https://b.test/')
+        crawler._record_rate_limit_status_code(429, request_url='https://a.test/')
+        crawler._record_rate_limit_status_code(429, request_url='https://b.test/')
 
     matching = [
         r for r in caplog.records if 'ThrottlingRequestManager' in r.getMessage() and 'HTTP 429' in r.getMessage()
@@ -2537,15 +2537,9 @@ async def test_warn_unconfigured_throttle_domain_once_per_domain(caplog: pytest.
     crawler = BasicCrawler(configure_logging=False, request_manager=throttler)
 
     with caplog.at_level(logging.WARNING, logger='crawlee'):
-        crawler._raise_for_session_blocked_status_code(
-            session=None, status_code=429, request_url='https://A.example.com/page1'
-        )
-        crawler._raise_for_session_blocked_status_code(
-            session=None, status_code=429, request_url='https://a.example.com/page2'
-        )
-        crawler._raise_for_session_blocked_status_code(
-            session=None, status_code=429, request_url='https://other.example.com/page1'
-        )
+        crawler._record_rate_limit_status_code(429, request_url='https://A.example.com/page1')
+        crawler._record_rate_limit_status_code(429, request_url='https://a.example.com/page2')
+        crawler._record_rate_limit_status_code(429, request_url='https://other.example.com/page1')
 
     matching = [
         r

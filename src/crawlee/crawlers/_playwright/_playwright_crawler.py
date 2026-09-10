@@ -494,7 +494,7 @@ class PlaywrightCrawler(
         return extract_links
 
     async def _handle_status_code_response(self, context: TPostNavContext) -> AsyncGenerator[TPostNavContext, None]:
-        """Validate the HTTP status code and raise appropriate exceptions if needed.
+        """Record rate limiting and validate the HTTP status code, raising appropriate exceptions if needed.
 
         Args:
             context: The current crawling context containing the response.
@@ -508,13 +508,13 @@ class PlaywrightCrawler(
             The original crawling context if no errors are detected.
         """
         status_code = context.response.status
+        self._record_rate_limit_status_code(
+            status_code,
+            request_url=context.request.url,
+            retry_after_header=context.response.headers.get('retry-after'),
+        )
         if self._retry_on_blocked:
-            self._raise_for_session_blocked_status_code(
-                context.session,
-                status_code,
-                request_url=context.request.url,
-                retry_after_header=context.response.headers.get('retry-after'),
-            )
+            self._raise_for_session_blocked_status_code(context.session, status_code)
         self._raise_for_error_status_code(status_code)
         yield context
 
