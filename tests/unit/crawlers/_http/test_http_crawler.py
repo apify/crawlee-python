@@ -704,7 +704,7 @@ async def test_records_429_regardless_of_retry_on_blocked(
 ) -> None:
     """Rate limiting is a separate concern from session blocking, so a 429 must be recorded either way."""
     domain = server_url.host or ''
-    inner = await RequestQueue.open(alias=f'throttle-429-{retry_on_blocked}')
+    inner = await RequestQueue.open(alias='throttle-429-inner')
     throttler = ThrottlingRequestManager(
         inner,
         domains=[domain],
@@ -715,7 +715,7 @@ async def test_records_429_regardless_of_retry_on_blocked(
         request_manager=throttler,
         retry_on_blocked=retry_on_blocked,
         max_request_retries=0,
-        # Without this, a 429 retires the session and the retries walk the backoff up to `max_delay`.
+        # Without this, a 429 retires the session and the rotation retries walk the backoff up to `max_delay`.
         use_session_pool=False,
     )
 
