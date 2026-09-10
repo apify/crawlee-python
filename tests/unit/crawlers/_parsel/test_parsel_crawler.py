@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest import mock
 
 import pytest
@@ -95,9 +95,10 @@ async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: U
 
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
+        # The overloads reject this combination statically, so build the call dynamically to reach the runtime guard.
+        kwargs: dict[str, Any] = {'requests': [Request.from_url(str(server_url / 'start_enqueue'))], 'selector': 'a'}
         try:
-            # Testing runtime enforcement of the overloads.
-            await context.enqueue_links(requests=[Request.from_url(str(server_url / 'start_enqueue'))], selector='a')
+            await context.enqueue_links(**kwargs)
         except Exception as e:
             exceptions.append(e)
 
