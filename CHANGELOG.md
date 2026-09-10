@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Name the extra to install in optional-dependency import errors ([#2208](https://github.com/apify/crawlee-python/pull/2208)) ([d57c6a0](https://github.com/apify/crawlee-python/commit/d57c6a03a74e208329990898f9a777e54599740e)) by [@vdusek](https://github.com/vdusek)
+- Make enqueue_links and export_to overloads consistent with their implementations ([#2225](https://github.com/apify/crawlee-python/pull/2225)) ([47e4630](https://github.com/apify/crawlee-python/commit/47e46308a0871527523b902889f87ecdf6c8445f)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->
