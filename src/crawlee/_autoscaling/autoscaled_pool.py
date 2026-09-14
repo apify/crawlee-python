@@ -105,7 +105,7 @@ class AutoscaledPool:
     async def run(self) -> None:
         """Start the autoscaled pool and return when all tasks are completed and `is_finished_function` returns True.
 
-        If there is an exception in one of the tasks, it will be re-raised.
+        If a task or a scheduling callback raises an exception, it will be re-raised.
         """
         if self._current_run is not None:
             raise RuntimeError('The pool is already running')
@@ -216,6 +216,7 @@ class AutoscaledPool:
         Exits when `is_finished_function` returns True.
         """
         finished = False
+        orchestrator_error: Exception | None = None
 
         try:
             while not (finished := await self._is_finished_function()) and not run.result.done():
@@ -243,6 +244,8 @@ class AutoscaledPool:
 
                 with suppress(asyncio.TimeoutError):
                     await asyncio.wait_for(run.worker_tasks_updated.wait(), timeout=0.5)
+        except Exception as exc:
+            orchestrator_error = exc
         finally:
             if finished:
                 logger.debug('`is_finished_function` reports that we are finished')
@@ -257,7 +260,10 @@ class AutoscaledPool:
                 logger.debug('Terminating - no running tasks to wait for')
 
             if not run.result.done():
-                run.result.set_result(object())
+                if orchestrator_error is not None:
+                    run.result.set_exception(orchestrator_error)
+                else:
+                    run.result.set_result(object())
 
     def _reap_worker_task(self, task: asyncio.Task, run: _AutoscaledPoolRun) -> None:
         """Handle cleanup and tracking of a completed worker task.

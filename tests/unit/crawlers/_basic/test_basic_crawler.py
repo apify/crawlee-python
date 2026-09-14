@@ -61,6 +61,36 @@ async def test_processes_requests_from_explicit_queue() -> None:
     assert calls == ['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com']
 
 
+@pytest.mark.parametrize('method', ['is_empty', 'is_finished'])
+@pytest.mark.parametrize('error_type', [RuntimeError, asyncio.TimeoutError])
+async def test_propagates_request_queue_status_errors(
+    monkeypatch: pytest.MonkeyPatch, method: str, error_type: type[Exception]
+) -> None:
+    queue = await RequestQueue.open()
+    await queue.add_request('https://a.placeholder.com')
+    crawler = BasicCrawler(request_manager=queue)
+    handled_urls = []
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        handled_urls.append(context.request.url)
+
+    error = error_type('Queue status unavailable')
+    with monkeypatch.context() as patch_queue:
+        patch_queue.setattr(queue, method, AsyncMock(side_effect=error))
+        with pytest.raises(error_type, match='Queue status unavailable') as exc_info:
+            await crawler.run()
+        assert exc_info.value is error
+
+    assert handled_urls == []
+    assert not await queue.is_finished()
+
+    recovery_crawler = BasicCrawler(request_manager=queue, request_handler=handler)
+    await recovery_crawler.run()
+    assert handled_urls == ['https://a.placeholder.com']
+    assert await queue.is_finished()
+
+
 async def test_processes_requests_from_request_source_tandem() -> None:
     request_queue = await RequestQueue.open()
     await request_queue.add_requests(
