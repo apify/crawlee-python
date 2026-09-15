@@ -19,7 +19,7 @@ from unittest.mock import ANY, AsyncMock, Mock, call, patch
 
 import pytest
 
-from crawlee import ConcurrencySettings, Glob, service_locator
+from crawlee import ConcurrencySettings, Glob, ThroughputAutoscaledPool, service_locator
 from crawlee._log_config import CrawleeLogFormatter
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpMethod
@@ -2590,3 +2590,11 @@ async def test_throttled_domain_waits_out_backoff_without_ending_the_crawl() -> 
     assert empty_during_cooldown == [True]
     assert len(dispatched_at) == 2
     assert dispatched_at[1] - dispatched_at[0] >= 0.5
+
+
+def test_autoscaled_pool_class() -> None:
+    """The crawler builds its pool from `autoscaled_pool_class`."""
+    with pytest.warns(UserWarning, match='experimental'):
+        crawler = BasicCrawler(autoscaled_pool_class=ThroughputAutoscaledPool)
+
+    assert isinstance(crawler._autoscaled_pool, ThroughputAutoscaledPool)
