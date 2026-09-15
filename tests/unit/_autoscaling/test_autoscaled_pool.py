@@ -302,6 +302,45 @@ async def test_autoscales_uses_desired_concurrency_ratio(
             await pool_run_task
 
 
+async def test_keeps_min_concurrency_when_overloaded(system_status: SystemStatus | Mock) -> None:
+    """Test that the pool keeps `min_concurrency` tasks running while the system stays overloaded."""
+    done_count = 0
+    running_count = 0
+    max_running_count = 0
+
+    async def run() -> None:
+        nonlocal done_count, running_count, max_running_count
+        running_count += 1
+        max_running_count = max(max_running_count, running_count)
+        await asyncio.sleep(0.05)
+        running_count -= 1
+        done_count += 1
+
+    cast('Mock', system_status.get_current_system_info).return_value = SystemInfo(
+        cpu_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
+        memory_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=1.0),
+        event_loop_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
+        client_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
+    )
+
+    pool = AutoscaledPool(
+        system_status=system_status,
+        run_task_function=run,
+        is_task_ready_function=lambda: future(True),
+        is_finished_function=lambda: future(done_count >= 5),
+        concurrency_settings=ConcurrencySettings(
+            min_concurrency=2,
+            desired_concurrency=4,
+            max_concurrency=4,
+        ),
+    )
+
+    await asyncio.wait_for(pool.run(), timeout=5)
+
+    assert done_count >= 5
+    assert max_running_count == 2
+
+
 async def test_max_tasks_per_minute_works(system_status: SystemStatus | Mock) -> None:
     done_count = 0
 
