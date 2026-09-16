@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import suppress
 from datetime import timedelta
 from itertools import chain, repeat
@@ -162,6 +163,31 @@ async def test_orchestrator_error_waits_for_running_worker(system_status: System
     finally:
         release_worker.set()
         await asyncio.gather(pool_run_task, return_exceptions=True)
+
+
+async def test_orchestrator_error_is_logged_when_the_run_is_cancelled(
+    system_status: SystemStatus | Mock, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A scheduling error raised while the run is being cancelled is logged, as the cancelled result cannot carry it."""
+
+    async def is_finished() -> bool:
+        pool_run_task.cancel()
+        raise RuntimeError('Queue status unavailable')
+
+    pool = AutoscaledPool(
+        system_status=system_status,
+        run_task_function=lambda: future(None),
+        is_task_ready_function=lambda: future(False),
+        is_finished_function=is_finished,
+    )
+
+    with caplog.at_level(logging.ERROR, logger='crawlee._autoscaling.autoscaled_pool'):
+        pool_run_task = asyncio.create_task(pool.run())
+        with pytest.raises(asyncio.CancelledError):
+            await pool_run_task
+
+    assert 'Unpropagated exception in worker task orchestrator' in caplog.text
+    assert 'Queue status unavailable' in caplog.text
 
 
 async def test_propagates_exceptions_after_finished(system_status: SystemStatus | Mock) -> None:
