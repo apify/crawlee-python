@@ -697,8 +697,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             requests: The requests to be enqueued before the crawler starts.
             purge_request_queue: If this is `True` and the crawler is not being run for the first time, the request
                 queue will be purged. A run that ended with an exception does not count as a previous run, so a
-                retry keeps the requests that were still pending. Named request queues are considered persistent
-                and are never purged implicitly.
+                retry keeps the requests that were still pending even when this is `True`. Named request queues
+                are considered persistent and are never purged implicitly.
         """
         if self._running:
             raise RuntimeError(
@@ -722,8 +722,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 if self._use_session_pool:
                     await self._session_pool.reset_store()
 
-                # A run that ended with an exception does not count as a previous run, so the requests it left
-                # pending survive into the retry.
+                # A failed run does not count as a previous run, so its pending requests survive into the retry.
                 if purge_request_queue and not self._last_run_failed:
                     request_manager = await self.get_request_manager()
                     # A `ThrottlingRequestManager` delegates `purge` to the manager it wraps, so inspect the wrapped
@@ -768,36 +767,37 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 if threading.current_thread() is threading.main_thread():
                     with suppress(NotImplementedError):
                         asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
+
+            if self._statistics.error_tracker.total > 0:
+                self._logger.info(
+                    'Error analysis:'
+                    f' total_errors={self._statistics.error_tracker.total}'
+                    f' unique_errors={self._statistics.error_tracker.unique_error_count}'
+                )
+
+            if interrupted:
+                self._logger.info(
+                    f'The crawl was interrupted. To resume, do: CRAWLEE_PURGE_ON_START=0 python {sys.argv[0]}'
+                )
+
+            self._has_finished_before = True
+            self._last_run_failed = False
+
+            await self._save_crawler_state()
+
+            final_statistics = self._statistics.calculate()
+            if self._statistics_log_format == 'table':
+                self._logger.info(f'Final request statistics:\n{final_statistics.to_table()}')
+            else:
+                self._logger.info('Final request statistics:', extra=final_statistics.to_dict())
         except BaseException:
             self._last_run_failed = True
             raise
+        else:
+            return final_statistics
         finally:
             # A failed run must leave the instance usable, so that the caller can retry after handling the error.
             self._running = False
-
-        if self._statistics.error_tracker.total > 0:
-            self._logger.info(
-                'Error analysis:'
-                f' total_errors={self._statistics.error_tracker.total}'
-                f' unique_errors={self._statistics.error_tracker.unique_error_count}'
-            )
-
-        if interrupted:
-            self._logger.info(
-                f'The crawl was interrupted. To resume, do: CRAWLEE_PURGE_ON_START=0 python {sys.argv[0]}'
-            )
-
-        self._has_finished_before = True
-        self._last_run_failed = False
-
-        await self._save_crawler_state()
-
-        final_statistics = self._statistics.calculate()
-        if self._statistics_log_format == 'table':
-            self._logger.info(f'Final request statistics:\n{final_statistics.to_table()}')
-        else:
-            self._logger.info('Final request statistics:', extra=final_statistics.to_dict())
-        return final_statistics
 
     async def _run_crawler(self) -> None:
         local_event_manager = self._service_locator.get_event_manager()

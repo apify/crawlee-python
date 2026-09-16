@@ -138,6 +138,56 @@ async def test_failed_run_keeps_pending_requests_for_the_retry(monkeypatch: pyte
     assert handled_urls == ['https://a.placeholder.com', 'https://b.placeholder.com']
 
 
+async def test_purge_resumes_once_a_run_succeeds_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The purge exemption lasts only until a run succeeds, so the run after the retry starts from a clean queue."""
+    queue = await RequestQueue.open()
+    crawler = BasicCrawler(request_manager=queue)
+    handled_urls = []
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        handled_urls.append(context.request.url)
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    with monkeypatch.context() as monkey:
+        monkey.setattr(queue, 'is_empty', AsyncMock(side_effect=RuntimeError('Queue status unavailable')))
+        with pytest.raises(RuntimeError, match='Queue status unavailable'):
+            await crawler.run(['https://b.placeholder.com'])
+
+    await crawler.run()
+    await crawler.run(['https://a.placeholder.com'])
+
+    assert handled_urls == [
+        'https://a.placeholder.com',
+        'https://b.placeholder.com',
+        'https://a.placeholder.com',
+    ]
+
+
+async def test_failure_after_the_crawl_marks_the_run_as_failed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A run whose post-crawl state save raises counts as failed too, so the retry keeps the queue intact."""
+    queue = await RequestQueue.open()
+    crawler = BasicCrawler(request_manager=queue)
+    handled_urls = []
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        handled_urls.append(context.request.url)
+
+    await crawler.run(['https://a.placeholder.com'])
+    assert handled_urls == ['https://a.placeholder.com']
+
+    with monkeypatch.context() as monkey:
+        monkey.setattr(crawler, '_save_crawler_state', AsyncMock(side_effect=RuntimeError('Key-value store down')))
+        with pytest.raises(RuntimeError, match='Key-value store down'):
+            await crawler.run()
+
+    await queue.add_request('https://b.placeholder.com')
+    await crawler.run()
+    assert handled_urls == ['https://a.placeholder.com', 'https://b.placeholder.com']
+
+
 async def test_processes_requests_from_request_source_tandem() -> None:
     request_queue = await RequestQueue.open()
     await request_queue.add_requests(
