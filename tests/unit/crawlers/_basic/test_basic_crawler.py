@@ -61,11 +61,18 @@ async def test_processes_requests_from_explicit_queue() -> None:
     assert calls == ['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com']
 
 
-@pytest.mark.parametrize('method', ['is_empty', 'is_finished'])
-@pytest.mark.parametrize('error_type', [RuntimeError, asyncio.TimeoutError])
+@pytest.mark.parametrize(
+    'method',
+    [pytest.param('is_empty', id='is_empty'), pytest.param('is_finished', id='is_finished')],
+)
+@pytest.mark.parametrize(
+    'error_type',
+    [pytest.param(RuntimeError, id='runtime error'), pytest.param(asyncio.TimeoutError, id='timeout error')],
+)
 async def test_propagates_request_queue_status_errors(
     monkeypatch: pytest.MonkeyPatch, method: str, error_type: type[Exception]
 ) -> None:
+    """A request manager failure reaches the caller, and the crawler can be run again once the manager recovers."""
     queue = await RequestQueue.open()
     await queue.add_request('https://a.placeholder.com')
     crawler = BasicCrawler(request_manager=queue)
@@ -76,8 +83,8 @@ async def test_propagates_request_queue_status_errors(
         handled_urls.append(context.request.url)
 
     error = error_type('Queue status unavailable')
-    with monkeypatch.context() as patch_queue:
-        patch_queue.setattr(queue, method, AsyncMock(side_effect=error))
+    with monkeypatch.context() as monkey:
+        monkey.setattr(queue, method, AsyncMock(side_effect=error))
         with pytest.raises(error_type, match='Queue status unavailable') as exc_info:
             await crawler.run()
         assert exc_info.value is error
