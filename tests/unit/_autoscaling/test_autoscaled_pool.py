@@ -343,6 +343,106 @@ async def test_autoscales_uses_desired_concurrency_ratio(
             await pool_run_task
 
 
+async def test_keeps_min_concurrency_when_overloaded(system_status: SystemStatus | Mock) -> None:
+    """Test that the pool keeps `min_concurrency` tasks running while the system stays overloaded."""
+    done_count = 0
+    running_count = 0
+    max_running_count = 0
+
+    async def run() -> None:
+        nonlocal done_count, running_count, max_running_count
+        running_count += 1
+        max_running_count = max(max_running_count, running_count)
+        await asyncio.sleep(0.05)
+        running_count -= 1
+        done_count += 1
+
+    overloaded_system_info = SystemInfo(
+        cpu_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
+        memory_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=1.0),
+        event_loop_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
+        client_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
+    )
+    cast('Mock', system_status.get_current_system_info).return_value = overloaded_system_info
+    cast('Mock', system_status.get_historical_system_info).return_value = overloaded_system_info
+
+    pool = AutoscaledPool(
+        system_status=system_status,
+        run_task_function=run,
+        is_task_ready_function=lambda: future(True),
+        is_finished_function=lambda: future(done_count >= 5),
+        concurrency_settings=ConcurrencySettings(
+            min_concurrency=2,
+            desired_concurrency=4,
+            max_concurrency=4,
+        ),
+    )
+
+    await asyncio.wait_for(pool.run(), timeout=5)
+
+    assert done_count >= 5
+    assert max_running_count == 2
+
+
+async def test_drops_to_min_concurrency_when_overload_starts(system_status: SystemStatus | Mock) -> None:
+    """Test that an overload starting mid-run settles concurrency at `min_concurrency`."""
+    done_count = 0
+    running_count = 0
+    max_running_count = 0
+    overloaded = False
+
+    async def run() -> None:
+        nonlocal done_count, running_count, max_running_count
+        running_count += 1
+        max_running_count = max(max_running_count, running_count)
+        await asyncio.sleep(0.05)
+        running_count -= 1
+        done_count += 1
+
+    def get_system_info() -> SystemInfo:
+        return SystemInfo(
+            cpu_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
+            memory_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=1.0 if overloaded else 0.3),
+            event_loop_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
+            client_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
+        )
+
+    cast('Mock', system_status.get_current_system_info).side_effect = get_system_info
+    cast('Mock', system_status.get_historical_system_info).side_effect = get_system_info
+
+    pool = AutoscaledPool(
+        system_status=system_status,
+        run_task_function=run,
+        is_task_ready_function=lambda: future(True),
+        is_finished_function=lambda: future(False),
+        concurrency_settings=ConcurrencySettings(
+            min_concurrency=2,
+            desired_concurrency=4,
+            max_concurrency=4,
+        ),
+    )
+
+    pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
+
+    try:
+        assert await poll_until_condition(lambda: max_running_count == 4, timeout=5.0)
+
+        overloaded = True
+
+        # The tasks started while the system was idle have to finish before the overload cap becomes observable.
+        assert await poll_until_condition(lambda: pool.current_concurrency <= 2, timeout=5.0)
+
+        max_running_count = 0
+        done_before = done_count
+        assert await poll_until_condition(lambda: done_count >= done_before + 4, timeout=5.0)
+
+        assert max_running_count == 2
+    finally:
+        pool_run_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await pool_run_task
+
+
 async def test_max_tasks_per_minute_works(system_status: SystemStatus | Mock) -> None:
     done_count = 0
 

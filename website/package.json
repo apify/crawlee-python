@@ -37,7 +37,7 @@
         "@docusaurus/theme-mermaid": "^3.9.2",
         "@giscus/react": "^3.0.0",
         "@mdx-js/react": "^3.0.1",
-        "@mermaid-js/layout-elk": "^0.2.0",
+        "@mermaid-js/layout-elk": "^1.0.0",
         "@signalwire/docusaurus-plugin-llms-txt": "^1.2.1",
         "axios": "^1.5.0",
         "buffer": "^6.0.3",
@@ -65,12 +65,12 @@
         "fs-extra": "^11.1.0",
         "markdownlint": "^0.41.0",
         "markdownlint-cli": "^0.49.0",
-        "oxfmt": "^0.66.0",
+        "oxfmt": "^0.67.0",
         "oxlint": "^1.73.0",
         "patch-package": "^8.0.0",
         "path-browserify": "^1.0.1",
         "rimraf": "^6.0.0",
         "typescript": "^6.0.0"
     },
-    "packageManager": "pnpm@12.3.4"
+    "packageManager": "pnpm@12.4.1"
 }

@@ -39,8 +39,9 @@ class _AutoscaledPoolRun:
 class AutoscaledPool:
     """Manages a pool of asynchronous resource-intensive tasks that are executed in parallel.
 
-    The pool only starts new tasks if there is enough free CPU and memory available. If an exception is thrown in
-    any of the tasks or in the pool's scheduling loop, it is propagated and the pool is stopped.
+    The pool keeps `min_concurrency` tasks running even while the system is overloaded, and starts additional tasks
+    only if there is enough free CPU and memory available. If an exception is thrown in any of the tasks or in the
+    pool's scheduling loop, it is propagated and the pool is stopped.
     """
 
     _AUTOSCALE_INTERVAL = timedelta(seconds=10)
@@ -223,7 +224,7 @@ class AutoscaledPool:
                 run.worker_tasks_updated.clear()
 
                 current_status = self._system_status.get_current_system_info()
-                if not current_status.is_system_idle:
+                if not current_status.is_system_idle and self.current_concurrency >= self._min_concurrency:
                     logger.debug('Not scheduling new tasks - system is overloaded')
                 elif self._is_paused:
                     logger.debug('Not scheduling new tasks - the autoscaled pool is paused')
