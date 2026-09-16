@@ -252,7 +252,7 @@ class AutoscaledPool:
         finally:
             if finished:
                 logger.debug('`is_finished_function` reports that we are finished')
-            elif run.result.done() and run.result.exception() is not None:
+            elif run.result.done() and not run.result.cancelled() and run.result.exception() is not None:
                 logger.debug('Unhandled exception in `run_task_function`')
 
             if run.worker_tasks:
@@ -269,7 +269,7 @@ class AutoscaledPool:
                     run.result.set_result(object())
             elif orchestrator_error is not None:
                 # A worker failure or an abort already decided the run, so this error has no way out.
-                logger.error('Exception in worker task orchestrator', exc_info=orchestrator_error)
+                logger.error('Unpropagated exception in worker task orchestrator', exc_info=orchestrator_error)
 
     def _reap_worker_task(self, task: asyncio.Task, run: _AutoscaledPoolRun) -> None:
         """Handle cleanup and tracking of a completed worker task.
