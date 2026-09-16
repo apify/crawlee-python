@@ -264,6 +264,9 @@ class AutoscaledPool:
                     run.result.set_exception(orchestrator_error)
                 else:
                     run.result.set_result(object())
+            elif orchestrator_error is not None:
+                # A worker failure or an abort already decided the run, so this error has no way out.
+                logger.error('Exception in worker task orchestrator', exc_info=orchestrator_error)
 
     def _reap_worker_task(self, task: asyncio.Task, run: _AutoscaledPoolRun) -> None:
         """Handle cleanup and tracking of a completed worker task.
