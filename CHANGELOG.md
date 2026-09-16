@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.10.1 - **not yet released**
+## [1.10.1](https://github.com/apify/crawlee-python/releases/tag/v1.10.1) (2026-09-16)
 
 ### 🐛 Bug Fixes
 
@@ -14,7 +13,6 @@ All notable changes to this project will be documented in this file.
 - Propagate autoscaled pool scheduling errors ([#2229](https://github.com/apify/crawlee-python/pull/2229)) ([cb7822e](https://github.com/apify/crawlee-python/commit/cb7822e0337ea6b03f27514f8a7f22cae134d7d6)) by [@Kuang-xianxin](https://github.com/Kuang-xianxin)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.10.0](https://github.com/apify/crawlee-python/releases/tag/v1.10.0) (2026-08-31)
 
 ### 🚀 Features
