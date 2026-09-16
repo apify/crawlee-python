@@ -97,6 +97,47 @@ async def test_propagates_request_queue_status_errors(
     assert await queue.is_finished()
 
 
+async def test_crawler_is_usable_after_a_failed_run_setup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failure before the crawl starts leaves the instance usable, so the caller can retry after handling it."""
+    queue = await RequestQueue.open()
+    crawler = BasicCrawler(request_manager=queue)
+    handled_urls = []
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        handled_urls.append(context.request.url)
+
+    with monkeypatch.context() as monkey:
+        monkey.setattr(queue, 'add_requests', AsyncMock(side_effect=RuntimeError('Queue unavailable')))
+        with pytest.raises(RuntimeError, match='Queue unavailable'):
+            await crawler.run(['https://a.placeholder.com'])
+
+    await crawler.run(['https://a.placeholder.com'])
+    assert handled_urls == ['https://a.placeholder.com']
+
+
+async def test_failed_run_keeps_pending_requests_for_the_retry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Requests left pending by a failed run survive into the retry even when an earlier run completed."""
+    queue = await RequestQueue.open()
+    crawler = BasicCrawler(request_manager=queue)
+    handled_urls = []
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        handled_urls.append(context.request.url)
+
+    await crawler.run(['https://a.placeholder.com'])
+    assert handled_urls == ['https://a.placeholder.com']
+
+    with monkeypatch.context() as monkey:
+        monkey.setattr(queue, 'is_empty', AsyncMock(side_effect=RuntimeError('Queue status unavailable')))
+        with pytest.raises(RuntimeError, match='Queue status unavailable'):
+            await crawler.run(['https://b.placeholder.com'])
+
+    await crawler.run()
+    assert handled_urls == ['https://a.placeholder.com', 'https://b.placeholder.com']
+
+
 async def test_processes_requests_from_request_source_tandem() -> None:
     request_queue = await RequestQueue.open()
     await request_queue.add_requests(
