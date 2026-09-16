@@ -40,7 +40,7 @@ class AutoscaledPool:
     """Manages a pool of asynchronous resource-intensive tasks that are executed in parallel.
 
     The pool only starts new tasks if there is enough free CPU and memory available. If an exception is thrown in
-    any of the tasks, it is propagated and the pool is stopped.
+    any of the tasks or in the pool's scheduling loop, it is propagated and the pool is stopped.
     """
 
     _AUTOSCALE_INTERVAL = timedelta(seconds=10)
@@ -105,7 +105,7 @@ class AutoscaledPool:
     async def run(self) -> None:
         """Start the autoscaled pool and return when all tasks are completed and `is_finished_function` returns True.
 
-        If a task or a scheduling callback raises an exception, it will be re-raised.
+        If a task or the pool's scheduling loop raises an exception, it will be re-raised.
         """
         if self._current_run is not None:
             raise RuntimeError('The pool is already running')
@@ -245,6 +245,8 @@ class AutoscaledPool:
                 with suppress(asyncio.TimeoutError):
                     await asyncio.wait_for(run.worker_tasks_updated.wait(), timeout=0.5)
         except Exception as exc:
+            # Surface the error through `run.result` only once the cleanup below has awaited the worker tasks,
+            # so that the caller does not observe the failure while tasks are still in flight.
             orchestrator_error = exc
         finally:
             if finished:
