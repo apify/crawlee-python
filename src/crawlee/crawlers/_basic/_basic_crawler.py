@@ -1630,8 +1630,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     ) -> None:
         """Record a 429 Too Many Requests response so the request's domain gets a backoff.
 
-        Other status codes are ignored. Rate limiting is independent of session blocking, so this runs for every
-        response regardless of `retry_on_blocked`.
+        Rate limiting is independent of session blocking, so this runs for every response regardless of
+        `retry_on_blocked`.
 
         Args:
             status_code: The HTTP status code to check.
