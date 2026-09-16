@@ -316,12 +316,14 @@ async def test_keeps_min_concurrency_when_overloaded(system_status: SystemStatus
         running_count -= 1
         done_count += 1
 
-    cast('Mock', system_status.get_current_system_info).return_value = SystemInfo(
+    overloaded_system_info = SystemInfo(
         cpu_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
         memory_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=1.0),
         event_loop_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
         client_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
     )
+    cast('Mock', system_status.get_current_system_info).return_value = overloaded_system_info
+    cast('Mock', system_status.get_historical_system_info).return_value = overloaded_system_info
 
     pool = AutoscaledPool(
         system_status=system_status,
