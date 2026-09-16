@@ -71,9 +71,6 @@ httpx = ["httpx2[brotli,http2,zstd]>=2.12.0", "apify_fingerprint_datapoints>=0.0
 parsel = ["parsel>=1.10.0"]
 playwright = ["playwright>=1.27.0", "apify_fingerprint_datapoints>=0.0.2", "browserforge>=1.2.3"]
 otel = [
-    # The OpenTelemetry packages release in lockstep and pin each other with `==`, so one floor covers the
-    # whole group. 0.65b0 (paired with 1.44.0 on the stable line) is the first release with
-    # `HTTPX2ClientInstrumentor`, the instrumentor for the `httpx2` package that `HttpxHttpClient` runs on.
     "opentelemetry-api>=1.44.0",
     "opentelemetry-distro[otlp]>=0.65b0",
     "opentelemetry-instrumentation>=0.65b0",
