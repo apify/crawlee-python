@@ -716,7 +716,7 @@ async def test_records_429_regardless_of_retry_on_blocked(
         retry_on_blocked=retry_on_blocked,
         max_request_retries=0,
         # Without this, a 429 retires the session and the rotation retries walk the backoff up to `max_delay`.
-        use_session_pool=False,
+        max_session_rotations=0,
     )
 
     await crawler.run([str(server_url / 'status/429')])
