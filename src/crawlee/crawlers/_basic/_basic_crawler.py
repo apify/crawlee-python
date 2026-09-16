@@ -695,8 +695,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Args:
             requests: The requests to be enqueued before the crawler starts.
             purge_request_queue: If this is `True` and the crawler is not being run for the first time, the request
-                queue will be purged. Named request queues are considered persistent and are never purged
-                implicitly.
+                queue will be purged. A run that ended with an exception does not count as a previous run, so a
+                retry keeps the requests that were still pending. Named request queues are considered persistent
+                and are never purged implicitly.
         """
         if self._running:
             raise RuntimeError(
@@ -756,6 +757,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         except CancelledError:
             pass
         finally:
+            # A failed run must leave the instance usable, so that the caller can retry after handling the error.
+            self._running = False
+
             if threading.current_thread() is threading.main_thread():
                 with suppress(NotImplementedError):
                     asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
@@ -772,7 +776,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 f'The crawl was interrupted. To resume, do: CRAWLEE_PURGE_ON_START=0 python {sys.argv[0]}'
             )
 
-        self._running = False
         self._has_finished_before = True
 
         await self._save_crawler_state()

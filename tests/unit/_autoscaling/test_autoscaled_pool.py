@@ -123,6 +123,47 @@ async def test_propagates_exceptions(system_status: SystemStatus | Mock) -> None
     assert done_count < 20
 
 
+async def test_orchestrator_error_waits_for_running_worker(system_status: SystemStatus | Mock) -> None:
+    """A scheduling error reaches the caller only after the worker tasks that were still running have finished."""
+    worker_started = asyncio.Event()
+    worker_finished = asyncio.Event()
+    check_failed = asyncio.Event()
+    release_worker = asyncio.Event()
+    checks = 0
+
+    async def run() -> None:
+        worker_started.set()
+        await release_worker.wait()
+        worker_finished.set()
+
+    async def is_finished() -> bool:
+        nonlocal checks
+        checks += 1
+        if checks > 1:
+            await worker_started.wait()
+            check_failed.set()
+            raise RuntimeError('Queue status unavailable')
+        return False
+
+    pool = AutoscaledPool(
+        system_status=system_status,
+        run_task_function=run,
+        is_task_ready_function=lambda: future(True),
+        is_finished_function=is_finished,
+    )
+    pool_run_task = asyncio.create_task(pool.run())
+    try:
+        await asyncio.wait_for(check_failed.wait(), timeout=5)
+        assert not pool_run_task.done()
+        release_worker.set()
+        with pytest.raises(RuntimeError, match='Queue status unavailable'):
+            await asyncio.wait_for(pool_run_task, timeout=5)
+        assert worker_finished.is_set()
+    finally:
+        release_worker.set()
+        await asyncio.gather(pool_run_task, return_exceptions=True)
+
+
 async def test_propagates_exceptions_after_finished(system_status: SystemStatus | Mock) -> None:
     started_count = 0
 
