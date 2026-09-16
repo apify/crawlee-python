@@ -81,12 +81,19 @@ Finally, run your crawler. Your logs should show something like this:
     ]
   },
   "headers": {
-    "Accept": "*/*",
-    "Accept-Encoding": "gzip, deflate, br",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/png,image/svg+xml,*/*;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br, zstd",
+    "Accept-Language": "en-US,en;q=0.5",
     "Content-Length": "190",
     "Content-Type": "application/x-www-form-urlencoded",
     "Host": "httpbin.org",
-    "User-Agent": "python-httpx/0.27.0",
+    "Priority": "u=0, i",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0",
     "X-Amzn-Trace-Id": "Root=1-66c849d6-1ae432fb7b4156e6149ff37f"
   },
   "json": null,
