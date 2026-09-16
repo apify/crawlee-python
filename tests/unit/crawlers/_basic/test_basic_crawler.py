@@ -85,8 +85,7 @@ async def test_propagates_request_queue_status_errors(
     assert handled_urls == []
     assert not await queue.is_finished()
 
-    recovery_crawler = BasicCrawler(request_manager=queue, request_handler=handler)
-    await recovery_crawler.run()
+    await crawler.run()
     assert handled_urls == ['https://a.placeholder.com']
     assert await queue.is_finished()
 
