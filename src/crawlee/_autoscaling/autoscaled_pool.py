@@ -39,8 +39,9 @@ class _AutoscaledPoolRun:
 class AutoscaledPool:
     """Manages a pool of asynchronous resource-intensive tasks that are executed in parallel.
 
-    Beyond `min_concurrency`, the pool only starts new tasks if there is enough free CPU and memory available. If an
-    exception is thrown in any of the tasks, it is propagated and the pool is stopped.
+    The pool keeps `min_concurrency` tasks running even while the system is overloaded, and starts additional tasks
+    only if there is enough free CPU and memory available. If an exception is thrown in any of the tasks, it is
+    propagated and the pool is stopped.
     """
 
     _AUTOSCALE_INTERVAL = timedelta(seconds=10)
