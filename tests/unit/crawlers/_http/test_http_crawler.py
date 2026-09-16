@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlencode
@@ -709,6 +710,8 @@ async def test_records_429_regardless_of_retry_on_blocked(
         inner,
         domains=[domain],
         request_manager_opener=RequestQueue.open,
+        # Long enough that the assertion below cannot race the backoff expiring.
+        base_delay=timedelta(seconds=30),
     )
     crawler = HttpCrawler(
         request_handler=mock_request_handler,
