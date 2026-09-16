@@ -171,6 +171,9 @@ class _BasicCrawlerOptions(TypedDict):
     concurrency_settings: NotRequired[ConcurrencySettings]
     """Settings to fine-tune concurrency levels."""
 
+    autoscaled_pool_class: NotRequired[type[AutoscaledPool]]
+    """The pool class deciding how concurrency moves within `concurrency_settings`."""
+
     request_handler_timeout: NotRequired[timedelta]
     """Maximum duration allowed for a single request handler to run."""
 
@@ -295,6 +298,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         additional_http_error_status_codes: Iterable[int] | None = None,
         ignore_http_error_status_codes: Iterable[int] | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
+        autoscaled_pool_class: type[AutoscaledPool] = AutoscaledPool,
         request_handler_timeout: timedelta = timedelta(minutes=1),
         statistics: Statistics[TStatisticsState] | None = None,
         abort_on_error: bool = False,
@@ -344,6 +348,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             ignore_http_error_status_codes: HTTP status codes that are typically considered errors but should be treated
                 as successful responses.
             concurrency_settings: Settings to fine-tune concurrency levels.
+            autoscaled_pool_class: The pool class deciding how concurrency moves within `concurrency_settings`. Pass
+                `ThroughputAutoscaledPool` to settle near the throughput peak of the targets.
             request_handler_timeout: Maximum duration allowed for a single request handler to run.
             statistics: A custom `Statistics` instance, allowing the use of non-default configuration.
             abort_on_error: If True, the crawler stops immediately when any request handler error occurs.
@@ -490,7 +496,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
         self._robots_txt_lock = asyncio.Lock()
         self._snapshotter = Snapshotter.from_config(config)
-        self._autoscaled_pool = AutoscaledPool(
+        self._autoscaled_pool = autoscaled_pool_class(
             system_status=SystemStatus(self._snapshotter),
             concurrency_settings=concurrency_settings,
             is_finished_function=self.__is_finished_function,

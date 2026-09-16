@@ -47,3 +47,16 @@ The `desired_concurrency` option in the <ApiLink to="class/ConcurrencySettings">
 ## Autoscaled pool
 
 The <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink> manages a pool of asynchronous, resource-intensive tasks that run in parallel. It automatically starts new tasks only when there is enough free CPU and memory. To monitor system resources, it leverages the <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> and <ApiLink to="class/SystemStatus">`SystemStatus`</ApiLink> classes. If any task raises an exception, the error is propagated, and the pool is stopped. Every crawler uses an <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink> under the hood.
+
+## Throughput autoscaled pool
+
+The default <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink> adds tasks until CPU or memory runs out. When the target website is the bottleneck, more tasks stop paying off. The site answers more slowly, and the crawler finishes fewer pages while loading the site harder. The experimental <ApiLink to="class/ThroughputAutoscaledPool">`ThroughputAutoscaledPool`</ApiLink>, passed to a crawler as `autoscaled_pool_class`, steers by throughput instead. By Little's law, `N` tasks that each take `T` seconds finish `N / T` tasks per second, so more concurrency helps only while `T` grows slower than `N`. The pool reads throughput from windows of finished tasks and doubles the concurrency while that pays off. It then compares a level above and a level below the current concurrency, moves toward the better one, and holds once the two tie at the peak. It doesn't stay there for good. After each hold it measures the levels around the peak again, so even on a steady site the concurrency keeps moving within about 15% of it. The CPU and memory checks of the default pool still apply.
+
+The pool works best on long-running crawls. It learns the peak from finished tasks, so the time it spends measuring pays off only over a long run.
+
+Known limitations of the throughput pool:
+
+- Each step waits for its tasks to finish, so on slow pages the throughput pool ramps up more slowly than the default pool.
+- Every finished task counts as work, so a site that answers fast with errors such as HTTP 429 looks like it can take more.
+- The pool looks for a single concurrency for the whole crawl. Across many hosts, each with its own peak, such a point rarely exists, so the pool stays unstable and keeps moving instead of holding.
+- Stay with the default pool when the machine is the bottleneck. When you need a fixed rate, use `max_tasks_per_minute` with the default pool, since the throughput pool only settles at whatever rate the limit lets through.
