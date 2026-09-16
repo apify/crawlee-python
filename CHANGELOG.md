@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Make enqueue_links and export_to overloads consistent with their implementations ([#2225](https://github.com/apify/crawlee-python/pull/2225)) ([47e4630](https://github.com/apify/crawlee-python/commit/47e46308a0871527523b902889f87ecdf6c8445f)) by [@vdusek](https://github.com/vdusek)
 - **throttling-manager:** Apply per-domain backoff when `retry_on_blocked` is disabled ([#2158](https://github.com/apify/crawlee-python/pull/2158)) ([9c23101](https://github.com/apify/crawlee-python/commit/9c2310180478c2821d006e514ec55bfbfec4b4dc)) by [@Mantisus](https://github.com/Mantisus), closes [#2126](https://github.com/apify/crawlee-python/issues/2126)
 - **autoscaling:** Keep `min_concurrency` tasks running while the system is overloaded ([#2235](https://github.com/apify/crawlee-python/pull/2235)) ([cbaefb4](https://github.com/apify/crawlee-python/commit/cbaefb49eb75ce7f57610aceffc1f1220d3c9cc7)) by [@Mantisus](https://github.com/Mantisus)
+- Propagate autoscaled pool scheduling errors ([#2229](https://github.com/apify/crawlee-python/pull/2229)) ([cb7822e](https://github.com/apify/crawlee-python/commit/cb7822e0337ea6b03f27514f8a7f22cae134d7d6)) by [@Kuang-xianxin](https://github.com/Kuang-xianxin)
 
 
 <!-- git-cliff-unreleased-end -->
