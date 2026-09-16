@@ -85,18 +85,21 @@ class PlaywrightPersistentBrowser(Browser):
 
         return self._context
 
-    async def _delete_temp_dir(self, _: BrowserContext | None) -> None:
+    async def _delete_temp_dir(self, _: BrowserContext | None = None) -> None:
         """Remove the temporary user data directory, retrying until the browser releases its files.
 
         The browser process can keep files in the directory open for a while after the context is closed, which makes
         the removal fail on Windows.
         """
-        temp_dir = self._temp_dir
-
-        if not temp_dir:
-            return
-
         async with self._temp_dir_lock:
+            temp_dir = self._temp_dir
+
+            if not temp_dir:
+                return
+
+            # One close asks for the removal twice, so the second caller finds nothing left to do.
+            self._temp_dir = None
+
             for attempt in range(self._TMP_DIR_DELETE_ATTEMPTS):
                 if attempt:
                     await asyncio.sleep(self._TMP_DIR_DELETE_INTERVAL.total_seconds())
@@ -115,7 +118,7 @@ class PlaywrightPersistentBrowser(Browser):
             await self._context.close()
             self._context = None
         self._is_connected = False
-        await self._delete_temp_dir(self._context)
+        await self._delete_temp_dir()
 
     @property
     @override

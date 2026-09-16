@@ -52,6 +52,8 @@ async def test_delete_temp_folder_when_files_are_locked(
     playwright: Playwright, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The temp directory is removed even when the first delete attempts fail, as Windows locks the browser files."""
+    monkeypatch.setattr(PlaywrightPersistentBrowser, '_TMP_DIR_DELETE_INTERVAL', timedelta(0))
+
     real_rmtree = shutil.rmtree
     locked_attempts = 3
     rmtree = Mock()
@@ -72,7 +74,8 @@ async def test_delete_temp_folder_when_files_are_locked(
     current_temp_dir = persist_browser._temp_dir
     assert current_temp_dir.exists()
     await persist_browser.close()
-    assert rmtree.call_count > locked_attempts
+    # The context's `close` event and `close` itself both ask for the removal, but only one of them retries.
+    assert rmtree.call_count == locked_attempts + 1
     assert not current_temp_dir.exists()
 
 
@@ -88,6 +91,6 @@ async def test_warn_when_temp_folder_cannot_be_deleted(
     persist_browser._temp_dir = tmp_path
 
     with caplog.at_level(logging.WARNING, logger='crawlee.browsers._playwright_browser'):
-        await persist_browser._delete_temp_dir(None)
+        await persist_browser._delete_temp_dir()
 
     assert 'Could not remove the temporary user data directory' in caplog.text
