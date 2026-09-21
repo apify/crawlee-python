@@ -303,6 +303,19 @@ def test_get_cpu_info_measures_a_window_when_the_sampler_has_no_reading(
     cpu_load.sample.assert_called_once()
 
 
+@pytest.mark.usefixtures('_cpu_limited')
+def test_get_cpu_info_measures_a_window_without_a_sampler(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without a sampler, the load is still measured against the limit."""
+    get_cpu_used_ratio = Mock(return_value=0.25)
+    monkeypatch.setattr(proclimits, 'get_cpu_used_ratio', get_cpu_used_ratio)
+    cpu_percent = Mock(return_value=42.0)
+    monkeypatch.setattr(psutil, 'cpu_percent', cpu_percent)
+
+    assert get_cpu_info().used_ratio == 0.25
+    get_cpu_used_ratio.assert_called_once_with(system._CPU_SAMPLE_INTERVAL_SECS)
+    cpu_percent.assert_not_called()
+
+
 @pytest.mark.parametrize(
     ('sampled', 'measured'),
     [

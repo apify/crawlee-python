@@ -217,6 +217,7 @@ def _log_resource_limits() -> None:
     # The latch is consumed before the reading, so a sensor that raises costs one snapshot rather than every one.
     if not _ResourceLimits.is_pending:
         return
+
     _ResourceLimits.is_pending = False
 
     limits = proclimits.snapshot()
@@ -230,7 +231,7 @@ def _log_resource_limits() -> None:
     logger.info(f'Resource limits applying to this process: memory {memory}, CPU {cpu}.')
 
 
-def get_cpu_info(cpu_load: proclimits.CpuLoad) -> CpuInfo:
+def get_cpu_info(cpu_load: proclimits.CpuLoad | None = None) -> CpuInfo:
     """Retrieve the current CPU usage.
 
     Under a container limit the load is measured against the cores this process may use. The sampler measures across
@@ -239,6 +240,7 @@ def get_cpu_info(cpu_load: proclimits.CpuLoad) -> CpuInfo:
 
     Args:
         cpu_load: The sampler owned by the caller. Two callers sharing one would measure each other's windows.
+            Without one, every call under a limit takes a short measurement of its own.
     """
     logger.debug('Calling get_cpu_info()...')
 
@@ -246,7 +248,7 @@ def get_cpu_info(cpu_load: proclimits.CpuLoad) -> CpuInfo:
     if proclimits.get_cpu_limit() is None:
         return CpuInfo(used_ratio=psutil.cpu_percent(interval=_CPU_SAMPLE_INTERVAL_SECS) / 100)
 
-    used_ratio = cpu_load.sample()
+    used_ratio = cpu_load.sample() if cpu_load is not None else None
 
     if used_ratio is None:
         used_ratio = proclimits.get_cpu_used_ratio(_CPU_SAMPLE_INTERVAL_SECS)
