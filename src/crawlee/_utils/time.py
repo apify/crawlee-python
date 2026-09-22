@@ -1,16 +1,24 @@
 from __future__ import annotations
 
+import asyncio
+import sys
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from async_timeout import Timeout, timeout
-
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from types import TracebackType
+
+if sys.version_info >= (3, 11):
+    timeout_ctx = asyncio.timeout
+else:
+    # async-timeout backports asyncio.timeout for Python 3.10; drop once the
+    # project floor is 3.11 (its Timeout also raises TimeoutError, a subclass
+    # of asyncio.TimeoutError, on expiry).
+    from async_timeout import timeout as timeout_ctx  # type: ignore[no-redef]
 
 _SECONDS_PER_MINUTE = 60
 _SECONDS_PER_HOUR = 3600
@@ -46,7 +54,7 @@ class SharedTimeout:
 
     def __init__(self, timeout: timedelta) -> None:
         self._remaining_timeout = timeout
-        self._active_timeout: Timeout | None = None
+        self._active_timeout: asyncio.Timeout | None = None
         self._activation_timestamp: float | None = None
 
     async def __aenter__(self) -> timedelta:
@@ -54,7 +62,7 @@ class SharedTimeout:
             raise RuntimeError('A shared timeout context cannot be entered twice at the same time')
 
         self._activation_timestamp = time.monotonic()
-        self._active_timeout = new_timeout = timeout(self._remaining_timeout.total_seconds())
+        self._active_timeout = new_timeout = timeout_ctx(self._remaining_timeout.total_seconds())
         await new_timeout.__aenter__()
         return self._remaining_timeout
 

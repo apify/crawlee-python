@@ -34,7 +34,7 @@ keywords = [
     "scraping",
 ]
 dependencies = [
-    "async-timeout>=5.0.1",
+    "async-timeout>=5.0.1; python_full_version < '3.11'",
     "cachetools>=5.5.0",
     "colorama>=0.4.0",
     "impit>=0.13.2",
