@@ -52,3 +52,29 @@ def test_nested_guard_keeps_the_inner_message(module_name: str, monkeypatch: pyt
 
     assert sys.modules[module_name].OptionalSymbol.message == inner_message
     assert inner_message.count('pip install') == 1
+
+
+def test_omitted_extra_keeps_the_original_message(module_name: str) -> None:
+    """Without `extra_name` the message is left as it is, so external callers of the helper keep working."""
+    with try_import(module_name, 'OptionalSymbol'):
+        raise ModuleNotFoundError("No module named 'parsel'", name='parsel')
+
+    assert sys.modules[module_name].OptionalSymbol.message == "No module named 'parsel'"
+
+
+def test_install_hint_names_the_given_package(module_name: str) -> None:
+    """Downstream packages reusing the helper can point users at their own extras."""
+    with try_import(module_name, 'OptionalSymbol', extra_name='scrapy', package_name='apify'):
+        raise ModuleNotFoundError("No module named 'scrapy'", name='scrapy')
+
+    assert sys.modules[module_name].OptionalSymbol.message == (
+        "No module named 'scrapy'. Install the optional 'scrapy' extra to use it: pip install 'apify[scrapy]'"
+    )
+
+
+def test_import_error_without_arguments_is_handled(module_name: str) -> None:
+    """An `ImportError` carrying no message does not break the guard itself."""
+    with try_import(module_name, 'OptionalSymbol', extra_name='parsel'):
+        raise ImportError
+
+    assert sys.modules[module_name].OptionalSymbol.message == ''
