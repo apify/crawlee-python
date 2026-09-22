@@ -2,15 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.10.2 - **not yet released**
+## [1.10.2](https://github.com/apify/crawlee-python/releases/tag/v1.10.2) (2026-09-22)
 
 ### 🐛 Bug Fixes
 
 - Make `extra_name` of `try_import` optional and the install hint reusable ([#2247](https://github.com/apify/crawlee-python/pull/2247)) ([626f334](https://github.com/apify/crawlee-python/commit/626f3343ecd72d3031b15c24160ae4ea78912153)) by [@Pijukatel](https://github.com/Pijukatel)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.10.1](https://github.com/apify/crawlee-python/releases/tag/v1.10.1) (2026-09-16)
 
 ### 🐛 Bug Fixes
