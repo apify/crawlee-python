@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
 
@@ -15,29 +15,15 @@ from ._client_mixin import MetadataUpdateParams, RedisClientMixin
 from ._utils import await_redis_response
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Mapping
 
     from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
+    from redis.commands.json._util import JsonType
 
     from crawlee._types import JsonSerializable
 
-    # Mirrors redis' own JSON type, which requires arrays to be a `list`.
-    JsonType = Mapping[str, 'JsonType'] | list['JsonType'] | str | int | float | bool | None
-
 logger = getLogger(__name__)
-
-
-def _to_redis_json(value: JsonSerializable) -> JsonType:
-    """Convert a JSON-serializable value to the `JsonType` accepted by redis JSON commands.
-
-    Redis expects arrays as `list`, while `JsonSerializable` allows any read-only `Sequence`.
-    """
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, Mapping):
-        return {key: _to_redis_json(item) for key, item in value.items()}
-    return [_to_redis_json(item) for item in value]
 
 
 class _DatasetMetadataUpdateParams(MetadataUpdateParams):
@@ -148,7 +134,8 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         items = data if isinstance(data, Sequence) else [data]
 
         async with self._get_pipeline() as pipe:
-            pipe.json().arrappend(self._items_key, '$', *[_to_redis_json(item) for item in items])
+            # redis' `JsonType` types arrays as `list`, although `arrappend` only encodes them.
+            pipe.json().arrappend(self._items_key, '$', *cast('list[JsonType]', items))
             await self._update_metadata(
                 pipe,
                 **_DatasetMetadataUpdateParams(
