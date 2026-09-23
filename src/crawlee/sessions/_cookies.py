@@ -3,7 +3,6 @@ from __future__ import annotations
 from copy import deepcopy
 from email.message import Message
 from http.cookiejar import Cookie, CookieJar
-from logging import getLogger
 from typing import TYPE_CHECKING, Any, Literal
 from urllib.request import Request as UrlRequest
 
@@ -14,8 +13,6 @@ from crawlee._utils.docs import docs_group
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from typing import TypeGuard
-
-logger = getLogger(__name__)
 
 
 class _SetCookieResponse:
@@ -113,7 +110,7 @@ class SessionCookies:
         http_only: bool = False,
         secure: bool = False,
         same_site: Literal['Lax', 'None', 'Strict'] | None = None,
-        **ignored_kwargs: Any,
+        **_ignored_kwargs: Any,
     ) -> None:
         """Create and store a cookie with modern browser attributes.
 
@@ -126,11 +123,7 @@ class SessionCookies:
             http_only: Whether cookie is HTTP-only.
             secure: Whether cookie requires secure context.
             same_site: SameSite cookie attribute value.
-            ignored_kwargs: Unknown cookie parameters, which are ignored.
         """
-        if ignored_kwargs:
-            logger.debug(f'Ignoring unknown parameters of cookie {name!r}: {sorted(ignored_kwargs)}')
-
         cookie = Cookie(
             version=0,
             name=name,
