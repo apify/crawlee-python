@@ -180,6 +180,23 @@ async def test_domain_matching_is_case_insensitive(
 
 
 @pytest.mark.parametrize(
+    ('url', 'expected'),
+    [
+        pytest.param(f'https://{THROTTLED_DOMAIN}/page2', True, id='rate-limited'),
+        pytest.param(f'https://{NON_THROTTLED_DOMAIN}/page1', False, id='unconfigured'),
+    ],
+)
+async def test_is_throttled(manager: ThrottlingRequestManager[RequestQueue], url: str, *, expected: bool) -> None:
+    """Only a configured domain in a cooldown is reported as throttled."""
+    assert manager.is_throttled(f'https://{THROTTLED_DOMAIN}/page1') is False
+
+    manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/page1')
+    manager.record_domain_delay(f'https://{NON_THROTTLED_DOMAIN}/page1')
+
+    assert manager.is_throttled(url) is expected
+
+
+@pytest.mark.parametrize(
     ('configured', 'url'),
     [
         pytest.param('xn--hky-ela4t.cz', 'https://háčky.cz/page', id='punycode entry'),
@@ -1067,6 +1084,374 @@ async def test_reclaim_routes_to_sub_manager_after_restart(fs_service_locator: S
 
     assert not await restarted._sub_managers[THROTTLED_DOMAIN].is_empty()
     assert await restarted.inner.is_empty()
+
+
+# ── Stall Detection Tests ─────────────────────────────
+
+
+def _stall(manager: ThrottlingRequestManager[Any], clock: MagicMock, url: str) -> None:
+    """Rate-limit `url` twice, a full stall window apart, so its domain counts as stalled."""
+    manager.record_domain_delay(url)
+    clock.now.return_value += manager._max_domain_stall + timedelta(seconds=1)
+    manager.record_domain_delay(url)
+
+
+async def test_stall_reported_after_window(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A domain rate-limiting every request for longer than the window is reported as stalled."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await manager.add_request(url)
+
+    with _frozen_clock() as clock:
+        manager.record_domain_delay(url)
+        assert await manager.get_stall_reason() is None
+
+        clock.now.return_value += manager._max_domain_stall + timedelta(seconds=1)
+        manager.record_domain_delay(url)
+        reason = await manager.get_stall_reason()
+
+    assert reason is not None
+    assert f'"{THROTTLED_DOMAIN}" (901s)' in reason
+    assert '`max_domain_stall` (900s)' in reason
+
+
+async def test_suppressed_429_extends_stall(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A 429 inside an active backoff still counts as the domain turning us away."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    state = manager._domain_states[THROTTLED_DOMAIN]
+
+    with _frozen_clock() as clock:
+        manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
+        clock.now.return_value += timedelta(seconds=30)
+        manager.record_domain_delay(url)
+
+    assert state.consecutive_429_count == 1
+    assert state.rate_limited_since == CLOCK_START
+    assert state.last_rate_limited_at == CLOCK_START + timedelta(seconds=30)
+
+
+async def test_first_429_after_idle_not_stalled(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """Idle time before the first 429 doesn't count towards the stall window."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await manager.add_request(url)
+
+    with _frozen_clock() as clock:
+        clock.now.return_value += manager._max_domain_stall * 2
+        manager.record_domain_delay(url)
+        assert await manager.get_stall_reason() is None
+
+
+async def test_old_rate_limit_not_stalled(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A domain that stopped rate-limiting a window ago is waited out, not stalled."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await manager.add_request(url)
+
+    with _frozen_clock() as clock:
+        manager.record_domain_delay(url)
+        clock.now.return_value += manager._max_domain_stall + timedelta(seconds=1)
+        assert await manager.get_stall_reason() is None
+
+
+@pytest.mark.parametrize(
+    'from_inner',
+    [
+        pytest.param(False, id='sub-manager'),
+        pytest.param(True, id='inner'),
+    ],
+)
+async def test_handled_request_clears_stall(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+    *,
+    from_inner: bool,
+) -> None:
+    """Marking a request of the domain as handled resets its stall clock, whoever holds the request."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+
+    with _frozen_clock() as clock:
+        await (inner_queue if from_inner else manager).add_request(url)
+        request = await manager.fetch_next_request()
+        assert request is not None
+        await manager.add_request(f'https://{THROTTLED_DOMAIN}/page2')
+
+        _stall(manager, clock, url)
+        assert await manager.get_stall_reason() is not None
+
+        await manager.mark_request_as_handled(request)
+        assert await manager.get_stall_reason() is None
+
+
+async def test_reclaim_keeps_stall(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """Reclaiming a request doesn't reset the stall clock."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await manager.add_request(url)
+
+    with _frozen_clock() as clock:
+        request = await manager.fetch_next_request()
+        assert request is not None
+        _stall(manager, clock, url)
+
+        await manager.reclaim_request(request)
+        assert await manager.get_stall_reason() is not None
+
+
+async def test_record_success_keeps_stall(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """`record_success` doesn't reset the stall clock."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await manager.add_request(url)
+
+    with _frozen_clock() as clock:
+        _stall(manager, clock, url)
+        manager.record_success(url)
+        assert await manager.get_stall_reason() is not None
+
+
+@pytest.mark.parametrize(
+    'ready_url',
+    [
+        pytest.param(f'https://{NON_THROTTLED_DOMAIN}/page1', id='inner'),
+        pytest.param(f'https://{SECOND_THROTTLED_DOMAIN}/page1', id='other-domain'),
+    ],
+)
+async def test_ready_work_masks_stall(
+    two_domain_manager: ThrottlingRequestManager[RequestQueue], ready_url: str
+) -> None:
+    """Dispatchable work anywhere else keeps a stalled domain from ending the crawl."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await two_domain_manager.add_request(url)
+    await two_domain_manager.add_request(ready_url)
+
+    with _frozen_clock() as clock:
+        _stall(two_domain_manager, clock, url)
+        assert await two_domain_manager.get_stall_reason() is None
+
+
+async def test_waiting_domain_masks_stall(two_domain_manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A domain waiting out a cooldown with work left keeps a stalled domain from ending the crawl."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    waiting_url = f'https://{SECOND_THROTTLED_DOMAIN}/page1'
+    await two_domain_manager.add_request(url)
+    await two_domain_manager.add_request(waiting_url)
+
+    with _frozen_clock() as clock:
+        _stall(two_domain_manager, clock, url)
+        two_domain_manager.record_domain_delay(waiting_url, retry_after=timedelta(seconds=60))
+        assert await two_domain_manager.get_stall_reason() is None
+
+
+async def test_empty_waiting_domain_does_not_mask_stall(
+    two_domain_manager: ThrottlingRequestManager[RequestQueue],
+) -> None:
+    """A domain in a cooldown with no work left doesn't keep a stalled domain from being reported."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await two_domain_manager.add_request(url)
+
+    with _frozen_clock() as clock:
+        _stall(two_domain_manager, clock, url)
+        two_domain_manager.record_domain_delay(f'https://{SECOND_THROTTLED_DOMAIN}/page1')
+        reason = await two_domain_manager.get_stall_reason()
+
+    assert reason is not None
+    assert THROTTLED_DOMAIN in reason
+    assert SECOND_THROTTLED_DOMAIN not in reason
+
+
+async def test_lapsed_backoff_does_not_mask_stall(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A stalled domain between two 429s isn't progress just because its backoff has run out."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await manager.add_request(url)
+
+    with _frozen_clock() as clock:
+        _stall(manager, clock, url)
+        clock.now.return_value = manager._domain_states[THROTTLED_DOMAIN].throttled_until + timedelta(seconds=1)
+        assert await manager.get_stall_reason() is not None
+
+
+async def test_empty_domain_not_stalled(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A domain with no requests left is finished, not stalled."""
+    with _frozen_clock() as clock:
+        _stall(manager, clock, f'https://{THROTTLED_DOMAIN}/page1')
+        assert await manager.get_stall_reason() is None
+
+
+async def test_is_empty_skips_stall_candidate(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A stalled domain doesn't count for `is_empty`, but its request can still be fetched."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await manager.add_request(url)
+
+    with _frozen_clock() as clock:
+        _stall(manager, clock, url)
+        clock.now.return_value = manager._domain_states[THROTTLED_DOMAIN].throttled_until + timedelta(seconds=1)
+
+        assert await manager.is_empty() is True
+        request = await manager.fetch_next_request()
+
+    assert request is not None
+    assert request.url == url
+
+
+async def test_purge_resets_stall_and_migrations(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+) -> None:
+    """A purge clears the stall clock and the migration count."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await inner_queue.add_request(url)
+    state = manager._domain_states[THROTTLED_DOMAIN]
+
+    with _frozen_clock() as clock:
+        _stall(manager, clock, url)
+        assert await manager.fetch_next_request() is None
+
+        await manager.purge()
+
+    assert state.rate_limited_since is None
+    assert state.last_rate_limited_at is None
+    assert await manager.get_total_count() == 0
+    assert await manager.get_handled_count() == 0
+
+
+@pytest.mark.parametrize(
+    'max_domain_stall',
+    [
+        pytest.param(timedelta(0), id='zero'),
+        pytest.param(timedelta(seconds=-1), id='negative'),
+    ],
+)
+async def test_max_domain_stall_must_be_positive(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+    max_domain_stall: timedelta,
+) -> None:
+    """A non-positive `max_domain_stall` is rejected."""
+    with pytest.raises(ValueError, match='max_domain_stall'):
+        ThrottlingRequestManager(
+            inner_queue,
+            domains=TEST_DOMAINS,
+            request_manager_opener=RequestQueue.open,
+            service_locator=service_locator,
+            max_domain_stall=max_domain_stall,
+        )
+
+
+# ── Inner Migration Tests ─────────────────────────────
+
+
+async def test_inner_request_migrates_while_throttled(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+) -> None:
+    """An inner request whose domain is in a cooldown moves into the domain's sub-manager instead of being fetched."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await inner_queue.add_request(url)
+    manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
+
+    assert await manager.fetch_next_request() is None
+
+    assert await inner_queue.is_finished() is True
+    assert await manager._sub_managers[THROTTLED_DOMAIN].get_total_count() == 1
+    assert await manager.get_total_count() == 1
+    assert await manager.get_handled_count() == 0
+    assert await manager.is_finished() is False
+
+
+async def test_inner_request_dispatched_when_not_throttled(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+) -> None:
+    """An inner request whose domain isn't in a cooldown is fetched from inner."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await inner_queue.add_request(url)
+
+    request = await manager.fetch_next_request()
+
+    assert request is not None
+    assert request.url == url
+    assert await manager._sub_managers[THROTTLED_DOMAIN].get_total_count() == 0
+
+
+async def test_migrated_copy_is_unhandled(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+) -> None:
+    """The request that lands in the sub-manager isn't marked handled along with the inner one."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await inner_queue.add_request(url)
+
+    with _frozen_clock() as clock:
+        manager.record_domain_delay(url)
+        assert await manager.fetch_next_request() is None
+
+        clock.now.return_value = manager._domain_states[THROTTLED_DOMAIN].throttled_until
+        request = await manager.fetch_next_request()
+
+    assert request is not None
+    assert request.url == url
+    assert request.handled_at is None
+
+
+async def test_migration_count_is_capped(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+) -> None:
+    """One fetch moves at most `_MAX_INNER_MIGRATIONS` requests out of inner."""
+    await inner_queue.add_requests([f'https://{THROTTLED_DOMAIN}/page{i}' for i in range(3)])
+    manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/', retry_after=timedelta(seconds=60))
+
+    with patch(f'{MANAGER_MODULE}._MAX_INNER_MIGRATIONS', 2):
+        assert await manager.fetch_next_request() is None
+
+    assert await inner_queue.get_handled_count() == 2
+    assert await manager._sub_managers[THROTTLED_DOMAIN].get_total_count() == 2
+
+
+@pytest.mark.parametrize(
+    ('add_request_mock', 'expected_error'),
+    [
+        pytest.param(AsyncMock(side_effect=RuntimeError('storage failure')), RuntimeError, id='error'),
+        pytest.param(AsyncMock(side_effect=asyncio.CancelledError), asyncio.CancelledError, id='cancelled'),
+        pytest.param(AsyncMock(return_value=None), RuntimeError, id='refused'),
+    ],
+)
+async def test_migration_failure_reclaims_request(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+    add_request_mock: AsyncMock,
+    expected_error: type[BaseException],
+) -> None:
+    """A request whose migration fails goes back to inner before the error is raised."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await inner_queue.add_request(url)
+    manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
+    await manager._ensure_sub_managers()
+
+    sub_manager = manager._sub_managers[THROTTLED_DOMAIN]
+    with patch.object(sub_manager, 'add_request', add_request_mock), pytest.raises(expected_error):
+        await manager.fetch_next_request()
+
+    assert await inner_queue.get_handled_count() == 0
+    assert await manager.get_total_count() == 1
+    request = await inner_queue.fetch_next_request()
+    assert request is not None
+    assert request.url == url
+
+
+async def test_stall_sees_migrated_inner_work(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+) -> None:
+    """Moving a stalled domain's request out of inner lets the stall be reported."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    await inner_queue.add_request(url)
+
+    with _frozen_clock() as clock:
+        request = await manager.fetch_next_request()
+        assert request is not None
+        _stall(manager, clock, url)
+        await manager.reclaim_request(request)
+        assert await manager.get_stall_reason() is None
+
+        assert await manager.fetch_next_request() is None
+        assert await manager.get_stall_reason() is not None
 
 
 # ── Utility Tests ──────────────────────────────────────

@@ -57,8 +57,10 @@ from crawlee.errors import (
     ContextPipelineInterruptedError,
     HttpClientStatusCodeError,
     HttpStatusCodeError,
+    PersistentRateLimitError,
     RequestCollisionError,
     RequestHandlerError,
+    RequestThrottledError,
     SessionError,
     UserDefinedErrorHandlerError,
     UserHandlerTimeoutError,
@@ -342,7 +344,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             additional_http_error_status_codes: Additional HTTP status codes to treat as errors,
                 triggering automatic retries when encountered.
             ignore_http_error_status_codes: HTTP status codes that are typically considered errors but should be treated
-                as successful responses.
+                as successful responses. Doesn't apply to a 429 from a domain throttled by a `ThrottlingRequestManager`,
+                which is retried later.
             concurrency_settings: Settings to fine-tune concurrency levels.
             request_handler_timeout: Maximum duration allowed for a single request handler to run.
             statistics: A custom `Statistics` instance, allowing the use of non-default configuration.
@@ -698,6 +701,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 queue will be purged. A run that ended with an exception does not count as a previous run, so a
                 retry keeps the requests that were still pending. Named request queues are considered persistent
                 and are never purged implicitly.
+
+        Raises:
+            PersistentRateLimitError: If a domain throttled by a `ThrottlingRequestManager` has rate-limited every
+                request for longer than the manager's `max_domain_stall` and no other requests are left.
         """
         if self._running:
             raise RuntimeError(
@@ -1420,6 +1427,19 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if self._keep_alive:
             return False
 
+        # Check for a stall only when the pool is idle. An in-flight request can still enqueue new work or end the
+        # stall.
+        if (
+            isinstance(self._request_manager, ThrottlingRequestManager)
+            and self._autoscaled_pool.current_concurrency == 0
+            and (reason := await self._request_manager.get_stall_reason()) is not None
+        ):
+            error = PersistentRateLimitError(f'Giving up: {reason}')
+            self._logger.error(
+                'Giving up the crawl because a domain keeps rate-limiting every request.', exc_info=error
+            )
+            raise error
+
         request_manager = await self.get_request_manager()
         return await request_manager.is_finished()
 
@@ -1507,6 +1527,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             await self._handle_request_error(context, request_error)
 
         except RequestHandlerError as primary_error:
+            if isinstance(primary_error.wrapped_exception, RequestThrottledError) and self._is_held_back(request):
+                await self._defer_throttled_request(request, primary_error.wrapped_exception)
+                return
+
             primary_error = cast(
                 'RequestHandlerError[TCrawlingContext]', primary_error
             )  # valid thanks to ContextPipeline
@@ -1568,6 +1592,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             await self._mark_request_as_handled(request)
 
         except ContextPipelineInitializationError as initialization_error:
+            wrapped = initialization_error.wrapped_exception
+            if isinstance(wrapped, RequestThrottledError) and self._is_held_back(request):
+                await self._defer_throttled_request(request, wrapped)
+                return
+
             self._logger.debug(
                 'An exception occurred during the initialization of crawling context',
                 exc_info=initialization_error,
@@ -1588,6 +1617,32 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     await cleanup()
                 except Exception:  # noqa: PERF203
                     self._logger.exception('Error in deferred cleanup')
+
+    def _is_held_back(self, request: Request) -> bool:
+        """Check whether a `ThrottlingRequestManager` holds the request's domain back, so a deferral can't spin."""
+        manager = self._request_manager
+        if isinstance(manager, ThrottlingRequestManager) and manager.is_throttled(request.url):
+            return True
+
+        self._logger_once.log(
+            f'`RequestThrottledError` was raised for {request.url}, but no `ThrottlingRequestManager` holds its domain '
+            "back, so it's handled as an ordinary error. Raise it only for a configured domain, after "
+            '`ThrottlingRequestManager.record_domain_delay` has put the domain into a backoff.',
+            key='throttled_error_without_backoff',
+            level=logging.WARNING,
+        )
+        return False
+
+    async def _defer_throttled_request(self, request: Request, error: RequestThrottledError) -> None:
+        """Give a rate-limited request back to the request manager without counting a failure or a retry."""
+        request.state = RequestState.ERROR_HANDLER
+        self._logger.debug(
+            f'Deferring request because its domain is rate-limiting us. {error}',
+            extra={'url': request.url, 'unique_key': request.unique_key},
+        )
+        request_manager = await self.get_request_manager()
+        await request_manager.reclaim_request(request, forefront=request.forefront)
+        self._statistics.record_request_processing_deferral(request.unique_key)
 
     async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
         context.request.state = RequestState.BEFORE_NAV
@@ -1630,7 +1685,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         *,
         request_url: str,
         retry_after_header: str | None = None,
-    ) -> None:
+    ) -> bool:
         """Record a 429 Too Many Requests response so the request's domain gets a backoff.
 
         Rate limiting is independent of session blocking, so this runs for every response regardless of
@@ -1640,9 +1695,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             status_code: The HTTP status code to check.
             request_url: The request URL, used for per-domain rate limit tracking.
             retry_after_header: The value of the `Retry-After` response header, if present.
+
+        Returns:
+            True if a `ThrottlingRequestManager` recorded the 429 for the request's domain, so the request should be
+                deferred.
         """
         if status_code != HTTPStatus.TOO_MANY_REQUESTS:
-            return
+            return False
 
         if not isinstance(self._request_manager, ThrottlingRequestManager):
             self._logger_once.log(
@@ -1653,7 +1712,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 key='no_throttling_manager_on_429',
                 level=logging.WARNING,
             )
-            return
+            return False
 
         retry_after = parse_retry_after_header(retry_after_header)
         if not self._request_manager.record_domain_delay(request_url, retry_after=retry_after):
@@ -1666,6 +1725,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     key=f'unconfigured_throttle_domain:{domain}',
                     level=logging.WARNING,
                 )
+            return False
+
+        return True
 
     def _raise_for_session_blocked_status_code(self, session: Session | None, status_code: int) -> None:
         """Raise an exception if the given status code indicates the session is blocked.

@@ -38,6 +38,7 @@ from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
 from crawlee.fingerprint_suite._header_generator import fingerprint_browser_type_from_playwright_browser_type
 from crawlee.http_clients import ImpitHttpClient
 from crawlee.proxy_configuration import ProxyConfiguration
+from crawlee.request_loaders import ThrottlingRequestManager
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import Statistics
 from crawlee.statistics._error_snapshotter import ErrorSnapshotter
@@ -1318,6 +1319,47 @@ async def test_error_handler_can_access_page(server_url: URL) -> None:
     # The failed-request handler runs only on the final attempt, which may itself be a non-navigated one, so an empty
     # result is legitimate here. Any content it did record must still be the page HTML.
     assert set(failed_handler_calls) <= {HELLO_WORLD.decode()}
+
+
+async def test_throttled_429_is_deferred() -> None:
+    """A throttled 429 is retried later without spending a retry, a session rotation or session reputation."""
+    url = 'https://throttled.placeholder.com/page'
+    throttler = ThrottlingRequestManager(
+        await RequestQueue.open(),
+        domains=['throttled.placeholder.com'],
+        request_manager_opener=RequestQueue.open,
+        base_delay=timedelta(milliseconds=50),
+        max_delay=timedelta(milliseconds=100),
+    )
+    failed_request_handler = AsyncMock()
+    crawler = PlaywrightCrawler(
+        request_manager=throttler,
+        session_pool=SessionPool(max_pool_size=1),
+        max_request_retries=0,
+        max_session_rotations=0,
+    )
+    crawler.failed_request_handler(failed_request_handler)
+    statuses = [429, 200]
+    handled: list[PlaywrightCrawlingContext] = []
+
+    @crawler.pre_navigation_hook
+    async def fulfill_with_next_status(context: PlaywrightPreNavCrawlingContext) -> None:
+        status = statuses.pop(0)
+        await context.page.route(url, lambda route: route.fulfill(status=status, body='<html></html>'))
+
+    @crawler.router.default_handler
+    async def handler(context: PlaywrightCrawlingContext) -> None:
+        handled.append(context)
+
+    await crawler.run([url])
+
+    assert [context.response.status for context in handled] == [200]
+    failed_request_handler.assert_not_called()
+    assert handled[0].request.retry_count == 0
+    assert (handled[0].request.session_rotation_count or 0) == 0
+    session = handled[0].session
+    assert session is not None
+    assert session.error_score == 0
 
 
 def test_import_error_handled() -> None:

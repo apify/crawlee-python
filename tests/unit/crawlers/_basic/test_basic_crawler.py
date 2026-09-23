@@ -26,7 +26,13 @@ from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpMethod
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
-from crawlee.errors import RequestCollisionError, SessionError, UserDefinedErrorHandlerError
+from crawlee.errors import (
+    PersistentRateLimitError,
+    RequestCollisionError,
+    RequestThrottledError,
+    SessionError,
+    UserDefinedErrorHandlerError,
+)
 from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
 from crawlee.http_clients import HttpClient
 from crawlee.request_loaders import RequestList, RequestManagerTandem, ThrottlingRequestManager
@@ -2620,3 +2626,260 @@ async def test_throttled_domain_waits_out_backoff_without_ending_the_crawl() -> 
     assert empty_during_cooldown == [True]
     assert len(dispatched_at) == 2
     assert dispatched_at[1] - dispatched_at[0] >= 0.5
+
+
+THROTTLED_URL = 'https://throttled.placeholder.com/page'
+
+# Well above the autoscaled pool's idle tick of 0.5 s, so a stall is detected even on a slow runner and lasts for
+# more than one tick.
+MAX_DOMAIN_STALL = timedelta(milliseconds=1200)
+
+# Guards the tests against an endless crawl if deferral or stall detection breaks.
+MAX_HANDLER_CALLS = 50
+
+
+async def _open_throttler() -> ThrottlingRequestManager[RequestQueue]:
+    """Open a throttler for `THROTTLED_URL` with short delays and a short stall window."""
+    return ThrottlingRequestManager(
+        await RequestQueue.open(),
+        domains=['throttled.placeholder.com'],
+        request_manager_opener=RequestQueue.open,
+        base_delay=timedelta(milliseconds=50),
+        max_delay=timedelta(milliseconds=100),
+        max_domain_stall=MAX_DOMAIN_STALL,
+    )
+
+
+async def test_handler_raised_throttled_error_is_deferred() -> None:
+    """A `RequestThrottledError` from the handler costs neither a retry nor session reputation."""
+    throttler = await _open_throttler()
+    failed_request_handler = AsyncMock()
+    crawler = BasicCrawler(
+        request_manager=throttler,
+        session_pool=SessionPool(max_pool_size=1),
+        max_request_retries=0,
+    )
+    crawler.failed_request_handler(failed_request_handler)
+    contexts = list[BasicCrawlingContext]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        contexts.append(context)
+        if len(contexts) == 1:
+            throttler.record_domain_delay(context.request.url)
+            raise RequestThrottledError
+
+    stats = await crawler.run([THROTTLED_URL])
+
+    assert len(contexts) == 2
+    failed_request_handler.assert_not_called()
+    assert contexts[1].request.retry_count == 0
+    assert stats.requests_finished == 1
+    assert stats.requests_failed == 0
+    session = contexts[1].session
+    assert session is not None
+    assert session.error_score == 0
+
+
+@pytest.mark.parametrize(
+    'use_throttler',
+    [
+        pytest.param(True, id='no-recorded-delay'),
+        pytest.param(False, id='no-throttler'),
+    ],
+)
+async def test_throttled_error_without_backoff_is_ordinary_error(
+    caplog: pytest.LogCaptureFixture,
+    *,
+    use_throttler: bool,
+) -> None:
+    """A `RequestThrottledError` whose domain nothing holds back is retried and failed like any other error."""
+    request_manager = await _open_throttler() if use_throttler else None
+    failed_request_handler = AsyncMock()
+    crawler = BasicCrawler(request_manager=request_manager, max_request_retries=1)
+    crawler.failed_request_handler(failed_request_handler)
+    handler = AsyncMock(side_effect=RequestThrottledError)
+    crawler.router.default_handler(handler)
+
+    with caplog.at_level(logging.WARNING):
+        stats = await crawler.run([THROTTLED_URL])
+
+    assert handler.await_count == 2
+    failed_request_handler.assert_called_once()
+    assert stats.requests_failed == 1
+    assert any('no `ThrottlingRequestManager` holds its domain back' in record.message for record in caplog.records)
+
+
+async def test_keep_alive_ignores_stall() -> None:
+    """A crawler running with `keep_alive` keeps waiting on a stalled domain instead of raising."""
+    throttler = await _open_throttler()
+    crawler = BasicCrawler(request_manager=throttler, keep_alive=True)
+    stall_reasons = list[str | None]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        throttler.record_domain_delay(context.request.url)
+        raise RequestThrottledError
+
+    async def stop_after_stall() -> None:
+        stall_reasons.append(await poll_until_condition(throttler.get_stall_reason, timeout=10))
+        # Past the pool's next check, where a crawler without `keep_alive` raises.
+        await asyncio.sleep(0.6)
+        crawler.stop()
+
+    stopper = asyncio.create_task(stop_after_stall())
+    try:
+        await crawler.run([THROTTLED_URL])
+        await stopper
+    finally:
+        stopper.cancel()
+
+    assert stall_reasons[0] is not None
+
+
+async def test_stall_waits_for_in_flight_work() -> None:
+    """A stall isn't raised while a request is in flight, so the work it enqueues is still crawled."""
+    throttler = await _open_throttler()
+    # An overloaded system still runs `min_concurrency` tasks, so the throttled request keeps being dispatched while the
+    # slow one is in flight.
+    crawler = BasicCrawler(
+        request_manager=throttler,
+        concurrency_settings=ConcurrencySettings(min_concurrency=2, desired_concurrency=2),
+    )
+    visited = list[str]()
+    stall_reasons = list[str | None]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+        if len(visited) > MAX_HANDLER_CALLS:
+            crawler.stop()
+        if context.request.url == THROTTLED_URL:
+            throttler.record_domain_delay(context.request.url)
+            raise RequestThrottledError
+        if context.request.url == 'https://free.placeholder.com/slow':
+            stall_reasons.append(await poll_until_condition(throttler.get_stall_reason, timeout=10))
+            # Two more pool checks, so at least one ran entirely while the stall was live and this request in flight.
+            checks = is_finished.await_count
+            await poll_until_condition(lambda: is_finished.await_count >= checks + 2, timeout=10)
+            await context.add_requests(['https://free.placeholder.com/next'])
+
+    with (
+        patch.object(throttler, 'is_finished', wraps=throttler.is_finished) as is_finished,
+        pytest.raises(PersistentRateLimitError),
+    ):
+        await crawler.run([THROTTLED_URL, 'https://free.placeholder.com/slow'])
+
+    assert stall_reasons[0] is not None
+    assert 'https://free.placeholder.com/next' in visited
+
+
+async def test_max_requests_per_crawl_precedes_stall() -> None:
+    """Reaching `max_requests_per_crawl` ends the crawl normally even when a domain has stalled."""
+    throttler = await _open_throttler()
+    crawler = BasicCrawler(
+        request_manager=throttler,
+        max_requests_per_crawl=1,
+        # An overloaded system still runs `min_concurrency` tasks, so the throttled request keeps being dispatched
+        # while the slow one is in flight.
+        concurrency_settings=ConcurrencySettings(min_concurrency=2, desired_concurrency=2),
+    )
+    calls = 0
+    stall_reasons = list[str | None]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        nonlocal calls
+        calls += 1
+        if calls > MAX_HANDLER_CALLS:
+            crawler.stop()
+        if context.request.url == THROTTLED_URL:
+            throttler.record_domain_delay(context.request.url)
+            raise RequestThrottledError
+        stall_reasons.append(await poll_until_condition(throttler.get_stall_reason, timeout=10))
+
+    stats = await crawler.run([THROTTLED_URL, 'https://free.placeholder.com/slow'])
+
+    assert stall_reasons[0] is not None
+    assert stats.requests_finished == 1
+
+
+async def test_stall_waits_for_paced_domain() -> None:
+    """A stalled domain doesn't end the crawl while a domain paced by its crawl-delay still has work."""
+    paced_urls = [f'https://paced.placeholder.com/{i}' for i in range(3)]
+    throttler = ThrottlingRequestManager(
+        await RequestQueue.open(),
+        domains=['throttled.placeholder.com', 'paced.placeholder.com'],
+        request_manager_opener=RequestQueue.open,
+        base_delay=timedelta(milliseconds=50),
+        max_delay=timedelta(milliseconds=100),
+        max_domain_stall=MAX_DOMAIN_STALL,
+    )
+    throttler.set_crawl_delay(paced_urls[0], 1)
+    crawler = BasicCrawler(request_manager=throttler)
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+        # A deferral every ~100 ms over a few seconds stays well below this.
+        if len(visited) > 200:
+            crawler.stop()
+        if context.request.url == THROTTLED_URL:
+            throttler.record_domain_delay(context.request.url)
+            raise RequestThrottledError
+
+    with pytest.raises(PersistentRateLimitError):
+        await crawler.run([THROTTLED_URL, *paced_urls])
+
+    assert set(paced_urls) <= set(visited)
+
+
+async def test_inner_held_429_is_deferred_and_stalls() -> None:
+    """A rate-limited request held by `inner` moves into its domain's sub-manager and can stall the crawl."""
+    throttler = await _open_throttler()
+    await throttler.inner.add_request(THROTTLED_URL)
+    crawler = BasicCrawler(request_manager=throttler)
+    calls = 0
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        nonlocal calls
+        calls += 1
+        if calls > MAX_HANDLER_CALLS:
+            crawler.stop()
+        throttler.record_domain_delay(context.request.url)
+        raise RequestThrottledError
+
+    with pytest.raises(PersistentRateLimitError):
+        await crawler.run()
+
+    assert await throttler.inner.is_finished() is True
+    assert await throttler.is_finished() is False
+
+
+@pytest.mark.parametrize(
+    ('outcomes', 'expected_histogram'),
+    [
+        pytest.param(['429', 'ok'], [1], id='deferral-only'),
+        pytest.param(['error', 'error', '429', 'ok'], [0, 0, 1], id='after-retries'),
+    ],
+)
+async def test_deferral_not_counted_as_retry(outcomes: list[str], expected_histogram: list[int]) -> None:
+    """A deferral doesn't show up in the retry histogram, while earlier retries still do."""
+    throttler = await _open_throttler()
+    crawler = BasicCrawler(request_manager=throttler, max_request_retries=3)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        outcome = outcomes.pop(0)
+        if outcome == 'error':
+            raise RuntimeError('Handler failed')
+        if outcome == '429':
+            throttler.record_domain_delay(context.request.url)
+            raise RequestThrottledError
+
+    stats = await crawler.run([THROTTLED_URL])
+
+    assert outcomes == []
+    assert stats.retry_histogram == expected_histogram

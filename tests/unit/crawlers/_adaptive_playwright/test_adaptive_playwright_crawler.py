@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from itertools import cycle
 from typing import TYPE_CHECKING, cast
-from unittest.mock import Mock, call, patch
+from unittest.mock import AsyncMock, Mock, call, patch
 
 import pytest
 from bs4 import Tag
@@ -29,6 +29,7 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statisti
     AdaptivePlaywrightCrawlerStatisticState,
 )
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import AdaptiveContextError
+from crawlee.request_loaders import ThrottlingRequestManager
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storage_clients import SqlStorageClient
@@ -935,6 +936,45 @@ async def test_adaptive_playwright_crawler_with_sql_storage(test_urls: list[str]
         await crawler.run(test_urls[:1])
 
         mocked_handler.assert_called()
+
+
+async def test_throttled_429_is_deferred() -> None:
+    """A throttled 429 from the browser sub crawler is retried later without spending a retry."""
+    url = 'https://throttled.placeholder.com/page'
+    throttler = ThrottlingRequestManager(
+        await RequestQueue.open(),
+        domains=['throttled.placeholder.com'],
+        request_manager_opener=RequestQueue.open,
+        base_delay=timedelta(milliseconds=50),
+        max_delay=timedelta(milliseconds=100),
+    )
+    failed_request_handler = AsyncMock()
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(
+            rendering_types=cycle(['client only']), detection_probability_recommendation=cycle([0])
+        ),
+        request_manager=throttler,
+        max_request_retries=0,
+        max_session_rotations=0,
+    )
+    crawler.failed_request_handler(failed_request_handler)
+    statuses = [429, 200]
+    handled: list[AdaptivePlaywrightCrawlingContext] = []
+
+    @crawler.pre_navigation_hook
+    async def fulfill_with_next_status(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+        status = statuses.pop(0)
+        await context.page.route(url, lambda route: route.fulfill(status=status, body='<html></html>'))
+
+    @crawler.router.default_handler
+    async def handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        handled.append(context)
+
+    await crawler.run([url])
+
+    assert [context.response.status for context in handled] == [200]
+    failed_request_handler.assert_not_called()
+    assert handled[0].request.retry_count == 0
 
 
 @pytest.mark.parametrize(
