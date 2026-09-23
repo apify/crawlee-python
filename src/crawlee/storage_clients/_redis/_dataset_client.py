@@ -133,7 +133,7 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         items = data if isinstance(data, Sequence) else [data]
 
         async with self._get_pipeline() as pipe:
-            pipe.json().arrappend(self._items_key, '$', *items)
+            pipe.json().arrappend(self._items_key, '$', *cast('list[Any]', items))
             await self._update_metadata(
                 pipe,
                 **_DatasetMetadataUpdateParams(
