@@ -28,7 +28,7 @@ class _SetCookieResponse:
 
 
 @docs_group('Session management')
-class CookieParam(TypedDict, total=False):
+class CookieParam(TypedDict, total=False, closed=True):
     """Dictionary representation of cookies for `SessionCookies.set` method."""
 
     name: Required[str]
@@ -187,17 +187,23 @@ class SessionCookies:
 
     def _from_playwright(self, cookie_dict: PlaywrightCookieParam) -> CookieParam:
         """Convert Playwright cookie to internal format."""
-        result: dict = dict(cookie_dict)
+        result = CookieParam(name=cookie_dict.get('name', ''), value=cookie_dict.get('value', ''))
 
-        if 'httpOnly' in result:
-            result['http_only'] = result.pop('httpOnly')
-        if 'sameSite' in result:
-            result['same_site'] = result.pop('sameSite')
-        if 'expires' in result:
-            expires = int(result['expires'])
-            result['expires'] = None if expires == -1 else expires
+        if 'domain' in cookie_dict:
+            result['domain'] = cookie_dict['domain']
+        if 'path' in cookie_dict:
+            result['path'] = cookie_dict['path']
+        if 'secure' in cookie_dict:
+            result['secure'] = cookie_dict['secure']
+        if 'httpOnly' in cookie_dict:
+            result['http_only'] = cookie_dict['httpOnly']
+        if 'sameSite' in cookie_dict:
+            result['same_site'] = cookie_dict['sameSite']
+        # Playwright uses -1 for session cookies, which have no expiration.
+        if 'expires' in cookie_dict and (expires := int(cookie_dict['expires'])) != -1:
+            result['expires'] = expires
 
-        return CookieParam(name=result.pop('name', ''), value=result.pop('value', ''), **result)
+        return result
 
     def get_cookies_as_dicts(self) -> list[CookieParam]:
         """Convert cookies to a list with `CookieParam` dicts."""

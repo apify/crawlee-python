@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
@@ -133,7 +134,9 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         items = data if isinstance(data, Sequence) else [data]
 
         async with self._get_pipeline() as pipe:
-            pipe.json().arrappend(self._items_key, '$', *cast('list[Any]', items))
+            # Equivalent of `pipe.json().arrappend(...)`, whose `JsonType` stub only accepts `list`/`dict`, not
+            # read-only `Sequence`/`Mapping` values.
+            pipe.execute_command('JSON.ARRAPPEND', self._items_key, '$', *[json.dumps(item) for item in items])
             await self._update_metadata(
                 pipe,
                 **_DatasetMetadataUpdateParams(

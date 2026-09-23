@@ -20,8 +20,7 @@ async def main() -> None:
             # First pass: establish cookies once and store them for every session,
             # then raise to trigger a retry.
             await context.send_request('https://httpbingo.org/cookies/set?logged_in=1')
-            cookies = context.session.cookies.get_cookies_as_dicts()
-            state['cookies'] = cast('list[dict]', cookies)
+            state['cookies'] = context.session.cookies.get_cookies_as_dicts()
             raise RuntimeError('retry with cookies')
 
         context.log.info(f'Cookies: {context.session.cookies.get_cookies_as_dicts()}')
