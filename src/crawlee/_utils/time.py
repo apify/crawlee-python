@@ -15,9 +15,9 @@ if TYPE_CHECKING:
 if sys.version_info >= (3, 11):
     timeout_ctx = asyncio.timeout
 else:
-    # async-timeout backports asyncio.timeout for Python 3.10; drop once the
-    # project floor is 3.11 (its Timeout also raises TimeoutError, a subclass
-    # of asyncio.TimeoutError, on expiry).
+    # TODO: `async-timeout` backports `asyncio.timeout` for Python 3.10; drop once the
+    # project floor bump to 3.11
+    # https://github.com/apify/crawlee-python/issues/2052
     from async_timeout import timeout as timeout_ctx  # type: ignore[no-redef]
 
 _SECONDS_PER_MINUTE = 60
