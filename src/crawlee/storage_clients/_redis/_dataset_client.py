@@ -135,7 +135,8 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
 
         async with self._get_pipeline() as pipe:
             # redis' `JsonType` types arrays as `list`, although `arrappend` only encodes them.
-            pipe.json().arrappend(self._items_key, '$', *cast('list[JsonType]', items))
+            redis_items = cast('list[JsonType]', items)
+            pipe.json().arrappend(self._items_key, '$', *redis_items)
             await self._update_metadata(
                 pipe,
                 **_DatasetMetadataUpdateParams(
