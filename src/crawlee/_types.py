@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from crawlee.storage_clients import StorageClient
     from crawlee.storages import KeyValueStore
 
-    JsonSerializable = dict[str, 'JsonSerializable'] | list['JsonSerializable'] | str | int | float | bool | None
+    JsonSerializable = Mapping[str, 'JsonSerializable'] | Sequence['JsonSerializable'] | str | int | float | bool | None
 else:
     from pydantic import JsonValue as JsonSerializable
 

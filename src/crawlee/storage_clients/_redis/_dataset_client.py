@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
     from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
+    from redis.commands.json._util import JsonType
 
     from crawlee._types import JsonSerializable
 
@@ -133,7 +134,9 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         items = data if isinstance(data, Sequence) else [data]
 
         async with self._get_pipeline() as pipe:
-            pipe.json().arrappend(self._items_key, '$', *items)
+            # redis' `JsonType` types arrays as `list`, although `arrappend` only encodes them.
+            redis_items = cast('list[JsonType]', items)
+            pipe.json().arrappend(self._items_key, '$', *redis_items)
             await self._update_metadata(
                 pipe,
                 **_DatasetMetadataUpdateParams(
