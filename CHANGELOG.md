@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.10.3 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Make `JsonSerializable` type alias read-only ([#2249](https://github.com/apify/crawlee-python/pull/2249)) ([dd7358f](https://github.com/apify/crawlee-python/commit/dd7358f3d78b8d200bf53d3afb55b76c86b7c11d)) by [@Pijukatel](https://github.com/Pijukatel)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.10.2](https://github.com/apify/crawlee-python/releases/tag/v1.10.2) (2026-09-22)
 
 ### 🐛 Bug Fixes
