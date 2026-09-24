@@ -46,7 +46,7 @@ class PlaywrightPersistentBrowser(Browser):
         self._browser_launch_options = browser_launch_options
         self._user_data_dir = user_data_dir
         self._temp_dir: Path | None = None
-        # Both `close` and the context's `close` event trigger the removal, so serialize the two.
+        # Both `close` and the context's `close` event trigger the removal, and `close` must wait until it finishes.
         self._temp_dir_lock = asyncio.Lock()
 
         self._context: BrowserContext | None = None

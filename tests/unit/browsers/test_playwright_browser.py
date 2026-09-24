@@ -66,13 +66,15 @@ async def test_delete_temp_folder_when_files_are_locked(monkeypatch: pytest.Monk
     monkeypatch.setattr(shutil, 'rmtree', rmtree)
 
     # A real browser on Windows can hold the files longer than the whole retry budget, so a fake context stands in.
-    # Like Playwright, it runs the `close` listener as a separate task.
+    # Like Playwright, it runs the `close` listener as a separate task. Letting that task start first makes `close` wait
+    # for the removal the listener is running.
     context = Mock()
     listener_tasks = list[asyncio.Task]()
 
     async def close_context() -> None:
         listener = context.on.call_args.args[1]
         listener_tasks.append(asyncio.create_task(listener(context)))
+        await asyncio.sleep(0)
 
     context.close = close_context
     browser_type = Mock()
@@ -84,10 +86,10 @@ async def test_delete_temp_folder_when_files_are_locked(monkeypatch: pytest.Monk
     current_temp_dir = persist_browser._temp_dir
     assert current_temp_dir.exists()
     await persist_browser.close()
+    assert not current_temp_dir.exists()
     await asyncio.gather(*listener_tasks)
     # The context's `close` event and `close` itself both ask for the removal, but only one of them retries.
     assert rmtree.call_count == locked_attempts + 1
-    assert not current_temp_dir.exists()
 
 
 async def test_warn_when_temp_folder_cannot_be_deleted(
