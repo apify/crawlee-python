@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import shutil
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from playwright.async_api import async_playwright
@@ -48,9 +49,7 @@ async def test_delete_temp_folder_with_close_browser(playwright: Playwright) -> 
     assert not current_temp_dir.exists()
 
 
-async def test_delete_temp_folder_when_files_are_locked(
-    playwright: Playwright, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_delete_temp_folder_when_files_are_locked(monkeypatch: pytest.MonkeyPatch) -> None:
     """The temp directory is removed even when the first delete attempts fail, as Windows locks the browser files."""
     monkeypatch.setattr(PlaywrightPersistentBrowser, '_TMP_DIR_DELETE_INTERVAL', timedelta(0))
 
@@ -66,14 +65,26 @@ async def test_delete_temp_folder_when_files_are_locked(
     rmtree.side_effect = rmtree_locked_at_first
     monkeypatch.setattr(shutil, 'rmtree', rmtree)
 
-    persist_browser = PlaywrightPersistentBrowser(
-        playwright.chromium, user_data_dir=None, browser_launch_options={'headless': True}
-    )
+    # A real browser on Windows can hold the files longer than the whole retry budget, so a fake context stands in.
+    # Like Playwright, it runs the `close` listener as a separate task.
+    context = Mock()
+    listener_tasks = list[asyncio.Task]()
+
+    async def close_context() -> None:
+        listener = context.on.call_args.args[1]
+        listener_tasks.append(asyncio.create_task(listener(context)))
+
+    context.close = close_context
+    browser_type = Mock()
+    browser_type.launch_persistent_context = AsyncMock(return_value=context)
+
+    persist_browser = PlaywrightPersistentBrowser(browser_type, user_data_dir=None, browser_launch_options={})
     await persist_browser.new_context()
     assert isinstance(persist_browser._temp_dir, Path)
     current_temp_dir = persist_browser._temp_dir
     assert current_temp_dir.exists()
     await persist_browser.close()
+    await asyncio.gather(*listener_tasks)
     # The context's `close` event and `close` itself both ask for the removal, but only one of them retries.
     assert rmtree.call_count == locked_attempts + 1
     assert not current_temp_dir.exists()
