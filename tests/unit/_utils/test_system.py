@@ -413,7 +413,7 @@ def test_log_resource_limits_lets_a_failing_sensor_surface(monkeypatch: pytest.M
     with pytest.raises(RuntimeError):
         get_memory_info()
 
-    # The latch is consumed first, so the next sample reports as usual rather than raising again.
+    # The latch is consumed first, so the next sample reports as usual.
     assert get_memory_info().current_size >= ByteSize(100)
     snapshot.assert_called_once()
 

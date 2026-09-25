@@ -122,8 +122,8 @@ class Snapshotter:
         config = config or service_locator.get_configuration()
 
         # Compute the maximum memory size based on the provided configuration. If `memory_mbytes` is provided,
-        # it uses that value. Otherwise, it calculates the `max_memory_size` as a proportion of the system's
-        # total available memory based on `available_memory_ratio`.
+        # it uses that value. Otherwise, it calculates the `max_memory_size` as a proportion of the memory available
+        # to this process based on `available_memory_ratio`.
         max_memory_size = (
             ByteSize.from_mb(config.memory_mbytes)
             if config.memory_mbytes

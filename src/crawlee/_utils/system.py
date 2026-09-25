@@ -207,14 +207,14 @@ class MemoryInfo(MemoryUsageInfo):
 
 
 class _ResourceLimits:
-    """Process-wide latch keeping the limits report to one line per process, rather than one per sample."""
+    """Process-wide latch keeping the limits report to one line per process."""
 
     is_pending = True
 
 
 def _log_resource_limits() -> None:
     """Report the limits applying to this process, at most once per process and only where any apply."""
-    # The latch is consumed before the reading, so a sensor that raises costs one snapshot rather than every one.
+    # The latch is consumed before the reading, so a sensor that raises fails the first sample only.
     if not _ResourceLimits.is_pending:
         return
 
@@ -244,7 +244,7 @@ def get_cpu_info(cpu_load: proclimits.CpuLoad | None = None) -> CpuInfo:
     """
     logger.debug('Calling get_cpu_info()...')
 
-    # Read on every sample rather than latched, because a limit can be resized while the process runs.
+    # Read on every sample, since a limit can be resized while the process runs.
     if proclimits.get_cpu_limit() is None:
         return CpuInfo(used_ratio=psutil.cpu_percent(interval=_CPU_SAMPLE_INTERVAL_SECS) / 100)
 
