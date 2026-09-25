@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from logging import WARNING, getLogger
 from typing import TYPE_CHECKING, Annotated
 
+import proclimits
 import psutil
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
 
@@ -18,6 +19,9 @@ logger_once = LoggerOnce(logger)
 # Reading a memory metric of a process that is denied or gone raises either a `psutil.Error` or a bare `OSError` -
 # psutil re-raises `FileNotFoundError` as is when a `/proc` entry is missing for a process that is still alive.
 _METRIC_ERRORS = (psutil.Error, OSError)
+
+_CPU_SAMPLE_INTERVAL_SECS = 0.1
+"""How long a blocking CPU measurement lasts. A window shorter than 0.01 seconds is refused by the sensor."""
 
 
 class _PssAvailability:
@@ -185,7 +189,10 @@ class MemoryInfo(MemoryUsageInfo):
     total_size: Annotated[
         ByteSize, PlainValidator(ByteSize.validate), PlainSerializer(lambda size: size.bytes), Field(alias='totalSize')
     ]
-    """Total memory available in the system."""
+    """Total memory available to this process.
+
+    Under a container limit this is the limit rather than the memory of the host machine.
+    """
 
     system_wide_used_size: Annotated[
         ByteSize,
@@ -193,27 +200,74 @@ class MemoryInfo(MemoryUsageInfo):
         PlainSerializer(lambda size: size.bytes),
         Field(alias='systemWideUsedSize'),
     ]
-    """Total memory used by all processes system-wide (including non-crawlee processes)."""
+    """Total memory used within the scope `total_size` covers, including memory used by non-crawlee processes.
+
+    Under a container limit this is the memory charged against that limit.
+    """
 
 
-def get_cpu_info() -> CpuInfo:
+class _ResourceLimits:
+    """Process-wide latch keeping the limits report to one line per process."""
+
+    is_pending = True
+
+
+def _log_resource_limits() -> None:
+    """Report the limits applying to this process, at most once per process and only where any apply."""
+    # The latch is consumed before the reading, so a sensor that raises fails the first sample only.
+    if not _ResourceLimits.is_pending:
+        return
+
+    _ResourceLimits.is_pending = False
+
+    limits = proclimits.snapshot()
+    cores = limits.cpu_limit
+
+    if limits.memory_budget is None and cores is None:
+        return
+
+    memory = str(ByteSize(limits.memory_budget.limit)) if limits.memory_budget else 'unrestricted'
+    cpu = f'{cores:g} core{"" if cores == 1 else "s"}' if cores is not None else 'unrestricted'
+    logger.info(f'Resource limits applying to this process: memory {memory}, CPU {cpu}.')
+
+
+def get_cpu_info(cpu_load: proclimits.CpuLoad | None = None) -> CpuInfo:
     """Retrieve the current CPU usage.
 
-    It utilizes the `psutil` library. Function `psutil.cpu_percent()` returns a float representing the current
-    system-wide CPU utilization as a percentage.
+    Under a container limit the load is measured against the cores this process may use. The sampler measures across
+    the gap between calls, and a call it has no reading for, such as the first, falls back to a short measurement of
+    its own. Without a limit the process competes for the whole machine, and `psutil.cpu_percent()` answers instead.
+
+    Args:
+        cpu_load: The sampler owned by the caller. Two callers sharing one would measure each other's windows.
+            Without one, every call under a limit takes a short measurement of its own.
     """
     logger.debug('Calling get_cpu_info()...')
-    cpu_percent = psutil.cpu_percent(interval=0.1)
-    return CpuInfo(used_ratio=cpu_percent / 100)
+
+    # Read on every sample, since a limit can be resized while the process runs.
+    if proclimits.get_cpu_limit() is None:
+        return CpuInfo(used_ratio=psutil.cpu_percent(interval=_CPU_SAMPLE_INTERVAL_SECS) / 100)
+
+    used_ratio = cpu_load.sample() if cpu_load is not None else None
+
+    if used_ratio is None:
+        used_ratio = proclimits.get_cpu_used_ratio(_CPU_SAMPLE_INTERVAL_SECS)
+
+    if used_ratio is None:
+        used_ratio = psutil.cpu_percent(interval=_CPU_SAMPLE_INTERVAL_SECS) / 100
+
+    return CpuInfo(used_ratio=used_ratio)
 
 
 def get_memory_info() -> MemoryInfo:
     """Retrieve the current memory usage of the process and its children.
 
     It utilizes the `psutil` library. The reported `current_size` is best-effort - processes that cannot be inspected
-    are left out of the sum, and PSS may be substituted by RSS for some or all of the processes.
+    are left out of the sum, and PSS may be substituted by RSS for some or all of the processes. The system-wide
+    figures come from the limit applying to this process whenever one restricts how much memory it may use.
     """
     logger.debug('Calling get_memory_info()...')
+    _log_resource_limits()
     current_process = psutil.Process(os.getpid())
 
     # Retrieve estimated memory usage of the current process. Deliberately not guarded - a process can always read
@@ -236,10 +290,18 @@ def get_memory_info() -> MemoryInfo:
     for child in children:
         current_size_bytes += _get_child_used_memory(child)
 
-    vm = psutil.virtual_memory()
+    budget = proclimits.get_memory_budget()
+
+    if budget is None:
+        vm = psutil.virtual_memory()
+        total_size_bytes, system_wide_used_size_bytes = vm.total, vm.total - vm.available
+    else:
+        # Not clamped to the memory of the machine: a Windows job limits commit, so that would pair a commit charge
+        # with a physical ceiling.
+        total_size_bytes, system_wide_used_size_bytes = budget.limit, budget.used
 
     return MemoryInfo(
-        total_size=ByteSize(vm.total),
+        total_size=ByteSize(total_size_bytes),
         current_size=ByteSize(current_size_bytes),
-        system_wide_used_size=ByteSize(vm.total - vm.available),
+        system_wide_used_size=ByteSize(system_wide_used_size_bytes),
     )

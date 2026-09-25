@@ -11,14 +11,15 @@ from crawlee.events import LocalEventManager
 from crawlee.events._types import Event, EventSystemInfoData
 
 if TYPE_CHECKING:
+    import proclimits
     import pytest
 
 
 async def test_emit_system_info_event(monkeypatch: pytest.MonkeyPatch) -> None:
     """The recurring task emits the first `SystemInfo` event as soon as it starts, without waiting for the interval."""
-    # Both readings are replaced with instant ones - a real `get_cpu_info` samples the CPU utilization over 100 ms,
+    # Both readings are replaced with instant ones - a real `get_cpu_info` may sample the CPU utilization over 100 ms,
     # and on a loaded runner it takes far longer than that.
-    monkeypatch.setattr('crawlee.events._local_event_manager.get_cpu_info', lambda: MagicMock(spec=CpuInfo))
+    monkeypatch.setattr('crawlee.events._local_event_manager.get_cpu_info', lambda _: MagicMock(spec=CpuInfo))
     monkeypatch.setattr('crawlee.events._local_event_manager.get_memory_info', lambda: MagicMock(spec=MemoryInfo))
 
     mocked_listener = AsyncMock()
@@ -43,7 +44,7 @@ async def test_system_info_readings_run_concurrently(monkeypatch: pytest.MonkeyP
     # A party left waiting alone breaks the barrier, which fails the test instead of hanging it.
     barrier = threading.Barrier(2, timeout=5)
 
-    def get_cpu_info_at_barrier() -> Any:
+    def get_cpu_info_at_barrier(_cpu_load: Any) -> Any:
         barrier.wait()
         return MagicMock(spec=CpuInfo)
 
@@ -69,3 +70,30 @@ async def test_system_info_readings_run_concurrently(monkeypatch: pytest.MonkeyP
         await event_manager.wait_for_all_listeners_to_complete()
 
     assert len(received) == 1
+
+
+async def test_cpu_sampler_restarts_with_each_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each session samples the CPU afresh, instead of measuring across the idle gap since the previous one."""
+    samplers: list[proclimits.CpuLoad] = []
+
+    def get_cpu_info(cpu_load: proclimits.CpuLoad) -> Any:
+        samplers.append(cpu_load)
+        return MagicMock(spec=CpuInfo)
+
+    monkeypatch.setattr('crawlee.events._local_event_manager.get_cpu_info', get_cpu_info)
+    monkeypatch.setattr('crawlee.events._local_event_manager.get_memory_info', lambda: MagicMock(spec=MemoryInfo))
+
+    event_manager = LocalEventManager(system_info_interval=timedelta(hours=1))
+
+    for _ in range(2):
+        async with event_manager:
+            received = asyncio.Event()
+
+            async def listener(_event_data: EventSystemInfoData, received: asyncio.Event = received) -> None:
+                received.set()
+
+            event_manager.on(event=Event.SYSTEM_INFO, listener=listener)
+            await asyncio.wait_for(received.wait(), timeout=5)
+
+    assert len(samplers) == 2
+    assert samplers[0] is not samplers[1]

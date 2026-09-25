@@ -4,16 +4,18 @@ import asyncio
 import time
 from bisect import insort
 from datetime import datetime, timedelta, timezone
-from logging import getLogger
+from logging import WARNING, getLogger
 from math import floor
 from typing import TYPE_CHECKING, Any, cast
 from unittest import mock
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock
 
+import proclimits
 import pytest
 
 from crawlee import service_locator
 from crawlee._autoscaling import Snapshotter
+from crawlee._autoscaling import snapshotter as snapshotter_module
 from crawlee._autoscaling._types import (
     SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD,
     ClientSnapshot,
@@ -22,6 +24,7 @@ from crawlee._autoscaling._types import (
 )
 from crawlee._autoscaling.snapshotter import SortedSnapshotList
 from crawlee._utils.byte_size import ByteSize
+from crawlee._utils.log import LoggerOnce
 from crawlee._utils.system import CpuInfo, MemoryInfo, get_memory_info
 from crawlee.configuration import Configuration
 from crawlee.events import LocalEventManager
@@ -445,3 +448,33 @@ async def test_dynamic_memory(
         assert memory_samples[0].is_overloaded
         # Second sample can reflect the increased available memory based on the configuration used to create Snapshotter
         assert memory_samples[1].is_overloaded == (not dynamic_memory)
+
+
+@pytest.mark.parametrize(
+    ('config_options', 'limit_bytes', 'expected_warning'),
+    [
+        pytest.param({}, 512 * 1024**2, True, id='default ratio under a limit'),
+        pytest.param({'available_memory_ratio': 0.25}, 512 * 1024**2, False, id='ratio set explicitly'),
+        pytest.param({'memory_mbytes': 1024}, 512 * 1024**2, False, id='memory_mbytes set'),
+        pytest.param({}, None, False, id='no limit'),
+    ],
+)
+def test_from_config_warns_on_default_ratio_under_limit(
+    *,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    config_options: dict[str, Any],
+    limit_bytes: int | None,
+    expected_warning: bool,
+) -> None:
+    """Warns when the default `available_memory_ratio` stacks on top of a memory limit."""
+    budget = None if limit_bytes is None else proclimits.MemoryBudget(limit=limit_bytes, used=0, available=limit_bytes)
+    monkeypatch.setattr(proclimits, 'get_memory_budget', Mock(return_value=budget))
+    monkeypatch.setattr(snapshotter_module, 'logger_once', LoggerOnce(snapshotter_module.logger))
+
+    with caplog.at_level(WARNING, logger=snapshotter_module.logger.name):
+        Snapshotter.from_config(Configuration(**config_options))
+
+    warnings = [record.message for record in caplog.records if 'Setting max memory of this run' in record.message]
+    assert len(warnings) == int(expected_warning)
+    assert all('to 128.00 MB, 25% of the 512.00 MB memory limit' in warning for warning in warnings)
