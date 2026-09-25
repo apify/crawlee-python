@@ -87,7 +87,7 @@ def cpu_load(monkeypatch: pytest.MonkeyPatch) -> Mock:
 
 
 @pytest.fixture
-def _cpu_limited(monkeypatch: pytest.MonkeyPatch) -> None:
+def cpu_limited(monkeypatch: pytest.MonkeyPatch) -> None:
     """Report a CPU limit, so that the load is measured against it rather than against the host machine."""
     monkeypatch.setattr(proclimits, 'get_cpu_limit', Mock(return_value=1.0))
 
@@ -100,7 +100,7 @@ def measured_current_process(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
-def _fixed_host_memory(monkeypatch: pytest.MonkeyPatch) -> None:
+def fixed_host_memory(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pin the host memory `psutil` reports, so the expected values do not move with the machine running the tests."""
     monkeypatch.setattr(
         psutil,
@@ -250,7 +250,7 @@ def test_get_cpu_info_returns_valid_values(cpu_load: Mock) -> None:
     assert 0 <= cpu_info.used_ratio <= 1
 
 
-@pytest.mark.usefixtures('_fixed_host_memory', 'measured_current_process')
+@pytest.mark.usefixtures('fixed_host_memory', 'measured_current_process')
 def test_get_memory_info_reports_the_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     """A limit applying to the process replaces the memory of the host machine."""
     budget = proclimits.MemoryBudget(limit=512 * 1024**2, used=100 * 1024**2, available=412 * 1024**2)
@@ -262,7 +262,7 @@ def test_get_memory_info_reports_the_limit(monkeypatch: pytest.MonkeyPatch) -> N
     assert memory_info.system_wide_used_size == ByteSize(budget.used)
 
 
-@pytest.mark.usefixtures('_fixed_host_memory', 'measured_current_process')
+@pytest.mark.usefixtures('fixed_host_memory', 'measured_current_process')
 def test_get_memory_info_falls_back_to_the_host(monkeypatch: pytest.MonkeyPatch) -> None:
     """An unrestricted process is measured against the memory of the host machine."""
     monkeypatch.setattr(proclimits, 'get_memory_budget', Mock(return_value=None))
@@ -273,7 +273,7 @@ def test_get_memory_info_falls_back_to_the_host(monkeypatch: pytest.MonkeyPatch)
     assert memory_info.system_wide_used_size == ByteSize(HOST_TOTAL_BYTES - HOST_AVAILABLE_BYTES)
 
 
-@pytest.mark.usefixtures('_cpu_limited')
+@pytest.mark.usefixtures('cpu_limited')
 def test_get_cpu_info_measures_against_the_limit(monkeypatch: pytest.MonkeyPatch, cpu_load: Mock) -> None:
     """A sampled load is reported as it is, without measuring the host machine as well."""
     cpu_load.sample.return_value = 0.5
@@ -284,7 +284,7 @@ def test_get_cpu_info_measures_against_the_limit(monkeypatch: pytest.MonkeyPatch
     cpu_percent.assert_not_called()
 
 
-@pytest.mark.usefixtures('_cpu_limited')
+@pytest.mark.usefixtures('cpu_limited')
 def test_get_cpu_info_measures_a_window_when_the_sampler_has_no_reading(
     monkeypatch: pytest.MonkeyPatch, cpu_load: Mock
 ) -> None:
@@ -303,7 +303,7 @@ def test_get_cpu_info_measures_a_window_when_the_sampler_has_no_reading(
     cpu_load.sample.assert_called_once()
 
 
-@pytest.mark.usefixtures('_cpu_limited')
+@pytest.mark.usefixtures('cpu_limited')
 def test_get_cpu_info_measures_a_window_without_a_sampler(monkeypatch: pytest.MonkeyPatch) -> None:
     """Without a sampler, the load is still measured against the limit."""
     get_cpu_used_ratio = Mock(return_value=0.25)
@@ -323,7 +323,7 @@ def test_get_cpu_info_measures_a_window_without_a_sampler(monkeypatch: pytest.Mo
         pytest.param(None, 0.0, id='measured over a window'),
     ],
 )
-@pytest.mark.usefixtures('_cpu_limited')
+@pytest.mark.usefixtures('cpu_limited')
 def test_get_cpu_info_reports_an_idle_limit_as_no_load(
     monkeypatch: pytest.MonkeyPatch, cpu_load: Mock, sampled: float | None, measured: float | None
 ) -> None:
@@ -337,7 +337,7 @@ def test_get_cpu_info_reports_an_idle_limit_as_no_load(
     cpu_percent.assert_not_called()
 
 
-@pytest.mark.usefixtures('_cpu_limited')
+@pytest.mark.usefixtures('cpu_limited')
 def test_get_cpu_info_falls_back_to_the_host_without_a_rate(monkeypatch: pytest.MonkeyPatch, cpu_load: Mock) -> None:
     """A limit that no rate can be measured against is covered by the load of the host machine."""
     monkeypatch.setattr(psutil, 'cpu_percent', Mock(return_value=42.0))
