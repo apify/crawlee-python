@@ -507,6 +507,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._keep_alive = keep_alive
         self._running = False
         self._has_finished_before = False
+        self._last_run_failed = False
         self._failed = False
         self._unexpected_stop = False
         self._logger_once = LoggerOnce(self._logger)
@@ -696,8 +697,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             requests: The requests to be enqueued before the crawler starts.
             purge_request_queue: If this is `True` and the crawler is not being run for the first time, the request
                 queue will be purged. A run that ended with an exception does not count as a previous run, so a
-                retry keeps the requests that were still pending. Named request queues are considered persistent
-                and are never purged implicitly.
+                retry keeps the requests that were still pending even when this is `True`. Named request queues
+                are considered persistent and are never purged implicitly.
         """
         if self._running:
             raise RuntimeError(
@@ -706,86 +707,97 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         self._running = True
 
-        if self._respect_robots_txt_file and not isinstance(self._request_manager, ThrottlingRequestManager):
-            self._logger.warning(
-                'The `respect_robots_txt_file` option is enabled, but the crawler is not using '
-                '`ThrottlingRequestManager`. Crawl-delay directives from robots.txt will not be enforced. To enable '
-                'crawl-delay support, configure the crawler to use `ThrottlingRequestManager` as the request manager.'
-            )
-
-        if self._has_finished_before:
-            await self._statistics.reset()
-
-            if self._use_session_pool:
-                await self._session_pool.reset_store()
-
-            if purge_request_queue:
-                request_manager = await self.get_request_manager()
-                # A `ThrottlingRequestManager` delegates `purge` to the manager it wraps, so inspect the wrapped
-                # manager when deciding whether the purge would hit a named queue.
-                inner_manager = (
-                    request_manager.inner if isinstance(request_manager, ThrottlingRequestManager) else request_manager
-                )
-                # Named storages are persistent and shared across runs, so they are never purged implicitly
-                # (the same named-storage exemption as in `StorageClient._purge_if_needed`).
-                is_named_queue = isinstance(inner_manager, RequestQueue) and inner_manager.name is not None
-                if not is_named_queue:
-                    await request_manager.purge()
-
-        if requests is not None:
-            await self.add_requests(requests)
-
-        interrupted = False
-
-        def sigint_handler() -> None:
-            nonlocal interrupted
-
-            if not interrupted:
-                interrupted = True
-                self._logger.info('Pausing... Press CTRL+C again to force exit.')
-
-            run_task.cancel()
-
-        run_task = asyncio.create_task(self._run_crawler(), name='run_crawler_task')
-
-        if threading.current_thread() is threading.main_thread():  # `add_signal_handler` works only in the main thread
-            with suppress(NotImplementedError):  # event loop signal handlers are not supported on Windows
-                asyncio.get_running_loop().add_signal_handler(signal.SIGINT, sigint_handler)
-
         try:
-            await run_task
-        except CancelledError:
-            pass
+            if self._respect_robots_txt_file and not isinstance(self._request_manager, ThrottlingRequestManager):
+                self._logger.warning(
+                    'The `respect_robots_txt_file` option is enabled, but the crawler is not using '
+                    '`ThrottlingRequestManager`. Crawl-delay directives from robots.txt will not be enforced. To '
+                    'enable crawl-delay support, configure the crawler to use `ThrottlingRequestManager` as the '
+                    'request manager.'
+                )
+
+            if self._has_finished_before:
+                await self._statistics.reset()
+
+                if self._use_session_pool:
+                    await self._session_pool.reset_store()
+
+                # A failed run does not count as a previous run, so its pending requests survive into the retry.
+                if purge_request_queue and not self._last_run_failed:
+                    request_manager = await self.get_request_manager()
+                    # A `ThrottlingRequestManager` delegates `purge` to the manager it wraps, so inspect the wrapped
+                    # manager when deciding whether the purge would hit a named queue.
+                    inner_manager = (
+                        request_manager.inner
+                        if isinstance(request_manager, ThrottlingRequestManager)
+                        else request_manager
+                    )
+                    # Named storages are persistent and shared across runs, so they are never purged implicitly
+                    # (the same named-storage exemption as in `StorageClient._purge_if_needed`).
+                    is_named_queue = isinstance(inner_manager, RequestQueue) and inner_manager.name is not None
+                    if not is_named_queue:
+                        await request_manager.purge()
+
+            if requests is not None:
+                await self.add_requests(requests)
+
+            interrupted = False
+
+            def sigint_handler() -> None:
+                nonlocal interrupted
+
+                if not interrupted:
+                    interrupted = True
+                    self._logger.info('Pausing... Press CTRL+C again to force exit.')
+
+                run_task.cancel()
+
+            run_task = asyncio.create_task(self._run_crawler(), name='run_crawler_task')
+
+            # `add_signal_handler` works only in the main thread
+            if threading.current_thread() is threading.main_thread():
+                with suppress(NotImplementedError):  # event loop signal handlers are not supported on Windows
+                    asyncio.get_running_loop().add_signal_handler(signal.SIGINT, sigint_handler)
+
+            try:
+                await run_task
+            except CancelledError:
+                pass
+            finally:
+                if threading.current_thread() is threading.main_thread():
+                    with suppress(NotImplementedError):
+                        asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
+
+            if self._statistics.error_tracker.total > 0:
+                self._logger.info(
+                    'Error analysis:'
+                    f' total_errors={self._statistics.error_tracker.total}'
+                    f' unique_errors={self._statistics.error_tracker.unique_error_count}'
+                )
+
+            if interrupted:
+                self._logger.info(
+                    f'The crawl was interrupted. To resume, do: CRAWLEE_PURGE_ON_START=0 python {sys.argv[0]}'
+                )
+
+            self._has_finished_before = True
+            self._last_run_failed = False
+
+            await self._save_crawler_state()
+
+            final_statistics = self._statistics.calculate()
+            if self._statistics_log_format == 'table':
+                self._logger.info(f'Final request statistics:\n{final_statistics.to_table()}')
+            else:
+                self._logger.info('Final request statistics:', extra=final_statistics.to_dict())
+        except BaseException:
+            self._last_run_failed = True
+            raise
+        else:
+            return final_statistics
         finally:
             # A failed run must leave the instance usable, so that the caller can retry after handling the error.
             self._running = False
-
-            if threading.current_thread() is threading.main_thread():
-                with suppress(NotImplementedError):
-                    asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
-
-        if self._statistics.error_tracker.total > 0:
-            self._logger.info(
-                'Error analysis:'
-                f' total_errors={self._statistics.error_tracker.total}'
-                f' unique_errors={self._statistics.error_tracker.unique_error_count}'
-            )
-
-        if interrupted:
-            self._logger.info(
-                f'The crawl was interrupted. To resume, do: CRAWLEE_PURGE_ON_START=0 python {sys.argv[0]}'
-            )
-
-        self._has_finished_before = True
-
-        await self._save_crawler_state()
-
-        final_statistics = self._statistics.calculate()
-        if self._statistics_log_format == 'table':
-            self._logger.info(f'Final request statistics:\n{final_statistics.to_table()}')
-        else:
-            self._logger.info('Final request statistics:', extra=final_statistics.to_dict())
-        return final_statistics
 
     async def _run_crawler(self) -> None:
         local_event_manager = self._service_locator.get_event_manager()
