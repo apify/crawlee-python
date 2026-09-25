@@ -367,6 +367,12 @@ def test_get_cpu_info_measures_the_host_without_a_limit(monkeypatch: pytest.Monk
             id='single core',
         ),
         pytest.param(None, 2.5, 'memory unrestricted, CPU 2.5 cores.', id='fractional cores'),
+        pytest.param(
+            proclimits.MemoryBudget(limit=512 * 1024**2, used=100 * 1024**2, available=412 * 1024**2),
+            None,
+            'memory 512.00 MB, CPU unrestricted.',
+            id='memory only',
+        ),
     ],
 )
 @pytest.mark.usefixtures('measured_current_process')
