@@ -477,4 +477,4 @@ def test_from_config_warns_on_default_ratio_under_limit(
 
     warnings = [record.message for record in caplog.records if 'Setting max memory of this run' in record.message]
     assert len(warnings) == int(expected_warning)
-    assert all('to 25% of the 512.00 MB memory limit' in warning for warning in warnings)
+    assert all('to 128.00 MB, 25% of the 512.00 MB memory limit' in warning for warning in warnings)

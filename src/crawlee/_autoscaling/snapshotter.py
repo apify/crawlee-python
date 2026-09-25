@@ -135,10 +135,12 @@ class Snapshotter:
         if not config.memory_mbytes and 'available_memory_ratio' not in config.model_fields_set:
             budget = proclimits.get_memory_budget()
             if budget is not None:
+                limit = ByteSize(budget.limit)
                 logger_once.log(
-                    f'Setting max memory of this run to {config.available_memory_ratio:.0%} of the '
-                    f'{ByteSize(budget.limit)} memory limit applying to this process. Use the CRAWLEE_MEMORY_MBYTES '
-                    'or CRAWLEE_AVAILABLE_MEMORY_RATIO environment variable to override it.',
+                    f'Setting max memory of this run to {limit * config.available_memory_ratio}, '
+                    f'{config.available_memory_ratio:.0%} of the {limit} memory limit applying to this process. '
+                    'Use the CRAWLEE_MEMORY_MBYTES or CRAWLEE_AVAILABLE_MEMORY_RATIO environment variable to '
+                    'override it.',
                     key='default_memory_ratio_under_limit',
                     level=WARNING,
                 )
