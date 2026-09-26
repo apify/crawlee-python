@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Make `JsonSerializable` type alias read-only ([#2249](https://github.com/apify/crawlee-python/pull/2249)) ([dd7358f](https://github.com/apify/crawlee-python/commit/dd7358f3d78b8d200bf53d3afb55b76c86b7c11d)) by [@Pijukatel](https://github.com/Pijukatel)
+- Use container memory and CPU limits when running in a container ([#2128](https://github.com/apify/crawlee-python/pull/2128)) ([40dafe5](https://github.com/apify/crawlee-python/commit/40dafe5f98fbb2f0d84adcf289a4bcd0bedb646b)) by [@Mantisus](https://github.com/Mantisus), closes [#1535](https://github.com/apify/crawlee-python/issues/1535), [#2095](https://github.com/apify/crawlee-python/issues/2095)
 
 
 <!-- git-cliff-unreleased-end -->
