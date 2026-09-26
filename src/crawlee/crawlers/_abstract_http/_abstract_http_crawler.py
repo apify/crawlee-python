@@ -15,7 +15,7 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.time import SharedTimeout
 from crawlee._utils.urls import to_absolute_url_iterator
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
-from crawlee.errors import SessionError
+from crawlee.errors import RequestThrottledError, SessionError
 from crawlee.statistics import StatisticsState
 
 from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult, TSelectResult
@@ -295,6 +295,7 @@ class AbstractHttpCrawler(
             context: The current crawling context containing the HTTP response.
 
         Raises:
+            RequestThrottledError: If the response is a 429 from a domain throttled by a `ThrottlingRequestManager`.
             SessionError: If the status code indicates the session is blocked.
             HttpStatusCodeError: If the status code represents a server error or is explicitly configured as an error.
             HttpClientStatusCodeError: If the status code represents a client error.
@@ -303,11 +304,12 @@ class AbstractHttpCrawler(
             The original crawling context if no errors are detected.
         """
         status_code = context.http_response.status_code
-        self._record_rate_limit_status_code(
+        if self._record_rate_limit_status_code(
             status_code,
             request_url=context.request.url,
             retry_after_header=context.http_response.headers.get('retry-after'),
-        )
+        ):
+            raise RequestThrottledError(f'{context.request.url} responded with 429.')
         if self._retry_on_blocked:
             self._raise_for_session_blocked_status_code(context.session, status_code)
         self._raise_for_error_status_code(status_code)

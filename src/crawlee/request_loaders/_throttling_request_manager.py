@@ -39,20 +39,23 @@ eventually overflows the `timedelta` multiplication. Low enough that the doublin
 `base_delay` up to a year.
 """
 
+_MAX_INNER_MIGRATIONS = 1000
+"""How many requests one fetch may move out of `inner` before it returns `None`."""
+
 
 @docs_group('Request loaders')
 class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     """A request manager that wraps another and enforces per-domain delays.
 
     Requests for explicitly configured domains are routed into dedicated sub-managers, so each request lives in exactly
-    one store and is deduplicated there. A request that reached `inner` before its domain was configured stays and is
-    completed there, without the domain's delay.
+    one store and is deduplicated there. A configured-domain request that's already in `inner` moves into the domain's
+    sub-manager if it's fetched during the domain's cooldown. Otherwise it's dispatched and completed in `inner`.
 
     `fetch_next_request()` takes from the sub-manager whose domain has been waiting the longest, skipping domains in a
     cooldown, and falls back to the inner manager when no sub-manager yields a request. If nothing can be dispatched
-    right now, it returns `None` rather than waiting, so the caller's task slot is released. `is_empty()` reports the
-    same view and reads as empty while every remaining request sits in a cooldown, whereas `is_finished()` counts those
-    requests, so the crawl idles until they are dispatchable instead of ending early.
+    right now, it returns `None` rather than waiting, so the caller's task slot is released. `is_empty()` reads as
+    empty while every remaining request sits in a cooldown or belongs to a stalled domain, whereas `is_finished()`
+    counts those requests, so the crawl idles until they are dispatchable instead of ending early.
 
     Delay sources:
     - HTTP 429 responses (via `record_domain_delay`)
@@ -93,6 +96,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         service_locator: ServiceLocator | None = None,
         base_delay: timedelta = timedelta(seconds=2),
         max_delay: timedelta = timedelta(seconds=60),
+        max_domain_stall: timedelta = timedelta(seconds=900),
     ) -> None:
         """Initialize the throttling manager.
 
@@ -112,14 +116,22 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 locator, ensuring consistency with the crawler's storage backend.
             base_delay: Initial delay after the first 429 response from a domain.
             max_delay: Maximum delay between requests to a rate-limited domain.
+            max_domain_stall: How long a domain may rate-limit every request before the crawler raises
+                `PersistentRateLimitError`. A crawler running with `keep_alive` never raises it. The crawler checks
+                for a stall about twice a second, so a window under a second may not be detected.
 
         Raises:
-            ValueError: If a non-blank entry of `domains` does not yield a hostname a crawled URL could match.
+            ValueError: If a non-blank entry of `domains` does not yield a hostname a crawled URL could match, or if
+                `max_domain_stall` is not positive.
         """
+        if max_domain_stall <= timedelta(0):
+            raise ValueError(f'max_domain_stall must be positive, got {max_domain_stall}.')
+
         self._inner: TRequestManager = inner
         self._service_locator = service_locator if service_locator is not None else global_service_locator
         self._base_delay = base_delay
         self._max_delay = max_delay
+        self._max_domain_stall = max_domain_stall
         self._request_manager_opener = request_manager_opener
         # Padding on an entry would otherwise survive parsing into a key no crawled hostname can match.
         domain_keys = [self._parse_configured_domain(entry) for d in domains if (entry := d.strip())]
@@ -128,11 +140,14 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         self._sub_managers_ready = False
         self._sub_managers_lock = asyncio.Lock()
         self._in_flight_from_inner: set[tuple[str, str]] = set()
-        """`(unique_key, url)` pairs of configured-domain requests that `fetch_next_request` took from `inner`, where
-        they live if they were added before their domain was listed, and where they must be completed. The URL is part
-        of the key because an explicit `unique_key` is only unique per store. Identical pairs held by `inner` and by a
-        sub-manager are indistinguishable, so their completions can cross; both stores hold the key, so the cost is a
-        duplicate crawl and a retry without the domain's delay."""
+        """`(unique_key, url)` pairs of configured-domain requests that `fetch_next_request` took from `inner` and
+        dispatched, which must be completed there. A request fetched while its domain is in a cooldown moves into the
+        domain's sub-manager instead. The URL is part of the key because an explicit `unique_key` is only unique per
+        store. Identical pairs held by `inner` and by a sub-manager are indistinguishable, so their completions can
+        cross; both stores hold the key, so the cost is a duplicate crawl and a retry without the domain's delay."""
+        self._migrated_from_inner = 0
+        """Number of requests moved from `inner` into a sub-manager. Both stores count such a request, so the handled
+        and total counts subtract it."""
 
     @property
     def inner(self) -> TRequestManager:
@@ -152,12 +167,13 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """Empty the inner manager and all sub-managers, and reset transient per-domain throttle state.
 
         The configured domain list and any robots.txt-derived `crawl_delay` are preserved. Only the dynamic backoff
-        state (consecutive 429 counter and the throttle clocks) is cleared. Sub-managers stay open; they're just
-        emptied.
+        state (consecutive 429 counter, the throttle clocks and the stall clock) is cleared. Sub-managers stay open;
+        they're just emptied.
         """
         await self._ensure_sub_managers()
         await asyncio.gather(self._inner.purge(), *(sm.purge() for sm in self._sub_managers.values()))
         self._in_flight_from_inner.clear()
+        self._migrated_from_inner = 0
         for state in self._domain_states.values():
             state.reset_throttling()
 
@@ -245,7 +261,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 self._mark_domain_dispatched(domain)
                 return request
 
-        request = await self._inner.fetch_next_request()
+        request = await self._fetch_from_inner()
         if request is not None and self._extract_domain(request.url) in self._domain_states:
             self._in_flight_from_inner.add((request.unique_key, request.url))
         return request
@@ -261,6 +277,11 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         await self._ensure_sub_managers()
+        # Reached on success, when retries run out, or when the request is skipped. None of these ends in a 429, so the
+        # domain isn't turning every request away.
+        state = self._get_domain_state(request.url)
+        if state is not None:
+            state.rate_limited_since = None
         manager = self._fetch_owner(request)
         result = await manager.mark_request_as_handled(request)
         self._clear_fetch_owner(request)
@@ -272,7 +293,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         counts = await asyncio.gather(
             self._inner.get_handled_count(), *(sm.get_handled_count() for sm in self._sub_managers.values())
         )
-        return sum(counts)
+        return sum(counts) - self._migrated_from_inner
 
     @override
     async def get_total_count(self) -> int:
@@ -280,18 +301,25 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         counts = await asyncio.gather(
             self._inner.get_total_count(), *(sm.get_total_count() for sm in self._sub_managers.values())
         )
-        return sum(counts)
+        return sum(counts) - self._migrated_from_inner
 
     @override
     async def is_empty(self) -> bool:
         """Report whether anything can be dispatched right now.
 
-        Requests queued for a domain in a cooldown do not count. They still count towards `is_finished`, so the crawl
-        waits for them.
+        Requests queued for a domain in a cooldown don't count. They still count towards `is_finished`, so the crawl
+        waits for them. Requests of a domain that has rate-limited every request for longer than `max_domain_stall`
+        don't count either.
         """
         await self._ensure_sub_managers()
+        now = datetime.now(timezone.utc)
         results = await asyncio.gather(
-            self._inner.is_empty(), *(self._sub_managers[d].is_empty() for d in self._fetchable_domains())
+            self._inner.is_empty(),
+            *(
+                self._sub_managers[d].is_empty()
+                for d in self._fetchable_domains()
+                if not self._domain_states[d].is_stall_candidate(now, self._max_domain_stall)
+            ),
         )
         return all(results)
 
@@ -303,12 +331,64 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         )
         return all(results)
 
+    async def get_stall_reason(self) -> str | None:
+        """Explain why the crawl can't make progress, or return `None` if it can.
+
+        A domain is stalled once it has rate-limited every request for longer than `max_domain_stall`. It's reported
+        only when nothing else can be dispatched and no domain in a cooldown has requests left.
+        """
+        await self._ensure_sub_managers()
+        now = datetime.now(timezone.utc)
+        dispatchable: list[RequestManager] = [self._inner]
+        cooling: list[RequestManager] = []
+        candidates: list[str] = []
+
+        for domain, state in self._domain_states.items():
+            # A domain that turned away every request for the whole window isn't dispatchable just because its backoff
+            # lapsed between two 429s.
+            if state.is_stall_candidate(now, self._max_domain_stall):
+                candidates.append(domain)
+            elif now >= state.throttled_until:
+                dispatchable.append(self._sub_managers[domain])
+            else:
+                cooling.append(self._sub_managers[domain])
+
+        if not candidates:
+            return None
+
+        all_dispatchable_empty = all(await asyncio.gather(*(manager.is_empty() for manager in dispatchable)))
+        if not all_dispatchable_empty:
+            return None
+
+        # A domain waiting out a cooldown with work left will still make progress, so the crawl isn't stuck yet.
+        all_cooling_finished = all(await asyncio.gather(*(manager.is_finished() for manager in cooling)))
+        if not all_cooling_finished:
+            return None
+
+        candidates_empty = await asyncio.gather(*(self._sub_managers[domain].is_empty() for domain in candidates))
+        stalled = [domain for domain, is_empty in zip(candidates, candidates_empty, strict=True) if not is_empty]
+        if not stalled:
+            return None
+
+        summary = ', '.join(
+            f'"{domain}" ({(now - since).total_seconds():.0f}s)'
+            for domain in stalled
+            if (since := self._domain_states[domain].rate_limited_since) is not None
+        )
+        window = self._max_domain_stall.total_seconds()
+        return (
+            f'{summary} rate-limited every request for longer than `max_domain_stall` ({window:.0f}s). Waiting '
+            "longer will not help - lower the crawler's concurrency, or drop these domains. Their requests are "
+            'still queued, so re-running with purge_on_start disabled will resume them if the rate limit lifts.'
+        )
+
     def record_domain_delay(self, url: str, *, retry_after: timedelta | None = None) -> bool:
         """Record a 429 Too Many Requests response for the domain of the given URL.
 
         Advances the consecutive 429 count and calculates the next allowed request time using exponential backoff or
         the `Retry-After` value. Only the first 429 of a burst advances the count, so the delay tracks how hard the
-        domain pushes back, not how many requests were in flight.
+        domain pushes back, not how many requests were in flight. Every call, including a manual one or a 429 inside a
+        burst, also starts or extends the domain's stall clock.
 
         Args:
             url: The URL that received a 429 response.
@@ -324,6 +404,10 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             return False
 
         now = datetime.now(timezone.utc)
+
+        state.last_rate_limited_at = now
+        if state.rate_limited_since is None:
+            state.rate_limited_since = now
 
         # Requests in flight when the limit was hit all come back 429. That is one rate-limit event, so only the first
         # advances the exponent. Checking `crawl_delay_until` too would swallow every 429, as it is armed on every
@@ -369,7 +453,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """Reset a domain's consecutive 429 count, so the next 429 starts the backoff over at `base_delay`.
 
         An active backoff window is not lifted. The manager does not call this itself; the count decays on its own once
-        the domain has stopped rate-limiting for a full extra window.
+        the domain has stopped rate-limiting for a full extra window. It doesn't affect the stall clock.
 
         Args:
             url: The URL that received a successful response.
@@ -378,6 +462,14 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         if state is not None and state.consecutive_429_count > 0:
             logger.debug(f'Resetting rate limit state for domain "{state.domain}" after successful request')
             state.consecutive_429_count = 0
+
+    def is_throttled(self, url: str) -> bool:
+        """Check whether the URL's domain is in a cooldown, so requests to it are held back.
+
+        Args:
+            url: A URL from the domain to check.
+        """
+        return self._is_domain_throttled(self._extract_domain(url))
 
     def set_crawl_delay(self, url: str, delay_seconds: int) -> None:
         """Set the robots.txt crawl-delay for a domain.
@@ -476,6 +568,40 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
             self._sub_managers_ready = True
 
+    async def _fetch_from_inner(self) -> Request | None:
+        """Fetch the next request from `inner`, moving each one whose domain is in a cooldown into its sub-manager."""
+        for _ in range(_MAX_INNER_MIGRATIONS):
+            request = await self._inner.fetch_next_request()
+            if request is None:
+                return None
+
+            state = self._get_domain_state(request.url)
+            if state is None or datetime.now(timezone.utc) >= state.throttled_until:
+                return request
+
+            await self._migrate_to_sub_manager(request)
+
+        return None
+
+    async def _migrate_to_sub_manager(self, request: Request) -> None:
+        """Move a request fetched from `inner` into its domain's sub-manager."""
+        sub_manager = self._sub_managers[self._extract_domain(request.url)]
+        try:
+            # A copy, because some storage clients keep the added object and `inner` marks this one handled below.
+            processed = await sub_manager.add_request(request.model_copy(deep=True))
+        # Includes cancellation, which would otherwise leave the request in progress in `inner`.
+        except BaseException:
+            await self._inner.reclaim_request(request, forefront=True)
+            raise
+
+        # A storage that refuses the request returns `None` instead of raising.
+        if processed is None:
+            await self._inner.reclaim_request(request, forefront=True)
+            raise RuntimeError(f'The storage refused to move request {request.url} into its domain queue.')
+
+        await self._inner.mark_request_as_handled(request)
+        self._migrated_from_inner += 1
+
     def _is_domain_throttled(self, domain: str) -> bool:
         """Check if a domain is currently throttled."""
         state = self._domain_states.get(domain)
@@ -554,6 +680,12 @@ class _DomainState:
     crawl_delay: timedelta | None = None
     """Minimum interval between requests, used to push `crawl_delay_until` on dispatch."""
 
+    rate_limited_since: datetime | None = None
+    """Time of the first 429 since the domain last completed a request."""
+
+    last_rate_limited_at: datetime | None = None
+    """Time of the most recent 429 from the domain."""
+
     @property
     def throttled_until(self) -> datetime:
         """Earliest time the next request to this domain is allowed by either of its two independent clocks."""
@@ -570,6 +702,12 @@ class _DomainState:
         # window before the domain is even retried, making every 429 look like a fresh burst.
         self.backoff_decays_at = self.throttled_until + delay
 
+    def is_stall_candidate(self, now: datetime, window: timedelta) -> bool:
+        """Check whether the domain still rate-limits us and has rate-limited every request for longer than `window`."""
+        since = self.rate_limited_since
+        last = self.last_rate_limited_at
+        return since is not None and last is not None and now - last <= window and now - since > window
+
     def apply_crawl_delay(self, now: datetime) -> None:
         """Block the domain for its crawl-delay, if it declared one."""
         if self.crawl_delay is not None:
@@ -581,3 +719,5 @@ class _DomainState:
         self.backoff_until = _NEVER_THROTTLED
         self.crawl_delay_until = _NEVER_THROTTLED
         self.backoff_decays_at = _NEVER_THROTTLED
+        self.rate_limited_since = None
+        self.last_rate_limited_at = None

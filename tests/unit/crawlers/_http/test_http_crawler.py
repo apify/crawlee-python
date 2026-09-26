@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlencode
 
@@ -10,6 +11,8 @@ import pytest
 
 from crawlee import ConcurrencySettings, Request, RequestState
 from crawlee.crawlers import HttpCrawler
+from crawlee.errors import PersistentRateLimitError
+from crawlee.http_clients import HttpClient, HttpCrawlingResult
 from crawlee.request_loaders import ThrottlingRequestManager
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
@@ -23,7 +26,6 @@ if TYPE_CHECKING:
 
     from crawlee._types import BasicCrawlingContext
     from crawlee.crawlers import HttpCrawlingContext
-    from crawlee.http_clients._base import HttpClient
 
 # Payload, e.g. data for a form submission.
 PAYLOAD = {
@@ -690,6 +692,59 @@ async def test_request_state(server_url: URL) -> None:
     await queue.drop()
 
 
+def _crawl_result(status_code: int) -> HttpCrawlingResult:
+    """Build an HTTP client result with the given status code and an empty body."""
+    return HttpCrawlingResult(http_response=Mock(status_code=status_code, headers={}, read=AsyncMock(return_value=b'')))
+
+
+@pytest.mark.parametrize(
+    'crawler_kwargs',
+    [
+        pytest.param({}, id='default'),
+        pytest.param({'retry_on_blocked': False}, id='no_retry_on_blocked'),
+        pytest.param({'ignore_http_error_status_codes': {429}}, id='ignored_429'),
+    ],
+)
+async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any]) -> None:
+    """A throttled 429 is retried later without spending a retry, a session rotation or session reputation."""
+    throttler = ThrottlingRequestManager(
+        await RequestQueue.open(),
+        domains=['throttled.placeholder.com'],
+        request_manager_opener=RequestQueue.open,
+        base_delay=timedelta(milliseconds=50),
+        max_delay=timedelta(milliseconds=100),
+    )
+    http_client = AsyncMock(spec=HttpClient)
+    http_client.crawl.side_effect = [_crawl_result(429), _crawl_result(200)]
+    failed_request_handler = AsyncMock()
+    crawler = HttpCrawler(
+        http_client=http_client,
+        request_manager=throttler,
+        session_pool=SessionPool(max_pool_size=1),
+        max_request_retries=0,
+        max_session_rotations=0,
+        **crawler_kwargs,
+    )
+    crawler.failed_request_handler(failed_request_handler)
+    handled: list[HttpCrawlingContext] = []
+
+    @crawler.router.default_handler
+    async def handler(context: HttpCrawlingContext) -> None:
+        handled.append(context)
+
+    await crawler.run(['https://throttled.placeholder.com/page'])
+
+    assert [context.http_response.status_code for context in handled] == [200]
+    failed_request_handler.assert_not_called()
+    request = handled[0].request
+    assert request.retry_count == 0
+    assert (request.session_rotation_count or 0) == 0
+    session = handled[0].session
+    assert session is not None
+    assert session.error_score == 0
+    assert session.is_usable
+
+
 @pytest.mark.parametrize(
     'retry_on_blocked',
     [
@@ -697,31 +752,38 @@ async def test_request_state(server_url: URL) -> None:
         pytest.param(False, id='no_retry_on_blocked'),
     ],
 )
-async def test_records_429_regardless_of_retry_on_blocked(
-    mock_request_handler: AsyncMock,
+async def test_persistent_429_raises_after_stall(
     server_url: URL,
+    caplog: pytest.LogCaptureFixture,
     *,
     retry_on_blocked: bool,
 ) -> None:
-    """Rate limiting is a separate concern from session blocking, so a 429 must be recorded either way."""
-    domain = server_url.host or ''
-    inner = await RequestQueue.open(alias='throttle-429-inner')
+    """A domain that rate-limits every request for longer than `max_domain_stall` ends the run with an error."""
     throttler = ThrottlingRequestManager(
-        inner,
-        domains=[domain],
+        await RequestQueue.open(alias='throttle-429-inner'),
+        domains=[server_url.host or ''],
         request_manager_opener=RequestQueue.open,
-        # Long enough that the assertion below cannot race the backoff expiring.
-        base_delay=timedelta(seconds=30),
+        base_delay=timedelta(milliseconds=50),
+        max_delay=timedelta(milliseconds=100),
+        max_domain_stall=timedelta(milliseconds=1200),
     )
+    failed_request_handler = AsyncMock()
     crawler = HttpCrawler(
-        request_handler=mock_request_handler,
+        request_handler=AsyncMock(),
         request_manager=throttler,
         retry_on_blocked=retry_on_blocked,
         max_request_retries=0,
-        # Without this, a 429 retires the session and the rotation retries walk the backoff up to `max_delay`.
         max_session_rotations=0,
     )
+    crawler.failed_request_handler(failed_request_handler)
 
-    await crawler.run([str(server_url / 'status/429')])
+    with caplog.at_level(logging.ERROR), pytest.raises(PersistentRateLimitError, match='Giving up: '):
+        await crawler.run([str(server_url / 'status/429')])
 
-    assert throttler._is_domain_throttled(domain)
+    assert any(record.levelno == logging.ERROR and record.exc_info for record in caplog.records)
+    assert await throttler.is_finished() is False
+    failed_request_handler.assert_not_called()
+
+    # A failed run keeps the queue, and the stall clock still runs, so a re-run gives up again.
+    with pytest.raises(PersistentRateLimitError):
+        await crawler.run()
