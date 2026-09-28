@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup, Tag
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
+from crawlee._utils.html import declared_html_encoding, decode_html_body
 from crawlee.crawlers._abstract_http import AbstractHttpParser
 
 if TYPE_CHECKING:
@@ -25,7 +26,8 @@ class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup, Tag]):
     @override
     async def parse(self, response: HttpResponse) -> BeautifulSoup:
         body = await response.read()
-        return await asyncio.to_thread(BeautifulSoup, body, features=self._parser)
+        content_type = response.headers.get('content-type')
+        return await asyncio.to_thread(self._parse_body, body, content_type)
 
     @override
     async def parse_text(self, text: str) -> BeautifulSoup:
@@ -48,6 +50,12 @@ class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup, Tag]):
             if url:
                 urls.append(url.strip())
         return urls
+
+    def _parse_body(self, body: bytes, content_type: str | None) -> BeautifulSoup:
+        encoding = declared_html_encoding(body, content_type)
+        if encoding is None:
+            return BeautifulSoup(body, features=self._parser)
+        return BeautifulSoup(decode_html_body(body, encoding), features=self._parser)
 
 
 BeautifulSoupParserType = Literal['html.parser', 'lxml', 'xml', 'html5lib']

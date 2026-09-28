@@ -7,6 +7,7 @@ from parsel import Selector
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
+from crawlee._utils.html import declared_html_encoding, decode_html_body
 from crawlee.crawlers._abstract_http import AbstractHttpParser
 
 if TYPE_CHECKING:
@@ -22,7 +23,8 @@ class ParselParser(AbstractHttpParser[Selector, Selector]):
     @override
     async def parse(self, response: HttpResponse) -> Selector:
         response_body = await response.read()
-        return await asyncio.to_thread(Selector, body=response_body)
+        content_type = response.headers.get('content-type')
+        return await asyncio.to_thread(self._parse_body, response_body, content_type)
 
     @override
     async def parse_text(self, text: str) -> Selector:
@@ -45,3 +47,10 @@ class ParselParser(AbstractHttpParser[Selector, Selector]):
             if url:
                 urls.append(url.strip())
         return urls
+
+    @staticmethod
+    def _parse_body(body: bytes, content_type: str | None) -> Selector:
+        encoding = declared_html_encoding(body, content_type)
+        if encoding is None:
+            return Selector(body=body)
+        return Selector(text=decode_html_body(body, encoding))
