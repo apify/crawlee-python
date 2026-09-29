@@ -4,7 +4,7 @@ import codecs
 
 import pytest
 
-from crawlee._utils.html import _ENCODING_BY_LABEL, _PRESCAN_BYTES, declared_html_encoding, decode_html_body
+from crawlee._utils.html import _ENCODING_BY_LABEL, _PRESCAN_BYTES, decode_html_body, get_declared_html_encoding
 
 _CZECH = 'Test dekódování znaků českého jazyka'
 _FRENCH = 'Test de décodage des caractères de la langue française dans une œuvre'
@@ -111,7 +111,7 @@ _FRENCH = 'Test de décodage des caractères de la langue française dans une œ
 )
 def test_detect_and_decode(body: bytes, content_type: str | None, expected: str | None) -> None:
     """The body is decoded with the encoding the page declares, or not at all if it declares none."""
-    encoding = declared_html_encoding(body, content_type)
+    encoding = get_declared_html_encoding(body, content_type)
 
     text = None if encoding is None else decode_html_body(body, encoding)
 
@@ -125,9 +125,9 @@ def test_detect_and_decode(body: bytes, content_type: str | None, expected: str 
         pytest.param(b'<p>x</p>', 'text/html; charset=ISO-8859-1', 'windows-1252', id='header-superset'),
     ],
 )
-def test_declared_html_encoding(body: bytes, content_type: str, expected: str) -> None:
+def test_get_declared_html_encoding(body: bytes, content_type: str, expected: str) -> None:
     """The Python codec of the encoding the page declares is detected."""
-    assert declared_html_encoding(body, content_type) == expected
+    assert get_declared_html_encoding(body, content_type) == expected
 
 
 def test_encoding_labels_resolve_to_python_codecs() -> None:

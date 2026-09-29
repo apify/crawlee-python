@@ -7,7 +7,7 @@ from parsel import Selector
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
-from crawlee._utils.html import declared_html_encoding, decode_html_body
+from crawlee._utils.html import decode_html_body, get_declared_html_encoding
 from crawlee.crawlers._abstract_http import AbstractHttpParser
 
 if TYPE_CHECKING:
@@ -50,7 +50,7 @@ class ParselParser(AbstractHttpParser[Selector, Selector]):
 
     @staticmethod
     def _parse_body(body: bytes, content_type: str | None) -> Selector:
-        encoding = declared_html_encoding(body, content_type)
+        encoding = get_declared_html_encoding(body, content_type)
         if encoding is None:
             return Selector(body=body)
         return Selector(text=decode_html_body(body, encoding))

@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup, Tag
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
-from crawlee._utils.html import declared_html_encoding, decode_html_body
+from crawlee._utils.html import decode_html_body, get_declared_html_encoding
 from crawlee.crawlers._abstract_http import AbstractHttpParser
 
 if TYPE_CHECKING:
@@ -52,7 +52,7 @@ class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup, Tag]):
         return urls
 
     def _parse_body(self, body: bytes, content_type: str | None) -> BeautifulSoup:
-        encoding = declared_html_encoding(body, content_type)
+        encoding = get_declared_html_encoding(body, content_type)
         if encoding is None:
             return BeautifulSoup(body, features=self._parser)
         return BeautifulSoup(decode_html_body(body, encoding), features=self._parser)

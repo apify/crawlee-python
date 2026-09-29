@@ -91,7 +91,7 @@ _WHATWG_ENCODING_LABELS = {
 _ENCODING_BY_LABEL = {label: codec for codec, labels in _WHATWG_ENCODING_LABELS.items() for label in labels.split()}
 
 
-def declared_html_encoding(body: bytes, content_type: str | None) -> str | None:
+def get_declared_html_encoding(body: bytes, content_type: str | None) -> str | None:
     """Get the Python codec for the encoding an HTML response body declares.
 
     The encoding comes from the BOM, then the `charset` of the `Content-Type` header, then an XML declaration or the
@@ -114,7 +114,7 @@ def declared_html_encoding(body: bytes, content_type: str | None) -> str | None:
 
 
 def decode_html_body(body: bytes, encoding: str) -> str:
-    """Decode an HTML response body with the codec from `declared_html_encoding`, dropping a leading U+FEFF.
+    """Decode an HTML response body with the codec from `get_declared_html_encoding`, dropping a leading U+FEFF.
 
     Undecodable bytes are replaced with U+FFFD.
 
