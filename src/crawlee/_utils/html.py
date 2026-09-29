@@ -13,8 +13,8 @@ _XML_ENCODING_PATTERN = re.compile(rb'^\s*<\?xml[^>]*\sencoding\s*=\s*["\']([a-z
 # Matches both `<meta charset="...">` and `<meta http-equiv="Content-Type" content="...; charset=...">`.
 _META_CHARSET_PATTERN = re.compile(rb'<meta[\s/][^>]*charset\s*=\s*["\']?\s*([a-z0-9_:.+-]+)', re.IGNORECASE)
 
-# Comments are skipped, so a commented-out `<meta>` tag doesn't count.
-_HTML_COMMENT_PATTERN = re.compile(rb'<!--.*?-->', re.DOTALL)
+# Comments are skipped, so a commented-out `<meta>` tag doesn't count. An unclosed comment runs to the prescan end.
+_HTML_COMMENT_PATTERN = re.compile(rb'<!--.*?(?:-->|\Z)', re.DOTALL)
 
 # How much of the body is searched for a declared encoding. Browsers prescan 1024 bytes but still switch to a
 # `<meta>` charset found later, so a larger window catches pages with a long `<head>` before it.

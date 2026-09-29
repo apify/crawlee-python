@@ -58,6 +58,7 @@ _FRENCH = 'Test de décodage des caractères de la langue française dans une œ
             None,
             id='commented-out-meta',
         ),
+        pytest.param(f'<!-- <meta charset="windows-1250"> <p>{_CZECH}</p>'.encode(), None, None, id='unclosed-comment'),
         pytest.param(b'<metadata charset="windows-1250">', None, None, id='not-a-meta-tag'),
         pytest.param(b'', 'text/html; charset=utf-8', None, id='empty-body'),
         pytest.param(
