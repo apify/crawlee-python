@@ -103,11 +103,8 @@ def declared_html_encoding(body: bytes, content_type: str | None) -> str | None:
         content_type: The `Content-Type` header of the response.
 
     Returns:
-        The codec, or `None` if the body is empty or declares no encoding browsers know.
+        The codec, or `None` if the body declares no encoding browsers know.
     """
-    if not body:
-        return None
-
     for bom, encoding in _BOMS:
         if body.startswith(bom):
             return encoding

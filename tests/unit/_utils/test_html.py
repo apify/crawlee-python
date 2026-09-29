@@ -79,7 +79,7 @@ _FRENCH = 'Test de décodage des caractères de la langue française dans une œ
             f'<meta content="a>b" charset="windows-1250"><p>{_CZECH}</p>',
             id='quoted-gt-in-meta',
         ),
-        pytest.param(b'', 'text/html; charset=utf-8', None, id='empty-body'),
+        pytest.param(b'', 'text/html; charset=utf-8', '', id='empty-body'),
         pytest.param(
             b'<p>' + b'a' * (_PRESCAN_BYTES - len(b'<p><meta charset=iso-8859-1')) + b'<meta charset=iso-8859-15>',
             None,
