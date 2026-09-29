@@ -1086,10 +1086,7 @@ async def test_reclaim_routes_to_sub_manager_after_restart(fs_service_locator: S
     assert await restarted.inner.is_empty()
 
 
-# ── Stall Detection Tests ─────────────────────────────
-
-
-def _stall(manager: ThrottlingRequestManager[Any], clock: MagicMock, url: str) -> None:
+def make_stalled(manager: ThrottlingRequestManager[Any], clock: MagicMock, url: str) -> None:
     """Rate-limit `url` twice, a full stall window apart, so its domain counts as stalled."""
     manager.record_domain_delay(url)
     clock.now.return_value += manager._max_domain_stall + timedelta(seconds=1)
@@ -1173,7 +1170,7 @@ async def test_handled_request_clears_stall(
         assert request is not None
         await manager.add_request(f'https://{THROTTLED_DOMAIN}/page2')
 
-        _stall(manager, clock, url)
+        make_stalled(manager, clock, url)
         assert await manager.get_stall_reason() is not None
 
         await manager.mark_request_as_handled(request)
@@ -1188,7 +1185,7 @@ async def test_reclaim_keeps_stall(manager: ThrottlingRequestManager[RequestQueu
     with _frozen_clock() as clock:
         request = await manager.fetch_next_request()
         assert request is not None
-        _stall(manager, clock, url)
+        make_stalled(manager, clock, url)
 
         await manager.reclaim_request(request)
         assert await manager.get_stall_reason() is not None
@@ -1200,7 +1197,7 @@ async def test_record_success_keeps_stall(manager: ThrottlingRequestManager[Requ
     await manager.add_request(url)
 
     with _frozen_clock() as clock:
-        _stall(manager, clock, url)
+        make_stalled(manager, clock, url)
         manager.record_success(url)
         assert await manager.get_stall_reason() is not None
 
@@ -1221,7 +1218,7 @@ async def test_ready_work_masks_stall(
     await two_domain_manager.add_request(ready_url)
 
     with _frozen_clock() as clock:
-        _stall(two_domain_manager, clock, url)
+        make_stalled(two_domain_manager, clock, url)
         assert await two_domain_manager.get_stall_reason() is None
 
 
@@ -1233,7 +1230,7 @@ async def test_waiting_domain_masks_stall(two_domain_manager: ThrottlingRequestM
     await two_domain_manager.add_request(waiting_url)
 
     with _frozen_clock() as clock:
-        _stall(two_domain_manager, clock, url)
+        make_stalled(two_domain_manager, clock, url)
         two_domain_manager.record_domain_delay(waiting_url, retry_after=timedelta(seconds=60))
         assert await two_domain_manager.get_stall_reason() is None
 
@@ -1246,7 +1243,7 @@ async def test_empty_waiting_domain_does_not_mask_stall(
     await two_domain_manager.add_request(url)
 
     with _frozen_clock() as clock:
-        _stall(two_domain_manager, clock, url)
+        make_stalled(two_domain_manager, clock, url)
         two_domain_manager.record_domain_delay(f'https://{SECOND_THROTTLED_DOMAIN}/page1')
         reason = await two_domain_manager.get_stall_reason()
 
@@ -1261,7 +1258,7 @@ async def test_lapsed_backoff_does_not_mask_stall(manager: ThrottlingRequestMana
     await manager.add_request(url)
 
     with _frozen_clock() as clock:
-        _stall(manager, clock, url)
+        make_stalled(manager, clock, url)
         clock.now.return_value = manager._domain_states[THROTTLED_DOMAIN].throttled_until + timedelta(seconds=1)
         assert await manager.get_stall_reason() is not None
 
@@ -1269,7 +1266,7 @@ async def test_lapsed_backoff_does_not_mask_stall(manager: ThrottlingRequestMana
 async def test_empty_domain_not_stalled(manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """A domain with no requests left is finished, not stalled."""
     with _frozen_clock() as clock:
-        _stall(manager, clock, f'https://{THROTTLED_DOMAIN}/page1')
+        make_stalled(manager, clock, f'https://{THROTTLED_DOMAIN}/page1')
         assert await manager.get_stall_reason() is None
 
 
@@ -1279,7 +1276,7 @@ async def test_is_empty_skips_stall_candidate(manager: ThrottlingRequestManager[
     await manager.add_request(url)
 
     with _frozen_clock() as clock:
-        _stall(manager, clock, url)
+        make_stalled(manager, clock, url)
         clock.now.return_value = manager._domain_states[THROTTLED_DOMAIN].throttled_until + timedelta(seconds=1)
 
         assert await manager.is_empty() is True
@@ -1299,7 +1296,7 @@ async def test_purge_resets_stall_and_migrations(
     state = manager._domain_states[THROTTLED_DOMAIN]
 
     with _frozen_clock() as clock:
-        _stall(manager, clock, url)
+        make_stalled(manager, clock, url)
         assert await manager.fetch_next_request() is None
 
         await manager.purge()
@@ -1331,9 +1328,6 @@ async def test_max_domain_stall_must_be_positive(
             service_locator=service_locator,
             max_domain_stall=max_domain_stall,
         )
-
-
-# ── Inner Migration Tests ─────────────────────────────
 
 
 async def test_inner_request_migrates_while_throttled(
@@ -1446,7 +1440,7 @@ async def test_stall_sees_migrated_inner_work(
     with _frozen_clock() as clock:
         request = await manager.fetch_next_request()
         assert request is not None
-        _stall(manager, clock, url)
+        make_stalled(manager, clock, url)
         await manager.reclaim_request(request)
         assert await manager.get_stall_reason() is None
 

@@ -692,7 +692,7 @@ async def test_request_state(server_url: URL) -> None:
     await queue.drop()
 
 
-def _crawl_result(status_code: int) -> HttpCrawlingResult:
+def crawl_result(status_code: int) -> HttpCrawlingResult:
     """Build an HTTP client result with the given status code and an empty body."""
     return HttpCrawlingResult(http_response=Mock(status_code=status_code, headers={}, read=AsyncMock(return_value=b'')))
 
@@ -715,7 +715,7 @@ async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any]) -> None
         max_delay=timedelta(milliseconds=100),
     )
     http_client = AsyncMock(spec=HttpClient)
-    http_client.crawl.side_effect = [_crawl_result(429), _crawl_result(200)]
+    http_client.crawl.side_effect = [crawl_result(429), crawl_result(200)]
     failed_request_handler = AsyncMock()
     crawler = HttpCrawler(
         http_client=http_client,
