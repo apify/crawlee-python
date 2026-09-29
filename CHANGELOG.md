@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Use container memory and CPU limits when running in a container ([#2128](https://github.com/apify/crawlee-python/pull/2128)) ([40dafe5](https://github.com/apify/crawlee-python/commit/40dafe5f98fbb2f0d84adcf289a4bcd0bedb646b)) by [@Mantisus](https://github.com/Mantisus), closes [#1535](https://github.com/apify/crawlee-python/issues/1535), [#2095](https://github.com/apify/crawlee-python/issues/2095)
 - **crawlers:** Keep the crawler usable after a failed run ([#2255](https://github.com/apify/crawlee-python/pull/2255)) ([3e73166](https://github.com/apify/crawlee-python/commit/3e73166fa00160c4c1df656e9a25f1c60ae89773)) by [@vdusek](https://github.com/vdusek)
 - **browsers:** Retry the temp directory removal until the browser releases its files ([#2239](https://github.com/apify/crawlee-python/pull/2239)) ([8f41522](https://github.com/apify/crawlee-python/commit/8f41522fa9a15bfd585ef9745c853c25c26d9074)) by [@vdusek](https://github.com/vdusek)
+- **throttling-manager:** Defer throttled 429s without spending retries and give up on persistently rate-limited domains ([#2250](https://github.com/apify/crawlee-python/pull/2250)) ([6b7db66](https://github.com/apify/crawlee-python/commit/6b7db6601b7a5a5cf7d567bcb38598c1374d42a2)) by [@Mantisus](https://github.com/Mantisus), closes [#2143](https://github.com/apify/crawlee-python/issues/2143)
 
 
 <!-- git-cliff-unreleased-end -->
