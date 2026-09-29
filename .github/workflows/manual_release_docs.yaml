@@ -43,7 +43,7 @@ jobs:
       # skipped when called from another workflow.
       - name: Wait for checks
         if: github.event_name == 'workflow_dispatch'
-        uses: apify/actions/wait-for-checks@v1.6.0
+        uses: apify/actions/wait-for-checks@v1.6.1
         with:
           ref: ${{ github.sha }}
           check-regexp: '^Checks'
@@ -65,7 +65,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Set up uv package manager
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -73,7 +73,7 @@ jobs:
         run: uv run poe install-dev
 
       - name: Install pnpm and website dependencies
-        uses: apify/actions/pnpm-install@v1.6.0
+        uses: apify/actions/pnpm-install@v1.6.1
         with:
           working-directory: website
 

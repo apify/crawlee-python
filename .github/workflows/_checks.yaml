@@ -35,7 +35,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check spelling with typos
-        uses: crate-ci/typos@512fc24f32f44ab01972217aaaf3dc86ec234d53 # v1.50.2
+        uses: crate-ci/typos@00f422f3b19c57bc6338715ebfe3316d38768461 # v1.50.3
 
   lint_check:
     name: Lint check
@@ -62,7 +62,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install pnpm and website dependencies
-        uses: apify/actions/pnpm-install@v1.6.0
+        uses: apify/actions/pnpm-install@v1.6.1
         with:
           working-directory: website
 
@@ -83,7 +83,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install pnpm and website dependencies
-        uses: apify/actions/pnpm-install@v1.6.0
+        uses: apify/actions/pnpm-install@v1.6.1
         with:
           working-directory: website
 
@@ -149,7 +149,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up uv package manager
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: "3.14"
 
@@ -157,7 +157,7 @@ jobs:
         run: uv run poe build
 
       - name: Verify built package
-        uses: apify/actions/python-package-check@v1.6.0
+        uses: apify/actions/python-package-check@v1.6.1
         with:
           package_name: crawlee
           dist_dir: dist

@@ -5,6 +5,8 @@ from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+import proclimits
+
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.system import get_cpu_info, get_memory_info
@@ -48,6 +50,9 @@ class LocalEventManager(EventManager):
         self._system_info_interval = system_info_interval
         """Interval between the emitted `SystemInfo` events."""
 
+        self._cpu_load = proclimits.CpuLoad()
+        """CPU sampler of this event manager, measuring across the gap between its emissions."""
+
         self._emit_system_info_event_rec_task = RecurringTask(
             func=self._emit_system_info_event,
             delay=self._system_info_interval,
@@ -76,6 +81,8 @@ class LocalEventManager(EventManager):
         await super().__aenter__()
 
         if self._active_ref_count == 1:
+            # A reading kept from a previous session would report the average load over the idle gap since then.
+            self._cpu_load = proclimits.CpuLoad()
             self._emit_system_info_event_rec_task.start()
 
         return self
@@ -98,10 +105,10 @@ class LocalEventManager(EventManager):
 
     async def _emit_system_info_event(self) -> None:
         """Emit a system info event with the current CPU and memory usage."""
-        # Both readings block the thread they run in - `get_cpu_info` even samples the CPU utilization over a short
+        # Both readings block the thread they run in - `get_cpu_info` may sample the CPU utilization over a short
         # interval - so run them concurrently instead of one after the other.
         cpu_info, memory_info = await asyncio.gather(
-            asyncio.to_thread(get_cpu_info),
+            asyncio.to_thread(get_cpu_info, self._cpu_load),
             asyncio.to_thread(get_memory_info),
         )
 

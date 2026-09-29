@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 from logging import WARNING, getLogger
 from typing import TYPE_CHECKING, TypeVar, cast
 
+import proclimits
+
 from crawlee import service_locator
 from crawlee._autoscaling._types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Ratio, Snapshot
 from crawlee._utils.byte_size import ByteSize
@@ -120,13 +122,28 @@ class Snapshotter:
         config = config or service_locator.get_configuration()
 
         # Compute the maximum memory size based on the provided configuration. If `memory_mbytes` is provided,
-        # it uses that value. Otherwise, it calculates the `max_memory_size` as a proportion of the system's
-        # total available memory based on `available_memory_ratio`.
+        # it uses that value. Otherwise, it calculates the `max_memory_size` as a proportion of the memory available
+        # to this process based on `available_memory_ratio`.
         max_memory_size = (
             ByteSize.from_mb(config.memory_mbytes)
             if config.memory_mbytes
             else Ratio(value=config.available_memory_ratio)
         )
+
+        # The default ratio protects the machine from the crawler. Under a limit set outside of Crawlee it stacks on
+        # top of that limit, which is rarely what the user meant.
+        if not config.memory_mbytes and 'available_memory_ratio' not in config.model_fields_set:
+            budget = proclimits.get_memory_budget()
+            if budget is not None:
+                limit = ByteSize(budget.limit)
+                logger_once.log(
+                    f'Setting max memory of this run to {limit * config.available_memory_ratio}, '
+                    f'{config.available_memory_ratio:.0%} of the {limit} memory limit applying to this process. '
+                    'Use the CRAWLEE_MEMORY_MBYTES or CRAWLEE_AVAILABLE_MEMORY_RATIO environment variable to '
+                    'override it.',
+                    key='default_memory_ratio_under_limit',
+                    level=WARNING,
+                )
 
         return cls(
             max_used_cpu_ratio=config.max_used_cpu_ratio,

@@ -186,9 +186,9 @@ class Configuration(BaseSettings):
             le=1.0,
         ),
     ] = 0.25
-    """The maximum proportion of system memory to use. If `memory_mbytes` is not provided, this ratio is used to
-    calculate the maximum memory. This option is utilized by the `Snapshotter` and supports the dynamic system memory
-    scaling."""
+    """The maximum proportion of the memory available to this process to use, which is the memory limit where one
+    applies. If `memory_mbytes` is not provided, this ratio is used to calculate the maximum memory. This option is
+    utilized by the `Snapshotter` and supports the dynamic system memory scaling."""
 
     storage_dir: Annotated[
         str,

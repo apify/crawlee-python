@@ -97,13 +97,13 @@ class MemorySnapshot:
     """Memory usage of the current Python process and its children."""
 
     system_wide_used_size: ByteSize | None
-    """Memory usage of all processes, system-wide."""
+    """Memory usage of all processes, within the scope `system_wide_memory_size` covers."""
 
     max_memory_size: ByteSize
     """The maximum memory that can be used by `AutoscaledPool`."""
 
     system_wide_memory_size: ByteSize | None
-    """Total memory available in the whole system."""
+    """Total memory available to this process, which is the memory limit where one applies."""
 
     max_used_memory_ratio: float
     """The maximum acceptable ratio of `current_size` to `max_memory_size`."""
