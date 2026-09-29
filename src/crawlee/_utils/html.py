@@ -10,8 +10,10 @@ from crawlee._utils.http import parse_content_type_charset
 # Matches the `encoding` of an XML declaration, which XHTML pages may use instead of a `<meta>` tag.
 _XML_ENCODING_PATTERN = re.compile(rb'^\s*<\?xml[^>]*\sencoding\s*=\s*["\']([a-z0-9_:.+-]+)', re.IGNORECASE)
 
-# Matches both `<meta charset="...">` and `<meta http-equiv="Content-Type" content="...; charset=...">`.
-_META_CHARSET_PATTERN = re.compile(rb'<meta[\s/][^>]*charset\s*=\s*["\']?\s*([a-z0-9_:.+-]+)', re.IGNORECASE)
+# A quoted attribute value may contain `>`, so it doesn't end the tag. A tag cut off by the prescan end doesn't match.
+_META_TAG_PATTERN = re.compile(rb'<meta[\s/]((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>', re.IGNORECASE)
+
+_ATTRIBUTE_PATTERN = re.compile(rb'([^\s/>=]+)(?:\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]*)))?')
 
 # Comments are skipped, so a commented-out `<meta>` tag doesn't count. An unclosed comment runs to the prescan end.
 _HTML_COMMENT_PATTERN = re.compile(rb'<!--.*?(?:-->|\Z)', re.DOTALL)
@@ -136,7 +138,32 @@ def _resolve_encoding(label: str | None) -> str | None:
 def _find_declared_encoding(body: bytes) -> str | None:
     """Find the encoding declared by an XML declaration or a `<meta>` tag near the start of the body."""
     prescan = _HTML_COMMENT_PATTERN.sub(b'', body[:_PRESCAN_BYTES])
-    match = _XML_ENCODING_PATTERN.match(prescan) or _META_CHARSET_PATTERN.search(prescan)
-    encoding = _resolve_encoding(match.group(1).decode('ascii')) if match else None
+    xml_match = _XML_ENCODING_PATTERN.match(prescan)
+    encoding = _resolve_encoding(xml_match.group(1).decode('ascii')) if xml_match else _find_meta_encoding(prescan)
     # A declaration readable as ASCII rules out UTF-16, so browsers read such pages as UTF-8.
     return 'utf-8' if encoding and encoding.startswith('utf-16') else encoding
+
+
+def _find_meta_encoding(prescan: bytes) -> str | None:
+    """Find the encoding of the first `<meta>` tag that declares one browsers know.
+
+    Both `<meta charset="...">` and `<meta http-equiv="Content-Type" content="...; charset=...">` count; a `charset=`
+    in the `content` of any other `<meta>` tag doesn't.
+    """
+    for tag in _META_TAG_PATTERN.finditer(prescan):
+        attributes: dict[str, str] = {}
+        for match in _ATTRIBUTE_PATTERN.finditer(tag.group(1)):
+            value = match.group(2) or match.group(3) or match.group(4) or b''
+            attributes.setdefault(match.group(1).decode('latin-1').lower(), value.decode('latin-1'))
+
+        if 'charset' in attributes:
+            label = attributes['charset'].strip()
+        elif attributes.get('http-equiv', '').strip().lower() == 'content-type':
+            label = (parse_content_type_charset(attributes.get('content')) or '').strip('\'"')
+        else:
+            continue
+
+        encoding = _resolve_encoding(label)
+        if encoding:
+            return encoding
+    return None

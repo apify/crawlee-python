@@ -4,7 +4,7 @@ import codecs
 
 import pytest
 
-from crawlee._utils.html import _ENCODING_BY_LABEL, declared_html_encoding, decode_html_body
+from crawlee._utils.html import _ENCODING_BY_LABEL, _PRESCAN_BYTES, declared_html_encoding, decode_html_body
 
 _CZECH = 'Test dekódování znaků českého jazyka'
 _FRENCH = 'Test de décodage des caractères de la langue française dans une œuvre'
@@ -60,7 +60,40 @@ _FRENCH = 'Test de décodage des caractères de la langue française dans une œ
         ),
         pytest.param(f'<!-- <meta charset="windows-1250"> <p>{_CZECH}</p>'.encode(), None, None, id='unclosed-comment'),
         pytest.param(b'<metadata charset="windows-1250">', None, None, id='not-a-meta-tag'),
+        pytest.param(b'<meta name="x" data-charset="windows-1250">', None, None, id='charset-suffixed-attribute'),
+        pytest.param(
+            b'<meta name="description" content="Set charset=windows-1250 in the header">',
+            None,
+            None,
+            id='charset-in-other-meta-content',
+        ),
+        pytest.param(
+            f'<meta charset="bogus"><meta charset=windows-1250><p>{_CZECH}</p>'.encode('cp1250'),
+            None,
+            f'<meta charset="bogus"><meta charset=windows-1250><p>{_CZECH}</p>',
+            id='unknown-meta-label-skipped',
+        ),
+        pytest.param(
+            f'<meta content="a>b" charset="windows-1250"><p>{_CZECH}</p>'.encode('cp1250'),
+            None,
+            f'<meta content="a>b" charset="windows-1250"><p>{_CZECH}</p>',
+            id='quoted-gt-in-meta',
+        ),
         pytest.param(b'', 'text/html; charset=utf-8', None, id='empty-body'),
+        pytest.param(
+            b'<p>' + b'a' * (_PRESCAN_BYTES - len(b'<p><meta charset=iso-8859-1')) + b'<meta charset=iso-8859-15>',
+            None,
+            None,
+            id='meta-cut-off-by-prescan-end',
+        ),
+        pytest.param(
+            f'<meta http-equiv="Content-Type" content="text/html; charset=\'windows-1250\'"><p>{_CZECH}</p>'.encode(
+                'cp1250'
+            ),
+            None,
+            f'<meta http-equiv="Content-Type" content="text/html; charset=\'windows-1250\'"><p>{_CZECH}</p>',
+            id='single-quoted-charset-in-meta-content',
+        ),
         pytest.param(
             f'<?xml version="1.0" encoding="windows-1250"?><p>{_CZECH}</p>'.encode('cp1250'),
             None,
