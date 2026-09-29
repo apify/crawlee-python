@@ -30,6 +30,7 @@ from crawlee.crawlers import (
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
 from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.crawlers._playwright._playwright_crawler import _PlaywrightCrawlerAdditionalOptions
+from crawlee.errors import ContextPipelineInitializationError, RequestHandlerError, RequestThrottledError
 from crawlee.statistics import Statistics, StatisticsState
 
 from ._adaptive_playwright_crawler_statistics import AdaptivePlaywrightCrawlerStatisticState
@@ -395,6 +396,13 @@ class AdaptivePlaywrightCrawler(
                 if static_run.result and self.result_checker(static_run.result):
                     self._context_result_map[context] = static_run.result
                     return
+                # The browser would hit the same rate-limited domain, so let the crawler defer the request.
+                if (
+                    isinstance(static_run.exception, (ContextPipelineInitializationError, RequestHandlerError))
+                    and isinstance(static_run.exception.wrapped_exception, RequestThrottledError)
+                    and self._is_held_back(context.request)
+                ):
+                    raise static_run.exception
                 if static_run.exception:
                     context.log.error(
                         msg=f'Static crawler: failed for {context.request.url}', exc_info=static_run.exception

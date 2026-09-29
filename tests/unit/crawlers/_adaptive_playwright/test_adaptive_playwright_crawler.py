@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import timedelta
 from itertools import cycle
@@ -29,6 +30,8 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statisti
     AdaptivePlaywrightCrawlerStatisticState,
 )
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import AdaptiveContextError
+from crawlee.errors import RequestThrottledError
+from crawlee.http_clients import HttpClient, HttpCrawlingResult
 from crawlee.request_loaders import ThrottlingRequestManager
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
@@ -975,6 +978,119 @@ async def test_throttled_429_is_deferred() -> None:
     assert [context.response.status for context in handled] == [200]
     failed_request_handler.assert_not_called()
     assert handled[0].request.retry_count == 0
+
+
+async def test_throttled_static_429_is_deferred() -> None:
+    """A throttled 429 from the static sub crawler defers the request without falling back to the browser."""
+    throttler = ThrottlingRequestManager(
+        await RequestQueue.open(),
+        domains=['throttled.placeholder.com'],
+        request_manager_opener=RequestQueue.open,
+        base_delay=timedelta(milliseconds=50),
+        max_delay=timedelta(milliseconds=100),
+    )
+    http_client = AsyncMock(spec=HttpClient)
+    http_client.crawl.side_effect = [
+        HttpCrawlingResult(http_response=Mock(status_code=status, headers={}, read=AsyncMock(return_value=b'')))
+        for status in (429, 200)
+    ]
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(
+            rendering_types=cycle(['static']), detection_probability_recommendation=cycle([0])
+        ),
+        request_manager=throttler,
+        http_client=http_client,
+        max_request_retries=0,
+        max_session_rotations=0,
+    )
+    browser_navigations = Mock()
+
+    @crawler.pre_navigation_hook
+    async def track_browser_navigation(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+        with suppress(AdaptiveContextError):
+            context.page  # noqa:B018 Intentionally "useless expression". Raises outside the browser sub crawler.
+            browser_navigations()
+
+    handled: list[AdaptivePlaywrightCrawlingContext] = []
+
+    @crawler.router.default_handler
+    async def handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        handled.append(context)
+
+    await crawler.run(['https://throttled.placeholder.com/page'])
+
+    browser_navigations.assert_not_called()
+    assert http_client.crawl.await_count == 2
+    assert len(handled) == 1
+    assert handled[0].request.retry_count == 0
+
+
+async def test_static_handler_raised_throttled_error_is_deferred() -> None:
+    """A `RequestThrottledError` from the static handler defers the request without falling back to the browser."""
+    url = 'https://throttled.placeholder.com/page'
+    throttler = ThrottlingRequestManager(
+        await RequestQueue.open(),
+        domains=['throttled.placeholder.com'],
+        request_manager_opener=RequestQueue.open,
+        base_delay=timedelta(milliseconds=50),
+        max_delay=timedelta(milliseconds=100),
+    )
+    http_client = AsyncMock(spec=HttpClient)
+    http_client.crawl.return_value = HttpCrawlingResult(
+        http_response=Mock(status_code=200, headers={}, read=AsyncMock(return_value=b''))
+    )
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(
+            rendering_types=cycle(['static']), detection_probability_recommendation=cycle([0])
+        ),
+        request_manager=throttler,
+        http_client=http_client,
+        max_request_retries=0,
+    )
+    browser_navigations = Mock()
+    handler_calls = Mock()
+
+    @crawler.pre_navigation_hook
+    async def track_browser_navigation(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+        with suppress(AdaptiveContextError):
+            context.page  # noqa:B018 Intentionally "useless expression". Raises outside the browser sub crawler.
+            browser_navigations()
+
+    @crawler.router.default_handler
+    async def handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        handler_calls()
+        if handler_calls.call_count == 1:
+            throttler.record_domain_delay(context.request.url)
+            raise RequestThrottledError
+
+    await crawler.run([url])
+
+    browser_navigations.assert_not_called()
+    assert handler_calls.call_count == 2
+
+
+async def test_static_throttled_error_without_backoff_falls_back_to_browser(test_urls: list[str]) -> None:
+    """A `RequestThrottledError` from the static handler whose domain nothing holds back falls back to the browser."""
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(
+            rendering_types=cycle(['static']), detection_probability_recommendation=cycle([0])
+        ),
+        max_request_retries=0,
+    )
+    rendering_types = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        try:
+            context.page  # noqa:B018 Intentionally "useless expression". Raises outside the browser sub crawler.
+        except AdaptiveContextError:
+            rendering_types('static')
+            raise RequestThrottledError from None
+        rendering_types('client only')
+
+    await crawler.run(test_urls[:1])
+
+    assert [c.args[0] for c in rendering_types.call_args_list] == ['static', 'client only']
 
 
 @pytest.mark.parametrize(
