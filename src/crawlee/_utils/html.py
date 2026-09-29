@@ -111,7 +111,7 @@ def declared_html_encoding(body: bytes, content_type: str | None) -> str | None:
             return encoding
 
     header_charset = parse_content_type_charset(content_type)
-    return resolve_encoding(header_charset) or _find_declared_encoding(body)
+    return _resolve_encoding(header_charset) or _find_declared_encoding(body)
 
 
 def decode_html_body(body: bytes, encoding: str) -> str:
@@ -126,7 +126,7 @@ def decode_html_body(body: bytes, encoding: str) -> str:
     return body.decode(encoding, 'replace').removeprefix('\ufeff')
 
 
-def resolve_encoding(label: str | None) -> str | None:
+def _resolve_encoding(label: str | None) -> str | None:
     """Get the Python codec for a WHATWG encoding label, or `None` if browsers don't know the label."""
     if not label:
         return None
@@ -137,6 +137,6 @@ def _find_declared_encoding(body: bytes) -> str | None:
     """Find the encoding declared by an XML declaration or a `<meta>` tag near the start of the body."""
     prescan = _HTML_COMMENT_PATTERN.sub(b'', body[:_PRESCAN_BYTES])
     match = _XML_ENCODING_PATTERN.match(prescan) or _META_CHARSET_PATTERN.search(prescan)
-    encoding = resolve_encoding(match.group(1).decode('ascii')) if match else None
+    encoding = _resolve_encoding(match.group(1).decode('ascii')) if match else None
     # A declaration readable as ASCII rules out UTF-16, so browsers read such pages as UTF-8.
     return 'utf-8' if encoding and encoding.startswith('utf-16') else encoding
