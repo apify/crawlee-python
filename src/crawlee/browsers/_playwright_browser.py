@@ -46,7 +46,8 @@ class PlaywrightPersistentBrowser(Browser):
         self._browser_launch_options = browser_launch_options
         self._user_data_dir = user_data_dir
         self._temp_dir: Path | None = None
-        # Both `close` and the context's `close` event trigger the removal, and `close` must wait until it finishes.
+        # The `close` method and the context's `close` event both trigger the removal. The lock makes the `close` method
+        # wait for a removal the event already started.
         self._temp_dir_lock = asyncio.Lock()
 
         self._context: BrowserContext | None = None
@@ -89,8 +90,9 @@ class PlaywrightPersistentBrowser(Browser):
         """Remove the temporary user data directory, retrying until the browser releases its files.
 
         Browser helper processes can outlive the context: they keep files in the directory open, which makes the removal
-        fail on Windows, and they can write into the directory again after it is removed. Each attempt therefore waits
-        before checking that the directory is gone.
+        fail on Windows, and they can write into the directory again after it is removed, which recreates it. Each
+        attempt therefore waits before checking that the directory is gone. This is best effort: a write that comes
+        later than one interval after a successful removal leaves the recreated directory behind.
         """
         async with self._temp_dir_lock:
             temp_dir = self._temp_dir
