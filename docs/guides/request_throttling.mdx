@@ -32,7 +32,7 @@ To use request throttling, create a <ApiLink to="class/ThrottlingRequestManager"
 
 ## How it works
 
-1. **Insertion-time routing**: When you add requests via `add_request` or `add_requests`, each request is checked against the configured domain list. Matching requests go directly into a per-domain sub-manager; all others go to the inner manager. Each request added this way lives in exactly one store, so it is deduplicated there.
+1. **Insertion-time routing**: When you add requests via `add_request` or `add_requests`, each request is checked against the configured domain list. Matching requests go directly into a per-domain sub-manager. All others go to the inner manager. Each request added this way lives in exactly one store, so it is deduplicated there. A request that reached the inner manager before its domain was configured moves into the domain's sub-manager if it's fetched during the domain's cooldown. Otherwise it's crawled from the inner manager.
 
 2. **429 backoff**: When the crawler detects an HTTP 429 response, the `ThrottlingRequestManager` records an exponential backoff delay for that domain (starting at 2s, doubling up to 60s). Requests already in flight when the limit was hit are treated as a single rate-limit event, so the delay doubles once per backoff window rather than once per 429. Once the domain goes a full extra window without rate-limiting, the next 429 starts the backoff over at the initial delay. If the response includes a `Retry-After` header with a positive delay, that value takes priority.
 
@@ -40,7 +40,21 @@ To use request throttling, create a <ApiLink to="class/ThrottlingRequestManager"
 
 4. **Fair scheduling**: `fetch_next_request` sorts available sub-managers by how long each domain has been waiting, ensuring no domain is starved.
 
-5. **Cooldown handling**: While a domain is in a cooldown, its queued requests don't count as dispatchable, so the crawler's autoscaled pool idles instead of keeping a worker slot blocked. The requests still count towards completion, so the crawl waits for them and finishes only once every one has been handled.
+5. **Cooldown handling**: While a domain is in a cooldown, its queued requests don't count as dispatchable, so the crawler's autoscaled pool idles instead of keeping a worker slot blocked. The requests still count towards completion, so the crawl waits for them and finishes only once every one has been handled. A domain that never stops rate-limiting doesn't keep the crawl running forever. For details, see [Persistent rate limiting](#persistent-rate-limiting).
+
+## Persistent rate limiting
+
+A 429 from a throttled domain doesn't fail the request. The request goes back to its queue and waits out the backoff, while the crawler keeps crawling other domains. The retry doesn't count towards `max_request_retries` or `max_session_rotations`, and the session isn't marked as bad. The 429 doesn't reach `error_handler` or `failed_request_handler`. Setting `ignore_http_error_status_codes={429}` doesn't pass the response to your request handler either, because the request is retried once the backoff ends.
+
+Some domains keep rate-limiting every request no matter how long the crawler waits. A domain that has done so for longer than the manager's `max_domain_stall` (15 minutes by default) counts as stalled. The crawler still finishes every other domain first, including domains waiting out a backoff or a crawl-delay. Once only stalled domains have requests left, `crawler.run()` raises <ApiLink to="class/PersistentRateLimitError">`PersistentRateLimitError`</ApiLink> instead of waiting forever. The error message names the stalled domains. To fix the stall, lower the crawler's concurrency or drop those domains.
+
+The requests of a stalled domain stay queued. To resume them, call `crawler.run()` again once `max_domain_stall` has passed since the domain's last 429, or start a new process with `purge_on_start` disabled.
+
+Note that:
+
+- A crawler running with `keep_alive=True` never raises the error. Instead, a stalled domain's requests don't make the crawler start new tasks until `max_domain_stall` has passed since the domain's last 429. A task started for other requests can still pick them up.
+- The stall clock survives a failed run. Rerunning in the same process within `max_domain_stall` of the last 429 raises the error again, before any request is sent if nothing else is queued. To reset the clock at once, create a new crawler with a new `ThrottlingRequestManager`.
+- A backoff or `Retry-After` delay longer than `max_domain_stall` delays detection until the domain's next 429.
 
 ## Sub-manager storage
 

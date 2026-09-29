@@ -13,9 +13,11 @@ __all__ = [
     'ContextPipelineInterruptedError',
     'HttpClientStatusCodeError',
     'HttpStatusCodeError',
+    'PersistentRateLimitError',
     'ProxyError',
     'RequestCollisionError',
     'RequestHandlerError',
+    'RequestThrottledError',
     'ServiceConflictError',
     'SessionError',
     'UserDefinedErrorHandlerError',
@@ -116,3 +118,23 @@ class ContextPipelineInterruptedError(Exception):
 @docs_group('Errors')
 class RequestCollisionError(Exception):
     """Raised when a request cannot be processed due to a conflict with required resources."""
+
+
+@docs_group('Errors')
+class RequestThrottledError(Exception):
+    """Raised when a domain throttled by a `ThrottlingRequestManager` responds with 429.
+
+    The request is retried later without spending a retry or marking the session as bad. If you raise it yourself, call
+    `ThrottlingRequestManager.record_domain_delay` first. Otherwise it's handled as an ordinary error.
+    """
+
+    def __init__(self, message: str = 'Request is being retried later because its domain is rate-limiting us') -> None:
+        super().__init__(message)
+
+
+@docs_group('Errors')
+class PersistentRateLimitError(Exception):
+    """Raised when a domain has rate-limited every request for longer than `max_domain_stall`.
+
+    Raised only once no other requests are left. The domain's requests stay queued.
+    """

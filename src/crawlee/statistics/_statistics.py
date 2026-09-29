@@ -42,6 +42,10 @@ class RequestProcessingRecord:
         self._runs += 1
         return self._runs
 
+    def undo_run(self) -> None:
+        """Stop counting the most recent run towards `retry_count`."""
+        self._runs -= 1
+
     def finish(self) -> timedelta:
         """Mark the job as finished."""
         if self._last_run_at_ns is None:
@@ -239,6 +243,13 @@ class Statistics(Generic[TStatisticsState]):
         )
 
         del self._requests_in_progress[request_id_or_key]
+
+    @ensure_context
+    def record_request_processing_deferral(self, request_id_or_key: str) -> None:
+        """Mark a request as deferred, so this attempt doesn't count as a retry."""
+        record = self._requests_in_progress.get(request_id_or_key)
+        if record is not None:
+            record.undo_run()
 
     @ensure_context
     def record_request_processing_failure(self, request_id_or_key: str) -> None:
