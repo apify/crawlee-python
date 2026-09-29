@@ -139,7 +139,8 @@ def _find_declared_encoding(body: bytes) -> str | None:
     """Find the encoding declared by an XML declaration or a `<meta>` tag near the start of the body."""
     prescan = _HTML_COMMENT_PATTERN.sub(b'', body[:_PRESCAN_BYTES])
     xml_match = _XML_ENCODING_PATTERN.match(prescan)
-    encoding = _resolve_encoding(xml_match.group(1).decode('ascii')) if xml_match else _find_meta_encoding(prescan)
+    xml_encoding = _resolve_encoding(xml_match.group(1).decode('ascii')) if xml_match else None
+    encoding = xml_encoding or _find_meta_encoding(prescan)
     # A declaration readable as ASCII rules out UTF-16, so browsers read such pages as UTF-8.
     return 'utf-8' if encoding and encoding.startswith('utf-16') else encoding
 

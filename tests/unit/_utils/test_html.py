@@ -100,6 +100,12 @@ _FRENCH = 'Test de décodage des caractères de la langue française dans une œ
             f'<?xml version="1.0" encoding="windows-1250"?><p>{_CZECH}</p>',
             id='xml-declaration',
         ),
+        pytest.param(
+            f'<?xml version="1.0" encoding="bogus"?><meta charset="windows-1250"><p>{_CZECH}</p>'.encode('cp1250'),
+            None,
+            f'<?xml version="1.0" encoding="bogus"?><meta charset="windows-1250"><p>{_CZECH}</p>',
+            id='unknown-xml-label-falls-back-to-meta',
+        ),
         pytest.param(b'\xffok', 'text/html; charset=utf-8', '\ufffdok', id='invalid-bytes'),
     ],
 )
