@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.10.3 - **not yet released**
+## [1.10.3](https://github.com/apify/crawlee-python/releases/tag/v1.10.3) (2026-09-29)
 
 ### 🐛 Bug Fixes
 
@@ -15,7 +14,6 @@ All notable changes to this project will be documented in this file.
 - **crawlers:** Decode non-UTF-8 pages correctly in ParselCrawler and BeautifulSoupCrawler ([#2260](https://github.com/apify/crawlee-python/pull/2260)) ([209e8a1](https://github.com/apify/crawlee-python/commit/209e8a108507c8dcc9ff6296957946854a46a0ed)) by [@Mantisus](https://github.com/Mantisus)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.10.2](https://github.com/apify/crawlee-python/releases/tag/v1.10.2) (2026-09-22)
 
 ### 🐛 Bug Fixes
