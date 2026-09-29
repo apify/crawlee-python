@@ -1619,7 +1619,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     self._logger.exception('Error in deferred cleanup')
 
     def _is_held_back(self, request: Request) -> bool:
-        """Check whether a `ThrottlingRequestManager` holds the request's domain back, so a deferral can't spin."""
+        """Check whether a `ThrottlingRequestManager` holds the request's domain back, so a deferral can't spin.
+
+        Logs a one-time warning when it doesn't, since the `RequestThrottledError` is then handled as an ordinary error.
+        """
         manager = self._request_manager
         if isinstance(manager, ThrottlingRequestManager) and manager.is_throttled(request.url):
             return True

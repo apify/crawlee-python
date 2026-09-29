@@ -379,7 +379,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         return (
             f'{summary} rate-limited every request for longer than `max_domain_stall` ({window:.0f}s). Waiting '
             "longer will not help - lower the crawler's concurrency, or drop these domains. Their requests are "
-            'still queued, so re-running with purge_on_start disabled will resume them if the rate limit lifts.'
+            'still queued, so re-running with `purge_on_start` disabled will resume them if the rate limit lifts.'
         )
 
     def record_domain_delay(self, url: str, *, retry_after: timedelta | None = None) -> bool:
