@@ -8,6 +8,7 @@ import pytest
 
 from crawlee import ConcurrencySettings, Glob, HttpHeaders, Request, RequestTransformAction, SkippedReason
 from crawlee.crawlers import ParselCrawler
+from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
@@ -16,6 +17,10 @@ if TYPE_CHECKING:
     from crawlee._request import RequestOptions
     from crawlee.crawlers import BasicCrawlingContext, ParselCrawlingContext
     from crawlee.http_clients._base import HttpClient
+
+_CZECH = 'Test dekódování znaků českého jazyka'
+_UKRAINIAN = 'Тест декодування символів української мови'
+_CHINESE = '中文字符解码测试'
 
 
 async def test_basic(server_url: URL, http_client: HttpClient) -> None:
@@ -509,3 +514,37 @@ async def test_enqueue_links_with_limit(server_url: URL, http_client: HttpClient
         mock.call(str(server_url / 'page_3')),
     ]
     visit.assert_has_calls(expected_visit_calls, any_order=True)
+
+
+@pytest.mark.parametrize(
+    ('texts', 'body', 'content_type'),
+    [
+        pytest.param(
+            [_CZECH],
+            f'<p>{_CZECH}</p>'.encode('cp1250'),
+            'text/html; charset=windows-1250',
+            id='header',
+        ),
+        pytest.param(
+            [_CHINESE],
+            b'<head><meta http-equiv="Content-Type" content="text/html; charset=GBK"></head>'
+            + f'<p>{_CHINESE}</p>'.encode('gbk'),
+            'text/html',
+            id='meta',
+        ),
+        pytest.param(
+            [_CZECH, '\ufffd'],
+            f'<head><meta charset="windows-1250"></head><p>{_CZECH}</p>'.encode('cp1250') + b'<p>\x81</p>',
+            'text/html',
+            id='meta-with-invalid-byte',
+        ),
+        pytest.param([_UKRAINIAN], f'<p>{_UKRAINIAN}</p>'.encode(), 'text/html', id='undeclared'),
+    ],
+)
+async def test_parse_decodes_page_encoding(texts: list[str], body: bytes, content_type: str) -> None:
+    """The page is decoded with the encoding its header or `<meta>` tag declares."""
+    response = mock.Mock(headers=HttpHeaders({'Content-Type': content_type}), read=mock.AsyncMock(return_value=body))
+
+    selector = await ParselParser().parse(response)
+
+    assert selector.css('p::text').getall() == texts

@@ -2,11 +2,24 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from logging import getLogger
 
 logger = getLogger(__name__)
+
+_CHARSET_PATTERN = re.compile(r'(?:^|;)\s*charset\s*=\s*(?:"([^"]*)"|([^;\s]*))', re.IGNORECASE)
+
+
+def parse_content_type_charset(value: str | None) -> str | None:
+    """Get the `charset` parameter of a `Content-Type` header value, if it has one."""
+    if not value:
+        return None
+    match = _CHARSET_PATTERN.search(value)
+    if match is None:
+        return None
+    return (match.group(1) or match.group(2) or '').strip() or None
 
 
 def parse_retry_after_header(value: str | None) -> timedelta | None:
