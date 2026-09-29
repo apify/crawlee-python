@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - **crawlers:** Keep the crawler usable after a failed run ([#2255](https://github.com/apify/crawlee-python/pull/2255)) ([3e73166](https://github.com/apify/crawlee-python/commit/3e73166fa00160c4c1df656e9a25f1c60ae89773)) by [@vdusek](https://github.com/vdusek)
 - **browsers:** Retry the temp directory removal until the browser releases its files ([#2239](https://github.com/apify/crawlee-python/pull/2239)) ([8f41522](https://github.com/apify/crawlee-python/commit/8f41522fa9a15bfd585ef9745c853c25c26d9074)) by [@vdusek](https://github.com/vdusek)
 - **throttling-manager:** Defer throttled 429s without spending retries and give up on persistently rate-limited domains ([#2250](https://github.com/apify/crawlee-python/pull/2250)) ([6b7db66](https://github.com/apify/crawlee-python/commit/6b7db6601b7a5a5cf7d567bcb38598c1374d42a2)) by [@Mantisus](https://github.com/Mantisus), closes [#2143](https://github.com/apify/crawlee-python/issues/2143)
+- **crawlers:** Decode non-UTF-8 pages correctly in ParselCrawler and BeautifulSoupCrawler ([#2260](https://github.com/apify/crawlee-python/pull/2260)) ([209e8a1](https://github.com/apify/crawlee-python/commit/209e8a108507c8dcc9ff6296957946854a46a0ed)) by [@Mantisus](https://github.com/Mantisus)
 
 
 <!-- git-cliff-unreleased-end -->
