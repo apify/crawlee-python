@@ -428,7 +428,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._context_result_map = WeakKeyDictionary[BasicCrawlingContext, RequestHandlerRunResult]()
 
         # Context pipeline
-        self._context_pipeline = (_context_pipeline or ContextPipeline()).compose(self._check_url_after_redirects)  # ty: ignore[invalid-argument-type]
+        self._context_pipeline = (_context_pipeline or ContextPipeline[TCrawlingContext]()).compose(
+            self._check_url_after_redirects
+        )
 
         # Crawl settings
         self._max_request_retries = max_request_retries
