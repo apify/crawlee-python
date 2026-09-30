@@ -10,8 +10,9 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
 import RequestExample from '!!raw-loader!roa-loader!./code_examples/fill_and_submit_web_form_request.py';
 import CrawlerExample from '!!raw-loader!roa-loader!./code_examples/fill_and_submit_web_form_crawler.py';
+import AutomatedExample from '!!raw-loader!roa-loader!./code_examples/fill_and_submit_web_form_automated.py';
 
-This example demonstrates how to fill and submit a web form using the <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> crawler. The same approach applies to any crawler that inherits from it, such as the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> or <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>.
+This example demonstrates how to fill and submit a web form using the <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> crawler. The same approach applies to any crawler that inherits from it, such as the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> or <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>. These two crawlers can also [fill in the form automatically](#fill-in-the-form-automatically).
 
 We are going to use the [httpbin.org](https://httpbin.org) website to demonstrate how it works.
 
@@ -118,3 +119,21 @@ Finally, run your crawler. Your logs should show something like this:
 ```
 
 This log output confirms that the crawler successfully submitted the form and processed the response. Congratulations! You have successfully filled and submitted a web form using the <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink>.
+
+## Fill in the form automatically
+
+The <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> and <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> can build the form request for you. Their crawling contexts provide the <ApiLink to="class/ParselCrawlingContext#extract_form_requests">`extract_form_requests`</ApiLink> helper, which reads the form from the page, fills in your values and returns a list with the request that submits it the way a browser does. The action URL, the method and the encoding come from the form itself, so you only need the field names from [Investigate the form fields](#investigate-the-form-fields).
+
+The crawler below opens the page with the form. The default handler fills in the form with the `fields` argument and enqueues the submission with a label. A separate handler for that label processes the response.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {AutomatedExample}
+</RunnableCodeBlock>
+
+Note that:
+
+- `fields` replaces the values of the listed fields and adds the ones the form doesn't have. A list submits the field once per value, as with the `topping` checkboxes.
+- Fields you don't list keep the values from the page, so hidden inputs such as CSRF tokens are submitted as they are. A CSRF token is tied to the session cookie, so pass `session_id=context.session.id` to send the form in the same session. The request also carries the `Referer` and `Origin` headers a browser sends, which some CSRF checks require.
+- On a page with several forms, the helper submits the one sharing the most field names with `fields`, or the first one if none shares any. It skips forms that can't be submitted, for example because their action is JavaScript, but never falls back to a form sharing fewer names, so the list can be empty. To pick a form yourself, pass a CSS selector such as `selector='#order'`. To submit each form, pass `all_forms=True`. Then `fields` only replaces the fields each form has.
+- The first enabled submit button of the form is clicked by default, and a form without one is submitted anyway. Use the `click` argument to pick another button by its attributes, even a disabled one, or to submit without one.
+- The page decides where its form is sent. To enqueue only requests to the same host, call `context.add_requests(requests, strategy='same-hostname')`.

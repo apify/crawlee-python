@@ -80,7 +80,7 @@ Both frameworks give you a request scheduler, filtering of duplicate requests, r
 | `response.follow()` / `yield Request(...)` | <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> / <ApiLink to="class/AddRequestsFunction">`add_requests`</ApiLink> |
 | `dont_filter=True` | <ApiLink to="class/Request#from_url">`Request.from_url(always_enqueue=True)`</ApiLink> |
 | `allowed_domains` | <ApiLink to="class/EnqueueLinksFunction">`enqueue_links(strategy=...)`</ApiLink> |
-| `scrapy.FormRequest` | <ApiLink to="class/Request#from_url">`Request.from_url(method='POST', payload=...)`</ApiLink> |
+| `scrapy.FormRequest` | <ApiLink to="class/Request#from_url">`Request.from_url(method='POST', payload=...)`</ApiLink> / <ApiLink to="class/BeautifulSoupCrawlingContext#extract_form_requests">`context.extract_form_requests(...)`</ApiLink> |
 | Item pipelines | <ApiLink to="class/Dataset">`Dataset`</ApiLink> |
 | Downloader / spider middlewares | <ApiLink to="class/Router#use">`router.use()`</ApiLink>, navigation hooks, <ApiLink to="class/HttpClient">HTTP clients</ApiLink> |
 | `settings.py` | <ApiLink to="class/Configuration">`Configuration`</ApiLink> + crawler arguments |
@@ -263,7 +263,7 @@ Scrapy retries failed requests with `RetryMiddleware` and reports terminal failu
 
 ## Forms and login
 
-Scrapy submits forms with `FormRequest`, which encodes `formdata` as `form-urlencoded` and sets the header for you. Crawlee's <ApiLink to="class/Request#from_url">`payload`</ApiLink> takes the raw request body, so encode the fields yourself with `urllib.parse.urlencode` and set the `Content-Type` through `headers=`. For a full login flow with session reuse, see the [Logging in with a crawler guide](./logging-in-with-a-crawler).
+Scrapy submits forms with `FormRequest.from_response`, which reads the form from the page, keeps its hidden fields and encodes the data for you. Crawlee's <ApiLink to="class/ParselCrawlingContext#extract_form_requests">`extract_form_requests`</ApiLink> helper does the same in the <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> and <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>. Pass your values in `fields` and request options such as `label` or `session_id` as keyword arguments. Like `from_response`, it submits a single form. Scrapy takes the first form by default, while the helper prefers the one sharing the most field names with `fields`. It returns a list, which is empty when no form matches, so enqueue it with `add_requests`. For a plain `FormRequest` that doesn't come from a form on the page, use <ApiLink to="class/Request#from_url">`Request.from_url`</ApiLink>. Its `payload` is the raw request body, so encode the fields with `urllib.parse.urlencode` and set the `Content-Type` through `headers=`. For a full login flow with session reuse, see the [Logging in with a crawler guide](./logging-in-with-a-crawler).
 
 <Tabs groupId="scrapy-migration-login">
     <TabItem value="scrapy" label="Scrapy">
