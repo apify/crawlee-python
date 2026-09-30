@@ -13,7 +13,7 @@ from typing_extensions import NotRequired, TypeVar
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._utils.docs import docs_group
 from crawlee._utils.time import SharedTimeout
-from crawlee._utils.urls import to_absolute_url_iterator
+from crawlee._utils.urls import convert_to_absolute_url, to_absolute_url_iterator
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import RequestThrottledError, SessionError
 from crawlee.statistics import StatisticsState
@@ -218,13 +218,14 @@ class AbstractHttpCrawler(
                 self._parser.find_links(parsed_content, selector=selector, attribute=attribute)
             )
 
-            # Get base URL from <base> tag if present
+            # A relative `<base href>` is resolved against the page URL, and an invalid one is ignored.
+            base_url = context.request.loaded_url or context.request.url
             extracted_base_urls = list(self._parser.find_links(parsed_content, 'base[href]', 'href'))
-            base_url: str = (
-                str(extracted_base_urls[0])
-                if extracted_base_urls
-                else context.request.loaded_url or context.request.url
-            )
+            if extracted_base_urls:
+                try:
+                    base_url = convert_to_absolute_url(base_url, extracted_base_urls[0])
+                except ValueError:
+                    context.log.debug(f'Ignoring invalid base URL "{extracted_base_urls[0]}", using the page URL.')
             links_iterator = to_absolute_url_iterator(base_url, links_iterator, logger=context.log)
 
             if robots_txt_file:

@@ -375,6 +375,30 @@ async def test_extract_links(server_url: URL, http_client: HttpClient) -> None:
     assert extracted_links[0] == str(server_url / 'page_1')
 
 
+@pytest.mark.parametrize(
+    ('base', 'expected_path'),
+    [
+        pytest.param('{origin}/abs/', '/abs/page', id='absolute-base'),
+        pytest.param('/sub/', '/sub/page', id='relative-base'),
+        pytest.param('http://[bad', '/page', id='invalid-base'),
+    ],
+)
+async def test_extract_links_base_href(server_url: URL, http_client: HttpClient, base: str, expected_path: str) -> None:
+    """Links are resolved against `<base href>`, a relative one against the page URL, and an invalid one is ignored."""
+    crawler = ParselCrawler(http_client=http_client)
+    handler = mock.AsyncMock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        links = await context.extract_links()
+        await handler([request.url for request in links])
+
+    page = f'<head><base href="{base.format(origin=server_url.origin())}"></head><body><a href="page">Page</a></body>'
+    await crawler.run([str((server_url / 'echo_content').with_query(content=page))])
+
+    handler.assert_awaited_once_with([str(server_url.with_path(expected_path))])
+
+
 async def test_extract_non_href_links(server_url: URL, http_client: HttpClient) -> None:
     crawler = ParselCrawler(http_client=http_client)
     extracted_links: list[str] = []

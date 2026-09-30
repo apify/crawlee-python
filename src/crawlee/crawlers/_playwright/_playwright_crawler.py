@@ -18,7 +18,7 @@ from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.time import SharedTimeout
-from crawlee._utils.urls import to_absolute_url_iterator
+from crawlee._utils.urls import is_url_absolute, to_absolute_url_iterator
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import RequestThrottledError, SessionError
@@ -445,13 +445,17 @@ class PlaywrightCrawler(
             strategy = kwargs.get('strategy', 'same-hostname')
 
             elements = await context.page.query_selector_all(selector)
+            # Browsers ignore the whitespace around a URL, as `find_links` of the HTTP parsers does.
             links_iterator: Iterator[str] = iter(
-                [url for element in elements if (url := await element.get_attribute(attribute)) is not None]
+                [url.strip() for element in elements if (url := await element.get_attribute(attribute)) is not None]
             )
 
-            # Get base URL from <base> tag if present
+            # The browser resolves `<base href>` itself. Chromium reports an invalid one as `about:blank`, so the page
+            # URL is used instead, as in other browsers.
             extracted_base_url = await context.page.evaluate('document.baseURI')
-            base_url: str = extracted_base_url or context.request.loaded_url or context.request.url
+            base_url = context.request.loaded_url or context.request.url
+            if extracted_base_url and is_url_absolute(extracted_base_url):
+                base_url = extracted_base_url
 
             links_iterator = to_absolute_url_iterator(base_url, links_iterator, logger=context.log)
 
