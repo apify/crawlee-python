@@ -50,7 +50,11 @@ class ParselParser(AbstractHttpParser[Selector, Selector]):
 
     @staticmethod
     def _parse_body(body: bytes, content_type: str | None) -> Selector:
+        media_type = (content_type or '').split(';')[0].strip().lower()
+        # Other responses keep Parsel's own detection of JSON, XML and HTML.
+        selector_type = 'html' if media_type in {'text/html', 'application/xhtml+xml'} else None
+
         encoding = get_declared_html_encoding(body, content_type)
         if encoding is None:
-            return Selector(body=body)
-        return Selector(text=decode_html_body(body, encoding))
+            return Selector(body=body, type=selector_type)
+        return Selector(text=decode_html_body(body, encoding), type=selector_type)
