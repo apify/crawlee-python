@@ -12,7 +12,7 @@ from asyncio import Future
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from itertools import product
 from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import ANY, AsyncMock, Mock, call, patch
@@ -2446,11 +2446,16 @@ async def test_crawler_intermediate_statistics() -> None:
     # has enough time to reach the active state on slow CI runners under xdist load.
     crawler_task = asyncio.create_task(crawler.run(['https://a.placeholder.com']))
     assert await poll_until_condition(lambda: crawler.statistics.active, timeout=30)
+    active_seen_at = datetime.now(timezone.utc)
 
-    # Wait some time and check that runtime is updated.
+    # Wait some time and check that runtime is updated. The runtime is measured on the wall clock, which can disagree
+    # with the `asyncio.sleep` clock (it ticks at ~15.6 ms on Windows), so bound it by a wall-clock interval that lies
+    # entirely within the run.
     await asyncio.sleep(check_time.total_seconds())
+    min_runtime = datetime.now(timezone.utc) - active_seen_at
     crawler.statistics.calculate()
-    assert crawler.statistics.state.crawler_runtime >= check_time
+    assert min_runtime > timedelta(0)
+    assert crawler.statistics.state.crawler_runtime >= min_runtime
 
     # Wait for crawler to finish
     await crawler_task
