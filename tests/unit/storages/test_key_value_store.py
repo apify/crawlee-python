@@ -267,6 +267,82 @@ async def test_iterate_keys_with_limit(kvs: KeyValueStore) -> None:
     assert len(collected_keys) == 5
 
 
+async def test_iterate_values(kvs: KeyValueStore) -> None:
+    """Test iterating over values in the key-value store."""
+    await kvs.set_value('key1', 'value1')
+    await kvs.set_value('key2', {'nested': 2})
+    await kvs.set_value('key3', [3])
+
+    collected_values = [value async for value in kvs.iterate_values()]
+
+    assert len(collected_values) == 3
+    assert 'value1' in collected_values
+    assert {'nested': 2} in collected_values
+    assert [3] in collected_values
+
+
+async def test_iterate_entries(kvs: KeyValueStore) -> None:
+    """Test iterating over (key, value) pairs in the key-value store."""
+    await kvs.set_value('key1', 'value1')
+    await kvs.set_value('key2', {'nested': 2})
+    await kvs.set_value('key3', [3])
+
+    collected_entries = dict([entry async for entry in kvs.iterate_entries()])
+
+    assert collected_entries == {'key1': 'value1', 'key2': {'nested': 2}, 'key3': [3]}
+
+
+async def test_iterate_entries_with_limit_and_exclusive_start_key(kvs: KeyValueStore) -> None:
+    """Test that `iterate_entries` passes `limit` and `exclusive_start_key` through to the key listing."""
+    for i in range(10):
+        await kvs.set_value(f'key{i}', f'value{i}')
+
+    all_keys = [metadata.key for metadata in await kvs.list_keys()]
+    start_key = all_keys[2]
+
+    collected_entries = [entry async for entry in kvs.iterate_entries(exclusive_start_key=start_key, limit=3)]
+
+    assert len(collected_entries) == 3
+    expected_keys = all_keys[all_keys.index(start_key) + 1 :][:3]
+    assert [key for key, _ in collected_entries] == expected_keys
+    assert all(value == f'value{key.removeprefix("key")}' for key, value in collected_entries)
+
+
+async def test_iterate_entries_empty_kvs(kvs: KeyValueStore) -> None:
+    """Test that iterating over an empty key-value store yields nothing."""
+    collected_entries = [entry async for entry in kvs.iterate_entries()]
+
+    assert collected_entries == []
+
+
+async def test_iterate_entries_skips_records_deleted_during_iteration(kvs: KeyValueStore) -> None:
+    """Test that a record deleted after its key was listed but before its value was read is skipped."""
+    for i in range(5):
+        await kvs.set_value(f'key{i}', f'value{i}')
+
+    all_keys = [metadata.key for metadata in await kvs.list_keys()]
+    deleted_key = all_keys[-1]
+
+    collected_entries = []
+    async for key, value in kvs.iterate_entries():
+        if key == all_keys[0]:
+            await kvs.delete_value(deleted_key)
+        collected_entries.append((key, value))
+
+    assert len(collected_entries) == 4
+    assert deleted_key not in dict(collected_entries)
+
+
+async def test_async_iteration(kvs: KeyValueStore) -> None:
+    """Test that the key-value store can be used directly in an `async for` loop, yielding (key, value) pairs."""
+    await kvs.set_value('key1', 'value1')
+    await kvs.set_value('key2', 'value2')
+
+    collected_entries = {key: value async for key, value in kvs}
+
+    assert collected_entries == {'key1': 'value1', 'key2': 'value2'}
+
+
 async def test_drop(
     storage_client: StorageClient,
 ) -> None:

@@ -280,6 +280,23 @@ async def test_iterate_items(dataset: Dataset) -> None:
     assert collected_items[-1]['id'] == 5
 
 
+async def test_async_iteration(dataset: Dataset) -> None:
+    """Test that the dataset can be used directly in an `async for` loop."""
+    items = [{'id': i} for i in range(1, 6)]  # 5 items
+    await dataset.push_data(items)
+
+    collected_items = [item async for item in dataset]
+
+    assert collected_items == items
+
+
+async def test_async_iteration_empty_dataset(dataset: Dataset) -> None:
+    """Test that iterating over an empty dataset yields nothing."""
+    collected_items = [item async for item in dataset]
+
+    assert collected_items == []
+
+
 async def test_iterate_items_with_options(dataset: Dataset) -> None:
     """Test iterating with offset, limit and desc parameters."""
     # Add some items
