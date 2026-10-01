@@ -202,21 +202,33 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         if not record_db:
             return None
 
-        # Deserialize the value based on content type
-        value_bytes = record_db.value
+        return self._build_record(
+            key=record_db.key,
+            content_type=record_db.content_type,
+            size=record_db.size,
+            value_bytes=record_db.value,
+        )
 
+    @staticmethod
+    def _build_record(
+        *, key: str, content_type: str, size: int | None, value_bytes: bytes
+    ) -> KeyValueStoreRecord | None:
+        """Deserialize a stored value based on its content type into a record.
+
+        Returns None, after logging a warning, when the stored bytes cannot be decoded as the content type claims.
+        """
         # Handle None values
-        if record_db.content_type == 'application/x-none':
+        if content_type == 'application/x-none':
             value = None
         # Handle JSON values
-        elif 'application/json' in record_db.content_type:
+        elif 'application/json' in content_type:
             try:
                 value = json.loads(value_bytes.decode('utf-8'))
             except (json.JSONDecodeError, UnicodeDecodeError):
                 logger.warning(f'Failed to decode JSON value for key "{key}"')
                 return None
         # Handle text values
-        elif record_db.content_type.startswith('text/'):
+        elif content_type.startswith('text/'):
             try:
                 value = value_bytes.decode('utf-8')
             except UnicodeDecodeError:
@@ -226,12 +238,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         else:
             value = value_bytes
 
-        return KeyValueStoreRecord(
-            key=record_db.key,
-            value=value,
-            content_type=record_db.content_type,
-            size=record_db.size,
-        )
+        return KeyValueStoreRecord(key=key, value=value, content_type=content_type, size=size)
 
     @retry_on_error(SQLAlchemyError)
     @override
@@ -279,6 +286,48 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
                     content_type=row.content_type,
                     size=row.size,
                 )
+
+            await self._add_buffer_record(session)
+
+    @override
+    async def iterate_entries(
+        self,
+        *,
+        exclusive_start_key: str | None = None,
+        limit: int | None = None,
+    ) -> AsyncIterator[KeyValueStoreRecord]:
+        # Read the values together with the keys in a single streamed query, instead of one query per record as the
+        # default implementation does. Streaming keeps a single row in memory at a time.
+        stmt = (
+            select(
+                self._ITEM_TABLE.key,
+                self._ITEM_TABLE.content_type,
+                self._ITEM_TABLE.size,
+                self._ITEM_TABLE.value,
+            )
+            .where(self._ITEM_TABLE.key_value_store_id == self._id)
+            .order_by(self._ITEM_TABLE.key)
+        )
+
+        if exclusive_start_key is not None:
+            stmt = stmt.where(self._ITEM_TABLE.key > exclusive_start_key)
+
+        if limit is not None:
+            stmt = stmt.limit(limit)
+
+        async with self.get_session(with_simple_commit=True) as session:
+            result = await session.stream(stmt.execution_options(stream_results=True))
+
+            async for row in result:
+                record = self._build_record(
+                    key=row.key,
+                    content_type=row.content_type,
+                    size=row.size,
+                    value_bytes=row.value,
+                )
+                if record is None:
+                    continue
+                yield record
 
             await self._add_buffer_record(session)
 

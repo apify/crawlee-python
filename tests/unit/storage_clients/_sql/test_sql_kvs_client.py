@@ -325,3 +325,42 @@ async def test_set_value_does_not_retry_on_unexpected_exception(kvs_client: SqlK
 
     # Verify that retry logic was not attempted
     assert mock_sleep.call_count == 0
+
+
+async def test_iterate_entries_reads_values_in_a_single_query(kvs_client: SqlKeyValueStoreClient) -> None:
+    """Test that `iterate_entries` reads keys and values together instead of calling `get_value` per key."""
+    await kvs_client.set_value(key='a-json', value={'nested': [1, 2]})
+    await kvs_client.set_value(key='b-text', value='plain text')
+    await kvs_client.set_value(key='c-bytes', value=b'\x00\x01binary', content_type='application/octet-stream')
+    await kvs_client.set_value(key='d-none', value=None)
+
+    with patch.object(kvs_client, 'get_value', side_effect=AssertionError('get_value must not be called')):
+        records = [record async for record in kvs_client.iterate_entries()]
+
+    assert [record.key for record in records] == ['a-json', 'b-text', 'c-bytes', 'd-none']
+    assert [record.value for record in records] == [{'nested': [1, 2]}, 'plain text', b'\x00\x01binary', None]
+    assert records[0].content_type.startswith('application/json')
+    assert records[1].content_type.startswith('text/plain')
+    assert records[2].content_type == 'application/octet-stream'
+    assert all(record.size is not None for record in records)
+
+
+async def test_iterate_entries_with_exclusive_start_key_and_limit(kvs_client: SqlKeyValueStoreClient) -> None:
+    """Test that `iterate_entries` applies `exclusive_start_key` and `limit` in the query."""
+    for i in range(6):
+        await kvs_client.set_value(key=f'key{i}', value=f'value{i}')
+
+    with patch.object(kvs_client, 'get_value', side_effect=AssertionError('get_value must not be called')):
+        records = [record async for record in kvs_client.iterate_entries(exclusive_start_key='key1', limit=3)]
+
+    assert [(record.key, record.value) for record in records] == [
+        ('key2', 'value2'),
+        ('key3', 'value3'),
+        ('key4', 'value4'),
+    ]
+
+
+async def test_iterate_entries_empty_store(kvs_client: SqlKeyValueStoreClient) -> None:
+    records = [record async for record in kvs_client.iterate_entries()]
+
+    assert records == []

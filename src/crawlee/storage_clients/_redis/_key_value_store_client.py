@@ -51,6 +51,15 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
     _CLIENT_TYPE = 'Key-value store'
     """Human-readable client type for error messages."""
 
+    _ITERATE_ENTRIES_BATCH_MAX_KEYS = 100
+    """Maximum number of records fetched with a single HMGET call in `iterate_entries`."""
+
+    _ITERATE_ENTRIES_BATCH_MAX_BYTES = 8 * 1024 * 1024
+    """Maximum total size of the records fetched with a single HMGET call in `iterate_entries`.
+
+    A single record larger than this is still fetched, but alone in its batch.
+    """
+
     def __init__(self, storage_name: str, storage_id: str, redis: Redis) -> None:
         """Initialize a new instance.
 
@@ -181,6 +190,19 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
         # redis-py typing issue
         value_bytes: bytes | None = await await_redis_response(self._redis.hget(self._items_key, key))  # ty: ignore[invalid-assignment]
 
+        return self._build_record(metadata_item, value_bytes)
+
+    @staticmethod
+    def _build_record(
+        metadata_item: KeyValueStoreRecordMetadata, value_bytes: bytes | None
+    ) -> KeyValueStoreRecord | None:
+        """Deserialize a stored value based on its content type into a record.
+
+        Returns None, after logging a warning, when the value is missing or cannot be decoded as the content type
+        claims.
+        """
+        key = metadata_item.key
+
         if value_bytes is None:
             logger.warning(f'Value for key "{key}" is missing.')
             return None
@@ -251,6 +273,55 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
                 pipe,
                 **MetadataUpdateParams(update_accessed_at=True),
             )
+
+    @override
+    async def iterate_entries(
+        self,
+        *,
+        exclusive_start_key: str | None = None,
+        limit: int | None = None,
+    ) -> AsyncIterator[KeyValueStoreRecord]:
+        # Fetch the values in batches with a single HMGET per batch, instead of two round trips per record as the
+        # default implementation does. The batches are bounded by the record sizes known from the metadata, so a store
+        # with large values does not load too many of them at once.
+        batch: list[KeyValueStoreRecordMetadata] = []
+        batch_size = 0
+
+        async for metadata_item in self.iterate_keys(exclusive_start_key=exclusive_start_key, limit=limit):
+            item_size = metadata_item.size or 0
+            if batch and (
+                len(batch) >= self._ITERATE_ENTRIES_BATCH_MAX_KEYS
+                or batch_size + item_size > self._ITERATE_ENTRIES_BATCH_MAX_BYTES
+            ):
+                async for record in self._fetch_records(batch):
+                    yield record
+                batch, batch_size = [], 0
+
+            batch.append(metadata_item)
+            batch_size += item_size
+
+        if batch:
+            async for record in self._fetch_records(batch):
+                yield record
+
+    async def _fetch_records(self, batch: list[KeyValueStoreRecordMetadata]) -> AsyncIterator[KeyValueStoreRecord]:
+        """Fetch the values of the given records with a single HMGET call and yield the deserialized records."""
+        keys = [item.key for item in batch if item.content_type != 'application/x-none']
+        values: list[bytes | None] = []
+        if keys:
+            # redis-py typing issue
+            values = await await_redis_response(self._redis.hmget(self._items_key, keys))  # ty: ignore[invalid-assignment]
+        values_by_key = dict(zip(keys, values, strict=True))
+
+        for metadata_item in batch:
+            if metadata_item.content_type == 'application/x-none':
+                yield KeyValueStoreRecord(value=None, **metadata_item.model_dump())
+                continue
+
+            record = self._build_record(metadata_item, values_by_key.get(metadata_item.key))
+            if record is None:
+                continue
+            yield record
 
     @override
     async def get_public_url(self, *, key: str) -> str:
