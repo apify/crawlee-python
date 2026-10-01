@@ -450,11 +450,11 @@ class PlaywrightCrawler(
                 [url.strip() for element in elements if (url := await element.get_attribute(attribute)) is not None]
             )
 
-            # The browser resolves `<base href>` itself. Chromium reports an invalid one as `about:blank`, so the page
-            # URL is used instead, as in other browsers.
+            # The browser resolves `<base href>` itself. Chromium reports an invalid one as `about:blank` and a
+            # `mailto:`-like one as-is, so the page URL is used whenever the base is not an absolute URL.
             extracted_base_url = await context.page.evaluate('document.baseURI')
             base_url = context.request.loaded_url or context.request.url
-            if extracted_base_url and is_url_absolute(extracted_base_url):
+            if is_url_absolute(extracted_base_url):
                 base_url = extracted_base_url
 
             links_iterator = to_absolute_url_iterator(base_url, links_iterator, logger=context.log)
