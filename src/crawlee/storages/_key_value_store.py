@@ -220,8 +220,9 @@ class KeyValueStore(Storage):
     ) -> AsyncIterator[Any]:
         """Iterate over the values of the existing records in the KVS.
 
-        The values are fetched one by one as the iteration advances, so only a single value is held in memory at
-        a time. On remote backends this means one request per record on top of the paginated key listing.
+        The records are fetched lazily as the iteration advances, so only a single value is held in memory at
+        a time. On remote backends this means one request per record on top of the paginated key listing, unless
+        the storage client provides a more efficient implementation.
 
         Args:
             exclusive_start_key: Key to start the iteration from.
@@ -240,9 +241,10 @@ class KeyValueStore(Storage):
     ) -> AsyncIterator[tuple[str, Any]]:
         """Iterate over the existing records in the KVS as `(key, value)` pairs.
 
-        The values are fetched one by one as the iteration advances, so only a single value is held in memory at
-        a time. On remote backends this means one request per record on top of the paginated key listing. A record
-        deleted after its key was listed but before its value was fetched is skipped.
+        The records are fetched lazily as the iteration advances, so only a single value is held in memory at
+        a time. On remote backends this means one request per record on top of the paginated key listing, unless
+        the storage client provides a more efficient implementation. A record deleted after its key was listed but
+        before its value was fetched is skipped.
 
         Args:
             exclusive_start_key: Key to start the iteration from.
@@ -251,11 +253,8 @@ class KeyValueStore(Storage):
         Yields:
             A `(key, value)` tuple for each record.
         """
-        async for metadata in self.iterate_keys(exclusive_start_key=exclusive_start_key, limit=limit):
-            record = await self._client.get_value(key=metadata.key)
-            if record is None:
-                continue
-            yield metadata.key, record.value
+        async for record in self._client.iterate_entries(exclusive_start_key=exclusive_start_key, limit=limit):
+            yield record.key, record.value
 
     def __aiter__(self) -> AsyncIterator[tuple[str, Any]]:
         """Iterate over all records in the KVS as `(key, value)` pairs.

@@ -9,11 +9,13 @@ import pytest
 from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient, SqlStorageClient, StorageClient
+from crawlee.storage_clients._memory import MemoryKeyValueStoreClient
+from crawlee.storage_clients.models import KeyValueStoreRecord
 from crawlee.storages import KeyValueStore
 from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, AsyncIterator
     from pathlib import Path
 
 
@@ -331,6 +333,47 @@ async def test_iterate_entries_skips_records_deleted_during_iteration(kvs: KeyVa
 
     assert len(collected_entries) == 4
     assert deleted_key not in dict(collected_entries)
+
+
+async def test_iterate_entries_uses_storage_client_implementation() -> None:
+    """Test that `iterate_entries` and `iterate_values` go through the storage client's `iterate_entries`.
+
+    Storage clients can override the default key-by-key implementation with a more efficient one, so the frontend
+    must delegate to the client instead of combining `iterate_keys` and `get_value` itself.
+    """
+
+    class OptimizedKeyValueStoreClient(MemoryKeyValueStoreClient):
+        async def iterate_entries(
+            self,
+            *,
+            exclusive_start_key: str | None = None,
+            limit: int | None = None,
+        ) -> AsyncIterator[KeyValueStoreRecord]:
+            # A single-pass implementation that never touches `get_value`.
+            keys = sorted(k for k in self._records if exclusive_start_key is None or k > exclusive_start_key)
+            for key in keys[:limit]:
+                record = self._records[key]
+                yield KeyValueStoreRecord(
+                    key=key,
+                    value=f'optimized-{record.value}',
+                    content_type=record.content_type,
+                    size=record.size,
+                )
+
+        async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
+            raise AssertionError(f'get_value must not be called for {key!r} when the client implements iterate_entries')
+
+    client = await OptimizedKeyValueStoreClient.open(id=None, name=None, alias=None)
+    kvs = KeyValueStore(client, id=(await client.get_metadata()).id, name=None)
+    await kvs.set_value('key1', 'value1')
+    await kvs.set_value('key2', 'value2')
+    await kvs.set_value('key3', 'value3')
+
+    entries = [entry async for entry in kvs.iterate_entries(exclusive_start_key='key1', limit=1)]
+    values = [value async for value in kvs.iterate_values()]
+
+    assert entries == [('key2', 'optimized-value2')]
+    assert values == ['optimized-value1', 'optimized-value2', 'optimized-value3']
 
 
 async def test_async_iteration(kvs: KeyValueStore) -> None:

@@ -79,6 +79,27 @@ class KeyValueStoreClient(ABC):
         if False:
             yield KeyValueStoreRecordMetadata()
 
+    async def iterate_entries(
+        self,
+        *,
+        exclusive_start_key: str | None = None,
+        limit: int | None = None,
+    ) -> AsyncIterator[KeyValueStoreRecord]:
+        """Iterate over all the existing records in the key-value store, including their values.
+
+        The backend method for the `KeyValueStore.iterate_entries` and `KeyValueStore.iterate_values` calls.
+
+        The default implementation lists the keys with `iterate_keys` and reads each value separately with
+        `get_value` as the iteration advances, so only a single value is held in memory at a time. A record deleted
+        after its key was listed but before its value was read is skipped. Backends that can read the keys together
+        with their values more efficiently should override this method.
+        """
+        async for metadata in self.iterate_keys(exclusive_start_key=exclusive_start_key, limit=limit):
+            record = await self.get_value(key=metadata.key)
+            if record is None:
+                continue
+            yield record
+
     @abstractmethod
     async def get_public_url(self, *, key: str) -> str:
         """Get the public URL for the given key.
