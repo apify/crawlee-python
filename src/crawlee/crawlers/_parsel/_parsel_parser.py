@@ -50,11 +50,20 @@ class ParselParser(AbstractHttpParser[Selector, Selector]):
 
     @staticmethod
     def _parse_body(body: bytes, content_type: str | None) -> Selector:
-        media_type = (content_type or '').split(';')[0].strip().lower()
-        # Other responses keep Parsel's own detection of JSON, XML and HTML.
-        selector_type = 'html' if media_type in {'text/html', 'application/xhtml+xml'} else None
+        # Parsel rejects an empty body, but reads empty text as an empty HTML document.
+        if not body:
+            return Selector(text='')
 
         encoding = get_declared_html_encoding(body, content_type)
-        if encoding is None:
+        text = None if encoding is None else decode_html_body(body, encoding)
+
+        # Parsel detects a JSON object or array as JSON, and servers can send JSON as `text/html`.
+        may_be_json = body.lstrip()[:1] in (b'{', b'[') if text is None else text.lstrip()[:1] in ('{', '[')
+
+        # Parsel reads a page starting with an XML declaration as XML, where CSS selectors miss XHTML elements.
+        media_type = (content_type or '').split(';')[0].strip().lower()
+        selector_type = 'html' if media_type in {'text/html', 'application/xhtml+xml'} and not may_be_json else None
+
+        if text is None:
             return Selector(body=body, type=selector_type)
-        return Selector(text=decode_html_body(body, encoding), type=selector_type)
+        return Selector(text=text, type=selector_type)
