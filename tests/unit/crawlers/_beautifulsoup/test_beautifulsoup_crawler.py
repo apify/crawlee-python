@@ -295,6 +295,7 @@ async def test_extract_links(server_url: URL, http_client: HttpClient) -> None:
         pytest.param('{origin}/abs/', '/abs/page', id='absolute-base'),
         pytest.param('/sub/', '/sub/page', id='relative-base'),
         pytest.param('http://[bad', '/page', id='invalid-base'),
+        pytest.param('mailto:a@b.c', '/page', id='non-hierarchical-base'),
     ],
 )
 async def test_extract_links_base_href(server_url: URL, http_client: HttpClient, base: str, expected_path: str) -> None:
