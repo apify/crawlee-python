@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - **crawlers:** Parse HTML responses starting with an XML declaration as HTML in `ParselCrawler` ([#2262](https://github.com/apify/crawlee-python/pull/2262)) ([df1178c](https://github.com/apify/crawlee-python/commit/df1178c384284f81236804466be75f88a36eabad)) by [@Mantisus](https://github.com/Mantisus)
+- **crawlers:** Resolve relative and invalid base URLs when extracting links ([#2263](https://github.com/apify/crawlee-python/pull/2263)) ([c69f75f](https://github.com/apify/crawlee-python/commit/c69f75f00697e407b3f4006ebeb4ed847dab0675)) by [@Mantisus](https://github.com/Mantisus)
 
 
 <!-- git-cliff-unreleased-end -->
