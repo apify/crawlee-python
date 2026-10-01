@@ -548,3 +548,24 @@ async def test_parse_decodes_page_encoding(texts: list[str], body: bytes, conten
     selector = await ParselParser().parse(response)
 
     assert selector.css('p::text').getall() == texts
+
+
+@pytest.mark.parametrize(
+    ('content_type', 'expected_type'),
+    [
+        pytest.param('text/html', 'html', id='html'),
+        pytest.param('application/xhtml+xml; charset=utf-8', 'html', id='xhtml'),
+        pytest.param('application/xml', 'xml', id='xml'),
+    ],
+)
+async def test_parse_xml_declaration(content_type: str, expected_type: str) -> None:
+    """A page starting with an XML declaration is read as HTML unless the response is XML."""
+    body = (
+        b'<?xml version="1.0" encoding="UTF-8"?>'
+        b'<html xmlns="http://www.w3.org/1999/xhtml"><body><a href="/next">Next</a></body></html>'
+    )
+    response = mock.Mock(headers=HttpHeaders({'Content-Type': content_type}), read=mock.AsyncMock(return_value=body))
+
+    selector = await ParselParser().parse(response)
+
+    assert selector.type == expected_type
