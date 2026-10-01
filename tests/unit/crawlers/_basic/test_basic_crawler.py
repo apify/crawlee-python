@@ -2448,9 +2448,8 @@ async def test_crawler_intermediate_statistics() -> None:
     assert await poll_until_condition(lambda: crawler.statistics.active, timeout=30)
     active_seen_at = datetime.now(timezone.utc)
 
-    # Wait some time and check that runtime is updated. The runtime is measured on the wall clock, which can disagree
-    # with the `asyncio.sleep` clock (it ticks at ~15.6 ms on Windows), so bound it by a wall-clock interval that lies
-    # entirely within the run.
+    # Wait some time and check that runtime is updated. The runtime is measured on the wall clock, which on Windows
+    # ticks at ~15.6 ms independently of the `asyncio.sleep` clock, so bound it by a wall-clock interval inside the run.
     await asyncio.sleep(check_time.total_seconds())
     min_runtime = datetime.now(timezone.utc) - active_seen_at
     crawler.statistics.calculate()
