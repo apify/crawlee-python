@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.10.4 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **crawlers:** Parse HTML responses starting with an XML declaration as HTML in `ParselCrawler` ([#2262](https://github.com/apify/crawlee-python/pull/2262)) ([df1178c](https://github.com/apify/crawlee-python/commit/df1178c384284f81236804466be75f88a36eabad)) by [@Mantisus](https://github.com/Mantisus)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.10.3](https://github.com/apify/crawlee-python/releases/tag/v1.10.3) (2026-09-29)
 
 ### 🐛 Bug Fixes
