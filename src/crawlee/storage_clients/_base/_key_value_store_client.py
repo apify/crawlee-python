@@ -90,10 +90,10 @@ class KeyValueStoreClient(ABC):
         The backend method for the `KeyValueStore.iterate_entries` and `KeyValueStore.iterate_values` calls.
 
         The default implementation lists the keys with `iterate_keys` and reads each value separately with
-        `get_value` as the iteration advances, so only a single value is held in memory at a time. A record deleted
-        after its key was listed but before its value was read is skipped. Backends that can read the keys together
-        with their values more efficiently should override this method; such an implementation must still keep the
-        memory usage bounded, e.g. by streaming or by batching on the known record sizes.
+        `get_value` as the iteration advances, so only a single value is held in memory at a time. Whether a record
+        deleted while the iteration is in progress is yielded depends on the implementation. Backends that can read
+        the keys together with their values more efficiently should override this method; such an implementation
+        must still keep the memory usage bounded, e.g. by streaming or by batching on the known record sizes.
         """
         async for metadata in self.iterate_keys(exclusive_start_key=exclusive_start_key, limit=limit):
             record = await self.get_value(key=metadata.key)

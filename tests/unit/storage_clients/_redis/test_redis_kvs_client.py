@@ -291,8 +291,8 @@ async def test_iterate_entries_reads_values_in_batches(
     assert records[1].content_type.startswith('text/plain')
     assert records[2].content_type == 'application/octet-stream'
 
-    # All values fit in a single batch, and the `None` record needs no value fetch at all.
-    assert hmget_calls == [['a-json', 'b-text', 'c-bytes']]
+    # All values fit in a single batch.
+    assert hmget_calls == [['a-json', 'b-text', 'c-bytes', 'd-none']]
 
 
 async def test_iterate_entries_batches_are_bounded_by_key_count(

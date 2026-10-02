@@ -207,8 +207,11 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             logger.warning(f'Value for key "{key}" is missing.')
             return None
 
+        # Handle None values
+        if metadata_item.content_type == 'application/x-none':
+            value = None
         # Handle JSON values
-        if 'application/json' in metadata_item.content_type:
+        elif 'application/json' in metadata_item.content_type:
             try:
                 value = json.loads(value_bytes.decode('utf-8'))
             except (json.JSONDecodeError, UnicodeDecodeError):
@@ -306,19 +309,12 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
 
     async def _fetch_records(self, batch: list[KeyValueStoreRecordMetadata]) -> AsyncIterator[KeyValueStoreRecord]:
         """Fetch the values of the given records with a single HMGET call and yield the deserialized records."""
-        keys = [item.key for item in batch if item.content_type != 'application/x-none']
-        values: list[bytes | None] = []
-        if keys:
-            # redis-py typing issue
-            values = await await_redis_response(self._redis.hmget(self._items_key, keys))  # ty: ignore[invalid-assignment]
-        values_by_key = dict(zip(keys, values, strict=True))
+        keys = [item.key for item in batch]
+        # redis-py typing issue
+        values: list[bytes | None] = await await_redis_response(self._redis.hmget(self._items_key, keys))  # ty: ignore[invalid-assignment]
 
-        for metadata_item in batch:
-            if metadata_item.content_type == 'application/x-none':
-                yield KeyValueStoreRecord(value=None, **metadata_item.model_dump())
-                continue
-
-            record = self._build_record(metadata_item, values_by_key.get(metadata_item.key))
+        for metadata_item, value_bytes in zip(batch, values, strict=True):
+            record = self._build_record(metadata_item, value_bytes)
             if record is None:
                 continue
             yield record
