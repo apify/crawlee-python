@@ -296,8 +296,11 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         exclusive_start_key: str | None = None,
         limit: int | None = None,
     ) -> AsyncIterator[KeyValueStoreRecord]:
-        # Read the values together with the keys in a single streamed query, instead of one query per record as the
-        # default implementation does. Streaming keeps a single row in memory at a time.
+        """Iterate over all the existing records in the key-value store, including their values.
+
+        The values are read together with the keys in a single streamed query, instead of one query per record as
+        the default implementation does. Streaming keeps a single row in memory at a time.
+        """
         stmt = (
             select(
                 self._ITEM_TABLE.key,
