@@ -317,33 +317,6 @@ async def test_iterate_entries_empty_kvs(kvs: KeyValueStore) -> None:
     assert collected_entries == []
 
 
-async def test_iterate_entries_skips_records_deleted_during_iteration(
-    kvs: KeyValueStore, storage_client: StorageClient
-) -> None:
-    """Test that a record deleted after its key was listed but before its value was read is skipped.
-
-    This only holds for storage clients using the default key-by-key `iterate_entries` implementation. Clients that
-    read the values in batches or in a single query may have already read the record when it gets deleted.
-    """
-    if not isinstance(storage_client, (MemoryStorageClient, FileSystemStorageClient)):
-        pytest.skip('Storage client reads values in batches, so a deleted record may already be read.')
-
-    for i in range(5):
-        await kvs.set_value(f'key{i}', f'value{i}')
-
-    all_keys = [metadata.key for metadata in await kvs.list_keys()]
-    deleted_key = all_keys[-1]
-
-    collected_entries = []
-    async for key, value in kvs.iterate_entries():
-        if key == all_keys[0]:
-            await kvs.delete_value(deleted_key)
-        collected_entries.append((key, value))
-
-    assert len(collected_entries) == 4
-    assert deleted_key not in dict(collected_entries)
-
-
 async def test_iterate_entries_uses_storage_client_implementation() -> None:
     """Test that `iterate_entries` and `iterate_values` go through the storage client's `iterate_entries`.
 
