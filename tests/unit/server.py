@@ -223,10 +223,19 @@ async def hello_world_json(_scope: dict[str, Any], _receive: Receive, send: Send
 
 async def hello_world_xml(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:
     """Handle basic requests with a simple XML response."""
-    await send_html_response(
-        send,
-        b"""<?xml version="1.0"?>
+    await send(
+        {
+            'type': 'http.response.start',
+            'status': 200,
+            'headers': [[b'content-type', b'application/xml']],
+        }
+    )
+    await send(
+        {
+            'type': 'http.response.body',
+            'body': b"""<?xml version="1.0"?>
             <hello>world</hello>""",
+        }
     )
 
 
