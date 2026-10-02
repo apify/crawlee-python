@@ -213,6 +213,64 @@ class KeyValueStore(Storage):
         ):
             yield item
 
+    async def iterate_values(
+        self,
+        exclusive_start_key: str | None = None,
+        limit: int | None = None,
+    ) -> AsyncIterator[Any]:
+        """Iterate over the values of the existing records in the KVS.
+
+        The records are fetched lazily as the iteration advances, so only a single value is held in memory at
+        a time. On remote backends this means one request per record on top of the paginated key listing, unless
+        the storage client provides a more efficient implementation.
+
+        Args:
+            exclusive_start_key: Key to start the iteration from.
+            limit: Maximum number of records to iterate over. None means no limit.
+
+        Yields:
+            The value of each record.
+        """
+        async for _, value in self.iterate_entries(exclusive_start_key=exclusive_start_key, limit=limit):
+            yield value
+
+    async def iterate_entries(
+        self,
+        exclusive_start_key: str | None = None,
+        limit: int | None = None,
+    ) -> AsyncIterator[tuple[str, Any]]:
+        """Iterate over the existing records in the KVS as `(key, value)` pairs.
+
+        The records are fetched lazily as the iteration advances, so only a single value is held in memory at
+        a time. On remote backends this means one request per record on top of the paginated key listing, unless
+        the storage client provides a more efficient implementation. A record deleted while the iteration is in
+        progress may or may not be yielded, depending on whether its value was already read.
+
+        Args:
+            exclusive_start_key: Key to start the iteration from.
+            limit: Maximum number of records to iterate over. None means no limit.
+
+        Yields:
+            A `(key, value)` tuple for each record.
+        """
+        async for record in self._client.iterate_entries(exclusive_start_key=exclusive_start_key, limit=limit):
+            yield record.key, record.value
+
+    def __aiter__(self) -> AsyncIterator[tuple[str, Any]]:
+        """Iterate over all records in the KVS as `(key, value)` pairs.
+
+        Allows using the key-value store directly in an `async for` loop. It is equivalent to calling
+        `iterate_entries` with the default arguments.
+
+        ### Usage
+
+        ```python
+        async for key, value in kvs:
+            print(key, value)
+        ```
+        """
+        return self.iterate_entries()
+
     async def list_keys(
         self,
         exclusive_start_key: str | None = None,
