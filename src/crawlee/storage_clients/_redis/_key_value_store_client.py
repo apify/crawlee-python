@@ -312,7 +312,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
     async def _fetch_records(self, batch: list[KeyValueStoreRecordMetadata]) -> AsyncIterator[KeyValueStoreRecord]:
         """Fetch the values of the given records with a single HMGET call and yield the deserialized records."""
         keys = [item.key for item in batch]
-        values = expect_bytes(await await_redis_response(self._redis.hmget(self._items_key, keys)))
+        values = [expect_bytes(v) for v in await await_redis_response(self._redis.hmget(self._items_key, keys))]
 
         for metadata_item, value_bytes in zip(batch, values, strict=True):
             record = self._build_record(metadata_item, value_bytes)
