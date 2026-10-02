@@ -10,6 +10,7 @@ from typing_extensions import override
 from crawlee._utils.file import infer_mime_type
 from crawlee._utils.retry import retry_on_error
 from crawlee.storage_clients._base import KeyValueStoreClient
+from crawlee.storage_clients._utils import batch_records_by_size
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
 from ._client_mixin import MetadataUpdateParams, RedisClientMixin
@@ -292,23 +293,15 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
         as the default implementation does. The batches are bounded by the record sizes known from the metadata, so
         a store with large values does not load too many of them at once.
         """
-        batch: list[KeyValueStoreRecordMetadata] = []
-        batch_size = 0
+        metadata_items = [
+            item async for item in self.iterate_keys(exclusive_start_key=exclusive_start_key, limit=limit)
+        ]
 
-        async for metadata_item in self.iterate_keys(exclusive_start_key=exclusive_start_key, limit=limit):
-            item_size = metadata_item.size or 0
-            if batch and (
-                len(batch) >= self._ITERATE_ENTRIES_BATCH_MAX_KEYS
-                or batch_size + item_size > self._ITERATE_ENTRIES_BATCH_MAX_BYTES
-            ):
-                async for record in self._fetch_records(batch):
-                    yield record
-                batch, batch_size = [], 0
-
-            batch.append(metadata_item)
-            batch_size += item_size
-
-        if batch:
+        for batch in batch_records_by_size(
+            metadata_items,
+            max_records=self._ITERATE_ENTRIES_BATCH_MAX_KEYS,
+            max_bytes=self._ITERATE_ENTRIES_BATCH_MAX_BYTES,
+        ):
             async for record in self._fetch_records(batch):
                 yield record
 
