@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fakeredis import FakeAsyncRedis
 from redis.exceptions import RedisError
 
 from crawlee.storage_clients import RedisStorageClient
@@ -13,8 +14,6 @@ from crawlee.storage_clients._redis._utils import await_redis_response
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterator
-
-    from fakeredis import FakeAsyncRedis
 
     from crawlee.storage_clients._redis import RedisKeyValueStoreClient
 
@@ -347,3 +346,16 @@ async def test_iterate_entries_empty_store(kvs_client: RedisKeyValueStoreClient)
     records = [record async for record in kvs_client.iterate_entries()]
 
     assert records == []
+
+
+async def test_decoding_redis_client_is_rejected(suppress_user_warning: None) -> None:  # noqa: ARG001
+    """Test that reading values through a Redis client created with `decode_responses=True` raises a clear error."""
+    storage_client = RedisStorageClient(redis=FakeAsyncRedis(decode_responses=True))
+    kvs_client = await storage_client.create_kvs_client(name='decoding_kvs')
+    await kvs_client.set_value(key='key', value='value')
+
+    with pytest.raises(TypeError, match='decode_responses'):
+        await kvs_client.get_value(key='key')
+
+    with pytest.raises(TypeError, match='decode_responses'):
+        _ = [record async for record in kvs_client.iterate_entries()]

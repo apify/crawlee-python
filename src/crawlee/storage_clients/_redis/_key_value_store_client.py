@@ -13,7 +13,7 @@ from crawlee.storage_clients._base import KeyValueStoreClient
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
 from ._client_mixin import MetadataUpdateParams, RedisClientMixin
-from ._utils import await_redis_response
+from ._utils import await_redis_response, expect_bytes
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -187,8 +187,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             return KeyValueStoreRecord(value=None, **metadata_item.model_dump())
 
         # Query the record by key
-        # redis-py typing issue
-        value_bytes: bytes | None = await await_redis_response(self._redis.hget(self._items_key, key))  # ty: ignore[invalid-assignment]
+        value_bytes = expect_bytes(await await_redis_response(self._redis.hget(self._items_key, key)))
 
         return self._build_record(metadata_item, value_bytes)
 
@@ -313,8 +312,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
     async def _fetch_records(self, batch: list[KeyValueStoreRecordMetadata]) -> AsyncIterator[KeyValueStoreRecord]:
         """Fetch the values of the given records with a single HMGET call and yield the deserialized records."""
         keys = [item.key for item in batch]
-        # redis-py typing issue
-        values: list[bytes | None] = await await_redis_response(self._redis.hmget(self._items_key, keys))  # ty: ignore[invalid-assignment]
+        values = expect_bytes(await await_redis_response(self._redis.hmget(self._items_key, keys)))
 
         for metadata_item, value_bytes in zip(batch, values, strict=True):
             record = self._build_record(metadata_item, value_bytes)
