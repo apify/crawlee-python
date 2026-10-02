@@ -40,6 +40,9 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
 
     All operations are atomic through Redis hash operations and pipeline transactions. The client supports
     concurrent access through Redis's built-in atomic operations for hash fields.
+
+    Values are stored as raw bytes, so the Redis client must not decode responses. A Redis client created with
+    `decode_responses=True` is rejected when a value is read.
     """
 
     _DEFAULT_NAME = 'default'

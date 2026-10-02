@@ -22,15 +22,16 @@ def expect_bytes(value: bytes | str | None) -> bytes | None:
     """Narrow a Redis reply to raw bytes, rejecting a client that decodes responses.
 
     redis-py types every reply as `bytes | str | None`, because a client created with `decode_responses=True` returns
-    strings. The storage clients store binary values and need the raw bytes back, so such a client is not supported.
+    strings. The key-value store client stores binary values and needs the raw bytes back, so it rejects such
+    a client.
 
     Raises:
         TypeError: If the reply is a string, i.e. the Redis client decodes responses.
     """
     if isinstance(value, str):
         raise TypeError(
-            'The Redis client returned a decoded string instead of raw bytes. The Redis storage client requires '
-            'a Redis client created without `decode_responses=True`.'
+            'The Redis client returned a decoded string instead of raw bytes. The Redis key-value store client '
+            'requires a Redis client created without `decode_responses=True`.'
         )
     return value
 
