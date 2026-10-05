@@ -175,6 +175,14 @@ jobs:
             BeautifulSoupCrawler()
             ParselCrawler()
 
+      # uv and pip >= 26 fall back to pre-releases when a package publishes nothing else; older pip does not,
+      # so a specifier like `>=0.54` on a beta-only package breaks `pip install 'crawlee[all]'` for its users.
+      - name: Resolve the `all` extra with pip < 26
+        run: |
+          uv venv --seed --python 3.14 .venv-pip
+          .venv-pip/bin/python -m pip install 'pip<26'
+          .venv-pip/bin/python -m pip install --dry-run "$(ls dist/*.whl)[all]"
+
   doc_check:
     name: Doc check
     uses: apify/workflows/.github/workflows/python_docs_check.yaml@main
