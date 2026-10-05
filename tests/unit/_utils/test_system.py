@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import sys
-from multiprocessing import get_context, synchronize
+from multiprocessing import get_context, resource_tracker, synchronize
 from multiprocessing.shared_memory import SharedMemory
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
@@ -523,7 +523,10 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory(start_meth
 
         # Some start methods launch long-lived helper processes (the fork server, the resource tracker) on first use.
         # They belong to the process tree and so to the estimate, but started inside a round they would inflate its
-        # baseline. Start them ahead of the measurements, keeping the barriers referenced until the child is done.
+        # baseline. Start them ahead of the measurements, keeping the barriers referenced until the child is done. The
+        # resource tracker is started explicitly: under `fork` no barrier registers with it, and every child creating
+        # shared memory would start one of its own.
+        resource_tracker.ensure_running()
         ready, measured = ctx.Barrier(parties=1), ctx.Barrier(parties=1)
         warm_up = ctx.Process(target=no_extra_memory_child, args=[ready, measured])
         warm_up.start()
