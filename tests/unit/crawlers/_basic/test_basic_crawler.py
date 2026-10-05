@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import signal
 import sys
 import time
 from asyncio import Future
@@ -2981,3 +2982,29 @@ async def test_deferral_not_counted_as_retry(
 
     assert outcomes == []
     assert stats.retry_histogram == expected_histogram
+
+
+async def test_sigint_without_loop_signal_handlers(caplog: pytest.LogCaptureFixture) -> None:
+    """SIGINT pauses the crawl on event loops without `add_signal_handler`, as on Windows."""
+    crawler = BasicCrawler(
+        configure_logging=False,
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+    )
+    sigint_handler_before_run = signal.getsignal(signal.SIGINT)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        signal.raise_signal(signal.SIGINT)
+        # The pause lets the running request finish, so keep it running until the pause takes effect.
+        await asyncio.sleep(0.5)
+
+    with (
+        patch.object(asyncio.get_running_loop(), 'add_signal_handler', side_effect=NotImplementedError),
+        caplog.at_level(logging.INFO, logger='crawlee'),
+    ):
+        stats = await crawler.run(['https://a.placeholder.com', 'https://b.placeholder.com'])
+
+    assert stats.requests_finished == 1
+    assert 'Pausing...' in caplog.text
+    assert 'The crawl was interrupted' in caplog.text
+    assert signal.getsignal(signal.SIGINT) is sigint_handler_before_run
