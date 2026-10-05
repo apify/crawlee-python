@@ -40,7 +40,7 @@ from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics, StatisticsState
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
-from tests.unit.utils import poll_until_condition
+from tests.unit.utils import open_throttler_held_until_reclaim, poll_until_condition
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -2745,9 +2745,9 @@ async def open_throttler() -> ThrottlingRequestManager[RequestQueue]:
     )
 
 
-async def test_handler_raised_throttled_error_is_deferred() -> None:
+async def test_handler_raised_throttled_error_is_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
     """A `RequestThrottledError` from the handler costs neither a retry nor session reputation."""
-    throttler = await open_throttler()
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
     failed_request_handler = AsyncMock()
     crawler = BasicCrawler(
         request_manager=throttler,
@@ -2960,9 +2960,11 @@ async def test_inner_held_429_is_deferred_and_stalls() -> None:
         pytest.param(['error', 'error', '429', 'ok'], [0, 0, 1], id='after-retries'),
     ],
 )
-async def test_deferral_not_counted_as_retry(outcomes: list[str], expected_histogram: list[int]) -> None:
+async def test_deferral_not_counted_as_retry(
+    outcomes: list[str], expected_histogram: list[int], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A deferral doesn't show up in the retry histogram, while earlier retries still do."""
-    throttler = await open_throttler()
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
     crawler = BasicCrawler(request_manager=throttler, max_request_retries=3)
 
     @crawler.router.default_handler

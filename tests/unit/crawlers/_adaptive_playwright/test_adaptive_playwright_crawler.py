@@ -32,11 +32,11 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statisti
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import AdaptiveContextError
 from crawlee.errors import RequestThrottledError
 from crawlee.http_clients import HttpClient, HttpCrawlingResult
-from crawlee.request_loaders import ThrottlingRequestManager
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storage_clients import SqlStorageClient
 from crawlee.storages import KeyValueStore, RequestQueue
+from tests.unit.utils import open_throttler_held_until_reclaim
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterator
@@ -941,16 +941,10 @@ async def test_adaptive_playwright_crawler_with_sql_storage(test_urls: list[str]
         mocked_handler.assert_called()
 
 
-async def test_throttled_429_is_deferred() -> None:
+async def test_throttled_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
     """A throttled 429 from the browser sub crawler is retried later without spending a retry."""
     url = 'https://throttled.placeholder.com/page'
-    throttler = ThrottlingRequestManager(
-        await RequestQueue.open(),
-        domains=['throttled.placeholder.com'],
-        request_manager_opener=RequestQueue.open,
-        base_delay=timedelta(milliseconds=50),
-        max_delay=timedelta(milliseconds=100),
-    )
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
     failed_request_handler = AsyncMock()
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         rendering_type_predictor=_SimpleRenderingTypePredictor(
@@ -980,15 +974,9 @@ async def test_throttled_429_is_deferred() -> None:
     assert handled[0].request.retry_count == 0
 
 
-async def test_throttled_static_429_is_deferred() -> None:
+async def test_throttled_static_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
     """A throttled 429 from the static sub crawler defers the request without falling back to the browser."""
-    throttler = ThrottlingRequestManager(
-        await RequestQueue.open(),
-        domains=['throttled.placeholder.com'],
-        request_manager_opener=RequestQueue.open,
-        base_delay=timedelta(milliseconds=50),
-        max_delay=timedelta(milliseconds=100),
-    )
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
     http_client = AsyncMock(spec=HttpClient)
     http_client.crawl.side_effect = [
         HttpCrawlingResult(http_response=Mock(status_code=status, headers={}, read=AsyncMock(return_value=b'')))
@@ -1025,16 +1013,10 @@ async def test_throttled_static_429_is_deferred() -> None:
     assert handled[0].request.retry_count == 0
 
 
-async def test_static_handler_raised_throttled_error_is_deferred() -> None:
+async def test_static_handler_raised_throttled_error_is_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
     """A `RequestThrottledError` from the static handler defers the request without falling back to the browser."""
     url = 'https://throttled.placeholder.com/page'
-    throttler = ThrottlingRequestManager(
-        await RequestQueue.open(),
-        domains=['throttled.placeholder.com'],
-        request_manager_opener=RequestQueue.open,
-        base_delay=timedelta(milliseconds=50),
-        max_delay=timedelta(milliseconds=100),
-    )
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
     http_client = AsyncMock(spec=HttpClient)
     http_client.crawl.return_value = HttpCrawlingResult(
         http_response=Mock(status_code=200, headers={}, read=AsyncMock(return_value=b''))
