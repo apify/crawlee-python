@@ -461,7 +461,14 @@ def shared_extra_memory_child(ready: synchronize.Barrier, measured: synchronize.
 @pytest.mark.skipif(sys.platform != 'linux', reason='Improved estimation available only on Linux')
 # The start methods differ in how much memory the children share with the rest of the process tree, which is what the
 # estimation has to account for. The default is `fork` up to Python 3.13 and `forkserver` from 3.14 on.
-@pytest.mark.parametrize('start_method', ['fork', 'forkserver', 'spawn'])
+@pytest.mark.parametrize(
+    'start_method',
+    [
+        pytest.param('fork', id='fork'),
+        pytest.param('forkserver', id='forkserver'),
+        pytest.param('spawn', id='spawn'),
+    ],
+)
 def test_memory_estimation_does_not_overestimate_due_to_shared_memory(start_method: str) -> None:
     """Test that memory usage estimation is not overestimating memory usage by counting shared memory multiple times.
 
