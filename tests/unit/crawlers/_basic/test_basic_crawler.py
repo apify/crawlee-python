@@ -14,6 +14,7 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from itertools import product
+from multiprocessing import get_context
 from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import ANY, AsyncMock, Mock, call, patch
 
@@ -2347,7 +2348,7 @@ async def test_crawler_state_persistence(tmp_path: Path) -> None:
         storage_client=FileSystemStorageClient(), configuration=Configuration(storage_dir=str(tmp_path))
     )
 
-    with ProcessPoolExecutor() as executor:
+    with ProcessPoolExecutor(mp_context=get_context('spawn')) as executor:
         # Crawl 2 requests in the first run and automatically persist the state.
         first_run_state = executor.submit(
             _process_run_crawlers,
@@ -2360,7 +2361,7 @@ async def test_crawler_state_persistence(tmp_path: Path) -> None:
         assert state.get('urls') == ['https://a.placeholder.com', 'https://b.placeholder.com']
 
     # Do not reuse the executor to simulate a fresh process to avoid modified class attributes.
-    with ProcessPoolExecutor() as executor:
+    with ProcessPoolExecutor(mp_context=get_context('spawn')) as executor:
         # Crawl 1 additional requests in the second run, but use previously automatically persisted state.
         second_run_state = executor.submit(
             _process_run_crawlers,
@@ -2396,7 +2397,7 @@ async def test_crawler_state_persistence_2_crawlers_with_migration(tmp_path: Pat
         storage_client=FileSystemStorageClient(), configuration=Configuration(storage_dir=str(tmp_path))
     )
 
-    with ProcessPoolExecutor() as executor:
+    with ProcessPoolExecutor(mp_context=get_context('spawn')) as executor:
         # Run 2 crawler, each crawl 1 request in and automatically persist the state.
         first_run_states = executor.submit(
             _process_run_crawlers,
@@ -2414,7 +2415,7 @@ async def test_crawler_state_persistence_2_crawlers_with_migration(tmp_path: Pat
         state_1 = await state_kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_1')
         assert state_1.get('urls') == ['https://c.placeholder.com']
 
-    with ProcessPoolExecutor() as executor:
+    with ProcessPoolExecutor(mp_context=get_context('spawn')) as executor:
         # Run 2 crawler, each crawl 1 request in and automatically persist the state.
         second_run_states = executor.submit(
             _process_run_crawlers,
