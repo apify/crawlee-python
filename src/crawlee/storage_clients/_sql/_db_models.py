@@ -84,7 +84,7 @@ class DatasetMetadataDb(StorageMetadataDb, Base):
 
     # Relationship to dataset items with cascade deletion
     items: Mapped[list[DatasetItemDb]] = relationship(
-        back_populates='dataset', cascade='all, delete-orphan', lazy='noload'
+        back_populates='dataset', cascade='all, delete-orphan', lazy='raise', passive_deletes=True
     )
 
     id = synonym('dataset_id')
@@ -113,11 +113,11 @@ class RequestQueueMetadataDb(StorageMetadataDb, Base):
 
     # Relationship to queue requests with cascade deletion
     requests: Mapped[list[RequestDb]] = relationship(
-        back_populates='queue', cascade='all, delete-orphan', lazy='noload'
+        back_populates='queue', cascade='all, delete-orphan', lazy='raise', passive_deletes=True
     )
     # Relationship to queue state
     state: Mapped[RequestQueueStateDb] = relationship(
-        back_populates='queue', cascade='all, delete-orphan', lazy='noload'
+        back_populates='queue', cascade='all, delete-orphan', lazy='raise', passive_deletes=True
     )
 
     id = synonym('request_queue_id')
@@ -134,7 +134,7 @@ class KeyValueStoreMetadataDb(StorageMetadataDb, Base):
 
     # Relationship to store records with cascade deletion
     records: Mapped[list[KeyValueStoreRecordDb]] = relationship(
-        back_populates='kvs', cascade='all, delete-orphan', lazy='noload'
+        back_populates='kvs', cascade='all, delete-orphan', lazy='raise', passive_deletes=True
     )
 
     id = synonym('key_value_store_id')
