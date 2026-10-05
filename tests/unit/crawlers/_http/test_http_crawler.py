@@ -18,6 +18,7 @@ from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storages import RequestQueue
 from tests.unit.server_endpoints import HELLO_WORLD
+from tests.unit.utils import open_throttler_held_until_reclaim
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -705,15 +706,9 @@ def crawl_result(status_code: int) -> HttpCrawlingResult:
         pytest.param({'ignore_http_error_status_codes': {429}}, id='ignored_429'),
     ],
 )
-async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any]) -> None:
+async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
     """A throttled 429 is retried later without spending a retry, a session rotation or session reputation."""
-    throttler = ThrottlingRequestManager(
-        await RequestQueue.open(),
-        domains=['throttled.placeholder.com'],
-        request_manager_opener=RequestQueue.open,
-        base_delay=timedelta(milliseconds=50),
-        max_delay=timedelta(milliseconds=100),
-    )
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
     http_client = AsyncMock(spec=HttpClient)
     http_client.crawl.side_effect = [crawl_result(429), crawl_result(200)]
     failed_request_handler = AsyncMock()

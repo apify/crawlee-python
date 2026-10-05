@@ -38,12 +38,12 @@ from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
 from crawlee.fingerprint_suite._header_generator import fingerprint_browser_type_from_playwright_browser_type
 from crawlee.http_clients import ImpitHttpClient
 from crawlee.proxy_configuration import ProxyConfiguration
-from crawlee.request_loaders import ThrottlingRequestManager
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import Statistics
 from crawlee.statistics._error_snapshotter import ErrorSnapshotter
 from crawlee.storages import RequestQueue
 from tests.unit.server_endpoints import GENERIC_RESPONSE, HELLO_WORLD
+from tests.unit.utils import open_throttler_held_until_reclaim
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -1362,16 +1362,10 @@ async def test_error_handler_can_access_page(server_url: URL) -> None:
     assert set(failed_handler_calls) <= {HELLO_WORLD.decode()}
 
 
-async def test_throttled_429_is_deferred() -> None:
+async def test_throttled_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
     """A throttled 429 is retried later without spending a retry, a session rotation or session reputation."""
     url = 'https://throttled.placeholder.com/page'
-    throttler = ThrottlingRequestManager(
-        await RequestQueue.open(),
-        domains=['throttled.placeholder.com'],
-        request_manager_opener=RequestQueue.open,
-        base_delay=timedelta(milliseconds=50),
-        max_delay=timedelta(milliseconds=100),
-    )
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
     failed_request_handler = AsyncMock()
     crawler = PlaywrightCrawler(
         request_manager=throttler,

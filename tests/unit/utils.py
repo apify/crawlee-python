@@ -5,17 +5,23 @@ import inspect
 import sys
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
 from crawlee.http_clients._base import HttpClient, HttpResponse
+from crawlee.request_loaders import ThrottlingRequestManager, _throttling_request_manager
+from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Awaitable, Callable
 
     from yarl import URL
+
+    from crawlee import Request
+    from crawlee.storage_clients.models import ProcessedRequest
 
 T = TypeVar('T')
 
@@ -58,6 +64,35 @@ def make_status_stream_client(
     client = AsyncMock(spec=HttpClient)
     client.stream = stream
     return client, attempts
+
+
+async def open_throttler_held_until_reclaim(
+    monkeypatch: pytest.MonkeyPatch,
+) -> ThrottlingRequestManager[RequestQueue]:
+    """Open a throttler for `throttled.placeholder.com` whose backoff lasts until the crawler gives a request back.
+
+    The throttler runs on a stopped clock, so a backoff can't run out before the crawler checks whether the domain is
+    held back. Each reclaimed request moves the clock past the backoff, so a deferred request is dispatched right away.
+    """
+    backoff = timedelta(minutes=1)
+    clock = Mock()
+    clock.now.return_value = datetime.now(timezone.utc)
+    monkeypatch.setattr(_throttling_request_manager, 'datetime', clock)
+    throttler = ThrottlingRequestManager(
+        await RequestQueue.open(),
+        domains=['throttled.placeholder.com'],
+        request_manager_opener=RequestQueue.open,
+        base_delay=backoff,
+        max_delay=backoff,
+    )
+    reclaim_request = throttler.reclaim_request
+
+    async def reclaim_after_backoff(request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
+        clock.now.return_value += backoff
+        return await reclaim_request(request, forefront=forefront)
+
+    monkeypatch.setattr(throttler, 'reclaim_request', reclaim_after_backoff)
+    return throttler
 
 
 async def maybe_await(value: Awaitable[T] | T) -> T:
