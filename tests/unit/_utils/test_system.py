@@ -425,7 +425,7 @@ def test_log_resource_limits_lets_a_failing_sensor_surface(monkeypatch: pytest.M
     snapshot.assert_called_once()
 
 
-_EXTRA_MEMORY_SIZE = 1024 * 1024 * 100  # 100 MB
+EXTRA_MEMORY_SIZE = 1024 * 1024 * 100  # 100 MB
 
 
 # The children of the estimation test below live at module level, so that every start method can pickle them.
@@ -435,9 +435,9 @@ def no_extra_memory_child(ready: synchronize.Barrier, measured: synchronize.Barr
 
 
 def extra_memory_child(ready: synchronize.Barrier, measured: synchronize.Barrier) -> None:
-    memory = SharedMemory(size=_EXTRA_MEMORY_SIZE, create=True)
+    memory = SharedMemory(size=EXTRA_MEMORY_SIZE, create=True)
     assert memory.buf is not None
-    fill_buffer(memory.buf, _EXTRA_MEMORY_SIZE)
+    fill_buffer(memory.buf, EXTRA_MEMORY_SIZE)
     print(f'Using the memory... {memory.buf[-1]}')
     ready.wait()
     measured.wait()
@@ -487,7 +487,6 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory(start_meth
 
     def parent_process() -> None:
         ctx = cast('ForkContext | ForkServerContext | SpawnContext', get_context(start_method))
-        extra_memory_size = _EXTRA_MEMORY_SIZE
         children_count = 4
         # Memory calculation is not exact, so allow for some tolerance.
         test_tolerance = 0.3
@@ -503,9 +502,9 @@ def test_memory_estimation_does_not_overestimate_due_to_shared_memory(start_meth
             memory_before = get_memory_info().current_size
 
             if use_shared_memory:
-                shared_memory = SharedMemory(size=extra_memory_size, create=True)
+                shared_memory = SharedMemory(size=EXTRA_MEMORY_SIZE, create=True)
                 assert shared_memory.buf is not None
-                fill_buffer(shared_memory.buf, extra_memory_size)
+                fill_buffer(shared_memory.buf, EXTRA_MEMORY_SIZE)
                 extra_args = [shared_memory]
             else:
                 extra_args = []
