@@ -256,20 +256,22 @@ class KeyValueStore(Storage):
         async for record in self._client.iterate_entries(exclusive_start_key=exclusive_start_key, limit=limit):
             yield record.key, record.value
 
-    def __aiter__(self) -> AsyncIterator[tuple[str, Any]]:
-        """Iterate over all records in the KVS as `(key, value)` pairs.
+    async def __aiter__(self) -> AsyncIterator[str]:
+        """Iterate over all keys in the KVS.
 
-        Allows using the key-value store directly in an `async for` loop. It is equivalent to calling
-        `iterate_entries` with the default arguments.
+        Allows using the key-value store directly in an `async for` loop, which yields the keys like iterating
+        over a `dict` does. Use `iterate_keys` for the key metadata, `iterate_values` for the values, or
+        `iterate_entries` for `(key, value)` pairs.
 
         ### Usage
 
         ```python
-        async for key, value in kvs:
-            print(key, value)
+        async for key in kvs:
+            print(key)
         ```
         """
-        return self.iterate_entries()
+        async for metadata in self.iterate_keys():
+            yield metadata.key
 
     async def list_keys(
         self,

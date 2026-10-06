@@ -359,13 +359,13 @@ async def test_iterate_entries_uses_storage_client_implementation() -> None:
 
 
 async def test_async_iteration(kvs: KeyValueStore) -> None:
-    """Test that the key-value store can be used directly in an `async for` loop, yielding (key, value) pairs."""
+    """Test that the key-value store can be used directly in an `async for` loop, yielding keys like a dict."""
     await kvs.set_value('key1', 'value1')
     await kvs.set_value('key2', 'value2')
 
-    collected_entries = {key: value async for key, value in kvs}
+    collected_keys = [key async for key in kvs]
 
-    assert collected_entries == {'key1': 'value1', 'key2': 'value2'}
+    assert sorted(collected_keys) == ['key1', 'key2']
 
 
 async def test_drop(
