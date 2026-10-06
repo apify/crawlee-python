@@ -278,6 +278,16 @@ async def test_multipart_form(extract_form_requests: ExtractFormRequests) -> Non
     assert request.unique_key == again.unique_key
 
 
+async def test_multipart_escapes(extract_form_requests: ExtractFormRequests) -> None:
+    """Multipart names escape quotes and line breaks, and values submit line breaks as CRLF."""
+    html = '<form method="post" enctype="multipart/form-data"><textarea name="a&quot;b">x\ny</textarea></form>'
+
+    [request] = await extract_form_requests(html, fields={'c\nd': 'v'})
+
+    assert b'name="a%22b"\r\n\r\nx\r\ny\r\n' in (request.payload or b'')
+    assert b'name="c%0D%0Ad"\r\n\r\nv\r\n' in (request.payload or b'')
+
+
 async def test_text_plain_form(extract_form_requests: ExtractFormRequests) -> None:
     """A `text/plain` form sends one field per line."""
     html = '<form method="post" enctype="TEXT/PLAIN"><input name="a" value="1"><input name="b" value="2"></form>'
@@ -339,7 +349,7 @@ async def test_submitted_fields(extract_form_requests: ExtractFormRequests) -> N
         'multi-disabled': 'e',
         'text-value': 'spaced text',
         'multi': ['m1', 'm3'],
-        'area': '\nlong text',
+        'area': '\r\nlong text',
         'file': '',
         'empty': '',
         'hidden': '',

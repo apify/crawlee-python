@@ -112,8 +112,12 @@ _BUTTON_INPUT_TYPES = ('submit', 'image', 'reset', 'button')
 # Browsers cut a longer referrer down to the origin.
 _MAX_REFERRER_LENGTH = 4096
 
+_LINE_BREAK_PATTERN = re.compile(r'\r\n|\r|\n')
+
 # Browsers collapse only ASCII whitespace in an option text, keeping non-breaking spaces.
 _ASCII_WHITESPACE_PATTERN = re.compile(r'[ \t\n\f\r]+')
+
+_MULTIPART_NAME_ESCAPES = str.maketrans({'"': '%22', '\r': '%0D', '\n': '%0A'})
 
 
 class FormRequestOptions(TypedDict):
@@ -469,7 +473,11 @@ def _collect_fields(
             continue
         entries.extend(_element_fields(element))
 
-    return _apply_fields(entries, fields or {})
+    # Browsers submit every line break as CRLF.
+    return [
+        _Field(_LINE_BREAK_PATTERN.sub('\r\n', entry.name), _LINE_BREAK_PATTERN.sub('\r\n', entry.value), entry.is_file)
+        for entry in _apply_fields(entries, fields or {})
+    ]
 
 
 def _is_radio(element: HtmlElement) -> bool:
@@ -595,7 +603,7 @@ def _encode_multipart(entries: list[_Field], encoding: str) -> tuple[bytes, str]
     """Encode fields as `multipart/form-data`, returning the body and the `Content-Type` header value."""
     parts: list[bytes] = []
     for entry in entries:
-        disposition = f'form-data; name="{entry.name}"'
+        disposition = f'form-data; name="{entry.name.translate(_MULTIPART_NAME_ESCAPES)}"'
         if entry.is_file:
             head = f'Content-Disposition: {disposition}; filename=""\r\nContent-Type: application/octet-stream\r\n\r\n'
         else:
