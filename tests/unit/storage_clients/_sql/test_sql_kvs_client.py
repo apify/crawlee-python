@@ -385,6 +385,18 @@ async def test_iterate_entries_limit_spans_multiple_pages(
     assert fetched_keys(fetch_records) == [['key0', 'key1'], ['key2']]
 
 
+async def test_iterate_entries_skips_record_deleted_after_listing(kvs_client: SqlKeyValueStoreClient) -> None:
+    """Test that a record deleted between the metadata listing and its value fetch is skipped."""
+    await kvs_client.set_value(key='kept', value='a')
+    await kvs_client.set_value(key='removed', value='b')
+    batch = [item async for item in kvs_client.iterate_keys()]
+    await kvs_client.delete_value(key='removed')
+
+    records = await kvs_client._fetch_records(batch)
+
+    assert [(record.key, record.value) for record in records] == [('kept', 'a')]
+
+
 async def test_iterate_entries_empty_store(kvs_client: SqlKeyValueStoreClient) -> None:
     """Test that `iterate_entries` on an empty store yields nothing."""
     records = [record async for record in kvs_client.iterate_entries()]
