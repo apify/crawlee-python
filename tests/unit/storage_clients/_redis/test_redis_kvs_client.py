@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -259,22 +259,17 @@ async def test_set_value_does_not_retry_on_unexpected_exception(kvs_client: Redi
 
 
 @pytest.fixture
-def hmget_calls(kvs_client: RedisKeyValueStoreClient) -> Iterator[list[list[str]]]:
-    """Record the keys of every Redis `hmget` call made through the client, while still performing the call."""
-    calls: list[list[str]] = []
-    original_hmget = kvs_client.redis.hmget
-
-    def recording_hmget(name: str, keys: list[str], *args: str) -> Any:
-        calls.append(list(keys))
-        return original_hmget(name, keys, *args)
-
-    with patch.object(kvs_client.redis, 'hmget', side_effect=recording_hmget):
-        yield calls
+def hmget(kvs_client: RedisKeyValueStoreClient) -> Iterator[MagicMock]:
+    """Wrap the Redis `hmget` of the client in a mock that records the calls while still performing them."""
+    with patch.object(kvs_client.redis, 'hmget', wraps=kvs_client.redis.hmget) as mock:
+        yield mock
 
 
-async def test_iterate_entries_reads_values_in_batches(
-    kvs_client: RedisKeyValueStoreClient, hmget_calls: list[list[str]]
-) -> None:
+def hmget_keys(hmget: MagicMock) -> list[list[str]]:
+    return [list(call.args[1]) for call in hmget.call_args_list]
+
+
+async def test_iterate_entries_reads_values_in_batches(kvs_client: RedisKeyValueStoreClient, hmget: MagicMock) -> None:
     """Test that `iterate_entries` fetches values with batched HMGET calls instead of `get_value` per key."""
     await kvs_client.set_value(key='a-json', value={'nested': [1, 2]})
     await kvs_client.set_value(key='b-text', value='plain text')
@@ -291,11 +286,11 @@ async def test_iterate_entries_reads_values_in_batches(
     assert records[2].content_type == 'application/octet-stream'
 
     # All values fit in a single batch.
-    assert hmget_calls == [['a-json', 'b-text', 'c-bytes', 'd-none']]
+    assert hmget_keys(hmget) == [['a-json', 'b-text', 'c-bytes', 'd-none']]
 
 
 async def test_iterate_entries_batches_are_bounded_by_key_count(
-    kvs_client: RedisKeyValueStoreClient, hmget_calls: list[list[str]]
+    kvs_client: RedisKeyValueStoreClient, hmget: MagicMock
 ) -> None:
     """Test that `iterate_entries` splits the HMGET calls when a batch reaches the maximum number of keys."""
     for i in range(5):
@@ -305,11 +300,11 @@ async def test_iterate_entries_batches_are_bounded_by_key_count(
         records = [record async for record in kvs_client.iterate_entries()]
 
     assert [(record.key, record.value) for record in records] == [(f'key{i}', f'value{i}') for i in range(5)]
-    assert hmget_calls == [['key0', 'key1'], ['key2', 'key3'], ['key4']]
+    assert hmget_keys(hmget) == [['key0', 'key1'], ['key2', 'key3'], ['key4']]
 
 
 async def test_iterate_entries_batches_are_bounded_by_size(
-    kvs_client: RedisKeyValueStoreClient, hmget_calls: list[list[str]]
+    kvs_client: RedisKeyValueStoreClient, hmget: MagicMock
 ) -> None:
     """Test that `iterate_entries` splits the HMGET calls by the record sizes known from the metadata.
 
@@ -324,7 +319,7 @@ async def test_iterate_entries_batches_are_bounded_by_size(
         records = [record async for record in kvs_client.iterate_entries()]
 
     assert [record.key for record in records] == ['large', 'small1', 'small2', 'small3']
-    assert hmget_calls == [['large'], ['small1', 'small2', 'small3']]
+    assert hmget_keys(hmget) == [['large'], ['small1', 'small2', 'small3']]
 
 
 async def test_iterate_entries_with_exclusive_start_key_and_limit(kvs_client: RedisKeyValueStoreClient) -> None:

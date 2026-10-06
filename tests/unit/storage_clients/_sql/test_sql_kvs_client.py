@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import SqlStorageClient
 from crawlee.storage_clients._sql._db_models import KeyValueStoreMetadataDb, KeyValueStoreRecordDb
-from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
+from crawlee.storage_clients.models import KeyValueStoreMetadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterator
@@ -328,17 +328,14 @@ async def test_set_value_does_not_retry_on_unexpected_exception(kvs_client: SqlK
 
 
 @pytest.fixture
-def fetched_batches(kvs_client: SqlKeyValueStoreClient) -> Iterator[list[list[str]]]:
-    """Record the keys of every value batch `iterate_entries` fetches, while still performing the fetch."""
-    calls: list[list[str]] = []
-    original_fetch = kvs_client._fetch_records
+def fetch_records(kvs_client: SqlKeyValueStoreClient) -> Iterator[AsyncMock]:
+    """Wrap `_fetch_records` of the client in a mock that records the value batches while still fetching them."""
+    with patch.object(kvs_client, '_fetch_records', wraps=kvs_client._fetch_records) as mock:
+        yield mock
 
-    async def recording_fetch(batch: list[KeyValueStoreRecordMetadata]) -> list[KeyValueStoreRecord]:
-        calls.append([item.key for item in batch])
-        return await original_fetch(batch)
 
-    with patch.object(kvs_client, '_fetch_records', side_effect=recording_fetch):
-        yield calls
+def fetched_keys(fetch_records: AsyncMock) -> list[list[str]]:
+    return [[item.key for item in call.args[0]] for call in fetch_records.await_args_list]
 
 
 async def test_iterate_entries_reads_values_in_batches(kvs_client: SqlKeyValueStoreClient) -> None:
@@ -375,7 +372,7 @@ async def test_iterate_entries_with_exclusive_start_key_and_limit(kvs_client: Sq
 
 
 async def test_iterate_entries_limit_spans_multiple_pages(
-    kvs_client: SqlKeyValueStoreClient, fetched_batches: list[list[str]]
+    kvs_client: SqlKeyValueStoreClient, fetch_records: AsyncMock
 ) -> None:
     """Test that `iterate_entries` stops at `limit` when it falls in the middle of a later metadata page."""
     for i in range(6):
@@ -385,7 +382,7 @@ async def test_iterate_entries_limit_spans_multiple_pages(
         records = [record async for record in kvs_client.iterate_entries(limit=3)]
 
     assert [(record.key, record.value) for record in records] == [(f'key{i}', f'value{i}') for i in range(3)]
-    assert fetched_batches == [['key0', 'key1'], ['key2']]
+    assert fetched_keys(fetch_records) == [['key0', 'key1'], ['key2']]
 
 
 async def test_iterate_entries_empty_store(kvs_client: SqlKeyValueStoreClient) -> None:
@@ -396,7 +393,7 @@ async def test_iterate_entries_empty_store(kvs_client: SqlKeyValueStoreClient) -
 
 
 async def test_iterate_entries_batches_are_bounded_by_key_count(
-    kvs_client: SqlKeyValueStoreClient, fetched_batches: list[list[str]]
+    kvs_client: SqlKeyValueStoreClient, fetch_records: AsyncMock
 ) -> None:
     """Test that `iterate_entries` splits the value queries when a batch reaches the maximum number of keys."""
     for i in range(5):
@@ -406,11 +403,11 @@ async def test_iterate_entries_batches_are_bounded_by_key_count(
         records = [record async for record in kvs_client.iterate_entries()]
 
     assert [(record.key, record.value) for record in records] == [(f'key{i}', f'value{i}') for i in range(5)]
-    assert fetched_batches == [['key0', 'key1'], ['key2', 'key3'], ['key4']]
+    assert fetched_keys(fetch_records) == [['key0', 'key1'], ['key2', 'key3'], ['key4']]
 
 
 async def test_iterate_entries_batches_are_bounded_by_size(
-    kvs_client: SqlKeyValueStoreClient, fetched_batches: list[list[str]]
+    kvs_client: SqlKeyValueStoreClient, fetch_records: AsyncMock
 ) -> None:
     """Test that `iterate_entries` splits the value queries by the record sizes.
 
@@ -425,4 +422,4 @@ async def test_iterate_entries_batches_are_bounded_by_size(
         records = [record async for record in kvs_client.iterate_entries()]
 
     assert [record.key for record in records] == ['large', 'small1', 'small2', 'small3']
-    assert fetched_batches == [['large'], ['small1', 'small2', 'small3']]
+    assert fetched_keys(fetch_records) == [['large'], ['small1', 'small2', 'small3']]
