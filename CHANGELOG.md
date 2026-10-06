@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.10.4 - **not yet released**
+## [1.10.4](https://github.com/apify/crawlee-python/releases/tag/v1.10.4) (2026-10-06)
 
 ### 🐛 Bug Fixes
 
@@ -14,7 +13,6 @@ All notable changes to this project will be documented in this file.
 - Pause the crawl on Ctrl+C on Windows instead of crashing ([#2277](https://github.com/apify/crawlee-python/pull/2277)) ([dbec1f5](https://github.com/apify/crawlee-python/commit/dbec1f562ae69556c920d75b3cbb3fa659dd12f1)) by [@Mantisus](https://github.com/Mantisus), closes [#228](https://github.com/apify/crawlee-python/issues/228)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.10.3](https://github.com/apify/crawlee-python/releases/tag/v1.10.3) (2026-09-29)
 
 ### 🐛 Bug Fixes
