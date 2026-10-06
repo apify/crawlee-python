@@ -289,7 +289,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
     ) -> AsyncIterator[KeyValueStoreRecord]:
         """Iterate over all the existing records in the key-value store, including their values.
 
-        The values are fetched in batches with a single HMGET call per batch, instead of two round trips per record
+        The values are fetched in batches with a single HMGET call per batch, instead of several round trips per record
         as the default implementation does. The batches are bounded by the record sizes known from the metadata, so
         a store with large values does not load too many of them at once.
         """
