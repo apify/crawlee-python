@@ -451,6 +451,16 @@ async def test_browser_rules(extract_form_requests: ExtractFormRequests, html: s
         pytest.param('<form action="../up"></form>', 'https://example.com/up', id='relative'),
         pytest.param('<form action=" /go "></form>', 'https://example.com/go', id='whitespace-around-action'),
         pytest.param(
+            '<head><base href=" https://other.com/dir/ "></head><form action=" "></form>',
+            'https://other.com/dir/',
+            id='whitespace-around-base-href',
+        ),
+        pytest.param(
+            '<head><base href="https://other.com/dir/"></head><form action=" "></form>',
+            'https://other.com/dir/',
+            id='whitespace-action-base-href',
+        ),
+        pytest.param(
             '<head><base href="https://other.com/dir/"></head><form action="go"></form>',
             'https://other.com/dir/go',
             id='base-href',

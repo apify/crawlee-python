@@ -236,7 +236,7 @@ def forms_to_requests(
     root = forms[0].getroottree().getroot()
     base = root.find('.//base[@href]')
     try:
-        base_url = convert_to_absolute_url(page_url, '' if base is None else base.get('href'))
+        base_url = convert_to_absolute_url(page_url, '' if base is None else base.get('href').strip())
     except ValueError:
         base_url = page_url
 
@@ -379,7 +379,7 @@ def _form_to_request(
 
     method = (_submission_attribute(form, button, 'method') or 'get').upper()
     enctype = _submission_attribute(form, button, 'enctype').lower()
-    action = _submission_attribute(form, button, 'action').strip()
+    action = _submission_attribute(form, button, 'action')
 
     # A dialog form only closes its `<dialog>` on the client.
     if method == 'DIALOG':
@@ -443,7 +443,7 @@ def _resolve_action(page_url: str, base_url: str, action: str) -> str | None:
         return page_url
 
     try:
-        url = convert_to_absolute_url(base_url, action)
+        url = convert_to_absolute_url(base_url, action.strip())
         validate_http_url(url)
     except ValueError:
         return None
