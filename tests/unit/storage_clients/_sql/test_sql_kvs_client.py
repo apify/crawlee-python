@@ -374,6 +374,20 @@ async def test_iterate_entries_with_exclusive_start_key_and_limit(kvs_client: Sq
     ]
 
 
+async def test_iterate_entries_limit_spans_multiple_pages(
+    kvs_client: SqlKeyValueStoreClient, fetched_batches: list[list[str]]
+) -> None:
+    """Test that `iterate_entries` stops at `limit` when it falls in the middle of a later metadata page."""
+    for i in range(6):
+        await kvs_client.set_value(key=f'key{i}', value=f'value{i}')
+
+    with patch.object(type(kvs_client), '_ITERATE_ENTRIES_BATCH_MAX_KEYS', 2):
+        records = [record async for record in kvs_client.iterate_entries(limit=3)]
+
+    assert [(record.key, record.value) for record in records] == [(f'key{i}', f'value{i}') for i in range(3)]
+    assert fetched_batches == [['key0', 'key1'], ['key2']]
+
+
 async def test_iterate_entries_empty_store(kvs_client: SqlKeyValueStoreClient) -> None:
     records = [record async for record in kvs_client.iterate_entries()]
 
