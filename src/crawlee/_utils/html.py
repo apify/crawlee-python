@@ -431,10 +431,9 @@ def _is_submit_button(element: HtmlElement) -> bool:
 
 def _submission_attribute(form: HtmlElement, button: HtmlElement | None, name: str) -> str:
     """Get a form attribute like `action`, which the clicked button can override with its `form*` counterpart."""
-    if button is not None:
-        button_value = button.get(f'form{name}')
-        if button_value:
-            return button_value
+    # A present but empty override still wins, like `formaction=""` submitting to the page URL.
+    if button is not None and (button_value := button.get(f'form{name}')) is not None:
+        return button_value
     return form.get(name) or ''
 
 

@@ -637,6 +637,21 @@ async def test_click_button_overrides(extract_form_requests: ExtractFormRequests
     assert _submitted_fields(request) == {'q': 'x', 'action': 'delete'}
 
 
+async def test_empty_button_overrides(extract_form_requests: ExtractFormRequests) -> None:
+    """Empty `formaction`, `formmethod` and `formenctype` override the form attributes with their defaults."""
+    html = """
+    <form action="/save" method="post" enctype="text/plain">
+        <input name="q" value="x">
+        <button formaction="" formmethod="" formenctype="">Go</button>
+    </form>
+    """
+
+    [request] = await extract_form_requests(html)
+
+    assert request.method == 'GET'
+    assert request.url == f'{_PAGE_URL}?q=x'
+
+
 async def test_click_disabled_button(extract_form_requests: ExtractFormRequests) -> None:
     """`click` picks a disabled button only if no enabled one matches."""
     html = (
