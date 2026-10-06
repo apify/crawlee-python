@@ -302,6 +302,14 @@ async def test_submitted_fields(extract_form_requests: ExtractFormRequests) -> N
         <select name="first"><option value="o1">1</option><option value="o2">2</option></select>
         <select name="last"><option value="a" selected>A</option><option value="b" selected>B</option></select>
         <select name="first-enabled"><option value="off" disabled>Off</option><option value="on">On</option></select>
+        <select name="list-box" size="2"><option value="l1">1</option><option value="l2">2</option></select>
+        <select name="placeholder"><option value="" disabled selected>Pick</option><option value="p">P</option></select>
+        <select name="multi-disabled" multiple>
+            <option value="d1" disabled selected>1</option>
+            <optgroup disabled><option value="d2" selected>2</option></optgroup>
+            <option value="e" selected>3</option>
+        </select>
+        <select name="text-value"><option> spaced\n  text </option></select>
         <select name="no-options"></select>
         <select name="multi" multiple>
             <option value="m1" selected>1</option><option value="m2">2</option><option value="m3" selected>3</option>
@@ -328,6 +336,8 @@ async def test_submitted_fields(extract_form_requests: ExtractFormRequests) -> N
         'first': 'o1',
         'last': 'b',
         'first-enabled': 'on',
+        'multi-disabled': 'e',
+        'text-value': 'spaced text',
         'multi': ['m1', 'm3'],
         'area': '\nlong text',
         'file': '',
@@ -352,6 +362,15 @@ async def test_form_attribute(extract_form_requests: ExtractFormRequests) -> Non
     assert _submitted_fields(search) == {'q': 'y', 'lang': 'en', 'go': ''}
     assert _submitted_fields(login) == {'other': 'p'}
     assert _submitted_fields(empty) == {}
+
+
+async def test_option_text_keeps_nbsp(extract_form_requests: ExtractFormRequests) -> None:
+    """An `<option>` without a value collapses only ASCII whitespace in its text."""
+    html = '<form><select name="s"><option>&nbsp;a&nbsp;\n b </option></select></form>'
+
+    [request] = await extract_form_requests(html, content_type='text/html; charset=utf-8')
+
+    assert _submitted_fields(request) == {'s': '\xa0a\xa0 b'}
 
 
 async def test_disabled_fieldset(extract_form_requests: ExtractFormRequests) -> None:

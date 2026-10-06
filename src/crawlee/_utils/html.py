@@ -112,6 +112,9 @@ _BUTTON_INPUT_TYPES = ('submit', 'image', 'reset', 'button')
 # Browsers cut a longer referrer down to the origin.
 _MAX_REFERRER_LENGTH = 4096
 
+# Browsers collapse only ASCII whitespace in an option text, keeping non-breaking spaces.
+_ASCII_WHITESPACE_PATTERN = re.compile(r'[ \t\n\f\r]+')
+
 
 class FormRequestOptions(TypedDict):
     """Options for the `Request` created from a form.
@@ -493,8 +496,7 @@ def _element_fields(element: HtmlElement) -> list[_Field]:
     name = element.get('name')
 
     if element.tag == 'select':
-        values = element.value if element.multiple else [element.value]
-        return [_Field(name, value) for value in values if value is not None]
+        return [_Field(name, value) for value in _select_values(element)]
 
     if element.tag == 'textarea':
         # Browsers drop the newline right after `<textarea>`, lxml keeps it.
@@ -511,6 +513,31 @@ def _element_fields(element: HtmlElement) -> list[_Field]:
         return []
 
     return [_Field(name, element.value or '')]
+
+
+def _select_values(select: HtmlElement) -> list[str]:
+    """Get the values of the selected options of a `<select>`, which browsers submit unless disabled."""
+    options = list(select.iter('option'))
+    enabled = {
+        option
+        for option in options
+        if 'disabled' not in option.attrib
+        and not (option.getparent().tag == 'optgroup' and 'disabled' in option.getparent().attrib)
+    }
+    selected = [option for option in options if 'selected' in option.attrib]
+    if not select.multiple:
+        # Only the last selected option counts. A drop-down, unlike a list box with `size` above 1, defaults to the
+        # first enabled option.
+        size = re.match(r'[ \t\n\f\r]*\+?(\d+)', select.get('size', ''))
+        default = [] if size and int(size.group(1)) > 1 else [option for option in options if option in enabled][:1]
+        selected = selected[-1:] or default
+    return [_option_value(option) for option in selected if option in enabled]
+
+
+def _option_value(option: HtmlElement) -> str:
+    """Get the value of an `<option>`: its `value` attribute, else its text with collapsed whitespace."""
+    value = option.get('value')
+    return _ASCII_WHITESPACE_PATTERN.sub(' ', option.text_content()).strip(' ') if value is None else value
 
 
 def _apply_fields(entries: list[_Field], fields: Mapping[str, str | Sequence[str] | None]) -> list[_Field]:
