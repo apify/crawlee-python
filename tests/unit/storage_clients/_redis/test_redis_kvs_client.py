@@ -342,6 +342,21 @@ async def test_iterate_entries_with_exclusive_start_key_and_limit(kvs_client: Re
     ]
 
 
+async def test_iterate_entries_skips_value_deleted_after_listing(
+    kvs_client: RedisKeyValueStoreClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Test that `iterate_entries` silently skips a record whose value is gone by the time its batch is fetched."""
+    await kvs_client.set_value(key='kept', value='a')
+    await kvs_client.set_value(key='removed', value='b')
+    await await_redis_response(kvs_client.redis.hdel(kvs_client._items_key, 'removed'))
+
+    with caplog.at_level('WARNING'):
+        records = [record async for record in kvs_client.iterate_entries()]
+
+    assert [(record.key, record.value) for record in records] == [('kept', 'a')]
+    assert 'missing' not in caplog.text
+
+
 async def test_iterate_entries_empty_store(kvs_client: RedisKeyValueStoreClient) -> None:
     records = [record async for record in kvs_client.iterate_entries()]
 

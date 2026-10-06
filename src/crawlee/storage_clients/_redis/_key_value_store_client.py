@@ -311,9 +311,11 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
         keys = [item.key for item in batch]
         values = [expect_bytes(v) for v in await await_redis_response(self._redis.hmget(self._items_key, keys))]
 
+        # A missing value means the record was deleted after its metadata was listed, so it is skipped silently.
         records = (
             self._build_record(metadata_item, value_bytes)
             for metadata_item, value_bytes in zip(batch, values, strict=True)
+            if value_bytes is not None
         )
         return [record for record in records if record is not None]
 
