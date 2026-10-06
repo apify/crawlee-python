@@ -11,7 +11,7 @@ import threading
 import traceback
 from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Sequence
-from contextlib import AsyncExitStack, suppress
+from contextlib import AsyncExitStack
 from datetime import timedelta
 from functools import partial
 from http import HTTPStatus
@@ -763,19 +763,29 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             run_task = asyncio.create_task(self._run_crawler(), name='run_crawler_task')
 
+            loop = asyncio.get_running_loop()
+            remove_sigint_handler: Callable[[], object] | None = None
+
             # `add_signal_handler` works only in the main thread
             if threading.current_thread() is threading.main_thread():
-                with suppress(NotImplementedError):  # event loop signal handlers are not supported on Windows
-                    asyncio.get_running_loop().add_signal_handler(signal.SIGINT, sigint_handler)
+                try:
+                    loop.add_signal_handler(signal.SIGINT, sigint_handler)
+                    remove_sigint_handler = partial(loop.remove_signal_handler, signal.SIGINT)
+                except NotImplementedError:
+                    # Windows event loops, such as the default `ProactorEventLoop`, don't support `add_signal_handler`.
+                    # Like `asyncio.Runner`, set the handler with `signal.signal` and pass the call to the event loop.
+                    previous_sigint_handler = signal.signal(
+                        signal.SIGINT, lambda *_: loop.call_soon_threadsafe(sigint_handler)
+                    )
+                    remove_sigint_handler = partial(signal.signal, signal.SIGINT, previous_sigint_handler)
 
             try:
                 await run_task
             except CancelledError:
                 pass
             finally:
-                if threading.current_thread() is threading.main_thread():
-                    with suppress(NotImplementedError):
-                        asyncio.get_running_loop().remove_signal_handler(signal.SIGINT)
+                if remove_sigint_handler is not None:
+                    remove_sigint_handler()
 
             if self._statistics.error_tracker.total > 0:
                 self._logger.info(
