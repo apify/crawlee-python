@@ -358,6 +358,7 @@ async def test_iterate_entries_skips_value_deleted_after_listing(
 
 
 async def test_iterate_entries_empty_store(kvs_client: RedisKeyValueStoreClient) -> None:
+    """Test that `iterate_entries` on an empty store yields nothing."""
     records = [record async for record in kvs_client.iterate_entries()]
 
     assert records == []

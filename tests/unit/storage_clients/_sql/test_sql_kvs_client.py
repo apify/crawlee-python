@@ -389,6 +389,7 @@ async def test_iterate_entries_limit_spans_multiple_pages(
 
 
 async def test_iterate_entries_empty_store(kvs_client: SqlKeyValueStoreClient) -> None:
+    """Test that `iterate_entries` on an empty store yields nothing."""
     records = [record async for record in kvs_client.iterate_entries()]
 
     assert records == []
