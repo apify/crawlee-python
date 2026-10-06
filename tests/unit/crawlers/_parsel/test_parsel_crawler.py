@@ -404,6 +404,7 @@ async def test_extract_links_base_href(server_url: URL, http_client: HttpClient,
 
 
 async def test_extract_form_requests(server_url: URL, http_client: HttpClient) -> None:
+    """A form request built in the handler submits the form fields with the `Referer` of the page."""
     crawler = ParselCrawler(http_client=http_client)
     responses: list[dict[str, Any]] = []
     page = '<form method="post" action="/post"><input type="hidden" name="token" value="t"><input name="q"></form>'
