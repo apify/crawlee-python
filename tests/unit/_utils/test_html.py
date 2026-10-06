@@ -306,6 +306,7 @@ async def test_submitted_fields(extract_form_requests: ExtractFormRequests) -> N
         <input type="checkbox" name="checked" value="c1" checked>
         <input type="checkbox" name="unchecked" value="c2">
         <input type="checkbox" name="no-value" checked>
+        <input type="checkbox" name="empty-value" value="" checked>
         <input type="radio" name="radio" value="r1" checked>
         <input type="radio" name="radio" value="r2" checked>
         <input type="radio" name="radio" value="r3">
@@ -342,6 +343,7 @@ async def test_submitted_fields(extract_form_requests: ExtractFormRequests) -> N
         'text': 't',
         'checked': 'c1',
         'no-value': 'on',
+        'empty-value': '',
         'radio': 'r2',
         'first': 'o1',
         'last': 'b',
@@ -381,6 +383,21 @@ async def test_option_text_keeps_nbsp(extract_form_requests: ExtractFormRequests
     [request] = await extract_form_requests(html, content_type='text/html; charset=utf-8')
 
     assert _submitted_fields(request) == {'s': '\xa0a\xa0 b'}
+
+
+async def test_input_value_sanitization(extract_form_requests: ExtractFormRequests) -> None:
+    """Text-like inputs drop line breaks, email and URL inputs also surrounding whitespace, hidden inputs neither."""
+    html = """
+    <form>
+        <input name="text" value="a\nb">
+        <input type="email" name="email" value=" x@y.z ">
+        <input type="hidden" name="hidden" value="c\nd">
+    </form>
+    """
+
+    [request] = await extract_form_requests(html)
+
+    assert _submitted_fields(request) == {'text': 'ab', 'email': 'x@y.z', 'hidden': 'c\r\nd'}
 
 
 async def test_disabled_fieldset(extract_form_requests: ExtractFormRequests) -> None:

@@ -519,7 +519,14 @@ def _element_fields(element: HtmlElement) -> list[_Field]:
     if element.checkable and not element.checked:
         return []
 
-    return [_Field(name, element.value or '')]
+    # lxml reports `on` for a checkbox or radio button with an empty `value`, which browsers submit as is.
+    value = element.get('value', 'on' if element.checkable else '')
+    # Browsers strip line breaks from the value of a text-like input, and surrounding whitespace from an email or URL.
+    if element.type not in ('hidden', 'checkbox', 'radio'):
+        value = value.replace('\r', '').replace('\n', '')
+        if element.type in ('email', 'url'):
+            value = value.strip(' \t\n\f\r')
+    return [_Field(name, value)]
 
 
 def _select_values(select: HtmlElement) -> list[str]:
