@@ -23,10 +23,10 @@ class RedisStorageClient(StorageClient):
     to a Redis database v8.0+. Each storage type uses Redis-specific data structures and key patterns for
     efficient storage and retrieval.
 
-    The client accepts either a Redis connection string or a pre-configured Redis client instance. Key-value stores
-    hold binary values, so their client needs a Redis client that returns raw bytes, which is the default; a client
-    created with `decode_responses=True` works for datasets and request queues only.
-    Exactly one of these parameters must be provided during initialization.
+    The client accepts either a Redis connection string or a pre-configured Redis client instance. Exactly one of these
+    parameters must be provided during initialization. Key-value stores hold binary values, so their client needs
+    a Redis client that returns raw bytes, which is the default; a client created with `decode_responses=True` works
+    for datasets and request queues only.
 
     Storage types use the following Redis data structures:
     - **Datasets**: Redis JSON arrays for item storage with metadata in JSON objects

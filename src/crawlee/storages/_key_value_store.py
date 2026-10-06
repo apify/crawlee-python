@@ -221,8 +221,8 @@ class KeyValueStore(Storage):
         """Iterate over the values of the existing records in the KVS.
 
         The records are fetched lazily as the iteration advances, so only a bounded number of values is held in
-        memory at a time. By default this means one request per record on top of the paginated key listing, unless the
-        storage client reads the values in bounded batches instead.
+        memory at a time. By default this means one request per record on top of the key listing, unless the storage
+        client reads the values in bounded batches instead.
 
         Args:
             exclusive_start_key: Key to start the iteration from.
@@ -242,8 +242,8 @@ class KeyValueStore(Storage):
         """Iterate over the existing records in the KVS as `(key, value)` pairs.
 
         The records are fetched lazily as the iteration advances, so only a bounded number of values is held in
-        memory at a time. By default this means one request per record on top of the paginated key listing, unless the
-        storage client reads the values in bounded batches instead. A record deleted while the iteration is in
+        memory at a time. By default this means one request per record on top of the key listing, unless the storage
+        client reads the values in bounded batches instead. A record deleted while the iteration is in
         progress may or may not be yielded, depending on whether its value was already read.
 
         Args:
