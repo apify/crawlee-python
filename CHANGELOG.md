@@ -10,6 +10,8 @@ All notable changes to this project will be documented in this file.
 - **crawlers:** Parse HTML responses starting with an XML declaration as HTML in `ParselCrawler` ([#2262](https://github.com/apify/crawlee-python/pull/2262)) ([df1178c](https://github.com/apify/crawlee-python/commit/df1178c384284f81236804466be75f88a36eabad)) by [@Mantisus](https://github.com/Mantisus)
 - **crawlers:** Resolve relative and invalid base URLs when extracting links ([#2263](https://github.com/apify/crawlee-python/pull/2263)) ([c69f75f](https://github.com/apify/crawlee-python/commit/c69f75f00697e407b3f4006ebeb4ed847dab0675)) by [@Mantisus](https://github.com/Mantisus)
 - **crawlers:** Detect JSON served as `text&#x2F;html` and handle empty responses in `ParselCrawler` ([#2266](https://github.com/apify/crawlee-python/pull/2266)) ([3a58843](https://github.com/apify/crawlee-python/commit/3a58843bb334363eb255690d717f8d6f653e96de)) by [@Mantisus](https://github.com/Mantisus)
+- Make `crawlee[all]` installable with pip &lt; 26 ([#2270](https://github.com/apify/crawlee-python/pull/2270)) ([87561ee](https://github.com/apify/crawlee-python/commit/87561ee3fa56c233dabf704c9467834f5ce12e26)) by [@vdusek](https://github.com/vdusek), closes [#2269](https://github.com/apify/crawlee-python/issues/2269)
+- Pause the crawl on Ctrl+C on Windows instead of crashing ([#2277](https://github.com/apify/crawlee-python/pull/2277)) ([dbec1f5](https://github.com/apify/crawlee-python/commit/dbec1f562ae69556c920d75b3cbb3fa659dd12f1)) by [@Mantisus](https://github.com/Mantisus), closes [#228](https://github.com/apify/crawlee-python/issues/228)
 
 
 <!-- git-cliff-unreleased-end -->
