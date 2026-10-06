@@ -355,9 +355,11 @@ async def test_form_attribute(extract_form_requests: ExtractFormRequests) -> Non
 
 
 async def test_disabled_fieldset(extract_form_requests: ExtractFormRequests) -> None:
-    """A disabled `<fieldset>` disables all fields inside it, and an enabled one none."""
+    """A disabled `<fieldset>` disables all fields inside it except its first `<legend>`, and an enabled one none."""
     html = """
     <form>
+        <fieldset disabled><legend><input name="first-legend"></legend><legend><input name="second-legend"></legend>
+        </fieldset>
         <fieldset disabled><fieldset disabled></fieldset><label><input name="a"></label><input name="b"></fieldset>
         <fieldset><label><input name="c"></label></fieldset>
     </form>
@@ -365,7 +367,7 @@ async def test_disabled_fieldset(extract_form_requests: ExtractFormRequests) -> 
 
     [request] = await extract_form_requests(html)
 
-    assert _submitted_fields(request) == {'c': ''}
+    assert _submitted_fields(request) == {'first-legend': '', 'c': ''}
 
 
 async def test_fields_argument(extract_form_requests: ExtractFormRequests) -> None:

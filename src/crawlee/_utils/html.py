@@ -336,7 +336,10 @@ def _disabled_elements(root: HtmlElement, elements: list[HtmlElement]) -> set[Ht
     for fieldset in root.iter('fieldset'):
         # A fieldset inside a disabled one is already covered, so each element is visited once.
         if 'disabled' in fieldset.attrib and fieldset not in disabled:
-            disabled.update(fieldset.iter('fieldset', *_FIELD_TAGS))
+            # The contents of the first `<legend>` child stay enabled.
+            legend = next((child for child in fieldset if child.tag == 'legend'), None)
+            exempt = set() if legend is None else set(legend.iter('fieldset', *_FIELD_TAGS))
+            disabled.update(element for element in fieldset.iter('fieldset', *_FIELD_TAGS) if element not in exempt)
     return disabled
 
 
