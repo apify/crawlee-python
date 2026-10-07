@@ -1079,7 +1079,7 @@ async def test_static_throttled_error_without_backoff_falls_back_to_browser(test
     'optional_module_name',
     [
         pytest.param('playwright', id='playwright'),
-        pytest.param('jaro', id='jaro'),
+        pytest.param('rapidfuzz', id='rapidfuzz'),
         pytest.param('sklearn', id='sklearn'),
     ],
 )
