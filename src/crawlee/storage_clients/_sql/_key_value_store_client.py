@@ -13,6 +13,7 @@ from typing_extensions import Self, override
 from crawlee._utils.file import infer_mime_type
 from crawlee._utils.retry import retry_on_error
 from crawlee.storage_clients._base import KeyValueStoreClient
+from crawlee.storage_clients._utils import batch_records_by_size
 from crawlee.storage_clients.models import (
     KeyValueStoreMetadata,
     KeyValueStoreRecord,
@@ -58,6 +59,15 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
 
     _DEFAULT_NAME = 'default'
     """Default dataset name used when no name is provided."""
+
+    _ITERATE_ENTRIES_BATCH_MAX_KEYS = 100
+    """Maximum number of records listed or read with a single query in `iterate_entries`."""
+
+    _ITERATE_ENTRIES_BATCH_MAX_BYTES = 8 * 1024 * 1024
+    """Maximum total size of the records read with a single query in `iterate_entries`.
+
+    A single record larger than this is still read, but alone in its batch.
+    """
 
     _METADATA_TABLE = KeyValueStoreMetadataDb
     """SQLAlchemy model for key-value store metadata."""
@@ -202,21 +212,33 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         if not record_db:
             return None
 
-        # Deserialize the value based on content type
-        value_bytes = record_db.value
+        return self._build_record(
+            key=record_db.key,
+            content_type=record_db.content_type,
+            size=record_db.size,
+            value_bytes=record_db.value,
+        )
 
+    @staticmethod
+    def _build_record(
+        *, key: str, content_type: str, size: int | None, value_bytes: bytes
+    ) -> KeyValueStoreRecord | None:
+        """Deserialize a stored value based on its content type into a record.
+
+        Returns None, after logging a warning, when the stored bytes cannot be decoded as the content type claims.
+        """
         # Handle None values
-        if record_db.content_type == 'application/x-none':
+        if content_type == 'application/x-none':
             value = None
         # Handle JSON values
-        elif 'application/json' in record_db.content_type:
+        elif 'application/json' in content_type:
             try:
                 value = json.loads(value_bytes.decode('utf-8'))
             except (json.JSONDecodeError, UnicodeDecodeError):
                 logger.warning(f'Failed to decode JSON value for key "{key}"')
                 return None
         # Handle text values
-        elif record_db.content_type.startswith('text/'):
+        elif content_type.startswith('text/'):
             try:
                 value = value_bytes.decode('utf-8')
             except UnicodeDecodeError:
@@ -226,12 +248,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
         else:
             value = value_bytes
 
-        return KeyValueStoreRecord(
-            key=record_db.key,
-            value=value,
-            content_type=record_db.content_type,
-            size=record_db.size,
-        )
+        return KeyValueStoreRecord(key=key, value=value, content_type=content_type, size=size)
 
     @retry_on_error(SQLAlchemyError)
     @override
@@ -281,6 +298,96 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
                 )
 
             await self._add_buffer_record(session)
+
+    @override
+    async def iterate_entries(
+        self,
+        *,
+        exclusive_start_key: str | None = None,
+        limit: int | None = None,
+    ) -> AsyncIterator[KeyValueStoreRecord]:
+        """Iterate over all the existing records in the key-value store, including their values.
+
+        The records are read in keyset-paginated pages of metadata, and the values of each page are then fetched with
+        a single query per batch, instead of one query per record as the default implementation does. The batches are
+        bounded by the record sizes, so a store with large values does not load too many of them at once. Every query
+        runs in its own short session, so no transaction stays open while the consumer processes the records.
+        """
+        last_key = exclusive_start_key
+        remaining = limit
+
+        while remaining is None or remaining > 0:
+            page_size = self._ITERATE_ENTRIES_BATCH_MAX_KEYS
+            if remaining is not None:
+                page_size = min(page_size, remaining)
+
+            page = await self._list_record_metadata(exclusive_start_key=last_key, limit=page_size)
+            if not page:
+                return
+
+            for batch in batch_records_by_size(
+                page,
+                max_records=self._ITERATE_ENTRIES_BATCH_MAX_KEYS,
+                max_bytes=self._ITERATE_ENTRIES_BATCH_MAX_BYTES,
+            ):
+                for record in await self._fetch_records(batch):
+                    yield record
+
+            last_key = page[-1].key
+            if remaining is not None:
+                remaining -= len(page)
+            if len(page) < page_size:
+                return
+
+    @retry_on_error(SQLAlchemyError)
+    async def _list_record_metadata(
+        self, *, exclusive_start_key: str | None, limit: int
+    ) -> list[KeyValueStoreRecordMetadata]:
+        """Read one page of record metadata, ordered by key and starting after `exclusive_start_key`."""
+        stmt = (
+            select(self._ITEM_TABLE.key, self._ITEM_TABLE.content_type, self._ITEM_TABLE.size)
+            .where(self._ITEM_TABLE.key_value_store_id == self._id)
+            .order_by(self._ITEM_TABLE.key)
+            .limit(limit)
+        )
+        if exclusive_start_key is not None:
+            stmt = stmt.where(self._ITEM_TABLE.key > exclusive_start_key)
+
+        async with self.get_session(with_simple_commit=True) as session:
+            result = await session.execute(stmt)
+            page = [
+                KeyValueStoreRecordMetadata(key=row.key, content_type=row.content_type, size=row.size) for row in result
+            ]
+            await self._add_buffer_record(session)
+
+        return page
+
+    @retry_on_error(SQLAlchemyError)
+    async def _fetch_records(self, batch: list[KeyValueStoreRecordMetadata]) -> list[KeyValueStoreRecord]:
+        """Fetch the values of the given records with a single query and return the deserialized records."""
+        stmt = (
+            select(
+                self._ITEM_TABLE.key,
+                self._ITEM_TABLE.content_type,
+                self._ITEM_TABLE.size,
+                self._ITEM_TABLE.value,
+            )
+            .where(
+                self._ITEM_TABLE.key_value_store_id == self._id,
+                self._ITEM_TABLE.key.in_([item.key for item in batch]),
+            )
+            .order_by(self._ITEM_TABLE.key)
+        )
+
+        async with self.get_session(with_simple_commit=True) as session:
+            result = await session.execute(stmt)
+            rows = result.all()
+
+        records = (
+            self._build_record(key=row.key, content_type=row.content_type, size=row.size, value_bytes=row.value)
+            for row in rows
+        )
+        return [record for record in records if record is not None]
 
     @retry_on_error(SQLAlchemyError)
     @override

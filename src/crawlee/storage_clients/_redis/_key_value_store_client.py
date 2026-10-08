@@ -10,10 +10,11 @@ from typing_extensions import override
 from crawlee._utils.file import infer_mime_type
 from crawlee._utils.retry import retry_on_error
 from crawlee.storage_clients._base import KeyValueStoreClient
+from crawlee.storage_clients._utils import batch_records_by_size
 from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
 from ._client_mixin import MetadataUpdateParams, RedisClientMixin
-from ._utils import await_redis_response
+from ._utils import await_redis_response, expect_bytes
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -40,6 +41,9 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
 
     All operations are atomic through Redis hash operations and pipeline transactions. The client supports
     concurrent access through Redis's built-in atomic operations for hash fields.
+
+    Values are stored as raw bytes, so the Redis client must not decode responses. A Redis client created with
+    `decode_responses=True` is rejected when a value is read.
     """
 
     _DEFAULT_NAME = 'default'
@@ -50,6 +54,15 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
 
     _CLIENT_TYPE = 'Key-value store'
     """Human-readable client type for error messages."""
+
+    _ITERATE_ENTRIES_BATCH_MAX_KEYS = 100
+    """Maximum number of records fetched with a single HMGET call in `iterate_entries`."""
+
+    _ITERATE_ENTRIES_BATCH_MAX_BYTES = 8 * 1024 * 1024
+    """Maximum total size of the records fetched with a single HMGET call in `iterate_entries`.
+
+    A single record larger than this is still fetched, but alone in its batch.
+    """
 
     def __init__(self, storage_name: str, storage_id: str, redis: Redis) -> None:
         """Initialize a new instance.
@@ -178,15 +191,30 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             return KeyValueStoreRecord(value=None, **metadata_item.model_dump())
 
         # Query the record by key
-        # redis-py typing issue
-        value_bytes: bytes | None = await await_redis_response(self._redis.hget(self._items_key, key))  # ty: ignore[invalid-assignment]
+        value_bytes = expect_bytes(await await_redis_response(self._redis.hget(self._items_key, key)))
+
+        return self._build_record(metadata_item, value_bytes)
+
+    @staticmethod
+    def _build_record(
+        metadata_item: KeyValueStoreRecordMetadata, value_bytes: bytes | None
+    ) -> KeyValueStoreRecord | None:
+        """Deserialize a stored value based on its content type into a record.
+
+        Returns None, after logging a warning, when the value is missing or cannot be decoded as the content type
+        claims.
+        """
+        key = metadata_item.key
 
         if value_bytes is None:
             logger.warning(f'Value for key "{key}" is missing.')
             return None
 
+        # Handle None values
+        if metadata_item.content_type == 'application/x-none':
+            value = None
         # Handle JSON values
-        if 'application/json' in metadata_item.content_type:
+        elif 'application/json' in metadata_item.content_type:
             try:
                 value = json.loads(value_bytes.decode('utf-8'))
             except (json.JSONDecodeError, UnicodeDecodeError):
@@ -251,6 +279,45 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
                 pipe,
                 **MetadataUpdateParams(update_accessed_at=True),
             )
+
+    @override
+    async def iterate_entries(
+        self,
+        *,
+        exclusive_start_key: str | None = None,
+        limit: int | None = None,
+    ) -> AsyncIterator[KeyValueStoreRecord]:
+        """Iterate over all the existing records in the key-value store, including their values.
+
+        The values are fetched in batches with a single HMGET call per batch, instead of several round trips per record
+        as the default implementation does. The batches are bounded by the record sizes known from the metadata, so
+        a store with large values does not load too many of them at once.
+        """
+        metadata_items = [
+            item async for item in self.iterate_keys(exclusive_start_key=exclusive_start_key, limit=limit)
+        ]
+
+        for batch in batch_records_by_size(
+            metadata_items,
+            max_records=self._ITERATE_ENTRIES_BATCH_MAX_KEYS,
+            max_bytes=self._ITERATE_ENTRIES_BATCH_MAX_BYTES,
+        ):
+            for record in await self._fetch_records(batch):
+                yield record
+
+    @retry_on_error(RedisError)
+    async def _fetch_records(self, batch: list[KeyValueStoreRecordMetadata]) -> list[KeyValueStoreRecord]:
+        """Fetch the values of the given records with a single HMGET call and return the deserialized records."""
+        keys = [item.key for item in batch]
+        values = [expect_bytes(v) for v in await await_redis_response(self._redis.hmget(self._items_key, keys))]
+
+        # A missing value means the record was deleted after its metadata was listed, so it is skipped silently.
+        records = (
+            self._build_record(metadata_item, value_bytes)
+            for metadata_item, value_bytes in zip(batch, values, strict=True)
+            if value_bytes is not None
+        )
+        return [record for record in records if record is not None]
 
     @override
     async def get_public_url(self, *, key: str) -> str:

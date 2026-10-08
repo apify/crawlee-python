@@ -151,9 +151,11 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
         if limit is not None:
             keys = keys[:limit]
 
-        # Yield metadata for each key
+        # Yield metadata for each key, skipping records deleted while the iteration was suspended.
         for key in keys:
-            record = self._records[key]
+            record = self._records.get(key)
+            if record is None:
+                continue
             yield KeyValueStoreRecordMetadata(
                 key=key,
                 content_type=record.content_type,

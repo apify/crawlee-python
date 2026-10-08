@@ -6,15 +6,14 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fakeredis import FakeAsyncRedis
 from redis.exceptions import RedisError
 
 from crawlee.storage_clients import RedisStorageClient
 from crawlee.storage_clients._redis._utils import await_redis_response
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
-
-    from fakeredis import FakeAsyncRedis
+    from collections.abc import AsyncGenerator, Iterator
 
     from crawlee.storage_clients._redis import RedisKeyValueStoreClient
 
@@ -257,3 +256,117 @@ async def test_set_value_does_not_retry_on_unexpected_exception(kvs_client: Redi
 
     # Verify that retry logic was not attempted
     assert mock_sleep.call_count == 0
+
+
+@pytest.fixture
+def hmget(kvs_client: RedisKeyValueStoreClient) -> Iterator[MagicMock]:
+    """Wrap the Redis `hmget` of the client in a mock that records the calls while still performing them."""
+    with patch.object(kvs_client.redis, 'hmget', wraps=kvs_client.redis.hmget) as mock:
+        yield mock
+
+
+def hmget_keys(hmget: MagicMock) -> list[list[str]]:
+    return [list(call.args[1]) for call in hmget.call_args_list]
+
+
+async def test_iterate_entries_reads_values_in_batches(kvs_client: RedisKeyValueStoreClient, hmget: MagicMock) -> None:
+    """Test that `iterate_entries` fetches values with batched HMGET calls instead of `get_value` per key."""
+    await kvs_client.set_value(key='a-json', value={'nested': [1, 2]})
+    await kvs_client.set_value(key='b-text', value='plain text')
+    await kvs_client.set_value(key='c-bytes', value=b'\x00\x01binary', content_type='application/octet-stream')
+    await kvs_client.set_value(key='d-none', value=None)
+
+    with patch.object(kvs_client, 'get_value', side_effect=AssertionError('get_value must not be called')):
+        records = [record async for record in kvs_client.iterate_entries()]
+
+    assert [record.key for record in records] == ['a-json', 'b-text', 'c-bytes', 'd-none']
+    assert [record.value for record in records] == [{'nested': [1, 2]}, 'plain text', b'\x00\x01binary', None]
+    assert records[0].content_type.startswith('application/json')
+    assert records[1].content_type.startswith('text/plain')
+    assert records[2].content_type == 'application/octet-stream'
+
+    # All values fit in a single batch.
+    assert hmget_keys(hmget) == [['a-json', 'b-text', 'c-bytes', 'd-none']]
+
+
+async def test_iterate_entries_batches_are_bounded_by_key_count(
+    kvs_client: RedisKeyValueStoreClient, hmget: MagicMock
+) -> None:
+    """Test that `iterate_entries` splits the HMGET calls when a batch reaches the maximum number of keys."""
+    for i in range(5):
+        await kvs_client.set_value(key=f'key{i}', value=f'value{i}')
+
+    with patch.object(type(kvs_client), '_ITERATE_ENTRIES_BATCH_MAX_KEYS', 2):
+        records = [record async for record in kvs_client.iterate_entries()]
+
+    assert [(record.key, record.value) for record in records] == [(f'key{i}', f'value{i}') for i in range(5)]
+    assert hmget_keys(hmget) == [['key0', 'key1'], ['key2', 'key3'], ['key4']]
+
+
+async def test_iterate_entries_batches_are_bounded_by_size(
+    kvs_client: RedisKeyValueStoreClient, hmget: MagicMock
+) -> None:
+    """Test that `iterate_entries` splits the HMGET calls by the record sizes known from the metadata.
+
+    A record larger than the limit is still fetched, but alone in its batch.
+    """
+    await kvs_client.set_value(key='small1', value='ab')
+    await kvs_client.set_value(key='small2', value='cd')
+    await kvs_client.set_value(key='large', value='x' * 100)
+    await kvs_client.set_value(key='small3', value='ef')
+
+    with patch.object(type(kvs_client), '_ITERATE_ENTRIES_BATCH_MAX_BYTES', 10):
+        records = [record async for record in kvs_client.iterate_entries()]
+
+    assert [record.key for record in records] == ['large', 'small1', 'small2', 'small3']
+    assert hmget_keys(hmget) == [['large'], ['small1', 'small2', 'small3']]
+
+
+async def test_iterate_entries_with_exclusive_start_key_and_limit(kvs_client: RedisKeyValueStoreClient) -> None:
+    """Test that `iterate_entries` applies `exclusive_start_key` and `limit`."""
+    for i in range(6):
+        await kvs_client.set_value(key=f'key{i}', value=f'value{i}')
+
+    with patch.object(kvs_client, 'get_value', side_effect=AssertionError('get_value must not be called')):
+        records = [record async for record in kvs_client.iterate_entries(exclusive_start_key='key1', limit=3)]
+
+    assert [(record.key, record.value) for record in records] == [
+        ('key2', 'value2'),
+        ('key3', 'value3'),
+        ('key4', 'value4'),
+    ]
+
+
+async def test_iterate_entries_skips_value_deleted_after_listing(
+    kvs_client: RedisKeyValueStoreClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Test that `iterate_entries` silently skips a record whose value is gone by the time its batch is fetched."""
+    await kvs_client.set_value(key='kept', value='a')
+    await kvs_client.set_value(key='removed', value='b')
+    await await_redis_response(kvs_client.redis.hdel(kvs_client._items_key, 'removed'))
+
+    with caplog.at_level('WARNING'):
+        records = [record async for record in kvs_client.iterate_entries()]
+
+    assert [(record.key, record.value) for record in records] == [('kept', 'a')]
+    assert 'missing' not in caplog.text
+
+
+async def test_iterate_entries_empty_store(kvs_client: RedisKeyValueStoreClient) -> None:
+    """Test that `iterate_entries` on an empty store yields nothing."""
+    records = [record async for record in kvs_client.iterate_entries()]
+
+    assert records == []
+
+
+async def test_decoding_redis_client_is_rejected(suppress_user_warning: None) -> None:  # noqa: ARG001
+    """Test that reading values through a Redis client created with `decode_responses=True` raises a clear error."""
+    storage_client = RedisStorageClient(redis=FakeAsyncRedis(decode_responses=True))
+    kvs_client = await storage_client.create_kvs_client(name='decoding_kvs')
+    await kvs_client.set_value(key='key', value='value')
+
+    with pytest.raises(TypeError, match='decode_responses'):
+        await kvs_client.get_value(key='key')
+
+    with pytest.raises(TypeError, match='decode_responses'):
+        _ = [record async for record in kvs_client.iterate_entries()]

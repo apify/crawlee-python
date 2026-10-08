@@ -9,11 +9,13 @@ import pytest
 from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient, SqlStorageClient, StorageClient
+from crawlee.storage_clients._memory import MemoryKeyValueStoreClient
+from crawlee.storage_clients.models import KeyValueStoreRecord
 from crawlee.storages import KeyValueStore
 from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, AsyncIterator
     from pathlib import Path
 
 
@@ -265,6 +267,101 @@ async def test_iterate_keys_with_limit(kvs: KeyValueStore) -> None:
 
     # Verify iteration result
     assert len(collected_keys) == 5
+
+
+async def test_iterate_values(kvs: KeyValueStore) -> None:
+    """Test iterating over values in the key-value store."""
+    await kvs.set_value('key1', 'value1')
+    await kvs.set_value('key2', {'nested': 2})
+    await kvs.set_value('key3', [3])
+
+    collected_values = [value async for value in kvs.iterate_values()]
+
+    assert len(collected_values) == 3
+    assert 'value1' in collected_values
+    assert {'nested': 2} in collected_values
+    assert [3] in collected_values
+
+
+async def test_iterate_entries(kvs: KeyValueStore) -> None:
+    """Test iterating over (key, value) pairs in the key-value store."""
+    await kvs.set_value('key1', 'value1')
+    await kvs.set_value('key2', {'nested': 2})
+    await kvs.set_value('key3', [3])
+
+    collected_entries = dict([entry async for entry in kvs.iterate_entries()])
+
+    assert collected_entries == {'key1': 'value1', 'key2': {'nested': 2}, 'key3': [3]}
+
+
+async def test_iterate_entries_with_limit_and_exclusive_start_key(kvs: KeyValueStore) -> None:
+    """Test that `iterate_entries` passes `limit` and `exclusive_start_key` through to the key listing."""
+    for i in range(10):
+        await kvs.set_value(f'key{i}', f'value{i}')
+
+    all_keys = [metadata.key for metadata in await kvs.list_keys()]
+    start_key = all_keys[2]
+
+    collected_entries = [entry async for entry in kvs.iterate_entries(exclusive_start_key=start_key, limit=3)]
+
+    assert len(collected_entries) == 3
+    expected_keys = all_keys[all_keys.index(start_key) + 1 :][:3]
+    assert [key for key, _ in collected_entries] == expected_keys
+    assert all(value == f'value{key.removeprefix("key")}' for key, value in collected_entries)
+
+
+async def test_iterate_entries_empty_kvs(kvs: KeyValueStore) -> None:
+    """Test that iterating over an empty key-value store yields nothing."""
+    collected_entries = [entry async for entry in kvs.iterate_entries()]
+
+    assert collected_entries == []
+
+
+async def test_iterate_entries_uses_storage_client_implementation() -> None:
+    """Test that `iterate_entries` and `iterate_values` delegate to the storage client's `iterate_entries`."""
+
+    class OptimizedKeyValueStoreClient(MemoryKeyValueStoreClient):
+        async def iterate_entries(
+            self,
+            *,
+            exclusive_start_key: str | None = None,
+            limit: int | None = None,
+        ) -> AsyncIterator[KeyValueStoreRecord]:
+            # A single-pass implementation that never touches `get_value`.
+            keys = sorted(k for k in self._records if exclusive_start_key is None or k > exclusive_start_key)
+            for key in keys[:limit]:
+                record = self._records[key]
+                yield KeyValueStoreRecord(
+                    key=key,
+                    value=f'optimized-{record.value}',
+                    content_type=record.content_type,
+                    size=record.size,
+                )
+
+        async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
+            raise AssertionError(f'get_value must not be called for {key!r} when the client implements iterate_entries')
+
+    client = await OptimizedKeyValueStoreClient.open(id=None, name=None, alias=None)
+    kvs = KeyValueStore(client, id=(await client.get_metadata()).id, name=None)
+    await kvs.set_value('key1', 'value1')
+    await kvs.set_value('key2', 'value2')
+    await kvs.set_value('key3', 'value3')
+
+    entries = [entry async for entry in kvs.iterate_entries(exclusive_start_key='key1', limit=1)]
+    values = [value async for value in kvs.iterate_values()]
+
+    assert entries == [('key2', 'optimized-value2')]
+    assert values == ['optimized-value1', 'optimized-value2', 'optimized-value3']
+
+
+async def test_async_iteration(kvs: KeyValueStore) -> None:
+    """Test that the key-value store can be used directly in an `async for` loop, yielding keys like a dict."""
+    await kvs.set_value('key1', 'value1')
+    await kvs.set_value('key2', 'value2')
+
+    collected_keys = [key async for key in kvs]
+
+    assert sorted(collected_keys) == ['key1', 'key2']
 
 
 async def test_drop(

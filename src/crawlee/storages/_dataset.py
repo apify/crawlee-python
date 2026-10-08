@@ -246,6 +246,21 @@ class Dataset(Storage):
         ):
             yield item
 
+    def __aiter__(self) -> AsyncIterator[Mapping[str, JsonSerializable]]:
+        """Iterate over all items in the dataset.
+
+        Allows using the dataset directly in an `async for` loop. It is equivalent to calling `iterate_items`
+        with the default arguments.
+
+        ### Usage
+
+        ```python
+        async for item in dataset:
+            print(item)
+        ```
+        """
+        return self.iterate_items()
+
     async def list_items(
         self,
         *,

@@ -16,7 +16,7 @@ from crawlee.storage_clients._sql._db_models import KeyValueStoreMetadataDb, Key
 from crawlee.storage_clients.models import KeyValueStoreMetadata
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, Iterator
     from pathlib import Path
 
     from sqlalchemy import Connection
@@ -325,3 +325,113 @@ async def test_set_value_does_not_retry_on_unexpected_exception(kvs_client: SqlK
 
     # Verify that retry logic was not attempted
     assert mock_sleep.call_count == 0
+
+
+@pytest.fixture
+def fetch_records(kvs_client: SqlKeyValueStoreClient) -> Iterator[AsyncMock]:
+    """Wrap `_fetch_records` of the client in a mock that records the value batches while still fetching them."""
+    with patch.object(kvs_client, '_fetch_records', wraps=kvs_client._fetch_records) as mock:
+        yield mock
+
+
+def fetched_keys(fetch_records: AsyncMock) -> list[list[str]]:
+    return [[item.key for item in call.args[0]] for call in fetch_records.await_args_list]
+
+
+async def test_iterate_entries_reads_values_in_batches(kvs_client: SqlKeyValueStoreClient) -> None:
+    """Test that `iterate_entries` reads values in batches instead of calling `get_value` per key."""
+    await kvs_client.set_value(key='a-json', value={'nested': [1, 2]})
+    await kvs_client.set_value(key='b-text', value='plain text')
+    await kvs_client.set_value(key='c-bytes', value=b'\x00\x01binary', content_type='application/octet-stream')
+    await kvs_client.set_value(key='d-none', value=None)
+
+    with patch.object(kvs_client, 'get_value', side_effect=AssertionError('get_value must not be called')):
+        records = [record async for record in kvs_client.iterate_entries()]
+
+    assert [record.key for record in records] == ['a-json', 'b-text', 'c-bytes', 'd-none']
+    assert [record.value for record in records] == [{'nested': [1, 2]}, 'plain text', b'\x00\x01binary', None]
+    assert records[0].content_type.startswith('application/json')
+    assert records[1].content_type.startswith('text/plain')
+    assert records[2].content_type == 'application/octet-stream'
+    assert all(record.size is not None for record in records)
+
+
+async def test_iterate_entries_with_exclusive_start_key_and_limit(kvs_client: SqlKeyValueStoreClient) -> None:
+    """Test that `iterate_entries` applies `exclusive_start_key` and `limit` in the query."""
+    for i in range(6):
+        await kvs_client.set_value(key=f'key{i}', value=f'value{i}')
+
+    with patch.object(kvs_client, 'get_value', side_effect=AssertionError('get_value must not be called')):
+        records = [record async for record in kvs_client.iterate_entries(exclusive_start_key='key1', limit=3)]
+
+    assert [(record.key, record.value) for record in records] == [
+        ('key2', 'value2'),
+        ('key3', 'value3'),
+        ('key4', 'value4'),
+    ]
+
+
+async def test_iterate_entries_limit_spans_multiple_pages(
+    kvs_client: SqlKeyValueStoreClient, fetch_records: AsyncMock
+) -> None:
+    """Test that `iterate_entries` stops at `limit` when it falls in the middle of a later metadata page."""
+    for i in range(6):
+        await kvs_client.set_value(key=f'key{i}', value=f'value{i}')
+
+    with patch.object(type(kvs_client), '_ITERATE_ENTRIES_BATCH_MAX_KEYS', 2):
+        records = [record async for record in kvs_client.iterate_entries(limit=3)]
+
+    assert [(record.key, record.value) for record in records] == [(f'key{i}', f'value{i}') for i in range(3)]
+    assert fetched_keys(fetch_records) == [['key0', 'key1'], ['key2']]
+
+
+async def test_fetch_records_skips_record_deleted_after_listing(kvs_client: SqlKeyValueStoreClient) -> None:
+    """Test that a record deleted between the metadata listing and its value fetch is skipped."""
+    await kvs_client.set_value(key='kept', value='a')
+    await kvs_client.set_value(key='removed', value='b')
+    batch = [item async for item in kvs_client.iterate_keys()]
+    await kvs_client.delete_value(key='removed')
+
+    records = await kvs_client._fetch_records(batch)
+
+    assert [(record.key, record.value) for record in records] == [('kept', 'a')]
+
+
+async def test_iterate_entries_empty_store(kvs_client: SqlKeyValueStoreClient) -> None:
+    """Test that `iterate_entries` on an empty store yields nothing."""
+    records = [record async for record in kvs_client.iterate_entries()]
+
+    assert records == []
+
+
+async def test_iterate_entries_batches_are_bounded_by_key_count(
+    kvs_client: SqlKeyValueStoreClient, fetch_records: AsyncMock
+) -> None:
+    """Test that `iterate_entries` splits the value queries when a batch reaches the maximum number of keys."""
+    for i in range(5):
+        await kvs_client.set_value(key=f'key{i}', value=f'value{i}')
+
+    with patch.object(type(kvs_client), '_ITERATE_ENTRIES_BATCH_MAX_KEYS', 2):
+        records = [record async for record in kvs_client.iterate_entries()]
+
+    assert [(record.key, record.value) for record in records] == [(f'key{i}', f'value{i}') for i in range(5)]
+    assert fetched_keys(fetch_records) == [['key0', 'key1'], ['key2', 'key3'], ['key4']]
+
+
+async def test_iterate_entries_batches_are_bounded_by_size(
+    kvs_client: SqlKeyValueStoreClient, fetch_records: AsyncMock
+) -> None:
+    """Test that `iterate_entries` splits the value queries by the record sizes.
+
+    A record larger than the limit is still read, but alone in its batch.
+    """
+    await kvs_client.set_value(key='small1', value='ab')
+    await kvs_client.set_value(key='small2', value='cd')
+    await kvs_client.set_value(key='large', value='x' * 100)
+    await kvs_client.set_value(key='small3', value='ef')
+
+    with patch.object(type(kvs_client), '_ITERATE_ENTRIES_BATCH_MAX_BYTES', 10):
+        records = [record async for record in kvs_client.iterate_entries()]
+
+    assert [record.key for record in records] == ['large', 'small1', 'small2', 'small3']
+    assert fetched_keys(fetch_records) == [['large'], ['small1', 'small2', 'small3']]

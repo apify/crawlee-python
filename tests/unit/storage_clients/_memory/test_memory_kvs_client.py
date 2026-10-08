@@ -78,3 +78,17 @@ async def test_memory_metadata_updates(kvs_client: MemoryKeyValueStoreClient) ->
     assert metadata.created_at == initial_created
     assert metadata.modified_at > initial_modified
     assert metadata.accessed_at > accessed_after_read
+
+
+async def test_iterate_keys_skips_record_deleted_during_iteration(kvs_client: MemoryKeyValueStoreClient) -> None:
+    """Test that a record deleted while `iterate_keys` is suspended is skipped."""
+    await kvs_client.set_value(key='key1', value='a')
+    await kvs_client.set_value(key='key2', value='b')
+
+    collected_keys = []
+    async for metadata in kvs_client.iterate_keys():
+        if metadata.key == 'key1':
+            await kvs_client.delete_value(key='key2')
+        collected_keys.append(metadata.key)
+
+    assert collected_keys == ['key1']
