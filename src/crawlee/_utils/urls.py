@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import tempfile
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from pydantic import AnyHttpUrl, TypeAdapter
-from tldextract import TLDExtract
 from typing_extensions import assert_never
 from yarl import URL
+
+from crawlee._utils.public_suffix import public_suffix_list
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -124,7 +124,11 @@ def _matches_enqueue_strategy(
         return target_url.host == origin_url.host
 
     if strategy == 'same-domain':
-        return _domain_under_public_suffix(origin_url.host) == _domain_under_public_suffix(target_url.host)
+        origin_domain = _get_registrable_domain(origin_url.host)
+        if origin_domain is None:
+            # No registrable domain (e.g. an IP address), fall back to comparing host and port.
+            return target_url.host_port_subcomponent == origin_url.host_port_subcomponent
+        return origin_domain == _get_registrable_domain(target_url.host)
 
     if strategy == 'same-origin':
         return (
@@ -140,16 +144,7 @@ def _to_url(value: str | URL) -> URL:
     return URL(value) if isinstance(value, str) else value
 
 
-@lru_cache(maxsize=1)
-def _get_tld_extractor() -> TLDExtract:
-    """Return a lazily-initialized `TLDExtract` instance shared across the module."""
-    # `mkdtemp` (vs `TemporaryDirectory`) returns a path whose lifetime is tied to the process — `TemporaryDirectory`
-    # is collected immediately when its return value is discarded, which would race the directory out from under
-    # tldextract.
-    return TLDExtract(cache_dir=tempfile.mkdtemp())
-
-
 @lru_cache(maxsize=2048)
-def _domain_under_public_suffix(host: str) -> str:
+def _get_registrable_domain(host: str) -> str | None:
     """Return the registrable domain for `host`, cached to avoid re-running the PSL lookup."""
-    return _get_tld_extractor().extract_str(host).top_domain_under_public_suffix
+    return public_suffix_list.get_registrable_domain(host)
