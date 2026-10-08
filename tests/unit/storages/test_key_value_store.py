@@ -318,11 +318,7 @@ async def test_iterate_entries_empty_kvs(kvs: KeyValueStore) -> None:
 
 
 async def test_iterate_entries_uses_storage_client_implementation() -> None:
-    """Test that `iterate_entries` and `iterate_values` go through the storage client's `iterate_entries`.
-
-    Storage clients can override the default key-by-key implementation with a more efficient one, so the frontend
-    must delegate to the client instead of combining `iterate_keys` and `get_value` itself.
-    """
+    """Test that `iterate_entries` and `iterate_values` delegate to the storage client's `iterate_entries`."""
 
     class OptimizedKeyValueStoreClient(MemoryKeyValueStoreClient):
         async def iterate_entries(

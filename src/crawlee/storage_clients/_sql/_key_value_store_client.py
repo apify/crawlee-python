@@ -61,7 +61,7 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
     """Default dataset name used when no name is provided."""
 
     _ITERATE_ENTRIES_BATCH_MAX_KEYS = 100
-    """Maximum number of records read with a single query in `iterate_entries`."""
+    """Maximum number of records listed or read with a single query in `iterate_entries`."""
 
     _ITERATE_ENTRIES_BATCH_MAX_BYTES = 8 * 1024 * 1024
     """Maximum total size of the records read with a single query in `iterate_entries`.

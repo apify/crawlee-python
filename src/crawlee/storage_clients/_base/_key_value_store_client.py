@@ -97,9 +97,8 @@ class KeyValueStoreClient(ABC):
         """
         async for metadata in self.iterate_keys(exclusive_start_key=exclusive_start_key, limit=limit):
             record = await self.get_value(key=metadata.key)
-            if record is None:
-                continue
-            yield record
+            if record is not None:
+                yield record
 
     @abstractmethod
     async def get_public_url(self, *, key: str) -> str:

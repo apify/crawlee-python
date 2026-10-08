@@ -385,7 +385,7 @@ async def test_iterate_entries_limit_spans_multiple_pages(
     assert fetched_keys(fetch_records) == [['key0', 'key1'], ['key2']]
 
 
-async def test_iterate_entries_skips_record_deleted_after_listing(kvs_client: SqlKeyValueStoreClient) -> None:
+async def test_fetch_records_skips_record_deleted_after_listing(kvs_client: SqlKeyValueStoreClient) -> None:
     """Test that a record deleted between the metadata listing and its value fetch is skipped."""
     await kvs_client.set_value(key='kept', value='a')
     await kvs_client.set_value(key='removed', value='b')
