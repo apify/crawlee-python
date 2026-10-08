@@ -119,6 +119,12 @@ _ASCII_WHITESPACE_PATTERN = re.compile(r'[ \t\n\f\r]+')
 
 _MULTIPART_NAME_ESCAPES = str.maketrans({'"': '%22', '\r': '%0D', '\n': '%0A'})
 
+# The URL parser strips C0 controls and spaces around a URL, but no other whitespace.
+_URL_STRIP_CHARS = ''.join(map(chr, range(0x21)))
+
+_COLOR_PATTERN = re.compile(r'#[0-9a-fA-F]{6}')
+_FLOAT_PATTERN = re.compile(r'-?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][-+]?\d+)?', re.ASCII)
+
 
 class FormRequestOptions(TypedDict):
     """Options for the `Request` created from a form.
@@ -234,13 +240,18 @@ def forms_to_requests(
         return []
 
     root = forms[0].getroottree().getroot()
-    base = root.find('.//base[@href]')
+    base = next(iter(root.xpath('//base[@href][not(ancestor::template)]')), None)
     try:
-        base_url = convert_to_absolute_url(page_url, '' if base is None else base.get('href').strip())
+        base_url = convert_to_absolute_url(page_url, '' if base is None else base.get('href').strip(_URL_STRIP_CHARS))
     except ValueError:
         base_url = page_url
 
-    page_elements = list(root.iter(*_FIELD_TAGS))
+    # Browsers keep the contents of a `<template>` out of the page, so its elements don't take part.
+    inert = {element for template in root.iter('template') for element in template.iter('form', *_FIELD_TAGS)}
+    forms = [form for form in forms if form not in inert]
+    if not forms:
+        return []
+    page_elements = [element for element in root.iter(*_FIELD_TAGS) if element not in inert]
     elements_by_form = _elements_by_form(root, page_elements)
     disabled = _disabled_elements(root, page_elements)
 
@@ -325,7 +336,7 @@ def _elements_by_form(root: HtmlElement, elements: list[HtmlElement]) -> dict[Ht
     # The first element with a given ID wins, as in `getElementById`. Only the `form` attribute needs them.
     elements_by_id: dict[str, HtmlElement] = {}
     if any(element.get('form') is not None for element in elements):
-        for element in root.xpath('//*[@id!=""]'):
+        for element in root.xpath('//*[@id!=""][not(ancestor::template)]'):
             elements_by_id.setdefault(element.get('id'), element)
 
     elements_by_form: dict[HtmlElement, list[HtmlElement]] = {}
@@ -423,7 +434,8 @@ def _is_submit_button(element: HtmlElement) -> bool:
     """Check whether the element submits the form when clicked."""
     button_type = element.get('type', '').lower()
     if element.tag == 'button':
-        return button_type in ('', 'submit')
+        # A missing or unknown type makes a submit button.
+        return button_type not in ('reset', 'button')
     if element.tag == 'input':
         return button_type in ('submit', 'image')
     return False
@@ -443,7 +455,7 @@ def _resolve_action(page_url: str, base_url: str, action: str) -> str | None:
         return page_url
 
     try:
-        url = convert_to_absolute_url(base_url, action.strip())
+        url = convert_to_absolute_url(base_url, action.strip(_URL_STRIP_CHARS))
         validate_http_url(url)
     except ValueError:
         return None
@@ -489,7 +501,7 @@ def _button_fields(button: HtmlElement) -> list[_Field]:
     name = button.get('name')
 
     # An image button sends the click coordinates instead of its value.
-    if button.get('type', '').lower() == 'image':
+    if button.tag == 'input' and button.get('type', '').lower() == 'image':
         prefix = f'{name}.' if name else ''
         return [_Field(f'{prefix}x', '0'), _Field(f'{prefix}y', '0')]
 
@@ -521,8 +533,13 @@ def _element_fields(element: HtmlElement) -> list[_Field]:
 
     # lxml reports `on` for a checkbox or radio button with an empty `value`, which browsers submit as is.
     value = element.get('value', 'on' if element.checkable else '')
-    # Browsers strip line breaks from the value of a text-like input, and surrounding whitespace from an email or URL.
-    if element.type not in ('hidden', 'checkbox', 'radio'):
+    # Browsers replace an invalid color with black and an invalid number with an empty string, strip line breaks from
+    # the value of a text-like input, and also surrounding whitespace from an email or URL.
+    if element.type == 'color':
+        value = value.lower() if _COLOR_PATTERN.fullmatch(value) else '#000000'
+    elif element.type == 'number':
+        value = value if _FLOAT_PATTERN.fullmatch(value) else ''
+    elif element.type not in ('hidden', 'checkbox', 'radio'):
         value = value.replace('\r', '').replace('\n', '')
         if element.type in ('email', 'url'):
             value = value.strip(' \t\n\f\r')
@@ -542,7 +559,7 @@ def _select_values(select: HtmlElement) -> list[str]:
     if not select.multiple:
         # Only the last selected option counts. A drop-down, unlike a list box with `size` above 1, defaults to the
         # first enabled option.
-        size = re.match(r'[ \t\n\f\r]*\+?(\d+)', select.get('size', ''))
+        size = re.match(r'[ \t\n\f\r]*\+?(\d+)', select.get('size', ''), re.ASCII)
         default = [] if size and int(size.group(1)) > 1 else [option for option in options if option in enabled][:1]
         selected = selected[-1:] or default
     return [_option_value(option) for option in selected if option in enabled]

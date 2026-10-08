@@ -34,7 +34,7 @@ _PAGE_URL = 'https://example.com/page/index.html'
 _REFERRER_PAGE_URL = 'https://user:pass@example.com/page?token=1#top'
 
 
-def _mock_context(html: str, page_request: Request | None, content_type: str | None, encoding: str | None) -> Mock:
+def mock_context(html: str, page_request: Request | None, content_type: str | None, encoding: str | None) -> Mock:
     body = html.encode(encoding or 'utf-8', 'xmlcharrefreplace')
     return Mock(
         request=page_request or Request.from_url(_PAGE_URL),
@@ -45,19 +45,19 @@ def _mock_context(html: str, page_request: Request | None, content_type: str | N
     )
 
 
-async def _extract_with_parsel(
+async def extract_with_parsel(
     html: str,
     page_request: Request | None = None,
     content_type: str | None = None,
     encoding: str | None = None,
     **kwargs: Any,
 ) -> list[Request]:
-    context = _mock_context(html, page_request, content_type, encoding)
+    context = mock_context(html, page_request, content_type, encoding)
     context.selector = await ParselParser().parse(context.http_response)
     return await ParselCrawlingContext.extract_form_requests(context, **kwargs)
 
 
-async def _extract_with_beautifulsoup(
+async def extract_with_beautifulsoup(
     html: str,
     page_request: Request | None = None,
     content_type: str | None = None,
@@ -65,26 +65,26 @@ async def _extract_with_beautifulsoup(
     parser: BeautifulSoupParserType = 'lxml',
     **kwargs: Any,
 ) -> list[Request]:
-    context = _mock_context(html, page_request, content_type, encoding)
+    context = mock_context(html, page_request, content_type, encoding)
     context.soup = await BeautifulSoupParser(parser).parse(context.http_response)
     return await BeautifulSoupCrawlingContext.extract_form_requests(context, **kwargs)
 
 
 @pytest.fixture(
     params=[
-        pytest.param(_extract_with_parsel, id='parsel'),
-        pytest.param(_extract_with_beautifulsoup, id='beautifulsoup'),
+        pytest.param(extract_with_parsel, id='parsel'),
+        pytest.param(extract_with_beautifulsoup, id='beautifulsoup'),
     ]
 )
 def extract_form_requests(request: pytest.FixtureRequest) -> ExtractFormRequests:
     return request.param
 
 
-def _paths(requests: list[Request]) -> list[str]:
+def request_paths(requests: list[Request]) -> list[str]:
     return [urlsplit(request.url).path for request in requests]
 
 
-def _submitted_fields(request: Request) -> dict[str, str | list[str]]:
+def submitted_fields(request: Request) -> dict[str, str | list[str]]:
     """Get the fields a request submits, in the shape of the `fields` argument."""
     query = urlsplit(request.url).query if request.method == 'GET' else (request.payload or b'').decode()
     parsed = parse_qs(query, keep_blank_values=True)
@@ -339,7 +339,7 @@ async def test_submitted_fields(extract_form_requests: ExtractFormRequests) -> N
 
     [request] = await extract_form_requests(html)
 
-    assert _submitted_fields(request) == {
+    assert submitted_fields(request) == {
         'text': 't',
         'checked': 'c1',
         'no-value': 'on',
@@ -371,9 +371,9 @@ async def test_form_attribute(extract_form_requests: ExtractFormRequests) -> Non
 
     search, login, empty = await extract_form_requests(html, fields={'q': 'y', 'other': 'p'}, all_forms=True)
 
-    assert _submitted_fields(search) == {'q': 'y', 'lang': 'en', 'go': ''}
-    assert _submitted_fields(login) == {'other': 'p'}
-    assert _submitted_fields(empty) == {}
+    assert submitted_fields(search) == {'q': 'y', 'lang': 'en', 'go': ''}
+    assert submitted_fields(login) == {'other': 'p'}
+    assert submitted_fields(empty) == {}
 
 
 async def test_option_text_keeps_nbsp(extract_form_requests: ExtractFormRequests) -> None:
@@ -382,22 +382,38 @@ async def test_option_text_keeps_nbsp(extract_form_requests: ExtractFormRequests
 
     [request] = await extract_form_requests(html, content_type='text/html; charset=utf-8')
 
-    assert _submitted_fields(request) == {'s': '\xa0a\xa0 b'}
+    assert submitted_fields(request) == {'s': '\xa0a\xa0 b'}
 
 
 async def test_input_value_sanitization(extract_form_requests: ExtractFormRequests) -> None:
-    """Text-like inputs drop line breaks, email and URL inputs also surrounding whitespace, hidden inputs neither."""
+    """Input values are sanitized per type, like line breaks dropped from text and an invalid color reset to black."""
     html = """
     <form>
         <input name="text" value="a\nb">
         <input type="email" name="email" value=" x@y.z ">
         <input type="hidden" name="hidden" value="c\nd">
+        <input type="color" name="color" value="#AABBCC">
+        <input type="color" name="no-color">
+        <input type="number" name="number" value="-1.5e3">
+        <input type="number" name="bad-number" value="abc">
+        <input type="number" name="number-line-break" value="1&#10;">
+        <input type="number" name="non-ascii-number" value="\u0661">
     </form>
     """
 
     [request] = await extract_form_requests(html)
 
-    assert _submitted_fields(request) == {'text': 'ab', 'email': 'x@y.z', 'hidden': 'c\r\nd'}
+    assert submitted_fields(request) == {
+        'text': 'ab',
+        'email': 'x@y.z',
+        'hidden': 'c\r\nd',
+        'color': '#aabbcc',
+        'no-color': '#000000',
+        'number': '-1.5e3',
+        'bad-number': '',
+        'number-line-break': '',
+        'non-ascii-number': '',
+    }
 
 
 async def test_disabled_fieldset(extract_form_requests: ExtractFormRequests) -> None:
@@ -413,7 +429,20 @@ async def test_disabled_fieldset(extract_form_requests: ExtractFormRequests) -> 
 
     [request] = await extract_form_requests(html)
 
-    assert _submitted_fields(request) == {'first-legend': '', 'c': ''}
+    assert submitted_fields(request) == {'first-legend': '', 'c': ''}
+
+
+async def test_template_contents_ignored(extract_form_requests: ExtractFormRequests) -> None:
+    """Fields and forms inside a `<template>` are neither submitted nor picked."""
+    html = """
+    <template><form action="/template"><input name="q"></form></template>
+    <form action="/page"><input name="a" value="1"><template><input name="b" value="2"></template></form>
+    """
+
+    [request] = await extract_form_requests(html, fields={'q': 'x'})
+
+    assert request.url.startswith('https://example.com/page?')
+    assert submitted_fields(request) == {'a': '1', 'q': 'x'}
 
 
 async def test_fields_argument(extract_form_requests: ExtractFormRequests) -> None:
@@ -422,7 +451,7 @@ async def test_fields_argument(extract_form_requests: ExtractFormRequests) -> No
 
     [request] = await extract_form_requests(html, fields={'replace': 'new', 'drop': None, 'tags': ['a', 'b']})
 
-    assert _submitted_fields(request) == {'keep': 'k', 'replace': 'new', 'tags': ['a', 'b']}
+    assert submitted_fields(request) == {'keep': 'k', 'replace': 'new', 'tags': ['a', 'b']}
 
 
 @pytest.mark.parametrize(
@@ -442,6 +471,12 @@ async def test_fields_argument(extract_form_requests: ExtractFormRequests) -> No
             'q=x',
             id='first-id-not-a-form',
         ),
+        pytest.param(
+            '<template><div id="f"></div></template><form id="f"><input name="q" value="x"></form>'
+            '<input name="z" value="1" form="f">',
+            'q=x&z=1',
+            id='id-in-template-ignored',
+        ),
         pytest.param('<FORM><INPUT TYPE="IMAGE" NAME="q"></FORM>', 'q.x=0&q.y=0', id='uppercase-tags'),
         pytest.param(
             '<form id=""><input name="q" value="x"></form><input name="z" value="1" form="">',
@@ -451,6 +486,13 @@ async def test_fields_argument(extract_form_requests: ExtractFormRequests) -> No
         pytest.param('<form><input name="q" value="x"><button>Go</button></form>', 'q=x', id='unnamed-button'),
         pytest.param('<form><input type="image" name="map" src="go.png"></form>', 'map.x=0&map.y=0', id='image-button'),
         pytest.param('<form><input type="image" src="go.png"></form>', 'x=0&y=0', id='unnamed-image-button'),
+        pytest.param('<form><button type="foo" name="b" value="1"></button></form>', 'b=1', id='unknown-button-type'),
+        pytest.param('<form><button type="image" name="b" value="1"></button></form>', 'b=1', id='image-type-button'),
+        pytest.param(
+            '<form><select name="s" size="٢"><option value="a">A</option></select></form>',
+            's=a',
+            id='non-ascii-select-size',
+        ),
     ],
 )
 async def test_browser_rules(extract_form_requests: ExtractFormRequests, html: str, expected_query: str) -> None:
@@ -467,6 +509,7 @@ async def test_browser_rules(extract_form_requests: ExtractFormRequests, html: s
         pytest.param('<form></form>', 'https://example.com/page/index.html', id='no-action'),
         pytest.param('<form action="../up"></form>', 'https://example.com/up', id='relative'),
         pytest.param('<form action=" /go "></form>', 'https://example.com/go', id='whitespace-around-action'),
+        pytest.param('<form action="&nbsp;/go"></form>', 'https://example.com/page/%C2%A0/go', id='nbsp-in-action'),
         pytest.param(
             '<head><base href=" https://other.com/dir/ "></head><form action=" "></form>',
             'https://other.com/dir/',
@@ -497,6 +540,11 @@ async def test_browser_rules(extract_form_requests: ExtractFormRequests, html: s
             'https://example.com/page/go',
             id='base-without-href',
         ),
+        pytest.param(
+            '<head><template><base href="https://other.com/dir/"></template></head><form action="go"></form>',
+            'https://example.com/page/go',
+            id='base-href-in-template-ignored',
+        ),
     ],
 )
 async def test_action_resolution(extract_form_requests: ExtractFormRequests, html: str, expected_url: str) -> None:
@@ -523,7 +571,7 @@ async def test_unsubmittable_forms_skipped(extract_form_requests: ExtractFormReq
         '<form action="http:x"></form><form method="dialog"><button>Close</button></form><form action="/ok"></form>'
     )
 
-    assert _paths(await extract_form_requests(html, all_forms=True)) == ['/ok']
+    assert request_paths(await extract_form_requests(html, all_forms=True)) == ['/ok']
 
 
 async def test_request_options(extract_form_requests: ExtractFormRequests) -> None:
@@ -661,7 +709,7 @@ async def test_click_button_overrides(extract_form_requests: ExtractFormRequests
 
     assert request.method == 'POST'
     assert request.url == 'https://example.com/delete'
-    assert _submitted_fields(request) == {'q': 'x', 'action': 'delete'}
+    assert submitted_fields(request) == {'q': 'x', 'action': 'delete'}
 
 
 async def test_empty_button_overrides(extract_form_requests: ExtractFormRequests) -> None:
@@ -688,8 +736,8 @@ async def test_click_disabled_button(extract_form_requests: ExtractFormRequests)
     [enabled] = await extract_form_requests(html, click={'name': 'go'})
     [disabled] = await extract_form_requests(html, click={'value': 'back'})
 
-    assert _submitted_fields(enabled) == {'go': 'next'}
-    assert _submitted_fields(disabled) == {'go': 'back'}
+    assert submitted_fields(enabled) == {'go': 'next'}
+    assert submitted_fields(disabled) == {'go': 'back'}
 
 
 @pytest.mark.parametrize(
@@ -711,14 +759,14 @@ async def test_click_picks_form(
     <form action="/login"><input name="user" value="me"><button name="log-in">Log in</button></form>
     """
 
-    assert _paths(await extract_form_requests(html, click=click)) == expected_paths
+    assert request_paths(await extract_form_requests(html, click=click)) == expected_paths
 
 
 async def test_selector(extract_form_requests: ExtractFormRequests) -> None:
     """`selector` narrows the forms, skipping other elements it matches."""
     html = '<form id="a" action="/a"></form><div id="b"></div><form id="c" action="/c"></form>'
 
-    assert _paths(await extract_form_requests(html, selector='#c, #b')) == ['/c']
+    assert request_paths(await extract_form_requests(html, selector='#c, #b')) == ['/c']
 
 
 @pytest.mark.parametrize(
@@ -778,7 +826,7 @@ async def test_form_choice(
     extract_form_requests: ExtractFormRequests, html: str, fields: dict[str, str], expected_paths: list[str]
 ) -> None:
     """The first submittable form among those sharing the most field names with `fields` is submitted."""
-    assert _paths(await extract_form_requests(html, fields=fields)) == expected_paths
+    assert request_paths(await extract_form_requests(html, fields=fields)) == expected_paths
 
 
 @pytest.mark.parametrize(
@@ -797,7 +845,7 @@ async def test_xml_declaration_page(extract_form_requests: ExtractFormRequests) 
     """An HTML page starting with an XML declaration is read as HTML."""
     html = '<?xml version="1.0" encoding="UTF-8"?><html><body><form action="/ok"></form></body></html>'
 
-    assert _paths(await extract_form_requests(html, content_type='text/html')) == ['/ok']
+    assert request_paths(await extract_form_requests(html, content_type='text/html')) == ['/ok']
 
 
 async def test_form_after_html_end(extract_form_requests: ExtractFormRequests) -> None:
@@ -805,9 +853,9 @@ async def test_form_after_html_end(extract_form_requests: ExtractFormRequests) -
     html = '<html><body><form id="ok" action="/ok"></form></body></html><form action="/after"></form>'
 
     # Newer libxml2 puts content after `</html>` into a second root, which isn't searched, older versions keep it.
-    assert _paths(await extract_form_requests(html, all_forms=True)) in (['/ok'], ['/ok', '/after'])
-    assert _paths(await extract_form_requests(html, selector='#ok')) == ['/ok']
-    assert _paths(await extract_form_requests(html, selector='[action="/after"]')) in ([], ['/after'])
+    assert request_paths(await extract_form_requests(html, all_forms=True)) in (['/ok'], ['/ok', '/after'])
+    assert request_paths(await extract_form_requests(html, selector='#ok')) == ['/ok']
+    assert request_paths(await extract_form_requests(html, selector='[action="/after"]')) in ([], ['/after'])
 
 
 @pytest.mark.parametrize('parser', [pytest.param('lxml', id='lxml'), pytest.param('html5lib', id='html5lib')])
@@ -817,9 +865,9 @@ async def test_beautifulsoup_form_inside_select(parser: BeautifulSoupParserType)
 
     # With a declared encoding, a soup built by lxml is reused.
     content_type = 'text/html; charset=utf-8'
-    requests = await _extract_with_beautifulsoup(html, content_type=content_type, parser=parser, selector='#y')
+    requests = await extract_with_beautifulsoup(html, content_type=content_type, parser=parser, selector='#y')
 
-    assert _paths(requests) == ['/y']
+    assert request_paths(requests) == ['/y']
 
 
 async def test_deeply_nested_form(extract_form_requests: ExtractFormRequests) -> None:
@@ -828,7 +876,7 @@ async def test_deeply_nested_form(extract_form_requests: ExtractFormRequests) ->
 
     [request] = await extract_form_requests(html)
 
-    assert _submitted_fields(request) == {'q': 'x'}
+    assert submitted_fields(request) == {'q': 'x'}
 
 
 @pytest.mark.parametrize(
@@ -879,9 +927,7 @@ async def test_beautifulsoup_undeclared_encoding(html: str, value: str, encoding
     """A page declaring no encoding in the prescan submits in the one browsers would pick."""
     page = f'{html}<form><input name="q"></form>'
 
-    [request] = await _extract_with_beautifulsoup(
-        page, content_type='text/html', encoding=encoding, fields={'q': value}
-    )
+    [request] = await extract_with_beautifulsoup(page, content_type='text/html', encoding=encoding, fields={'q': value})
 
     assert urlsplit(request.url).query == urlencode({'q': value}, encoding=encoding, errors='xmlcharrefreplace')
 
@@ -892,7 +938,7 @@ async def test_beautifulsoup_guess_fallback() -> None:
     target = 'crawlee.crawlers._beautifulsoup._beautifulsoup_crawling_context.EncodingDetector'
 
     with patch(target, return_value=detector):
-        [request] = await _extract_with_beautifulsoup(
+        [request] = await extract_with_beautifulsoup(
             f'<form><input name="q" value="{_CZECH}"></form>', content_type='text/html'
         )
 
@@ -904,14 +950,14 @@ async def test_beautifulsoup_undeclared_selector() -> None:
     # `BeautifulSoup` reads the page as UTF-7, which browsers don't know, and finds a form with the `first` ID.
     html = '<meta charset="utf-7">+ADw-form id=first+AD4-+ADw-/form+AD4-<form action="/login"></form>'
 
-    assert await _extract_with_beautifulsoup(html, content_type='text/html', selector='#first') == []
+    assert await extract_with_beautifulsoup(html, content_type='text/html', selector='#first') == []
 
 
 async def test_parsel_undeclared_encoding() -> None:
     """A page declaring no encoding submits in UTF-8 with Parsel."""
     html = '<form><input name="q"></form>'
 
-    [request] = await _extract_with_parsel(html, content_type='text/html', fields={'q': _CZECH})
+    [request] = await extract_with_parsel(html, content_type='text/html', fields={'q': _CZECH})
 
     assert urlsplit(request.url).query == urlencode({'q': _CZECH})
 
@@ -920,4 +966,4 @@ async def test_parsel_json_response() -> None:
     """A JSON response yields no requests with Parsel."""
     body = '{"html": "<form action=\\"/a\\"></form>"}'
 
-    assert await _extract_with_parsel(body, content_type='application/json') == []
+    assert await extract_with_parsel(body, content_type='application/json') == []
