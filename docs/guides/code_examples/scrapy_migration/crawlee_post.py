@@ -1,7 +1,5 @@
 import asyncio
-from urllib.parse import urlencode
 
-from crawlee import Request
 from crawlee.crawlers import ParselCrawler, ParselCrawlingContext
 
 
@@ -14,34 +12,16 @@ async def main() -> None:
         if not context.session:
             raise RuntimeError('Session not found')
 
-        token = context.selector.css('input[name="csrf_token"]::attr(value)').get()
-
-        # The CSRF token is required for the POST to succeed. If it's missing,
-        # the login will fail.
-        if not token:
-            raise RuntimeError('CSRF token not found')
-
-        form = {'csrf_token': token, 'username': 'user', 'password': 'pass'}
-
         # highlight-start
-        # Crawlee's `payload` is the raw request body, so encode the fields yourself
-        # and set the `Content-Type`. Scrapy's `FormRequest` does both for you.
-        await context.add_requests(
-            [
-                Request.from_url(
-                    'https://quotes.toscrape.com/login',
-                    method='POST',
-                    payload=urlencode(form),
-                    headers={'content-type': 'application/x-www-form-urlencoded'},
-                    label='after-login',
-                    # Bind the POST to the same session so its CSRF cookie matches.
-                    session_id=context.session.id,
-                    # The POST shares the GET's URL. Include the method and payload
-                    # in the unique key, or the queue drops it as a duplicate.
-                    use_extended_unique_key=True,
-                )
-            ]
+        # Like Scrapy's `FormRequest.from_response`, the helper keeps the hidden
+        # `csrf_token` field, encodes the data and sets the `Content-Type` header.
+        requests = await context.extract_form_requests(
+            fields={'username': 'user', 'password': 'pass'},
+            label='after-login',
+            # Bind the POST to the same session so its CSRF cookie matches.
+            session_id=context.session.id,
         )
+        await context.add_requests(requests)
         # highlight-end
 
     @crawler.router.handler('after-login')

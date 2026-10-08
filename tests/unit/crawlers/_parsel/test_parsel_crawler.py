@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import codecs
+import json
 import sys
 from typing import TYPE_CHECKING, Any
 from unittest import mock
@@ -400,6 +401,28 @@ async def test_extract_links_base_href(server_url: URL, http_client: HttpClient,
     await crawler.run([str((server_url / 'echo_content').with_query(content=page))])
 
     handler.assert_awaited_once_with([str(server_url.with_path(expected_path))])
+
+
+async def test_extract_form_requests(server_url: URL, http_client: HttpClient) -> None:
+    """A form request built in the handler submits the form fields with the `Referer` of the page."""
+    crawler = ParselCrawler(http_client=http_client)
+    responses: list[dict[str, Any]] = []
+    page = '<form method="post" action="/post"><input type="hidden" name="token" value="t"><input name="q"></form>'
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        requests = await context.extract_form_requests(fields={'q': 'x'}, label='result')
+        await context.add_requests(requests)
+
+    @crawler.router.handler('result')
+    async def result_handler(context: ParselCrawlingContext) -> None:
+        responses.append(json.loads(await context.http_response.read()))
+
+    await crawler.run([str((server_url / 'echo_content').with_query(content=page))])
+
+    [response] = responses
+    assert response['form'] == {'token': 't', 'q': 'x'}
+    assert response['headers']['referer'].startswith(str(server_url / 'echo_content'))
 
 
 async def test_extract_non_href_links(server_url: URL, http_client: HttpClient) -> None:
