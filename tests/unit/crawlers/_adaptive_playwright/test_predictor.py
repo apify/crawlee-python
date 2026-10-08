@@ -208,6 +208,7 @@ async def test_persistent_prediction_recovery(*, persistence_enabled: bool, same
         ('https://differente.com/same', 'https://differenta.com/same', 0),
         ('https://same.com/almost_the_same', 'https://same.com/almost_the_sama', 1),
         ('https://same.com/same/extra', 'https://same.com/same', 0.5),
+        pytest.param('https://same.com/item/12345', 'https://same.com/item/12399', 1, id='shared numeric prefix'),
     ],
 )
 def test_url_similarity(url_1: str, url_2: str, expected_rounded_similarity: float) -> None:

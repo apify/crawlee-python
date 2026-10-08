@@ -259,7 +259,7 @@ def calculate_url_similarity(url_1: UrlComponents, url_2: UrlComponents) -> floa
     """Calculate url similarity based on host name and path components similarity.
 
     Return 0 if different host names.
-    Compare path components using jaro-wrinkler method and assign 1 or 0 value based on similarity_cutoff for each
+    Compare path components using Jaro-Winkler method and assign 1 or 0 value based on similarity_cutoff for each
     path component. Return their weighted average.
     """
     # Anything with Jaro-Winkler similarity less than this value is considered completely different,
