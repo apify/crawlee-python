@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.10.5 - **not yet released**
+
+### 🚀 Features
+
+- **storages:** Add direct async iteration on Dataset and KeyValueStore ([#2267](https://github.com/apify/crawlee-python/pull/2267)) ([e02e71d](https://github.com/apify/crawlee-python/commit/e02e71dc549abb0038ce884038304716e260d24b)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1745](https://github.com/apify/crawlee-python/issues/1745)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.10.4](https://github.com/apify/crawlee-python/releases/tag/v1.10.4) (2026-10-06)
 
 ### 🐛 Bug Fixes
