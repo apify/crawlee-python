@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - **storages:** Add direct async iteration on Dataset and KeyValueStore ([#2267](https://github.com/apify/crawlee-python/pull/2267)) ([e02e71d](https://github.com/apify/crawlee-python/commit/e02e71dc549abb0038ce884038304716e260d24b)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1745](https://github.com/apify/crawlee-python/issues/1745)
+- **crawlers:** Add `extract_form_requests` helper for HTTP crawlers with HTML parsers ([#2257](https://github.com/apify/crawlee-python/pull/2257)) ([62386fd](https://github.com/apify/crawlee-python/commit/62386fddde42f98cdc2df7aca961ef0e9c1c77ab)) by [@Mantisus](https://github.com/Mantisus)
 
 
 <!-- git-cliff-unreleased-end -->
