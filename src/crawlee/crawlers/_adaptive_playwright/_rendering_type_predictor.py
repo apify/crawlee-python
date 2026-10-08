@@ -9,8 +9,8 @@ from statistics import mean
 from typing import TYPE_CHECKING, Annotated, Literal
 from urllib.parse import urlparse
 
-from jaro import jaro_winkler_metric
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
+from rapidfuzz.distance import JaroWinkler
 from sklearn.linear_model import LogisticRegression
 from typing_extensions import override
 
@@ -259,10 +259,10 @@ def calculate_url_similarity(url_1: UrlComponents, url_2: UrlComponents) -> floa
     """Calculate url similarity based on host name and path components similarity.
 
     Return 0 if different host names.
-    Compare path components using jaro-wrinkler method and assign 1 or 0 value based on similarity_cutoff for each
+    Compare path components using Jaro-Winkler method and assign 1 or 0 value based on similarity_cutoff for each
     path component. Return their weighted average.
     """
-    # Anything with jaro_winkler_metric less than this value is considered completely different,
+    # Anything with Jaro-Winkler similarity less than this value is considered completely different,
     # otherwise considered the same.
     similarity_cutoff = 0.8
 
@@ -273,6 +273,6 @@ def calculate_url_similarity(url_1: UrlComponents, url_2: UrlComponents) -> floa
 
     # Each additional path component from longer path is compared to empty string.
     return mean(
-        1 if jaro_winkler_metric(path_1, path_2) > similarity_cutoff else 0
+        1 if JaroWinkler.similarity(path_1, path_2) > similarity_cutoff else 0
         for path_1, path_2 in zip_longest(url_1[1:], url_2[1:], fillvalue='')
     )
