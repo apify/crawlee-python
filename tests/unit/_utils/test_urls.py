@@ -99,3 +99,23 @@ def test_filter_url(strategy: EnqueueStrategy, origin: str, target: str, *, expe
     ok, reason = filter_url(target=target, strategy=strategy, origin=origin)
     assert ok is expected
     assert (reason is None) is expected
+
+
+@pytest.mark.parametrize(
+    ('origin', 'target', 'expected'),
+    [
+        pytest.param('https://www.example.co.uk/', 'https://shop.example.co.uk/', True, id='multi_label_suffix'),
+        pytest.param('https://example.co.uk/', 'https://other.co.uk/', False, id='sibling_under_suffix'),
+        pytest.param('http://127.0.0.1:8000/', 'http://127.0.0.1:8000/page', True, id='ip_same_origin'),
+        pytest.param('http://127.0.0.1:8000/', 'https://127.0.0.1:8000/', True, id='ip_other_scheme'),
+        pytest.param('http://127.0.0.1:8000/', 'http://127.0.0.1:9000/', False, id='ip_other_port'),
+        pytest.param('http://127.0.0.1:8000/', 'http://10.0.0.1:8000/', False, id='ip_other_host'),
+        pytest.param('http://localhost:3000/', 'http://localhost:3000/page', True, id='localhost_same_origin'),
+        pytest.param('http://localhost:3000/', 'http://example.com/', False, id='localhost_other_host'),
+        pytest.param('http://a.example.local/', 'http://b.other.local/', False, id='unknown_tld_other_domain'),
+    ],
+)
+def test_filter_url_same_domain(origin: str, target: str, *, expected: bool) -> None:
+    """`same-domain` compares registrable domains, or host and port for hosts without one."""
+    ok, _ = filter_url(target=target, strategy='same-domain', origin=origin)
+    assert ok is expected
