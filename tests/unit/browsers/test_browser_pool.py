@@ -169,8 +169,8 @@ async def test_reaper_does_not_close_browser_with_page_opening_in_flight(monkeyp
 
     async def create_context_with_gated_first_page(
         self: PlaywrightBrowserController, *args: Any, **kwargs: Any
-    ) -> BrowserContext:
-        context = await original_create_context(self, *args, **kwargs)
+    ) -> tuple[BrowserContext, dict[str, str]]:
+        context, generated_headers = await original_create_context(self, *args, **kwargs)
         original_new_page = context.new_page
 
         async def gated_new_page(*new_page_args: Any, **new_page_kwargs: Any) -> Page:
@@ -179,7 +179,7 @@ async def test_reaper_does_not_close_browser_with_page_opening_in_flight(monkeyp
             return await original_new_page(*new_page_args, **new_page_kwargs)
 
         monkeypatch.setattr(context, 'new_page', gated_new_page)
-        return context
+        return context, generated_headers
 
     monkeypatch.setattr(PlaywrightBrowserController, '_create_browser_context', create_context_with_gated_first_page)
 

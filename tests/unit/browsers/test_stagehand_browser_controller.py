@@ -86,7 +86,7 @@ async def test_initial_state(playwright: Playwright, session_mock: MagicMock) ->
 
 
 async def test_open_and_close_page(controller: StagehandBrowserController) -> None:
-    page = await controller.new_page()
+    page, _ = await controller.new_page()
 
     assert isinstance(page, StagehandPage)
     assert page in controller.pages
@@ -100,10 +100,10 @@ async def test_open_and_close_page(controller: StagehandBrowserController) -> No
 
 
 async def test_max_open_pages_limit(controller: StagehandBrowserController) -> None:
-    page1 = await controller.new_page()
+    page1, _ = await controller.new_page()
     assert controller.pages_count == 1
 
-    page2 = await controller.new_page()
+    page2, _ = await controller.new_page()
     assert controller.pages_count == 2
 
     with pytest.raises(ValueError, match=r'Cannot open more pages in this browser.'):
@@ -114,7 +114,7 @@ async def test_max_open_pages_limit(controller: StagehandBrowserController) -> N
     await page1.close()
     assert controller.pages_count == 1
 
-    page3 = await controller.new_page()
+    page3, _ = await controller.new_page()
     assert controller.pages_count == 2
 
     await page2.close()
@@ -164,8 +164,8 @@ async def test_second_page_reuses_session(
     controller: StagehandBrowserController,
     stagehand_client_mock: MagicMock,
 ) -> None:
-    page1 = await controller.new_page()
-    page2 = await controller.new_page()
+    page1, _ = await controller.new_page()
+    page2, _ = await controller.new_page()
 
     assert stagehand_client_mock.sessions.start.await_count == 1
     assert page1.context == page2.context
@@ -204,7 +204,7 @@ async def test_concurrent_session_init(
         # Only one session should be started despite concurrent calls to `new_page()`.
         assert call_count == 1
 
-        for page in pages:
+        for page, _ in pages:
             await page.close()
         await controller.close(force=True)
 
@@ -230,7 +230,7 @@ async def test_session_start_params_local(
     )
 
     with patch.object(playwright.chromium, 'connect_over_cdp', AsyncMock(return_value=browser)):
-        page = await controller.new_page()
+        page, _ = await controller.new_page()
         await page.close()
         await controller.close()
 
@@ -256,7 +256,7 @@ async def test_session_start_params_browserbase(
     )
 
     with patch.object(playwright.chromium, 'connect_over_cdp', AsyncMock(return_value=browser)):
-        page = await controller.new_page()
+        page, _ = await controller.new_page()
         await page.close()
         await controller.close()
 
@@ -346,7 +346,7 @@ async def test_proxy_set_browserbase(
     reason='Test is flaky on Windows when Playwright hits net::ERR_NO_BUFFER_SPACE under xdist load.',
 )
 async def test_fingerprint_headers_set_on_new_page(controller: StagehandBrowserController, server_url: URL) -> None:
-    page = await controller.new_page()
+    page, _ = await controller.new_page()
 
     response = await page.goto(str(server_url / 'headers'))
 

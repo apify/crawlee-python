@@ -16,3 +16,5 @@ class CrawleePage:
     id: str
     browser_type: BrowserType
     page: Page
+    generated_headers: dict[str, str] | None = None
+    """HTTP headers generated for the page's browser context by a fingerprint or header generator, if any."""
