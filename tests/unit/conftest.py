@@ -5,7 +5,7 @@ import os
 import socket
 import warnings
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 from curl_cffi import CurlHttpVersion
@@ -100,8 +100,9 @@ def _isolate_test_environment(prepare_test_env: Callable[[], None]) -> None:
 @pytest.fixture(scope='session', autouse=True)
 def _offline_public_suffix_list() -> Iterator[None]:
     """Serve the bundled Public Suffix List snapshot instead of downloading it."""
-    with patch('crawlee._utils.public_suffix.impit') as impit:
-        impit.get.return_value = Mock(status_code=200, content=PUBLIC_SUFFIX_LIST_SNAPSHOT.read_bytes())
+    response = Mock(status_code=200, content=PUBLIC_SUFFIX_LIST_SNAPSHOT.read_bytes())
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr('crawlee._utils.public_suffix.impit', Mock(get=Mock(return_value=response)))
         yield
 
 

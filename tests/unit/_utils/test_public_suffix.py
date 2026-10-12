@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 import logging
-from contextlib import contextmanager
-from typing import TYPE_CHECKING
-from unittest.mock import ANY, Mock, patch
+from typing import Any
+from unittest.mock import ANY, Mock
 
 import impit
 import pytest
 
 from crawlee._utils.public_suffix import PUBLIC_SUFFIX_LIST_URL, PublicSuffixList
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
 
 # A downloaded list that differs from the snapshot: `fresh.com` is a public suffix only here, and `private.com` is
 # listed in the private section.
@@ -28,14 +24,16 @@ DOWNLOADED_LIST = (
 )
 
 
-@contextmanager
-def _mock_download(
-    *, status_code: int = 200, body: str = DOWNLOADED_LIST, error: Exception | None = None
-) -> Iterator[Mock]:
-    with patch('crawlee._utils.public_suffix.impit') as impit_mock:
-        impit_mock.get.return_value = Mock(status_code=status_code, content=body.encode())
-        impit_mock.get.side_effect = error
-        yield impit_mock.get
+def mock_download(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    status_code: int = 200,
+    body: str = DOWNLOADED_LIST,
+    error: Exception | None = None,
+) -> Mock:
+    get = Mock(return_value=Mock(status_code=status_code, content=body.encode()), side_effect=error)
+    monkeypatch.setattr('crawlee._utils.public_suffix.impit', Mock(get=get))
+    return get
 
 
 @pytest.mark.parametrize(
@@ -60,26 +58,24 @@ def test_registrable_domain(host: str, expected: str | None) -> None:
     assert PublicSuffixList().get_registrable_domain(host) == expected
 
 
-def test_lookup_downloads_list() -> None:
+def test_lookup_downloads_list(monkeypatch: pytest.MonkeyPatch) -> None:
     """The first lookup downloads the current list."""
-    with _mock_download() as get:
-        assert PublicSuffixList().get_registrable_domain('a.b.fresh.com') == 'b.fresh.com'
-
+    get = mock_download(monkeypatch)
+    assert PublicSuffixList().get_registrable_domain('a.b.fresh.com') == 'b.fresh.com'
     get.assert_called_once_with(PUBLIC_SUFFIX_LIST_URL, timeout=ANY, follow_redirects=True)
 
 
-def test_ip_skips_download() -> None:
+def test_ip_skips_download(monkeypatch: pytest.MonkeyPatch) -> None:
     """IP addresses are resolved without loading the list."""
-    with _mock_download() as get:
-        assert PublicSuffixList().get_registrable_domain('127.0.0.1') is None
-
+    get = mock_download(monkeypatch)
+    assert PublicSuffixList().get_registrable_domain('127.0.0.1') is None
     get.assert_not_called()
 
 
-def test_private_section_ignored() -> None:
+def test_private_section_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
     """Rules outside the ICANN section of the downloaded list are ignored."""
-    with _mock_download():
-        assert PublicSuffixList().get_registrable_domain('a.b.private.com') == 'private.com'
+    mock_download(monkeypatch)
+    assert PublicSuffixList().get_registrable_domain('a.b.private.com') == 'private.com'
 
 
 @pytest.mark.parametrize(
@@ -90,9 +86,12 @@ def test_private_section_ignored() -> None:
         pytest.param({'body': '<html>Captive portal</html>'}, id='no_icann_section'),
     ],
 )
-def test_lookup_falls_back_to_snapshot(download: dict, caplog: pytest.LogCaptureFixture) -> None:
+def test_lookup_falls_back_to_snapshot(
+    download: dict[str, Any], monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     """A failed download leaves the snapshot in use and logs a warning."""
-    with _mock_download(**download), caplog.at_level(logging.WARNING):
+    mock_download(monkeypatch, **download)
+    with caplog.at_level(logging.WARNING):
         assert PublicSuffixList().get_registrable_domain('a.b.fresh.com') == 'fresh.com'
 
     assert 'using the bundled snapshot' in caplog.text
@@ -105,12 +104,11 @@ def test_lookup_falls_back_to_snapshot(download: dict, caplog: pytest.LogCapture
         pytest.param({'status_code': 503}, id='failure'),
     ],
 )
-def test_list_downloaded_once(download: dict) -> None:
+def test_list_downloaded_once(download: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
     """Later lookups reuse the loaded list, even after a failed download."""
+    get = mock_download(monkeypatch, **download)
     public_suffix_list = PublicSuffixList()
-
-    with _mock_download(**download) as get:
-        public_suffix_list.get_registrable_domain('www.example.com')
-        public_suffix_list.get_registrable_domain('www.example.org')
+    public_suffix_list.get_registrable_domain('www.example.com')
+    public_suffix_list.get_registrable_domain('www.example.org')
 
     get.assert_called_once()
