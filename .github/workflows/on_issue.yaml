@@ -1,8 +1,12 @@
-name: CI (issue)
+name: CI (issue or PR)
 
 on:
   # Runs when a new issue is opened.
   issues:
+    types:
+      - opened
+  # Runs when a new PR is opened. pull_request_target so the token has write access for PRs from forks; no code is checked out here.
+  pull_request_target:
     types:
       - opened
 
@@ -15,9 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
+      pull-requests: write
 
     steps:
-      # Add the "t-tooling" label to all new issues
+      # Add the "t-tooling" label to all new issues and PRs
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
