@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import TypedDict
 
@@ -16,7 +16,7 @@ class State(TypedDict):
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[State]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[State]:
     # Start up code that runs once when the app starts
 
     # Results will be stored in this dictionary

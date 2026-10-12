@@ -31,7 +31,7 @@ from tests.unit.utils import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Callable
+    from collections.abc import AsyncGenerator, AsyncIterator, Callable
 
 
 def _make_mock_client(url_map: dict[str, tuple[int, bytes]]) -> AsyncMock:
@@ -56,7 +56,7 @@ def _make_flaky_stream_client(body: bytes, *, fail_times: int) -> tuple[AsyncMoc
     attempts: list[int] = []
 
     @asynccontextmanager
-    async def stream(_url: str, **_kwargs: Any) -> 'AsyncIterator[HttpResponse]':
+    async def stream(_url: str, **_kwargs: Any) -> 'AsyncGenerator[HttpResponse]':
         attempt = len(attempts) + 1
         attempts.append(attempt)
         if attempt <= fail_times:
@@ -81,7 +81,7 @@ def _make_stream_client(body_for_url: 'Callable[[str], bytes]') -> tuple[AsyncMo
     fetched: list[str] = []
 
     @asynccontextmanager
-    async def stream(url: str, **_kwargs: Any) -> 'AsyncIterator[HttpResponse]':
+    async def stream(url: str, **_kwargs: Any) -> 'AsyncGenerator[HttpResponse]':
         fetched.append(url)
 
         async def read_stream() -> 'AsyncIterator[bytes]':
@@ -599,7 +599,7 @@ async def test_gzip_sitemap_stops_reading_after_member_end() -> None:
     chunks_read = 0
 
     @asynccontextmanager
-    async def stream(_url: str, **_kwargs: Any) -> 'AsyncIterator[HttpResponse]':
+    async def stream(_url: str, **_kwargs: Any) -> 'AsyncGenerator[HttpResponse]':
         async def read_stream() -> 'AsyncIterator[bytes]':
             nonlocal chunks_read
             chunks_read += 1
@@ -631,7 +631,7 @@ async def test_gzip_text_sitemap_parsed_by_extension_when_served_as_gzip() -> No
     body = compress_gzip('\n'.join(urls))
 
     @asynccontextmanager
-    async def stream(_url: str, **_kwargs: Any) -> 'AsyncIterator[HttpResponse]':
+    async def stream(_url: str, **_kwargs: Any) -> 'AsyncGenerator[HttpResponse]':
         async def read_stream() -> 'AsyncIterator[bytes]':
             yield body
 

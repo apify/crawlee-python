@@ -11,7 +11,7 @@ from crawlee._utils.crypto import crypto_random_object_id
 from ._utils import await_redis_response, read_lua_script
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncGenerator
 
     from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
@@ -175,7 +175,7 @@ class RedisClientMixin:
             self._scripts_loaded = True
 
     @asynccontextmanager
-    async def _get_pipeline(self, *, with_execute: bool = True) -> AsyncIterator[Pipeline]:
+    async def _get_pipeline(self, *, with_execute: bool = True) -> AsyncGenerator[Pipeline]:
         """Create a new Redis pipeline."""
         async with self._redis.pipeline() as pipe:
             try:

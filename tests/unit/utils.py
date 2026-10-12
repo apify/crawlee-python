@@ -16,7 +16,7 @@ from crawlee.request_loaders import ThrottlingRequestManager, _throttling_reques
 from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Awaitable, Callable
+    from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 
     from yarl import URL
 
@@ -40,7 +40,7 @@ def make_status_stream_client(
     indexes: dict[str, int] = {}
 
     @asynccontextmanager
-    async def stream(url: str, **_kwargs: Any) -> AsyncIterator[HttpResponse]:
+    async def stream(url: str, **_kwargs: Any) -> AsyncGenerator[HttpResponse]:
         sequence = responses[url]
         index = indexes.get(url, 0)
         indexes[url] = index + 1

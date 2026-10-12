@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from logging import getLogger
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from pydantic_ai import Agent
 from pydantic_ai.usage import RunUsage
@@ -116,15 +116,11 @@ class PydanticAiDirectExtractor(BasePydanticAiHtmlExtractor):
     ) -> TSchema:
         distilled_html = await asyncio.to_thread(self._distiller.distill, html)
 
-        # `cast` restores the static type pinned at runtime by `output_type`.
-        agent: Agent[None, TSchema] = cast(
-            'Agent[None, TSchema]',
-            Agent(
-                self._model,
-                output_type=schema,
-                instructions=self._base_instructions,
-                retries=self._retries,
-            ),
+        agent: Agent[None, TSchema] = Agent(
+            self._model,
+            output_type=schema,
+            instructions=self._base_instructions,
+            retries=self._retries,
         )
 
         # The task framing names the fields explicitly: the output tool schema alone is not enough for smaller

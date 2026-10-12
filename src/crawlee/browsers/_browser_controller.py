@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
     from datetime import datetime, timedelta
 
     from playwright.async_api import Page
@@ -26,7 +26,7 @@ class BrowserController(ABC):
 
     @property
     @abstractmethod
-    def pages(self) -> list[Page]:
+    def pages(self) -> Sequence[Page]:
         """Return the list of opened pages."""
 
     @property

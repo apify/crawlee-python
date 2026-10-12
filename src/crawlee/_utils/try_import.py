@@ -7,7 +7,7 @@ from types import ModuleType
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator
     from typing import Any
 
 
@@ -17,7 +17,7 @@ def try_import(
     *symbol_names: str,
     extra_name: str | list[str] | None = None,
     package_name: str = 'crawlee',
-) -> Iterator[None]:
+) -> Generator[None]:
     """Context manager to attempt importing symbols into a module.
 
     If an `ImportError` is raised during the import, the symbols are replaced with `FailedImport` objects. When the

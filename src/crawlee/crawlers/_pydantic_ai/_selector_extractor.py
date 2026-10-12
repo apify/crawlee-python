@@ -511,14 +511,11 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
         schema: type[TSchema],
         additional_instructions: str | None,
     ) -> SelectorMap:
-        agent: Agent[None, SelectorMap] = cast(
-            'Agent[None, SelectorMap]',
-            Agent(
-                self._model,
-                output_type=SelectorMap,
-                instructions=self._base_instructions,
-                retries=self._retries,
-            ),
+        agent: Agent[None, SelectorMap] = Agent(
+            self._model,
+            output_type=SelectorMap,
+            instructions=self._base_instructions,
+            retries=self._retries,
         )
 
         @agent.output_validator
