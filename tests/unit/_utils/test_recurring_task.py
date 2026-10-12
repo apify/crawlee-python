@@ -42,18 +42,17 @@ async def test_start_and_stop(function: AsyncMock, delay: timedelta) -> None:
     assert rt.task.done()
 
 
-@pytest.mark.run_alone
 async def test_execution(function: AsyncMock, delay: timedelta) -> None:
+    """The recurring task keeps calling its function until stopped."""
+    third_call_done = asyncio.Event()
+    function.side_effect = lambda: third_call_done.set() if function.call_count >= 3 else None
     task = RecurringTask(function, delay)
 
     task.start()
-    await asyncio.sleep(0.2)  # Wait enough for the task to execute a few times
+    await asyncio.wait_for(third_call_done.wait(), timeout=5)
     await task.stop()
 
-    assert isinstance(task.func, AsyncMock)  # To let type checker know that the function is a mock
-    assert task.func.call_count >= 3
-
-    await task.stop()
+    assert function.call_count >= 3
 
 
 async def test_execution_continues_after_exception(delay: timedelta, caplog: pytest.LogCaptureFixture) -> None:
