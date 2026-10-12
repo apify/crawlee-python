@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from async_timeout import Timeout, timeout
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator
     from types import TracebackType
 
 _SECONDS_PER_MINUTE = 60
@@ -23,7 +23,7 @@ class TimerResult:
 
 
 @contextmanager
-def measure_time() -> Iterator[TimerResult]:
+def measure_time() -> Generator[TimerResult]:
     """Measure the execution time (wall-clock and CPU) between the start and end of the with-block."""
     result = TimerResult()
     before_wall = time.monotonic()

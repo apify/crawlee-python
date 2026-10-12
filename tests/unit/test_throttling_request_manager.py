@@ -20,7 +20,7 @@ from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator
 
 THROTTLED_DOMAIN = 'throttled.com'
 SECOND_THROTTLED_DOMAIN = 'slow.com'
@@ -86,7 +86,7 @@ def _make_request(url: str) -> Request:
 
 
 @contextmanager
-def _frozen_clock() -> Iterator[MagicMock]:
+def _frozen_clock() -> Generator[MagicMock]:
     """Freeze the manager's clock at `CLOCK_START`. Move it by reassigning `clock.now.return_value`."""
     with patch(f'{MANAGER_MODULE}.datetime') as clock:
         clock.now.return_value = CLOCK_START

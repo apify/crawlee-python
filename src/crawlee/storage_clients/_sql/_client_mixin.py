@@ -16,7 +16,7 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from crawlee._utils.crypto import crypto_random_object_id
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncGenerator
 
     from sqlalchemy import Insert
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -193,7 +193,7 @@ class SqlClientMixin(ABC):
         return client
 
     @asynccontextmanager
-    async def get_session(self, *, with_simple_commit: bool = False) -> AsyncIterator[AsyncSession]:
+    async def get_session(self, *, with_simple_commit: bool = False) -> AsyncGenerator[AsyncSession]:
         """Create a new SQLAlchemy session for this storage."""
         async with self._storage_client.create_session() as session:
             # For operations where a final commit is mandatory and does not require specific processing conditions

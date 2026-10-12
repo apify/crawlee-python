@@ -23,7 +23,7 @@ from tests.unit.utils import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncGenerator, AsyncIterator
 
     from crawlee._types import JsonSerializable
 
@@ -43,7 +43,7 @@ async def test_nested_sitemap_chain_bounded_by_max_depth() -> None:
     fetched: list[str] = []
 
     @asynccontextmanager
-    async def stream(url: str, **_kwargs: Any) -> 'AsyncIterator[HttpResponse]':
+    async def stream(url: str, **_kwargs: Any) -> 'AsyncGenerator[HttpResponse]':
         fetched.append(url)
         index = int(url.removesuffix('.xml').rsplit('-', 1)[-1])
         # Every sitemap is an index pointing at the next unique URL, so only the depth cap can stop the chain.
