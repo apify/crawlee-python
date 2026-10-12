@@ -109,6 +109,7 @@ def test_filter_url(strategy: EnqueueStrategy, origin: str, target: str, *, expe
         pytest.param('http://127.0.0.1:8000/', 'http://127.0.0.1:8000/page', True, id='ip_same_origin'),
         pytest.param('http://127.0.0.1:8000/', 'https://127.0.0.1:8000/', True, id='ip_other_scheme'),
         pytest.param('http://127.0.0.1:8000/', 'http://127.0.0.1:9000/', False, id='ip_other_port'),
+        pytest.param('http://127.0.0.1/', 'https://127.0.0.1/', False, id='ip_other_default_port'),
         pytest.param('http://127.0.0.1:8000/', 'http://10.0.0.1:8000/', False, id='ip_other_host'),
         pytest.param('http://localhost:3000/', 'http://localhost:3000/page', True, id='localhost_same_origin'),
         pytest.param('http://localhost:3000/', 'http://example.com/', False, id='localhost_other_host'),

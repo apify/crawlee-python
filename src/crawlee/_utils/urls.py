@@ -127,7 +127,7 @@ def _matches_enqueue_strategy(
         origin_domain = _get_registrable_domain(origin_url.host)
         if origin_domain is None:
             # No registrable domain (e.g. an IP address), fall back to comparing host and port.
-            return target_url.host_port_subcomponent == origin_url.host_port_subcomponent
+            return (target_url.host, target_url.port) == (origin_url.host, origin_url.port)
         return origin_domain == _get_registrable_domain(target_url.host)
 
     if strategy == 'same-origin':
