@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import logging
 import os
 import socket
+import sys
+import threading
 import warnings
 from typing import TYPE_CHECKING, Any, cast
 
@@ -23,12 +27,49 @@ from crawlee.storages import KeyValueStore
 from tests.unit.server import TestServer, app, no_robots_app, serve_in_thread
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Callable, Iterator
+    from collections.abc import AsyncGenerator, Callable, Generator, Iterator
     from pathlib import Path
 
     from yarl import URL
 
     from crawlee.http_clients._base import HttpClient
+
+
+if sys.version_info < (3, 11):
+    from backports.asyncio.runner import runner as backports_runner  # ty: ignore[unresolved-import]
+
+    original_copy_context = contextvars.copy_context
+    original_patch_object = backports_runner._patch_object
+    copy_context_override = threading.local()
+
+    def copy_context() -> contextvars.Context:
+        factory = getattr(copy_context_override, 'factory', None)
+        return original_copy_context() if factory is None else factory()
+
+    @contextlib.contextmanager
+    def patch_object(target: Any, attribute: str, new: Any) -> Generator[None]:
+        """Thread-local stand-in for the `_patch_object` helper of `backports.asyncio.runner`.
+
+        On Python 3.10, pytest-asyncio's `Runner.run(coro, context=...)` swaps the module-global
+        `contextvars.copy_context` for a lambda returning the fixture's context while it creates the task. If the main
+        thread releases the GIL meanwhile (e.g. a GC finalizer closing a socket), the test server's event loop thread
+        builds its handles with that same context. When it runs one of them while the main thread steps the fixture
+        task, `Context.run` raises "cannot enter context: ... is already entered", the task step is dropped, and the
+        fixture never finishes. Keeping the override thread-local confines it to the thread that creates the task.
+        """
+        if target is not contextvars or attribute != 'copy_context':
+            with original_patch_object(target, attribute, new):
+                yield
+            return
+        previous = getattr(copy_context_override, 'factory', None)
+        copy_context_override.factory = new
+        try:
+            yield
+        finally:
+            copy_context_override.factory = previous
+
+    contextvars.copy_context = copy_context  # ty: ignore[invalid-assignment]
+    backports_runner._patch_object = patch_object
 
 
 @pytest.fixture(autouse=True)
@@ -291,83 +332,3 @@ async def http_client(request: pytest.FixtureRequest) -> AsyncGenerator[HttpClie
 @pytest.fixture
 def redis_client() -> FakeAsyncRedis:
     return FakeAsyncRedis()
-
-
-# --- Temporary hang diagnostics (not for merge) ---------------------------------------------------------------------
-
-import asyncio as _diag_asyncio  # noqa: E402
-import gc as _diag_gc  # noqa: E402
-import subprocess as _diag_subprocess  # noqa: E402
-import threading as _diag_threading  # noqa: E402
-import traceback as _diag_traceback  # noqa: E402
-
-_DIAG_WORKER = os.environ.get('PYTEST_XDIST_WORKER', 'main')
-_DIAG_AFTER = float(os.environ.get('CRAWLEE_HANG_DIAG_AFTER', '300'))
-
-_diag_stream: Any = None
-
-
-def pytest_configure(config: pytest.Config) -> None:  # noqa: ARG001
-    # Capture is suspended while plugins configure, so fd 2 is the real stderr here; the dup survives fd capture.
-    global _diag_stream  # noqa: PLW0603
-    _diag_stream = open(os.dup(2), 'w', buffering=1)  # noqa: PTH123, SIM115
-    handler = logging.StreamHandler(_diag_stream)
-    handler.setLevel(logging.ERROR)
-    handler.setFormatter(logging.Formatter(f'HANG-DIAG [{_DIAG_WORKER}] asyncio logger: %(message)s'))
-    logging.getLogger('asyncio').addHandler(handler)
-
-
-def _diag_dump(nodeid: str) -> None:
-    out: list[str] = [f'===== HANG-DIAG [{_DIAG_WORKER}] pid={os.getpid()} stuck in {nodeid} =====']
-    try:
-        loops = [o for o in _diag_gc.get_objects() if isinstance(o, _diag_asyncio.AbstractEventLoop)]
-        for loop in loops:
-            if loop.is_closed():
-                continue
-            out.append(f'--- loop {loop!r} running={loop.is_running()}')
-            out.append(f'ready={list(getattr(loop, "_ready", []))!r}')
-            out.append(f'scheduled={list(getattr(loop, "_scheduled", []))[:20]!r}')
-            out.append(f'current_task={getattr(_diag_asyncio.tasks, "_current_tasks", {}).get(loop)!r}')
-            for task in list(_diag_asyncio.all_tasks(loop)):
-                out.append(f'task {task!r} type={type(task).__module__}.{type(task).__qualname__}')
-                for frame in task.get_stack():
-                    out.extend('    ' + line for line in _diag_traceback.format_stack(frame, limit=1))
-                waiter = getattr(task, '_fut_waiter', None)
-                out.append(f'    fut_waiter={waiter!r}')
-    except Exception:
-        out.append(_diag_traceback.format_exc())
-    try:
-        for tid in sorted(os.listdir('/proc/self/task')):  # noqa: PTH208
-            with open(f'/proc/self/task/{tid}/comm') as f:  # noqa: PTH123
-                comm = f.read().strip()
-            with open(f'/proc/self/task/{tid}/wchan') as f:  # noqa: PTH123
-                wchan = f.read().strip()
-            out.append(f'native thread {tid} comm={comm} wchan={wchan}')
-        out.append(
-            _diag_subprocess.run(['ss', '-tanpe'], capture_output=True, text=True, timeout=20, check=False).stdout  # noqa: S607
-        )
-        out.append(
-            _diag_subprocess.run(
-                ['ps', '-eo', 'pid,ppid,stat,etime,wchan:20,args'],  # noqa: S607
-                capture_output=True,
-                text=True,
-                timeout=20,
-                check=False,
-            ).stdout
-        )
-    except Exception:
-        out.append(_diag_traceback.format_exc())
-    out.append(f'===== HANG-DIAG [{_DIAG_WORKER}] end =====')
-    _diag_stream.write('\n'.join(out) + '\n')
-    _diag_stream.flush()
-
-
-@pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_protocol(item: pytest.Item) -> Iterator[None]:
-    timer = _diag_threading.Timer(_DIAG_AFTER, _diag_dump, (item.nodeid,))
-    timer.daemon = True
-    timer.start()
-    try:
-        yield
-    finally:
-        timer.cancel()
