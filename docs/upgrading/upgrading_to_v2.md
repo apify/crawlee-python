@@ -41,7 +41,7 @@ Secondary arguments of the public API are now keyword-only. The main argument of
 - `HeaderGenerator.get_specific_headers(header_names, *, browser_type)`.
 - `BrowserController.new_page(*, browser_new_context_options, proxy_info)`, including the Playwright and Stagehand controllers.
 - `PlaywrightPersistentBrowser(browser_type, user_data_dir, *, browser_launch_options)`.
-- `AbstractHttpParser.find_links(parsed_content, selector, *, attribute)`, including the built-in parsers. Custom parsers must use the same signature.
+- `AbstractHttpParser.find_links(parsed_content, selector, *, attribute)`, including the built-in parsers. Custom parsers keep working, since the crawler passes `attribute` by keyword.
 
 For example:
 
