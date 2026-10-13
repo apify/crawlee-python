@@ -77,7 +77,7 @@ async def test_value_record_creation_and_content(kvs_client: RedisKeyValueStoreC
 
     # Check record metadata
     assert metadata['key'] == test_key
-    assert metadata['content_type'] == 'text/plain; charset=utf-8'
+    assert metadata['contentType'] == 'text/plain; charset=utf-8'
     assert metadata['size'] == len(test_value.encode('utf-8'))
 
     # Verify retrieval works correctly

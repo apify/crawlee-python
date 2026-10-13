@@ -436,7 +436,7 @@ class FileSystemDatasetClient(DatasetClient):
         await asyncio.to_thread(self.path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
 
         # Dump the serialized metadata to the file.
-        data = await json_dumps(self._metadata.model_dump())
+        data = await json_dumps(self._metadata.model_dump(by_alias=True))
         await atomic_write(self.path_to_metadata, data)
 
     async def _push_item(self, item: Mapping[str, JsonSerializable], item_id: int) -> None:

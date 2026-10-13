@@ -10,6 +10,7 @@ import pytest
 from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
+from crawlee.storage_clients.models import RequestQueueMetadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -104,6 +105,7 @@ async def test_request_file_persistence(rq_client: FileSystemRequestQueueClient)
             request_data = json.load(f)
             assert 'url' in request_data
             assert request_data['url'].startswith('https://example.com/')
+            assert 'uniqueKey' in request_data
 
 
 async def test_opening_rq_does_not_have_side_effect_on_service_locator(configuration: Configuration) -> None:
@@ -164,7 +166,7 @@ async def test_metadata_file_updates(rq_client: FileSystemRequestQueueClient) ->
     # Verify metadata file is updated on disk
     with rq_client.path_to_metadata.open() as f:
         metadata_json = json.load(f)
-        assert metadata_json['total_request_count'] == 1
+        assert metadata_json['totalRequestCount'] == 1
 
 
 async def test_data_persistence_across_reopens() -> None:
@@ -199,6 +201,35 @@ async def test_data_persistence_across_reopens() -> None:
     assert request1 is not None
     assert request2 is not None
     assert {request1.url, request2.url} == {'https://example.com/1', 'https://example.com/2'}
+
+    await reopened_client.drop()
+
+
+async def test_snake_case_files_from_v1_are_still_read() -> None:
+    """Metadata and request files with snake_case keys, as Crawlee v1 wrote them, still load."""
+    storage_client = FileSystemStorageClient()
+    client = await storage_client.create_rq_client(name='snake-case-rq')
+    request = Request.from_url('https://example.com/1', label='detail')
+    request.crawl_depth = 2
+    await client.add_batch_of_requests([request])
+    rq_id = (await client.get_metadata()).id
+
+    # Rewrite every file the way v1 serialized it, without aliases.
+    for path in client.path_to_rq.glob('*.json'):
+        data = json.loads(path.read_text())
+        model = RequestQueueMetadata if path == client.path_to_metadata else Request
+        snake_case_data = model.model_validate(data).model_dump(mode='json')
+        assert 'uniqueKey' not in snake_case_data
+        path.write_text(json.dumps(snake_case_data))
+
+    reopened_client = await storage_client.create_rq_client(id=rq_id)
+    assert (await reopened_client.get_metadata()).total_request_count == 1
+
+    fetched = await reopened_client.fetch_next_request()
+    assert fetched is not None
+    assert fetched.unique_key == request.unique_key
+    assert fetched.label == 'detail'
+    assert fetched.crawl_depth == 2
 
     await reopened_client.drop()
 

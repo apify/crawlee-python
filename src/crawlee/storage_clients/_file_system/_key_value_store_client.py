@@ -324,7 +324,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         size = len(value_bytes)
         record_metadata = KeyValueStoreRecordMetadata(key=key, content_type=content_type, size=size)
         record_metadata_filepath = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
-        record_metadata_content = await json_dumps(record_metadata.model_dump())
+        record_metadata_content = await json_dumps(record_metadata.model_dump(by_alias=True))
 
         async with self._lock:
             # Ensure the key-value store directory exists.
@@ -480,7 +480,7 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         await asyncio.to_thread(self.path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
 
         # Dump the serialized metadata to the file.
-        data = await json_dumps(self._metadata.model_dump())
+        data = await json_dumps(self._metadata.model_dump(by_alias=True))
         await atomic_write(self.path_to_metadata, data)
 
     def _encode_key(self, key: str) -> str:
