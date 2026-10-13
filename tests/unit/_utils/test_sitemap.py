@@ -2,7 +2,7 @@ import base64
 import gzip
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 from xml.sax.expatreader import ExpatParser
@@ -792,6 +792,23 @@ def test_xml_handler_discards_url_with_empty_loc() -> None:
     )
 
     assert handler.items == [{'type': 'url', 'loc': 'https://example.com/real-page'}]
+
+
+def test_xml_handler_parses_lastmod_with_z_suffix() -> None:
+    """A `lastmod` with a `Z` UTC designator is parsed into a UTC-aware datetime."""
+    handler = _XMLSaxSitemapHandler()
+    parser = ExpatParser()
+    parser.setContentHandler(handler)
+    parser.feed(
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        '<url><loc>https://example.com/page</loc><lastmod>2005-01-01T12:30:00Z</lastmod></url>'
+        '</urlset>'
+    )
+
+    assert handler.items == [
+        {'type': 'url', 'loc': 'https://example.com/page', 'lastmod': datetime(2005, 1, 1, 12, 30, tzinfo=UTC)}
+    ]
 
 
 async def test_txt_parser_flush_clears_buffer() -> None:
