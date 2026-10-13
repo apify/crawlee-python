@@ -5,6 +5,7 @@ from enum import StrEnum
 from typing import Annotated, Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 from crawlee._utils.docs import docs_group
 from crawlee._utils.models import timedelta_secs
@@ -40,29 +41,26 @@ class Event(StrEnum):
 class EventPersistStateData(BaseModel):
     """Data for the persist state event."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)
 
-    is_migrating: Annotated[bool, Field(alias='isMigrating')]
+    is_migrating: bool
 
 
 @docs_group('Event data')
 class EventSystemInfoData(BaseModel):
     """Data for the system info event."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)
 
-    cpu_info: Annotated[CpuInfo, Field(alias='cpuInfo')]
-    memory_info: Annotated[
-        MemoryUsageInfo,
-        Field(alias='memoryInfo'),
-    ]
+    cpu_info: CpuInfo
+    memory_info: MemoryUsageInfo
 
 
 @docs_group('Event data')
 class EventMigratingData(BaseModel):
     """Data for the migrating event."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)
 
     # The remaining time in seconds before the migration is forced and the process is killed
     # Optional because it's not present when the event handler is called manually
