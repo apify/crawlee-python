@@ -9,13 +9,13 @@ from statistics import mean
 from typing import TYPE_CHECKING, Annotated, Literal
 from urllib.parse import urlparse
 
-from pydantic import Field, PlainSerializer, PlainValidator
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
+from pydantic.alias_generators import to_camel
 from rapidfuzz.distance import JaroWinkler
 from sklearn.linear_model import LogisticRegression
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
-from crawlee._utils.models import CamelCaseModel
 from crawlee._utils.recoverable_state import RecoverableState
 
 from ._utils import sklearn_model_serializer, sklearn_model_validator
@@ -32,7 +32,9 @@ RenderingType = Literal['static', 'client only']
 FeatureVector = tuple[float, float]
 
 
-class RenderingTypePredictorState(CamelCaseModel):
+class RenderingTypePredictorState(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)
+
     model: Annotated[
         LogisticRegression,
         Field(LogisticRegression),

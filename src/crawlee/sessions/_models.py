@@ -4,22 +4,19 @@ from collections.abc import MutableMapping
 from datetime import datetime, timedelta
 from typing import Annotated, Any
 
-from pydantic import (
-    BeforeValidator,
-    GetPydanticSchema,
-    PlainSerializer,
-    computed_field,
-)
+from pydantic import BaseModel, BeforeValidator, ConfigDict, GetPydanticSchema, PlainSerializer, computed_field
+from pydantic.alias_generators import to_camel
 
 from crawlee._types import JsonSerializable
-from crawlee._utils.models import CamelCaseModel
 
 from ._cookies import CookieParam
 from ._session import Session
 
 
-class SessionModel(CamelCaseModel):
+class SessionModel(BaseModel):
     """Model for a Session object."""
+
+    model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)
 
     id: str
     max_age: timedelta
@@ -34,8 +31,10 @@ class SessionModel(CamelCaseModel):
     blocked_status_codes: list[int]
 
 
-class SessionPoolModel(CamelCaseModel):
+class SessionPoolModel(BaseModel):
     """Model for a SessionPool object."""
+
+    model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)
 
     max_pool_size: int
 

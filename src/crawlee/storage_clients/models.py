@@ -4,11 +4,11 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Annotated, Any, Generic
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 from typing_extensions import TypeVar
 
 from crawlee._types import HttpMethod, JsonSerializable
 from crawlee._utils.docs import docs_group
-from crawlee._utils.models import CamelCaseModel
 from crawlee._utils.urls import validate_http_url
 
 if TYPE_CHECKING:
@@ -18,13 +18,15 @@ KvsValueType = TypeVar('KvsValueType', default=Any)
 
 
 @docs_group('Storage data')
-class StorageMetadata(CamelCaseModel):
+class StorageMetadata(BaseModel):
     """Represents the base model for storage metadata.
 
     It contains common fields shared across all specific storage types.
     """
 
-    model_config = ConfigDict(extra='allow', from_attributes=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, validate_by_name=True, validate_by_alias=True, extra='allow', from_attributes=True
+    )
 
     id: str
     """The unique identifier of the storage."""
@@ -46,7 +48,9 @@ class StorageMetadata(CamelCaseModel):
 class DatasetMetadata(StorageMetadata):
     """Model for a dataset metadata."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, validate_by_name=True, validate_by_alias=True, from_attributes=True
+    )
 
     item_count: int
     """The number of items in the dataset."""
@@ -56,14 +60,18 @@ class DatasetMetadata(StorageMetadata):
 class KeyValueStoreMetadata(StorageMetadata):
     """Model for a key-value store metadata."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, validate_by_name=True, validate_by_alias=True, from_attributes=True
+    )
 
 
 @docs_group('Storage data')
 class RequestQueueMetadata(StorageMetadata):
     """Model for a request queue metadata."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, validate_by_name=True, validate_by_alias=True, from_attributes=True
+    )
 
     had_multiple_clients: bool
     """Indicates whether the queue has been accessed by multiple clients (consumers)."""
@@ -79,10 +87,12 @@ class RequestQueueMetadata(StorageMetadata):
 
 
 @docs_group('Storage data')
-class KeyValueStoreRecordMetadata(CamelCaseModel):
+class KeyValueStoreRecordMetadata(BaseModel):
     """Model for a key-value store record metadata."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, validate_by_name=True, validate_by_alias=True, from_attributes=True
+    )
 
     key: str
     """The key of the record.
@@ -104,7 +114,9 @@ class KeyValueStoreRecordMetadata(CamelCaseModel):
 class KeyValueStoreRecord(KeyValueStoreRecordMetadata, Generic[KvsValueType]):
     """Model for a key-value store record."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, validate_by_name=True, validate_by_alias=True, from_attributes=True
+    )
 
     value: KvsValueType
     """The value of the record."""
@@ -141,10 +153,12 @@ class DatasetItemsListPage(BaseModel):
 
 
 @docs_group('Storage data')
-class ProcessedRequest(CamelCaseModel):
+class ProcessedRequest(BaseModel):
     """Represents a processed request."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, validate_by_name=True, validate_by_alias=True, from_attributes=True
+    )
 
     id: Annotated[str | None, Field(alias='requestId')] = None
     """Internal representation of the request by the storage client. Only some clients use id."""
@@ -155,10 +169,12 @@ class ProcessedRequest(CamelCaseModel):
 
 
 @docs_group('Storage data')
-class UnprocessedRequest(CamelCaseModel):
+class UnprocessedRequest(BaseModel):
     """Represents an unprocessed request."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, validate_by_name=True, validate_by_alias=True, from_attributes=True
+    )
 
     unique_key: str
     url: Annotated[str, BeforeValidator(validate_http_url)]
@@ -166,7 +182,7 @@ class UnprocessedRequest(CamelCaseModel):
 
 
 @docs_group('Storage data')
-class AddRequestsResponse(CamelCaseModel):
+class AddRequestsResponse(BaseModel):
     """Model for a response to add requests to a queue.
 
     Contains detailed information about the processing results when adding multiple requests
@@ -174,7 +190,9 @@ class AddRequestsResponse(CamelCaseModel):
     encountered issues during processing.
     """
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel, validate_by_name=True, validate_by_alias=True, from_attributes=True
+    )
 
     processed_requests: list[ProcessedRequest]
     """Successfully processed requests, including information about whether they were

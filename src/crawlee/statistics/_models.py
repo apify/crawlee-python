@@ -5,12 +5,13 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Any
 
-from pydantic import ConfigDict, Field, PlainSerializer, PlainValidator, computed_field
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator, computed_field
+from pydantic.alias_generators import to_camel
 from typing_extensions import override
 
 from crawlee._utils.console import make_table
 from crawlee._utils.docs import docs_group
-from crawlee._utils.models import CamelCaseModel, timedelta_ms
+from crawlee._utils.models import timedelta_ms
 from crawlee._utils.time import format_duration
 
 _STATISTICS_TABLE_WIDTH = 100
@@ -54,10 +55,12 @@ class FinalStatistics:
 
 
 @docs_group('Statistics')
-class StatisticsState(CamelCaseModel):
+class StatisticsState(BaseModel):
     """Statistic data about a crawler run."""
 
-    model_config = ConfigDict(ser_json_inf_nan='constants')
+    model_config = ConfigDict(
+        alias_generator=to_camel, validate_by_name=True, validate_by_alias=True, ser_json_inf_nan='constants'
+    )
     stats_id: int | None = None
 
     requests_finished: int = 0
@@ -95,7 +98,7 @@ class StatisticsState(CamelCaseModel):
             lambda value: [value.get(i, 0) for i in range(max(value.keys(), default=0) + 1)],
             return_type=list[int],
         ),
-    ] = Field(default_factory=dict)
+    ] = {}
 
     # Used to track the crawler runtime, that had already been persisted. This is the runtime from previous runs.
     _runtime_offset: Annotated[timedelta, Field(exclude=True)] = timedelta()

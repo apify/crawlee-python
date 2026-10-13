@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, Annotated
 
 import proclimits
 import psutil
-from pydantic import Field, PlainSerializer, PlainValidator
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
+from pydantic.alias_generators import to_camel
 
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.log import LoggerOnce
-from crawlee._utils.models import CamelCaseModel
 
 logger = getLogger(__name__)
 logger_once = LoggerOnce(logger)
@@ -126,8 +126,10 @@ def _get_child_used_memory(child: psutil.Process) -> int:
         return 0
 
 
-class CpuInfo(CamelCaseModel):
+class CpuInfo(BaseModel):
     """Information about the CPU usage."""
+
+    model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)
 
     used_ratio: float
     """The ratio of CPU currently in use, represented as a float between 0 and 1."""
@@ -144,8 +146,10 @@ class CpuInfo(CamelCaseModel):
         """The time at which the measurement was taken."""
 
 
-class MemoryUsageInfo(CamelCaseModel):
+class MemoryUsageInfo(BaseModel):
     """Information about the memory usage."""
+
+    model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)
 
     current_size: Annotated[
         ByteSize,
@@ -173,6 +177,8 @@ class MemoryUsageInfo(CamelCaseModel):
 
 class MemoryInfo(MemoryUsageInfo):
     """Information about system memory."""
+
+    model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)
 
     total_size: Annotated[ByteSize, PlainValidator(ByteSize.validate), PlainSerializer(lambda size: size.bytes)]
     """Total memory available to this process.

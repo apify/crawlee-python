@@ -6,12 +6,12 @@ from enum import IntEnum
 from typing import TYPE_CHECKING, Annotated, Any, TypedDict, cast
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, PlainValidator, TypeAdapter
+from pydantic.alias_generators import to_camel
 from yarl import URL
 
 from crawlee._types import EnqueueStrategy, HttpHeaders, HttpMethod, HttpPayload, JsonSerializable
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
-from crawlee._utils.models import CamelCaseModel
 from crawlee._utils.requests import compute_unique_key
 from crawlee._utils.urls import validate_http_url
 
@@ -32,8 +32,10 @@ class RequestState(IntEnum):
     SKIPPED = 7
 
 
-class CrawleeRequestData(CamelCaseModel):
+class CrawleeRequestData(BaseModel):
     """Crawlee-specific configuration stored in the `user_data`."""
+
+    model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)
 
     max_retries: Annotated[int | None, Field(frozen=True)] = None
     """Maximum number of retries for this request. Allows to override the global `max_request_retries` option of
@@ -71,6 +73,7 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
     """
 
     model_config = ConfigDict(extra='allow')
+
     __pydantic_extra__: dict[str, JsonSerializable] = Field(init=False)
 
     crawlee_data: Annotated[CrawleeRequestData | None, Field(alias='__crawlee')] = None
@@ -143,7 +146,7 @@ class RequestOptions(TypedDict):
 
 
 @docs_group('Storage data')
-class Request(CamelCaseModel):
+class Request(BaseModel):
     """Represents a request in the Crawlee framework, containing the necessary information for crawling operations.
 
     The `Request` class is one of the core components in Crawlee, utilized by various components such as request
@@ -166,6 +169,8 @@ class Request(CamelCaseModel):
     request = Request.from_url('https://crawlee.dev')
     ```
     """
+
+    model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)
 
     unique_key: Annotated[str, Field(frozen=True)]
     """A unique key identifying the request. Two requests with the same `unique_key` are considered as pointing

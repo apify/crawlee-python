@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import ConfigDict
-
-from crawlee._utils.models import CamelCaseModel
+from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
 
 SupportedOperatingSystems = Literal['windows', 'macos', 'linux', 'android', 'ios']
 SupportedDevices = Literal['desktop', 'mobile']
@@ -12,8 +11,8 @@ SupportedHttpVersion = Literal['1', '2']
 SupportedBrowserType = Literal['chrome', 'firefox', 'safari', 'edge']
 
 
-class ScreenOptions(CamelCaseModel):
-    model_config = ConfigDict(extra='forbid')
+class ScreenOptions(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, extra='forbid', validate_by_name=True, validate_by_alias=True)
 
     """Defines the screen constrains for the fingerprint generator."""
 
@@ -30,10 +29,10 @@ class ScreenOptions(CamelCaseModel):
     """Maximal screen height constraint for the fingerprint generator."""
 
 
-class HeaderGeneratorOptions(CamelCaseModel):
+class HeaderGeneratorOptions(BaseModel):
     """Collection of header related attributes that can be used by the fingerprint generator."""
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(alias_generator=to_camel, extra='forbid', validate_by_name=True, validate_by_alias=True)
 
     browsers: list[SupportedBrowserType] | None = None
     """List of BrowserSpecifications to generate the headers for."""

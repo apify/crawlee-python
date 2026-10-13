@@ -4,8 +4,7 @@ from contextlib import suppress
 from datetime import timedelta
 from typing import TYPE_CHECKING, Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, PlainSerializer, TypeAdapter, ValidationError, WrapValidator
-from pydantic.alias_generators import to_camel
+from pydantic import PlainSerializer, TypeAdapter, ValidationError, WrapValidator
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -67,12 +66,3 @@ def _timedelta_from_secs(
 
 timedelta_ms = Annotated[timedelta, PlainSerializer(_timedelta_to_ms), WrapValidator(_timedelta_from_ms)]
 timedelta_secs = Annotated[timedelta, PlainSerializer(_timedelta_to_secs), WrapValidator(_timedelta_from_secs)]
-
-
-class CamelCaseModel(BaseModel):
-    """Base model whose fields (de)serialize under camelCase aliases generated from their names.
-
-    A field whose external key differs from the generated one sets an explicit `Field(alias=...)`.
-    """
-
-    model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)
