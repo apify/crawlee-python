@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from crawlee import Request
 from crawlee._utils.crypto import crypto_random_object_id
@@ -94,7 +94,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
         # Create a new queue
         queue_id = id or crypto_random_object_id()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         metadata = RequestQueueMetadata(
             id=queue_id,
@@ -237,7 +237,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
 
         # Set handled_at timestamp if not already set.
         if not request.was_already_handled:
-            request.handled_at = datetime.now(timezone.utc)
+            request.handled_at = datetime.now(UTC)
 
         # Move request to handled storage.
         self._handled_requests[request.unique_key] = request
@@ -317,7 +317,7 @@ class MemoryRequestQueueClient(RequestQueueClient):
             new_pending_request_count: If provided, set the pending request count to this value.
             new_total_request_count: If provided, set the total request count to this value.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         if update_accessed_at:
             self._metadata.accessed_at = now

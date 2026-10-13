@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
@@ -76,7 +76,7 @@ async def test_get_session(session_pool: SessionPool) -> None:
     """Check retrieval of a session from the pool and verify its properties."""
     session = await session_pool.get_session()
     assert session is not None
-    assert session.expires_at >= datetime.now(timezone.utc)
+    assert session.expires_at >= datetime.now(UTC)
     assert not session.is_blocked
     assert not session.is_expired
     assert not session.is_max_usage_count_reached

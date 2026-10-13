@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from contextlib import asynccontextmanager
 from http import HTTPStatus
 from logging import getLogger
@@ -183,7 +182,7 @@ class ImpitHttpClient(HttpClient):
                 timeout=timeout,
             )
         except TimeoutException as exc:
-            raise asyncio.TimeoutError from exc
+            raise TimeoutError from exc
         except (TransportError, HTTPError) as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
@@ -224,7 +223,7 @@ class ImpitHttpClient(HttpClient):
                 timeout=timeout,
             )
         except TimeoutException as exc:
-            raise asyncio.TimeoutError from exc
+            raise TimeoutError from exc
         except (TransportError, HTTPError) as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
@@ -262,7 +261,7 @@ class ImpitHttpClient(HttpClient):
                 stream=True,
             )
         except TimeoutException as exc:
-            raise asyncio.TimeoutError from exc
+            raise TimeoutError from exc
 
         try:
             yield _ImpitResponse(response)
@@ -313,7 +312,7 @@ class ImpitHttpClient(HttpClient):
         for _ in range(self._max_redirects + 1):
             remaining = deadline - monotonic() if deadline is not None else None
             if remaining is not None and remaining <= 0:
-                raise asyncio.TimeoutError
+                raise TimeoutError
 
             # Rebuilt per hop, so that the `Cookie` header never reaches a URL its cookies do not match. A header
             # passed by the caller wins over the session, which is how `impit` treats its own cookie jar.

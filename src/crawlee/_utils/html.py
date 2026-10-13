@@ -17,9 +17,10 @@ from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute, valida
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
+    from typing import NotRequired
 
     from lxml.html import HtmlElement
-    from typing_extensions import NotRequired, Unpack
+    from typing_extensions import Unpack
 
     from crawlee._types import JsonSerializable
 

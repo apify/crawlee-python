@@ -9,8 +9,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from datetime import timedelta
     from types import TracebackType
-
-    from typing_extensions import Self
+    from typing import Self
 
 logger = getLogger(__name__)
 

@@ -18,7 +18,6 @@ def test_default_logger() -> None:
     assert BeautifulSoupCrawler().log.name == 'BeautifulSoupCrawler'
 
 
-@pytest.mark.usefixtures('_restore_crawlers_binding')
 def test_import_error_handled() -> None:
     # Simulate ImportError for BeautifulSoup
     with mock.patch.dict('sys.modules', {'bs4': None}):

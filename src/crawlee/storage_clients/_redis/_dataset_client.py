@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, NotRequired, cast
 
 from redis.exceptions import RedisError
-from typing_extensions import NotRequired, override
+from typing_extensions import override
 
 from crawlee._utils.retry import retry_on_error
 from crawlee.storage_clients._base import DatasetClient

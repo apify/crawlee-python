@@ -4,11 +4,11 @@ from __future__ import annotations
 import asyncio
 import math
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from logging import Logger, getLogger
-from typing import TYPE_CHECKING, Generic, Literal
+from typing import TYPE_CHECKING, Generic, Literal, Self
 
-from typing_extensions import Self, TypeVar
+from typing_extensions import TypeVar
 
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
@@ -177,7 +177,7 @@ class Statistics(Generic[TStatisticsState]):
         await asyncio.sleep(0.01)
         self._active = True
 
-        self.state.crawler_last_started_at = datetime.now(timezone.utc)
+        self.state.crawler_last_started_at = datetime.now(UTC)
         self.state.crawler_started_at = self.state.crawler_started_at or self.state.crawler_last_started_at
         return self
 
@@ -200,7 +200,7 @@ class Statistics(Generic[TStatisticsState]):
 
         # Stop logging and deactivate the statistics to prevent further changes to crawler_runtime
         await self._periodic_logger.stop()
-        self.state.crawler_finished_at = datetime.now(timezone.utc)
+        self.state.crawler_finished_at = datetime.now(UTC)
         self._active = False
         await self._state.teardown()
 

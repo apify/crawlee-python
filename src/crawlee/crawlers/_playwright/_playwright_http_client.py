@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import contextvars
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import TYPE_CHECKING
@@ -120,13 +119,13 @@ class PlaywrightHttpClient(HttpClient):
 
     @staticmethod
     def _raise_if_non_positive_timeout(timeout: timedelta | None) -> None:
-        """Raise `asyncio.TimeoutError` for a non-positive timeout.
+        """Raise `TimeoutError` for a non-positive timeout.
 
         Playwright treats an explicit `0` timeout as "disable timeout", so a non-positive timeout must be
         rejected here instead of being forwarded as-is.
         """
         if timeout is not None and timeout.total_seconds() <= 0:
-            raise asyncio.TimeoutError
+            raise TimeoutError
 
     async def cleanup(self) -> None:
         # The `browser_page_context` is responsible for resource cleanup

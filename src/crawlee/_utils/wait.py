@@ -35,8 +35,8 @@ async def wait_for(
     for iteration in range(1, max_retries + 1):
         try:
             return await asyncio.wait_for(operation(), timeout.total_seconds())
-        except asyncio.TimeoutError as ex:  # noqa: PERF203
-            raise asyncio.TimeoutError(timeout_message) from ex
+        except TimeoutError as ex:
+            raise TimeoutError(timeout_message) from ex
         except Exception as e:
             if iteration == max_retries:
                 raise

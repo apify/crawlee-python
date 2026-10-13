@@ -4,11 +4,11 @@ import asyncio
 import logging
 from abc import ABC
 from datetime import timedelta
-from typing import TYPE_CHECKING, Generic
+from typing import TYPE_CHECKING, Generic, NotRequired
 
 from more_itertools import partition
 from pydantic import ValidationError
-from typing_extensions import NotRequired, TypeVar
+from typing_extensions import TypeVar
 
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._utils.docs import docs_group

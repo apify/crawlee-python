@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 from sqlalchemy import CursorResult, delete, select
 from sqlalchemy import func as sql_func
 from sqlalchemy.exc import SQLAlchemyError
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from crawlee._utils.file import infer_mime_type
 from crawlee._utils.retry import retry_on_error
@@ -153,7 +153,7 @@ class SqlKeyValueStoreClient(
 
         Remove all records from key_value_store_records table.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         await self._purge(metadata_kwargs=MetadataUpdateParams(accessed_at=now, modified_at=now))
 
     @retry_on_error(SQLAlchemyError)

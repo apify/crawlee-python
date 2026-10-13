@@ -187,7 +187,7 @@ class CurlImpersonateHttpClient(HttpClient):
                 timeout=timeout.total_seconds() if timeout is not None else None,
             )
         except Timeout as exc:
-            raise asyncio.TimeoutError from exc
+            raise TimeoutError from exc
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
@@ -237,7 +237,7 @@ class CurlImpersonateHttpClient(HttpClient):
                 timeout=timeout.total_seconds() if timeout is not None else None,
             )
         except Timeout as exc:
-            raise asyncio.TimeoutError from exc
+            raise TimeoutError from exc
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
@@ -282,7 +282,7 @@ class CurlImpersonateHttpClient(HttpClient):
                 timeout=timeout.total_seconds() if timeout is not None else None,
             )
         except Timeout as exc:
-            raise asyncio.TimeoutError from exc
+            raise TimeoutError from exc
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
@@ -323,13 +323,13 @@ class CurlImpersonateHttpClient(HttpClient):
 
     @staticmethod
     def _raise_if_non_positive_timeout(timeout: timedelta | None) -> None:
-        """Raise `asyncio.TimeoutError` for a non-positive timeout.
+        """Raise `TimeoutError` for a non-positive timeout.
 
         `curl_cffi` (like `libcurl`) treats an explicit `0` timeout as "no timeout", so a non-positive timeout
         must be rejected here instead of being forwarded as-is.
         """
         if timeout is not None and timeout.total_seconds() <= 0:
-            raise asyncio.TimeoutError
+            raise TimeoutError
 
     def _convert_method(self, method: HttpMethod) -> CurlHttpMethod:
         """Convert from Crawlee HTTP method to curl-cffi HTTP method.

@@ -4,13 +4,13 @@ import asyncio
 import json
 import shutil
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from logging import getLogger
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 from pydantic import ValidationError
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from crawlee._consts import METADATA_FILENAME
 from crawlee._types import JsonSerializable
@@ -184,7 +184,7 @@ class FileSystemDatasetClient(DatasetClient):
 
             # Otherwise, create a new dataset client.
             else:
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 metadata = DatasetMetadata(
                     id=crypto_random_object_id(),
                     name=name,
@@ -423,7 +423,7 @@ class FileSystemDatasetClient(DatasetClient):
             update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
             update_modified_at: If True, update the `modified_at` timestamp to the current time.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         if update_accessed_at:
             self._metadata.accessed_at = now

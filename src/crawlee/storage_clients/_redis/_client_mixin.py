@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, ClassVar, TypedDict, overload
 
@@ -12,11 +12,11 @@ from ._utils import await_redis_response, read_lua_script
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+    from typing import NotRequired, Self
 
     from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
     from redis.commands.core import AsyncScript
-    from typing_extensions import NotRequired, Self
 
     from crawlee.storage_clients.models import DatasetMetadata, KeyValueStoreMetadata, RequestQueueMetadata
 
@@ -144,7 +144,7 @@ class RedisClientMixin:
                 await client._update_metadata(pipe, update_accessed_at=True)
         # Otherwise, create a new storage
         else:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             metadata = metadata_model(
                 id=crypto_random_object_id(),
                 name=name,
@@ -278,7 +278,7 @@ class RedisClientMixin:
             update_modified_at: Whether to update modified_at timestamp.
             **kwargs: Additional arguments for _specific_update_metadata.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         if update_accessed_at:
             await await_redis_response(

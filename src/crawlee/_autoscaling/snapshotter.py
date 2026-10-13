@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from bisect import insort
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from logging import WARNING, getLogger
 from typing import TYPE_CHECKING, TypeVar, cast
 
@@ -107,7 +107,7 @@ class Snapshotter:
         self._snapshot_event_loop_task = RecurringTask(self._snapshot_event_loop, self._EVENT_LOOP_SNAPSHOT_INTERVAL)
         self._snapshot_client_task = RecurringTask(self._snapshot_client, self._CLIENT_SNAPSHOT_INTERVAL)
 
-        self._timestamp_of_last_memory_warning: datetime = datetime.now(timezone.utc) - timedelta(hours=1)
+        self._timestamp_of_last_memory_warning: datetime = datetime.now(UTC) - timedelta(hours=1)
 
         # Flag to indicate the context state.
         self._active = False

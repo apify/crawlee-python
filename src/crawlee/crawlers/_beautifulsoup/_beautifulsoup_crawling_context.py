@@ -27,8 +27,9 @@ from ._utils import html_to_text
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
+    from typing import Self
 
-    from typing_extensions import Self, Unpack
+    from typing_extensions import Unpack
 
     from crawlee._request import Request
     from crawlee._utils.html import FormRequestOptions

@@ -218,7 +218,7 @@ class BrowserPool:
         try:
             for plugin in self._plugins:
                 await asyncio.wait_for(plugin.__aenter__(), timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(f'Initializing of the browser plugin {plugin} timed out, will be skipped.')
 
         return self
@@ -324,7 +324,7 @@ class BrowserPool:
                 ),
                 timeout,
             )
-        except asyncio.TimeoutError as exc:
+        except TimeoutError as exc:
             raise TimeoutError(f'Creating a new page with plugin {plugin} timed out.') from exc
         except RuntimeError as exc:
             raise RuntimeError('Browser pool is not initialized.') from exc

@@ -31,7 +31,7 @@ async def test_error_tracker_counts(error_tracker: ErrorTracker, expected_unique
     ]:
         try:
             raise error  # Errors raised on same line
-        except Exception as e:  # noqa:PERF203
+        except Exception as e:
             await error_tracker.add(e)
 
     try:
@@ -66,7 +66,7 @@ async def test_error_tracker_similar_messages_full_stack(
     ]:
         try:
             raise error  # Errors raised on the same line
-        except Exception as e:  # noqa:PERF203
+        except Exception as e:
             await error_tracker.add(e)
             line = traceback.extract_tb(e.__traceback__)[0].lineno
 

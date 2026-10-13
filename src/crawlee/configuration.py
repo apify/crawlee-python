@@ -11,7 +11,7 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.models import timedelta_ms
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 __all__ = ['Configuration']
 

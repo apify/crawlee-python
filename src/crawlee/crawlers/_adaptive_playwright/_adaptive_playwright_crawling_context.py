@@ -15,9 +15,9 @@ from crawlee.crawlers._playwright._types import PlaywrightHttpResponse
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Sequence
+    from typing import Self
 
     from playwright.async_api import Page, Response
-    from typing_extensions import Self
 
     from crawlee.crawlers._playwright._types import BlockRequestsFunction, GotoOptions
 

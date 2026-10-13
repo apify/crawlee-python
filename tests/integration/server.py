@@ -630,7 +630,7 @@ class TestServer(Server):
 
             try:
                 await asyncio.wait_for(self.restart_requested.wait(), timeout=0.1)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
 
             self.restart_requested.clear()

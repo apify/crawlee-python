@@ -16,7 +16,6 @@ _CHINESE = '中文字符解码测试'
 _XHTML = b'<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><body><a href="/next">Next</a></body></html>'
 
 
-@pytest.mark.usefixtures('_restore_crawlers_binding')
 def test_import_error_handled() -> None:
     # Simulate ImportError for parsel
     with mock.patch.dict('sys.modules', {'parsel': None}):

@@ -25,8 +25,7 @@ from crawlee.events._types import (
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
     from types import TracebackType
-
-    from typing_extensions import NotRequired, Self
+    from typing import NotRequired, Self
 
     from crawlee.events._types import EventData, WrappedListener
 

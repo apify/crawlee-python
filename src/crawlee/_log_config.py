@@ -4,10 +4,9 @@ import json
 import logging
 import sys
 import textwrap
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, assert_never
 
 from colorama import Fore, Style, just_fix_windows_console
-from typing_extensions import assert_never
 
 from crawlee import service_locator
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -28,7 +28,7 @@ NON_THROTTLED_DOMAIN = 'free.com'
 TEST_DOMAINS = [THROTTLED_DOMAIN]
 
 MANAGER_MODULE = 'crawlee.request_loaders._throttling_request_manager'
-CLOCK_START = datetime(2026, 1, 1, tzinfo=timezone.utc)
+CLOCK_START = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -399,7 +399,7 @@ async def test_retry_after_header_priority(manager: ThrottlingRequestManager[Req
     manager.record_domain_delay(url, retry_after=timedelta(seconds=30))
 
     state = manager._domain_states[THROTTLED_DOMAIN]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     actual_delay = state.throttled_until - now
 
     assert actual_delay > timedelta(seconds=28)
@@ -417,7 +417,7 @@ async def test_retry_after_exceeding_max_delay_logs_warning(
         manager.record_domain_delay(url, retry_after=manager._max_delay + timedelta(seconds=240))
 
     state = manager._domain_states[THROTTLED_DOMAIN]
-    actual_delay = state.throttled_until - datetime.now(timezone.utc)
+    actual_delay = state.throttled_until - datetime.now(UTC)
     assert actual_delay <= manager._max_delay + timedelta(seconds=1)
 
     warnings = [r for r in caplog.records if r.levelname == 'WARNING']
@@ -629,7 +629,7 @@ async def test_expired_throttle_makes_the_domain_fetchable_again(
     manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
     assert await manager.is_empty() is True
 
-    manager._domain_states[THROTTLED_DOMAIN].backoff_until = datetime.now(timezone.utc) - timedelta(seconds=1)
+    manager._domain_states[THROTTLED_DOMAIN].backoff_until = datetime.now(UTC) - timedelta(seconds=1)
 
     assert await manager.is_empty() is False
     result = await manager.fetch_next_request()
@@ -646,7 +646,7 @@ async def test_fetch_prefers_longest_overdue_domain(
     await two_domain_manager.add_request(recent_url)
     await two_domain_manager.add_request(overdue_url)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     two_domain_manager._domain_states[THROTTLED_DOMAIN].backoff_until = now - timedelta(seconds=1)
     two_domain_manager._domain_states[SECOND_THROTTLED_DOMAIN].backoff_until = now - timedelta(seconds=10)
 
@@ -1480,7 +1480,7 @@ def test_parse_retry_after_invalid_value() -> None:
 
 def test_parse_retry_after_http_date_with_timezone() -> None:
     """A future HTTP-date with explicit timezone should yield a positive delay."""
-    future = datetime.now(timezone.utc) + timedelta(seconds=120)
+    future = datetime.now(UTC) + timedelta(seconds=120)
     header = future.strftime('%a, %d %b %Y %H:%M:%S GMT')
 
     result = parse_retry_after_header(header)
@@ -1491,7 +1491,7 @@ def test_parse_retry_after_http_date_with_timezone() -> None:
 
 def test_parse_retry_after_naive_http_date_treated_as_utc() -> None:
     """A future HTTP-date without timezone info should be treated as UTC, not raise on subtraction."""
-    future = datetime.now(timezone.utc) + timedelta(seconds=120)
+    future = datetime.now(UTC) + timedelta(seconds=120)
     # Format without any timezone designator — `parsedate_to_datetime` returns a naive datetime here.
     header = future.strftime('%a, %d %b %Y %H:%M:%S')
 

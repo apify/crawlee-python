@@ -59,7 +59,7 @@ async def test_send_request_respects_timeout(server_url: URL) -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        with pytest.raises(asyncio.TimeoutError):
+        with pytest.raises(TimeoutError):
             await context.send_request(
                 str(server_url / 'slow') + '?delay=2',
                 timeout=timedelta(milliseconds=100),

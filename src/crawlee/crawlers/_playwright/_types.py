@@ -10,9 +10,9 @@ from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+    from typing import NotRequired, Self
 
     from playwright.async_api import Response
-    from typing_extensions import NotRequired, Self
 
 
 @docs_group('Functions')

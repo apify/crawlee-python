@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
+from typing import Self
 
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from crawlee._types import PageSnapshot
 from crawlee._utils.docs import docs_group

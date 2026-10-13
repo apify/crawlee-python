@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, assert_never
 
 from pydantic import AnyHttpUrl, TypeAdapter
-from typing_extensions import assert_never
 from yarl import URL
 
 from crawlee._utils.public_suffix import public_suffix_list

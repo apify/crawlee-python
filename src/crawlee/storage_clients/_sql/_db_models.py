@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import JSON, BigInteger, Boolean, ForeignKey, Index, Integer, LargeBinary, String, Text, text
@@ -28,7 +28,7 @@ class AwareDateTime(TypeDecorator):
     def process_result_value(self, value: datetime | None, dialect: Dialect) -> datetime | None:
         """Add UTC timezone to naive datetime values."""
         if value is not None and value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
+            return value.replace(tzinfo=UTC)
         return value
 
 

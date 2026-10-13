@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING, Generic, Protocol, TypeVar
 
@@ -30,7 +30,7 @@ TRequestManager = TypeVar('TRequestManager', bound=RequestManager)
 TRequestManager_co = TypeVar('TRequestManager_co', bound=RequestManager, covariant=True)
 """Covariant counterpart of `TRequestManager`, for protocols that only ever return a request manager."""
 
-_NEVER_THROTTLED = datetime.min.replace(tzinfo=timezone.utc)
+_NEVER_THROTTLED = datetime.min.replace(tzinfo=UTC)
 """Sentinel timestamp meaning one of a domain's throttle clocks has never been armed."""
 
 _MAX_BACKOFF_EXPONENT = 20
@@ -312,7 +312,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         don't count either.
         """
         await self._ensure_sub_managers()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         results = await asyncio.gather(
             self._inner.is_empty(),
             *(
@@ -338,7 +338,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         only when nothing else can be dispatched and no domain in a cooldown has requests left.
         """
         await self._ensure_sub_managers()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         dispatchable: list[RequestManager] = [self._inner]
         cooling: list[RequestManager] = []
         candidates: list[str] = []
@@ -403,7 +403,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         if state is None:
             return False
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         state.last_rate_limited_at = now
         if state.rate_limited_since is None:
@@ -576,7 +576,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 return None
 
             state = self._get_domain_state(request.url)
-            if state is None or datetime.now(timezone.utc) >= state.throttled_until:
+            if state is None or datetime.now(UTC) >= state.throttled_until:
                 return request
 
             await self._migrate_to_sub_manager(request)
@@ -607,11 +607,11 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         state = self._domain_states.get(domain)
         if state is None:
             return False
-        return datetime.now(timezone.utc) < state.throttled_until
+        return datetime.now(UTC) < state.throttled_until
 
     def _fetchable_domains(self) -> list[str]:
         """Return the configured domains that are not in a cooldown right now, longest-overdue first."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         available = [domain for domain, state in self._domain_states.items() if now >= state.throttled_until]
         available.sort(key=lambda domain: self._domain_states[domain].throttled_until)
         return available
@@ -623,7 +623,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """
         state = self._domain_states.get(domain)
         if state is not None:
-            state.apply_crawl_delay(datetime.now(timezone.utc))
+            state.apply_crawl_delay(datetime.now(UTC))
 
     def _fetch_owner(self, request: Request) -> TRequestManager:
         """Return the manager the request must be given back to, leaving its in-flight record in place.

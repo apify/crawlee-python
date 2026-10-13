@@ -26,7 +26,7 @@ async def test_shared_timeout_expires() -> None:
 
     # The body outlasts the budget a hundredfold, so the `TimeoutError` alone shows the budget cut it short. A
     # wall-clock bound would also measure how long the event loop was starved on a loaded runner.
-    with pytest.raises(asyncio.TimeoutError):
+    with pytest.raises(TimeoutError):
         async with shared_timeout:
             await asyncio.sleep(10)
 

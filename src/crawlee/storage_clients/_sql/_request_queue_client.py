@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from hashlib import sha256
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, NotRequired, Self, cast
 
 from sqlalchemy import CursorResult, exists, func, or_, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only
-from typing_extensions import NotRequired, Self, override
+from typing_extensions import override
 
 from crawlee import Request
 from crawlee._utils.crypto import crypto_random_object_id
@@ -191,7 +191,7 @@ class SqlRequestQueueClient(
         Resets pending_request_count and handled_request_count to 0 and deletes all records from request_queue_records
         table.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         await self._purge(
             metadata_kwargs=_QueueMetadataUpdateParams(
                 accessed_at=now,
@@ -422,7 +422,7 @@ class SqlRequestQueueClient(
         if self._pending_fetch_cache:
             return self._pending_fetch_cache.popleft()
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         block_until = now + timedelta(seconds=self._BLOCK_REQUEST_TIME)
         dialect = self._storage_client.get_dialect_name()
 
@@ -511,7 +511,7 @@ class SqlRequestQueueClient(
 
         # Update the request's handled_at timestamp.
         if request.handled_at is None:
-            request.handled_at = datetime.now(timezone.utc)
+            request.handled_at = datetime.now(UTC)
 
         # Update request in Db
         stmt = (
@@ -557,7 +557,7 @@ class SqlRequestQueueClient(
             if forefront:
                 new_sequence = state.forefront_sequence_counter
                 state.forefront_sequence_counter -= 1
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 block_until = now + timedelta(seconds=self._BLOCK_REQUEST_TIME)
                 # Extend blocking for forefront request, it is considered blocked by the current client.
                 stmt = stmt.values(
@@ -601,7 +601,7 @@ class SqlRequestQueueClient(
         if self._pending_fetch_cache:
             return False
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Check if there are any unhandled requests that are not blocked.
         async with self.get_session(with_simple_commit=True) as session:

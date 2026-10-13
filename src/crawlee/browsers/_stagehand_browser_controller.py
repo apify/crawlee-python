@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from asyncio import Lock
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
@@ -73,7 +73,7 @@ class StagehandBrowserController(BrowserController):
         self._pages = list[StagehandPage]()
         self._total_opened_pages = 0
         self._opening_pages_count = 0
-        self._last_page_opened_at = datetime.now(timezone.utc)
+        self._last_page_opened_at = datetime.now(UTC)
 
     @property
     @override
@@ -98,7 +98,7 @@ class StagehandBrowserController(BrowserController):
     @property
     @override
     def idle_time(self) -> timedelta:
-        return datetime.now(timezone.utc) - self._last_page_opened_at
+        return datetime.now(UTC) - self._last_page_opened_at
 
     @property
     @override
@@ -165,7 +165,7 @@ class StagehandBrowserController(BrowserController):
             raw_page.on('close', lambda _: self._on_page_close(page))
 
             self._pages.append(page)
-            self._last_page_opened_at = datetime.now(timezone.utc)
+            self._last_page_opened_at = datetime.now(UTC)
             self._total_opened_pages += 1
         finally:
             self._opening_pages_count -= 1
