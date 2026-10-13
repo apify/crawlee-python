@@ -134,7 +134,6 @@ async def test_preexisting_unnamed_storage_open_by_id(storage_type: type[Storage
 
 async def test_concurrent_open_datasets() -> None:
     """Test that concurrent open datasets with the same name return the same instance."""
-
     barrier = asyncio.Barrier(2)
 
     async def push_data(data: dict) -> None:
@@ -157,7 +156,6 @@ async def test_concurrent_open_datasets() -> None:
 
 async def test_concurrent_open_datasets_with_same_name_and_alias() -> None:
     """Test that concurrent open requests for the same storage return the same instance."""
-
     valid_kwargs: dict[str, str | None] = {}
 
     exception_calls = AsyncMock()

@@ -53,7 +53,7 @@ async def test_send_request_zero_timeout_expires_immediately(http_client: HttpCl
     slow_url = str((server_url / 'slow').with_query(delay=2))
     start = time.monotonic()
 
-    with pytest.raises(asyncio.TimeoutError):
+    with pytest.raises(TimeoutError):
         await http_client.send_request(slow_url, timeout=timedelta(0))
 
     assert time.monotonic() - start < 1
@@ -64,7 +64,7 @@ async def test_crawl_zero_timeout_expires_immediately(http_client: HttpClient, s
     slow_url = str((server_url / 'slow').with_query(delay=2))
     start = time.monotonic()
 
-    with pytest.raises(asyncio.TimeoutError):
+    with pytest.raises(TimeoutError):
         await http_client.crawl(Request.from_url(slow_url), timeout=timedelta(0))
 
     assert time.monotonic() - start < 1
@@ -75,7 +75,7 @@ async def test_stream_zero_timeout_expires_immediately(http_client: HttpClient, 
     slow_url = str((server_url / 'slow').with_query(delay=2))
     start = time.monotonic()
 
-    with pytest.raises(asyncio.TimeoutError):
+    with pytest.raises(TimeoutError):
         async with http_client.stream(slow_url, timeout=timedelta(0)):
             pass
 

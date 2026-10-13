@@ -474,7 +474,7 @@ async def test_navigation_timeout_on_slow_request(server_url: URL, http_client: 
     await crawler.run([str(server_url.with_path('/slow').with_query(delay=5))])
 
     assert failed_request_handler.call_count == 1
-    assert isinstance(failed_request_handler.call_args[0][1], asyncio.TimeoutError)
+    assert isinstance(failed_request_handler.call_args[0][1], TimeoutError)
 
 
 async def test_navigation_timeout_applies_to_hooks(server_url: URL) -> None:

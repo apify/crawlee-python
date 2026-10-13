@@ -75,7 +75,7 @@ async def test_processes_requests_from_explicit_queue() -> None:
 )
 @pytest.mark.parametrize(
     'error_type',
-    [pytest.param(RuntimeError, id='runtime error'), pytest.param(asyncio.TimeoutError, id='timeout error')],
+    [pytest.param(RuntimeError, id='runtime error'), pytest.param(TimeoutError, id='timeout error')],
 )
 async def test_propagates_request_queue_status_errors(
     monkeypatch: pytest.MonkeyPatch, method: str, error_type: type[Exception]
@@ -699,7 +699,7 @@ async def test_send_request_respects_timeout(server_url: URL) -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        with pytest.raises(asyncio.TimeoutError):
+        with pytest.raises(TimeoutError):
             await context.send_request(
                 str(server_url / 'slow') + '?delay=2',
                 timeout=timedelta(milliseconds=100),
@@ -1775,7 +1775,6 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
 
     Result should be incremented by 2.
     Method `use_state` must be implemented in a way that prevents race conditions in such scenario."""
-
     crawler = BasicCrawler()
     store = await crawler.get_key_value_store()
     await store.set_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0', {'counter': 0})
@@ -1813,7 +1812,6 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     Handler should be able to time out even if the code causing the timeout is blocking sync code.
     Crawler should attempt to retry it.
     This test creates situation where the request handler times out twice, on third retry it does not time out."""
-
     non_realtime_system_coefficient = 10
     handler_timeout = timedelta(seconds=1)
     max_request_retries = 3

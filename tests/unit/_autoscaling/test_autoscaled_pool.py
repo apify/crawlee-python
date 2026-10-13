@@ -238,7 +238,7 @@ async def test_propagates_timeout_error_from_task_function(system_status: System
         ),
     )
 
-    with pytest.raises(asyncio.TimeoutError, match=r'Fetching a session from the pool timed out'):
+    with pytest.raises(TimeoutError, match=r'Fetching a session from the pool timed out'):
         await pool.run()
 
 

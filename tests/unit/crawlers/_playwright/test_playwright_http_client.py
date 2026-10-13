@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from datetime import timedelta
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -43,7 +42,7 @@ async def test_send_request_zero_timeout_expires_immediately() -> None:
     client = PlaywrightHttpClient()
 
     async with browser_page_context(page):
-        with pytest.raises(asyncio.TimeoutError):
+        with pytest.raises(TimeoutError):
             await client.send_request('https://example.com', timeout=timedelta(0))
 
     page.request.fetch.assert_not_awaited()
