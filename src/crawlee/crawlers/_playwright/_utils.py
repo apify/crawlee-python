@@ -126,7 +126,7 @@ async def infinite_scroll(page: Page) -> None:
 
 
 async def block_requests(
-    page: Page, url_patterns: list[str] | None = None, extra_url_patterns: list[str] | None = None
+    page: Page, *, url_patterns: list[str] | None = None, extra_url_patterns: list[str] | None = None
 ) -> None:
     """Blocks network requests matching specified URL patterns.
 

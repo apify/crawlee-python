@@ -45,7 +45,7 @@ class SelectolaxLexborParser(AbstractHttpParser[LexborHTMLParser, LexborNode]):
 
     @override
     def find_links(
-        self, parsed_content: LexborHTMLParser, selector: str, attribute: str
+        self, parsed_content: LexborHTMLParser, selector: str, *, attribute: str
     ) -> Iterable[str]:
         """Extract href attributes from elements matching the selector.
 

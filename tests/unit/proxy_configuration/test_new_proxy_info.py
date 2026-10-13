@@ -12,10 +12,10 @@ async def test_returns_proxy_info() -> None:
     """Test that proxy_urls can return contain both string and None."""
     config = ProxyConfiguration(proxy_urls=[None, 'http://proxy.com:1111'])
 
-    proxy_info = await config.new_proxy_info(None, None, None)
+    proxy_info = await config.new_proxy_info()
     assert proxy_info is None
 
-    proxy_info = await config.new_proxy_info(None, None, None)
+    proxy_info = await config.new_proxy_info()
     assert proxy_info is not None
     assert proxy_info.url == 'http://proxy.com:1111'
     assert proxy_info.hostname == 'proxy.com'
@@ -30,7 +30,7 @@ async def test_throws_on_invalid_new_url_function() -> None:
     )
 
     with pytest.raises(ValueError):  # noqa: PT011
-        await config.new_proxy_info(None, None, None)
+        await config.new_proxy_info()
 
 
 async def test_returns_proxy_info_with_new_url_function() -> None:
@@ -39,10 +39,10 @@ async def test_returns_proxy_info_with_new_url_function() -> None:
 
     config = ProxyConfiguration(new_url_function=lambda session_id=None, request=None: next(proxy_iterator))  # noqa: ARG005
 
-    proxy_info = await config.new_proxy_info(None, None, None)
+    proxy_info = await config.new_proxy_info()
     assert proxy_info is None
 
-    proxy_info = await config.new_proxy_info(None, None, None)
+    proxy_info = await config.new_proxy_info()
     assert proxy_info is not None
     assert proxy_info.url == 'http://proxy.com:1111'
     assert proxy_info.hostname == 'proxy.com'
@@ -57,7 +57,7 @@ async def test_returns_proxy_info_with_new_url_function_async() -> None:
 
     config = ProxyConfiguration(new_url_function=new_url)
 
-    proxy_info = await config.new_proxy_info(None, None, None)
+    proxy_info = await config.new_proxy_info()
 
     assert proxy_info is not None
     assert proxy_info.url == 'http://proxy.com:1111'
@@ -71,15 +71,15 @@ async def test_rotates_proxies() -> None:
     proxy_urls: list[str | None] = ['http://proxy:1111', 'http://proxy:2222', 'http://proxy:3333']
     config = ProxyConfiguration(proxy_urls=proxy_urls)
 
-    info = await config.new_proxy_info(None, None, None)
+    info = await config.new_proxy_info()
     assert info is not None
     assert info.url == proxy_urls[0]
 
-    info = await config.new_proxy_info(None, None, None)
+    info = await config.new_proxy_info()
     assert info is not None
     assert info.url == proxy_urls[1]
 
-    info = await config.new_proxy_info(None, None, None)
+    info = await config.new_proxy_info()
     assert info is not None
     assert info.url == proxy_urls[2]
 
@@ -92,65 +92,65 @@ async def test_rotates_proxies_with_sessions() -> None:
     config = ProxyConfiguration(proxy_urls=proxy_urls)
 
     # A single session should always receive the same proxy
-    info = await config.new_proxy_info(sessions[0], None, None)
+    info = await config.new_proxy_info(session_id=sessions[0])
     assert info is not None
     assert info.url == proxy_urls[0]
 
-    info = await config.new_proxy_info(sessions[0], None, None)
+    info = await config.new_proxy_info(session_id=sessions[0])
     assert info is not None
     assert info.url == proxy_urls[0]
 
-    info = await config.new_proxy_info(sessions[0], None, None)
+    info = await config.new_proxy_info(session_id=sessions[0])
     assert info is not None
     assert info.url == proxy_urls[0]
 
-    info = await config.new_proxy_info(sessions[0], request, None)
+    info = await config.new_proxy_info(session_id=sessions[0], request=request)
     assert info is not None
     assert info.url == proxy_urls[0]
 
-    info = await config.new_proxy_info(sessions[0], request, None)
+    info = await config.new_proxy_info(session_id=sessions[0], request=request)
     assert info is not None
     assert info.url == proxy_urls[0]
 
     # Different sessions should get rotated proxies
-    info = await config.new_proxy_info(sessions[1], None, None)
+    info = await config.new_proxy_info(session_id=sessions[1])
     assert info is not None
     assert info.url == proxy_urls[1]
 
-    info = await config.new_proxy_info(sessions[2], request, None)
+    info = await config.new_proxy_info(session_id=sessions[2], request=request)
     assert info is not None
     assert info.url == proxy_urls[2]
 
-    info = await config.new_proxy_info(sessions[3], None, None)
+    info = await config.new_proxy_info(session_id=sessions[3])
     assert info is not None
     assert info.url == proxy_urls[0]
 
-    info = await config.new_proxy_info(sessions[4], None, None)
+    info = await config.new_proxy_info(session_id=sessions[4])
     assert info is not None
     assert info.url == proxy_urls[1]
 
-    info = await config.new_proxy_info(sessions[5], request, None)
+    info = await config.new_proxy_info(session_id=sessions[5], request=request)
     assert info is not None
     assert info.url == proxy_urls[2]
 
     # Without sessions should get rotated proxies
-    info = await config.new_proxy_info(None, None, None)
+    info = await config.new_proxy_info()
     assert info is not None
     assert info.url == proxy_urls[0]
 
-    info = await config.new_proxy_info(None, request, None)
+    info = await config.new_proxy_info(request=request)
     assert info is not None
     assert info.url == proxy_urls[1]
 
-    info = await config.new_proxy_info(None, None, None)
+    info = await config.new_proxy_info()
     assert info is not None
     assert info.url == proxy_urls[2]
 
-    info = await config.new_proxy_info(None, None, None)
+    info = await config.new_proxy_info()
     assert info is not None
     assert info.url == proxy_urls[0]
 
-    info = await config.new_proxy_info(None, request, None)
+    info = await config.new_proxy_info(request=request)
     assert info is not None
     assert info.url == proxy_urls[1]
 
@@ -173,6 +173,6 @@ async def test_sets_port(url: str, expected_port: int) -> None:
     """
     config = ProxyConfiguration(proxy_urls=[url])
 
-    info = await config.new_proxy_info(None, None, None)
+    info = await config.new_proxy_info()
     assert info is not None
     assert info.port == expected_port

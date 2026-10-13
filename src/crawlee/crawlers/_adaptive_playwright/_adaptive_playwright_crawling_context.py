@@ -77,7 +77,7 @@ class AdaptivePlaywrightCrawlingContext(
             raise AdaptiveContextError('Page was not crawled with PlaywrightCrawler.')
         return self._response
 
-    async def wait_for_selector(self, selector: str, timeout: timedelta = timedelta(seconds=5)) -> None:
+    async def wait_for_selector(self, selector: str, *, timeout: timedelta = timedelta(seconds=5)) -> None:
         """Locate element by css selector and return `None` once it is found.
 
         If element is not found within timeout, `TimeoutError` is raised.
@@ -91,7 +91,7 @@ class AdaptivePlaywrightCrawlingContext(
         await self.page.locator(selector).wait_for(timeout=timeout.total_seconds() * 1000)
 
     async def query_selector_one(
-        self, selector: str, timeout: timedelta = timedelta(seconds=5)
+        self, selector: str, *, timeout: timedelta = timedelta(seconds=5)
     ) -> TStaticSelectResult | None:
         """Locate element by css selector and return first element found.
 
@@ -109,7 +109,7 @@ class AdaptivePlaywrightCrawlingContext(
         return None
 
     async def query_selector_all(
-        self, selector: str, timeout: timedelta = timedelta(seconds=5)
+        self, selector: str, *, timeout: timedelta = timedelta(seconds=5)
     ) -> Sequence[TStaticSelectResult]:
         """Locate element by css selector and return all elements found.
 
@@ -147,7 +147,7 @@ class AdaptivePlaywrightCrawlingContext(
         )
 
     async def parse_with_static_parser(
-        self, selector: str | None = None, timeout: timedelta = timedelta(seconds=5)
+        self, selector: str | None = None, *, timeout: timedelta = timedelta(seconds=5)
     ) -> TStaticParseResult:
         """Parse whole page with static parser. If `selector` argument is used, wait for selector first.
 
@@ -161,7 +161,7 @@ class AdaptivePlaywrightCrawlingContext(
             Result of used static parser `parse_text` method.
         """
         if selector:
-            await self.wait_for_selector(selector, timeout)
+            await self.wait_for_selector(selector, timeout=timeout)
         if self._page:
             return await self._static_parser.parse_text(await self.page.content())
         return self.parsed_content

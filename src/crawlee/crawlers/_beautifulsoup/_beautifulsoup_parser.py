@@ -42,7 +42,7 @@ class BeautifulSoupParser(AbstractHttpParser[BeautifulSoup, Tag]):
         return tuple(match for match in parsed_content.select(selector))
 
     @override
-    def find_links(self, parsed_content: Tag, selector: str, attribute: str) -> Iterable[str]:
+    def find_links(self, parsed_content: Tag, selector: str, *, attribute: str) -> Iterable[str]:
         link: Tag
         urls: list[str] = []
         for link in parsed_content.select(selector):
