@@ -43,7 +43,7 @@ async def test_start_and_stop(function: AsyncMock, delay: timedelta) -> None:
 
 
 async def test_execution(function: AsyncMock, delay: timedelta) -> None:
-    """The recurring task keeps calling its function until stopped."""
+    """The recurring task calls its function repeatedly."""
     third_call_done = asyncio.Event()
     function.side_effect = lambda: third_call_done.set() if function.call_count >= 3 else None
     task = RecurringTask(function, delay)
