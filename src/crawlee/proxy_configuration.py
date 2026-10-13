@@ -3,11 +3,10 @@ from __future__ import annotations
 import inspect
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from more_itertools import flatten
 from pydantic import AnyHttpUrl, TypeAdapter
-from typing_extensions import Protocol
 from yarl import URL
 
 from crawlee._utils.crypto import crypto_random_object_id

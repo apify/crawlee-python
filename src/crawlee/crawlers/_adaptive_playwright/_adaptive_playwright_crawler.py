@@ -45,8 +45,7 @@ from ._result_comparator import create_default_comparator
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
     from types import TracebackType
-
-    from typing_extensions import Unpack
+    from typing import Unpack
 
     from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
 

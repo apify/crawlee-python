@@ -16,9 +16,7 @@ from ._utils import validate_storage_name
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Mapping, Sequence
-    from typing import Any, Literal
-
-    from typing_extensions import Unpack
+    from typing import Any, Literal, Unpack
 
     from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs, JsonSerializable
     from crawlee.configuration import Configuration
