@@ -88,17 +88,25 @@ async def wait_for_all_tasks_to_finish(
 
 @asynccontextmanager
 async def task_group() -> AsyncGenerator[asyncio.TaskGroup]:
-    """Open an `asyncio.TaskGroup` that raises the first failure as is, not wrapped in an `ExceptionGroup`.
+    """Open an `asyncio.TaskGroup` that raises the first failure as is, not wrapped in an exception group.
 
-    A failure in a task or in the body cancels the remaining tasks, as with a plain `TaskGroup`. Callers keep catching
-    the same exception types they would get from awaiting the work directly.
+    A failure in a task or in the body cancels the remaining tasks, as with a plain `TaskGroup`, so callers catch the
+    same exception types as when awaiting the work directly.
     """
-    error: Exception | None = None
+    body_error: BaseException | None = None
+    error: BaseException | None = None
     try:
         async with asyncio.TaskGroup() as tg:
-            yield tg
-    except ExceptionGroup as group:
-        error = group.exceptions[0]
+            try:
+                yield tg
+            except BaseException as exc:
+                # A body raising while it is being cancelled is reacting to an earlier task failure, not failing first.
+                if not (current := asyncio.current_task()) or not current.cancelling():
+                    body_error = exc
+                raise
+    except BaseExceptionGroup as group:
+        # A failing body is the first failure, but `TaskGroup` lists it after errors the tasks raise while cancelled.
+        error = body_error if body_error in group.exceptions else group.exceptions[0]
 
     # Raised outside the `except` block, so the group does not become the exception's context.
     if error is not None:
