@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import contextlib
-import contextvars
 import logging
 import os
 import socket
-import sys
-import threading
 import warnings
 from typing import TYPE_CHECKING, Any, cast
 
@@ -27,49 +23,12 @@ from crawlee.storages import KeyValueStore
 from tests.unit.server import TestServer, app, no_robots_app, serve_in_thread
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Callable, Generator, Iterator
+    from collections.abc import AsyncGenerator, Callable, Iterator
     from pathlib import Path
 
     from yarl import URL
 
     from crawlee.http_clients._base import HttpClient
-
-
-if sys.version_info < (3, 11):
-    from backports.asyncio.runner import runner as backports_runner  # ty: ignore[unresolved-import]
-
-    original_copy_context = contextvars.copy_context
-    original_patch_object = backports_runner._patch_object
-    copy_context_override = threading.local()
-
-    def copy_context() -> contextvars.Context:
-        factory = getattr(copy_context_override, 'factory', None)
-        return original_copy_context() if factory is None else factory()
-
-    @contextlib.contextmanager
-    def patch_object(target: Any, attribute: str, new: Any) -> Generator[None]:
-        """Thread-local stand-in for the `_patch_object` helper of `backports.asyncio.runner`.
-
-        On Python 3.10, pytest-asyncio's `Runner.run(coro, context=...)` swaps the module-global
-        `contextvars.copy_context` for a lambda returning the fixture's context while it creates the task. If the main
-        thread releases the GIL meanwhile (e.g. a GC finalizer closing a socket), the test server's event loop thread
-        builds its handles with that same context. When it runs one of them while the main thread steps the fixture
-        task, `Context.run` raises "cannot enter context: ... is already entered", the task step is dropped, and the
-        fixture never finishes. Keeping the override thread-local confines it to the thread that creates the task.
-        """
-        if target is not contextvars or attribute != 'copy_context':
-            with original_patch_object(target, attribute, new):
-                yield
-            return
-        previous = getattr(copy_context_override, 'factory', None)
-        copy_context_override.factory = new
-        try:
-            yield
-        finally:
-            copy_context_override.factory = previous
-
-    contextvars.copy_context = copy_context  # ty: ignore[invalid-assignment]
-    backports_runner._patch_object = patch_object
 
 
 @pytest.fixture(autouse=True)
