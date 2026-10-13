@@ -167,7 +167,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
                 pipe.hset(
                     self._metadata_items_key,
                     key,
-                    item_metadata.model_dump_json(),
+                    item_metadata.model_dump_json(by_alias=True),
                 )
             )
             await self._update_metadata(pipe, **MetadataUpdateParams(update_accessed_at=True, update_modified_at=True))

@@ -9,6 +9,7 @@ import pytest
 from crawlee._consts import METADATA_FILENAME
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import FileSystemStorageClient
+from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -96,7 +97,7 @@ async def test_value_file_creation_and_content(kvs_client: FileSystemKeyValueSto
     with key_metadata_path.open() as f:
         metadata = json.load(f)
         assert metadata['key'] == test_key
-        assert metadata['content_type'] == 'text/plain; charset=utf-8'
+        assert metadata['contentType'] == 'text/plain; charset=utf-8'
         assert metadata['size'] == len(test_value.encode('utf-8'))
 
 
@@ -224,5 +225,30 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
     record = await reopened_client.get_value(key=test_key)
     assert record is not None
     assert record.value == test_value
+
+    await reopened_client.drop()
+
+
+async def test_snake_case_files_from_v1_are_still_read(configuration: Configuration) -> None:
+    """Store and record metadata files with snake_case keys, as Crawlee v1 wrote them, still load."""
+    storage_client = FileSystemStorageClient()
+    client = await storage_client.create_kvs_client(name='snake-case-kvs', configuration=configuration)
+    await client.set_value(key='key', value='value')
+    kvs_id = (await client.get_metadata()).id
+
+    # Rewrite every metadata file the way v1 serialized it, without aliases.
+    for path in client.path_to_kvs.glob(f'*{METADATA_FILENAME}'):
+        model = KeyValueStoreMetadata if path == client.path_to_metadata else KeyValueStoreRecordMetadata
+        snake_case_data = model.model_validate_json(path.read_text()).model_dump(mode='json', by_alias=False)
+        path.write_text(json.dumps(snake_case_data))
+
+    reopened_client = await storage_client.create_kvs_client(id=kvs_id, configuration=configuration)
+    assert (await reopened_client.get_metadata()).id == kvs_id
+
+    record = await reopened_client.get_value(key='key')
+    assert record is not None
+    assert record.value == 'value'
+    assert record.content_type == 'text/plain; charset=utf-8'
+    assert [key.key async for key in reopened_client.iterate_keys()] == ['key']
 
     await reopened_client.drop()

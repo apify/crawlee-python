@@ -381,7 +381,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                         state.regular_requests[request.unique_key] = sequence_number
 
                     # Save the clean request without extra fields
-                    request_data = await json_dumps(request.model_dump())
+                    request_data = await json_dumps(request.model_dump(by_alias=True))
                     await atomic_write(request_path, request_data)
 
                     # A new forefront request belongs to the very front of the queue, so it can go straight
@@ -513,7 +513,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 logger.warning(f'Request file for {request.unique_key} does not exist, cannot mark as handled.')
                 return None
 
-            request_data = await json_dumps(request.model_dump())
+            request_data = await json_dumps(request.model_dump(by_alias=True))
             await atomic_write(request_path, request_data)
 
             # Update state: remove from in-progress and pending, and add to handled. Dropping the key from
@@ -575,7 +575,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 state.regular_requests[request.unique_key] = sequence_number
 
             # Save the clean request without extra fields
-            request_data = await json_dumps(request.model_dump())
+            request_data = await json_dumps(request.model_dump(by_alias=True))
             await atomic_write(request_path, request_data)
 
             # Remove from in-progress.
@@ -706,7 +706,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
         await asyncio.to_thread(self.path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
 
         # Dump the serialized metadata to the file.
-        data = await json_dumps(self._metadata.model_dump())
+        data = await json_dumps(self._metadata.model_dump(by_alias=True))
         await atomic_write(self.path_to_metadata, data)
 
     async def _refresh_cache(self) -> None:

@@ -310,7 +310,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
             request = requests_by_unique_key[unique_key]
 
             new_unique_keys.append(unique_key)
-            new_request_data[unique_key] = request.model_dump_json()
+            new_request_data[unique_key] = request.model_dump_json(by_alias=True)
 
         if new_unique_keys:
             # Add new requests to the queue atomically, get back which were actually added
@@ -417,7 +417,9 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 elif self._dedup_strategy == 'bloom':
                     await await_redis_response(pipe.bf().add(self._handled_filter_key, request.unique_key))
 
-                await await_redis_response(pipe.hset(self._data_key, request.unique_key, request.model_dump_json()))
+                await await_redis_response(
+                    pipe.hset(self._data_key, request.unique_key, request.model_dump_json(by_alias=True))
+                )
 
                 await self._update_metadata(
                     pipe,
@@ -471,11 +473,15 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                         f'{{"client_id":"{self.client_key}","blocked_until_timestamp":{blocked_until_timestamp}}}',
                     )
                 )
-                await await_redis_response(pipe.hset(self._data_key, request.unique_key, request.model_dump_json()))
+                await await_redis_response(
+                    pipe.hset(self._data_key, request.unique_key, request.model_dump_json(by_alias=True))
+                )
                 self._pending_fetch_cache.appendleft(request)
             else:
                 await await_redis_response(pipe.rpush(self._queue_key, request.unique_key))
-                await await_redis_response(pipe.hset(self._data_key, request.unique_key, request.model_dump_json()))
+                await await_redis_response(
+                    pipe.hset(self._data_key, request.unique_key, request.model_dump_json(by_alias=True))
+                )
                 await await_redis_response(pipe.hdel(self._in_progress_key, request.unique_key))
             await self._update_metadata(
                 pipe,
