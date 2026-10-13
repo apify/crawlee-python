@@ -57,6 +57,6 @@ h2 = await context.query_selector_one('h2', timeout=timedelta(seconds=5))
 
 ## Storage data uses camelCase keys
 
-The storage clients now write their JSON data with camelCase keys, the same as Crawlee JS. This covers the metadata, request and record metadata files of `FileSystemStorageClient`, and the request and record metadata JSON stored by `RedisStorageClient` and `SqlStorageClient`. For example, `item_count` in a dataset's `__metadata__.json` becomes `itemCount`.
+The storage clients now write their JSON data with camelCase keys, the same as Crawlee JS. This covers the metadata, request and record metadata files of `FileSystemStorageClient`, the request and record metadata JSON stored by `RedisStorageClient`, and the request JSON stored by `SqlStorageClient`. For example, `item_count` in a dataset's `__metadata__.json` becomes `itemCount`. The storage metadata documents of `RedisStorageClient` keep their snake_case keys.
 
 Data written by v1 still loads, so an existing storage directory, Redis instance or database keeps working. Any tooling that reads these files directly needs to handle the camelCase keys.

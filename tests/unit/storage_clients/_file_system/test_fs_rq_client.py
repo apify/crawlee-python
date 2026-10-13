@@ -218,8 +218,7 @@ async def test_snake_case_files_from_v1_are_still_read() -> None:
     for path in client.path_to_rq.glob('*.json'):
         data = json.loads(path.read_text())
         model = RequestQueueMetadata if path == client.path_to_metadata else Request
-        snake_case_data = model.model_validate(data).model_dump(mode='json')
-        assert 'uniqueKey' not in snake_case_data
+        snake_case_data = model.model_validate(data).model_dump(mode='json', by_alias=False)
         path.write_text(json.dumps(snake_case_data))
 
     reopened_client = await storage_client.create_rq_client(id=rq_id)
