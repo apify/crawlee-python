@@ -131,7 +131,9 @@ async def test_memory_leak_on_concurrent_context_creation() -> None:
 
     # Create minimal instance of PlaywrightBrowserController with mocked browser
     controller = PlaywrightBrowserController(
-        PlaywrightPersistentBrowser(mocked_browser, None, {}), header_generator=None, fingerprint_generator=None
+        PlaywrightPersistentBrowser(mocked_browser, None, browser_launch_options={}),
+        header_generator=None,
+        fingerprint_generator=None,
     )
 
     # Both calls will try to create browser context at the same time, but only one context should be created.

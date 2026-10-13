@@ -112,7 +112,7 @@ class ProxyConfiguration:
         return URL(url)
 
     async def new_proxy_info(
-        self, session_id: str | None, request: Request | None, proxy_tier: int | None
+        self, *, session_id: str | None = None, request: Request | None = None, proxy_tier: int | None = None
     ) -> ProxyInfo | None:
         """Return a new ProxyInfo object based on the configured proxy rotation strategy.
 
@@ -157,7 +157,7 @@ class ProxyConfiguration:
         return info
 
     async def new_url(
-        self, session_id: str | None = None, request: Request | None = None, proxy_tier: int | None = None
+        self, *, session_id: str | None = None, request: Request | None = None, proxy_tier: int | None = None
     ) -> str | None:
         """Return a proxy URL string based on the configured proxy rotation strategy.
 
@@ -170,7 +170,7 @@ class ProxyConfiguration:
             proxy_tier: Specific proxy tier to use. If not provided, will be automatically
                 selected based on configuration.
         """
-        proxy_info = await self.new_proxy_info(session_id, request, proxy_tier)
+        proxy_info = await self.new_proxy_info(session_id=session_id, request=request, proxy_tier=proxy_tier)
         return proxy_info.url if proxy_info else None
 
     async def _pick_url(

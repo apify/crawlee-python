@@ -34,7 +34,7 @@ class HeaderGenerator:
         return HttpHeaders({key: value for key, value in all_headers.items() if key in header_names})
 
     def get_specific_headers(
-        self, header_names: set[str] | None = None, browser_type: SupportedBrowserType = 'chrome'
+        self, header_names: set[str] | None = None, *, browser_type: SupportedBrowserType = 'chrome'
     ) -> HttpHeaders:
         """Return subset of headers based on the selected `header_names`.
 

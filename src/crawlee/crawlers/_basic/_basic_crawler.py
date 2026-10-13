@@ -913,6 +913,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def get_data(
         self,
+        *,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
@@ -944,10 +945,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def export_data(
         self,
         path: str | Path,
+        *,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
-        *,
         collect_all_keys: bool = False,
         **additional_kwargs: Unpack[ExportDataKwargs],
     ) -> None:
@@ -1436,7 +1437,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         for (id, name, alias), changes in result.key_value_store_changes.items():
             store = await get_kvs(id=id, name=name, alias=alias)
             for key, value in changes.updates.items():
-                await store.set_value(key, value.content, value.content_type)
+                await store.set_value(key, value.content, content_type=value.content_type)
 
     async def __is_finished_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()

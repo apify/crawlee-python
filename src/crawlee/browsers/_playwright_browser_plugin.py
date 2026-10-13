@@ -190,7 +190,9 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
         if self._use_incognito_pages:
             browser: Browser | PlaywrightPersistentBrowser = await browser_type.launch(**self._browser_launch_options)
         else:
-            browser = PlaywrightPersistentBrowser(browser_type, self._user_data_dir, self._browser_launch_options)
+            browser = PlaywrightPersistentBrowser(
+                browser_type, self._user_data_dir, browser_launch_options=self._browser_launch_options
+            )
 
         return PlaywrightBrowserController(
             browser,
