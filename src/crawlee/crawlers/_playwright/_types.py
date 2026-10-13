@@ -24,7 +24,7 @@ class BlockRequestsFunction(Protocol):
     """
 
     async def __call__(
-        self, url_patterns: list[str] | None = None, extra_url_patterns: list[str] | None = None
+        self, *, url_patterns: list[str] | None = None, extra_url_patterns: list[str] | None = None
     ) -> None:
         """Call dunder method.
 

@@ -174,6 +174,7 @@ class KeyValueStore(Storage):
         self,
         key: str,
         value: Any,
+        *,
         content_type: str | None = None,
     ) -> None:
         """Set a value in the KVS.
@@ -195,6 +196,7 @@ class KeyValueStore(Storage):
 
     async def iterate_keys(
         self,
+        *,
         exclusive_start_key: str | None = None,
         limit: int | None = None,
     ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
@@ -215,6 +217,7 @@ class KeyValueStore(Storage):
 
     async def iterate_values(
         self,
+        *,
         exclusive_start_key: str | None = None,
         limit: int | None = None,
     ) -> AsyncIterator[Any]:
@@ -236,6 +239,7 @@ class KeyValueStore(Storage):
 
     async def iterate_entries(
         self,
+        *,
         exclusive_start_key: str | None = None,
         limit: int | None = None,
     ) -> AsyncIterator[tuple[str, Any]]:
@@ -274,6 +278,7 @@ class KeyValueStore(Storage):
 
     async def list_keys(
         self,
+        *,
         exclusive_start_key: str | None = None,
         limit: int = 1000,
     ) -> list[KeyValueStoreRecordMetadata]:

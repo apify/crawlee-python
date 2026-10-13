@@ -680,9 +680,9 @@ async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[st
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        h1 = await context.query_selector_one('h1', _ELEMENT_WAIT_TIMEOUT)
+        h1 = await context.query_selector_one('h1', timeout=_ELEMENT_WAIT_TIMEOUT)
         mocked_h1_handler(h1)
-        h2 = await context.query_selector_one('h2', _ELEMENT_WAIT_TIMEOUT)
+        h2 = await context.query_selector_one('h2', timeout=_ELEMENT_WAIT_TIMEOUT)
         mocked_h2_handler(h2)
 
     await crawler.run(test_urls[:1])
@@ -724,9 +724,9 @@ async def test_adaptive_context_query_selector_parsel(test_urls: list[str]) -> N
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        if h1 := await context.query_selector_one('h1', _ELEMENT_WAIT_TIMEOUT):
+        if h1 := await context.query_selector_one('h1', timeout=_ELEMENT_WAIT_TIMEOUT):
             mocked_h1_handler(type(h1), h1.get())
-        if h2 := await context.query_selector_one('h2', _ELEMENT_WAIT_TIMEOUT):
+        if h2 := await context.query_selector_one('h2', timeout=_ELEMENT_WAIT_TIMEOUT):
             mocked_h2_handler(type(h2), h2.get())
 
     await crawler.run(test_urls[:1])

@@ -40,6 +40,7 @@ class PlaywrightPersistentBrowser(Browser):
         self,
         browser_type: BrowserType,
         user_data_dir: str | Path | None,
+        *,
         browser_launch_options: dict[str, Any],
     ) -> None:
         self._browser_type = browser_type
