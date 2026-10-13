@@ -130,7 +130,10 @@ dev = [
     "pre-commit<5.0.0",
     "proxy-py<3.0.0",
     "pydoc-markdown<5.0.0",
-    "pytest-asyncio<2.0.0",
+    # pytest-asyncio 1.1+ runs tests through `backports.asyncio.runner` on Python 3.10, whose process-wide
+    # `contextvars.copy_context` patch can leak the fixture context into the test server thread and hang the test.
+    "pytest-asyncio<2.0.0; python_version >= '3.11' or sys_platform != 'linux'",
+    "pytest-asyncio>=1.0.0,<1.1.0; python_version < '3.11' and sys_platform == 'linux'",
     "pytest-cov<8.0.0",
     "pytest-rerunfailures<17.0.0",
     "pytest-timeout<3.0.0",

@@ -994,7 +994,7 @@ async def test_purge_on_start_enabled(storage_client: StorageClient) -> None:
 
     # Skip this test for memory storage since it doesn't persist data between client instances.
     if isinstance(storage_client, MemoryStorageClient):
-        pytest.skip('Memory storage does not persist data between client instances.')
+        raise pytest.skip.Exception('Memory storage does not persist data between client instances.')
 
     configuration = Configuration(purge_on_start=True)
 
@@ -1080,7 +1080,7 @@ async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
 
     # Skip this test for memory storage since it doesn't persist data between client instances.
     if isinstance(storage_client, MemoryStorageClient):
-        pytest.skip('Memory storage does not persist data between client instances.')
+        raise pytest.skip.Exception('Memory storage does not persist data between client instances.')
 
     configuration = Configuration(purge_on_start=False)
 

@@ -1,5 +1,3 @@
-import sys
-
 import pytest
 from playwright.async_api import async_playwright
 from yarl import URL
@@ -67,11 +65,6 @@ async def test_infinite_scroll_no_page_without_scroll(server_url: URL) -> None:
         await browser.close()
 
 
-@pytest.mark.skipif(
-    sys.platform == 'linux' and sys.version_info < (3, 11),
-    reason='Hangs on Linux with Python 3.10: the pytest-asyncio backports runner can leak the fixture context '
-    'into the test server thread.',
-)
 async def test_double_call_infinite_scroll(server_url: URL) -> None:
     """Checks that calling infinite_scroll twice does not load more items the second time."""
     async with async_playwright() as p:

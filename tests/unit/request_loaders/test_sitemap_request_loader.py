@@ -1,6 +1,5 @@
 import base64
 import gzip
-import sys
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -347,11 +346,6 @@ async def test_transform_request_function(server_url: URL, http_client: HttpClie
     assert extracted_urls == get_basic_results(server_url)
 
 
-@pytest.mark.skipif(
-    sys.platform == 'linux' and sys.version_info < (3, 11),
-    reason='Hangs on Linux with Python 3.10: the pytest-asyncio backports runner can leak the fixture context '
-    'into the test server thread.',
-)
 async def test_transform_request_function_with_skip(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(
         base64=encode_base64(get_basic_sitemap(url=server_url).encode())
