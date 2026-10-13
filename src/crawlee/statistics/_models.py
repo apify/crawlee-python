@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import warnings
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Any
@@ -116,17 +115,6 @@ class StatisticsState(BaseModel):
             finished_at = self.crawler_finished_at or datetime.now(UTC)
             return self._runtime_offset + finished_at - self.crawler_last_started_at
         return self._runtime_offset
-
-    @crawler_runtime.setter
-    def crawler_runtime(self, value: timedelta) -> None:
-        # Setter for backwards compatibility only, the crawler_runtime is now computed_field, and can't be set manually.
-        # To be removed in v2 release https://github.com/apify/crawlee-python/issues/1567
-        warnings.warn(
-            f"Setting 'crawler_runtime' is deprecated and will be removed in a future version."
-            f' Value {value} will not be used.',
-            DeprecationWarning,
-            stacklevel=2,
-        )
 
     @computed_field(alias='crawlerRuntimeMillis')
     def crawler_runtime_for_serialization(self) -> timedelta:
