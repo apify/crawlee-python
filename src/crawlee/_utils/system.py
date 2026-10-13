@@ -139,10 +139,7 @@ class CpuInfo(CamelCaseModel):
     else:
         created_at: Annotated[
             datetime,
-            Field(
-                alias='createdAt',
-                default_factory=lambda: datetime.now(UTC),
-            ),
+            Field(default_factory=lambda: datetime.now(UTC)),
         ]
         """The time at which the measurement was taken."""
 
@@ -169,10 +166,7 @@ class MemoryUsageInfo(CamelCaseModel):
     else:
         created_at: Annotated[
             datetime,
-            Field(
-                alias='createdAt',
-                default_factory=lambda: datetime.now(UTC),
-            ),
+            Field(default_factory=lambda: datetime.now(UTC)),
         ]
         """The time at which the measurement was taken."""
 

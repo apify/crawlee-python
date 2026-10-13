@@ -72,7 +72,7 @@ timedelta_secs = Annotated[timedelta, PlainSerializer(_timedelta_to_secs), WrapV
 class CamelCaseModel(BaseModel):
     """Base model whose fields (de)serialize under camelCase aliases generated from their names.
 
-    A field whose external key differs from the generated one keeps an explicit `Field(alias=...)`.
+    A field whose external key differs from the generated one sets an explicit `Field(alias=...)`.
     """
 
     model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)

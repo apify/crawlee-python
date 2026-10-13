@@ -53,7 +53,7 @@ class CrawleeRequestData(CamelCaseModel):
     last_proxy_tier: int | None = None
     """The last proxy tier used to process the request."""
 
-    forefront: Annotated[bool, Field()] = False
+    forefront: bool = False
     """Indicate whether the request should be enqueued at the front of the queue."""
 
     crawl_depth: int = 0
@@ -211,7 +211,7 @@ class Request(CamelCaseModel):
         # Internally, the model contains `UserData`, this is just for convenience
         user_data: Annotated[
             MutableMapping[str, JsonSerializable],
-            Field(alias='userData', default_factory=UserData),
+            Field(default_factory=UserData),
             PlainValidator(user_data_adapter.validate_python),
             PlainSerializer(
                 lambda instance: user_data_adapter.dump_python(

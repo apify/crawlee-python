@@ -84,11 +84,8 @@ class StatisticsState(CamelCaseModel):
         requests_with_status_code: dict[str, int] = {}
     else:
         errors: Annotated[dict[str, Any], Field(default_factory=dict)]
-        retry_errors: Annotated[dict[str, Any], Field(alias='retryErrors', default_factory=dict)]
-        requests_with_status_code: Annotated[
-            dict[str, int],
-            Field(alias='requestsWithStatusCode', default_factory=dict),
-        ]
+        retry_errors: Annotated[dict[str, Any], Field(default_factory=dict)]
+        requests_with_status_code: Annotated[dict[str, int], Field(default_factory=dict)]
 
     stats_persisted_at: Annotated[datetime | None, PlainSerializer(lambda _: datetime.now(UTC))] = None
     request_retry_histogram: Annotated[

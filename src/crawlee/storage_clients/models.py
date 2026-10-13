@@ -29,7 +29,7 @@ class StorageMetadata(CamelCaseModel):
     id: str
     """The unique identifier of the storage."""
 
-    name: Annotated[str | None, Field(default=None)]
+    name: str | None = None
     """The name of the storage."""
 
     accessed_at: datetime
@@ -96,7 +96,7 @@ class KeyValueStoreRecordMetadata(CamelCaseModel):
     Describe the format and type of data stored in the record, following the MIME specification.
     """
 
-    size: Annotated[int | None, Field(default=None)] = None
+    size: int | None = None
     """The size of the record in bytes."""
 
 
@@ -146,7 +146,7 @@ class ProcessedRequest(CamelCaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: Annotated[str | None, Field(alias='requestId', default=None)] = None
+    id: Annotated[str | None, Field(alias='requestId')] = None
     """Internal representation of the request by the storage client. Only some clients use id."""
 
     unique_key: str
@@ -161,8 +161,8 @@ class UnprocessedRequest(CamelCaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     unique_key: str
-    url: Annotated[str, BeforeValidator(validate_http_url), Field()]
-    method: Annotated[HttpMethod | None, Field()] = None
+    url: Annotated[str, BeforeValidator(validate_http_url)]
+    method: HttpMethod | None = None
 
 
 @docs_group('Storage data')
