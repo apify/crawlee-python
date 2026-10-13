@@ -6,13 +6,14 @@ from contextlib import aclosing, suppress
 from logging import getLogger
 from typing import TYPE_CHECKING, Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 from typing_extensions import override
 from yarl import URL
 
 from crawlee import Request, RequestOptions
 from crawlee._utils.docs import docs_group
 from crawlee._utils.globs import Glob
+from crawlee._utils.models import CamelCaseModel
 from crawlee._utils.recoverable_state import RecoverableState
 from crawlee._utils.sitemap import (
     DEFAULT_MAX_DEPTH,
@@ -40,7 +41,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class SitemapRequestLoaderState(BaseModel):
+class SitemapRequestLoaderState(CamelCaseModel):
     """State model for persisting sitemap request loader data.
 
     The crawler processes one sitemap at a time. The current sitemap is stored in `in_progress_sitemap_url`.
@@ -67,36 +68,34 @@ class SitemapRequestLoaderState(BaseModel):
     `in_progress` is cleared.
     """
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
-
-    url_queue: Annotated[deque[str], Field(alias='urlQueue')]
+    url_queue: deque[str]
     """Queue of URLs extracted from sitemaps and ready for processing."""
 
-    in_progress: Annotated[set[str], Field(alias='inProgress')] = set()
+    in_progress: set[str] = Field(default_factory=set)
     """Set of request URLs currently being processed."""
 
-    pending_sitemap_urls: Annotated[deque[str], Field(alias='pendingSitemapUrls')]
+    pending_sitemap_urls: deque[str]
     """Queue of sitemap URLs that need to be fetched and processed."""
 
-    in_progress_sitemap_url: Annotated[str | None, Field(alias='inProgressSitemapUrl')] = None
+    in_progress_sitemap_url: str | None = None
     """The sitemap URL currently being processed."""
 
-    current_sitemap_processed_urls: Annotated[set[str], Field(alias='currentSitemapProcessedUrls')] = set()
+    current_sitemap_processed_urls: set[str] = Field(default_factory=set)
     """URLs from the current sitemap that have been added to the queue."""
 
-    processed_sitemap_urls: Annotated[set[str], Field(alias='processedSitemapUrls')] = set()
+    processed_sitemap_urls: set[str] = Field(default_factory=set)
     """Set of processed sitemap URLs."""
 
-    sitemap_depths: Annotated[dict[str, int], Field(alias='sitemapDepths')] = {}
+    sitemap_depths: dict[str, int] = Field(default_factory=dict)
     """Nesting depth of each known sitemap URL, used to bound how far nested sitemap chains are followed."""
 
     completed: Annotated[bool, Field(alias='sitemapCompleted')] = False
     """Whether all sitemaps have been fully processed."""
 
-    total_count: Annotated[int, Field(alias='totalCount')] = 0
+    total_count: int = 0
     """Total number of URLs found and added to the queue from all processed sitemaps."""
 
-    handled_count: Annotated[int, Field(alias='handledCount')] = 0
+    handled_count: int = 0
     """Number of URLs that have been successfully handled."""
 
 

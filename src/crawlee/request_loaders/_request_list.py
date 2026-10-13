@@ -6,22 +6,21 @@ from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Iterab
 from logging import getLogger
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from typing_extensions import override
 
 from crawlee._request import Request
 from crawlee._utils.docs import docs_group
+from crawlee._utils.models import CamelCaseModel
 from crawlee.request_loaders._request_loader import RequestLoader
 
 logger = getLogger(__name__)
 
 
-class RequestListState(BaseModel):
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
-
-    next_index: Annotated[int, Field(alias='nextIndex')] = 0
-    next_unique_key: Annotated[str | None, Field(alias='nextUniqueKey')] = None
-    in_progress: Annotated[set[str], Field(alias='inProgress')] = set()
+class RequestListState(CamelCaseModel):
+    next_index: int = 0
+    next_unique_key: str | None = None
+    in_progress: set[str] = Field(default_factory=set)
 
 
 class RequestListData(BaseModel):

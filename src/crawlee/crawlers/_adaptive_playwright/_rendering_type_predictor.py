@@ -9,12 +9,13 @@ from statistics import mean
 from typing import TYPE_CHECKING, Annotated, Literal
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
+from pydantic import Field, PlainSerializer, PlainValidator
 from rapidfuzz.distance import JaroWinkler
 from sklearn.linear_model import LogisticRegression
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
+from crawlee._utils.models import CamelCaseModel
 from crawlee._utils.recoverable_state import RecoverableState
 
 from ._utils import sklearn_model_serializer, sklearn_model_validator
@@ -31,9 +32,7 @@ RenderingType = Literal['static', 'client only']
 FeatureVector = tuple[float, float]
 
 
-class RenderingTypePredictorState(BaseModel):
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
-
+class RenderingTypePredictorState(CamelCaseModel):
     model: Annotated[
         LogisticRegression,
         Field(LogisticRegression),
@@ -41,7 +40,7 @@ class RenderingTypePredictorState(BaseModel):
         PlainSerializer(sklearn_model_serializer),
     ]
 
-    labels_coefficients: Annotated[defaultdict[str, float], Field(alias='labelsCoefficients')]
+    labels_coefficients: defaultdict[str, float]
 
 
 @docs_group('Other')

@@ -248,6 +248,7 @@ inline-quotes = "single"
 
 [tool.ruff.lint.flake8-type-checking]
 runtime-evaluated-base-classes = [
+    "crawlee._utils.models.CamelCaseModel",
     "pydantic.BaseModel",
     "pydantic_settings.BaseSettings",
 ]

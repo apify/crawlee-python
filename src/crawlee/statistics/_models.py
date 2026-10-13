@@ -5,12 +5,12 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator, computed_field
+from pydantic import ConfigDict, Field, PlainSerializer, PlainValidator, computed_field
 from typing_extensions import override
 
 from crawlee._utils.console import make_table
 from crawlee._utils.docs import docs_group
-from crawlee._utils.models import timedelta_ms
+from crawlee._utils.models import CamelCaseModel, timedelta_ms
 from crawlee._utils.time import format_duration
 
 _STATISTICS_TABLE_WIDTH = 100
@@ -54,17 +54,17 @@ class FinalStatistics:
 
 
 @docs_group('Statistics')
-class StatisticsState(BaseModel):
+class StatisticsState(CamelCaseModel):
     """Statistic data about a crawler run."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True, ser_json_inf_nan='constants')
-    stats_id: Annotated[int | None, Field(alias='statsId')] = None
+    model_config = ConfigDict(ser_json_inf_nan='constants')
+    stats_id: int | None = None
 
-    requests_finished: Annotated[int, Field(alias='requestsFinished')] = 0
-    requests_failed: Annotated[int, Field(alias='requestsFailed')] = 0
-    requests_retries: Annotated[int, Field(alias='requestsRetries')] = 0
-    requests_failed_per_minute: Annotated[float, Field(alias='requestsFailedPerMinute')] = 0
-    requests_finished_per_minute: Annotated[float, Field(alias='requestsFinishedPerMinute')] = 0
+    requests_finished: int = 0
+    requests_failed: int = 0
+    requests_retries: int = 0
+    requests_failed_per_minute: float = 0
+    requests_finished_per_minute: float = 0
     request_min_duration: Annotated[timedelta_ms | None, Field(alias='requestMinDurationMillis')] = None
     request_max_duration: Annotated[timedelta_ms | None, Field(alias='requestMaxDurationMillis')] = None
     request_total_failed_duration: Annotated[timedelta_ms, Field(alias='requestTotalFailedDurationMillis')] = (
@@ -73,9 +73,9 @@ class StatisticsState(BaseModel):
     request_total_finished_duration: Annotated[timedelta_ms, Field(alias='requestTotalFinishedDurationMillis')] = (
         timedelta()
     )
-    crawler_started_at: Annotated[datetime | None, Field(alias='crawlerStartedAt')] = None
+    crawler_started_at: datetime | None = None
     crawler_last_started_at: Annotated[datetime | None, Field(alias='crawlerLastStartTimestamp')] = None
-    crawler_finished_at: Annotated[datetime | None, Field(alias='crawlerFinishedAt')] = None
+    crawler_finished_at: datetime | None = None
 
     # Workaround for Pydantic and type checkers when using Annotated with default_factory
     if TYPE_CHECKING:
@@ -90,18 +90,15 @@ class StatisticsState(BaseModel):
             Field(alias='requestsWithStatusCode', default_factory=dict),
         ]
 
-    stats_persisted_at: Annotated[
-        datetime | None, Field(alias='statsPersistedAt'), PlainSerializer(lambda _: datetime.now(UTC))
-    ] = None
+    stats_persisted_at: Annotated[datetime | None, PlainSerializer(lambda _: datetime.now(UTC))] = None
     request_retry_histogram: Annotated[
         dict[int, int],
-        Field(alias='requestRetryHistogram'),
         PlainValidator(lambda value: dict(enumerate(value)), json_schema_input_type=list[int]),
         PlainSerializer(
             lambda value: [value.get(i, 0) for i in range(max(value.keys(), default=0) + 1)],
             return_type=list[int],
         ),
-    ] = {}
+    ] = Field(default_factory=dict)
 
     # Used to track the crawler runtime, that had already been persisted. This is the runtime from previous runs.
     _runtime_offset: Annotated[timedelta, Field(exclude=True)] = timedelta()
@@ -138,7 +135,7 @@ class StatisticsState(BaseModel):
     def request_avg_finished_duration(self) -> timedelta | None:
         return (self.request_total_finished_duration / self.requests_finished) if self.requests_finished else None
 
-    @computed_field(alias='requestsTotal')
+    @computed_field
     @property
     def requests_total(self) -> int:
         return self.requests_failed + self.requests_finished

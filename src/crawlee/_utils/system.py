@@ -8,10 +8,11 @@ from typing import TYPE_CHECKING, Annotated
 
 import proclimits
 import psutil
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
+from pydantic import Field, PlainSerializer, PlainValidator
 
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.log import LoggerOnce
+from crawlee._utils.models import CamelCaseModel
 
 logger = getLogger(__name__)
 logger_once = LoggerOnce(logger)
@@ -125,12 +126,10 @@ def _get_child_used_memory(child: psutil.Process) -> int:
         return 0
 
 
-class CpuInfo(BaseModel):
+class CpuInfo(CamelCaseModel):
     """Information about the CPU usage."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
-
-    used_ratio: Annotated[float, Field(alias='usedRatio')]
+    used_ratio: float
     """The ratio of CPU currently in use, represented as a float between 0 and 1."""
 
     # Workaround for Pydantic and type checkers when using Annotated with default_factory
@@ -148,16 +147,13 @@ class CpuInfo(BaseModel):
         """The time at which the measurement was taken."""
 
 
-class MemoryUsageInfo(BaseModel):
+class MemoryUsageInfo(CamelCaseModel):
     """Information about the memory usage."""
-
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     current_size: Annotated[
         ByteSize,
         PlainValidator(ByteSize.validate),
         PlainSerializer(lambda size: size.bytes),
-        Field(alias='currentSize'),
     ]
     """Memory usage of the current Python process and its children.
 
@@ -184,11 +180,7 @@ class MemoryUsageInfo(BaseModel):
 class MemoryInfo(MemoryUsageInfo):
     """Information about system memory."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
-
-    total_size: Annotated[
-        ByteSize, PlainValidator(ByteSize.validate), PlainSerializer(lambda size: size.bytes), Field(alias='totalSize')
-    ]
+    total_size: Annotated[ByteSize, PlainValidator(ByteSize.validate), PlainSerializer(lambda size: size.bytes)]
     """Total memory available to this process.
 
     Under a container limit this is the limit rather than the memory of the host machine.
@@ -198,7 +190,6 @@ class MemoryInfo(MemoryUsageInfo):
         ByteSize,
         PlainValidator(ByteSize.validate),
         PlainSerializer(lambda size: size.bytes),
-        Field(alias='systemWideUsedSize'),
     ]
     """Total memory used within the scope `total_size` covers, including memory used by non-crawlee processes.
 
