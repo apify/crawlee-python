@@ -14,8 +14,7 @@ from ._file_download_crawling_context import FileDownloadCrawlingContext
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
-
-    from typing_extensions import Unpack
+    from typing import Unpack
 
     from crawlee._types import BasicCrawlingContext
     from crawlee.crawlers._abstract_http import HttpCrawlerOptions

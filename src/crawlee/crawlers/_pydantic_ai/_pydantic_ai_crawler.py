@@ -17,9 +17,9 @@ from ._pydantic_ai_crawling_context import PydanticAiCrawlingContext
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+    from typing import Unpack
 
     from pydantic_ai.models import Model
-    from typing_extensions import Unpack
 
     from crawlee import Request
     from crawlee.crawlers._abstract_http import ParsedHttpCrawlingContext

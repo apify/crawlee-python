@@ -8,7 +8,7 @@ from crawlee.crawlers._abstract_http import AbstractHttpCrawler, ParsedHttpCrawl
 from ._http_parser import NoParser
 
 if TYPE_CHECKING:
-    from typing_extensions import Unpack
+    from typing import Unpack
 
     from crawlee.crawlers import BasicCrawlerOptions
 

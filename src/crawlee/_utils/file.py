@@ -12,9 +12,7 @@ from typing import TYPE_CHECKING, overload
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Mapping
-    from typing import Any, TextIO
-
-    from typing_extensions import Unpack
+    from typing import Any, TextIO, Unpack
 
     from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs, JsonSerializable
 
