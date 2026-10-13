@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from crawlee.sessions._cookies import CookieParam
 from crawlee.sessions._models import SessionModel
 
-SESSION_CREATED_AT = datetime.now(timezone.utc)
+SESSION_CREATED_AT = datetime.now(UTC)
 
 
 @pytest.fixture

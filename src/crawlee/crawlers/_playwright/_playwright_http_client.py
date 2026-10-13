@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import contextvars
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import TYPE_CHECKING
@@ -126,7 +125,7 @@ class PlaywrightHttpClient(HttpClient):
         rejected here instead of being forwarded as-is.
         """
         if timeout is not None and timeout.total_seconds() <= 0:
-            raise asyncio.TimeoutError
+            raise TimeoutError
 
     async def cleanup(self) -> None:
         # The `browser_page_context` is responsible for resource cleanup

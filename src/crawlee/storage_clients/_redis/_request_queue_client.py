@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import json
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, NotRequired
 
 from redis.exceptions import RedisError
-from typing_extensions import NotRequired, override
+from typing_extensions import override
 
 from crawlee import Request
 from crawlee._utils.crypto import crypto_random_object_id
@@ -363,7 +363,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         if self._fetch_script is None:
             raise RuntimeError('Scripts not loaded. Call _ensure_scripts_loaded() before using the client.')
 
-        blocked_until_timestamp = int(datetime.now(tz=timezone.utc).timestamp() * 1000) + self._BLOCK_REQUEST_TIME
+        blocked_until_timestamp = int(datetime.now(tz=UTC).timestamp() * 1000) + self._BLOCK_REQUEST_TIME
 
         # The script retrieves requests from the queue and places them in the in_progress hash.
         requests_json = await self._fetch_script(
@@ -407,7 +407,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
         # Update the request's handled_at timestamp.
         if request.handled_at is None:
-            request.handled_at = datetime.now(timezone.utc)
+            request.handled_at = datetime.now(UTC)
 
         try:
             async with self._get_pipeline() as pipe:
@@ -435,7 +435,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 was_already_handled=True,
             )
         except Exception:
-            blocked_until = int(datetime.now(tz=timezone.utc).timestamp() * 1000) + self._BLOCK_REQUEST_TIME
+            blocked_until = int(datetime.now(tz=UTC).timestamp() * 1000) + self._BLOCK_REQUEST_TIME
             # If we fail to mark the request as handled after removing it from in_progress, we restore request in
             # `in_progress` hash.
             await await_redis_response(
@@ -462,9 +462,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
         async with self._get_pipeline() as pipe:
             if forefront:
-                blocked_until_timestamp = (
-                    int(datetime.now(tz=timezone.utc).timestamp() * 1000) + self._BLOCK_REQUEST_TIME
-                )
+                blocked_until_timestamp = int(datetime.now(tz=UTC).timestamp() * 1000) + self._BLOCK_REQUEST_TIME
 
                 await await_redis_response(
                     pipe.hset(
@@ -501,9 +499,9 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
             return False
 
         # Reclaim stale requests if needed
-        if self._next_reclaim_stale is None or datetime.now(tz=timezone.utc) >= self._next_reclaim_stale:
+        if self._next_reclaim_stale is None or datetime.now(tz=UTC) >= self._next_reclaim_stale:
             await self._reclaim_stale_requests()
-            self._next_reclaim_stale = datetime.now(tz=timezone.utc) + self._RECLAIM_INTERVAL
+            self._next_reclaim_stale = datetime.now(tz=UTC) + self._RECLAIM_INTERVAL
 
         # Check if there are any requests in the queue.
         requests_in_queue = await await_redis_response(self._redis.llen(self._queue_key))
@@ -547,7 +545,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         if self._reclaim_stale_script is None:
             raise RuntimeError('Scripts not loaded. Call _ensure_scripts_loaded() before using the client.')
 
-        current_time = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+        current_time = int(datetime.now(tz=UTC).timestamp() * 1000)
 
         await self._reclaim_stale_script(
             keys=[self._in_progress_key, self._queue_key, self._data_key], args=[current_time]

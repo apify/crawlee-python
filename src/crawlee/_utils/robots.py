@@ -11,7 +11,7 @@ from crawlee._utils.urls import filter_url
 from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
     from crawlee._types import EnqueueStrategy
     from crawlee.http_clients import HttpClient

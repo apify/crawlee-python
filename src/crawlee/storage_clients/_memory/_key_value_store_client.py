@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, Self
 
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import infer_mime_type
@@ -79,7 +79,7 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
 
         # Create a new key-value store
         store_id = id or crypto_random_object_id()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         metadata = KeyValueStoreMetadata(
             id=store_id,
@@ -183,7 +183,7 @@ class MemoryKeyValueStoreClient(KeyValueStoreClient):
             update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
             update_modified_at: If True, update the `modified_at` timestamp to the current time.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         if update_accessed_at:
             self._metadata.accessed_at = now

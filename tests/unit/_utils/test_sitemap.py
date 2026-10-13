@@ -807,7 +807,7 @@ async def test_txt_parser_flush_clears_buffer() -> None:
 async def test_xml_parser_skips_missing_flush(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """A parser without `flush` is flushed silently, as on CPython before 3.10.14, 3.11.9 and 3.12.3."""
+    """A parser without `flush` is flushed silently, as on CPython before 3.11.9 and 3.12.3."""
     monkeypatch.delattr(ExpatParser, 'flush', raising=False)
     parser = _XmlSitemapParser()
 

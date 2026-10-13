@@ -11,12 +11,12 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from http import HTTPStatus
 from logging import getLogger
-from typing import TYPE_CHECKING, Literal, TypedDict
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
 from xml.sax import SAXParseException
 from xml.sax.expatreader import ExpatParser
 from xml.sax.handler import ContentHandler
 
-from typing_extensions import NotRequired, override
+from typing_extensions import override
 from yarl import URL
 
 from crawlee._utils.urls import filter_url
@@ -151,7 +151,7 @@ class _XMLSaxSitemapHandler(ContentHandler):
 
             elif name == 'lastmod' and text:
                 with suppress(ValueError):
-                    self._current_url['lastmod'] = datetime.fromisoformat(text.replace('Z', '+00:00'))
+                    self._current_url['lastmod'] = datetime.fromisoformat(text)
 
             elif name == 'priority' and text:
                 with suppress(ValueError):
@@ -228,7 +228,7 @@ class _XmlSitemapParser:
         """Process any remaining data in the buffer, yielding items one by one."""
         try:
             # `ExpatParser.flush` isn't part of the `IncrementalParser` interface and is missing before CPython
-            # 3.10.14, 3.11.9 and 3.12.3, whose bundled expat predates reparse deferral, so nothing stays buffered.
+            # 3.11.9 and 3.12.3, whose bundled expat predates reparse deferral, so nothing stays buffered.
             if (flush := getattr(self._parser, 'flush', None)) is not None:
                 flush()
 
@@ -744,7 +744,7 @@ async def _discover_for_hostname(
                     yield candidate
             except ProxyError:
                 logger.warning(f'Proxy error when checking {candidate} with sitemap discovery for {hostname}')
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(f'Timeout when checking {candidate} with sitemap discovery for {hostname}')
             except Exception:
                 logger.warning(f'Error when checking {candidate} with sitemap discovery for {hostname}', exc_info=True)

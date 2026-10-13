@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from logging import WARNING, getLogger
 from typing import TYPE_CHECKING, Annotated
 
@@ -135,14 +135,14 @@ class CpuInfo(BaseModel):
 
     # Workaround for Pydantic and type checkers when using Annotated with default_factory
     if TYPE_CHECKING:
-        created_at: datetime = datetime.now(timezone.utc)
+        created_at: datetime = datetime.now(UTC)
         """The time at which the measurement was taken."""
     else:
         created_at: Annotated[
             datetime,
             Field(
                 alias='createdAt',
-                default_factory=lambda: datetime.now(timezone.utc),
+                default_factory=lambda: datetime.now(UTC),
             ),
         ]
         """The time at which the measurement was taken."""
@@ -168,14 +168,14 @@ class MemoryUsageInfo(BaseModel):
 
     # Workaround for Pydantic and type checkers when using Annotated with default_factory
     if TYPE_CHECKING:
-        created_at: datetime = datetime.now(timezone.utc)
+        created_at: datetime = datetime.now(UTC)
         """The time at which the measurement was taken."""
     else:
         created_at: Annotated[
             datetime,
             Field(
                 alias='createdAt',
-                default_factory=lambda: datetime.now(timezone.utc),
+                default_factory=lambda: datetime.now(UTC),
             ),
         ]
         """The time at which the measurement was taken."""

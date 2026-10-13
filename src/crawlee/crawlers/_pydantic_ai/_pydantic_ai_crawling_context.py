@@ -7,7 +7,7 @@ from crawlee._utils.docs import docs_group
 from crawlee.crawlers._parsel._parsel_crawling_context import ParselCrawlingContext
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
     from ._types import ExtractFunction, PydanticAiUsageStats
 

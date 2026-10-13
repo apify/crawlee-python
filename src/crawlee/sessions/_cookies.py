@@ -3,10 +3,10 @@ from __future__ import annotations
 from copy import deepcopy
 from email.message import Message
 from http.cookiejar import Cookie, CookieJar
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, Required
 from urllib.request import Request as UrlRequest
 
-from typing_extensions import NotRequired, Required, TypedDict
+from typing_extensions import TypedDict
 
 from crawlee._utils.docs import docs_group
 

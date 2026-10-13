@@ -224,7 +224,7 @@ async def test_propagates_timeout_error_from_task_function(system_status: System
     async def run() -> None:
         nonlocal started_count
         started_count += 1
-        raise asyncio.TimeoutError('Fetching a session from the pool timed out after 10 seconds')
+        raise TimeoutError('Fetching a session from the pool timed out after 10 seconds')
 
     pool = AutoscaledPool(
         system_status=system_status,

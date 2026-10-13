@@ -290,7 +290,7 @@ class AutoscaledPool:
                 self._run_task_function(),
                 timeout=self._TASK_TIMEOUT.total_seconds() if self._TASK_TIMEOUT is not None else None,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             if self._TASK_TIMEOUT is None:
                 # Without a timeout, `wait_for` cannot time out - the error comes from the task function itself.
                 raise

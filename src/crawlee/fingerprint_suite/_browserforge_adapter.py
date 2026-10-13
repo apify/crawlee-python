@@ -262,7 +262,7 @@ class BrowserforgeFingerprintGenerator(FingerprintGenerator):
         for _attempt in range(max_attempts):
             try:
                 return self._generator.generate(**self._options)
-            except ValueError as exc:  # noqa:PERF203
+            except ValueError as exc:
                 last_error = exc
         raise RuntimeError('Failed to generate fingerprint.') from last_error
 

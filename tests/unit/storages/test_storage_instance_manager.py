@@ -1,5 +1,4 @@
 import asyncio
-import sys
 from pathlib import Path
 from typing import cast
 from unittest.mock import AsyncMock
@@ -133,12 +132,10 @@ async def test_preexisting_unnamed_storage_open_by_id(storage_type: type[Storage
     assert storage_1.id == storage_1_again.id
 
 
-@pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.Barrier was introduced in Python 3.11.')
 async def test_concurrent_open_datasets() -> None:
     """Test that concurrent open datasets with the same name return the same instance."""
-    from asyncio import Barrier  # ty:ignore[unresolved-import] # noqa: PLC0415
 
-    barrier = Barrier(2)
+    barrier = asyncio.Barrier(2)
 
     async def push_data(data: dict) -> None:
         await barrier.wait()
@@ -158,16 +155,14 @@ async def test_concurrent_open_datasets() -> None:
     await dataset.drop()
 
 
-@pytest.mark.skipif(sys.version_info[:3] < (3, 11), reason='asyncio.Barrier was introduced in Python 3.11.')
 async def test_concurrent_open_datasets_with_same_name_and_alias() -> None:
     """Test that concurrent open requests for the same storage return the same instance."""
-    from asyncio import Barrier  # ty:ignore[unresolved-import] # noqa: PLC0415
 
     valid_kwargs: dict[str, str | None] = {}
 
     exception_calls = AsyncMock()
 
-    barrier = Barrier(2)
+    barrier = asyncio.Barrier(2)
 
     async def open_dataset(name: str | None, alias: str | None) -> None:
         await barrier.wait()
