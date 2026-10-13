@@ -994,6 +994,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def _push_data(
         self,
         data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable],
+        *,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
@@ -1387,6 +1388,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self,
         context: BasicCrawlingContext,
         requests: Sequence[str | Request],
+        *,
         rq_id: str | None = None,
         rq_name: str | None = None,
         rq_alias: str | None = None,
