@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlencode
@@ -760,7 +760,7 @@ async def test_persistent_429_raises_after_stall(
     # sits between one and two backoffs, so the domain counts as stalled on the check after its second 429.
     backoff = timedelta(minutes=1)
     clock = Mock()
-    clock.now.return_value = datetime.now(timezone.utc)
+    clock.now.return_value = datetime.now(UTC)
     monkeypatch.setattr(_throttling_request_manager, 'datetime', clock)
     throttler = ThrottlingRequestManager(
         await RequestQueue.open(alias='throttle-429-inner'),

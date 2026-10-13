@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import pytest
@@ -30,7 +30,7 @@ async def snapshotter() -> AsyncGenerator[Snapshotter, None]:
 
 @pytest.fixture
 def now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 async def test_start_stop_lifecycle() -> None:

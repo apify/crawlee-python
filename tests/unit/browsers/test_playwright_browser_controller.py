@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock
 
@@ -55,7 +55,7 @@ async def test_open_and_close_page(controller: PlaywrightBrowserController, serv
 
     assert page in controller.pages
     assert controller.pages_count == 1
-    assert controller.last_page_opened_at <= datetime.now(timezone.utc)
+    assert controller.last_page_opened_at <= datetime.now(UTC)
 
     await page.close()
 

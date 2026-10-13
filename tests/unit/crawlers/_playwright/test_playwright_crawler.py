@@ -1139,7 +1139,7 @@ async def test_navigation_timeout_on_slow_page_load(server_url: URL) -> None:
     assert request_handler.call_count == 0
 
     assert failed_request_handler.call_count == 1
-    assert isinstance(failed_request_handler.call_args[0][1], asyncio.TimeoutError)
+    assert isinstance(failed_request_handler.call_args[0][1], TimeoutError)
 
 
 async def test_navigation_timeout_applies_to_hooks(server_url: URL) -> None:

@@ -474,7 +474,7 @@ async def test_navigation_timeout_on_slow_request(server_url: URL, http_client: 
     await crawler.run([str(server_url.with_path('/slow').with_query(delay=5))])
 
     assert failed_request_handler.call_count == 1
-    assert isinstance(failed_request_handler.call_args[0][1], asyncio.TimeoutError)
+    assert isinstance(failed_request_handler.call_args[0][1], TimeoutError)
 
 
 async def test_navigation_timeout_applies_to_hooks(server_url: URL) -> None:
@@ -554,7 +554,6 @@ async def test_enqueue_links_with_limit(server_url: URL, http_client: HttpClient
     visit.assert_has_calls(expected_visit_calls, any_order=True)
 
 
-@pytest.mark.usefixtures('_restore_crawlers_binding')
 def test_import_error_handled() -> None:
     # Simulate ImportError for BeautifulSoup
     with mock.patch.dict('sys.modules', {'bs4': None}):

@@ -16,8 +16,9 @@ from crawlee.events._types import Event, EventSystemInfoData
 
 if TYPE_CHECKING:
     from types import TracebackType
+    from typing import Self
 
-    from typing_extensions import Self, Unpack
+    from typing_extensions import Unpack
 
 logger = getLogger(__name__)
 

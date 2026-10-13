@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from crawlee._types import JsonSerializable
 from crawlee._utils.crypto import crypto_random_object_id
@@ -84,7 +84,7 @@ class MemoryDatasetClient(DatasetClient):
 
         # Create a new dataset
         dataset_id = id or crypto_random_object_id()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         metadata = DatasetMetadata(
             id=dataset_id,
@@ -251,7 +251,7 @@ class MemoryDatasetClient(DatasetClient):
             update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
             update_modified_at: If True, update the `modified_at` timestamp to the current time.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         if update_accessed_at:
             self._metadata.accessed_at = now

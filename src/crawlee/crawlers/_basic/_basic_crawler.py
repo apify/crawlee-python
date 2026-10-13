@@ -17,11 +17,11 @@ from functools import partial
 from http import HTTPStatus
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, NotRequired, ParamSpec, cast
 from weakref import WeakKeyDictionary
 
 from cachetools import LRUCache
-from typing_extensions import NotRequired, TypedDict, TypeVar, Unpack
+from typing_extensions import TypedDict, TypeVar, Unpack
 from yarl import URL
 
 from crawlee import Glob, RequestTransformAction, service_locator
@@ -1532,7 +1532,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             try:
                 self._check_request_collision(request, session)
                 await self._run_request_handler(context=context)
-            except asyncio.TimeoutError as e:
+            except TimeoutError as e:
                 raise RequestHandlerError(e, context) from e
 
             await self._commit_request_handler_result(context)
@@ -1639,7 +1639,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             for cleanup in deferred_cleanup:
                 try:
                     await cleanup()
-                except Exception:  # noqa: PERF203
+                except Exception:
                     self._logger.exception('Error in deferred cleanup')
 
     def _is_held_back(self, request: Request) -> bool:

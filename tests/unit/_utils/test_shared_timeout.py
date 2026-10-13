@@ -24,7 +24,7 @@ async def test_shared_timeout_expires() -> None:
     timeout_duration = timedelta(seconds=0.1)
     shared_timeout = SharedTimeout(timeout_duration)
 
-    with measure_time() as elapsed, pytest.raises(asyncio.TimeoutError):
+    with measure_time() as elapsed, pytest.raises(TimeoutError):
         async with shared_timeout:
             await asyncio.sleep(0.5)
 

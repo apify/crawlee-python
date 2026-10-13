@@ -5,7 +5,7 @@ import inspect
 import sys
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 from unittest.mock import AsyncMock, MagicMock, Mock
 
@@ -76,7 +76,7 @@ async def open_throttler_held_until_reclaim(
     """
     backoff = timedelta(minutes=1)
     clock = Mock()
-    clock.now.return_value = datetime.now(timezone.utc)
+    clock.now.return_value = datetime.now(UTC)
     monkeypatch.setattr(_throttling_request_manager, 'datetime', clock)
     throttler = ThrottlingRequestManager(
         await RequestQueue.open(),

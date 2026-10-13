@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING, ClassVar, Literal, overload
 
@@ -68,7 +68,7 @@ class Session:
         self._user_data: MutableMapping[str, JsonSerializable] = dict(user_data) if user_data is not None else {}
         self._max_error_score = max_error_score
         self._error_score_decrement = error_score_decrement
-        self._created_at = created_at or datetime.now(timezone.utc)
+        self._created_at = created_at or datetime.now(UTC)
         self._usage_count = usage_count
         self._max_usage_count = max_usage_count
         self._error_score = error_score
@@ -151,7 +151,7 @@ class Session:
     @property
     def is_expired(self) -> bool:
         """Indicate whether the session is expired based on the current time."""
-        return datetime.now(timezone.utc) >= self.expires_at
+        return datetime.now(UTC) >= self.expires_at
 
     @property
     def is_max_usage_count_reached(self) -> bool:

@@ -4,14 +4,14 @@ import asyncio
 import json
 import shutil
 from collections import deque
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from hashlib import sha256
 from logging import getLogger
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 from pydantic import BaseModel, ValidationError
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from crawlee import Request
 from crawlee._consts import METADATA_FILENAME
@@ -254,7 +254,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             # Otherwise, create a new dataset client.
             else:
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 metadata = RequestQueueMetadata(
                     id=crypto_random_object_id(),
                     name=name,
@@ -504,7 +504,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
 
             # Update the request's handled_at timestamp.
             if request.handled_at is None:
-                request.handled_at = datetime.now(timezone.utc)
+                request.handled_at = datetime.now(UTC)
 
             # Dump the updated request to the file.
             request_path = self._get_request_path(request.unique_key)
@@ -680,7 +680,7 @@ class FileSystemRequestQueueClient(RequestQueueClient):
             update_modified_at: If True, update the `modified_at` timestamp to the current time.
         """
         # Always create a new timestamp to ensure it's truly updated
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Update timestamps according to parameters
         if update_accessed_at:

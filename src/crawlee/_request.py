@@ -15,7 +15,7 @@ from crawlee._utils.requests import compute_unique_key
 from crawlee._utils.urls import validate_http_url
 
 if TYPE_CHECKING:
-    from typing_extensions import NotRequired, Required, Self
+    from typing import NotRequired, Required, Self
 
 
 class RequestState(IntEnum):

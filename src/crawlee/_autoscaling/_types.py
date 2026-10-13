@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated
 
 from pydantic import Field
@@ -46,7 +46,7 @@ class SystemInfo:
     client_info: LoadRatioInfo
     """The client load ratio."""
 
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     """The time at which the system load information was measured."""
 
     @property
@@ -80,7 +80,7 @@ class CpuSnapshot:
     max_used_ratio: float
     """The maximum ratio of CPU that is considered acceptable."""
 
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     """The time at which the system load information was measured."""
 
     @property
@@ -108,7 +108,7 @@ class MemorySnapshot:
     max_used_memory_ratio: float
     """The maximum acceptable ratio of `current_size` to `max_memory_size`."""
 
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     """The time at which the system load information was measured."""
 
     @property
@@ -132,7 +132,7 @@ class EventLoopSnapshot:
     max_delay: timedelta
     """The maximum delay that is considered acceptable."""
 
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     """The time at which the system load information was measured."""
 
     @property
@@ -159,7 +159,7 @@ class ClientSnapshot:
     max_error_count: int
     """The maximum number of errors that is considered acceptable."""
 
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     """The time at which the system load information was measured."""
 
     @property
