@@ -260,7 +260,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                     value = {
                         'request_id': request_id,
                         'request_queue_id': self._id,
-                        'data': request.model_dump_json(),
+                        'data': request.model_dump_json(by_alias=True),
                         'is_handled': False,
                     }
                     if forefront:
@@ -306,7 +306,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                                 'request_queue_id': self._id,
                                 'request_id': request_id,
                                 'sequence_number': state.forefront_sequence_counter,
-                                'data': request.model_dump_json(),
+                                'data': request.model_dump_json(by_alias=True),
                                 'is_handled': False,
                             }
                         )
@@ -515,7 +515,9 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
         stmt = (
             update(self._ITEM_TABLE)
             .where(self._ITEM_TABLE.request_queue_id == self._id, self._ITEM_TABLE.request_id == request_id)
-            .values(is_handled=True, time_blocked_until=None, client_key=None, data=request.model_dump_json())
+            .values(
+                is_handled=True, time_blocked_until=None, client_key=None, data=request.model_dump_json(by_alias=True)
+            )
         )
         async with self.get_session(with_simple_commit=True) as session:
             result = await session.execute(stmt)
@@ -562,7 +564,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                     sequence_number=new_sequence,
                     time_blocked_until=block_until,
                     client_key=self.client_key,
-                    data=request.model_dump_json(),
+                    data=request.model_dump_json(by_alias=True),
                 )
             else:
                 new_sequence = state.sequence_counter
@@ -571,7 +573,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
                     sequence_number=new_sequence,
                     time_blocked_until=None,
                     client_key=None,
-                    data=request.model_dump_json(),
+                    data=request.model_dump_json(by_alias=True),
                 )
 
             result = await session.execute(stmt)
