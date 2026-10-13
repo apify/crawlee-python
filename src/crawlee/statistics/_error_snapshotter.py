@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import re
 import string
 from typing import TYPE_CHECKING
 
+from crawlee._utils.wait import task_group
 from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
@@ -44,19 +44,13 @@ class ErrorSnapshotter:
         if snapshot := await context.get_snapshot():
             kvs = await KeyValueStore.open(name=self._kvs_name)
             snapshot_base_name = self._get_snapshot_base_name(error_message, file_and_line)
-            snapshot_save_tasks = list[asyncio.Task]()
 
-            if snapshot.html:
-                snapshot_save_tasks.append(
-                    asyncio.create_task(self._save_html(kvs, snapshot.html, base_name=snapshot_base_name))
-                )
+            async with task_group() as tg:
+                if snapshot.html:
+                    tg.create_task(self._save_html(kvs, snapshot.html, base_name=snapshot_base_name))
 
-            if snapshot.screenshot:
-                snapshot_save_tasks.append(
-                    asyncio.create_task(self._save_screenshot(kvs, snapshot.screenshot, base_name=snapshot_base_name))
-                )
-
-            await asyncio.gather(*snapshot_save_tasks)
+                if snapshot.screenshot:
+                    tg.create_task(self._save_screenshot(kvs, snapshot.screenshot, base_name=snapshot_base_name))
 
     async def _save_html(self, kvs: KeyValueStore, html: str, base_name: str) -> None:
         file_name = f'{base_name}.html'

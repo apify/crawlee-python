@@ -10,6 +10,7 @@ import proclimits
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.system import get_cpu_info, get_memory_info
+from crawlee._utils.wait import task_group
 from crawlee.configuration import Configuration
 from crawlee.events._event_manager import EventManager, EventManagerOptions
 from crawlee.events._types import Event, EventSystemInfoData
@@ -106,10 +107,9 @@ class LocalEventManager(EventManager):
         """Emit a system info event with the current CPU and memory usage."""
         # Both readings block the thread they run in - `get_cpu_info` may sample the CPU utilization over a short
         # interval - so run them concurrently instead of one after the other.
-        cpu_info, memory_info = await asyncio.gather(
-            asyncio.to_thread(get_cpu_info, self._cpu_load),
-            asyncio.to_thread(get_memory_info),
-        )
+        async with task_group() as tg:
+            cpu_info_task = tg.create_task(asyncio.to_thread(get_cpu_info, self._cpu_load))
+            memory_info_task = tg.create_task(asyncio.to_thread(get_memory_info))
 
-        event_data = EventSystemInfoData(cpu_info=cpu_info, memory_info=memory_info)
+        event_data = EventSystemInfoData(cpu_info=cpu_info_task.result(), memory_info=memory_info_task.result())
         self.emit(event=Event.SYSTEM_INFO, event_data=event_data)

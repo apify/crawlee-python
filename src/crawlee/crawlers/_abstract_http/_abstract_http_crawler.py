@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from abc import ABC
 from datetime import timedelta
@@ -14,6 +13,7 @@ from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._utils.docs import docs_group
 from crawlee._utils.time import SharedTimeout
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute, to_absolute_url_iterator
+from crawlee._utils.wait import task_group
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import RequestThrottledError, SessionError
 from crawlee.statistics import StatisticsState
@@ -261,10 +261,9 @@ class AbstractHttpCrawler(
 
                 requests.append(request)
 
-            skipped_tasks = [
-                asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped
-            ]
-            await asyncio.gather(*skipped_tasks)
+            async with task_group() as tg:
+                for request in skipped:
+                    tg.create_task(self._handle_skipped_request(request, 'robots_txt'))
 
             return requests
 

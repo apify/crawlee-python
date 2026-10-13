@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import warnings
 from datetime import timedelta
@@ -19,6 +18,7 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.time import SharedTimeout
 from crawlee._utils.urls import is_url_absolute, to_absolute_url_iterator
+from crawlee._utils.wait import task_group
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import RequestThrottledError, SessionError
@@ -488,10 +488,9 @@ class PlaywrightCrawler(
 
                 requests.append(request)
 
-            skipped_tasks = [
-                asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped
-            ]
-            await asyncio.gather(*skipped_tasks)
+            async with task_group() as tg:
+                for request in skipped:
+                    tg.create_task(self._handle_skipped_request(request, 'robots_txt'))
 
             return requests
 

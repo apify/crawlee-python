@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import suppress
-from typing import TYPE_CHECKING, TypeVar
+from contextlib import asynccontextmanager, suppress
+from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Sequence
+    from collections.abc import AsyncGenerator, Awaitable, Callable, Coroutine, Sequence
     from datetime import timedelta
     from logging import Logger
 
@@ -84,3 +84,32 @@ async def wait_for_all_tasks_to_finish(
                     pass
                 except Exception as e:
                     logger.warning(f'Task raised an exception: {e}')
+
+
+@asynccontextmanager
+async def task_group() -> AsyncGenerator[asyncio.TaskGroup]:
+    """Open an `asyncio.TaskGroup` that raises the first failure as is, not wrapped in an `ExceptionGroup`.
+
+    A failure in a task or in the body cancels the remaining tasks, as with a plain `TaskGroup`. Callers keep catching
+    the same exception types they would get from awaiting the work directly.
+    """
+    error: Exception | None = None
+    try:
+        async with asyncio.TaskGroup() as tg:
+            yield tg
+    except ExceptionGroup as group:
+        error = group.exceptions[0]
+
+    # Raised outside the `except` block, so the group does not become the exception's context.
+    if error is not None:
+        raise error
+
+
+async def run_all(*coros: Coroutine[Any, Any, T]) -> list[T]:
+    """Run the coroutines concurrently and return their results in order.
+
+    Unlike `asyncio.gather`, the first failure cancels the coroutines that are still running before it is raised.
+    """
+    async with task_group() as tg:
+        tasks = [tg.create_task(coro) for coro in coros]
+    return [task.result() for task in tasks]

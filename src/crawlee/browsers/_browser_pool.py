@@ -14,6 +14,7 @@ from crawlee._utils.context import ensure_context
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
+from crawlee._utils.wait import run_all
 from crawlee.browsers._browser_controller import BrowserController
 from crawlee.browsers._playwright_browser_plugin import PlaywrightBrowserPlugin
 from crawlee.browsers._types import BrowserType, CrawleePage
@@ -291,8 +292,7 @@ class BrowserPool:
         Returns:
             A list of newly created pages, one for each plugin in the pool.
         """
-        pages_coroutines = [self.new_page(browser_plugin=plugin) for plugin in self._plugins]
-        return await asyncio.gather(*pages_coroutines)
+        return await run_all(*(self.new_page(browser_plugin=plugin) for plugin in self._plugins))
 
     async def _get_new_page(
         self,
