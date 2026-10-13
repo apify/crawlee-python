@@ -11,4 +11,4 @@ We drop support for Python 3.10, which reached its end of life in October 2026. 
 
 ## `Event` is a `StrEnum`
 
-`Event` now subclasses `enum.StrEnum`. Calling `str()` on a member returns its value, for example `'systemInfo'`, where v1 returned `'Event.SYSTEM_INFO'`. Comparisons with plain strings work the same way as in v1.
+`Event` now subclasses `enum.StrEnum`. Calling `str()` on a member or formatting it in an f-string returns its value, for example `'systemInfo'`, where v1 returned `'Event.SYSTEM_INFO'`. Comparisons with plain strings work the same way as in v1.
