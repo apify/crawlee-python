@@ -292,7 +292,8 @@ class BrowserPool:
         Returns:
             A list of newly created pages, one for each plugin in the pool.
         """
-        return await run_all(*(self.new_page(browser_plugin=plugin) for plugin in self._plugins))
+        pages_coroutines = [self.new_page(browser_plugin=plugin) for plugin in self._plugins]
+        return await run_all(*pages_coroutines)
 
     async def _get_new_page(
         self,
