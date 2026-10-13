@@ -17,8 +17,7 @@ from ._stagehand_crawling_context import (
 if TYPE_CHECKING:
     from datetime import timedelta
     from pathlib import Path
-
-    from typing_extensions import Unpack
+    from typing import Unpack
 
     from crawlee.browsers import StagehandOptions
     from crawlee.crawlers._basic import BasicCrawlerOptions

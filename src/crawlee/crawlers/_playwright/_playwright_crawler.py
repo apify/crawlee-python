@@ -5,12 +5,12 @@ import logging
 import warnings
 from datetime import timedelta
 from functools import partial
-from typing import TYPE_CHECKING, Any, Generic, Literal, NotRequired, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, NotRequired, TypedDict, cast
 
 import playwright.async_api
 from more_itertools import partition
 from pydantic import ValidationError
-from typing_extensions import TypedDict, TypeVar
+from typing_extensions import TypeVar
 
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._types import BasicCrawlingContext, ConcurrencySettings
@@ -38,9 +38,9 @@ from ._utils import NavigationRequestInterceptor, block_requests, infinite_scrol
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator, Mapping
     from pathlib import Path
+    from typing import Unpack
 
     from playwright.async_api import Page, Response
-    from typing_extensions import Unpack
 
     from crawlee import RequestTransformAction
     from crawlee._types import (

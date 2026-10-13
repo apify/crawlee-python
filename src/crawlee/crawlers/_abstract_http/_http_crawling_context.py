@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
-from typing import Generic, Self
-
-from typing_extensions import TypeVar
+from typing import Generic, Self, TypeVar
 
 from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, ExtractLinksFunction, PageSnapshot
 from crawlee._utils.docs import docs_group

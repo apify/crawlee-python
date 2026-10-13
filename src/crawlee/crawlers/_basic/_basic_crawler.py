@@ -17,11 +17,11 @@ from functools import partial
 from http import HTTPStatus
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, Literal, NotRequired, ParamSpec, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, NotRequired, ParamSpec, TypedDict, Unpack, cast
 from weakref import WeakKeyDictionary
 
 from cachetools import LRUCache
-from typing_extensions import TypedDict, TypeVar, Unpack
+from typing_extensions import TypeVar
 from yarl import URL
 
 from crawlee import Glob, RequestTransformAction, service_locator

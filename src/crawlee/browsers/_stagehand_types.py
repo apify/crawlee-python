@@ -8,6 +8,8 @@ from playwright.async_api import Page
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
+    from typing import Unpack
+
     from stagehand import AsyncSession
     from stagehand.types.session_act_params import SessionActParamsNonStreaming
     from stagehand.types.session_act_response import SessionActResponse
@@ -17,7 +19,6 @@ if TYPE_CHECKING:
     from stagehand.types.session_extract_response import SessionExtractResponse
     from stagehand.types.session_observe_params import SessionObserveParamsNonStreaming
     from stagehand.types.session_observe_response import SessionObserveResponse
-    from typing_extensions import Unpack
 
 
 @dataclass
