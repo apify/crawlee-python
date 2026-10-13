@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 from sqlalchemy import Select, insert, select
 from sqlalchemy import func as sql_func
 from sqlalchemy.exc import SQLAlchemyError
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from crawlee._utils.retry import retry_on_error
 from crawlee.storage_clients._base import DatasetClient
@@ -19,10 +19,10 @@ from ._db_models import DatasetItemDb, DatasetMetadataBufferDb, DatasetMetadataD
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Mapping
+    from typing import NotRequired
 
     from sqlalchemy import Select
     from sqlalchemy.ext.asyncio import AsyncSession
-    from typing_extensions import NotRequired
 
     from crawlee._types import JsonSerializable
 
@@ -136,7 +136,7 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin):
 
         Resets item_count to 0 and deletes all records from dataset_records table.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         await self._purge(
             metadata_kwargs=_DatasetMetadataUpdateParams(
                 new_item_count=0,

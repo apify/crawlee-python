@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from io import StringIO
 from typing import TYPE_CHECKING, cast
 
@@ -20,7 +20,7 @@ async def test_json_dumps() -> None:
     assert await json_dumps(['one', 2, 3.0]) == '[\n  "one",\n  2,\n  3.0\n]'
     assert await json_dumps('string') == '"string"'
     assert await json_dumps(123) == '123'
-    assert await json_dumps(datetime(2022, 1, 1, tzinfo=timezone.utc)) == '"2022-01-01 00:00:00+00:00"'
+    assert await json_dumps(datetime(2022, 1, 1, tzinfo=UTC)) == '"2022-01-01 00:00:00+00:00"'
 
 
 async def async_iter(
@@ -123,7 +123,7 @@ async def test_export_csv_to_stream_writes_before_consuming_all_items() -> None:
 async def test_export_csv_to_stream_preserves_non_json_values() -> None:
     """CSV values do not pass through JSON serialization."""
     dst = StringIO()
-    value = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    value = datetime(2020, 1, 1, tzinfo=UTC)
 
     await export_csv_to_stream(
         async_iter([{'created_at': cast('JsonSerializable', value)}]),

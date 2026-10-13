@@ -6,11 +6,11 @@ from copy import deepcopy
 from dataclasses import dataclass
 from logging import getLogger
 from random import random
-from typing import TYPE_CHECKING, Any, Generic, get_args
+from typing import TYPE_CHECKING, Any, Generic, Self, get_args
 
 from bs4 import BeautifulSoup, Tag
 from parsel import Selector
-from typing_extensions import Self, TypeVar, override
+from typing_extensions import TypeVar, override
 
 from crawlee._types import BasicCrawlingContext, ConcurrencySettings, JsonSerializable, RequestHandlerRunResult
 from crawlee._utils.docs import docs_group

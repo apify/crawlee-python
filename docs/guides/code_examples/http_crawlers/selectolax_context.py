@@ -1,7 +1,7 @@
 from dataclasses import dataclass, fields
+from typing import Self
 
 from selectolax.lexbor import LexborHTMLParser
-from typing_extensions import Self
 
 from crawlee.crawlers._abstract_http import ParsedHttpCrawlingContext
 

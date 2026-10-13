@@ -5,12 +5,12 @@ import logging
 import warnings
 from datetime import timedelta
 from functools import partial
-from typing import TYPE_CHECKING, Any, Generic, Literal, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, NotRequired, cast
 
 import playwright.async_api
 from more_itertools import partition
 from pydantic import ValidationError
-from typing_extensions import NotRequired, TypedDict, TypeVar
+from typing_extensions import TypedDict, TypeVar
 
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._types import BasicCrawlingContext, ConcurrencySettings
@@ -401,7 +401,7 @@ class PlaywrightCrawler(
                 )
             context.request.state = RequestState.AFTER_NAV
         except playwright.async_api.TimeoutError as exc:
-            raise asyncio.TimeoutError from exc
+            raise TimeoutError from exc
 
         if response is None:
             raise SessionError(f'Failed to load the URL: {context.request.url}')

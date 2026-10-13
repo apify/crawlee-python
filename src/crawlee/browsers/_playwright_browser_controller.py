@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 from asyncio import Lock
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, cast
 
@@ -91,7 +91,7 @@ class PlaywrightBrowserController(BrowserController):
             self._browser.contexts[0] if len(self._browser.contexts) > 0 else None
         )
         self._pages = list[Page]()
-        self._last_page_opened_at = datetime.now(timezone.utc)
+        self._last_page_opened_at = datetime.now(UTC)
 
         self._total_opened_pages = 0
         self._opening_pages_count = 0
@@ -132,7 +132,7 @@ class PlaywrightBrowserController(BrowserController):
     @property
     @override
     def idle_time(self) -> timedelta:
-        return datetime.now(timezone.utc) - self._last_page_opened_at
+        return datetime.now(UTC) - self._last_page_opened_at
 
     @property
     @override
@@ -201,7 +201,7 @@ class PlaywrightBrowserController(BrowserController):
 
             # Update internal state
             self._pages.append(page)
-            self._last_page_opened_at = datetime.now(timezone.utc)
+            self._last_page_opened_at = datetime.now(UTC)
 
             self._total_opened_pages += 1
         finally:

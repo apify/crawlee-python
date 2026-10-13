@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 from bisect import insort
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from logging import WARNING, getLogger
 from math import floor
 from typing import TYPE_CHECKING, Any, cast
@@ -162,7 +162,7 @@ def test_snapshot_client_overloaded() -> None:
 async def test_get_cpu_sample(
     snapshotter: Snapshotter, event_manager: LocalEventManager, default_memory_info: MemoryInfo
 ) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     snapshotter._SNAPSHOT_HISTORY = timedelta(hours=10)  # Extend history for testing
 
     events_data = [
@@ -232,7 +232,7 @@ async def test_snapshot_pruning_removes_outdated_records(
     snapshotter._SNAPSHOT_HISTORY = timedelta(hours=2)
 
     # Create timestamps for testing
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     def randomly_delayed_insort(*args: Any, **kwargs: Any) -> None:
         """Sort with injected delay to provoke otherwise hard to reproduce race condition."""
@@ -333,8 +333,8 @@ async def test_snapshots_time_ordered(snapshotter: Snapshotter, event_manager: L
     # All internal snapshot list should be ordered by creation time in ascending order.
     # Scenario where older emitted event arrives after newer event.
     # Snapshotter should not trust the event order and check events' times.
-    time_new = datetime.now(tz=timezone.utc)
-    time_old = datetime.now(tz=timezone.utc) - timedelta(milliseconds=50)
+    time_new = datetime.now(tz=UTC)
+    time_old = datetime.now(tz=UTC) - timedelta(milliseconds=50)
 
     def create_event_data(creation_time: datetime) -> EventSystemInfoData:
         return EventSystemInfoData(
@@ -364,7 +364,7 @@ def test_sorted_snapshot_list_add_maintains_order() -> None:
     sorted_list = SortedSnapshotList[CpuSnapshot]()
 
     # Create snapshots with different timestamps (more items to test binary search better)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     snapshots = [
         CpuSnapshot(used_ratio=0.1, max_used_ratio=0.95, created_at=now - timedelta(seconds=50)),  # oldest
         CpuSnapshot(used_ratio=0.2, max_used_ratio=0.95, created_at=now - timedelta(seconds=40)),

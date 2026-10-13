@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, ClassVar, TypedDict, cast, overload
 
@@ -17,11 +17,11 @@ from crawlee._utils.crypto import crypto_random_object_id
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+    from typing import NotRequired, Self
 
     from sqlalchemy import Insert
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import DeclarativeBase
-    from typing_extensions import NotRequired, Self
 
     from crawlee.storage_clients.models import DatasetMetadata, KeyValueStoreMetadata, RequestQueueMetadata
 
@@ -120,7 +120,7 @@ class SqlClientMixin(ABC):
             # Ensure any pending buffer updates are processed
             await client._process_buffers()
         else:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             metadata = metadata_model(
                 id=crypto_random_object_id(),
                 name=name,
@@ -392,7 +392,7 @@ class SqlClientMixin(ABC):
             update_modified_at: Whether to update modified_at timestamp.
             **kwargs: Additional arguments for _prepare_buffer_data.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         values_to_set = {
             'storage_id': self._id,
             'accessed_at': now,  # All entries in the buffer require updating `accessed_at`
@@ -412,7 +412,7 @@ class SqlClientMixin(ABC):
             True if lock was acquired, False if already locked by another process.
         """
         capture_error_code = 1020  # MariaDB error code for "Record has changed since last read"
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         lock_until = now + self._BLOCK_BUFFER_TIME
         dialect = self._storage_client.get_dialect_name()
 

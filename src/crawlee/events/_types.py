@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Coroutine
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -12,7 +12,7 @@ from crawlee._utils.system import CpuInfo, MemoryUsageInfo
 
 
 @docs_group('Event data')
-class Event(str, Enum):
+class Event(StrEnum):
     """Names of all possible events that can be emitted using an `EventManager`."""
 
     # Core events

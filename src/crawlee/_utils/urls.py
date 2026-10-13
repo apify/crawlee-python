@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import tempfile
 from functools import lru_cache
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, assert_never
 
 from pydantic import AnyHttpUrl, TypeAdapter
 from tldextract import TLDExtract
-from typing_extensions import assert_never
 from yarl import URL
 
 if TYPE_CHECKING:

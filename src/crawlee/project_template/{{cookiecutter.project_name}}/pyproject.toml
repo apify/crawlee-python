@@ -19,7 +19,7 @@ authors = [
     {name = "Your Name",email = "you@example.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.10,<4.0"
+requires-python = ">=3.11,<4.0"
 dependencies = [
     "crawlee[{{ extras|join(',') }}]",
     # % if cookiecutter.crawler_type == 'playwright-camoufox'

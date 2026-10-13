@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Awaitable, Callable
 from typing import Generic, TypeVar
 
@@ -122,6 +121,6 @@ class Router(Generic[TCrawlingContext]):
 
         try:
             return await user_defined_handler(context)
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             # Timeout in handler, but not timeout of handler.
             raise UserHandlerTimeoutError('Timeout raised by user defined handler') from e

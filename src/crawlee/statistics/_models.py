@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import warnings
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator, computed_field
@@ -92,7 +92,7 @@ class StatisticsState(BaseModel):
         ]
 
     stats_persisted_at: Annotated[
-        datetime | None, Field(alias='statsPersistedAt'), PlainSerializer(lambda _: datetime.now(timezone.utc))
+        datetime | None, Field(alias='statsPersistedAt'), PlainSerializer(lambda _: datetime.now(UTC))
     ] = None
     request_retry_histogram: Annotated[
         dict[int, int],
@@ -113,7 +113,7 @@ class StatisticsState(BaseModel):
     @property
     def crawler_runtime(self) -> timedelta:
         if self.crawler_last_started_at:
-            finished_at = self.crawler_finished_at or datetime.now(timezone.utc)
+            finished_at = self.crawler_finished_at or datetime.now(UTC)
             return self._runtime_offset + finished_at - self.crawler_last_started_at
         return self._runtime_offset
 
@@ -131,7 +131,7 @@ class StatisticsState(BaseModel):
     @computed_field(alias='crawlerRuntimeMillis')
     def crawler_runtime_for_serialization(self) -> timedelta:
         if self.crawler_last_started_at:
-            finished_at = self.crawler_finished_at or datetime.now(timezone.utc)
+            finished_at = self.crawler_finished_at or datetime.now(UTC)
             return self._runtime_offset + finished_at - self.crawler_last_started_at
         return self._runtime_offset
 
