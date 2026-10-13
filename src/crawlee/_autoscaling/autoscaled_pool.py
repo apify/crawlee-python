@@ -243,7 +243,7 @@ class AutoscaledPool:
 
                     continue
 
-                with suppress(asyncio.TimeoutError):
+                with suppress(TimeoutError):
                     await asyncio.wait_for(run.worker_tasks_updated.wait(), timeout=0.5)
         except Exception as exc:
             # Surface the error through `run.result` only once the cleanup below has awaited the worker tasks,

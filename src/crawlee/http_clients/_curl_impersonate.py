@@ -323,7 +323,7 @@ class CurlImpersonateHttpClient(HttpClient):
 
     @staticmethod
     def _raise_if_non_positive_timeout(timeout: timedelta | None) -> None:
-        """Raise `asyncio.TimeoutError` for a non-positive timeout.
+        """Raise `TimeoutError` for a non-positive timeout.
 
         `curl_cffi` (like `libcurl`) treats an explicit `0` timeout as "no timeout", so a non-positive timeout
         must be rejected here instead of being forwarded as-is.
