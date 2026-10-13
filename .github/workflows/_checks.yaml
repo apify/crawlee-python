@@ -41,13 +41,13 @@ jobs:
     name: Lint check
     uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
     with:
-      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]'
 
   type_check:
     name: Type check
     uses: apify/workflows/.github/workflows/python_type_check.yaml@main
     with:
-      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]'
 
   markdown_lint_check:
     name: Markdown lint check
@@ -135,9 +135,9 @@ jobs:
     uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
     secrets: inherit
     with:
-      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]'
       operating_systems: '["ubuntu-latest", "windows-latest", "macos-latest"]'
-      python_version_for_codecov: "3.14"
+      python_version_for_codecov: "3.15"
       operating_system_for_codecov: ubuntu-latest
       tests_concurrency: "8"
 
