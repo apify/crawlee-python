@@ -50,7 +50,7 @@ from crawlee._utils.log import LoggerOnce
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import UNSUPPORTED_SCHEME_MESSAGE, convert_to_absolute_url, filter_url, is_url_absolute
-from crawlee._utils.wait import task_group, wait_for
+from crawlee._utils.wait import run_all, wait_for
 from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
 from crawlee.errors import (
     ContextPipelineInitializationError,
@@ -883,9 +883,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 skipped.append(request)
 
         if skipped:
-            async with task_group() as tg:
-                for request in skipped:
-                    tg.create_task(self._handle_skipped_request(request, 'robots_txt'))
+            skipped_coroutines = [self._handle_skipped_request(request, 'robots_txt') for request in skipped]
+            await run_all(*skipped_coroutines)
             self._logger.warning('Some requests were skipped because they were disallowed based on the robots.txt file')
 
         request_manager = await self.get_request_manager()
