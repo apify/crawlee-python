@@ -6,11 +6,11 @@ from copy import deepcopy
 from dataclasses import dataclass
 from logging import getLogger
 from random import random
-from typing import TYPE_CHECKING, Any, Generic, Self, get_args
+from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar, get_args
 
 from bs4 import BeautifulSoup, Tag
 from parsel import Selector
-from typing_extensions import TypeVar, override
+from typing_extensions import override
 
 from crawlee._types import BasicCrawlingContext, ConcurrencySettings, JsonSerializable, RequestHandlerRunResult
 from crawlee._utils.docs import docs_group
@@ -45,8 +45,7 @@ from ._result_comparator import create_default_comparator
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
     from types import TracebackType
-
-    from typing_extensions import Unpack
+    from typing import Unpack
 
     from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
 

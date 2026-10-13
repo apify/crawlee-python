@@ -12,8 +12,7 @@ from ._parsel_parser import ParselParser
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
-
-    from typing_extensions import Unpack
+    from typing import Unpack
 
     from crawlee.crawlers._abstract_http import ParsedHttpCrawlingContext
 

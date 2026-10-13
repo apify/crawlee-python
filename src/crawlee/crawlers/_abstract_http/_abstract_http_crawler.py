@@ -22,8 +22,7 @@ from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingConte
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator, Mapping
-
-    from typing_extensions import Unpack
+    from typing import Unpack
 
     from crawlee import RequestTransformAction
     from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, ExtractLinksFunction, JsonSerializable

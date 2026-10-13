@@ -15,9 +15,7 @@ if TYPE_CHECKING:
     import re
     from collections.abc import Awaitable, Coroutine, MutableMapping, Sequence
     from datetime import timedelta
-    from typing import NotRequired, Required, Self
-
-    from typing_extensions import Unpack
+    from typing import NotRequired, Required, Self, Unpack
 
     from crawlee import Glob, Request
     from crawlee._request import RequestOptions

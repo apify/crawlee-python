@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, TypeVar
 
 from pydantic import BaseModel
-from typing_extensions import TypeVar
 
 from crawlee._utils.docs import docs_group
 
