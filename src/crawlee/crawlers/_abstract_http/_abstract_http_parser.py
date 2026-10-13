@@ -93,7 +93,7 @@ class AbstractHttpParser(ABC, Generic[TParseResult, TSelectResult]):
         """
 
     @abstractmethod
-    def find_links(self, parsed_content: TParseResult, selector: str, attribute: str) -> Iterable[str]:
+    def find_links(self, parsed_content: TParseResult, selector: str, *, attribute: str) -> Iterable[str]:
         """Find all links in result using selector.
 
         Args:

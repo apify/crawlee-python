@@ -44,6 +44,6 @@ class NoParser(AbstractHttpParser[bytes, bytes]):
 
     @override
     def find_links(
-        self, parsed_content: bytes, selector: str, attribute: str
+        self, parsed_content: bytes, selector: str, *, attribute: str
     ) -> Iterable[str]:  # Intentional unused argument.
         return []

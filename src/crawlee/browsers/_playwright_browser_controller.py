@@ -157,6 +157,7 @@ class PlaywrightBrowserController(BrowserController):
     @override
     async def new_page(
         self,
+        *,
         browser_new_context_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
     ) -> Page:

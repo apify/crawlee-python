@@ -315,6 +315,7 @@ class Dataset(Storage):
     async def export_to(
         self,
         key: str,
+        *,
         content_type: Literal['json'],
         to_kvs_id: str | None = None,
         to_kvs_name: str | None = None,
@@ -327,19 +328,20 @@ class Dataset(Storage):
     async def export_to(
         self,
         key: str,
+        *,
         content_type: Literal['csv'],
         to_kvs_id: str | None = None,
         to_kvs_name: str | None = None,
         to_kvs_storage_client: StorageClient | None = None,
         to_kvs_configuration: Configuration | None = None,
-        *,
         collect_all_keys: bool = False,
         **kwargs: Unpack[ExportDataCsvKwargs],
     ) -> None: ...
 
-    async def export_to(  # noqa: PLR0917
+    async def export_to(
         self,
         key: str,
+        *,
         content_type: Literal['json', 'csv'] = 'json',
         to_kvs_id: str | None = None,
         to_kvs_name: str | None = None,
@@ -378,9 +380,9 @@ class Dataset(Storage):
 
         if content_type == 'csv':
             await export_csv_to_stream(self.iterate_items(), dst, **kwargs)
-            await kvs.set_value(key, dst.getvalue(), 'text/csv')
+            await kvs.set_value(key, dst.getvalue(), content_type='text/csv')
         elif content_type == 'json':
             await export_json_to_stream(self.iterate_items(), dst, **kwargs)
-            await kvs.set_value(key, dst.getvalue(), 'application/json')
+            await kvs.set_value(key, dst.getvalue(), content_type='application/json')
         else:
             raise ValueError('Unsupported content type, expecting CSV or JSON')

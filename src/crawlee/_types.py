@@ -106,6 +106,7 @@ class ConcurrencySettings:
 
     def __init__(
         self,
+        *,
         min_concurrency: int = 1,
         max_concurrency: int = 100,
         max_tasks_per_minute: float = float('inf'),
@@ -223,6 +224,7 @@ class KeyValueStoreInterface(Protocol):
         self,
         key: str,
         value: Any,
+        *,
         content_type: str | None = None,
     ) -> None: ...
 
@@ -242,6 +244,7 @@ class KeyValueStoreChangeRecords:
         self,
         key: str,
         value: Any,
+        *,
         content_type: str | None = None,
     ) -> None:
         self.updates[key] = KeyValueStoreValue(value, content_type)
@@ -278,6 +281,7 @@ class RequestHandlerRunResult:
     async def add_requests(
         self,
         requests: Sequence[str | Request],
+        *,
         rq_id: str | None = None,
         rq_name: str | None = None,
         rq_alias: str | None = None,
@@ -294,6 +298,7 @@ class RequestHandlerRunResult:
     async def push_data(
         self,
         data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable],
+        *,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
@@ -336,6 +341,7 @@ class AddRequestsFunction(Protocol):
     def __call__(
         self,
         requests: Sequence[str | Request],
+        *,
         rq_id: str | None = None,
         rq_name: str | None = None,
         rq_alias: str | None = None,
@@ -538,6 +544,7 @@ class PushDataFunction(Protocol):
     def __call__(
         self,
         data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable],
+        *,
         dataset_id: str | None = None,
         dataset_name: str | None = None,
         dataset_alias: str | None = None,
@@ -673,6 +680,7 @@ class BasicCrawlingContext:
 
     def create_modified_copy(
         self,
+        *,
         push_data: PushDataFunction | None = None,
         add_requests: AddRequestsFunction | None = None,
         get_key_value_store: GetKeyValueStoreFromRequestHandlerFunction | None = None,

@@ -105,7 +105,7 @@ class AdaptivePlaywrightCrawler(
         context.log.info(context.parsed_content.title)
 
         # Locate element h2 within 5 seconds
-        h2 = await context.query_selector_one('h2', timedelta(milliseconds=5000))
+        h2 = await context.query_selector_one('h2', timeout=timedelta(milliseconds=5000))
         # Do stuff with element found by the selector
         context.log.info(h2)
 
@@ -234,8 +234,9 @@ class AdaptivePlaywrightCrawler(
         self._static_parser = static_parser
 
     @classmethod
-    def with_beautifulsoup_static_parser(  # noqa: PLR0917
+    def with_beautifulsoup_static_parser(
         cls,
+        *,
         rendering_type_predictor: RenderingTypePredictor | None = None,
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
@@ -262,6 +263,7 @@ class AdaptivePlaywrightCrawler(
     @classmethod
     def with_parsel_static_parser(
         cls,
+        *,
         rendering_type_predictor: RenderingTypePredictor | None = None,
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,

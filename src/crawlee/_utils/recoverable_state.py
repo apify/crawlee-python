@@ -192,7 +192,7 @@ class RecoverableState(Generic[TStateModel]):
             await self._key_value_store.set_value(
                 self._persist_state_key,
                 self._state.model_dump(mode='json', by_alias=True),
-                'application/json',
+                content_type='application/json',
             )
         else:
             self._log.debug('Persistence is not enabled - not doing anything')

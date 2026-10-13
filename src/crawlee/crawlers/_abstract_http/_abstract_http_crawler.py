@@ -221,7 +221,7 @@ class AbstractHttpCrawler(
             # A relative `<base href>` is resolved against the page URL, and one that does not resolve to an absolute
             # URL (malformed, `mailto:`, ...) is ignored.
             base_url = context.request.loaded_url or context.request.url
-            extracted_base_urls = list(self._parser.find_links(parsed_content, 'base[href]', 'href'))
+            extracted_base_urls = list(self._parser.find_links(parsed_content, 'base[href]', attribute='href'))
             if extracted_base_urls:
                 try:
                     resolved_base_url = convert_to_absolute_url(base_url, extracted_base_urls[0])

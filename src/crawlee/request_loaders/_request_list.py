@@ -35,6 +35,7 @@ class RequestList(RequestLoader):
     def __init__(
         self,
         requests: Iterable[str | Request] | AsyncIterable[str | Request] | None = None,
+        *,
         name: str | None = None,
         persist_state_key: str | None = None,
         persist_requests_key: str | None = None,
