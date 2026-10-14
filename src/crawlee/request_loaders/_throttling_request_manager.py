@@ -13,7 +13,6 @@ from yarl import URL
 from crawlee._service_locator import ServiceLocator
 from crawlee._service_locator import service_locator as global_service_locator
 from crawlee._utils.docs import docs_group
-from crawlee._utils.wait import run_all
 from crawlee.request_loaders._request_manager import RequestManager
 
 if TYPE_CHECKING:
@@ -158,7 +157,6 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     @override
     async def drop(self) -> None:
         await self._ensure_sub_managers()
-        # `gather` lets every drop finish even when one of them fails, so no manager is left half-dropped.
         await asyncio.gather(self._inner.drop(), *(sm.drop() for sm in self._sub_managers.values()))
         self._sub_managers.clear()
         self._sub_managers_ready = False
@@ -173,7 +171,6 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         they're just emptied.
         """
         await self._ensure_sub_managers()
-        # `gather` lets every purge finish even when one of them fails.
         await asyncio.gather(self._inner.purge(), *(sm.purge() for sm in self._sub_managers.values()))
         self._in_flight_from_inner.clear()
         self._migrated_from_inner = 0
@@ -293,7 +290,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     @override
     async def get_handled_count(self) -> int:
         await self._ensure_sub_managers()
-        counts = await run_all(
+        counts = await asyncio.gather(
             self._inner.get_handled_count(), *(sm.get_handled_count() for sm in self._sub_managers.values())
         )
         return sum(counts) - self._migrated_from_inner
@@ -301,7 +298,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     @override
     async def get_total_count(self) -> int:
         await self._ensure_sub_managers()
-        counts = await run_all(
+        counts = await asyncio.gather(
             self._inner.get_total_count(), *(sm.get_total_count() for sm in self._sub_managers.values())
         )
         return sum(counts) - self._migrated_from_inner
@@ -316,7 +313,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """
         await self._ensure_sub_managers()
         now = datetime.now(UTC)
-        results = await run_all(
+        results = await asyncio.gather(
             self._inner.is_empty(),
             *(
                 self._sub_managers[d].is_empty()
@@ -329,7 +326,9 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     @override
     async def is_finished(self) -> bool:
         await self._ensure_sub_managers()
-        results = await run_all(self._inner.is_finished(), *(sm.is_finished() for sm in self._sub_managers.values()))
+        results = await asyncio.gather(
+            self._inner.is_finished(), *(sm.is_finished() for sm in self._sub_managers.values())
+        )
         return all(results)
 
     async def get_stall_reason(self) -> str | None:
@@ -357,16 +356,16 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         if not candidates:
             return None
 
-        all_dispatchable_empty = all(await run_all(*(manager.is_empty() for manager in dispatchable)))
+        all_dispatchable_empty = all(await asyncio.gather(*(manager.is_empty() for manager in dispatchable)))
         if not all_dispatchable_empty:
             return None
 
         # A domain waiting out a cooldown with work left will still make progress, so the crawl isn't stuck yet.
-        all_cooling_finished = all(await run_all(*(manager.is_finished() for manager in cooling)))
+        all_cooling_finished = all(await asyncio.gather(*(manager.is_finished() for manager in cooling)))
         if not all_cooling_finished:
             return None
 
-        candidates_empty = await run_all(*(self._sub_managers[domain].is_empty() for domain in candidates))
+        candidates_empty = await asyncio.gather(*(self._sub_managers[domain].is_empty() for domain in candidates))
         stalled = [domain for domain, is_empty in zip(candidates, candidates_empty, strict=True) if not is_empty]
         if not stalled:
             return None
