@@ -14,6 +14,10 @@ All notable changes to this project will be documented in this file.
 
 - **deps:** Replace `jaro-winkler` with `RapidFuzz` in the `adaptive-crawler` extra ([#2282](https://github.com/apify/crawlee-python/pull/2282)) ([81ab674](https://github.com/apify/crawlee-python/commit/81ab67496424e4ac10060e4dacba9d91cb10787e)) by [@Mantisus](https://github.com/Mantisus)
 
+### ⚡ Performance
+
+- Replace `tldextract` with a built-in Public Suffix List lookup ([#2283](https://github.com/apify/crawlee-python/pull/2283)) ([a14f745](https://github.com/apify/crawlee-python/commit/a14f745880205f654bf4c30ad999173a07b830ea)) by [@Mantisus](https://github.com/Mantisus), closes [#2056](https://github.com/apify/crawlee-python/issues/2056)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [1.10.4](https://github.com/apify/crawlee-python/releases/tag/v1.10.4) (2026-10-06)
