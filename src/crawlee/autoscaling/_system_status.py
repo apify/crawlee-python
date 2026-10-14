@@ -8,11 +8,12 @@ from typing import TYPE_CHECKING
 
 from more_itertools import pairwise
 
-from crawlee._autoscaling._types import LoadRatioInfo, Snapshot, SystemInfo
 from crawlee._utils.docs import docs_group
 
+from ._types import LoadRatioInfo, Snapshot, SystemInfo
+
 if TYPE_CHECKING:
-    from crawlee._autoscaling import Snapshotter
+    from ._snapshotter import Snapshotter
 
 logger = getLogger(__name__)
 

@@ -103,3 +103,65 @@ The `id` argument of `BasicCrawler` and its subclasses is now a `str`, so pass a
 The statistics a crawler creates by default now use the crawler's `id`. Crawlers that share an `id` therefore share both the state returned by `use_state` and the persisted statistics. In v1, they shared only the state.
 
 A crawler without an `id` gets its creation index, such as `'0'`, and crawlers with an explicit `id` now count towards that index too. If you resume a v1 run with `purge_on_start=False` and mix both kinds of crawlers, a generated `id` can differ from the one v1 assigned, and the crawler won't find the state that `use_state` stored under the old one.
+
+## Concurrency is managed by `ConcurrencySystem`
+
+Load monitoring and concurrency scaling moved from `AutoscaledPool` to the new `ConcurrencySystem`. A crawler builds a default system from its `concurrency_settings` for each run, so a crawler configured through `concurrency_settings` works as before. To cap the combined concurrency of several crawlers, pass one shared `ConcurrencySystem` to all of them through the new `concurrency_system` option.
+
+The autoscaling classes now live in the public `crawlee.autoscaling` package, which replaces the private `crawlee._autoscaling`. Import `AutoscaledPool`, `ConcurrencySystem`, `ConcurrencyConsumer`, `SystemInfo` and `LoadRatioInfo` from there. `Snapshotter` and `SystemStatus` stay internal.
+
+`AutoscaledPool` now only runs the task loop. If you create a pool yourself, note that:
+
+- `system_status` and `concurrency_settings` are replaced by `concurrency_system`, which has to be active when the pool runs, and `consumer`, which identifies the pool to the system.
+- `run_task_function` receives the id the task is booked under.
+- `current_concurrency` comes from the concurrency system, so a shared system may count the tasks of other pools too. The pool's own tasks are counted by the new `own_concurrency`.
+
+For example:
+
+```python
+# v1
+from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
+
+async with Snapshotter.from_config() as snapshotter:
+    pool = AutoscaledPool(
+        system_status=SystemStatus(snapshotter),
+        concurrency_settings=ConcurrencySettings(max_concurrency=10),
+        run_task_function=run_task,
+        is_task_ready_function=is_task_ready,
+        is_finished_function=is_finished,
+    )
+    await pool.run()
+
+# v2
+from crawlee.autoscaling import AutoscaledPool, ConcurrencyConsumer, ConcurrencySystem
+
+settings = ConcurrencySettings(max_concurrency=10)
+
+async with ConcurrencySystem(settings) as concurrency_system:
+    pool = AutoscaledPool(
+        concurrency_system=concurrency_system,
+        consumer=ConcurrencyConsumer(id='my-pool'),
+        run_task_function=run_task,  # Now called with the task id.
+        is_task_ready_function=is_task_ready,
+        is_finished_function=is_finished,
+    )
+    await pool.run()
+```
+
+## `max_tasks_per_minute` counts the last minute
+
+`ConcurrencySettings.max_tasks_per_minute` now caps the tasks started over the last 60 seconds, the same as Crawlee JS. In v1, the pool spaced task starts evenly, `60 / max_tasks_per_minute` seconds apart. In v2, tasks start as fast as the concurrency allows until the cap is reached. The next ones wait until the oldest starts age out of the window. The rate over a minute stays the same, but tasks start in bursts. For details, see [Max tasks per minute](../guides/scaling-crawlers#max-tasks-per-minute).
+
+The value has to be a whole number of at least 1, or infinity, which is the default. A fractional value, such as `0.5` or `7.5`, now raises `ValueError`.
+
+## Autoscaling logs moved to DEBUG
+
+The periodic log of the autoscaling state and the `Waiting for remaining tasks to finish` message are now logged at DEBUG instead of INFO. The crawler's status message at INFO still reports the desired concurrency.
+
+The state log also has a new format. Instead of raw ratios for every resource, it names only the overloaded ones, with the share of time each spent over its threshold and its limit:
+
+```text
+current concurrency 3, desired 5, overloaded: cpu 58% of the time (limit 40%)
+```
+
+To read the concurrency values in code, use `crawler.concurrency_system`.

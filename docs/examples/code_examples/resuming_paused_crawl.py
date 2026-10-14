@@ -16,8 +16,9 @@ configuration.purge_on_start = False
 
 async def main() -> None:
     crawler = BeautifulSoupCrawler(
-        # Let's slow down the crawler for a demonstration
-        concurrency_settings=ConcurrencySettings(max_tasks_per_minute=20)
+        # Let's slow down the crawler for a demonstration. It processes 2 requests
+        # and then waits for a minute, which leaves time to interrupt it.
+        concurrency_settings=ConcurrencySettings(max_tasks_per_minute=2)
     )
 
     @crawler.router.default_handler
