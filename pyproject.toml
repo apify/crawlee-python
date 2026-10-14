@@ -381,10 +381,6 @@ uv run pytest \
     tests/e2e/project_template
 """
 
-[tool.poe.tasks.update-docs-theme]
-shell = "pnpm update @apify/docs-theme"
-cwd = "website"
-
 [tool.poe.tasks.build-docs]
 shell = "./build_api_reference.sh && pnpm install && uv run pnpm build"
 cwd = "website"

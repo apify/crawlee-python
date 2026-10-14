@@ -12,5 +12,5 @@ quote_type = single
 [Makefile]
 indent_style = tab
 
-[{*.yaml, *.yml}]
+[{*.yaml,*.yml}]
 indent_size = 2

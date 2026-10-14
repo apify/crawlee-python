@@ -46,7 +46,7 @@ jobs:
         uses: apify/actions/wait-for-checks@v1.6.2
         with:
           ref: ${{ github.sha }}
-          check-regexp: '^Checks'
+          check-regexp: "^Checks"
 
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

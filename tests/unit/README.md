@@ -6,7 +6,7 @@ Here are some suggested approaches to mitigate flakiness, sorted in the order of
 
 - Investigate the root cause and fix the code or test.
 - Apply one of the pytest marks to mitigate the flakiness:
-    - `@run_alone_on_mac` - Test with such mark will run alone on macOS exeutor in CI (normally several tests run in parallel, which can cause resource-sensitive tests to fail.) Use for resource sensitive tests that are known to be flaky only on macOS.
-    - `@run_alone` - Test with such mark will run alone on any executor. Use for resource sensitive tests that are known to be flaky on all platforms or for tests that can not be run in parallel with other test due to their design (This should be extremely rare).
-    - `@pytest.mark.flaky` - Test with such mark will be retried several times if it fails. Use for tests that are known to be flaky, but the reason for flakiness is not understood or can not be easily mitigated.
-    - `@pytest.mark.skip` - Test with such mark will be skipped. Use when none of the above approaches mitigate the test flakiness. Marking test as skipped should be a last resort, as it can hide potential bugs and give false sense of security. Skipped tests should be tracked in GitHub issue.
+  - `@run_alone_on_mac` - Test with such mark will run alone on macOS exeutor in CI (normally several tests run in parallel, which can cause resource-sensitive tests to fail.) Use for resource sensitive tests that are known to be flaky only on macOS.
+  - `@run_alone` - Test with such mark will run alone on any executor. Use for resource sensitive tests that are known to be flaky on all platforms or for tests that can not be run in parallel with other test due to their design (This should be extremely rare).
+  - `@pytest.mark.flaky` - Test with such mark will be retried several times if it fails. Use for tests that are known to be flaky, but the reason for flakiness is not understood or can not be easily mitigated.
+  - `@pytest.mark.skip` - Test with such mark will be skipped. Use when none of the above approaches mitigate the test flakiness. Marking test as skipped should be a last resort, as it can hide potential bugs and give false sense of security. Skipped tests should be tracked in GitHub issue.

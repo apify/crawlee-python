@@ -6,7 +6,7 @@ on:
 
   # Runs every workday (Monday to Friday) at 04:00 UTC.
   schedule:
-    - cron: '0 4 * * 1-5'
+    - cron: "0 4 * * 1-5"
 
 concurrency:
   group: update-public-suffix-list
@@ -43,7 +43,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: '3.14'
+          python-version: "3.14"
 
       - name: Update Public Suffix List
         run: python scripts/update_public_suffix_list.py
@@ -62,10 +62,10 @@ jobs:
         if: steps.changes.outputs.has-changes == 'true'
         uses: apify/actions/signed-commit@v1.6.2
         with:
-          message: 'chore: update Public Suffix List snapshot'
+          message: "chore: update Public Suffix List snapshot"
           github-token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
           branch: ${{ env.BRANCH_NAME }}
-          create-branch: 'true'
+          create-branch: "true"
 
       - name: Create or update Pull Request
         if: steps.commit-and-push.outputs.committed == 'true'
