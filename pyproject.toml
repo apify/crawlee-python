@@ -45,7 +45,6 @@ dependencies = [
     "psutil>=6.0.0",
     "pydantic-settings>=2.12.0",
     "pydantic>=2.11.0",
-    "tldextract>=5.3.0",
     "typing-extensions>=4.10.0",
     "yarl>=1.18.0",
 ]
@@ -127,11 +126,15 @@ dev = [
     "apify_client<3.0.0", # For e2e tests.
     "build<2.0.0", # For e2e tests.
     "fakeredis[probabilistic,json,lua]<3.0.0",
+    "filelock<5.0.0", # For e2e tests.
     "poethepoet<1.0.0",
     "pre-commit<5.0.0",
     "proxy-py<3.0.0",
     "pydoc-markdown<5.0.0",
-    "pytest-asyncio<2.0.0",
+    # pytest-asyncio 1.1+ runs tests through `backports.asyncio.runner` on Python 3.10, whose process-wide
+    # `contextvars.copy_context` patch can leak the fixture context into the test server thread and hang the test.
+    "pytest-asyncio<2.0.0; python_version >= '3.11'",
+    "pytest-asyncio>=1.0.0,<1.1.0; python_version < '3.11'",
     "pytest-cov<8.0.0",
     "pytest-rerunfailures<17.0.0",
     "pytest-timeout<3.0.0",
@@ -268,6 +271,11 @@ addopts = "-r a --verbose --dist worksteal"
 asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
 timeout = 1800
+# A thread timer kills the stuck worker even when its main thread is blocked and a SIGALRM handler can never run.
+timeout_method = "thread"
+# pytest-timeout writes its stack dump to the xdist worker's stdout, which never reaches the console. faulthandler
+# writes straight to the stderr file descriptor, so a test stuck this long leaves its stacks in the log.
+faulthandler_timeout = 600
 markers = [
     "run_alone: marks tests that must run in isolation",
 ]
