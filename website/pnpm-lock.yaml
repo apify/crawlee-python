@@ -206,9 +206,6 @@ importers:
       prism-react-renderer:
         specifier: ^2.4.1
         version: 2.4.1(react@19.3.0)
-      prop-types:
-        specifier: ^15.8.1
-        version: 15.8.1
       raw-loader:
         specifier: ^4.0.2
         version: 4.0.2(webpack@5.111.1(@swc/core@1.16.13)(@swc/html@1.16.13)(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.29))(csso@5.0.5)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.29)(svgo@3.3.5))
