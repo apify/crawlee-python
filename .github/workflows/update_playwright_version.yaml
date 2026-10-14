@@ -4,9 +4,9 @@ on:
   # Runs when manually triggered from the GitHub UI.
   workflow_dispatch:
 
-  # Runs every day at 04:00 UTC.
+  # Runs every workday (Monday to Friday) at 04:00 UTC.
   schedule:
-    - cron: '0 4 * * *'
+    - cron: '0 4 * * 1-5'
 
 concurrency:
   group: update-playwright-version

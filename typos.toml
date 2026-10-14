@@ -15,6 +15,7 @@ extend-exclude = [
     "*.min.css",
     "**/CHANGELOG.md",
     "**/changelog.md",
+    "src/crawlee/_utils/resources/public_suffix_list.dat",
 ]
 
 [default.extend-identifiers]
