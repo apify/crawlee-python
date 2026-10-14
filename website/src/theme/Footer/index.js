@@ -9,6 +9,8 @@ import React from 'react';
 
 import styles from './index.module.css';
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 function FooterLinksColumn({ column }) {
     return (
         <div>
@@ -69,7 +71,7 @@ function Footer() {
                         <HearthIcon className={styles.hearthIcon} />
                         Crawlee is forever free and open source
                     </div>
-                    <div>© {new Date().getFullYear()} Apify</div>
+                    <div>© {CURRENT_YEAR} Apify</div>
                 </div>
             </div>
         </footer>

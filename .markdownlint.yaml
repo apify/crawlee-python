@@ -8,9 +8,9 @@ line-length: false
 ul-style:
   style: dash
 
-# Nested unordered lists use 4-space indentation.
-ul-indent:
-  indent: 4
+# Code blocks are fenced, never indented.
+code-block-style:
+  style: fenced
 
 # Docs are MDX and embed JSX components.
 no-inline-html: false

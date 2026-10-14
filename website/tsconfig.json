@@ -1,0 +1,15 @@
+{
+    "extends": "@apify/tsconfig",
+    "compilerOptions": {
+        "lib": ["ESNext", "DOM", "DOM.Iterable"],
+        "jsx": "react-jsx",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "allowJs": true,
+        "noEmit": true,
+        "skipLibCheck": true,
+        "types": ["@docusaurus/module-type-aliases"]
+    },
+    "include": ["src", "tools", "roa-loader", "*.js", "*.mts"],
+    "exclude": ["**/node_modules", "build", ".docusaurus"]
+}
