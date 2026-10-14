@@ -42,9 +42,9 @@ jobs:
       fail-fast: false
       max-parallel: 12
       matrix:
-        crawler-type: ["playwright_camoufox", "playwright_chrome", "playwright_firefox", "playwright_webkit", "playwright", "parsel", "beautifulsoup", "adaptive_beautifulsoup", "adaptive_parsel", "stagehand"]
-        http-client: ["httpx", "curl_impersonate", "impit"]
-        package-manager: ["pip", "uv", "poetry"]
+        crawler-type: [playwright_camoufox, playwright_chrome, playwright_firefox, playwright_webkit, playwright, parsel, beautifulsoup, adaptive_beautifulsoup, adaptive_parsel, stagehand]
+        http-client: [httpx, curl_impersonate, impit]
+        package-manager: [pip, uv, poetry]
 
     runs-on: ubuntu-latest
 

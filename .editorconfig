@@ -14,3 +14,4 @@ indent_style = tab
 
 [{*.yaml,*.yml}]
 indent_size = 2
+quote_type = double

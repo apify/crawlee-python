@@ -8,7 +8,7 @@ line-length: false
 ul-style:
   style: dash
 
-# Fenced blocks carry a language for syntax highlighting.
+# Code blocks are fenced, never indented.
 code-block-style:
   style: fenced
 
