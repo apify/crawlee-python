@@ -125,7 +125,8 @@ dev = [
     # drops Python 3.10 (https://github.com/apify/crawlee-python/issues/1721), remove this constraint.
     "apify_client<3.0.0", # For e2e tests.
     "build<2.0.0", # For e2e tests.
-    "fakeredis[probabilistic,json,lua]<3.0.0",
+    "fakeredis[probabilistic,json,lua]<3.0.0; python_version != '3.15' or sys_platform != 'win32'",
+    "fakeredis[probabilistic,json]<3.0.0; python_version == '3.15' and sys_platform == 'win32'",
     "filelock<5.0.0", # For e2e tests.
     "poethepoet<1.0.0",
     "pre-commit<5.0.0",
