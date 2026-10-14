@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -111,12 +112,17 @@ async def infinite_scroll(page: Page) -> None:
 
             await asyncio.sleep(1)
 
-    async with asyncio.TaskGroup() as tg:
-        tg.create_task(check_finished(), name='infinite_scroll_check_finished_task')
+    check_task = asyncio.create_task(check_finished(), name='infinite_scroll_check_finished_task')
 
+    try:
         while not finished:
             await scroll()
             await page.wait_for_timeout(250)
+    finally:
+        if not check_task.done():
+            check_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await check_task
 
 
 async def block_requests(

@@ -883,9 +883,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 skipped.append(request)
 
         if skipped:
-            async with asyncio.TaskGroup() as tg:
-                for request in skipped:
-                    tg.create_task(self._handle_skipped_request(request, 'robots_txt'))
+            skipped_tasks = [
+                asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped
+            ]
+            await asyncio.gather(*skipped_tasks)
             self._logger.warning('Some requests were skipped because they were disallowed based on the robots.txt file')
 
         request_manager = await self.get_request_manager()
