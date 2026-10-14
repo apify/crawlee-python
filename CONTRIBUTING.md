@@ -49,6 +49,11 @@ uv run poe e2e-templates-tests
 
 ## Code style
 
+### Readability
+
+- Prefer a few simple statements over one dense line. Give intermediate values a name instead of nesting calls, comprehensions, and unpacking into a single long expression.
+- When replacing a call with an equivalent one, change only the call and keep the surrounding statements as they were.
+
 ### Comments and docstrings
 
 - Comments and docstrings describe what the code does now. The bug a change fixed, what a PR changed, and contrasts with removed behavior (`instead of ...`, `no longer ...`) belong in the commit message.
