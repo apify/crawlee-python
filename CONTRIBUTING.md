@@ -65,6 +65,7 @@ uv run poe e2e-templates-tests
 - In `@pytest.mark.parametrize`, wrap each case in `pytest.param(..., id='...')` with an id that describes the case.
 - Use `Mock` and the `monkeypatch` fixture for test doubles, not hand-rolled stubs, counters, or flags.
 - A test that changes process-wide or event-loop-wide state restores it. Prefer `monkeypatch`; for APIs it can't patch (`loop.set_exception_handler()`, `signal.signal()`, logging config, `os.chdir()`), capture the original value and restore it in a `finally`.
+- On Windows with Python 3.12 or older, `datetime.now()` ticks in 1-15 ms steps, so two timestamps taken a few milliseconds apart can be equal. A test that asserts one timestamp is later than another injects a `Mock` clock instead of sleeping.
 - For a TCP endpoint that must refuse connections, bind a socket to `('127.0.0.1', 0)` and hold it open without calling `listen()`. A hard-coded port can be taken by a server in a parallel xdist worker. Test servers use `127.0.0.1`, since on Windows `localhost` resolves to both IPv4 and IPv6.
 
 ## Documentation
