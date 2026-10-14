@@ -291,8 +291,9 @@ class BrowserPool:
         Returns:
             A list of newly created pages, one for each plugin in the pool.
         """
-        pages_coroutines = [self.new_page(browser_plugin=plugin) for plugin in self._plugins]
-        return await asyncio.gather(*pages_coroutines)
+        async with asyncio.TaskGroup() as tg:
+            page_tasks = [tg.create_task(self.new_page(browser_plugin=plugin)) for plugin in self._plugins]
+        return [task.result() for task in page_tasks]
 
     async def _get_new_page(
         self,

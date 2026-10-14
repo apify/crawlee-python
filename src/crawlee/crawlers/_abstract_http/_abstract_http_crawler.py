@@ -261,10 +261,9 @@ class AbstractHttpCrawler(
 
                 requests.append(request)
 
-            skipped_tasks = [
-                asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped
-            ]
-            await asyncio.gather(*skipped_tasks)
+            async with asyncio.TaskGroup() as tg:
+                for request in skipped:
+                    tg.create_task(self._handle_skipped_request(request, 'robots_txt'))
 
             return requests
 
