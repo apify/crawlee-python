@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from importlib.util import find_spec
 from typing import TYPE_CHECKING
 
 import pytest
@@ -17,6 +18,16 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from fakeredis import FakeAsyncRedis
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Skip the Redis request queue cases when `lupa` is missing, since the Redis RQ client runs Lua scripts."""
+    if find_spec('lupa') is not None:
+        return
+    for item in items:
+        callspec = getattr(item, 'callspec', None)
+        if item.path.name == 'test_request_queue.py' and callspec and callspec.params.get('storage_client') == 'redis':
+            item.add_marker(pytest.mark.skip(reason='`lupa` is not installed'))
 
 
 @pytest.fixture(params=['memory', 'file_system', 'sql', 'redis'])

@@ -64,7 +64,7 @@ async function encodeAndSign(source) {
 
     if (working) {
         return new Promise((resolve, reject) => {
-            queue.push(() => {
+            queue.push(async () => {
                 return getHash(source).then(resolve, reject);
             });
         });

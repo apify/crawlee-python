@@ -40,7 +40,7 @@ jobs:
         uses: apify/actions/wait-for-checks@v1.6.2
         with:
           ref: ${{ github.sha }}
-          check-regexp: '^Checks'
+          check-regexp: ^Checks
 
   release_prepare:
     name: Release prepare

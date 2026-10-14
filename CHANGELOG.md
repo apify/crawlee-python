@@ -9,10 +9,15 @@ All notable changes to this project will be documented in this file.
 
 - **storages:** Add direct async iteration on Dataset and KeyValueStore ([#2267](https://github.com/apify/crawlee-python/pull/2267)) ([e02e71d](https://github.com/apify/crawlee-python/commit/e02e71dc549abb0038ce884038304716e260d24b)) by [@Pijukatel](https://github.com/Pijukatel), closes [#1745](https://github.com/apify/crawlee-python/issues/1745)
 - **crawlers:** Add `extract_form_requests` helper for HTTP crawlers with HTML parsers ([#2257](https://github.com/apify/crawlee-python/pull/2257)) ([62386fd](https://github.com/apify/crawlee-python/commit/62386fddde42f98cdc2df7aca961ef0e9c1c77ab)) by [@Mantisus](https://github.com/Mantisus)
+- Add support for Python 3.15 ([#2294](https://github.com/apify/crawlee-python/pull/2294)) ([680c7ef](https://github.com/apify/crawlee-python/commit/680c7ef14cfea5511a6fae78c6617c79373605fd)) by [@vdusek](https://github.com/vdusek)
 
 ### 🐛 Bug Fixes
 
 - **deps:** Replace `jaro-winkler` with `RapidFuzz` in the `adaptive-crawler` extra ([#2282](https://github.com/apify/crawlee-python/pull/2282)) ([81ab674](https://github.com/apify/crawlee-python/commit/81ab67496424e4ac10060e4dacba9d91cb10787e)) by [@Mantisus](https://github.com/Mantisus)
+
+### ⚡ Performance
+
+- Replace `tldextract` with a built-in Public Suffix List lookup ([#2283](https://github.com/apify/crawlee-python/pull/2283)) ([a14f745](https://github.com/apify/crawlee-python/commit/a14f745880205f654bf4c30ad999173a07b830ea)) by [@Mantisus](https://github.com/Mantisus), closes [#2056](https://github.com/apify/crawlee-python/issues/2056)
 
 
 <!-- git-cliff-unreleased-end -->

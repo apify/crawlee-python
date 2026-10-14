@@ -319,7 +319,7 @@ const onCopyAsMarkdownClick = async ({ setCopyingStatus, currentUrl }) => {
         // awaiting fetch first — otherwise Safari would reject the clipboard operation.
         const markdownContent = new ClipboardItem({
             'text/plain': fetch(markdownUrl)
-                .then((response) => {
+                .then(async (response) => {
                     if (!response.ok) {
                         throw new Error(`Failed to fetch markdown: ${response.status}`);
                     }
@@ -359,7 +359,7 @@ const MenuBase = React.forwardRef(
                         className={styles.copyUpIconWrapper}
                         onClick={(event) => {
                             event.stopPropagation();
-                            onCopyAsMarkdownClick({ setCopyingStatus, currentUrl });
+                            void onCopyAsMarkdownClick({ setCopyingStatus, currentUrl });
                         }}
                     >
                         {COPYING_STATUS_ICON[copyingStatus]}
@@ -367,7 +367,7 @@ const MenuBase = React.forwardRef(
                     <span
                         onClick={(event) => {
                             event.stopPropagation();
-                            onCopyAsMarkdownClick({ setCopyingStatus, currentUrl });
+                            void onCopyAsMarkdownClick({ setCopyingStatus, currentUrl });
                         }}
                         className={styles.llmButtonText}
                     >
@@ -425,7 +425,7 @@ export default function LLMButtons() {
             }
         };
 
-        checkMarkdownAvailability();
+        void checkMarkdownAvailability();
 
         return () => {
             controller.abort();
@@ -465,7 +465,7 @@ export default function LLMButtons() {
 
             if (option.value === 'copyForLLM') {
                 event?.preventDefault();
-                onCopyAsMarkdownClick({ setCopyingStatus, currentUrl });
+                void onCopyAsMarkdownClick({ setCopyingStatus, currentUrl });
             }
         },
         [setCopyingStatus, currentUrl],

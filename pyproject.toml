@@ -21,6 +21,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Topic :: Software Development :: Libraries",
 ]
 keywords = [
@@ -44,7 +45,6 @@ dependencies = [
     "psutil>=6.0.0",
     "pydantic-settings>=2.12.0",
     "pydantic>=2.11.0",
-    "tldextract>=5.3.0",
     "typing-extensions>=4.10.0",
     "yarl>=1.18.0",
 ]
@@ -125,7 +125,9 @@ dev = [
     # drops Python 3.10 (https://github.com/apify/crawlee-python/issues/1721), remove this constraint.
     "apify_client<3.0.0", # For e2e tests.
     "build<2.0.0", # For e2e tests.
-    "fakeredis[probabilistic,json,lua]<3.0.0",
+    "fakeredis[probabilistic,json,lua]<3.0.0; python_version != '3.15' or sys_platform != 'win32'",
+    "fakeredis[probabilistic,json]<3.0.0; python_version == '3.15' and sys_platform == 'win32'",
+    "filelock<5.0.0", # For e2e tests.
     "poethepoet<1.0.0",
     "pre-commit<5.0.0",
     "proxy-py<3.0.0",
@@ -325,6 +327,7 @@ apify-client = false
 apify-shared = false
 apify_fingerprint_datapoints = false
 crawlee = false
+impit = false
 
 # Run tasks with: uv run poe <task>
 [tool.poe.tasks]
@@ -386,11 +389,6 @@ uv run pytest \
     tests/e2e/project_template
 """
 help = "Run E2E tests of the project templates"
-
-[tool.poe.tasks.update-docs-theme]
-shell = "pnpm update @apify/docs-theme"
-cwd = "website"
-help = "Update the documentation website theme"
 
 [tool.poe.tasks.build-docs]
 shell = "./build_api_reference.sh && pnpm install && uv run pnpm build"
