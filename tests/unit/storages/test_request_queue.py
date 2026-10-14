@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
-from importlib.util import find_spec
 from typing import TYPE_CHECKING
 
 import pytest
@@ -19,14 +18,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Sequence
 
     from crawlee.storage_clients import StorageClient
-
-
-@pytest.fixture(autouse=True)
-def skip_redis_without_lua(request: pytest.FixtureRequest) -> None:
-    """Skip the Redis cases when `lupa` is missing, since the Redis RQ client runs Lua scripts."""
-    callspec = getattr(request.node, 'callspec', None)
-    if callspec is not None and callspec.params.get('storage_client') == 'redis' and find_spec('lupa') is None:
-        pytest.skip('`lupa` is not installed')
 
 
 @pytest.fixture
