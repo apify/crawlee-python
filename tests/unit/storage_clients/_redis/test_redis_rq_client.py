@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import timedelta
+from importlib.util import find_spec
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -20,6 +21,10 @@ if TYPE_CHECKING:
     from fakeredis import FakeAsyncRedis
 
     from crawlee.storage_clients._redis import RedisRequestQueueClient
+
+
+# The Redis RQ client runs Lua scripts, which `fakeredis` executes only with `lupa` installed.
+pytestmark = pytest.mark.skipif(find_spec('lupa') is None, reason='`lupa` is not installed')
 
 
 @pytest.fixture(params=['default', 'bloom'])
