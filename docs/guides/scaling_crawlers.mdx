@@ -9,6 +9,7 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
 import MaxTasksPerMinuteExample from '!!raw-loader!roa-loader!./code_examples/scaling_crawlers/max_tasks_per_minute_example.py';
 import MinAndMaxConcurrencyExample from '!!raw-loader!roa-loader!./code_examples/scaling_crawlers/min_and_max_concurrency_example.py';
+import SharedConcurrencySystemExample from '!!raw-loader!roa-loader!./code_examples/scaling_crawlers/shared_concurrency_system_example.py';
 
 As we build our crawler, we may want to control how many tasks it performs at any given time. In other words, how many requests it makes to the web we are trying to scrape. Crawlee offers several options to fine-tune the number of parallel tasks, limit the number of requests per minute, and optimize scaling based on available system resources.
 
@@ -20,7 +21,7 @@ All of these options are available across all crawlers provided by Crawlee. In t
 
 ## Max tasks per minute
 
-The `max_tasks_per_minute` setting in <ApiLink to="class/ConcurrencySettings">`ConcurrencySettings`</ApiLink> controls how many total tasks the crawler can process per minute. It ensures that tasks are spread evenly throughout the minute, preventing a sudden burst at the `max_concurrency` limit followed by idle time. By default, this is set to `Infinity`, meaning the crawler can run at full speed, limited only by `max_concurrency`. Use this option if you want to throttle your crawler to avoid overwhelming the target website with continuous requests.
+The `max_tasks_per_minute` setting in <ApiLink to="class/ConcurrencySettings">`ConcurrencySettings`</ApiLink> controls how many total tasks the crawler can process per minute. The tasks started over the last 60 seconds are counted, so the crawler may spend the whole limit early in the minute, as fast as its concurrency allows. It then waits until the oldest of those starts ages out of the window. By default, this is set to `Infinity`, meaning the crawler can run at full speed, limited only by `max_concurrency`. Use this option if you want to throttle your crawler to avoid overwhelming the target website with continuous requests.
 
 <RunnableCodeBlock className="language-python" language="python">
     {MaxTasksPerMinuteExample}
@@ -44,9 +45,15 @@ The `desired_concurrency` option in the <ApiLink to="class/ConcurrencySettings">
     {MinAndMaxConcurrencyExample}
 </RunnableCodeBlock>
 
-## Autoscaled pool
+## Concurrency system
 
-The <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink> manages a pool of asynchronous, resource-intensive tasks that run in parallel. It keeps `min_concurrency` tasks running even while the system is overloaded, and starts additional tasks only when there is enough free CPU and memory. To monitor system resources, it leverages the <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> and <ApiLink to="class/SystemStatus">`SystemStatus`</ApiLink> classes. If any task raises an exception, the error is propagated, and the pool is stopped. Every crawler uses an <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink> under the hood.
+Every crawler runs its requests through an <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink>, and the pool asks a <ApiLink to="class/ConcurrencySystem">`ConcurrencySystem`</ApiLink> whether there is room for one more request. The system is what keeps `min_concurrency` requests running even while the machine is overloaded, starts further ones only when there is enough free CPU and memory, and scales the budget up and down as the load changes. To monitor system resources, it leverages the <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> and <ApiLink to="class/SystemStatus">`SystemStatus`</ApiLink> classes. If any task raises an exception, the error is propagated and the pool is stopped.
+
+The crawler builds its own system from the `ConcurrencySettings` described above. Build one yourself and pass it as `concurrency_system` to go beyond those settings, or to share a single budget between several crawlers that would otherwise each scale against the whole machine and oversubscribe it. The budget goes to whoever asks for it first, so a crawler that joins a saturated system late may have to wait. Browser crawlers default to a lower `desired_concurrency` than the rest, and a supplied system replaces that default too, so set it in the `ConcurrencySettings` you build the system from. Holding the instance also lets you retune `min_concurrency` and `max_concurrency` while the crawl runs. The lifecycle of such a system belongs to you, so keep it open until every crawler using it has finished.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {SharedConcurrencySystemExample}
+</RunnableCodeBlock>
 
 ## Running under a resource limit
 
