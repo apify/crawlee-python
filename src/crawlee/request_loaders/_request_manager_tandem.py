@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -9,12 +10,17 @@ from typing_extensions import override
 from crawlee._utils.docs import docs_group
 from crawlee.request_loaders import RequestManager
 
+from ._types import ReadyStatus
+from ._utils import join_request_source_statuses
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee import Request
     from crawlee.request_loaders import RequestLoader
     from crawlee.storage_clients.models import ProcessedRequest
+
+    from ._types import RequestSourceStatus
 
 
 logger = getLogger(__name__)
@@ -41,12 +47,11 @@ class RequestManagerTandem(RequestManager):
         return (await self._read_only_loader.get_total_count()) + (await self._read_write_manager.get_total_count())
 
     @override
-    async def is_empty(self) -> bool:
-        return (await self._read_only_loader.is_empty()) and (await self._read_write_manager.is_empty())
-
-    @override
-    async def is_finished(self) -> bool:
-        return (await self._read_only_loader.is_finished()) and (await self._read_write_manager.is_finished())
+    async def check_readiness(self) -> RequestSourceStatus:
+        loader_status, manager_status = await asyncio.gather(
+            self._read_only_loader.check_readiness(), self._read_write_manager.check_readiness()
+        )
+        return join_request_source_statuses(loader_status, manager_status)
 
     @override
     async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest | None:
@@ -74,13 +79,22 @@ class RequestManagerTandem(RequestManager):
 
     @override
     async def fetch_next_request(self) -> Request | None:
-        if await self._read_only_loader.is_finished():
-            return await self._read_write_manager.fetch_next_request()
+        # Only the loader's own readiness decides the transfer, so a loader that's still loading doesn't block the
+        # manager's requests.
+        if isinstance(await self._read_only_loader.check_readiness(), ReadyStatus):
+            transferred = await self._transfer_next_request()
+            # The request was dropped, so skip the manager this round. The next call picks up where this one left off.
+            if not transferred:
+                return None
 
+        return await self._read_write_manager.fetch_next_request()
+
+    async def _transfer_next_request(self) -> bool:
+        """Move the loader's next request into the manager, returning `False` if it had to be dropped."""
         request = await self._read_only_loader.fetch_next_request()
 
         if not request:
-            return await self._read_write_manager.fetch_next_request()
+            return True
 
         try:
             await self._read_write_manager.add_request(request, forefront=True)
@@ -90,13 +104,13 @@ class RequestManagerTandem(RequestManager):
                 extra={'url': request.url, 'unique_key': request.unique_key},
             )
 
-            return None
+            return False
         finally:
             # Mark it as processed so that the `request` doesn't get stuck in the `in_progress` status
             # in `RequestLoader`
             await self._read_only_loader.mark_request_as_handled(request)
 
-        return await self._read_write_manager.fetch_next_request()
+        return True
 
     @override
     async def reclaim_request(self, request: Request, *, forefront: bool = False) -> None:

@@ -38,7 +38,16 @@ from crawlee.errors import (
 )
 from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
 from crawlee.http_clients import HttpClient
-from crawlee.request_loaders import RequestList, RequestManagerTandem, ThrottlingRequestManager
+from crawlee.request_loaders import (
+    FinishedStatus,
+    ReadyStatus,
+    RequestList,
+    RequestManagerTandem,
+    RequestSourceStatus,
+    StalledStatus,
+    ThrottlingRequestManager,
+    WaitingStatus,
+)
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics, Statistics, StatisticsState
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
@@ -71,15 +80,11 @@ async def test_processes_requests_from_explicit_queue() -> None:
 
 
 @pytest.mark.parametrize(
-    'method',
-    [pytest.param('is_empty', id='is_empty'), pytest.param('is_finished', id='is_finished')],
-)
-@pytest.mark.parametrize(
     'error_type',
     [pytest.param(RuntimeError, id='runtime error'), pytest.param(TimeoutError, id='timeout error')],
 )
 async def test_propagates_request_queue_status_errors(
-    monkeypatch: pytest.MonkeyPatch, method: str, error_type: type[Exception]
+    monkeypatch: pytest.MonkeyPatch, error_type: type[Exception]
 ) -> None:
     """A request manager failure reaches the caller, and the crawler can be run again once the manager recovers."""
     queue = await RequestQueue.open()
@@ -93,17 +98,17 @@ async def test_propagates_request_queue_status_errors(
 
     error = error_type('Queue status unavailable')
     with monkeypatch.context() as monkey:
-        monkey.setattr(queue, method, AsyncMock(side_effect=error))
+        monkey.setattr(queue, 'check_readiness', AsyncMock(side_effect=error))
         with pytest.raises(error_type, match='Queue status unavailable') as exc_info:
             await crawler.run()
         assert exc_info.value is error
 
     assert handled_urls == []
-    assert not await queue.is_finished()
+    assert await queue.check_readiness() == ReadyStatus()
 
     await crawler.run()
     assert handled_urls == ['https://a.placeholder.com']
-    assert await queue.is_finished()
+    assert await queue.check_readiness() == FinishedStatus()
 
 
 async def test_crawler_is_usable_after_a_failed_run_setup(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -139,7 +144,7 @@ async def test_failed_run_keeps_pending_requests_for_the_retry(monkeypatch: pyte
     assert handled_urls == ['https://a.placeholder.com']
 
     with monkeypatch.context() as monkey:
-        monkey.setattr(queue, 'is_empty', AsyncMock(side_effect=RuntimeError('Queue status unavailable')))
+        monkey.setattr(queue, 'check_readiness', AsyncMock(side_effect=RuntimeError('Queue status unavailable')))
         with pytest.raises(RuntimeError, match='Queue status unavailable'):
             await crawler.run(['https://b.placeholder.com'])
 
@@ -160,7 +165,7 @@ async def test_purge_resumes_once_a_run_succeeds_again(monkeypatch: pytest.Monke
     await crawler.run(['https://a.placeholder.com'])
 
     with monkeypatch.context() as monkey:
-        monkey.setattr(queue, 'is_empty', AsyncMock(side_effect=RuntimeError('Queue status unavailable')))
+        monkey.setattr(queue, 'check_readiness', AsyncMock(side_effect=RuntimeError('Queue status unavailable')))
         with pytest.raises(RuntimeError, match='Queue status unavailable'):
             await crawler.run(['https://b.placeholder.com'])
 
@@ -2752,8 +2757,8 @@ async def test_warn_unconfigured_throttle_domain_once_per_domain(caplog: pytest.
     assert any('other.example.com' in r.getMessage() for r in matching)
 
 
-async def test_throttled_domain_waits_out_backoff_without_ending_the_crawl() -> None:
-    """A domain in a cooldown reads as empty to the autoscaled pool, yet its queued requests are still crawled."""
+async def test_crawl_waits_out_backoff() -> None:
+    """Test that a domain in a cooldown reads as waiting, yet its queued requests are still crawled."""
     storage_client = MemoryStorageClient()
     # The throttler opens its sub-managers through the global service locator, so point that at the same client.
     service_locator.set_storage_client(storage_client)
@@ -2771,18 +2776,20 @@ async def test_throttled_domain_waits_out_backoff_without_ending_the_crawl() -> 
         concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
     )
     dispatched_at = list[float]()
-    empty_during_cooldown = list[bool]()
+    statuses_during_cooldown = list[RequestSourceStatus]()
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
         dispatched_at.append(time.monotonic())
         if len(dispatched_at) == 1:
             throttler.record_domain_delay(context.request.url, retry_after=timedelta(milliseconds=500))
-            empty_during_cooldown.append(await throttler.is_empty())
+            statuses_during_cooldown.append(await throttler.check_readiness())
 
     await crawler.run(['https://throttled.placeholder.com/a', 'https://throttled.placeholder.com/b'])
 
-    assert empty_during_cooldown == [True]
+    assert len(statuses_during_cooldown) == 1
+    assert isinstance(statuses_during_cooldown[0], WaitingStatus)
+    assert statuses_during_cooldown[0].ready_at is not None
     assert len(dispatched_at) == 2
     assert dispatched_at[1] - dispatched_at[0] >= 0.5
 
@@ -2795,6 +2802,11 @@ MAX_DOMAIN_STALL = timedelta(milliseconds=1200)
 
 # Guards the tests against an endless crawl if deferral or stall detection breaks.
 MAX_HANDLER_CALLS = 50
+
+
+def is_stalled(status: RequestSourceStatus) -> bool:
+    """Tell whether a request manager reported a stall."""
+    return isinstance(status, StalledStatus)
 
 
 async def open_throttler() -> ThrottlingRequestManager[RequestQueue]:
@@ -2894,7 +2906,7 @@ async def test_keep_alive_ignores_stall() -> None:
     """A crawler running with `keep_alive` keeps waiting on a stalled domain instead of raising."""
     throttler = await open_throttler()
     crawler = BasicCrawler(request_manager=throttler, keep_alive=True)
-    stall_reasons = list[str | None]()
+    stall_statuses = list[RequestSourceStatus]()
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -2902,7 +2914,7 @@ async def test_keep_alive_ignores_stall() -> None:
         raise RequestThrottledError
 
     async def stop_after_stall() -> None:
-        stall_reasons.append(await poll_until_condition(throttler.get_stall_reason, timeout=10))
+        stall_statuses.append(await poll_until_condition(throttler.check_readiness, is_stalled, timeout=10))
         # Past the pool's next check, where a crawler without `keep_alive` raises.
         await asyncio.sleep(0.6)
         crawler.stop()
@@ -2914,7 +2926,7 @@ async def test_keep_alive_ignores_stall() -> None:
     finally:
         stopper.cancel()
 
-    assert stall_reasons[0] is not None
+    assert isinstance(stall_statuses[0], StalledStatus)
 
 
 async def test_stall_waits_for_in_flight_work() -> None:
@@ -2927,7 +2939,7 @@ async def test_stall_waits_for_in_flight_work() -> None:
         concurrency_settings=ConcurrencySettings(min_concurrency=2, desired_concurrency=2),
     )
     visited = list[str]()
-    stall_reasons = list[str | None]()
+    stall_statuses = list[RequestSourceStatus]()
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -2938,19 +2950,20 @@ async def test_stall_waits_for_in_flight_work() -> None:
             throttler.record_domain_delay(context.request.url)
             raise RequestThrottledError
         if context.request.url == 'https://free.placeholder.com/slow':
-            stall_reasons.append(await poll_until_condition(throttler.get_stall_reason, timeout=10))
+            stall_statuses.append(await poll_until_condition(throttler.check_readiness, is_stalled, timeout=10))
             # Two more pool checks, so at least one ran entirely while the stall was live and this request in flight.
             checks = is_finished.await_count
             await poll_until_condition(lambda: is_finished.await_count >= checks + 2, timeout=10)
             await context.add_requests(['https://free.placeholder.com/next'])
 
+    is_finished_function = cast('Any', crawler)._BasicCrawler__is_finished_function
     with (
-        patch.object(throttler, 'is_finished', wraps=throttler.is_finished) as is_finished,
+        patch.object(crawler, '_BasicCrawler__is_finished_function', wraps=is_finished_function) as is_finished,
         pytest.raises(PersistentRateLimitError),
     ):
         await crawler.run([THROTTLED_URL, 'https://free.placeholder.com/slow'])
 
-    assert stall_reasons[0] is not None
+    assert isinstance(stall_statuses[0], StalledStatus)
     assert 'https://free.placeholder.com/next' in visited
 
 
@@ -2965,7 +2978,7 @@ async def test_max_requests_per_crawl_precedes_stall() -> None:
         concurrency_settings=ConcurrencySettings(min_concurrency=2, desired_concurrency=2),
     )
     calls = 0
-    stall_reasons = list[str | None]()
+    stall_statuses = list[RequestSourceStatus]()
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -2976,11 +2989,11 @@ async def test_max_requests_per_crawl_precedes_stall() -> None:
         if context.request.url == THROTTLED_URL:
             throttler.record_domain_delay(context.request.url)
             raise RequestThrottledError
-        stall_reasons.append(await poll_until_condition(throttler.get_stall_reason, timeout=10))
+        stall_statuses.append(await poll_until_condition(throttler.check_readiness, is_stalled, timeout=10))
 
     stats = await crawler.run([THROTTLED_URL, 'https://free.placeholder.com/slow'])
 
-    assert stall_reasons[0] is not None
+    assert isinstance(stall_statuses[0], StalledStatus)
     assert stats.requests_finished == 1
 
 
@@ -3015,6 +3028,18 @@ async def test_stall_waits_for_paced_domain() -> None:
     assert set(paced_urls) <= set(visited)
 
 
+async def test_stall_behind_tandem_raises() -> None:
+    """Test that a stall reported through a `RequestManagerTandem` ends the crawl."""
+    queue = await RequestQueue.open()
+    crawler = BasicCrawler(request_manager=RequestManagerTandem(RequestList([]), queue))
+
+    with (
+        patch.object(queue, 'check_readiness', return_value=StalledStatus('stuck')),
+        pytest.raises(PersistentRateLimitError, match='Giving up: stuck'),
+    ):
+        await crawler.run()
+
+
 async def test_inner_held_429_is_deferred_and_stalls() -> None:
     """A rate-limited request held by `inner` moves into its domain's sub-manager and can stall the crawl."""
     throttler = await open_throttler()
@@ -3034,8 +3059,8 @@ async def test_inner_held_429_is_deferred_and_stalls() -> None:
     with pytest.raises(PersistentRateLimitError):
         await crawler.run()
 
-    assert await throttler.inner.is_finished() is True
-    assert await throttler.is_finished() is False
+    assert await throttler.inner.check_readiness() == FinishedStatus()
+    assert await throttler.check_readiness() != FinishedStatus()
 
 
 @pytest.mark.parametrize(
@@ -3198,7 +3223,7 @@ async def test_stall_ignores_shared_concurrency() -> None:
 
     with (
         patch.object(crawler, '_autoscaled_pool', pool),
-        patch.object(throttler, 'get_stall_reason', AsyncMock(return_value='Domain stalled')),
+        patch.object(throttler, 'check_readiness', AsyncMock(return_value=StalledStatus('Domain stalled'))),
         pytest.raises(PersistentRateLimitError),
     ):
         await cast('Any', crawler)._BasicCrawler__is_finished_function()
