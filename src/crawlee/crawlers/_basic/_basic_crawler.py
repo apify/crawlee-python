@@ -517,7 +517,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # The default system is built per run, so that a run is not scaled on the load and concurrency of the previous
         # one. A supplied system is known up front.
         self._concurrency_system: ConcurrencySystemInterface | None = concurrency_system
-        self._autoscaled_pool: AutoscaledPool | None = None
         self._crawler_state_rec_task = RecurringTask(
             func=self._crawler_state_task,
             delay=status_message_logging_interval,
@@ -532,6 +531,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._failed = False
         self._unexpected_stop = False
         self._logger_once = LoggerOnce(self._logger)
+        self._run_logger_once = LoggerOnce(self._logger)
 
     @property
     def log(self) -> logging.Logger:
@@ -575,7 +575,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Args:
             reason: Reason for stopping that will be used in logs.
         """
-        self._logger.info(f'Crawler.stop() was called with following reason: {reason}.')
+        self._logger.info(f'Crawler.stop() was called with following reason: {reason.rstrip(" .")}.')
         self._unexpected_stop = True
 
     def _wrap_handler_with_error_context(
@@ -598,7 +598,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     def _stop_if_max_requests_count_exceeded(self) -> None:
         """Call `stop` when the maximum number of requests to crawl has been reached."""
-        if self._max_requests_per_crawl is None:
+        if self._max_requests_per_crawl is None or self._unexpected_stop:
             return
 
         if self._statistics.state.requests_total >= self._max_requests_per_crawl:
@@ -841,8 +841,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return final_statistics
         finally:
             # A failed run must leave the instance usable, so that the caller can retry after handling the error.
-            self._autoscaled_pool = None
             self._running = False
+
+            self._unexpected_stop = False
+            self._failed = False
+            self._run_logger_once = LoggerOnce(self._logger)
 
     async def _run_crawler(self) -> None:
         local_event_manager = self._service_locator.get_event_manager()
@@ -868,7 +871,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             concurrency_system = owned_concurrency_system
 
         self._concurrency_system = concurrency_system
-        self._autoscaled_pool = autoscaled_pool = AutoscaledPool(
+        autoscaled_pool = AutoscaledPool(
             concurrency_system=concurrency_system,
             consumer=ConcurrencyConsumer(id=str(self._id)),
             is_finished_function=self.__is_finished_function,
@@ -1491,22 +1494,19 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def __is_finished_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
         if self._unexpected_stop:
-            self._logger.info('The crawler will finish any remaining ongoing requests and shut down.')
+            self._logger.info('The crawler has finished all the remaining ongoing requests and will shut down now.')
             return True
 
         if self._abort_on_error and self._failed:
-            self._failed = False
             return True
 
         if self._keep_alive:
             return False
 
-        # Check for a stall only when the pool is idle. An in-flight request can still enqueue new work or end the
-        # stall. The pool's own requests are what counts, not those of another crawler sharing the budget.
+        # The pool asks only while none of this crawler's requests are in flight, so none of them can still enqueue
+        # new work or end the stall.
         if (
             isinstance(self._request_manager, ThrottlingRequestManager)
-            and self._autoscaled_pool is not None
-            and self._autoscaled_pool.own_concurrency == 0
             and (reason := await self._request_manager.get_stall_reason()) is not None
         ):
             error = PersistentRateLimitError(f'Giving up: {reason}')
@@ -1521,10 +1521,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def __is_task_ready_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
         if self._unexpected_stop:
-            self._logger.info(
-                'No new requests are allowed because crawler `stop` method was called. '
-                'Ongoing requests will be allowed to complete.'
+            self._run_logger_once.log(
+                'No new requests are allowed because the `stop()` method has been called. '
+                'Ongoing requests will be allowed to complete.',
+                key='shutting_down',
             )
+            return False
+
+        # The pool asks whether the run is finished only once nothing is in flight, so stop taking new requests here.
+        if self._abort_on_error and self._failed:
             return False
 
         request_manager = await self.get_request_manager()
