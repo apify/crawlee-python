@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections import OrderedDict
 from datetime import UTC, datetime
 from logging import getLogger
@@ -212,6 +213,9 @@ class MemoryRequestQueueClient(RequestQueueClient):
     @override
     async def fetch_next_request(self) -> Request | None:
         if not self._pending_requests:
+            # Yield to the event loop like the other clients do, so a caller polling an empty queue can't starve the
+            # tasks that would fill it.
+            await asyncio.sleep(0)
             return None
 
         _, request = self._pending_requests.popitem(last=False)
