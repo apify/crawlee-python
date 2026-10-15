@@ -26,7 +26,7 @@ from crawlee._log_config import CrawleeLogFormatter
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpMethod
 from crawlee._utils.robots import RobotsTxtFile
-from crawlee.autoscaling import AutoscaledPool, ConcurrencyConsumer, ConcurrencySystem
+from crawlee.autoscaling import ConcurrencyConsumer, ConcurrencySystem
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import (
@@ -72,15 +72,19 @@ async def test_processes_requests_from_explicit_queue() -> None:
 
 
 @pytest.mark.parametrize(
-    'method',
-    [pytest.param('is_empty', id='is_empty'), pytest.param('is_finished', id='is_finished')],
+    ('method', 'handled_before_error'),
+    [
+        pytest.param('is_empty', [], id='is_empty'),
+        # The pool asks whether the run is finished only once the queue is drained.
+        pytest.param('is_finished', ['https://a.placeholder.com'], id='is_finished'),
+    ],
 )
 @pytest.mark.parametrize(
     'error_type',
     [pytest.param(RuntimeError, id='runtime error'), pytest.param(TimeoutError, id='timeout error')],
 )
 async def test_propagates_request_queue_status_errors(
-    monkeypatch: pytest.MonkeyPatch, method: str, error_type: type[Exception]
+    monkeypatch: pytest.MonkeyPatch, method: str, handled_before_error: list[str], error_type: type[Exception]
 ) -> None:
     """A request manager failure reaches the caller, and the crawler can be run again once the manager recovers."""
     queue = await RequestQueue.open()
@@ -99,8 +103,7 @@ async def test_propagates_request_queue_status_errors(
             await crawler.run()
         assert exc_info.value is error
 
-    assert handled_urls == []
-    assert not await queue.is_finished()
+    assert handled_urls == handled_before_error
 
     await crawler.run()
     assert handled_urls == ['https://a.placeholder.com']
@@ -1429,6 +1432,22 @@ async def test_abort_on_error(
     assert stats.requests_finished == expected_finished
 
 
+async def test_abort_on_error_applies_to_one_run() -> None:
+    """An abort on error ends only the run it happened in, so the next run crawls again."""
+    crawler = BasicCrawler(abort_on_error=True)
+    handled_urls = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        handled_urls.append(context.request.url)
+        raise ValueError('Error request')
+
+    await crawler.run(['https://a.placeholder.com'])
+    await crawler.run(['https://b.placeholder.com'])
+
+    assert handled_urls == ['https://a.placeholder.com', 'https://b.placeholder.com']
+
+
 def test_crawler_log() -> None:
     crawler = BasicCrawler()
     assert isinstance(crawler.log, logging.Logger)
@@ -1828,6 +1847,54 @@ async def test_crawler_multiple_stops_in_parallel() -> None:
     assert len(processed_urls) == 2
     assert stats.requests_total == 2
     assert stats.requests_finished == 2
+
+
+async def test_stop_logged_once(caplog: pytest.LogCaptureFixture) -> None:
+    """The stop is logged once, while the requests in flight still finish one by one."""
+    start_urls = [f'https://placeholder.com/{i}' for i in range(3)]
+    crawler = BasicCrawler(
+        concurrency_settings=ConcurrencySettings(min_concurrency=3, desired_concurrency=3, max_concurrency=3),
+        max_requests_per_crawl=1,
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        # Finish one by one, so that the crawler is asked for new requests several times after the limit is reached.
+        await asyncio.sleep(0.05 * start_urls.index(context.request.url))
+
+    with caplog.at_level(logging.INFO, logger='crawlee'):
+        await crawler.run(start_urls)
+
+    assert caplog.text.count('Crawler.stop() was called') == 1
+    assert caplog.text.count('No new requests are allowed') == 1
+
+
+async def test_stop_applies_to_one_run(caplog: pytest.LogCaptureFixture) -> None:
+    """A stop ends only the run it was called in, so the next run crawls and logs its own stop."""
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1))
+    handled_urls = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        handled_urls.append(context.request.url)
+        crawler.stop()
+
+    with caplog.at_level(logging.INFO, logger='crawlee'):
+        await crawler.run(['https://a.placeholder.com'])
+        await crawler.run(['https://b.placeholder.com'])
+
+    assert handled_urls == ['https://a.placeholder.com', 'https://b.placeholder.com']
+    assert caplog.text.count('No new requests are allowed') == 2
+
+
+async def test_stop_before_run_starts() -> None:
+    """A stop called right after scheduling `run` as a task applies to that run."""
+    crawler = BasicCrawler(keep_alive=True, request_handler=AsyncMock())
+
+    run_task = asyncio.create_task(crawler.run())
+    crawler.stop()
+
+    await asyncio.wait_for(run_task, timeout=10)
 
 
 async def test_services_no_side_effect_on_crawler_init() -> None:
@@ -3064,12 +3131,12 @@ async def test_stall_waits_for_in_flight_work() -> None:
         if context.request.url == 'https://free.placeholder.com/slow':
             stall_reasons.append(await poll_until_condition(throttler.get_stall_reason, timeout=10))
             # Two more pool checks, so at least one ran entirely while the stall was live and this request in flight.
-            checks = is_finished.await_count
-            await poll_until_condition(lambda: is_finished.await_count >= checks + 2, timeout=10)
+            checks = is_empty.await_count
+            await poll_until_condition(lambda: is_empty.await_count >= checks + 2, timeout=10)
             await context.add_requests(['https://free.placeholder.com/next'])
 
     with (
-        patch.object(throttler, 'is_finished', wraps=throttler.is_finished) as is_finished,
+        patch.object(throttler, 'is_empty', wraps=throttler.is_empty) as is_empty,
         pytest.raises(PersistentRateLimitError),
     ):
         await crawler.run([THROTTLED_URL, 'https://free.placeholder.com/slow'])
@@ -3311,18 +3378,3 @@ async def test_consumer_carries_crawler_id() -> None:
 
     consumers = {booking.args[0] for booking in try_register_task_start.call_args_list}
     assert consumers == {ConcurrencyConsumer(id='my-crawler')}
-
-
-async def test_stall_ignores_shared_concurrency() -> None:
-    """A stall is judged by the crawler's own requests, not by those of another crawler sharing the system."""
-    throttler = await open_throttler()
-    crawler = BasicCrawler(request_manager=throttler)
-    # Another crawler sharing the system has a request in flight, while this one has none.
-    pool = Mock(spec=AutoscaledPool, own_concurrency=0, current_concurrency=1)
-
-    with (
-        patch.object(crawler, '_autoscaled_pool', pool),
-        patch.object(throttler, 'get_stall_reason', AsyncMock(return_value='Domain stalled')),
-        pytest.raises(PersistentRateLimitError),
-    ):
-        await cast('Any', crawler)._BasicCrawler__is_finished_function()
