@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlencode
@@ -13,7 +13,7 @@ from crawlee import ConcurrencySettings, Request, RequestState
 from crawlee.crawlers import HttpCrawler
 from crawlee.errors import PersistentRateLimitError
 from crawlee.http_clients import HttpClient, HttpCrawlingResult
-from crawlee.request_loaders import ThrottlingRequestManager
+from crawlee.request_loaders import ThrottlingRequestManager, _throttling_request_manager
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storages import RequestQueue
@@ -750,18 +750,33 @@ async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any], monkeyp
 async def test_persistent_429_raises_after_stall(
     server_url: URL,
     caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
     *,
     retry_on_blocked: bool,
 ) -> None:
     """A domain that rate-limits every request for longer than `max_domain_stall` ends the run with an error."""
+    # The throttler runs on a stopped clock that moves one backoff forward on each stall check. The crawler checks for
+    # a stall only while idle, so a backoff can't run out before the crawler decides to defer a 429. The stall window
+    # sits between one and two backoffs, so the domain counts as stalled on the check after its second 429.
+    backoff = timedelta(minutes=1)
+    clock = Mock()
+    clock.now.return_value = datetime.now(timezone.utc)
+    monkeypatch.setattr(_throttling_request_manager, 'datetime', clock)
     throttler = ThrottlingRequestManager(
         await RequestQueue.open(alias='throttle-429-inner'),
         domains=[server_url.host or ''],
         request_manager_opener=RequestQueue.open,
-        base_delay=timedelta(milliseconds=50),
-        max_delay=timedelta(milliseconds=100),
-        max_domain_stall=timedelta(milliseconds=1200),
+        base_delay=backoff,
+        max_delay=backoff,
+        max_domain_stall=backoff * 1.5,
     )
+    get_stall_reason = throttler.get_stall_reason
+
+    async def get_stall_reason_after_backoff() -> str | None:
+        clock.now.return_value += backoff
+        return await get_stall_reason()
+
+    monkeypatch.setattr(throttler, 'get_stall_reason', get_stall_reason_after_backoff)
     failed_request_handler = AsyncMock()
     crawler = HttpCrawler(
         request_handler=AsyncMock(),
