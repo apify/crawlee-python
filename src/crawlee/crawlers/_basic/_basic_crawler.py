@@ -67,7 +67,7 @@ from crawlee.errors import (
 )
 from crawlee.events._types import Event, EventCrawlerStatusData
 from crawlee.http_clients import ImpitHttpClient
-from crawlee.request_loaders import ThrottlingRequestManager
+from crawlee.request_loaders import FinishedStatus, ReadyStatus, StalledStatus, ThrottlingRequestManager
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics, StatisticsState
@@ -1454,21 +1454,19 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if self._keep_alive:
             return False
 
+        request_manager = await self.get_request_manager()
+        status = await request_manager.check_readiness()
+
         # Check for a stall only when the pool is idle. An in-flight request can still enqueue new work or end the
         # stall.
-        if (
-            isinstance(self._request_manager, ThrottlingRequestManager)
-            and self._autoscaled_pool.current_concurrency == 0
-            and (reason := await self._request_manager.get_stall_reason()) is not None
-        ):
-            error = PersistentRateLimitError(f'Giving up: {reason}')
+        if isinstance(status, StalledStatus) and self._autoscaled_pool.current_concurrency == 0:
+            error = PersistentRateLimitError(f'Giving up: {status.reason}')
             self._logger.error(
                 'Giving up the crawl because a domain keeps rate-limiting every request.', exc_info=error
             )
             raise error
 
-        request_manager = await self.get_request_manager()
-        return await request_manager.is_finished()
+        return isinstance(status, FinishedStatus)
 
     async def __is_task_ready_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
@@ -1480,7 +1478,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return False
 
         request_manager = await self.get_request_manager()
-        return not await request_manager.is_empty()
+        return isinstance(await request_manager.check_readiness(), ReadyStatus)
 
     async def __run_task_function(self) -> None:
         request_manager = await self.get_request_manager()

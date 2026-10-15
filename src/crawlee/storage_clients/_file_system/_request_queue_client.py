@@ -488,8 +488,12 @@ class FileSystemRequestQueueClient(RequestQueueClient):
                 state.in_progress_requests.add(next_request.unique_key)
                 # `in_progress_requests` is updated, so we need to invalidate the `is_empty` cache.
                 self._is_empty_cache = None
+                return next_request
 
-            return next_request
+        # Yield to the event loop like the other clients do, so a caller polling an empty queue can't starve the
+        # tasks that would fill it.
+        await asyncio.sleep(0)
+        return None
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
