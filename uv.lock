@@ -2,8 +2,8 @@ version = 1
 revision = 5
 requires-python = ">=3.10"
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -1003,7 +1003,7 @@ toml = [
 
 [[package]]
 name = "crawlee"
-version = "1.10.5"
+version = "1.11.0"
 source = { editable = "." }
 dependencies = [
     { name = "async-timeout" },
@@ -1345,8 +1345,8 @@ name = "cssselect"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -1574,8 +1574,8 @@ name = "filelock"
 version = "4.1.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -1717,8 +1717,8 @@ name = "griffelib"
 version = "2.3.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -2442,8 +2442,8 @@ name = "jsonpath-ng"
 version = "1.10.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -3265,8 +3265,8 @@ name = "numpy"
 version = "2.5.4"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -3597,8 +3597,8 @@ name = "platformdirs"
 version = "4.13.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -3678,8 +3678,8 @@ name = "pre-commit"
 version = "4.7.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -3973,8 +3973,8 @@ name = "pydantic-ai-slim"
 version = "2.55.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -4174,8 +4174,8 @@ name = "pydantic-graph"
 version = "2.55.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -4308,8 +4308,8 @@ name = "pytest"
 version = "9.1.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -4350,8 +4350,8 @@ name = "pytest-asyncio"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -4672,8 +4672,8 @@ name = "rapidfuzz"
 version = "3.14.6"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -5068,8 +5068,8 @@ name = "scikit-learn"
 version = "1.9.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -5272,8 +5272,8 @@ name = "scipy"
 version = "1.18.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -5410,8 +5410,8 @@ name = "soupsieve"
 version = "3.0.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -5492,8 +5492,8 @@ name = "sqlalchemy"
 version = "2.1.4"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
@@ -6294,8 +6294,8 @@ name = "websockets"
 version = "17.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version == '3.15.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "(python_full_version == '3.14.*' and sys_platform == 'win32') or (python_full_version >= '3.16' and sys_platform == 'win32') or (python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
