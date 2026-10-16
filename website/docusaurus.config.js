@@ -191,19 +191,17 @@ module.exports = {
                             'examples/playwright-crawler-with-fingerprint-generator',
                         ],
                         'guides/logging-in-with-a-crawler': ['examples/using_browser_profile'],
-                        'guides/deploy-on-apify': ['deployment/apify-platform'],
-                        'guides/deploy-on-aws-lambda': ['deployment/aws-lambda'],
-                        'guides/deploy-on-gcp-cloud-run-functions': ['deployment/gcp-cloud-run-functions'],
-                        'guides/deploy-on-gcp-cloud-run': ['deployment/gcp-cloud-run'],
-                        guides: ['examples', 'deployment'],
+                        guides: ['examples'],
                     };
 
-                    // Doc versions that still have the pre-restructure layout (no numbered concepts
-                    // directory). Their routes (e.g. /docs/1.11/examples/...) must not get redirects
-                    // generated over them.
+                    // Doc versions that still have the pre-restructure layout (no concepts directory).
+                    // Their routes (e.g. /docs/1.11/examples/...) must not get redirects generated
+                    // over them.
                     const versions = require('./versions.json');
                     const hasOldStructureOnDisk = (version) =>
-                        !fs.existsSync(path.join(__dirname, 'versioned_docs', `version-${version}`, '02_concepts'));
+                        !fs
+                            .readdirSync(path.join(__dirname, 'versioned_docs', `version-${version}`))
+                            .some((dir) => /^\d+_concepts$/.test(dir));
                     const OLD_STRUCTURE_VERSIONS = versions.filter(hasOldStructureOnDisk);
                     const latestHasOldStructure = OLD_STRUCTURE_VERSIONS.includes(versions[0]);
 
@@ -366,7 +364,7 @@ module.exports = {
             items: [
                 {
                     type: 'doc',
-                    docId: 'introduction/introduction',
+                    docId: 'quick-start/quick-start',
                     label: 'Docs',
                     position: 'left',
                 },

@@ -1,6 +1,6 @@
 ---
-id: deploy-on-aws-lambda
-title: Deploying to AWS Lambda
+id: aws-lambda
+title: Deploy on AWS Lambda
 description: Prepare your crawler to run on AWS Lambda.
 ---
 
@@ -8,9 +8,9 @@ import ApiLink from '@site/src/components/ApiLink';
 
 import CodeBlock from '@theme/CodeBlock';
 
-import BeautifulSoupCrawlerLambda from '!!raw-loader!./code_examples/deployment/aws/beautifulsoup_crawler_lambda.py';
-import PlaywrightCrawlerLambda from '!!raw-loader!./code_examples/deployment/aws/playwright_crawler_lambda.py';
-import PlaywrightCrawlerDockerfile from '!!raw-loader!./code_examples/deployment/aws/playwright_dockerfile';
+import BeautifulSoupCrawlerLambda from '!!raw-loader!./code_examples/aws/beautifulsoup_crawler_lambda.py';
+import PlaywrightCrawlerLambda from '!!raw-loader!./code_examples/aws/playwright_crawler_lambda.py';
+import PlaywrightCrawlerDockerfile from '!!raw-loader!./code_examples/aws/playwright_dockerfile';
 
 [AWS Lambda](https://docs.aws.amazon.com/lambda/latest/dg/welcome.html) is a serverless compute service that lets you run code without provisioning or managing servers. This guide covers deploying <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> and <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.
 
