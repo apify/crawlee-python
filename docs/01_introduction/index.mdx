@@ -1,56 +1,61 @@
 ---
 id: introduction
-title: Introduction
-description: A step-by-step tutorial that takes you from your first crawler to a production-ready scraper for a real website.
+title: Overview
+description: Crawlee for Python is a web scraping and browser automation library with a unified interface for HTTP and headless browser crawling.
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
-Crawlee covers your crawling and scraping end-to-end and helps you **build reliable scrapers. Fast.**
+import OverviewExample from '!!raw-loader!roa-loader!./code_examples/quick_start/beautifulsoup_crawler_example.py';
 
-Your crawlers will appear human-like and fly under the radar of modern bot protections even with the default configuration. Crawlee gives you the tools to crawl the web for links, scrape data and persistently store it in machine-readable formats, without having to worry about the technical details. And thanks to rich configuration options, you can tweak almost any aspect of Crawlee to suit your project's needs if the default settings don't cut it.
+Crawlee for Python is a web scraping and browser automation library. It handles the crawling infrastructure for you: it queues and deduplicates requests, retries failures, scales concurrency to the available system resources, rotates proxies and sessions, and stores the results. You write the code that extracts the data.
 
-## What you will learn
+The same interface works for plain HTTP crawling and for headless browsers, so you can switch between them without rewriting your handlers. With the default configuration, the HTTP client impersonates a real browser and browser crawlers use generated fingerprints, which helps them get past common bot protections.
 
-The goal of the introduction is to provide a step-by-step guide to the most important features of Crawlee. It will walk you through creating the simplest of crawlers that only prints text to console, all the way up to a full-featured scraper that collects links from a website and extracts data.
+<RunnableCodeBlock className="language-python" language="python">
+    {OverviewExample}
+</RunnableCodeBlock>
 
-## 🛠 Features
+## Features
 
-Why Crawlee is the preferred choice for web scraping and crawling?
+- One interface for HTTP and headless browser crawling.
+- Automatic parallel crawling based on available CPU and memory. For details, see [Scaling crawlers](./concepts/scaling-crawlers).
+- Automatic retries on errors and when the crawler gets blocked. For details, see [Error handling](./concepts/error-handling).
+- Proxy rotation and session management. For details, see [Proxy management](./concepts/proxy-management) and [Session management](./concepts/session-management).
+- Request routing that sends each URL to the right handler. For details, see [Request router](./concepts/request-router).
+- A persistent request queue and pluggable storages for tabular data and files. For details, see [Storages](./concepts/storages).
+- Full type hint coverage, built on standard `asyncio`.
 
-### Why use Crawlee instead of just a random HTTP library with an HTML parser?
+## Crawler types
 
-- Unified interface for **HTTP & headless browser** crawling.
-- Automatic **parallel crawling** based on available system resources.
-- Written in Python with **type hints** - enhances DX (IDE autocompletion) and reduces bugs (static type checking).
-- Automatic **retries** on errors or when you are getting blocked.
-- Integrated **proxy rotation** and session management.
-- Configurable **request routing** - direct URLs to the appropriate handlers.
-- Persistent **queue for URLs** to crawl.
-- Pluggable **storage** of both tabular data and files.
-- Robust **error handling**.
+Crawlee provides several crawlers that share the same base class, <ApiLink to="class/BasicCrawler">`BasicCrawler`</ApiLink>:
 
-### Why to use Crawlee rather than Scrapy?
+- <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> and <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> fetch pages over HTTP and parse the HTML. They're fast and light, but they can't run JavaScript. For details, see [HTTP crawlers](./concepts/http-crawlers).
+- <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> controls a headless browser through [Playwright](https://playwright.dev/), for pages that render their content with JavaScript. For details, see [Playwright crawler](./concepts/playwright-crawler).
+- <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> decides per request whether a plain HTTP fetch is enough or a browser is needed. For details, see [Adaptive Playwright crawler](./concepts/adaptive-playwright-crawler).
+- <ApiLink to="class/PydanticAiCrawler">`PydanticAiCrawler`</ApiLink> and <ApiLink to="class/StagehandCrawler">`StagehandCrawler`</ApiLink> use an LLM to extract data or drive the browser. For details, see [Pydantic AI crawler](./concepts/pydantic-ai-crawler) and [Stagehand crawler](./concepts/stagehand-crawler).
 
-- Crawlee has out-of-the-box support for **headless browser** crawling (Playwright).
-- Crawlee has a **minimalistic & elegant interface** - Set up your scraper with fewer than 10 lines of code.
-- Complete **type hint** coverage.
-- Based on standard **Asyncio**.
+## Installation
 
-{/* TODO:
+Crawlee requires Python 3.10 or higher. It's available as the [`crawlee`](https://pypi.org/project/crawlee/) package on PyPI. The core package is small, and each crawler type comes with an optional extra. To install Crawlee with all extras, run:
 
-### 👾 HTTP crawling
+```sh
+pip install 'crawlee[all]'
+```
 
-- ...
-*/}
+To use the <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, also install the browser binaries:
 
-{/* TODO:
+```sh
+playwright install
+```
 
-### 💻 Real browser crawling
-
-- ...
-*/}
+For the list of extras and for bootstrapping a project from a template with the Crawlee CLI, see [Setting up](./introduction/setting-up).
 
 ## Next steps
 
-Next, you will install Crawlee and learn how to bootstrap projects with the prepared Crawlee templates.
+- To run your first crawler in a few minutes, see the [Quick start](./quick-start).
+- To build a complete scraper for a real website step by step, follow the [Tutorial](./introduction/tutorial).
+- To learn how the parts of Crawlee work, read the [Concepts](./concepts).
+- For solutions to specific tasks, such as logging in, filling in forms, or deploying a crawler, see the [Guides](./guides).
+- If you're coming from Scrapy, see [Migrating from Scrapy](./guides/scrapy-migration).

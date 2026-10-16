@@ -17,11 +17,11 @@ import PlaywrightCrawlerExample from '!!raw-loader!roa-loader!./code_examples/qu
 
 import PlaywrightCrawlerHeadfulExample from '!!raw-loader!./code_examples/quick_start/playwright_crawler_headful_example.py';
 
-This short tutorial will help you start scraping with Crawlee in just a minute or two. For an in-depth understanding of how Crawlee works, check out the [Introduction](./introduction) section, which provides a comprehensive step-by-step guide to creating your first scraper.
+This page gets you from installation to a running crawler in a few minutes. To build a complete scraper step by step, follow the [Tutorial](./introduction/tutorial).
 
 ## Choose your crawler
 
-Crawlee offers the following main crawler classes: <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>, and <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>. All crawlers share the same interface, providing maximum flexibility when switching between them.
+Crawlee's main crawler classes are <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink>, and <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>. All crawlers share the same interface, so you can switch between them without rewriting your handlers.
 
 :::caution Minimum Python version
 
@@ -31,21 +31,21 @@ Crawlee requires Python 3.10 or higher.
 
 ### BeautifulSoupCrawler
 
-The <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> is a plain HTTP crawler that parses HTML using the well-known [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library. It crawls the web using an HTTP client that mimics a browser. This crawler is very fast and efficient but cannot handle JavaScript rendering.
+The <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> is a plain HTTP crawler that parses HTML using the well-known [BeautifulSoup](https://pypi.org/project/beautifulsoup4/) library. It fetches pages with an HTTP client that mimics a browser. It's fast and light, but it can't render JavaScript.
 
 ### ParselCrawler
 
-The <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> is similar to the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> but uses the [Parsel](https://pypi.org/project/parsel/) library for HTML parsing. Parsel is a lightweight library that provides a CSS selector-based API for extracting data from HTML documents. If you are familiar with the [Scrapy](https://scrapy.org/) framework, you will feel right at home with Parsel. As with the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, the <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> cannot handle JavaScript rendering.
+The <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> is similar to the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> but uses the [Parsel](https://pypi.org/project/parsel/) library for HTML parsing. Parsel extracts data from HTML with CSS selectors and XPath, and it's the selector library [Scrapy](https://scrapy.org/) uses. Like the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, the <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> can't render JavaScript.
 
 ### PlaywrightCrawler
 
-The <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> uses a headless browser controlled by the [Playwright](https://playwright.dev/) library. It can manage Chromium, Firefox, Webkit, and other browsers. Playwright is the successor to the [Puppeteer](https://pptr.dev/) library and is becoming the de facto standard in headless browser automation. If you need a headless browser, choose Playwright.
+The <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> uses a headless browser controlled by the [Playwright](https://playwright.dev/) library. It can drive Chromium, Firefox, and WebKit. Choose it when the target pages render their content with JavaScript.
 
 ## Installation
 
-Crawlee is available the [`crawlee`](https://pypi.org/project/crawlee/) package on PyPI. This package includes the core functionality, while additional features are available as optional extras to keep dependencies and package size minimal.
+Crawlee is available as the [`crawlee`](https://pypi.org/project/crawlee/) package on PyPI. The package includes the core functionality, and additional features are available as optional extras to keep dependencies small.
 
-You can install Crawlee with all features or choose only the ones you need. For installing it using the [pip](https://pip.pypa.io/en/stable/) package manager, run the following command:
+To install Crawlee with all extras using [pip](https://pip.pypa.io/en/stable/), run:
 
 ```sh
 python -m pip install 'crawlee[all]'
@@ -57,13 +57,13 @@ Verify that Crawlee is successfully installed:
 python -c 'import crawlee; print(crawlee.__version__)'
 ```
 
-If you plan to use the <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, you'll need to install Playwright dependencies, including the browser binaries. To do this, run the following command:
+If you plan to use the <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, also install the Playwright browser binaries:
 
 ```sh
 playwright install
 ```
 
-For detailed installation instructions, see the [Setting up](./introduction/setting-up) documentation page.
+For detailed installation instructions, see [Setting up](./introduction/setting-up).
 
 ## Crawling
 
@@ -87,33 +87,33 @@ Run the following example to perform a recursive crawl of the Crawlee website us
     </TabItem>
 </Tabs>
 
-When you run the example, you will see Crawlee automating the data extraction process in your terminal.
+When you run the example, the crawler logs its progress to your terminal.
 
 {/*TODO: improve the logging and add here a sample*/}
 
 ## Running headful browser
 
-By default, browsers controlled by Playwright run in headless mode (without a visible window). However, you can configure the crawler to run in a headful mode, which is useful during the development phase to observe the browser's actions. You can also switch from the default Chromium browser to Firefox or WebKit.
+By default, browsers controlled by Playwright run in headless mode, without a visible window. During development, it helps to run the browser in headful mode and watch what it does. You can also switch from the default Chromium browser to Firefox or WebKit.
 
 <CodeBlock language="python">
     {PlaywrightCrawlerHeadfulExample}
 </CodeBlock>
 
-When you run the example code, you'll see an automated browser navigating through the Crawlee website.
+When you run the example, a browser window opens and navigates through the Crawlee website.
 
 {/*TODO: add video example*/}
 
 ## Results
 
-By default, Crawlee stores data in the `./storage` directory within your current working directory. The results of your crawl will be saved as JSON files under `./storage/datasets/default/`.
+By default, Crawlee stores data in the `./storage` directory within your current working directory. The crawl results are saved as JSON files under `./storage/datasets/default/`.
 
-To view the results, you can use the `cat` command:
+To view the results, use the `cat` command:
 
 ```sh
 cat ./storage/datasets/default/000000001.json
 ```
 
-The JSON file will contain data similar to the following:
+The JSON file contains data similar to the following:
 
 ```json
 {
@@ -124,12 +124,12 @@ The JSON file will contain data similar to the following:
 
 :::tip
 
-If you want to change the storage directory, you can set the `CRAWLEE_STORAGE_DIR` environment variable to your preferred path.
+To change the storage directory, set the `CRAWLEE_STORAGE_DIR` environment variable to your preferred path.
 
 :::
 
-## Examples and further reading
+## Next steps
 
-For more examples showcasing various features of Crawlee, visit the [Guides](./guides) section of the documentation. To get a deeper understanding of Crawlee and its components, read the step-by-step [Introduction](./introduction) guide.
-
-[//]: # (TODO: add related links once they are ready)
+- To build a complete scraper for a real website, follow the [Tutorial](./introduction/tutorial).
+- To learn how crawlers, requests, storages, and other parts of Crawlee work, read the [Concepts](./concepts).
+- For solutions to specific tasks, see the [Guides](./guides).
