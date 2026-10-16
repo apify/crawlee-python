@@ -33,7 +33,7 @@ We also have a TypeScript implementation of the Crawlee, which you can explore a
 
 ## Installation
 
-We recommend visiting the [Introduction tutorial](https://crawlee.dev/python/docs/introduction) in Crawlee documentation for more information.
+For a step-by-step walkthrough, see the [tutorial](https://crawlee.dev/python/docs/introduction/tutorial) in the Crawlee documentation.
 
 Crawlee is available as [`crawlee`](https://pypi.org/project/crawlee/) package on PyPI. This package includes the core functionality, while additional features are available as optional extras to keep dependencies and package size minimal.
 

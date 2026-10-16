@@ -1,6 +1,6 @@
 ---
-id: gcp-cloud-run
-title: Cloud Run
+id: deploy-on-gcp-cloud-run
+title: Deploying to Google Cloud Run
 description: Prepare your crawler to run in Cloud Run on Google Cloud Platform.
 ---
 
@@ -8,10 +8,10 @@ import ApiLink from '@site/src/components/ApiLink';
 
 import CodeBlock from '@theme/CodeBlock';
 
-import GoogleCloudRun from '!!raw-loader!./code_examples/google/cloud_run_example.py';
+import GoogleCloudRun from '!!raw-loader!./code_examples/deployment/google/cloud_run_example.py';
 
 
-[Google Cloud Run](https://cloud.google.com/run)  is a container-based serverless platform that allows you to run web crawlers with headless browsers. This service is recommended when your Crawlee applications need browser rendering capabilities, require more granular control, or have complex dependencies that aren't supported by [Cloud Functions](./gcp-cloud-run-functions).
+[Google Cloud Run](https://cloud.google.com/run)  is a container-based serverless platform that allows you to run web crawlers with headless browsers. This service is recommended when your Crawlee applications need browser rendering capabilities, require more granular control, or have complex dependencies that aren't supported by [Cloud Functions](./deploy-on-gcp-cloud-run-functions).
 
 GCP Cloud Run allows you to deploy using Docker containers, giving you full control over your environment and the flexibility to use any web server framework of your choice, unlike Cloud Functions which are limited to [Flask](https://flask.palletsprojects.com/en/stable/).
 

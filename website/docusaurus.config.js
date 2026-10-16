@@ -167,8 +167,11 @@ module.exports = {
                             'guides/error-handling',
                             'examples/capturing-page-snapshots-with-error-snapshotter',
                         ],
+                        'concepts/pydantic-ai-crawler': ['guides/pydantic-ai-crawler'],
+                        'concepts/stagehand-crawler': ['guides/stagehand-crawler'],
                         'concepts/logging': ['examples/configure-json-logging'],
                         'concepts/service-locator': ['guides/service-locator'],
+                        'concepts/extending-crawlee': ['guides/extending-crawlee'],
                         'guides/crawling-links': [
                             'examples/crawl-all-links-on-website',
                             'examples/crawl-multiple-urls',
@@ -188,13 +191,20 @@ module.exports = {
                             'examples/playwright-crawler-with-fingerprint-generator',
                         ],
                         'guides/logging-in-with-a-crawler': ['examples/using_browser_profile'],
-                        guides: ['examples'],
+                        'guides/deploy-on-apify': ['deployment/apify-platform'],
+                        'guides/deploy-on-aws-lambda': ['deployment/aws-lambda'],
+                        'guides/deploy-on-gcp-cloud-run-functions': ['deployment/gcp-cloud-run-functions'],
+                        'guides/deploy-on-gcp-cloud-run': ['deployment/gcp-cloud-run'],
+                        guides: ['examples', 'deployment'],
                     };
 
-                    // Doc versions that still have the pre-restructure layout. Their routes
-                    // (e.g. /docs/1.9/examples/...) must not get redirects generated over them.
-                    const OLD_STRUCTURE_VERSIONS = ['0.6', '1.9'];
+                    // Doc versions that still have the pre-restructure layout (no numbered concepts
+                    // directory). Their routes (e.g. /docs/1.11/examples/...) must not get redirects
+                    // generated over them.
                     const versions = require('./versions.json');
+                    const hasOldStructureOnDisk = (version) =>
+                        !fs.existsSync(path.join(__dirname, 'versioned_docs', `version-${version}`, '02_concepts'));
+                    const OLD_STRUCTURE_VERSIONS = versions.filter(hasOldStructureOnDisk);
                     const latestHasOldStructure = OLD_STRUCTURE_VERSIONS.includes(versions[0]);
 
                     const marker = '/docs/';
@@ -356,7 +366,7 @@ module.exports = {
             items: [
                 {
                     type: 'doc',
-                    docId: 'quick-start/quick-start',
+                    docId: 'introduction/introduction',
                     label: 'Docs',
                     position: 'left',
                 },
