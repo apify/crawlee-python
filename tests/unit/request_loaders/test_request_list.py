@@ -1,22 +1,26 @@
 from collections.abc import AsyncGenerator
 
+from crawlee.request_loaders import FinishedStatus, ReadyStatus, WaitingStatus
 from crawlee.request_loaders._request_list import RequestList
 from crawlee.storages import KeyValueStore
 
 
 async def test_sync_traversal() -> None:
+    """Test that a list built from a sync iterable is traversed to the end."""
     request_list = RequestList(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
 
-    while not await request_list.is_finished():
+    while not isinstance(await request_list.check_readiness(), FinishedStatus):
         item = await request_list.fetch_next_request()
         assert item is not None
 
         await request_list.mark_request_as_handled(item)
 
-    assert await request_list.is_empty()
+    assert await request_list.get_handled_count() == 3
 
 
 async def test_async_traversal() -> None:
+    """Test that a list built from an async generator is traversed to the end."""
+
     async def generator() -> AsyncGenerator[str]:
         yield 'https://a.placeholder.com'
         yield 'https://b.placeholder.com'
@@ -24,39 +28,32 @@ async def test_async_traversal() -> None:
 
     request_list = RequestList(generator())
 
-    while not await request_list.is_finished():
+    while not isinstance(await request_list.check_readiness(), FinishedStatus):
         item = await request_list.fetch_next_request()
         assert item is not None
 
         await request_list.mark_request_as_handled(item)
 
-    assert await request_list.is_empty()
+    assert await request_list.get_handled_count() == 3
 
 
-async def test_is_empty_does_not_depend_on_fetch_next_request() -> None:
+async def test_readiness_during_traversal() -> None:
+    """Test that the list waits for fetched requests and finishes once they're all handled."""
     request_list = RequestList(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
 
-    item_1 = await request_list.fetch_next_request()
-    assert item_1 is not None
-    assert not await request_list.is_finished()
+    items = []
+    for _ in range(3):
+        assert await request_list.check_readiness() == ReadyStatus()
+        item = await request_list.fetch_next_request()
+        assert item is not None
+        items.append(item)
 
-    item_2 = await request_list.fetch_next_request()
-    assert item_2 is not None
-    assert not await request_list.is_finished()
+    assert await request_list.check_readiness() == WaitingStatus()
 
-    item_3 = await request_list.fetch_next_request()
-    assert item_3 is not None
-    assert not await request_list.is_finished()
+    for item in items:
+        await request_list.mark_request_as_handled(item)
 
-    assert await request_list.is_empty()
-    assert not await request_list.is_finished()
-
-    await request_list.mark_request_as_handled(item_1)
-    await request_list.mark_request_as_handled(item_2)
-    await request_list.mark_request_as_handled(item_3)
-
-    assert await request_list.is_empty()
-    assert await request_list.is_finished()
+    assert await request_list.check_readiness() == FinishedStatus()
 
 
 async def test_persist_requests_key_with_sync_iterable() -> None:
@@ -86,9 +83,8 @@ async def test_persist_requests_key_with_empty_iterator() -> None:
     # Create request list with empty iterator
     request_list = RequestList([], persist_requests_key=persist_key)
 
-    # Should be empty immediately
-    assert await request_list.is_empty()
-    assert await request_list.is_finished()
+    # Should be finished immediately
+    assert await request_list.check_readiness() == FinishedStatus()
 
     # Check that empty requests were persisted
     kvs = await KeyValueStore.open()

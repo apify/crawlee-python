@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 
 from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
+from crawlee.request_loaders import FinishedStatus, ReadyStatus, WaitingStatus
 from crawlee.storage_clients import MemoryStorageClient, StorageClient
 from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, UnprocessedRequest
 from crawlee.storages import RequestQueue
@@ -544,33 +546,52 @@ async def test_reclaim_request_with_forefront(rq: RequestQueue) -> None:
     assert next_request.url == 'https://example.com/first'
 
 
-async def test_is_empty_and_is_finished(rq: RequestQueue) -> None:
-    """Test checking if a request queue is empty and finished."""
-    # Initially the queue should be empty and finished
-    assert await rq.is_empty() is True
-    assert await rq.is_finished() is True
+async def test_check_readiness(rq: RequestQueue) -> None:
+    """Test that the readiness follows a request from adding to handling."""
+    assert await rq.check_readiness() == FinishedStatus()
 
-    # Add a request
     await rq.add_request('https://example.com')
-    assert await rq.is_empty() is False
-    assert await rq.is_finished() is False
+    assert await rq.check_readiness() == ReadyStatus()
 
-    # Fetch the request
     request = await rq.fetch_next_request()
-
     assert request is not None
 
-    # Queue is empty, because there is no request for fetching
-    assert await rq.is_empty() is True
-    # Queue is not finished, because there is a request being processed
-    assert await rq.is_finished() is False
+    # Nothing to fetch, but the request is still in progress.
+    assert await rq.check_readiness() == WaitingStatus()
 
-    # Mark the request as handled
     await rq.mark_request_as_handled(request)
+    assert await rq.check_readiness() == FinishedStatus()
 
-    # Queue should be empty and finished again
-    assert await rq.is_empty() is True
-    assert await rq.is_finished() is True
+
+async def test_readiness_waits_for_background_adds(rq: RequestQueue) -> None:
+    """Test that a drained queue waits while a batch is still being added in the background."""
+    release = asyncio.Event()
+    add_batch = rq._client.add_batch_of_requests
+
+    async def add_batch_after_release(requests: Sequence[Request], *, forefront: bool = False) -> AddRequestsResponse:
+        if requests[0].url == 'https://example.com/2':
+            await release.wait()
+        return await add_batch(requests, forefront=forefront)
+
+    with patch.object(rq._client, 'add_batch_of_requests', side_effect=add_batch_after_release):
+        await rq.add_requests(['https://example.com/1', 'https://example.com/2'], batch_size=1)
+
+        request = await rq.fetch_next_request()
+        assert request is not None
+        await rq.mark_request_as_handled(request)
+        assert await rq.check_readiness() == WaitingStatus()
+
+        release.set()
+        assert await poll_until_condition(rq.check_readiness, lambda status: status == ReadyStatus()) == ReadyStatus()
+
+
+async def test_empty_fetch_yields(rq: RequestQueue) -> None:
+    """Test that a fetch from an empty queue lets other tasks run."""
+    ran = asyncio.Event()
+    asyncio.get_running_loop().call_soon(ran.set)
+
+    assert await rq.fetch_next_request() is None
+    assert ran.is_set()
 
 
 @pytest.mark.parametrize(
@@ -605,38 +626,6 @@ async def test_add_requests_wait_for_all(
 
     # Verify all requests were added
     assert await rq.get_total_count() == 15
-
-
-async def test_is_finished(rq: RequestQueue) -> None:
-    """Test checking if a request queue is finished."""
-    # Initially the queue should be finished (empty and no background tasks)
-    assert await rq.is_finished() is True
-
-    # Add a request
-    await rq.add_request('https://example.com')
-    assert await rq.is_finished() is False
-
-    # Add requests in the background
-    await rq.add_requests(
-        ['https://example.com/1', 'https://example.com/2'],
-        wait_for_all_requests_to_be_added=False,
-    )
-
-    # Queue shouldn't be finished while background tasks are running
-    assert await rq.is_finished() is False
-
-    # Wait for the background add task to finish.
-    await poll_until_condition(lambda: not rq._add_requests_tasks)
-
-    # Process all requests
-    while True:
-        request = await rq.fetch_next_request()
-        if request is None:
-            break
-        await rq.mark_request_as_handled(request)
-
-    # Now queue should be finished
-    assert await rq.is_finished() is True
 
 
 async def test_mark_non_existent_request_as_handled(rq: RequestQueue) -> None:
@@ -681,7 +670,7 @@ async def test_drop(
     )
 
     # Verify the queue is empty
-    assert await new_rq.is_empty() is True
+    assert await new_rq.check_readiness() == FinishedStatus()
     metadata = await new_rq.get_metadata()
     assert metadata.total_request_count == 0
     assert metadata.pending_request_count == 0
@@ -785,7 +774,7 @@ async def test_purge(
     assert metadata.total_request_count == 0
     assert metadata.pending_request_count == 0
     assert metadata.handled_request_count == 0
-    assert await rq.is_empty() is True
+    assert await rq.check_readiness() != ReadyStatus()
 
     # Verify we can add new requests after purging
     await rq.add_request('https://example.com/new-after-purge')
@@ -1043,7 +1032,7 @@ async def test_alias_request_operations(
 
     # Test fetching and handling requests
     processed_urls = []
-    while not await rq.is_empty():
+    while await rq.check_readiness() == ReadyStatus():
         request = await rq.fetch_next_request()
         if request:
             processed_urls.append(request.url)
@@ -1057,7 +1046,7 @@ async def test_alias_request_operations(
     metadata = await rq.get_metadata()
     assert metadata.pending_request_count == 0
     assert metadata.handled_request_count == 3
-    assert await rq.is_empty() is True
+    assert await rq.check_readiness() == FinishedStatus()
 
     # Clean up
     await rq.drop()
