@@ -235,7 +235,7 @@ class ConcurrencySystemInterface(Protocol):
         make sense for ready tasks, such as a per-minute task cap, because the pool calls this before knowing whether
         any task is ready.
 
-        It should not refuse a `consumer` that has nothing in flight, otherwise its pool stalls with work still pending.
+        Permanently refusing a `consumer` that has nothing in flight stalls its pool with work still pending.
 
         Args:
             consumer: The consumer asking for capacity.
