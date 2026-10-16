@@ -26,6 +26,7 @@ from crawlee._log_config import CrawleeLogFormatter
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpMethod
 from crawlee._utils.robots import RobotsTxtFile
+from crawlee.autoscaling import ConcurrencySystem
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import (
@@ -70,15 +71,19 @@ async def test_processes_requests_from_explicit_queue() -> None:
 
 
 @pytest.mark.parametrize(
-    'method',
-    [pytest.param('is_empty', id='is_empty'), pytest.param('is_finished', id='is_finished')],
+    ('method', 'handled_before_error'),
+    [
+        pytest.param('is_empty', [], id='is_empty'),
+        # The pool asks whether the run is finished only once the queue is drained.
+        pytest.param('is_finished', ['https://a.placeholder.com'], id='is_finished'),
+    ],
 )
 @pytest.mark.parametrize(
     'error_type',
     [pytest.param(RuntimeError, id='runtime error'), pytest.param(TimeoutError, id='timeout error')],
 )
 async def test_propagates_request_queue_status_errors(
-    monkeypatch: pytest.MonkeyPatch, method: str, error_type: type[Exception]
+    monkeypatch: pytest.MonkeyPatch, method: str, handled_before_error: list[str], error_type: type[Exception]
 ) -> None:
     """A request manager failure reaches the caller, and the crawler can be run again once the manager recovers."""
     queue = await RequestQueue.open()
@@ -97,8 +102,7 @@ async def test_propagates_request_queue_status_errors(
             await crawler.run()
         assert exc_info.value is error
 
-    assert handled_urls == []
-    assert not await queue.is_finished()
+    assert handled_urls == handled_before_error
 
     await crawler.run()
     assert handled_urls == ['https://a.placeholder.com']
@@ -1377,6 +1381,22 @@ async def test_abort_on_error(
     assert stats.requests_finished == expected_finished
 
 
+async def test_abort_on_error_applies_to_one_run() -> None:
+    """An abort on error ends only the run it happened in, so the next run crawls again."""
+    crawler = BasicCrawler(abort_on_error=True)
+    handled_urls = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        handled_urls.append(context.request.url)
+        raise ValueError('Error request')
+
+    await crawler.run(['https://a.placeholder.com'])
+    await crawler.run(['https://b.placeholder.com'])
+
+    assert handled_urls == ['https://a.placeholder.com', 'https://b.placeholder.com']
+
+
 def test_crawler_log() -> None:
     crawler = BasicCrawler()
     assert isinstance(crawler.log, logging.Logger)
@@ -1611,6 +1631,54 @@ async def test_crawler_multiple_stops_in_parallel() -> None:
     assert len(processed_urls) == 2
     assert stats.requests_total == 2
     assert stats.requests_finished == 2
+
+
+async def test_stop_logged_once(caplog: pytest.LogCaptureFixture) -> None:
+    """The stop is logged once, while the requests in flight still finish one by one."""
+    start_urls = [f'https://placeholder.com/{i}' for i in range(3)]
+    crawler = BasicCrawler(
+        concurrency_settings=ConcurrencySettings(min_concurrency=3, desired_concurrency=3, max_concurrency=3),
+        max_requests_per_crawl=1,
+    )
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        # Finish one by one, so that the crawler is asked for new requests several times after the limit is reached.
+        await asyncio.sleep(0.05 * start_urls.index(context.request.url))
+
+    with caplog.at_level(logging.INFO, logger='crawlee'):
+        await crawler.run(start_urls)
+
+    assert caplog.text.count('Crawler.stop() was called') == 1
+    assert caplog.text.count('No new requests are allowed') == 1
+
+
+async def test_stop_applies_to_one_run(caplog: pytest.LogCaptureFixture) -> None:
+    """A stop ends only the run it was called in, so the next run crawls and logs its own stop."""
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1))
+    handled_urls = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        handled_urls.append(context.request.url)
+        crawler.stop()
+
+    with caplog.at_level(logging.INFO, logger='crawlee'):
+        await crawler.run(['https://a.placeholder.com'])
+        await crawler.run(['https://b.placeholder.com'])
+
+    assert handled_urls == ['https://a.placeholder.com', 'https://b.placeholder.com']
+    assert caplog.text.count('No new requests are allowed') == 2
+
+
+async def test_stop_before_run_starts() -> None:
+    """A stop called right after scheduling `run` as a task applies to that run."""
+    crawler = BasicCrawler(keep_alive=True, request_handler=AsyncMock())
+
+    run_task = asyncio.create_task(crawler.run())
+    crawler.stop()
+
+    await asyncio.wait_for(run_task, timeout=10)
 
 
 async def test_services_no_side_effect_on_crawler_init() -> None:
@@ -1883,7 +1951,8 @@ async def test_keep_alive(
 
     # Deterministically wait until the crawler has drained the initial queue.
     idle_signal = asyncio.Event()
-    original_is_finished = crawler._autoscaled_pool._is_finished_function
+    # The pool is built per run, so the hook goes on the crawler's own predicate, which the pool then picks up.
+    original_is_finished = cast('Any', crawler)._BasicCrawler__is_finished_function
 
     async def signal_idle_reached(*args: object, **kwargs: object) -> bool:
         try:
@@ -1892,8 +1961,8 @@ async def test_keep_alive(
             idle_signal.set()
 
     with patch.object(
-        crawler._autoscaled_pool,
-        '_is_finished_function',
+        crawler,
+        '_BasicCrawler__is_finished_function',
         side_effect=signal_idle_reached,
     ):
         crawler_run_task = asyncio.create_task(crawler.run())
@@ -2847,12 +2916,12 @@ async def test_stall_waits_for_in_flight_work() -> None:
         if context.request.url == 'https://free.placeholder.com/slow':
             stall_reasons.append(await poll_until_condition(throttler.get_stall_reason, timeout=10))
             # Two more pool checks, so at least one ran entirely while the stall was live and this request in flight.
-            checks = is_finished.await_count
-            await poll_until_condition(lambda: is_finished.await_count >= checks + 2, timeout=10)
+            checks = is_empty.await_count
+            await poll_until_condition(lambda: is_empty.await_count >= checks + 2, timeout=10)
             await context.add_requests(['https://free.placeholder.com/next'])
 
     with (
-        patch.object(throttler, 'is_finished', wraps=throttler.is_finished) as is_finished,
+        patch.object(throttler, 'is_empty', wraps=throttler.is_empty) as is_empty,
         pytest.raises(PersistentRateLimitError),
     ):
         await crawler.run([THROTTLED_URL, 'https://free.placeholder.com/slow'])
@@ -2998,3 +3067,84 @@ async def test_sigint_without_loop_signal_handlers(caplog: pytest.LogCaptureFixt
     assert 'Pausing...' in caplog.text
     assert 'The crawl was interrupted' in caplog.text
     assert signal.getsignal(signal.SIGINT) is sigint_handler_before_run
+
+
+async def test_concurrency_system_excludes_settings() -> None:
+    """The settings configure the default concurrency system, so a supplied one leaves them nowhere to go."""
+    with pytest.raises(ValueError, match='cannot be combined'):
+        BasicCrawler(concurrency_settings=ConcurrencySettings(), concurrency_system=ConcurrencySystem())
+
+
+async def test_inactive_concurrency_system_refused() -> None:
+    """The crawler does not own a supplied system, so it refuses to run against one that was never entered."""
+    crawler = BasicCrawler(concurrency_system=ConcurrencySystem(), request_handler=AsyncMock())
+
+    with pytest.raises(RuntimeError, match='not active'):
+        await crawler.run(['https://a.placeholder.com'])
+
+
+async def test_shared_concurrency_system_caps_total() -> None:
+    """Two crawlers sharing one system stay within its budget together, instead of each getting it in full."""
+    running_count = 0
+    max_running_count = 0
+
+    async def handler(context: BasicCrawlingContext) -> None:
+        nonlocal running_count, max_running_count
+        running_count += 1
+        max_running_count = max(max_running_count, running_count)
+        await asyncio.sleep(0.05)
+        running_count -= 1
+
+    first_queue = await RequestQueue.open(name='first')
+    second_queue = await RequestQueue.open(name='second')
+
+    settings = ConcurrencySettings(min_concurrency=2, max_concurrency=2, desired_concurrency=2)
+
+    async with ConcurrencySystem(settings) as concurrency_system:
+        first = BasicCrawler(
+            concurrency_system=concurrency_system,
+            request_manager=first_queue,
+            request_handler=handler,
+        )
+        second = BasicCrawler(
+            concurrency_system=concurrency_system,
+            request_manager=second_queue,
+            request_handler=handler,
+        )
+
+        first_statistics, second_statistics = await asyncio.gather(
+            first.run([f'https://a.placeholder.com/{i}' for i in range(5)]),
+            second.run([f'https://b.placeholder.com/{i}' for i in range(5)]),
+        )
+
+    assert first_statistics.requests_finished == 5
+    assert second_statistics.requests_finished == 5
+    assert max_running_count == 2
+
+
+async def test_concurrency_system_fresh_per_run() -> None:
+    """A run never inherits the concurrency the previous one scaled to, nor its load snapshots."""
+    crawler = BasicCrawler(request_handler=AsyncMock())
+
+    assert crawler.concurrency_system is None
+
+    await crawler.run(['https://a.placeholder.com'])
+    first_system = crawler.concurrency_system
+
+    await crawler.run(['https://b.placeholder.com'])
+
+    assert first_system is not None
+    assert crawler.concurrency_system is not first_system
+
+
+async def test_borrowed_concurrency_system_reused() -> None:
+    """A supplied system is exposed from the start and never replaced by a run."""
+    async with ConcurrencySystem() as concurrency_system:
+        crawler = BasicCrawler(concurrency_system=concurrency_system, request_handler=AsyncMock())
+
+        assert crawler.concurrency_system is concurrency_system
+
+        await crawler.run(['https://a.placeholder.com'])
+        await crawler.run(['https://b.placeholder.com'])
+
+        assert crawler.concurrency_system is concurrency_system
