@@ -174,7 +174,3 @@ The errors point at the cause:
 `UnexpectedModelBehavior`, `ModelHTTPError`, and `UsageLimitExceeded` come from the model run and share the base `AgentRunError`, so catch it to handle any model failure in one place. `ValueError` is raised by the extractor itself, around the schema or `scope`, not by the model.
 
 An extraction error is an ordinary request error, so Crawlee retries the request up to `max_request_retries` (3 by default), re-running the extraction and repeating its token cost. For errors that won't pass on retry, such as a wrong API key or an unsupported schema, the retries only waste effort, so catch them in the handler to skip the page, or set `abort_on_error=True` to stop the crawl.
-
-## Conclusion
-
-This guide introduced <ApiLink to="class/PydanticAiCrawler">`PydanticAiCrawler`</ApiLink> and its <ApiLink to="class/ExtractFunction">`extract`</ApiLink> helper, the <ApiLink to="class/PydanticAiDirectExtractor">`PydanticAiDirectExtractor`</ApiLink> and <ApiLink to="class/PydanticAiSelectorExtractor">`PydanticAiSelectorExtractor`</ApiLink> strategies, the built-in and custom distillers, the extract options, how failures and cost are handled, and how to debug extraction. If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!
