@@ -1,5 +1,4 @@
 import asyncio
-from datetime import timedelta
 
 from crawlee.configuration import Configuration
 from crawlee.crawlers import ParselCrawler
@@ -7,9 +6,7 @@ from crawlee.crawlers import ParselCrawler
 
 async def main() -> None:
     configuration = Configuration(
-        log_level='DEBUG',
-        headless=False,
-        persist_state_interval=timedelta(seconds=30),
+        purge_on_start=False,
     )
 
     # Register configuration via crawler.
