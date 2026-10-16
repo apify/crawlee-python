@@ -52,12 +52,6 @@ class CrawleeRequestData(BaseModel):
 
     skip_navigation: bool = False
 
-    last_proxy_tier: int | None = None
-    """The last proxy tier used to process the request."""
-
-    forefront: bool = False
-    """Indicate whether the request should be enqueued at the front of the queue."""
-
     crawl_depth: int = 0
     """The depth of the request in the crawl tree."""
 
@@ -408,24 +402,6 @@ class Request(BaseModel):
     @enqueue_strategy.setter
     def enqueue_strategy(self, new_enqueue_strategy: EnqueueStrategy) -> None:
         self.crawlee_data.enqueue_strategy = new_enqueue_strategy
-
-    @property
-    def last_proxy_tier(self) -> int | None:
-        """The last proxy tier used to process the request."""
-        return self.crawlee_data.last_proxy_tier
-
-    @last_proxy_tier.setter
-    def last_proxy_tier(self, new_value: int) -> None:
-        self.crawlee_data.last_proxy_tier = new_value
-
-    @property
-    def forefront(self) -> bool:
-        """Indicate whether the request should be enqueued at the front of the queue."""
-        return self.crawlee_data.forefront
-
-    @forefront.setter
-    def forefront(self, new_value: bool) -> None:
-        self.crawlee_data.forefront = new_value
 
     @property
     def was_already_handled(self) -> bool:

@@ -617,7 +617,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         return await self._proxy_configuration.new_proxy_info(
             session_id=session.id if session else None,
             request=request,
-            proxy_tier=None,
         )
 
     async def get_request_manager(self) -> RequestManager:
@@ -1229,7 +1228,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if retire_session and context.session:
             context.session.retire()
 
-        await request_manager.add_request(new_request, forefront=new_request.forefront)
+        await request_manager.add_request(new_request)
         await self._mark_request_as_handled(context.request)
         self._statistics.record_request_processing_finish(context.request.unique_key)
         return True
@@ -1258,7 +1257,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             if await self._handle_error_handler_replacement(context, error, request_manager=request_manager):
                 return
 
-            await request_manager.reclaim_request(request, forefront=request.forefront)
+            await request_manager.reclaim_request(request)
         else:
             request.state = RequestState.ERROR
             await self._mark_request_as_handled(request)
@@ -1595,7 +1594,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 # Increment session rotation count.
                 request.session_rotation_count = (request.session_rotation_count or 0) + 1
 
-                await request_manager.reclaim_request(request, forefront=request.forefront)
+                await request_manager.reclaim_request(request)
             else:
                 # Still invoke the error_handler for side effects, but never replace once rotations are exhausted.
                 if self._error_handler:
@@ -1671,7 +1670,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             extra={'url': request.url, 'unique_key': request.unique_key},
         )
         request_manager = await self.get_request_manager()
-        await request_manager.reclaim_request(request, forefront=request.forefront)
+        await request_manager.reclaim_request(request, forefront=True)
         self._statistics.record_request_processing_deferral(request.unique_key)
 
     async def _run_request_handler(self, context: BasicCrawlingContext) -> None:

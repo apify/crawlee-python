@@ -519,20 +519,19 @@ async def test_session_error_handler_exception_is_wrapped() -> None:
         await crawler.run(['https://a.placeholder.com'])
 
 
-async def test_reclaim_uses_request_forefront_flag() -> None:
-    """Retries must reclaim with `request.forefront` so tiered-proxy priority retries stay at the front."""
+async def test_retry_reclaims_request_to_the_back() -> None:
+    """A failed request is reclaimed for a retry at the back of the queue."""
     queue = await RequestQueue.open()
     crawler = BasicCrawler(request_manager=queue, max_request_retries=1)
 
     @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
-        context.request.forefront = True
+    async def handler(_context: BasicCrawlingContext) -> None:
         raise RuntimeError('Arbitrary crash for testing purposes')
 
     with patch.object(queue, 'reclaim_request', wraps=queue.reclaim_request) as reclaim_mock:
         await crawler.run(['https://a.placeholder.com'])
 
-    reclaim_mock.assert_awaited_once_with(ANY, forefront=True)
+    reclaim_mock.assert_awaited_once_with(ANY)
 
 
 async def test_handles_error_in_error_handler() -> None:
@@ -2766,6 +2765,27 @@ async def test_handler_raised_throttled_error_is_deferred(monkeypatch: pytest.Mo
     session = contexts[1].session
     assert session is not None
     assert session.error_score == 0
+
+
+async def test_deferred_request_is_reclaimed_to_the_front(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A request deferred by a `RequestThrottledError` is reclaimed at the front of the queue."""
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
+    reclaim_mock = AsyncMock(wraps=throttler.reclaim_request)
+    monkeypatch.setattr(throttler, 'reclaim_request', reclaim_mock)
+    crawler = BasicCrawler(request_manager=throttler, max_request_retries=0)
+    handled = list[Request]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        handled.append(context.request)
+        if len(handled) == 1:
+            throttler.record_domain_delay(context.request.url)
+            raise RequestThrottledError
+
+    await crawler.run([THROTTLED_URL])
+
+    assert len(handled) == 2
+    reclaim_mock.assert_awaited_once_with(ANY, forefront=True)
 
 
 @pytest.mark.parametrize(

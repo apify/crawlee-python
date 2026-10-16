@@ -13,8 +13,8 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 import QuickStartExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/quick_start_example.py';
 import IntegrationBsExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/integration_bs_example.py';
 import IntegrationPwExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/integration_pw_example.py';
-import TiersBsExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/tiers_bs_example.py';
-import TiersPwExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/tiers_pw_example.py';
+import RetryEscalationBsExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/retry_escalation_bs_example.py';
+import RetryEscalationPwExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/retry_escalation_pw_example.py';
 import InspectionBsExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/inspecting_bs_example.py';
 import InspectionPwExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/inspecting_pw_example.py';
 
@@ -81,23 +81,21 @@ When no `session_id` is provided, our proxy URLs are rotated round-robin.
     </TabItem>
 </Tabs>
 
-### Tiered proxies
+### Switching proxies on retries
 
 When you use HTTP proxies in real world crawling scenarios, you have to decide which type of proxy to use to reach the sweet spot between cost efficiency and reliably avoiding blocking. Some websites may allow crawling with no proxy, on some you may get away with using datacenter proxies, which are cheap but easily detected, and sometimes you need to use expensive residential proxies.
 
-To take the guesswork out of this process, Crawlee allows you to configure multiple tiers of proxy URLs. When crawling, it will automatically pick the lowest tier (smallest index) where it doesn't encounter blocking. If you organize your proxy server URLs in tiers so that the lowest tier contains the cheapest, least reliable ones and each higher tier contains more expensive, more reliable ones, you will get an optimal anti-blocking performance.
-
-In an active tier, Crawlee will alternate between proxies in a round-robin fashion, just like it would with `proxy_urls`.
+To start cheap and move to a more reliable proxy only when a request fails, pass a `new_url_function` to <ApiLink to="class/ProxyConfiguration">`ProxyConfiguration`</ApiLink>. The crawler calls it for every attempt with the current request, so the function can pick the proxy by the request's `retry_count`. In the following example, the first attempt goes without a proxy, the first retry uses a datacenter proxy and any further retry a residential one.
 
 <Tabs>
     <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
         <RunnableCodeBlock className="language-python" language="python">
-            {TiersBsExample}
+            {RetryEscalationBsExample}
         </RunnableCodeBlock>
     </TabItem>
     <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
         <RunnableCodeBlock className="language-python" language="python">
-            {TiersPwExample}
+            {RetryEscalationPwExample}
         </RunnableCodeBlock>
     </TabItem>
 </Tabs>
