@@ -1,28 +1,28 @@
 import asyncio
 
+from crawlee import Request
 from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 from crawlee.proxy_configuration import ProxyConfiguration
+
+CHEAP_PROXY_URL = 'http://cheap-datacenter-proxy.com/'
+PREMIUM_PROXY_URL = 'http://expensive-residential-proxy.com/'
+
+
+def pick_proxy_url(
+    session_id: str | None = None,  # noqa: ARG001
+    request: Request | None = None,
+) -> str | None:
+    # The first attempt goes without a proxy.
+    if request is None or request.retry_count == 0:
+        return None
+
+    # The first retry uses the cheap proxy, any further retry the expensive one.
+    return CHEAP_PROXY_URL if request.retry_count == 1 else PREMIUM_PROXY_URL
 
 
 async def main() -> None:
     # Create a ProxyConfiguration object and pass it to the crawler.
-    proxy_configuration = ProxyConfiguration(
-        tiered_proxy_urls=[
-            # No proxy tier.
-            # Optional in case you do not want to use any proxy on lowest tier.
-            [None],
-            # lower tier, cheaper, preferred as long as they work
-            [
-                'http://cheap-datacenter-proxy-1.com/',
-                'http://cheap-datacenter-proxy-2.com/',
-            ],
-            # higher tier, more expensive, used as a fallback
-            [
-                'http://expensive-residential-proxy-1.com/',
-                'http://expensive-residential-proxy-2.com/',
-            ],
-        ]
-    )
+    proxy_configuration = ProxyConfiguration(new_url_function=pick_proxy_url)
     crawler = PlaywrightCrawler(proxy_configuration=proxy_configuration)
 
     # Define the default request handler, which will be called for every request.
