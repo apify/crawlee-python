@@ -1,0 +1,74 @@
+---
+id: crawling-context
+title: Crawling context
+description: What a request handler receives, how each crawler extends the basic crawling context, and how the context helpers store results.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import ContextHelpersExample from '!!raw-loader!roa-loader!./code_examples/crawling_context/context_helpers.py';
+import BufferedResultsExample from '!!raw-loader!roa-loader!./code_examples/crawling_context/buffered_results.py';
+
+Every request handler receives a single argument, the crawling context. It holds the request being processed, the session and proxy used for it, and a set of helper functions for storing data and adding new requests. The crawler creates a new context for each request, so handlers don't share it.
+
+## Context types
+
+All contexts extend <ApiLink to="class/BasicCrawlingContext">`BasicCrawlingContext`</ApiLink>, which is what <ApiLink to="class/BasicCrawler">`BasicCrawler`</ApiLink> passes to its handlers. Each crawler builds on it and adds the attributes that make sense for the way it fetches pages:
+
+- <ApiLink to="class/HttpCrawlingContext">`HttpCrawlingContext`</ApiLink> adds `http_response`, the response returned by the HTTP client.
+- <ApiLink to="class/ParsedHttpCrawlingContext">`ParsedHttpCrawlingContext`</ApiLink> adds `parsed_content` together with the `enqueue_links` and `extract_links` helpers. <ApiLink to="class/HttpCrawler">`HttpCrawler`</ApiLink> uses it with the raw response body as `parsed_content`.
+- <ApiLink to="class/BeautifulSoupCrawlingContext">`BeautifulSoupCrawlingContext`</ApiLink> and <ApiLink to="class/ParselCrawlingContext">`ParselCrawlingContext`</ApiLink> are parsed contexts that expose the parsed document as `soup` and `selector`.
+- <ApiLink to="class/PlaywrightPreNavCrawlingContext">`PlaywrightPreNavCrawlingContext`</ApiLink> is what Playwright pre-navigation hooks receive. It adds the Playwright `page` before navigation, `goto_options` and the `block_requests` helper.
+- <ApiLink to="class/PlaywrightCrawlingContext">`PlaywrightCrawlingContext`</ApiLink> is what <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> handlers receive. It adds the navigation `response`, `enqueue_links`, `extract_links` and `infinite_scroll`.
+
+Pre-navigation hooks of HTTP crawlers receive a plain <ApiLink to="class/BasicCrawlingContext">`BasicCrawlingContext`</ApiLink>, because no response exists yet. Their post-navigation hooks receive an <ApiLink to="class/HttpCrawlingContext">`HttpCrawlingContext`</ApiLink>. Annotate your handler with the context type of your crawler to get the right attributes and type checking.
+
+For details on the crawler-specific attributes, see [HTTP crawlers](./http-crawlers) and [Playwright crawler](./playwright-crawler).
+
+## Request, session and proxy
+
+The `request` attribute is the <ApiLink to="class/Request">`Request`</ApiLink> being processed. It carries the URL, the label used for routing, user data and the retry count. For details, see [Requests](./requests).
+
+The `session` attribute is the <ApiLink to="class/Session">`Session`</ApiLink> assigned to the request, or `None` when the crawler runs without a session pool. You can call `mark_bad()` or `retire()` on it from the handler when a page shows signs of blocking. For details, see [Session management](./session-management).
+
+The `proxy_info` attribute is a <ApiLink to="class/ProxyInfo">`ProxyInfo`</ApiLink> describing the proxy used for the request, or `None` when no proxy is configured. For details, see [Proxy management](./proxy-management).
+
+The `log` attribute is the crawler's logger, so messages from handlers follow the same log configuration as the crawler's own. For details, see [Logging](./logging).
+
+## Context helpers
+
+The context provides helpers that operate on the crawler's storages and request queue:
+
+- `push_data` stores one item or a list of items in a dataset. It writes to the default dataset unless you pass `dataset_id`, `dataset_name` or `dataset_alias`.
+- `add_requests` adds URLs or <ApiLink to="class/Request">`Request`</ApiLink> objects to the request queue. Relative URLs resolve against the URL of the current page, and each new request gets a crawl depth one higher than the current one.
+- `enqueue_links` extracts links from the current page and adds them to the request queue through `add_requests`. It's available on the parsed HTTP contexts and on <ApiLink to="class/PlaywrightCrawlingContext">`PlaywrightCrawlingContext`</ApiLink>. For filtering links and choosing an enqueue strategy, see [Crawling links](../guides/crawling-links).
+- `get_key_value_store` opens a key-value store, the default one unless you pass `id`, `name` or `alias`.
+- `use_state` returns a dictionary shared by all handler calls of the crawler. The crawler keeps it in the default key-value store and saves it automatically. This helper is experimental and its interface may change.
+- `send_request` sends an extra HTTP request through the crawler's HTTP client, with the session and proxy of the current request. Its response isn't parsed, and the request doesn't go through the request queue.
+
+The following example uses most of these helpers in a <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> handler and reads the results back from the crawler once the run finishes.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {ContextHelpersExample}
+</RunnableCodeBlock>
+
+## Results are committed after the handler succeeds
+
+The `push_data`, `add_requests` and `enqueue_links` calls and the `set_value` calls on a key-value store from `get_key_value_store` don't write anything right away. The context records them in an internal `RequestHandlerRunResult` object, and the crawler commits the recorded changes only after the request handler returns without an exception. Reading a key from that key-value store in the same handler returns the value you've set, even before the commit.
+
+When the handler raises, the crawler discards the recorded changes and retries the request. A handler that pushes an item and then fails on the next line doesn't leave a partial or duplicate item in the dataset. The retry starts with an empty record and produces the output once, when it succeeds. The same applies to requests added by a failed attempt.
+
+The example simulates a failure on the first attempt. The dataset ends up with a single item, the one from the second attempt.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {BufferedResultsExample}
+</RunnableCodeBlock>
+
+A few parts of the context write directly, outside of the buffer:
+
+- Changes to the dictionary from `use_state` are visible to other handlers immediately and stay in place when the handler fails.
+- Requests made with `send_request` happen when you call it.
+- Storages you open yourself, for example with <ApiLink to="class/Dataset#open">`Dataset.open`</ApiLink>, write immediately.
+
+Error handlers and failed request handlers receive a copy of the context whose `push_data`, `add_requests` and `get_key_value_store` write directly, because the request has already failed and there's no successful run to wait for. For details, see [Error handling](./error-handling).
