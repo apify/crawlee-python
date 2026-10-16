@@ -5,8 +5,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from crawlee._autoscaling import Snapshotter, SystemStatus
-from crawlee._autoscaling._types import (
+from crawlee._utils.byte_size import ByteSize
+from crawlee.autoscaling._snapshotter import Snapshotter
+from crawlee.autoscaling._system_status import SystemStatus
+from crawlee.autoscaling._types import (
     ClientSnapshot,
     CpuSnapshot,
     EventLoopSnapshot,
@@ -14,7 +16,6 @@ from crawlee._autoscaling._types import (
     MemorySnapshot,
     SystemInfo,
 )
-from crawlee._utils.byte_size import ByteSize
 from crawlee.configuration import Configuration
 
 if TYPE_CHECKING:

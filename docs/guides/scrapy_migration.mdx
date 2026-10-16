@@ -195,7 +195,7 @@ The default (unnamed) <ApiLink to="class/Dataset">`Dataset`</ApiLink> stays on d
 
 ## Concurrency and throttling
 
-Both Scrapy and Crawlee have settings to influence the scraping throughput, but they differ in their approach. Crawlee reads <ApiLink to="class/ConcurrencySettings">`ConcurrencySettings`</ApiLink> and scales concurrency automatically based on system resources, as described in the [Scaling crawlers guide](./scaling-crawlers). Use <ApiLink to="class/ConcurrencySettings#__init__">`max_tasks_per_minute`</ApiLink> to cap the request rate. It's close to `DOWNLOAD_DELAY`, but it limits the whole pool rather than adding a fixed delay per domain.
+Both Scrapy and Crawlee have settings to influence the scraping throughput, but they differ in their approach. Crawlee reads <ApiLink to="class/ConcurrencySettings">`ConcurrencySettings`</ApiLink> and scales concurrency automatically based on system resources, as described in the [Scaling crawlers guide](./scaling-crawlers). Use <ApiLink to="class/ConcurrencySettings#__init__">`max_tasks_per_minute`</ApiLink> to cap the request rate. It's close to `DOWNLOAD_DELAY`, but it limits the whole pool rather than adding a fixed delay per domain. Requests aren't spaced out either. They start as fast as the concurrency allows until the cap for the last 60 seconds is reached, and then wait for that window to move on.
 
 <Tabs groupId="scrapy-migration-concurrency">
     <TabItem value="scrapy" label="Scrapy">
