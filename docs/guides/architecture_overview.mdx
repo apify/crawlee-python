@@ -351,12 +351,12 @@ The <ApiLink to="class/EventManager">`EventManager`</ApiLink> is responsible for
 Crawlee provides several implementations of the event manager:
 
 - <ApiLink to="class/EventManager">`EventManager`</ApiLink> is the base class for event management in Crawlee.
-- <ApiLink to="class/LocalEventManager">`LocalEventManager`</ApiLink> extends the base event manager for local environments by automatically emitting `SYSTEM_INFO` events at regular intervals. This provides real-time system metrics including CPU usage and memory consumption, which are essential for internal components like the <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> and <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink>.
+- <ApiLink to="class/LocalEventManager">`LocalEventManager`</ApiLink> extends the base event manager for local environments by automatically emitting `SYSTEM_INFO` events at regular intervals. This provides real-time system metrics including CPU usage and memory consumption, which are essential for internal components like the <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> and <ApiLink to="class/ConcurrencySystem">`ConcurrencySystem`</ApiLink>.
 - [`ApifyEventManager`](https://docs.apify.com/sdk/python/reference/class/ApifyEventManager) - Manages events on the [Apify platform](https://apify.com/) (cloud-based). It is implemented in the [Apify SDK](https://docs.apify.com/sdk/python/).
 
 :::info
 
-You can learn more about <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> and <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink> and their configuration in the [Scaling crawlers guide](./scaling-crawlers).
+You can learn more about <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> and <ApiLink to="class/ConcurrencySystem">`ConcurrencySystem`</ApiLink> and their configuration in the [Scaling crawlers guide](./scaling-crawlers).
 
 :::
 
