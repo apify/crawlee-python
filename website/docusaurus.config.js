@@ -120,40 +120,112 @@ module.exports = {
                 },
             },
         ],
-        // [
-        //     '@docusaurus/plugin-client-redirects',
-        //     {
-        //         redirects: [
-        //             {
-        //                 from: '/docs',
-        //                 to: '/docs/quick-start',
-        //             },
-        //             {
-        //                 from: '/docs/next',
-        //                 to: '/docs/next/quick-start',
-        //             },
-        //             {
-        //                 from: '/docs/guides/environment-variables',
-        //                 to: '/docs/guides/configuration',
-        //             },
-        //             {
-        //                 from: '/docs/guides/getting-started',
-        //                 to: '/docs/introduction',
-        //             },
-        //             {
-        //                 from: '/docs/guides/apify-platform',
-        //                 to: '/docs/deployment/apify-platform',
-        //             },
-        //         ],
-        //         createRedirects(existingPath) {
-        //             if (!existingPath.endsWith('/')) {
-        //                 return `${existingPath}/`;
-        //             }
-        //
-        //             return undefined; // Return a falsy value: no redirect created
-        //         },
-        //     },
-        // ],
+        [
+            '@docusaurus/plugin-client-redirects',
+            {
+                createRedirects(existingPath) {
+                    // Maps a current docs path suffix to the old suffixes that should redirect
+                    // to it, covering the restructuring that introduced the Concepts section
+                    // and merged the Examples section into Concepts and Guides. Redirects are
+                    // derived from existing routes, so they apply to every docs version that
+                    // contains the new page and never shadow versions that still have the old
+                    // layout (see OLD_STRUCTURE_VERSIONS below).
+                    const MOVED_DOCS = {
+                        'concepts/architecture-overview': ['guides/architecture-overview'],
+                        'concepts/http-crawlers': [
+                            'guides/http-crawlers',
+                            'examples/beautifulsoup-crawler',
+                            'examples/parsel-crawler',
+                            'examples/file-download',
+                        ],
+                        'concepts/playwright-crawler': [
+                            'guides/playwright-crawler',
+                            'examples/playwright-crawler',
+                            'examples/playwright-crawler-with-block-requests',
+                            'examples/capture-screenshots-using-playwright',
+                        ],
+                        'concepts/adaptive-playwright-crawler': [
+                            'guides/adaptive-playwright-crawler',
+                            'examples/adaptive-playwright-crawler',
+                        ],
+                        'concepts/request-router': ['guides/request-router'],
+                        'concepts/request-loaders': ['guides/request-loaders', 'examples/using-sitemap-request-loader'],
+                        'concepts/storages': [
+                            'guides/storages',
+                            'examples/add-data-to-dataset',
+                            'examples/export-entire-dataset-to-file',
+                        ],
+                        'concepts/storage-clients': ['guides/storage-clients'],
+                        'concepts/http-clients': ['guides/http-clients'],
+                        'concepts/session-management': ['guides/session-management'],
+                        'concepts/cookie-management': ['guides/cookie-management'],
+                        'concepts/http-headers': ['guides/http-headers'],
+                        'concepts/proxy-management': ['guides/proxy-management'],
+                        'concepts/scaling-crawlers': ['guides/scaling-crawlers'],
+                        'concepts/request-throttling': ['guides/request-throttling'],
+                        'concepts/error-handling': [
+                            'guides/error-handling',
+                            'examples/capturing-page-snapshots-with-error-snapshotter',
+                        ],
+                        'concepts/logging': ['examples/configure-json-logging'],
+                        'concepts/service-locator': ['guides/service-locator'],
+                        'guides/crawling-links': [
+                            'examples/crawl-all-links-on-website',
+                            'examples/crawl-multiple-urls',
+                            'examples/crawl-specific-links-on-website',
+                            'examples/crawl-website-with-relative-links',
+                        ],
+                        'guides/fill-and-submit-web-form': ['examples/fill-and-submit-web-form'],
+                        'guides/respect-robots-txt-file': ['examples/respect-robots-txt-file'],
+                        'guides/stopping-and-resuming-crawlers': [
+                            'examples/crawler-stop',
+                            'examples/crawler-keep-alive',
+                            'examples/resuming-paused-crawl',
+                        ],
+                        'guides/run-parallel-crawlers': ['examples/run-parallel-crawlers'],
+                        'guides/avoid-blocking': [
+                            'examples/playwright-crawler-with-camoufox',
+                            'examples/playwright-crawler-with-fingerprint-generator',
+                        ],
+                        'guides/logging-in-with-a-crawler': ['examples/using_browser_profile'],
+                        guides: ['examples'],
+                    };
+
+                    // Doc versions that still have the pre-restructure layout. Their routes
+                    // (e.g. /docs/1.9/examples/...) must not get redirects generated over them.
+                    const OLD_STRUCTURE_VERSIONS = ['0.6', '1.9'];
+                    const versions = require('./versions.json');
+                    const latestHasOldStructure = OLD_STRUCTURE_VERSIONS.includes(versions[0]);
+
+                    const marker = '/docs/';
+                    const markerIndex = existingPath.indexOf(marker);
+
+                    if (markerIndex === -1) {
+                        return undefined;
+                    }
+
+                    const redirects = [];
+
+                    for (const [currentSuffix, oldSuffixes] of Object.entries(MOVED_DOCS)) {
+                        if (!existingPath.endsWith(`/${currentSuffix}`)) {
+                            continue;
+                        }
+
+                        // E.g. '/python/docs/', '/python/docs/next/' or '/python/docs/1.9/'.
+                        const docsRoot = existingPath.slice(0, existingPath.length - currentSuffix.length);
+                        const version = docsRoot.slice(markerIndex + marker.length).replace(/\/$/, '');
+                        const hasOldStructure =
+                            version === '' ? latestHasOldStructure : OLD_STRUCTURE_VERSIONS.includes(version);
+
+                        if (!hasOldStructure) {
+                            redirects.push(...oldSuffixes.map((oldSuffix) => `${docsRoot}${oldSuffix}`));
+                        }
+                    }
+
+                    return redirects.length > 0 ? redirects : undefined;
+                },
+            },
+        ],
         [
             'docusaurus-gtm-plugin',
             {
@@ -289,12 +361,6 @@ module.exports = {
                     position: 'left',
                 },
                 {
-                    type: 'doc',
-                    docId: '/examples',
-                    label: 'Examples',
-                    position: 'left',
-                },
-                {
                     type: 'custom-api',
                     label: 'API',
                     position: 'left',
@@ -351,12 +417,12 @@ module.exports = {
                     title: 'Docs',
                     items: [
                         {
-                            label: 'Guides',
-                            to: 'docs/guides',
+                            label: 'Quick start',
+                            to: 'docs/quick-start',
                         },
                         {
-                            label: 'Examples',
-                            to: 'docs/examples',
+                            label: 'Guides',
+                            to: 'docs/guides',
                         },
                         {
                             label: 'API reference',

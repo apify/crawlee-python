@@ -1,0 +1,65 @@
+---
+id: error-handling
+title: Error handling
+description: How to handle errors that occur during web crawling.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import HandleProxyError from '!!raw-loader!roa-loader!./code_examples/error_handling/handle_proxy_error.py';
+import ChangeHandleErrorStatus from '!!raw-loader!roa-loader!./code_examples/error_handling/change_handle_error_status.py';
+import DisableRetry from '!!raw-loader!roa-loader!./code_examples/error_handling/disable_retry.py';
+import ParselCrawlerWithErrorSnapshotter from '!!raw-loader!roa-loader!./code_examples/error_handling/parsel_crawler_with_error_snapshotter.py';
+import PlaywrightCrawlerWithErrorSnapshotter from '!!raw-loader!roa-loader!./code_examples/error_handling/playwright_crawler_with_error_snapshotter.py';
+
+This page demonstrates how Crawlee deals with errors during crawling and the techniques available for handling them.
+
+## Handling proxy errors
+
+Low-quality proxies can cause problems even with high settings for `max_request_retries` and `max_session_rotations` in <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>. If you can't get data because of proxy errors, you might want to try again. You can do this using <ApiLink to="class/BasicCrawler#failed_request_handler">`failed_request_handler`</ApiLink>:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {HandleProxyError}
+</RunnableCodeBlock>
+
+You can use this same approach when testing different proxy providers. To better manage this process, you can count proxy errors and [stop the crawler](../guides/stopping-and-resuming-crawlers#stopping-a-crawler) if you get too many.
+
+## Changing how error status codes are handled
+
+By default, when <ApiLink to="class/Session">`Sessions`</ApiLink> get status codes like [401](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/401), [403](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/403), or [429](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/429), Crawlee marks the <ApiLink to="class/Session">`Session`</ApiLink> as `retire` and switches to a new one. This might not be what you want, especially when working with [authentication](../guides/logging-in-with-a-crawler). You can learn more on the [Session management](./session-management) page.
+
+Here's an example of how to change this behavior:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {ChangeHandleErrorStatus}
+</RunnableCodeBlock>
+
+## Turning off retries for non-network errors
+
+Sometimes you might get unexpected errors when parsing data, like when a website has an unusual structure. Crawlee normally tries again based on your `max_request_retries` setting, but sometimes you don't want that.
+
+Here's how to turn off retries for non-network errors using <ApiLink to="class/BasicCrawler#error_handler">`error_handler`</ApiLink>, which runs before Crawlee tries again:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {DisableRetry}
+</RunnableCodeBlock>
+
+## Capturing page snapshots on errors
+
+Debugging a failing request is much easier when you can see what the page looked like at the moment of failure. Set `save_error_snapshots=True` in the crawler's <ApiLink to="class/Statistics">`Statistics`</ApiLink> and Crawlee automatically captures a page snapshot on the first occurrence of each unique error. The snapshot can contain an HTML file and a JPEG screenshot of the page where the unhandled exception was raised, and it's saved to the default key-value store. Both <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> and [HTTP crawlers](./http-crawlers) capture the HTML file, but only <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> can capture a screenshot as well.
+
+<Tabs>
+    <TabItem value="ParselCrawler" label="ParselCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {ParselCrawlerWithErrorSnapshotter}
+        </RunnableCodeBlock>
+    </TabItem>
+    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
+        <RunnableCodeBlock className="language-python" language="python">
+            {PlaywrightCrawlerWithErrorSnapshotter}
+        </RunnableCodeBlock>
+    </TabItem>
+</Tabs>

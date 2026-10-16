@@ -107,13 +107,15 @@ function BenefitsSection() {
     );
 }
 
+// The /docs/next prefix on the concepts links is temporary: the Concepts section exists only in the
+// next (unreleased) docs until the first post-restructure version snapshot. Drop the prefix then.
 function OtherFeaturesSection() {
     return (
         <section className={styles.otherFeaturesSection}>
             <h2>What else is in Crawlee?</h2>
             <div className={styles.cardsWithContentContainer}>
                 <div className={styles.cardsWithImageContainer}>
-                    <Link className={styles.cardWithImage} to="/docs/guides/scaling-crawlers">
+                    <Link className={styles.cardWithImage} to="/docs/next/concepts/scaling-crawlers">
                         <ThemedImage
                             sources={{
                                 light: '/python/img/auto-scaling-light.webp',
@@ -129,7 +131,7 @@ function OtherFeaturesSection() {
                             </div>
                         </div>
                     </Link>
-                    <Link className={styles.cardWithImage} to="/docs/guides/proxy-management">
+                    <Link className={styles.cardWithImage} to="/docs/next/concepts/proxy-management">
                         <ThemedImage
                             sources={{
                                 light: '/python/img/smart-proxy-light.webp',
@@ -162,7 +164,7 @@ function OtherFeaturesSection() {
                             title: 'Queue and storage',
                             description:
                                 'Pause and resume crawlers thanks to a persistent queue of URLs and storage for structured data.',
-                            to: '/docs/guides/storages',
+                            to: '/docs/next/concepts/storages',
                         },
                         {
                             icon: (
@@ -289,7 +291,7 @@ function BuildFastScrapersSection() {
                             'Unblocking, proxy rotation and other core features are already turned on. But also very configurable.',
                         actionLink: {
                             text: 'Learn more',
-                            href: '/docs/examples',
+                            href: '/docs/guides',
                         },
                     },
                     {
