@@ -32,7 +32,7 @@ If [HTTP-based crawlers](./http-crawlers) are insufficient, <ApiLink to="class/P
 
 ## Basic example
 
-The following example crawls the Hacker News website using headless Chromium. The crawler manages the browser and page instances for you. In the request handler, Playwright's API is used to extract the title, rank, and URL of each post, and links to the next pages are enqueued to keep the crawl going.
+The following example crawls the Hacker News website using Chromium. The crawler manages the browser and page instances for you. In the request handler, Playwright's API is used to extract the title, rank, and URL of each post, and links to the next pages are enqueued to keep the crawl going.
 
 <RunnableCodeBlock className="language-python" language="python">
     {BasicExample}

@@ -17,7 +17,7 @@ Every crawler collects runtime statistics about the requests it processes. It co
 The raw data lives in a <ApiLink to="class/StatisticsState">`StatisticsState`</ApiLink> model. Its main fields are:
 
 - `requests_finished` and `requests_failed` count requests that succeeded or failed after exhausting their retries.
-- `requests_retries` counts requests that needed at least one retry, and `request_retry_histogram` shows how many requests finished after 0, 1, 2, and more retries.
+- `requests_retries` counts requests that needed at least one retry, and `request_retry_histogram` shows how many requests finished or failed after 0, 1, 2, and more retries.
 - `request_total_finished_duration`, `request_total_failed_duration`, `request_min_duration`, and `request_max_duration` measure request processing time.
 - `requests_with_status_code` maps HTTP status codes to the number of responses that returned them.
 - `crawler_started_at`, `crawler_finished_at`, and the computed `crawler_runtime` describe the run itself.
@@ -37,7 +37,7 @@ The following example reads the summary returned by `run()`, then looks at state
     {ReadFinalStatisticsExample}
 </RunnableCodeBlock>
 
-A crawler that you run again with `run()` resets its statistics at the start of the new run. To keep the numbers from a previous run, store the returned `FinalStatistics` before calling `run()` again.
+A crawler that you run again with `run()` after a completed run resets its statistics at the start of the new run. To keep the numbers from a previous run, store the returned `FinalStatistics` before calling `run()` again.
 
 ## Periodic logging
 
@@ -58,7 +58,7 @@ The following options control persistence:
 - `persist_state_key` is the key the state is stored under. It defaults to `__CRAWLER_STATISTICS_<n>`, where `<n>` is a per-process counter of `Statistics` instances.
 - `persist_state_kvs_name` selects a named key-value store. Without it, the default key-value store is used.
 
-The statistics a crawler creates for itself have persistence enabled and use the crawler's key-value store. A `Statistics` instance you create yourself has `persistence_enabled=False` by default. For how to resume an interrupted crawl, see [Stopping and resuming crawlers](../guides/stopping-and-resuming-crawlers).
+The statistics a crawler creates for itself have persistence enabled and use the crawler's key-value store. The exception is <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink>, whose default statistics don't persist. A `Statistics` instance you create yourself has `persistence_enabled=False` by default. For how to resume an interrupted crawl, see [Stopping and resuming crawlers](../guides/stopping-and-resuming-crawlers).
 
 ## Custom statistics
 

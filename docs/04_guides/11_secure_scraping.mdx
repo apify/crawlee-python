@@ -42,7 +42,7 @@ await context.enqueue_links()
 await context.enqueue_links(strategy='all')
 ```
 
-The same rules apply to URLs read by a <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> and to `Sitemap:` directives in `robots.txt`. A target can't seed your queue with off-host URLs that way either. Following `robots.txt` rules is itself opt-in: <ApiLink to="class/BasicCrawlerOptions#respect_robots_txt_file">`respect_robots_txt_file`</ApiLink> is `False` by default. The [respecting robots.txt example](./respect-robots-txt-file) shows how to turn it on.
+The same rules apply to URLs read by a <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> and to `Sitemap:` directives in `robots.txt`. A target can't seed your queue with off-host URLs that way either. Following `robots.txt` rules is itself opt-in: <ApiLink to="class/BasicCrawlerOptions#respect_robots_txt_file">`respect_robots_txt_file`</ApiLink> is `False` by default. The [respecting robots.txt guide](./respect-robots-txt-file) shows how to turn it on.
 
 ### Widening the scope
 

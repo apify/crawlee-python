@@ -60,7 +60,7 @@ The second request is a duplicate of the first one, so the queue ends up with fi
 
 ## Retries
 
-When a request handler raises an exception, the crawler retries the request. It increments `retry_count` and returns the request to the queue. A request is retried until `retry_count` reaches the crawler's `max_request_retries` option, which defaults to 3. To set a different limit for a single request, pass `max_retries` to `from_url`. A request created with `no_retry=True` isn't retried at all, and neither are requests that failed with an HTTP client error status (4xx). Session rotations caused by blocking are counted separately and are limited by `max_session_rotations`.
+When a request handler raises an exception, the crawler retries the request. It increments `retry_count` and returns the request to the queue. A request is retried until `retry_count` reaches the crawler's `max_request_retries` option, which defaults to 3. To set a different limit for a single request, pass `max_retries` to `from_url`. A request created with `no_retry=True` isn't retried at all, and neither are requests that failed with an HTTP client error status (4xx), except the status codes that mark a session as blocked (401, 403, and 429 by default), which rotate the session and retry. Session rotations caused by blocking are counted separately and are limited by `max_session_rotations`.
 
 When the retries run out, the crawler calls the failed request handler and marks the request as handled. For error handlers, failed request handlers, and the related options, see [Error handling](./error-handling).
 
@@ -84,6 +84,6 @@ Crawlee tracks the progress of a request in its `state` property, a `RequestStat
 4. `REQUEST_HANDLER`: the router runs your request handler.
 5. `DONE`: the handler finished, and the request is marked as handled.
 
-When an error occurs, the request switches to `ERROR_HANDLER` while the crawler runs the error handler and decides whether to retry. A retried request goes back to the queue and starts again from `BEFORE_NAV`. A request that runs out of retries ends in the `ERROR` state. Requests that the crawler skips, which currently happens only for URLs disallowed by robots.txt, end in the `SKIPPED` state. For details, see [Respecting robots.txt](../guides/respect-robots-txt-file).
+When an error occurs, the request switches to `ERROR_HANDLER` while the crawler runs the error handler and decides whether to retry. A retried request goes back to the queue and starts again from `BEFORE_NAV`. A request that runs out of retries ends in the `ERROR` state. Requests skipped because robots.txt disallows them end in the `SKIPPED` state. For details, see [Respecting robots.txt](../guides/respect-robots-txt-file).
 
 Failed and skipped requests are marked as handled too, so the queue doesn't hand them out again. The `handled_at` field holds the time a request was marked as handled, and `was_already_handled` tells whether it's set.

@@ -10,7 +10,7 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 import RespectRobotsTxt from '!!raw-loader!roa-loader!./code_examples/respect_robots_txt_file/respect_robots_txt_file.py';
 import OnSkippedRequest from '!!raw-loader!roa-loader!./code_examples/respect_robots_txt_file/respect_robots_on_skipped_request.py';
 
-This example demonstrates how to configure your crawler to respect the rules established by websites for crawlers as described in the [robots.txt](https://www.robotstxt.org/robotstxt.html) file.
+This guide shows how to configure your crawler to respect the rules established by websites for crawlers as described in the [robots.txt](https://www.robotstxt.org/robotstxt.html) file.
 
 To configure `Crawlee` to follow the `robots.txt` file, set the parameter `respect_robots_txt_file=True` in <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>. In this case, `Crawlee` will skip any URLs forbidden in the website's robots.txt file.
 

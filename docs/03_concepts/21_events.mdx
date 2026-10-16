@@ -64,7 +64,7 @@ Persisted state only helps if it's still there on the next run. Crawlee purges t
 
 The `use_state` helper of the crawling context returns a dictionary that's saved automatically. Every call within a crawler returns the same dictionary, so you can read and update it from any request handler. Crawlee saves it to the default key-value store on every `PERSIST_STATE` event and when the run finishes, and loads it back from there when the crawler starts again with existing storage. The optional argument sets the initial value when no saved state exists yet.
 
-The dictionary is stored under the `CRAWLEE_STATE_<id>` key, where the id is a counter of crawler instances in the process. Pass the same `id` to the constructors of several crawlers to make them share their state. Outside request handlers, use <ApiLink to="class/BasicCrawler#use_state">`crawler.use_state()`</ApiLink>. Values have to be JSON serializable.
+The dictionary is stored under the `CRAWLEE_STATE_<id>` key, where the id is the crawler's `id` argument or, without one, a per-process counter of crawler instances. Pass the same `id` to the constructors of several crawlers to make them share their state. Outside request handlers, use <ApiLink to="class/BasicCrawler#use_state">`crawler.use_state()`</ApiLink>. Values have to be JSON serializable.
 
 The following example stores the page title of every visited URL in the crawler state and reads it after the run:
 

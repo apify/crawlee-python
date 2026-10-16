@@ -9,13 +9,13 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
 import JsonLoggingExample from '!!raw-loader!roa-loader!./code_examples/logging/configure_json_logging.py';
 
-Crawlee builds on the standard Python [`logging`](https://docs.python.org/3/library/logging.html) module. Each crawler comes with a logger. HTTP crawlers name it after the crawler class (for example `HttpCrawler`). Inside a request handler the same logger is available as `context.log`, so you can log from your handlers without any setup.
+Crawlee builds on the standard Python [`logging`](https://docs.python.org/3/library/logging.html) module. Each crawler comes with a logger. Most HTTP crawlers name it after the crawler class (for example `HttpCrawler`), and the other crawlers after their module (for example `crawlee.crawlers._playwright._playwright_crawler`). Inside a request handler the same logger is available as `context.log`, so you can log from your handlers without any setup.
 
 ## Default configuration
 
 By default, a crawler sets up the logging infrastructure automatically when it's created. It attaches a handler with a human-readable, colored formatter to the root logger, unless the root logger already has handlers configured. You can opt out by passing `configure_logging=False` to the crawler's constructor (see <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>) and configure logging yourself.
 
-The log level is controlled by the <ApiLink to="class/Configuration#log_level">`Configuration.log_level`</ApiLink> option, which can also be set through the `CRAWLEE_LOG_LEVEL` environment variable. For the other settings and the environment variables behind them, see [Configuration](./configuration).
+The level of the root logger that the crawler configures comes from the <ApiLink to="class/Configuration#log_level">`Configuration.log_level`</ApiLink> option of the global configuration, which can also be set through the `CRAWLEE_LOG_LEVEL` environment variable. It has no effect when the crawler doesn't configure logging. For the other settings and the environment variables behind them, see [Configuration](./configuration).
 
 ## Statistics logs
 

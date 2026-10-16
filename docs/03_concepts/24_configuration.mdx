@@ -34,7 +34,7 @@ The following table lists the options you'll reach for most often. The <ApiLink 
 | --- | --- | --- | --- |
 | `storage_dir` | `CRAWLEE_STORAGE_DIR` | `'./storage'` | Root directory of the file system and SQLite storage clients. |
 | `purge_on_start` | `CRAWLEE_PURGE_ON_START` | `True` | Purging the default and unnamed storages when they're opened. |
-| `log_level` | `CRAWLEE_LOG_LEVEL` | `'INFO'` | Level of the logger that the crawler configures. |
+| `log_level` | `CRAWLEE_LOG_LEVEL` | `'INFO'` | Level of the root logger that the crawler configures. |
 | `memory_mbytes` | `CRAWLEE_MEMORY_MBYTES` | `None` | Absolute memory budget for autoscaling. |
 | `available_memory_ratio` | `CRAWLEE_AVAILABLE_MEMORY_RATIO` | `0.25` | Share of the available memory used as the budget when `memory_mbytes` isn't set. |
 | `max_used_memory_ratio` | `CRAWLEE_MAX_USED_MEMORY_RATIO` | `0.9` | Share of the memory budget above which the system counts as overloaded. |
@@ -70,16 +70,18 @@ If nothing is registered, the first call to `service_locator.get_configuration()
 
 ## Applying a configuration to one crawler
 
-Pass a `Configuration` to the crawler's `configuration` argument to use it for that crawler only. The crawler keeps it in a service locator of its own and leaves the global one untouched. It uses the configuration for the storages it opens, such as its default request queue and dataset, for the <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> that drives autoscaling, and for `internal_timeout`.
+Pass a `Configuration` to the crawler's `configuration` argument to use it for that crawler only. The crawler keeps it in a service locator of its own and uses the configuration for the storages it opens, such as its default request queue and dataset, for the <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> that drives autoscaling, and for `internal_timeout`.
 
 <RunnableCodeBlock className="language-python" language="python">
     {CrawlerConfigurationExample}
 </RunnableCodeBlock>
 
+The crawler still reads the global service locator for the services you don't pass, and some components always read it. If no global configuration is registered yet, creating the crawler registers a default one, so a later `service_locator.set_configuration()` call raises a `ServiceConflictError`. Running the example above logs warnings about this implicit setup. Register any global configuration before you create the crawler.
+
 A few settings are always read from the global configuration, whatever you pass to the crawler:
 
 - The log level that the crawler applies when it configures logging.
 - The browser launch defaults `headless`, `default_browser_path`, and `disable_browser_sandbox`.
-- The event intervals, unless you also pass an `event_manager`. Without one, the crawler uses the global event manager and logs a warning about it.
+- The event intervals. Autoscaling and state persistence listen to the global event manager, even when you pass an `event_manager` to the crawler.
 
 To change these settings, register the configuration globally or configure the component directly, for example with the `headless` argument of <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.

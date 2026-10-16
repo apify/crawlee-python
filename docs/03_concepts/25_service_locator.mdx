@@ -77,7 +77,7 @@ Services can be registered globally through the <ApiLink to="class/ServiceLocato
 
 ### Via crawler constructors
 
-Alternatively, services can be passed to the crawler constructors. The crawler keeps them in a service locator of its own, so they apply to that crawler and leave the global <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> untouched. Some components always read the global services, for example the log level and the browser launch defaults. For details, see [Configuration](./configuration#applying-a-configuration-to-one-crawler).
+Alternatively, services can be passed to the crawler constructors. The crawler keeps them in a service locator of its own, so they apply to that crawler only. For the services you don't pass, the crawler falls back to the global <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink>, which creates and registers defaults if none are set. Some components always read the global services, for example the log level, the browser launch defaults, and the event manager that drives autoscaling and state persistence. For details, see [Configuration](./configuration#applying-a-configuration-to-one-crawler).
 
 <Tabs>
 
