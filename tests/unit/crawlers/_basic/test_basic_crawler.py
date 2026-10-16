@@ -29,6 +29,7 @@ from crawlee._utils.robots import RobotsTxtFile
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import (
+    NavigationSkippedError,
     PersistentRateLimitError,
     RequestCollisionError,
     RequestThrottledError,
@@ -3008,3 +3009,45 @@ async def test_sigint_without_loop_signal_handlers(caplog: pytest.LogCaptureFixt
     assert 'Pausing...' in caplog.text
     assert 'The crawl was interrupted' in caplog.text
     assert signal.getsignal(signal.SIGINT) is sigint_handler_before_run
+
+
+async def test_skip_navigation_runs_handler_without_navigation() -> None:
+    """A request with `skip_navigation` set is processed directly, without the navigation pipeline."""
+    crawler = BasicCrawler(
+        configure_logging=False,
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+    )
+    processed: list[str] = []
+    navigation_members: dict[str, str] = {}
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        processed.append(context.request.unique_key)
+        try:
+            _ = context.request.loaded_url
+        except NavigationSkippedError:
+            navigation_members[context.request.unique_key] = 'raised'
+
+    plain_request = Request.from_url('https://plain.placeholder.com', unique_key='plain')
+    skipped_request = Request.from_url('https://skipped.placeholder.com', unique_key='skipped')
+    skipped_request.skip_navigation = True
+
+    stats = await crawler.run([plain_request, skipped_request])
+
+    assert stats.requests_finished == 2
+    assert processed == ['plain', 'skipped']
+    # `loaded_url` only raises for the skip-navigation request; on the plain one it is just `None`.
+    assert navigation_members == {'skipped': 'raised'}
+
+
+async def test_skip_navigation_request_serialization_roundtrip() -> None:
+    """`skip_navigation` survives serialization via the `skipNavigation` user data alias."""
+    request = Request.from_url('https://placeholder.com', unique_key='roundtrip')
+    assert request.skip_navigation is False
+
+    request.skip_navigation = True
+    data = request.model_dump(by_alias=True)
+    assert data['userData']['__crawlee']['skipNavigation'] is True
+
+    restored = Request.model_validate(data)
+    assert restored.skip_navigation is True

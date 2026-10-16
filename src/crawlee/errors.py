@@ -13,6 +13,7 @@ __all__ = [
     'ContextPipelineInterruptedError',
     'HttpClientStatusCodeError',
     'HttpStatusCodeError',
+    'NavigationSkippedError',
     'PersistentRateLimitError',
     'ProxyError',
     'RequestCollisionError',
@@ -33,6 +34,16 @@ class UserDefinedErrorHandlerError(Exception):
 
 class UserHandlerTimeoutError(UserDefinedErrorHandlerError):
     """Raised when a router fails due to user raised timeout. This is different from user-defined handler timing out."""
+
+
+@docs_group('Errors')
+class NavigationSkippedError(Exception):
+    """Raised when a navigation-only crawling context member is accessed, but `skip_navigation` was used.
+
+    When a request has `skip_navigation` set to `True`, the crawler does not open the page and the crawling
+    context does not contain the results of the navigation (e.g. `http_response`, `$`, parsed content or
+    `request.loaded_url`). Accessing such properties raises this error at runtime.
+    """
 
 
 @docs_group('Errors')
