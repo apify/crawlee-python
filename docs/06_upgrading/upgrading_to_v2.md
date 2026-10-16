@@ -35,7 +35,7 @@ Secondary arguments of the public API are now keyword-only. The main argument of
 - `Dataset.export_to(key, *, content_type, to_kvs_id, ...)`.
 - `ConcurrencySettings(*, min_concurrency, max_concurrency, max_tasks_per_minute, desired_concurrency)`.
 - `RequestList(requests, *, name, persist_state_key, persist_requests_key)`.
-- `ProxyConfiguration.new_url(*, session_id, request, proxy_tier)` and `ProxyConfiguration.new_proxy_info(*, session_id, request, proxy_tier)`. All three arguments of `new_proxy_info` now default to `None`.
+- `ProxyConfiguration.new_url(*, session_id, request)` and `ProxyConfiguration.new_proxy_info(*, session_id, request)`. Both arguments of `new_proxy_info` now default to `None`.
 - `AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(*, ...)` and `with_parsel_static_parser(*, ...)`.
 - `AdaptivePlaywrightCrawlingContext.wait_for_selector`, `query_selector_one`, `query_selector_all` and `parse_with_static_parser`, which take `timeout` by keyword only.
 - `HeaderGenerator.get_specific_headers(header_names, *, browser_type)`.
@@ -54,6 +54,41 @@ h2 = await context.query_selector_one('h2', timedelta(seconds=5))
 await kvs.set_value('report', data, content_type='application/json')
 h2 = await context.query_selector_one('h2', timeout=timedelta(seconds=5))
 ```
+
+## `tiered_proxy_urls` is removed from `ProxyConfiguration`
+
+The `tiered_proxy_urls` option is removed, together with `ProxyInfo.proxy_tier`, `Request.last_proxy_tier` and the `proxy_tier` argument of `ProxyConfiguration.new_url` and `ProxyConfiguration.new_proxy_info`. Crawlee JS v4 removed proxy tiers too.
+
+To move from a cheap proxy to a more reliable one when a request fails, pass a `new_url_function` that picks the proxy by the request's `retry_count`:
+
+```python
+# v1
+proxy_configuration = ProxyConfiguration(
+    tiered_proxy_urls=[
+        [None],
+        ['http://cheap-datacenter-proxy.com/'],
+        ['http://expensive-residential-proxy.com/'],
+    ]
+)
+
+
+# v2
+def pick_proxy_url(session_id=None, request=None):
+    if request is None or request.retry_count == 0:
+        return None
+    if request.retry_count == 1:
+        return 'http://cheap-datacenter-proxy.com/'
+    return 'http://expensive-residential-proxy.com/'
+
+
+proxy_configuration = ProxyConfiguration(new_url_function=pick_proxy_url)
+```
+
+Unlike tiers, this function doesn't track blocking per domain, so every request starts again from the first proxy. For details, see [Switching proxies on retries](../guides/proxy-management#switching-proxies-on-retries).
+
+## `Request.forefront` is removed
+
+The `Request.forefront` property is removed. Proxy tiers were the only code that set it. The crawler now reclaims a failed request for a retry at the back of the queue, and a request deferred by a `RequestThrottledError` at the front. To enqueue a request at the front, pass `forefront=True` to `add_requests` or `reclaim_request`.
 
 ## Storage data uses camelCase keys
 
