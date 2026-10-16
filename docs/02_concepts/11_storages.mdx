@@ -95,7 +95,7 @@ Each storage type (<ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to=
 
 ## Request queue
 
-The <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> is the primary storage for URLs in Crawlee, especially useful for deep crawling. It supports dynamic addition of URLs, making it ideal for recursive tasks where URLs are discovered and added during the crawling process (e.g., following links across multiple pages). Each Crawlee project has a **default request queue**, which can be used to store URLs during a specific run.
+The <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> is the primary storage for URLs in Crawlee, especially useful for deep crawling. It supports dynamic addition of URLs, making it ideal for recursive tasks where URLs are discovered and added during the crawling process (e.g., following links across multiple pages). Each Crawlee project has a **default request queue**, which can be used to store URLs during a specific run. For how the queue deduplicates requests, see [Requests](./requests#unique-key-and-deduplication).
 
 The following code demonstrates the usage of the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>:
 
@@ -119,7 +119,7 @@ The following code demonstrates the usage of the <ApiLink to="class/RequestQueue
 
 ### Request-related helpers
 
-Crawlee provides helper functions to simplify interactions with the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>:
+Crawlee provides helper functions to simplify interactions with the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>: Requests and data added through the context helpers are written only after the request handler succeeds. For details, see [Crawling context](./crawling-context#results-are-committed-after-the-handler-succeeds).
 
 - The <ApiLink to="class/AddRequestsFunction">`add_requests`</ApiLink> function allows you to manually add specific URLs to the configured request storage. In this case, you must explicitly provide the URLs you want to be added to the request storage. If you need to specify further details of the request, such as a `label` or `user_data`, you have to pass instances of the <ApiLink to="class/Request">`Request`</ApiLink> class to the helper.
 - The <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> function is designed to discover new URLs in the current page and add them to the request storage. It can be used with default settings, requiring no arguments, or you can customize its behavior by specifying link element selectors, choosing different enqueue strategies, or applying include/exclude filters to control which URLs are added. See the [Enqueue strategies](../guides/crawling-links#enqueue-strategies) section of the Crawling links guide for more details.
@@ -246,7 +246,7 @@ The cleanup occurs as soon as a storage is accessed:
 
 ### Disabling automatic purging
 
-To disable automatic purging, set `purge_on_start=False` in your configuration:
+To disable automatic purging, set `purge_on_start=False` in your configuration: For setting `purge_on_start` and `storage_dir` in code or through environment variables, see [Configuration](./configuration).
 
 <RunnableCodeBlock className="language-python" language="python">
     {CleaningDoNotPurgeExample}

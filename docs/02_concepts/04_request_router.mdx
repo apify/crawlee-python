@@ -22,7 +22,7 @@ The <ApiLink to="class/Router">`Router`</ApiLink> class manages request flow and
 
 ## Request handlers
 
-Request handlers are user-defined functions that process individual requests and their corresponding responses. Each handler receives a crawling context as its primary argument, which provides access to the current request, response data, and utility methods for data extraction, link enqueuing, and storage operations. Handlers determine how different types of pages are processed and how data is extracted and stored.
+Request handlers are user-defined functions that process individual requests and their corresponding responses. Each handler receives a crawling context as its primary argument, which provides access to the current request, response data, and utility methods for data extraction, link enqueuing, and storage operations. Handlers determine how different types of pages are processed and how data is extracted and stored. For the attributes and helpers available on the context, see [Crawling context](./crawling-context).
 
 :::note
 
@@ -38,7 +38,7 @@ Every crawler instance includes a built-in <ApiLink to="class/Router">`Router`</
     {SimpleDefaultHandler}
 </RunnableCodeBlock>
 
-The default handler processes all requests that either lack a label or have a label for which no specific handler has been registered.
+The default handler processes all requests that either lack a label or have a label for which no specific handler has been registered. Labels are stored on the request. For how to set them and pass data between handlers with `user_data`, see [Requests](./requests#labels-and-user-data).
 
 ### Custom router
 

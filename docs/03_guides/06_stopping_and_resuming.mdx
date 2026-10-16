@@ -33,7 +33,7 @@ To keep the crawler running even when there are no requests to process at the mo
 
 ## Resuming a paused crawl
 
-When a local crawler run is interrupted - say with `CTRL+C` - the default behavior is to start over on the next run, because Crawlee purges the storage on start. To continue from the previous state instead, disable `purge_on_start` in the <ApiLink to="class/Configuration">`Configuration`</ApiLink>.
+When a local crawler run is interrupted - say with `CTRL+C` - the default behavior is to start over on the next run, because Crawlee purges the storage on start. To continue from the previous state instead, disable `purge_on_start` in the <ApiLink to="class/Configuration">`Configuration`</ApiLink>. For what Crawlee persists and when, see [Events and state persistence](../concepts/events#state-persistence).
 
 Use the following code and perform two sequential runs. During the first run, stop the crawler by pressing `CTRL+C`, and the second run will resume crawling from where it stopped.
 

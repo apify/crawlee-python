@@ -15,11 +15,11 @@ Crawlee builds on the standard Python [`logging`](https://docs.python.org/3/libr
 
 By default, a crawler sets up the logging infrastructure automatically when it's created. It attaches a handler with a human-readable, colored formatter to the root logger, unless the root logger already has handlers configured. You can opt out by passing `configure_logging=False` to the crawler's constructor (see <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>) and configure logging yourself.
 
-The log level is controlled by the <ApiLink to="class/Configuration#log_level">`Configuration.log_level`</ApiLink> option, which can also be set through the `CRAWLEE_LOG_LEVEL` environment variable.
+The log level is controlled by the <ApiLink to="class/Configuration#log_level">`Configuration.log_level`</ApiLink> option, which can also be set through the `CRAWLEE_LOG_LEVEL` environment variable. For the other settings and the environment variables behind them, see [Configuration](./configuration).
 
 ## Statistics logs
 
-While running, the crawler periodically logs its statistics - requests finished and failed, retry histogram, durations, and more - and prints a final summary when the crawl ends. The `statistics_log_format` option of the crawler's constructor controls the output format: `table` (the default) renders the statistics as a formatted table, while `inline` logs them as a plain message with the values attached as extra fields, which is easier to consume with external log tooling.
+While running, the crawler periodically logs its statistics - requests finished and failed, retry histogram, durations, and more - and prints a final summary when the crawl ends. The `statistics_log_format` option of the crawler's constructor controls the output format: `table` (the default) renders the statistics as a formatted table, while `inline` logs them as a plain message with the values attached as extra fields, which is easier to consume with external log tooling. To change the logging interval or persist the statistics, see [Statistics](./statistics).
 
 ## JSON logging with loguru
 

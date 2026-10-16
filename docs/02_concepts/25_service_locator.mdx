@@ -33,7 +33,7 @@ There are three core services that are managed by the service locator:
 
 ### Configuration
 
-<ApiLink to="class/Configuration">`Configuration`</ApiLink> is a class that provides access to application-wide settings and parameters. It allows you to configure various aspects of Crawlee, such as timeouts, logging level, persistence intervals, and various other settings. The configuration can be set directly in the code or via environment variables.
+<ApiLink to="class/Configuration">`Configuration`</ApiLink> is a class that provides access to application-wide settings and parameters. It allows you to configure various aspects of Crawlee, such as timeouts, logging level, persistence intervals, and various other settings. The configuration can be set directly in the code or via environment variables. For the available options and how they resolve, see [Configuration](./configuration).
 
 ### StorageClient
 
@@ -43,7 +43,7 @@ Refer to the [Storage clients](./storage-clients) page for more information abou
 
 ### EventManager
 
-<ApiLink to="class/EventManager">`EventManager`</ApiLink> is responsible for coordinating internal events in Crawlee. It allows you to register event listeners and emit events throughout the framework. Examples of such events aborting, migrating, system info, or browser-specific events like page created, page closed and more. It provides a way to listen to events and execute custom logic when certain events occur.
+<ApiLink to="class/EventManager">`EventManager`</ApiLink> is responsible for coordinating internal events in Crawlee. It allows you to register event listeners and emit events throughout the framework. Examples of such events aborting, migrating, system info, or browser-specific events like page created, page closed and more. It provides a way to listen to events and execute custom logic when certain events occur. For the events and how to listen to them, see [Events and state persistence](./events).
 
 ## Service registration
 
