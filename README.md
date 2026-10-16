@@ -167,7 +167,7 @@ if __name__ == '__main__':
 
 ### More examples
 
-Explore our [Examples](https://crawlee.dev/python/docs/examples) page in the Crawlee documentation for a wide range of additional use cases and demonstrations.
+Explore the [Guides](https://crawlee.dev/python/docs/guides) section of the Crawlee documentation for a wide range of additional use cases and demonstrations.
 
 ## Features
 
