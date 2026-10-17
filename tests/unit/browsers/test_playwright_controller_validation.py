@@ -38,7 +38,9 @@ async def test_controller_validation_cross_mode_persistent(browser: Browser, cap
     controller = PlaywrightBrowserController(browser, use_incognito_pages=False)
     # storage_state is incognito-only
     with caplog.at_level(logging.WARNING):
-        page = await controller.new_page(browser_new_context_options={'storage_state': {'cookies': [], 'origins': []}})
+        page, _ = await controller.new_page(
+            browser_new_context_options={'storage_state': {'cookies': [], 'origins': []}}
+        )
         assert 'Option "storage_state" is only supported in incognito context mode' in caplog.text
         await page.close()
     await controller.close()
@@ -48,7 +50,7 @@ async def test_controller_validation_cross_mode_incognito(browser: Browser, capl
     controller = PlaywrightBrowserController(browser, use_incognito_pages=True)
     # env is persistent-only
     with caplog.at_level(logging.WARNING):
-        page = await controller.new_page(browser_new_context_options={'env': {}})
+        page, _ = await controller.new_page(browser_new_context_options={'env': {}})
         assert 'Option "env" is only supported in persistent context mode' in caplog.text
         await page.close()
     await controller.close()
@@ -57,7 +59,7 @@ async def test_controller_validation_cross_mode_incognito(browser: Browser, capl
 async def test_controller_validation_valid_common(browser: Browser) -> None:
     controller = PlaywrightBrowserController(browser)
     # viewport is common
-    page = await controller.new_page(browser_new_context_options={'viewport': {'width': 800, 'height': 600}})
+    page, _ = await controller.new_page(browser_new_context_options={'viewport': {'width': 800, 'height': 600}})
     assert page.viewport_size == {'width': 800, 'height': 600}
     await page.close()
     await controller.close()

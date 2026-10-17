@@ -126,7 +126,7 @@ class StagehandBrowserController(BrowserController):
         self,
         browser_new_context_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
-    ) -> StagehandPage:
+    ) -> tuple[StagehandPage, dict[str, str]]:
         """Create a new page in the Stagehand-managed browser.
 
         On the first call, starts the Stagehand session with the provided options. On subsequent calls,
@@ -137,6 +137,10 @@ class StagehandBrowserController(BrowserController):
             browser_new_context_options: Options merged on top of the plugin's launch options when creating the
                 first session. Ignored if the session already exists.
             proxy_info: Proxy injected into the session on first creation.
+
+        Returns:
+            A tuple of the newly created page and the HTTP headers generated for its browser context (always an
+            empty dict, as this controller does not generate headers).
 
         Raises:
             ValueError: If the browser has reached the maximum number of open pages.
@@ -170,7 +174,7 @@ class StagehandBrowserController(BrowserController):
         finally:
             self._opening_pages_count -= 1
 
-        return page
+        return page, {}
 
     @override
     async def close(self, *, force: bool = False) -> None:

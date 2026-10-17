@@ -50,7 +50,7 @@ async def test_initial_state(browser: Browser) -> None:
 
 @pytest.mark.run_alone
 async def test_open_and_close_page(controller: PlaywrightBrowserController, server_url: URL) -> None:
-    page = await controller.new_page()
+    page, _ = await controller.new_page()
     await page.goto(str(server_url))
 
     assert page in controller.pages
@@ -64,10 +64,10 @@ async def test_open_and_close_page(controller: PlaywrightBrowserController, serv
 
 
 async def test_max_open_pages_limit(controller: PlaywrightBrowserController) -> None:
-    page1 = await controller.new_page()
+    page1, _ = await controller.new_page()
     assert controller.pages_count == 1
 
-    page2 = await controller.new_page()
+    page2, _ = await controller.new_page()
     assert controller.pages_count == 2
 
     with pytest.raises(ValueError, match=r'Cannot open more pages in this browser.'):
@@ -78,7 +78,7 @@ async def test_max_open_pages_limit(controller: PlaywrightBrowserController) -> 
     await page1.close()
     assert controller.pages_count == 1
 
-    page3 = await controller.new_page()
+    page3, _ = await controller.new_page()
     assert controller.pages_count == 2
 
     await page2.close()
@@ -145,7 +145,7 @@ async def test_max_open_pages_limit_on_concurrent_creation(controller: Playwrigh
 
     assert controller.pages_count == 2
 
-    for page in pages:
+    for page, _ in pages:
         await page.close()
 
 
@@ -166,6 +166,6 @@ async def test_browser_with_pre_existing_context(tmp_path: Path) -> None:
         assert browser
 
         controller = PlaywrightBrowserController(browser=browser)
-        page_1 = await controller.new_page()
-        page_2 = await controller.new_page()
+        page_1, _ = await controller.new_page()
+        page_2, _ = await controller.new_page()
         assert page_1.context == page_2.context == persistent_context
