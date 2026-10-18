@@ -21,6 +21,7 @@ from crawlee import (
     SkippedReason,
     service_locator,
 )
+from crawlee.autoscaling import ConcurrencySystem
 from crawlee.browsers import BrowserPool, PlaywrightBrowserPlugin
 from crawlee.configuration import Configuration
 from crawlee.crawlers import (
@@ -1395,6 +1396,14 @@ async def test_throttled_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> Non
     session = handled[0].session
     assert session is not None
     assert session.error_score == 0
+
+
+async def test_accepts_concurrency_system() -> None:
+    """A supplied concurrency system is used as is, since the lower default concurrency applies only without one."""
+    concurrency_system = ConcurrencySystem()
+    crawler = PlaywrightCrawler(concurrency_system=concurrency_system)
+
+    assert crawler.concurrency_system is concurrency_system
 
 
 def test_import_error_handled() -> None:

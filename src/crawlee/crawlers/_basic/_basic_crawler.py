@@ -281,6 +281,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
     _request_handler_timeout_text = 'Request handler timed out after'
     __next_id = 0
+    __next_consumer_id = 0
 
     def __init__(
         self,
@@ -382,6 +383,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """
         self._id = str(BasicCrawler.__next_id) if id is None else id
         BasicCrawler.__next_id += 1
+
+        # Crawlers may share an `id` to share state, so the consumer gets an identifier of its own.
+        self._consumer = ConcurrencyConsumer(id=f'{type(self).__name__}-{BasicCrawler.__next_consumer_id}')
+        BasicCrawler.__next_consumer_id += 1
 
         implicit_event_manager_with_explicit_config = False
         if not configuration:
@@ -867,7 +872,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._concurrency_system = concurrency_system
         self._autoscaled_pool = autoscaled_pool = AutoscaledPool(
             concurrency_system=concurrency_system,
-            consumer=ConcurrencyConsumer(id=str(self._id)),
+            consumer=self._consumer,
             is_finished_function=self.__is_finished_function,
             is_task_ready_function=self.__is_task_ready_function,
             run_task_function=self.__run_task_function,
@@ -1527,8 +1532,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         request_manager = await self.get_request_manager()
         return not await request_manager.is_empty()
 
-    async def __run_task_function(self, task_id: str) -> None:
-        _task_id = task_id
+    async def __run_task_function(self, task_id: str) -> None:  # noqa: ARG002
         request_manager = await self.get_request_manager()
 
         request = await wait_for(

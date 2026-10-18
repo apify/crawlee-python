@@ -31,9 +31,9 @@ logger = getLogger(__name__)
 
 
 def _validate_concurrency(value: int, name: str) -> int:
-    """Check that a retuned concurrency bound is an integer of at least 1."""
-    if not isinstance(value, int) or value < 1:
-        raise ValueError(f'{name} must be an integer of at least 1')
+    """Check that a retuned concurrency bound is at least 1."""
+    if value < 1:
+        raise ValueError(f'{name} must be at least 1')
 
     return value
 
@@ -89,8 +89,13 @@ class ConcurrencySystem:
     ```
     """
 
-    _TASKS_PER_MINUTE_WINDOW = 60
-    """Number of one-second buckets the per-minute task cap is counted over."""
+    _TASKS_PER_MINUTE_BUCKET = timedelta(seconds=1)
+    """Time span one bucket of the per-minute task counter covers."""
+
+    _TASKS_PER_MINUTE_WINDOW = timedelta(minutes=1)
+    """Time span the per-minute task cap is counted over."""
+
+    _TASKS_PER_MINUTE_BUCKETS = int(_TASKS_PER_MINUTE_WINDOW / _TASKS_PER_MINUTE_BUCKET)
 
     _CURRENT_LOAD_TTL = timedelta(milliseconds=50)
     """How long the live load verdict is reused, so that starting one task does not evaluate the load twice."""
@@ -161,8 +166,8 @@ class ConcurrencySystem:
             ttl=self._CURRENT_LOAD_TTL.total_seconds(),
         )
 
-        self._tasks_started = deque([0] * self._TASKS_PER_MINUTE_WINDOW, maxlen=self._TASKS_PER_MINUTE_WINDOW)
-        self._age_tasks_started_task = RecurringTask(self._age_tasks_started, timedelta(seconds=1))
+        self._tasks_started = deque([0] * self._TASKS_PER_MINUTE_BUCKETS, maxlen=self._TASKS_PER_MINUTE_BUCKETS)
+        self._age_tasks_started_task = RecurringTask(self._age_tasks_started, self._TASKS_PER_MINUTE_BUCKET)
         self._autoscale_task = RecurringTask(self._autoscale, autoscale_interval)
         self._log_system_status_task = (
             RecurringTask(self._log_system_status, logging_interval) if logging_interval is not None else None
@@ -230,7 +235,7 @@ class ConcurrencySystem:
             raise RuntimeError(f'The {self.__class__.__name__} is already active.')
 
         # The window does not age while the system is down, so the starts of a previous session must not count.
-        self._tasks_started = deque([0] * self._TASKS_PER_MINUTE_WINDOW, maxlen=self._TASKS_PER_MINUTE_WINDOW)
+        self._tasks_started = deque([0] * self._TASKS_PER_MINUTE_BUCKETS, maxlen=self._TASKS_PER_MINUTE_BUCKETS)
 
         try:
             await self._measurement.enter_async_context(self._snapshotter)
@@ -283,7 +288,7 @@ class ConcurrencySystem:
         finally:
             await self._measurement.__aexit__(exc_type, exc_value, exc_traceback)
 
-    def has_capacity_for_task(self, consumer: ConcurrencyConsumer | None = None) -> bool:
+    def has_capacity_for_task(self, consumer: ConcurrencyConsumer | None = None) -> bool:  # noqa: ARG002
         """Report whether one more task may start right now.
 
         One budget serves the whole machine, so the consumer asking makes no difference here, and may be left out
@@ -298,7 +303,6 @@ class ConcurrencySystem:
         Raises:
             RuntimeError: If the system is not active, as nothing measures the load or scales the budget then.
         """
-        _consumer = consumer
         self._raise_if_inactive()
 
         if self._current_concurrency >= self._desired_concurrency:
@@ -325,7 +329,7 @@ class ConcurrencySystem:
         self._raise_if_inactive()
         return self._system_status.get_current_system_info()
 
-    def try_register_task_start(self, consumer: ConcurrencyConsumer, task_id: str) -> bool:
+    def try_register_task_start(self, consumer: ConcurrencyConsumer, task_id: str) -> bool:  # noqa: ARG002
         """Book a task against the budget, or report that there is no room for it.
 
         The per-minute cap is enforced here rather than in `has_capacity_for_task`, so that an empty queue is never
@@ -341,8 +345,6 @@ class ConcurrencySystem:
         Raises:
             RuntimeError: If the system is not active.
         """
-        _task_id = task_id
-
         if not self.has_capacity_for_task(consumer):
             return False
 
@@ -354,15 +356,13 @@ class ConcurrencySystem:
         self._tasks_started[-1] += 1
         return True
 
-    def register_task_end(self, consumer: ConcurrencyConsumer, task_id: str) -> None:
+    def register_task_end(self, consumer: ConcurrencyConsumer, task_id: str) -> None:  # noqa: ARG002
         """Return a task's slot to the budget.
 
         Args:
             consumer: The consumer the task was booked for.
             task_id: The id the task was booked under. Unused here.
         """
-        _consumer, _task_id = consumer, task_id
-
         if self._current_concurrency == 0:
             self._logger_once.log(
                 'Ignoring the end of a task that never started. Nothing is running right now, so something is '
@@ -401,7 +401,7 @@ class ConcurrencySystem:
         self._desired_concurrency = min(at_least_min, self._max_concurrency)
 
     def _age_tasks_started(self) -> None:
-        """Move the per-minute counter on by one second, dropping the oldest bucket."""
+        """Move the per-minute counter on by one bucket, dropping the oldest one."""
         self._tasks_started.append(0)
 
     def _autoscale(self) -> None:

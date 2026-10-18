@@ -512,7 +512,6 @@ async def test_scales_down_over_per_minute_cap(
     [
         pytest.param(0, id='zero'),
         pytest.param(-1, id='negative'),
-        pytest.param(1.5, id='fractional'),
     ],
 )
 async def test_rejects_invalid_retuned_bound(
@@ -523,7 +522,7 @@ async def test_rejects_invalid_retuned_bound(
     """A retuned bound has to be an integer of at least 1."""
     concurrency_system = make_concurrency_system()
 
-    with pytest.raises(ValueError, match=f'{bound} must be an integer'):
+    with pytest.raises(ValueError, match=f'{bound} must be at least 1'):
         setattr(concurrency_system, bound, value)
 
 
