@@ -58,3 +58,17 @@ def test_join_keeps_known_ready_at() -> None:
     assert join_request_source_statuses(known, WAITING) == known
     assert join_request_source_statuses(known, FINISHED) == known
     assert join_request_source_statuses(STALLED, known) == known
+
+
+@pytest.mark.parametrize(
+    ('readiness', 'name'),
+    [
+        pytest.param(READY, 'ready', id='ready'),
+        pytest.param(WAITING, 'waiting', id='waiting'),
+        pytest.param(STALLED, 'stalled', id='stalled'),
+        pytest.param(FINISHED, 'finished', id='finished'),
+    ],
+)
+def test_status_name(readiness: RequestSourceStatus, name: str) -> None:
+    """Test that each status carries its own name."""
+    assert readiness.status == name
