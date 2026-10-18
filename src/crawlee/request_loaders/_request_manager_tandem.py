@@ -10,7 +10,6 @@ from typing_extensions import override
 from crawlee._utils.docs import docs_group
 from crawlee.request_loaders import RequestManager
 
-from ._types import ReadyStatus
 from ._utils import join_request_source_statuses
 
 if TYPE_CHECKING:
@@ -81,7 +80,7 @@ class RequestManagerTandem(RequestManager):
     async def fetch_next_request(self) -> Request | None:
         # Only the loader's own readiness decides the transfer, so a loader that's still loading doesn't block the
         # manager's requests.
-        if isinstance(await self._read_only_loader.check_readiness(), ReadyStatus):
+        if (await self._read_only_loader.check_readiness()).status == 'ready':
             transferred = await self._transfer_next_request()
             # The request was dropped, so skip the manager this round. The next call picks up where this one left off.
             if not transferred:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 from crawlee._utils.docs import docs_group
 
@@ -14,6 +14,9 @@ if TYPE_CHECKING:
 class ReadyStatus:
     """The next `fetch_next_request` call is expected to return a request."""
 
+    status: ClassVar[Literal['ready']] = 'ready'
+    """The status name, so a check doesn't need to import the class."""
+
 
 @docs_group('Request loaders')
 @dataclass(frozen=True, kw_only=True)
@@ -22,6 +25,9 @@ class WaitingStatus:
 
     Requests are in progress, are being added in the background, or are held back until `ready_at`.
     """
+
+    status: ClassVar[Literal['waiting']] = 'waiting'
+    """The status name, so a check doesn't need to import the class."""
 
     ready_at: datetime | None = None
     """When the source expects to become ready, as a timezone-aware UTC time. `None` when the wait has no clock."""
@@ -32,6 +38,9 @@ class WaitingStatus:
 class StalledStatus:
     """The source holds requests it can't make progress on. Only a manager that paces its own dispatch reports it."""
 
+    status: ClassVar[Literal['stalled']] = 'stalled'
+    """The status name, so a check doesn't need to import the class."""
+
     reason: str
     """Why the source can't make progress."""
 
@@ -40,6 +49,9 @@ class StalledStatus:
 @dataclass(frozen=True)
 class FinishedStatus:
     """Every request has been handled."""
+
+    status: ClassVar[Literal['finished']] = 'finished'
+    """The status name, so a check doesn't need to import the class."""
 
 
 RequestLoaderStatus = ReadyStatus | WaitingStatus | FinishedStatus

@@ -210,18 +210,19 @@ In v1, `RequestQueue.purge()` worked around a storage client that didn't support
 - `StalledStatus`: the source holds requests it can't make progress on, as explained in `reason`. `ThrottlingRequestManager` reports it, and `RequestManagerTandem` passes it on from the manager it wraps.
 - `FinishedStatus`: every request has been handled.
 
+Each of these classes also has a `status` attribute set to `'ready'`, `'waiting'`, `'stalled'` or `'finished'`, so a check doesn't need an import.
+
 The change covers `RequestQueue`, `RequestList`, `SitemapRequestLoader`, `RequestManagerTandem` and `ThrottlingRequestManager`. `ThrottlingRequestManager.get_stall_reason` is removed too, since a stall is now reported as `StalledStatus`. Storage clients keep `is_empty` and `is_finished`.
 
 ```python
-from crawlee.request_loaders import FinishedStatus, ReadyStatus
-
 # v1
 has_requests = not await rq.is_empty()
 done = await rq.is_finished()
 
 # v2
-has_requests = isinstance(await rq.check_readiness(), ReadyStatus)
-done = isinstance(await rq.check_readiness(), FinishedStatus)
+readiness = await rq.check_readiness()
+has_requests = readiness.status == 'ready'
+done = readiness.status == 'finished'
 ```
 
 If you have a custom request loader or manager, replace `is_empty` and `is_finished` with `check_readiness`. Return `ReadyStatus` as soon as a request can be fetched, before checking anything else, since the crawler calls the method often. Never return `FinishedStatus` while requests are still pending or in progress. A loader doesn't return `StalledStatus`.
@@ -267,3 +268,5 @@ The crawler logs the first message once per run, the next time it looks for a ne
 When a crawl processes no requests because its request manager holds only handled ones, the crawler logs a new warning. It starts with `This crawl processed no requests` and explains how to crawl the requests again.
 
 `RequestQueue.purge()` no longer logs the `Storage client "..." does not support purging the request queue.` warnings. It raises `NotImplementedError` instead. For details, see [`RequestQueue.purge` raises when the storage client can't purge](#requestqueuepurge-raises-when-the-storage-client-cant-purge).
+
+The ERROR message the crawler logs before raising `PersistentRateLimitError` now reads "Giving up the crawl because the request manager can't make progress." instead of "Giving up the crawl because a domain keeps rate-limiting every request."

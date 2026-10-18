@@ -7,7 +7,6 @@ from crawlee.crawlers import (
     PlaywrightCrawler,
     PlaywrightCrawlingContext,
 )
-from crawlee.request_loaders import FinishedStatus
 from crawlee.sessions import SessionPool
 from crawlee.storages import RequestQueue
 
@@ -80,7 +79,7 @@ async def main() -> None:
         await parsel_crawler.run(['https://crawlee.dev/blog'])
 
         # Wait for the Playwright crawler to finish processing all requests
-        while not isinstance(await playwright_rq.check_readiness(), FinishedStatus):
+        while (await playwright_rq.check_readiness()).status != 'finished':
             playwright_crawler.log.info('Waiting for Playwright crawler to finish...')
             await asyncio.sleep(5)
 

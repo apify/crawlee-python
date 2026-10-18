@@ -15,7 +15,7 @@ from crawlee._service_locator import service_locator as global_service_locator
 from crawlee._utils.docs import docs_group
 from crawlee.request_loaders._request_manager import RequestManager
 
-from ._types import FinishedStatus, ReadyStatus, StalledStatus, WaitingStatus
+from ._types import FinishedStatus, StalledStatus, WaitingStatus
 from ._utils import join_request_source_statuses
 
 if TYPE_CHECKING:
@@ -329,34 +329,34 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             else:
                 cooling.append(domain)
 
-        status: RequestSourceStatus = FinishedStatus()
-        for manager_status in await asyncio.gather(*(manager.check_readiness() for manager in dispatchable)):
-            status = join_request_source_statuses(status, manager_status)
-        if isinstance(status, ReadyStatus):
-            return status
+        probed: RequestSourceStatus = FinishedStatus()
+        for readiness in await asyncio.gather(*(manager.check_readiness() for manager in dispatchable)):
+            probed = join_request_source_statuses(probed, readiness)
+        if probed.status == 'ready':
+            return probed
 
         cooling_statuses = await asyncio.gather(*(self._sub_managers[domain].check_readiness() for domain in cooling))
 
         ready_at = min(
             (
                 self._domain_states[domain].throttled_until
-                for domain, cooling_status in zip(cooling, cooling_statuses, strict=True)
-                if not isinstance(cooling_status, FinishedStatus)
+                for domain, readiness in zip(cooling, cooling_statuses, strict=True)
+                if readiness.status != 'finished'
             ),
             default=None,
         )
 
         # A domain waiting out a cooldown with work left will still make progress, so the crawl isn't stuck yet.
         if ready_at is not None:
-            return join_request_source_statuses(status, WaitingStatus(ready_at=ready_at))
+            return join_request_source_statuses(probed, WaitingStatus(ready_at=ready_at))
 
         candidate_statuses = await asyncio.gather(
             *(self._sub_managers[domain].check_readiness() for domain in candidates)
         )
         stalled = [
             domain
-            for domain, candidate_status in zip(candidates, candidate_statuses, strict=True)
-            if isinstance(candidate_status, ReadyStatus)
+            for domain, readiness in zip(candidates, candidate_statuses, strict=True)
+            if readiness.status == 'ready'
         ]
 
         if stalled:
@@ -373,10 +373,10 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             )
 
         # A candidate's requests that are in progress or still being added in the background aren't finished yet.
-        for candidate_status in candidate_statuses:
-            status = join_request_source_statuses(status, candidate_status)
+        for readiness in candidate_statuses:
+            probed = join_request_source_statuses(probed, readiness)
 
-        return status
+        return probed
 
     def record_domain_delay(self, url: str, *, retry_after: timedelta | None = None) -> bool:
         """Record a 429 Too Many Requests response for the domain of the given URL.
