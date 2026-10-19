@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from hashlib import sha256
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import CursorResult, exists, func, or_, select, update
 from sqlalchemy.exc import SQLAlchemyError
@@ -51,7 +51,9 @@ class _QueueMetadataUpdateParams(MetadataUpdateParams):
     update_had_multiple_clients: NotRequired[bool]
 
 
-class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
+class SqlRequestQueueClient(
+    RequestQueueClient, SqlClientMixin[RequestQueueMetadataDb, RequestQueueMetadataBufferDb, RequestDb]
+):
     """SQL implementation of the request queue client.
 
     This client persists requests to a SQL database with transaction handling and
@@ -84,10 +86,10 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
     database load).
     """
 
-    _METADATA_TABLE: ClassVar[type[RequestQueueMetadataDb]] = RequestQueueMetadataDb
+    _METADATA_TABLE = RequestQueueMetadataDb
     """SQLAlchemy model for request queue metadata."""
 
-    _ITEM_TABLE: ClassVar[type[RequestDb]] = RequestDb
+    _ITEM_TABLE = RequestDb
     """SQLAlchemy model for request items."""
 
     _CLIENT_TYPE = 'Request queue'
@@ -97,7 +99,7 @@ class SqlRequestQueueClient(RequestQueueClient, SqlClientMixin):
     """Number of seconds for which a request is considered blocked in the database after being fetched for processing.
     """
 
-    _BUFFER_TABLE: ClassVar[type[RequestQueueMetadataBufferDb]] = RequestQueueMetadataBufferDb
+    _BUFFER_TABLE = RequestQueueMetadataBufferDb
     """SQLAlchemy model for metadata buffer."""
 
     def __init__(

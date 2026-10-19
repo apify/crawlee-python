@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, ClassVar, TypedDict, cast, overload
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypedDict, TypeVar, cast, overload
 
 from sqlalchemy import CursorResult, delete, select, text, update
 from sqlalchemy import func as sql_func
@@ -41,6 +41,12 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
+MetadataTableT = TypeVar('MetadataTableT', bound='DatasetMetadataDb | KeyValueStoreMetadataDb | RequestQueueMetadataDb')
+BufferTableT = TypeVar(
+    'BufferTableT', bound='DatasetMetadataBufferDb | KeyValueStoreMetadataBufferDb | RequestQueueMetadataBufferDb'
+)
+ItemTableT = TypeVar('ItemTableT', bound='DatasetItemDb | KeyValueStoreRecordDb | RequestDb')
+
 
 class MetadataUpdateParams(TypedDict, total=False):
     """Parameters for updating metadata."""
@@ -49,7 +55,7 @@ class MetadataUpdateParams(TypedDict, total=False):
     modified_at: NotRequired[datetime]
 
 
-class SqlClientMixin(ABC):
+class SqlClientMixin(ABC, Generic[MetadataTableT, BufferTableT, ItemTableT]):
     """Mixin class for SQL clients.
 
     This mixin provides common SQL operations and basic methods for SQL storage clients.
@@ -58,15 +64,13 @@ class SqlClientMixin(ABC):
     _DEFAULT_NAME: ClassVar[str]
     """Default name when none provided."""
 
-    _METADATA_TABLE: ClassVar[type[DatasetMetadataDb | KeyValueStoreMetadataDb | RequestQueueMetadataDb]]
+    _METADATA_TABLE: type[MetadataTableT]
     """SQLAlchemy model for metadata."""
 
-    _BUFFER_TABLE: ClassVar[
-        type[KeyValueStoreMetadataBufferDb | DatasetMetadataBufferDb | RequestQueueMetadataBufferDb]
-    ]
+    _BUFFER_TABLE: type[BufferTableT]
     """SQLAlchemy model for metadata buffer."""
 
-    _ITEM_TABLE: ClassVar[type[DatasetItemDb | KeyValueStoreRecordDb | RequestDb]]
+    _ITEM_TABLE: type[ItemTableT]
     """SQLAlchemy model for items."""
 
     _CLIENT_TYPE: ClassVar[str]

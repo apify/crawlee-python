@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import CursorResult, delete, select
 from sqlalchemy import func as sql_func
@@ -34,7 +34,9 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
+class SqlKeyValueStoreClient(
+    KeyValueStoreClient, SqlClientMixin[KeyValueStoreMetadataDb, KeyValueStoreMetadataBufferDb, KeyValueStoreRecordDb]
+):
     """SQL implementation of the key-value store client.
 
     This client persists key-value data to a SQL database with transaction support and
@@ -69,16 +71,16 @@ class SqlKeyValueStoreClient(KeyValueStoreClient, SqlClientMixin):
     A single record larger than this is still read, but alone in its batch.
     """
 
-    _METADATA_TABLE: ClassVar[type[KeyValueStoreMetadataDb]] = KeyValueStoreMetadataDb
+    _METADATA_TABLE = KeyValueStoreMetadataDb
     """SQLAlchemy model for key-value store metadata."""
 
-    _ITEM_TABLE: ClassVar[type[KeyValueStoreRecordDb]] = KeyValueStoreRecordDb
+    _ITEM_TABLE = KeyValueStoreRecordDb
     """SQLAlchemy model for key-value store items."""
 
     _CLIENT_TYPE = 'Key-value store'
     """Human-readable client type for error messages."""
 
-    _BUFFER_TABLE: ClassVar[type[KeyValueStoreMetadataBufferDb]] = KeyValueStoreMetadataBufferDb
+    _BUFFER_TABLE = KeyValueStoreMetadataBufferDb
     """SQLAlchemy model for metadata buffer."""
 
     def __init__(
