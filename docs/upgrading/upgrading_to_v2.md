@@ -154,7 +154,7 @@ async with ConcurrencySystem(settings) as concurrency_system:
 
 The value has to be a whole number of at least 1, or infinity, which is the default. A fractional value, such as `0.5` or `7.5`, now raises `ValueError`.
 
-## Autoscaling logs moved to DEBUG
+## Autoscaling logs changed
 
 The periodic log of the autoscaling state and the `Waiting for remaining tasks to finish` message are now logged at DEBUG instead of INFO. The crawler's status message at INFO still reports the desired concurrency.
 
@@ -165,3 +165,5 @@ current concurrency 3, desired 5, overloaded: cpu 58% of the time (limit 40%)
 ```
 
 To read the concurrency values in code, use `crawler.concurrency_system`.
+
+The autoscaling loggers moved together with the package. `crawlee._autoscaling.autoscaled_pool`, `crawlee._autoscaling.snapshotter` and `crawlee._autoscaling.system_status` are now `crawlee.autoscaling._autoscaled_pool`, `crawlee.autoscaling._snapshotter` and `crawlee.autoscaling._system_status`. The state log, along with the messages about scaling and free capacity, now comes from the new `crawlee.autoscaling._concurrency_system` logger. To configure all of them at once, use the `crawlee.autoscaling` logger.

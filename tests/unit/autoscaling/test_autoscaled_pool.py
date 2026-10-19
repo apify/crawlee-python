@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from itertools import chain, repeat
 from typing import TYPE_CHECKING, TypeVar
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -74,33 +75,22 @@ async def test_retries_refused_booking() -> None:
     concurrency_system = Mock(spec=ConcurrencySystemInterface)
     concurrency_system.active = True
     concurrency_system.has_capacity_for_task.return_value = True
-    attempts = 0
-    done_count = 0
-
-    def try_register_task_start(*_args: object) -> bool:
-        """Accept the second booking attempt only, so that the first task start is refused and later retried."""
-        nonlocal attempts
-        attempts += 1
-        return attempts == 2
-
-    concurrency_system.try_register_task_start.side_effect = try_register_task_start
-
-    async def run(_task_id: str) -> None:
-        nonlocal done_count
-        done_count += 1
+    # Only the second booking attempt is accepted, so the first task start is refused and later retried.
+    concurrency_system.try_register_task_start.side_effect = chain([False, True], repeat(False))
+    run = AsyncMock()
 
     pool = AutoscaledPool(
         concurrency_system=concurrency_system,
         consumer=CONSUMER,
         run_task_function=run,
         is_task_ready_function=lambda: future(True),
-        is_finished_function=lambda: future(done_count >= 1),
+        is_finished_function=lambda: future(run.await_count >= 1),
     )
 
     await asyncio.wait_for(pool.run(), timeout=5)
 
-    assert done_count == 1
-    assert attempts >= 2
+    run.assert_awaited_once()
+    assert concurrency_system.try_register_task_start.call_count >= 2
 
 
 async def test_own_concurrency_excludes_others(
@@ -172,7 +162,7 @@ async def test_runs_concurrently(make_concurrency_system: type[ConcurrencySystem
 
 
 async def test_passes_task_id_to_task(make_concurrency_system: type[ConcurrencySystem]) -> None:
-    """Every task is told the id it was booked under, and the ids of concurrent tasks differ."""
+    """Every task runs and returns its slot under the id it was booked with, and concurrent tasks get different ids."""
     task_ids = list[str]()
 
     async def run(task_id: str) -> None:
@@ -190,9 +180,22 @@ async def test_passes_task_id_to_task(make_concurrency_system: type[ConcurrencyS
             is_finished_function=lambda: future(len(task_ids) >= 3),
         )
 
-        await pool.run()
+        with (
+            patch.object(
+                concurrency_system, 'try_register_task_start', wraps=concurrency_system.try_register_task_start
+            ) as try_register_task_start,
+            patch.object(
+                concurrency_system, 'register_task_end', wraps=concurrency_system.register_task_end
+            ) as register_task_end,
+        ):
+            await pool.run()
+
+    booked_ids = [booking.args[1] for booking in try_register_task_start.call_args_list]
+    released_ids = [release.args[1] for release in register_task_end.call_args_list]
 
     assert len(set(task_ids)) == 3
+    assert sorted(booked_ids) == sorted(task_ids)
+    assert sorted(released_ids) == sorted(task_ids)
 
 
 async def test_abort_works(make_concurrency_system: type[ConcurrencySystem]) -> None:
