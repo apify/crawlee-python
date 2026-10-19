@@ -39,7 +39,7 @@ from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
 from crawlee.http_clients import HttpClient
 from crawlee.request_loaders import RequestList, RequestManagerTandem, ThrottlingRequestManager
 from crawlee.sessions import Session, SessionPool
-from crawlee.statistics import FinalStatistics, StatisticsState
+from crawlee.statistics import FinalStatistics, Statistics, StatisticsState
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 from tests.unit.utils import open_throttler_held_until_reclaim, poll_until_condition
@@ -1187,14 +1187,14 @@ async def test_context_use_state_crawlers_share_state() -> None:
         assert isinstance(state['urls'], list)
         state['urls'].append(context.request.url)
 
-    crawler_1 = BasicCrawler(id=0, request_handler=handler)
-    crawler_2 = BasicCrawler(id=0, request_handler=handler)
+    crawler_1 = BasicCrawler(id='0', request_handler=handler)
+    crawler_2 = BasicCrawler(id='0', request_handler=handler)
 
     await crawler_1.run(['https://a.com'])
     await crawler_2.run(['https://b.com'])
 
     kvs = await KeyValueStore.open()
-    assert crawler_1._id == crawler_2._id == 0
+    assert crawler_1._id == crawler_2._id == '0'
     assert await kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_{crawler_1._id}') == {
         'urls': ['https://a.com', 'https://b.com']
     }
@@ -1204,8 +1204,8 @@ async def test_crawlers_share_stats() -> None:
     async def handler(context: BasicCrawlingContext) -> None:
         await context.use_state({'urls': []})
 
-    crawler_1 = BasicCrawler(id=0, request_handler=handler)
-    crawler_2 = BasicCrawler(id=0, request_handler=handler, statistics=crawler_1.statistics)
+    crawler_1 = BasicCrawler(id='0', request_handler=handler)
+    crawler_2 = BasicCrawler(id='0', request_handler=handler, statistics=crawler_1.statistics)
 
     result1 = await crawler_1.run(['https://a.com'])
     result2 = await crawler_2.run(['https://b.com'])
@@ -1230,6 +1230,35 @@ async def test_context_use_state_crawlers_own_state() -> None:
     kvs = await KeyValueStore.open()
     assert await kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0') == {'urls': ['https://a.com']}
     assert await kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_1') == {'urls': ['https://b.com']}
+
+
+@pytest.mark.parametrize(
+    ('crawler_id', 'expected_id'),
+    [
+        pytest.param(None, '0', id='generated id'),
+        pytest.param('my-crawler', 'my-crawler', id='explicit id'),
+    ],
+)
+async def test_default_statistics_use_crawler_id(crawler_id: str | None, expected_id: str) -> None:
+    """The default statistics take the crawler ID and persist under it."""
+    # Advance the `Statistics` counter, so an ID the statistics generate themselves can't match the crawler ID.
+    Statistics.with_default_state()
+    crawler = BasicCrawler(request_handler=AsyncMock(), id=crawler_id)
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    assert crawler._id == expected_id
+    assert crawler.statistics.state.stats_id == expected_id
+    kvs = await crawler.get_key_value_store()
+    persisted_state = await kvs.get_value(f'__CRAWLER_STATISTICS_{expected_id}')
+    assert persisted_state['statsId'] == expected_id
+
+
+def test_generated_id_follows_creation_order() -> None:
+    """A crawler without an ID takes its creation index, which crawlers with an explicit ID advance too."""
+    assert BasicCrawler()._id == '0'
+    assert BasicCrawler(id='custom')._id == 'custom'
+    assert BasicCrawler()._id == '2'
 
 
 async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> None:
@@ -2162,13 +2191,14 @@ async def test_status_message_emit() -> None:
 
     event_manager.on(event=Event.CRAWLER_STATUS, listener=listener)
 
-    crawler = BasicCrawler(request_handler=AsyncMock())
+    crawler = BasicCrawler(request_handler=AsyncMock(), id='my-crawler')
 
     await crawler.run(['https://a.placeholder.com'])
 
     event_manager.off(event=Event.CRAWLER_STATUS, listener=listener)
 
     assert status_message_listener.called
+    assert status_message_listener.call_args.args[0].crawler_id == 'my-crawler'
 
 
 async def test_status_message_reports_failed_request_count() -> None:
@@ -2283,7 +2313,7 @@ async def test_crawler_purge_request_queue_uses_same_storage_client() -> None:
     assert await unrelated_rq.fetch_next_request() == unrelated_request
 
 
-async def _run_crawler(crawler_id: int | None, requests: list[str], storage_dir: str) -> StatisticsState:
+async def _run_crawler(crawler_id: str | None, requests: list[str], storage_dir: str) -> StatisticsState:
     """Run crawler and return its statistics state.
 
     Must be defined like this to be pickable for ProcessPoolExecutor."""
@@ -2314,7 +2344,7 @@ async def _run_crawler(crawler_id: int | None, requests: list[str], storage_dir:
 @dataclass
 class _CrawlerInput:
     requests: list[str]
-    id: int | None = None
+    id: str | None = None
 
 
 def _process_run_crawlers(crawler_inputs: list[_CrawlerInput], storage_dir: str) -> list[StatisticsState]:
