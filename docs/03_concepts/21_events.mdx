@@ -1,0 +1,75 @@
+---
+id: events
+title: Events and state persistence
+description: How Crawlee's event manager broadcasts system and lifecycle events, how to listen to them, and how components persist their state on the persist state event.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import ListenToEventsExample from '!!raw-loader!roa-loader!./code_examples/events/listen_to_events.py';
+import UseStateExample from '!!raw-loader!roa-loader!./code_examples/events/use_state.py';
+
+Crawlee components talk to each other through events. An event manager emits events such as "save your state now" or "here's the current CPU and memory usage", and any component can register a listener for them. The crawler doesn't need to know which components care about an event. The <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> listens to system info events to drive autoscaling, and statistics, storages, and your own code listen to persist state events to save their progress.
+
+## Event manager
+
+The <ApiLink to="class/EventManager">`EventManager`</ApiLink> class keeps a registry of listeners and invokes them whenever an event is emitted. It also emits the `PERSIST_STATE` event on its own at a regular interval.
+
+Locally, Crawlee uses the <ApiLink to="class/LocalEventManager">`LocalEventManager`</ApiLink> subclass, which additionally measures CPU and memory usage and emits it as the `SYSTEM_INFO` event. The intervals come from the <ApiLink to="class/Configuration">`Configuration`</ApiLink>:
+
+- <ApiLink to="class/Configuration#persist_state_interval">`persist_state_interval`</ApiLink> defaults to 1 minute. You can set it with the `CRAWLEE_PERSIST_STATE_INTERVAL_MILLIS` environment variable.
+- <ApiLink to="class/Configuration#system_info_interval">`system_info_interval`</ApiLink> defaults to 1 second. You can set it with the `CRAWLEE_SYSTEM_INFO_INTERVAL_MILLIS` environment variable.
+
+The event manager is one of the global services of the [service locator](./service-locator). Call `service_locator.get_event_manager()` to get it. If none was set, the service locator creates a `LocalEventManager` from the current configuration on first access. To use a different one, register it with `service_locator.set_event_manager()` before you create the crawler. A crawler also accepts an `event_manager` argument, but components such as statistics and storages subscribe through the global service locator, so the global registration is the one to change.
+
+The event manager is an async context manager. The crawler enters it when `run()` starts and exits it when the run finishes, so events are only emitted while a crawler runs. Outside a crawler, use `async with event_manager:` yourself.
+
+## Events
+
+The <ApiLink to="enum/Event">`Event`</ApiLink> enum lists the event names. Each event comes with a payload model:
+
+- `PERSIST_STATE` carries <ApiLink to="class/EventPersistStateData">`EventPersistStateData`</ApiLink>. It's emitted when the event manager starts, then at every `persist_state_interval`, and one last time when it closes. Its `is_migrating` flag tells whether the process is about to be migrated.
+- `SYSTEM_INFO` carries <ApiLink to="class/EventSystemInfoData">`EventSystemInfoData`</ApiLink> with the CPU usage ratio and the memory used by the current process and its children. The `LocalEventManager` emits it at every `system_info_interval`.
+- `CRAWLER_STATUS` carries <ApiLink to="class/EventCrawlerStatusData">`EventCrawlerStatusData`</ApiLink> with the same status message that the crawler periodically logs.
+- `MIGRATING`, `ABORTING`, and `EXIT` carry <ApiLink to="class/EventMigratingData">`EventMigratingData`</ApiLink>, <ApiLink to="class/EventAbortingData">`EventAbortingData`</ApiLink>, and <ApiLink to="class/EventExitData">`EventExitData`</ApiLink>. Crawlee itself never emits them locally. They come from a platform, for example from the event manager of the [Apify SDK](https://docs.apify.com/sdk/python) when an Actor run is migrated to another server or aborted.
+
+The enum also defines session pool and browser pool event names, such as `SESSION_RETIRED` or `BROWSER_LAUNCHED`, which Crawlee for Python doesn't emit.
+
+## Listening to events
+
+Register a listener with <ApiLink to="class/EventManager#on">`on()`</ApiLink> and remove it with <ApiLink to="class/EventManager#off">`off()`</ApiLink>. Calling `off()` without a listener removes all listeners of the event. A listener can be sync or async and accepts either the event payload or no argument at all. Each invocation runs in its own task, and sync listeners run in a separate thread, so a slow listener doesn't block the crawler. An exception raised by a listener is logged and doesn't affect other listeners.
+
+The following example registers an event manager with a shorter persist state interval and prints the payload of the persist state and system info events during a short crawl:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {ListenToEventsExample}
+</RunnableCodeBlock>
+
+## State persistence
+
+State persistence builds on the `PERSIST_STATE` event. Components that need to survive a restart or a migration keep their state in memory, save it to a <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink> whenever the event fires, and load it back on the next start. The default key-value store of a crawler run then holds records like these:
+
+- `__CRAWLER_STATISTICS_<id>` holds the crawler's [statistics](./statistics). The crawler's default `Statistics` instance has persistence enabled.
+- `__RQ_STATE_<id>` holds the ordering and in-progress information of a request queue backed by the file system storage client. The requests themselves are stored as individual files.
+- `CRAWLEE_STATE_<id>` holds the state you manage with `use_state`, as described in [Crawler state](#crawler-state).
+
+Other components persist their state when you ask them to. The <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> does so with `persistence_enabled=True`, and the <ApiLink to="class/RequestList">`RequestList`</ApiLink> with a `persist_state_key`. For details, see [Request loaders](./request-loaders).
+
+Internally, these components use a helper class that loads the state on start, subscribes to `PERSIST_STATE`, and saves the state one last time on teardown. The helper isn't part of the public API. In your own code, use `use_state`, or listen to `PERSIST_STATE` and save your data to a key-value store.
+
+Persisted state only helps if it's still there on the next run. Crawlee purges the default storages on start, so to resume an interrupted crawl, disable `purge_on_start`. For details, see [Stopping and resuming crawlers](../guides/stopping-and-resuming-crawlers).
+
+## Crawler state
+
+The `use_state` helper of the crawling context returns a dictionary that's saved automatically. Every call within a crawler returns the same dictionary, so you can read and update it from any request handler. Crawlee saves it to the default key-value store on every `PERSIST_STATE` event and when the run finishes, and loads it back from there when the crawler starts again with existing storage. The optional argument sets the initial value when no saved state exists yet.
+
+The dictionary is stored under the `CRAWLEE_STATE_<id>` key, where the id is the crawler's `id` argument or, without one, a per-process counter of crawler instances. Pass the same `id` to the constructors of several crawlers to make them share their state. Outside request handlers, use <ApiLink to="class/BasicCrawler#use_state">`crawler.use_state()`</ApiLink>. Values have to be JSON serializable.
+
+The following example stores the page title of every visited URL in the crawler state and reads it after the run:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {UseStateExample}
+</RunnableCodeBlock>
+
+`use_state` is an experimental feature, so its behavior and interface may change in future versions.

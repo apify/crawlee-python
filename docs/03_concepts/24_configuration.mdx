@@ -1,0 +1,87 @@
+---
+id: configuration
+title: Configuration
+description: How Crawlee's Configuration class resolves settings from code and environment variables, its most useful options, and how to apply it globally or per crawler.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import GlobalConfigurationExample from '!!raw-loader!roa-loader!./code_examples/configuration/global_configuration.py';
+import CrawlerConfigurationExample from '!!raw-loader!roa-loader!./code_examples/configuration/crawler_configuration.py';
+
+The <ApiLink to="class/Configuration">`Configuration`</ApiLink> class holds the settings that Crawlee components share: where storages live, the log level, resource limits for autoscaling, browser launch defaults, and event intervals. Every option has a default, so a crawler runs without any configuration. You change a setting when the defaults don't fit your environment, for example to keep storages between runs or to cap memory in a container.
+
+## How values resolve
+
+`Configuration` is a [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) model. Each value is resolved when the instance is created, in this order:
+
+1. A keyword argument passed to the constructor, such as `Configuration(storage_dir='./data')`.
+2. An environment variable.
+3. The default value.
+
+Each option declares its environment variables explicitly. Most options accept two names, `CRAWLEE_<NAME>` and `APIFY_<NAME>`, so the same code reads the variables the Apify platform sets for an Actor. Names are case-insensitive. If both variables are set, the `APIFY_` one wins. Some variable names differ from the field name. For example `storage_dir` maps to `CRAWLEE_STORAGE_DIR` and `APIFY_LOCAL_STORAGE_DIR`, and interval options use a `_MILLIS` suffix and take milliseconds.
+
+The constructor accepts the field name or any of its aliases. Interval options take a `timedelta`. Values coming from the environment are converted and validated, so `CRAWLEE_HEADLESS=false` becomes `False` and an out-of-range ratio raises a validation error.
+
+Because values are read at creation time, set environment variables before Crawlee creates its configuration. That happens on first use, when a crawler or a storage asks the [service locator](./service-locator) for it.
+
+## Most useful options
+
+The following table lists the options you'll reach for most often. The <ApiLink to="class/Configuration">`Configuration`</ApiLink> API reference documents all of them.
+
+| Option | Environment variable | Default | Used for |
+| --- | --- | --- | --- |
+| `storage_dir` | `CRAWLEE_STORAGE_DIR` | `'./storage'` | Root directory of the file system and SQLite storage clients. |
+| `purge_on_start` | `CRAWLEE_PURGE_ON_START` | `True` | Purging the default and unnamed storages when they're opened. |
+| `log_level` | `CRAWLEE_LOG_LEVEL` | `'INFO'` | Level of the root logger that the crawler configures. |
+| `memory_mbytes` | `CRAWLEE_MEMORY_MBYTES` | `None` | Absolute memory budget for autoscaling. |
+| `available_memory_ratio` | `CRAWLEE_AVAILABLE_MEMORY_RATIO` | `0.25` | Share of the available memory used as the budget when `memory_mbytes` isn't set. |
+| `max_used_memory_ratio` | `CRAWLEE_MAX_USED_MEMORY_RATIO` | `0.9` | Share of the memory budget above which the system counts as overloaded. |
+| `max_used_cpu_ratio` | `CRAWLEE_MAX_USED_CPU_RATIO` | `0.95` | CPU usage above which the system counts as overloaded. |
+| `headless` | `CRAWLEE_HEADLESS` | `True` | Launching Playwright browsers in headless mode. |
+| `default_browser_path` | `CRAWLEE_DEFAULT_BROWSER_PATH` | `None` | Path to a browser executable for Playwright. |
+| `disable_browser_sandbox` | `CRAWLEE_DISABLE_BROWSER_SANDBOX` | `False` | Disabling the Chromium sandbox, which some containers require. |
+| `persist_state_interval` | `CRAWLEE_PERSIST_STATE_INTERVAL_MILLIS` | 1 minute | Interval of `PersistState` events that trigger state persistence. |
+| `system_info_interval` | `CRAWLEE_SYSTEM_INFO_INTERVAL_MILLIS` | 1 second | Interval of `SystemInfo` events with CPU and memory usage. |
+| `internal_timeout` | `CRAWLEE_INTERNAL_TIMEOUT` | `None` | Timeout of internal operations. When unset, the crawler uses twice the request handler timeout, at least 5 minutes. |
+
+Every variable in the table also has an `APIFY_` counterpart, except `CRAWLEE_INTERNAL_TIMEOUT`. `memory_mbytes` additionally reads `ACTOR_MEMORY_MBYTES`, which takes precedence over the other two.
+
+Some options behave differently depending on whether you set them:
+
+- `log_level` takes effect only when you set it explicitly. Otherwise the crawler logs at `INFO`, or at `DEBUG` when Python runs in [development mode](https://docs.python.org/3/library/devmode.html). For details, see [Logging](./logging).
+- `purge_on_start` doesn't touch named storages, which are meant to outlive a run. For details, see [Storages](./storages#cleaning-up-the-storages).
+- Under a container or other resource limit, the default `available_memory_ratio` makes Crawlee log the resulting memory budget as a warning. Setting `memory_mbytes` or `available_memory_ratio` silences it. For details, see [Scaling crawlers](./scaling-crawlers#running-under-a-resource-limit).
+
+## Applying a configuration globally
+
+The `service_locator` singleton holds the global configuration that all Crawlee components use by default. Register your instance with <ApiLink to="class/ServiceLocator#set_configuration">`service_locator.set_configuration()`</ApiLink> before you create any crawler or open any storage. <ApiLink to="class/Configuration#get_global_configuration">`Configuration.get_global_configuration()`</ApiLink> returns the same instance as <ApiLink to="class/ServiceLocator#get_configuration">`service_locator.get_configuration()`</ApiLink>.
+
+The following example sets the log level to `WARNING`, so the crawler's `INFO` messages don't show up in the output.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {GlobalConfigurationExample}
+</RunnableCodeBlock>
+
+If nothing is registered, the first call to `service_locator.get_configuration()` creates a default `Configuration` from the environment and keeps it. Once the service locator holds a configuration, setting a different instance raises a <ApiLink to="class/ServiceConflictError">`ServiceConflictError`</ApiLink>. Setting the same instance again is allowed. A crawler created without arguments retrieves the global configuration, so call `set_configuration()` before that. For details, see [Service locator](./service-locator#conflict-prevention).
+
+`get_global_configuration()` is a class method. Called on a subclass of `Configuration`, it raises a `TypeError` when the global instance isn't of that subclass.
+
+## Applying a configuration to one crawler
+
+Pass a `Configuration` to the crawler's `configuration` argument to use it for that crawler only. The crawler keeps it in a service locator of its own and uses the configuration for the storages it opens, such as its default request queue and dataset, for the <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> that drives autoscaling, and for `internal_timeout`.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {CrawlerConfigurationExample}
+</RunnableCodeBlock>
+
+The crawler still reads the global service locator for the services you don't pass, and some components always read it. If no global configuration is registered yet, creating the crawler registers a default one, so a later `service_locator.set_configuration()` call raises a `ServiceConflictError`. Running the example above logs warnings about this implicit setup. Register any global configuration before you create the crawler.
+
+A few settings are always read from the global configuration, whatever you pass to the crawler:
+
+- The log level that the crawler applies when it configures logging.
+- The browser launch defaults `headless`, `default_browser_path`, and `disable_browser_sandbox`.
+- The event intervals. Autoscaling and state persistence listen to the global event manager, even when you pass an `event_manager` to the crawler.
+
+To change these settings, register the configuration globally or configure the component directly, for example with the `headless` argument of <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.
