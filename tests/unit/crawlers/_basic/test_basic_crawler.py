@@ -147,35 +147,8 @@ async def test_failed_run_keeps_pending_requests_for_the_retry(monkeypatch: pyte
     assert handled_urls == ['https://a.placeholder.com', 'https://b.placeholder.com']
 
 
-async def test_purge_resumes_once_a_run_succeeds_again(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The purge exemption lasts only until a run succeeds, so the run after the retry starts from a clean queue."""
-    queue = await RequestQueue.open()
-    crawler = BasicCrawler(request_manager=queue)
-    handled_urls = []
-
-    @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
-        handled_urls.append(context.request.url)
-
-    await crawler.run(['https://a.placeholder.com'])
-
-    with monkeypatch.context() as monkey:
-        monkey.setattr(queue, 'is_empty', AsyncMock(side_effect=RuntimeError('Queue status unavailable')))
-        with pytest.raises(RuntimeError, match='Queue status unavailable'):
-            await crawler.run(['https://b.placeholder.com'])
-
-    await crawler.run()
-    await crawler.run(['https://a.placeholder.com'])
-
-    assert handled_urls == [
-        'https://a.placeholder.com',
-        'https://b.placeholder.com',
-        'https://a.placeholder.com',
-    ]
-
-
 async def test_failure_after_the_crawl_marks_the_run_as_failed(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A run whose post-crawl state save raises counts as failed too, so the retry keeps the queue intact."""
+    """A failure after the crawl leaves the instance usable, and the next run continues the same queue."""
     queue = await RequestQueue.open()
     crawler = BasicCrawler(request_manager=queue)
     handled_urls = []
@@ -236,7 +209,8 @@ async def test_processes_requests_from_run_args() -> None:
     assert calls == ['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com']
 
 
-async def test_allows_multiple_run_calls() -> None:
+async def test_allows_multiple_run_calls(caplog: pytest.LogCaptureFixture) -> None:
+    """A repeated run continues the same queue, so it crawls only the new requests and doesn't warn."""
     crawler = BasicCrawler()
     calls = list[str]()
 
@@ -245,16 +219,23 @@ async def test_allows_multiple_run_calls() -> None:
         calls.append(context.request.url)
 
     await crawler.run(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
-    await crawler.run(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
+    with caplog.at_level(logging.WARNING):
+        await crawler.run(
+            [
+                'https://a.placeholder.com',
+                'https://b.placeholder.com',
+                'https://c.placeholder.com',
+                'https://d.placeholder.com',
+            ]
+        )
 
     assert calls == [
         'https://a.placeholder.com',
         'https://b.placeholder.com',
         'https://c.placeholder.com',
-        'https://a.placeholder.com',
-        'https://b.placeholder.com',
-        'https://c.placeholder.com',
+        'https://d.placeholder.com',
     ]
+    assert processed_no_requests_warnings(caplog) == []
 
 
 async def test_retries_failed_requests() -> None:
@@ -1487,7 +1468,8 @@ def test_configure_logging_sets_up_unconfigured_root_logger() -> None:
         root_logger.setLevel(saved_level)
 
 
-async def test_consecutive_runs_purge_request_queue() -> None:
+async def test_consecutive_runs_recrawl_after_purge() -> None:
+    """Purging the request manager between runs lets the same requests be crawled again."""
     crawler = BasicCrawler()
     visit = Mock()
 
@@ -1495,9 +1477,10 @@ async def test_consecutive_runs_purge_request_queue() -> None:
     async def handler(context: BasicCrawlingContext) -> None:
         visit(context.request.url)
 
-    await crawler.run(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
-    await crawler.run(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
-    await crawler.run(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
+    for _ in range(3):
+        await crawler.run(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
+        request_manager = await crawler.get_request_manager()
+        await request_manager.purge()
 
     counter = Counter(args[0][0] for args in visit.call_args_list)
     assert counter == {
@@ -1544,6 +1527,139 @@ async def test_consecutive_runs_do_not_purge_named_queue_wrapped_in_throttling_m
     await crawler.run()
 
     assert visited == ['https://a.placeholder.com', 'https://b.placeholder.com']
+
+
+async def test_repeated_run_over_throttling_manager_does_not_recrawl() -> None:
+    """A second `run()` over a `ThrottlingRequestManager` doesn't crawl a request its domain queue already handled."""
+    throttler = ThrottlingRequestManager(
+        inner=await RequestQueue.open(), domains=['a.placeholder.com'], request_manager_opener=RequestQueue.open
+    )
+    crawler = BasicCrawler(request_manager=throttler)
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+
+    await crawler.run(['https://a.placeholder.com'])
+    await crawler.run(['https://a.placeholder.com'])
+
+    assert visited == ['https://a.placeholder.com']
+
+
+def processed_no_requests_warnings(caplog: pytest.LogCaptureFixture) -> list[str]:
+    """Return the logged warnings about a crawl that processed no requests."""
+    return [record.message for record in caplog.records if 'processed no requests' in record.message]
+
+
+async def test_repeated_run_over_handled_requests_warns_once(caplog: pytest.LogCaptureFixture) -> None:
+    """A repeated run over requests that are all handled warns once, explaining how to crawl them again."""
+    crawler = BasicCrawler()
+    handler = AsyncMock()
+    crawler.router.default_handler(handler)
+
+    with caplog.at_level(logging.WARNING):
+        for _ in range(3):
+            await crawler.run(['https://a.placeholder.com'])
+
+    handler.assert_awaited_once()
+    warnings = processed_no_requests_warnings(caplog)
+    assert len(warnings) == 1
+    assert 'holds 1 request,' in warnings[0]
+
+
+async def test_crawler_over_exhausted_queue_warns(caplog: pytest.LogCaptureFixture) -> None:
+    """A second crawler over a queue that another crawler worked through warns that it processed nothing."""
+    queue = await RequestQueue.open()
+    first_crawler = BasicCrawler(request_manager=queue)
+    first_crawler.router.default_handler(AsyncMock())
+    await first_crawler.run(['https://a.placeholder.com', 'https://b.placeholder.com'])
+
+    second_crawler = BasicCrawler(request_manager=queue)
+    second_crawler.router.default_handler(AsyncMock())
+    with caplog.at_level(logging.WARNING):
+        await second_crawler.run()
+
+    warnings = processed_no_requests_warnings(caplog)
+    assert len(warnings) == 1
+    assert 'holds 2 requests,' in warnings[0]
+
+
+async def test_run_with_nothing_to_crawl_does_not_warn(caplog: pytest.LogCaptureFixture) -> None:
+    """A run over an empty queue processes nothing without warning."""
+    crawler = BasicCrawler()
+
+    with caplog.at_level(logging.WARNING):
+        await crawler.run()
+
+    assert processed_no_requests_warnings(caplog) == []
+
+
+async def test_failed_request_counts_as_handled_for_a_repeated_run(caplog: pytest.LogCaptureFixture) -> None:
+    """A request that failed isn't crawled again by a repeated run, which warns instead."""
+    crawler = BasicCrawler(max_request_retries=0)
+    handler = AsyncMock(side_effect=RuntimeError('Handler failed'))
+    crawler.router.default_handler(handler)
+
+    with caplog.at_level(logging.WARNING):
+        first_stats = await crawler.run(['https://a.placeholder.com'])
+        assert first_stats.requests_failed == 1
+        assert processed_no_requests_warnings(caplog) == []
+
+        await crawler.run(['https://a.placeholder.com'])
+
+    handler.assert_awaited_once()
+    assert len(processed_no_requests_warnings(caplog)) == 1
+
+
+async def test_handled_count_error_does_not_fail_the_run(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A request manager that fails to report its handled count doesn't fail the run, which then doesn't warn."""
+    queue = await RequestQueue.open()
+    crawler = BasicCrawler(request_manager=queue)
+    crawler.router.default_handler(AsyncMock())
+    await crawler.run(['https://a.placeholder.com'])
+
+    get_handled_count = AsyncMock(side_effect=RuntimeError('Handled count unavailable'))
+    monkeypatch.setattr(queue, 'get_handled_count', get_handled_count)
+    with caplog.at_level(logging.WARNING):
+        stats = await crawler.run(['https://a.placeholder.com'])
+
+    assert stats.requests_total == 0
+    get_handled_count.assert_awaited_once()
+    assert processed_no_requests_warnings(caplog) == []
+
+
+async def test_aborted_crawl_with_pending_requests_does_not_warn(caplog: pytest.LogCaptureFixture) -> None:
+    """A crawl aborted before it processed anything doesn't warn while the aborted request is still pending."""
+    crawler = BasicCrawler(
+        abort_on_error=True,
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+    )
+    handler = AsyncMock(side_effect=[None, RuntimeError('Handler failed')])
+    crawler.router.default_handler(handler)
+    await crawler.run(['https://a.placeholder.com'])
+
+    with caplog.at_level(logging.WARNING):
+        stats = await crawler.run(['https://b.placeholder.com'])
+
+    assert stats.requests_total == 0
+    assert processed_no_requests_warnings(caplog) == []
+
+
+async def test_handled_count_not_read_when_requests_were_processed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A run that processed requests doesn't ask the request manager for its handled count."""
+    queue = await RequestQueue.open()
+    get_handled_count = AsyncMock(wraps=queue.get_handled_count)
+    monkeypatch.setattr(queue, 'get_handled_count', get_handled_count)
+    crawler = BasicCrawler(request_manager=queue)
+    crawler.router.default_handler(AsyncMock())
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    get_handled_count.assert_not_awaited()
 
 
 @pytest.mark.skipif(os.name == 'nt' and 'CI' in os.environ, reason='Skipped in Windows CI')
@@ -2331,29 +2447,6 @@ async def test_add_requests_error_with_multi_params(
             )
 
     await crawler.run(['https://start.placeholder.com'])
-
-
-async def test_crawler_purge_request_queue_uses_same_storage_client() -> None:
-    """Make sure that purge on start does not replace the storage client in the underlying storage manager"""
-
-    # Set some different storage_client globally and different for Crawlee.
-    service_locator.set_storage_client(FileSystemStorageClient())
-    unrelated_rq = await RequestQueue.open()
-    unrelated_request = Request.from_url('https://x.placeholder.com')
-    await unrelated_rq.add_request(unrelated_request)
-
-    crawler = BasicCrawler(storage_client=MemoryStorageClient())
-
-    @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
-        context.log.info(context.request.url)
-
-    for _ in (1, 2):
-        await crawler.run(requests=[Request.from_url('https://a.placeholder.com')], purge_request_queue=True)
-        assert crawler.statistics.state.requests_finished == 1
-
-    # Crawler should not fall back to the default storage after the purge
-    assert await unrelated_rq.fetch_next_request() == unrelated_request
 
 
 async def _run_crawler(crawler_id: str | None, requests: list[str], storage_dir: str) -> StatisticsState:
