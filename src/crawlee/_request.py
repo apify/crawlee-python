@@ -70,7 +70,8 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
     """
 
     model_config = ConfigDict(extra='allow')
-    __pydantic_extra__: dict[str, JsonSerializable] = Field(init=False)
+    # Pydantic's documented way to type extra fields; it rejects the `| None` the base declaration has.
+    __pydantic_extra__: dict[str, JsonSerializable] = Field(init=False)  # ty: ignore[invalid-mutable-override]
 
     crawlee_data: Annotated[CrawleeRequestData | None, Field(alias='__crawlee')] = None
     """Crawlee-specific configuration stored in the `user_data`."""
