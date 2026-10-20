@@ -381,6 +381,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
         self._id = str(BasicCrawler.__next_id) if id is None else id
+        self._default_rq_alias = None if BasicCrawler.__next_id == 0 else f'__default_{self._id}__'
         BasicCrawler.__next_id += 1
         self._consumer = ConcurrencyConsumer(id=self._id)
 
@@ -644,9 +645,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
     async def get_request_manager(self) -> RequestManager:
-        """Return the configured request manager. If none is configured, open and return the default request queue."""
+        """Return the configured request manager. If none is configured, open and return the crawler's own queue."""
         if not self._request_manager:
             self._request_manager = await RequestQueue.open(
+                alias=self._default_rq_alias,
                 storage_client=self._service_locator.get_storage_client(),
                 configuration=self._service_locator.get_configuration(),
             )
