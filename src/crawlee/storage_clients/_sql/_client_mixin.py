@@ -41,11 +41,11 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
-MetadataTableT = TypeVar('MetadataTableT', bound='DatasetMetadataDb | KeyValueStoreMetadataDb | RequestQueueMetadataDb')
-BufferTableT = TypeVar(
-    'BufferTableT', bound='DatasetMetadataBufferDb | KeyValueStoreMetadataBufferDb | RequestQueueMetadataBufferDb'
+TMetadataTable = TypeVar('TMetadataTable', bound='DatasetMetadataDb | KeyValueStoreMetadataDb | RequestQueueMetadataDb')
+TBufferTable = TypeVar(
+    'TBufferTable', bound='DatasetMetadataBufferDb | KeyValueStoreMetadataBufferDb | RequestQueueMetadataBufferDb'
 )
-ItemTableT = TypeVar('ItemTableT', bound='DatasetItemDb | KeyValueStoreRecordDb | RequestDb')
+TItemTable = TypeVar('TItemTable', bound='DatasetItemDb | KeyValueStoreRecordDb | RequestDb')
 
 
 class MetadataUpdateParams(TypedDict, total=False):
@@ -55,7 +55,7 @@ class MetadataUpdateParams(TypedDict, total=False):
     modified_at: NotRequired[datetime]
 
 
-class SqlClientMixin(ABC, Generic[MetadataTableT, BufferTableT, ItemTableT]):
+class SqlClientMixin(ABC, Generic[TMetadataTable, TBufferTable, TItemTable]):
     """Mixin class for SQL clients.
 
     This mixin provides common SQL operations and basic methods for SQL storage clients.
@@ -64,13 +64,13 @@ class SqlClientMixin(ABC, Generic[MetadataTableT, BufferTableT, ItemTableT]):
     _DEFAULT_NAME: ClassVar[str]
     """Default name when none provided."""
 
-    _METADATA_TABLE: type[MetadataTableT]
+    _METADATA_TABLE: type[TMetadataTable]
     """SQLAlchemy model for metadata."""
 
-    _BUFFER_TABLE: type[BufferTableT]
+    _BUFFER_TABLE: type[TBufferTable]
     """SQLAlchemy model for metadata buffer."""
 
-    _ITEM_TABLE: type[ItemTableT]
+    _ITEM_TABLE: type[TItemTable]
     """SQLAlchemy model for items."""
 
     _CLIENT_TYPE: ClassVar[str]
@@ -108,7 +108,7 @@ class SqlClientMixin(ABC, Generic[MetadataTableT, BufferTableT, ItemTableT]):
             session: Active database session.
             extra_metadata_fields: Storage-specific metadata fields.
         """
-        orm_metadata: DatasetMetadataDb | KeyValueStoreMetadataDb | RequestQueueMetadataDb | None = None
+        orm_metadata: TMetadataTable | None = None
         if id:
             orm_metadata = await session.get(cls._METADATA_TABLE, id)
             if not orm_metadata:
@@ -183,11 +183,7 @@ class SqlClientMixin(ABC, Generic[MetadataTableT, BufferTableT, ItemTableT]):
 
                 stmt = select(cls._METADATA_TABLE).where(cls._METADATA_TABLE.internal_name == internal_name)
                 result = await session.execute(stmt)
-                orm_metadata: DatasetMetadataDb | KeyValueStoreMetadataDb | RequestQueueMetadataDb | None
-                orm_metadata = cast(
-                    'DatasetMetadataDb | KeyValueStoreMetadataDb | RequestQueueMetadataDb | None',
-                    result.scalar_one_or_none(),
-                )
+                orm_metadata = result.scalar_one_or_none()
 
                 if not orm_metadata:
                     raise ValueError(f'{cls._CLIENT_TYPE} with Name "{internal_name}" not found.') from None
