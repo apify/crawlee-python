@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from sqlalchemy import Select, insert, select
 from sqlalchemy import func as sql_func
@@ -39,7 +39,7 @@ class _DatasetMetadataUpdateParams(MetadataUpdateParams):
     delta_item_count: NotRequired[int]
 
 
-class SqlDatasetClient(DatasetClient, SqlClientMixin[DatasetMetadataDb, DatasetMetadataBufferDb, DatasetItemDb]):
+class SqlDatasetClient(DatasetClient, SqlClientMixin):
     """SQL implementation of the dataset client.
 
     This client persists dataset items to a SQL database using two tables for storage
@@ -58,16 +58,16 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin[DatasetMetadataDb, DatasetM
     _DEFAULT_NAME = 'default'
     """Default dataset name used when no name is provided."""
 
-    _METADATA_TABLE = DatasetMetadataDb
+    _METADATA_TABLE: ClassVar[type[DatasetMetadataDb]] = DatasetMetadataDb
     """SQLAlchemy model for dataset metadata."""
 
-    _ITEM_TABLE = DatasetItemDb
+    _ITEM_TABLE: ClassVar[type[DatasetItemDb]] = DatasetItemDb
     """SQLAlchemy model for dataset items."""
 
     _CLIENT_TYPE = 'Dataset'
     """Human-readable client type for error messages."""
 
-    _BUFFER_TABLE = DatasetMetadataBufferDb
+    _BUFFER_TABLE: ClassVar[type[DatasetMetadataBufferDb]] = DatasetMetadataBufferDb
     """SQLAlchemy model for metadata buffer."""
 
     def __init__(
