@@ -228,8 +228,9 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
         self._seen = TTLCache[str, bool](
             maxsize=math.inf, ttl=_CONSUMER_TTL_TICKS * autoscale_interval.total_seconds(), timer=time.monotonic
         )
-        # When each booked task started, and the controller, window and member number it joined.
-        self._started = dict[tuple[str, str], tuple[_ThroughputController, float, _Cohort | None, int | None]]()
+        # When each booked task started, and the controller, window and member number it joined. Keyed by the consumer
+        # object rather than its id, since crawlers sharing an id number their tasks alike.
+        self._started = dict[tuple[int, str], tuple[_ThroughputController, float, _Cohort | None, int | None]]()
 
         if not per_consumer:
             self._controllers[_SHARED] = self._new_controller(lambda: self.current_concurrency)
@@ -287,7 +288,7 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
 
         self._in_flight[consumer.id] += 1
         controller = self._controller_for(consumer.id)
-        self._started[consumer.id, task_id] = (controller, *controller.task_started())
+        self._started[id(consumer), task_id] = (controller, *controller.task_started())
         return True
 
     @override
@@ -295,7 +296,7 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
         """Return a task's slot to the budget and record how long it ran."""
         super().register_task_end(consumer, task_id)
 
-        if (started := self._started.pop((consumer.id, task_id), None)) is None:
+        if (started := self._started.pop((id(consumer), task_id), None)) is None:
             return
 
         self._in_flight[consumer.id] -= 1

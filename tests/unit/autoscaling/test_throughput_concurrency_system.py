@@ -991,6 +991,24 @@ def test_unknown_task_end_keeps_slot() -> None:
         assert not system.has_capacity_for_task(FIRST)
 
 
+def test_equal_consumers_kept_apart() -> None:
+    """Two consumers sharing an id fill one share, yet their tasks booked under the same ids end apart."""
+    system = _system(desired=2, per_consumer=True)
+    first = ConcurrencyConsumer(id='shared')
+    second = ConcurrencyConsumer(id='shared')
+
+    with _active():
+        assert system.try_register_task_start(first, '0')
+        assert system.try_register_task_start(second, '0')
+        assert not system.has_capacity_for_task(first)
+
+        system.register_task_end(first, '0')
+        system.register_task_end(second, '0')
+
+    assert list(system._controllers) == ['shared']
+    assert system._in_flight['shared'] == 0
+
+
 def test_overload_keeps_own_minimum() -> None:
     """On an overloaded machine a consumer still starts tasks while it runs fewer than `min_concurrency`."""
     status = _status()
