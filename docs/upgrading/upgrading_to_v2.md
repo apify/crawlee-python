@@ -270,3 +270,5 @@ When a crawl processes no requests because its request manager holds only handle
 `RequestQueue.purge()` no longer logs the `Storage client "..." does not support purging the request queue.` warnings. It raises `NotImplementedError` instead. For details, see [`RequestQueue.purge` raises when the storage client can't purge](#requestqueuepurge-raises-when-the-storage-client-cant-purge).
 
 The ERROR message the crawler logs before raising `PersistentRateLimitError` now reads "Giving up the crawl because the request manager can't make progress." instead of "Giving up the crawl because a domain keeps rate-limiting every request."
+
+The two DEBUG messages that `RequestQueue.is_finished` logged, "Background add requests tasks are still in progress." and "The request queue is finished.", are removed together with the method.
