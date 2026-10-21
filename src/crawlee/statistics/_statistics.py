@@ -85,8 +85,9 @@ class Statistics(Generic[TStatisticsState]):
         state_model: type[TStatisticsState],
         statistics_log_format: Literal['table', 'inline'] = 'table',
         save_error_snapshots: bool = False,
+        id: str | None = None,
     ) -> None:
-        self._id = Statistics.__next_id
+        self._id = str(Statistics.__next_id) if id is None else id
         Statistics.__next_id += 1
 
         self.error_tracker = ErrorTracker(
@@ -123,6 +124,7 @@ class Statistics(Generic[TStatisticsState]):
             log_message=self._log_message,
             periodic_message_logger=self._periodic_message_logger,
             state_model=state_model,
+            id=self._id,
         )
         new_statistics._periodic_logger = self._periodic_logger  # Accessing private member to create copy like-object.
         return new_statistics
@@ -139,6 +141,7 @@ class Statistics(Generic[TStatisticsState]):
         log_interval: timedelta = timedelta(minutes=1),
         statistics_log_format: Literal['table', 'inline'] = 'table',
         save_error_snapshots: bool = False,
+        id: str | None = None,
     ) -> Statistics[StatisticsState]:
         """Initialize a new instance with default state model `StatisticsState`."""
         return Statistics[StatisticsState](
@@ -152,6 +155,7 @@ class Statistics(Generic[TStatisticsState]):
             state_model=StatisticsState,
             statistics_log_format=statistics_log_format,
             save_error_snapshots=save_error_snapshots,
+            id=id,
         )
 
     @property

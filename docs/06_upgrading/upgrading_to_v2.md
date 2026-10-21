@@ -95,3 +95,11 @@ The `Request.forefront` property is removed. Proxy tiers were the only code that
 The storage clients now write their JSON data with camelCase keys, the same as Crawlee JS. This covers the metadata, request and record metadata files of `FileSystemStorageClient`, the request and record metadata JSON stored by `RedisStorageClient`, and the request JSON stored by `SqlStorageClient`. For example, `item_count` in a dataset's `__metadata__.json` becomes `itemCount`. The storage metadata documents of `RedisStorageClient` keep their snake_case keys.
 
 Data written by v1 still loads, so an existing storage directory, Redis instance or database keeps working. Any tooling that reads these files directly needs to handle the camelCase keys.
+
+## Crawler `id` is a string
+
+The `id` argument of `BasicCrawler` and its subclasses is now a `str`, so pass a string wherever you passed an integer. `StatisticsState.stats_id` and `EventCrawlerStatusData.crawler_id` are strings too, and `crawler_id` holds the crawler's `id`. In v1, it held the Python object ID of the crawler.
+
+The statistics a crawler creates by default now use the crawler's `id`. Crawlers that share an `id` therefore share both the state returned by `use_state` and the persisted statistics. In v1, they shared only the state.
+
+A crawler without an `id` gets its creation index, such as `'0'`, and crawlers with an explicit `id` now count towards that index too. If you resume a v1 run with `purge_on_start=False` and mix both kinds of crawlers, a generated `id` can differ from the one v1 assigned, and the crawler won't find the state that `use_state` stored under the old one.

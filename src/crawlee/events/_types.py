@@ -90,7 +90,7 @@ class EventCrawlerStatusData(BaseModel):
     message: str
     """A message describing the current status of the crawler."""
 
-    crawler_id: int
+    crawler_id: str
     """The ID of the crawler that emitted the event."""
 
 
