@@ -1293,6 +1293,16 @@ async def test_crawlers_do_not_share_requests() -> None:
     assert stats_2.requests_finished == 1
 
 
+async def test_id_invalid_as_request_queue_alias() -> None:
+    """A later crawler whose ID can't form an RQ alias fails to open its RQ, unless it gets a request manager."""
+    BasicCrawler()
+    with pytest.raises(ValueError, match='Invalid storage alias'):
+        await BasicCrawler(id='shop/products').get_request_manager()
+    request_manager = Mock()
+    crawler = BasicCrawler(id='shop/products', request_manager=request_manager)
+    assert await crawler.get_request_manager() is request_manager
+
+
 async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> None:
     state_in_handler_one: dict[str, JsonSerializable] = {}
     state_in_handler_two: dict[str, JsonSerializable] = {}
