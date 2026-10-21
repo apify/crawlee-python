@@ -319,7 +319,7 @@ context = 7
 
 [tool.uv]
 # Minimal defense against supply-chain attacks.
-exclude-newer = "24 hours"
+exclude-newer = "7 days"
 
 [tool.uv.exclude-newer-package]
 # Allow internal Apify packages to install immediately.
