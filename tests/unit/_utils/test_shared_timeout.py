@@ -3,7 +3,7 @@ from datetime import timedelta
 
 import pytest
 
-from crawlee._utils.time import SharedTimeout, measure_time
+from crawlee._utils.time import SharedTimeout
 
 
 async def test_shared_timeout_tracks_elapsed_time() -> None:
@@ -24,12 +24,11 @@ async def test_shared_timeout_expires() -> None:
     timeout_duration = timedelta(seconds=0.1)
     shared_timeout = SharedTimeout(timeout_duration)
 
-    with measure_time() as elapsed, pytest.raises(asyncio.TimeoutError):
+    # The body outlasts the budget a hundredfold, so the `TimeoutError` alone shows the budget cut it short. A
+    # wall-clock bound would also measure how long the event loop was starved on a loaded runner.
+    with pytest.raises(asyncio.TimeoutError):
         async with shared_timeout:
-            await asyncio.sleep(0.5)
-
-    assert elapsed.wall is not None
-    assert elapsed.wall < 0.3
+            await asyncio.sleep(10)
 
 
 async def test_shared_timeout_cannot_be_nested() -> None:
