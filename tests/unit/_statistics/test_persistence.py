@@ -50,10 +50,10 @@ async def test_persistence_loads_numeric_id() -> None:
 
 
 def test_id_defaults_to_counter() -> None:
-    """Statistics without an ID take the next value of a counter that explicit IDs don't advance."""
+    """Statistics without an ID take their creation index, which statistics with an explicit ID advance too."""
     assert Statistics.with_default_state()._id == '0'
     assert Statistics.with_default_state(id='custom')._id == 'custom'
-    assert Statistics.with_default_state()._id == '1'
+    assert Statistics.with_default_state()._id == '2'
 
 
 def test_replace_state_model_keeps_id() -> None:

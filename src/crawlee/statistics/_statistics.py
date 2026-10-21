@@ -87,11 +87,8 @@ class Statistics(Generic[TStatisticsState]):
         save_error_snapshots: bool = False,
         id: str | None = None,
     ) -> None:
-        if id is None:
-            self._id = str(Statistics.__next_id)
-            Statistics.__next_id += 1
-        else:
-            self._id = id
+        self._id = str(Statistics.__next_id) if id is None else id
+        Statistics.__next_id += 1
 
         self.error_tracker = ErrorTracker(
             save_error_snapshots=save_error_snapshots,

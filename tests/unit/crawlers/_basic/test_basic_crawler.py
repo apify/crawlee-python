@@ -1261,6 +1261,14 @@ def test_generated_id_follows_creation_order() -> None:
     assert BasicCrawler()._id == '2'
 
 
+def test_default_statistics_key_differs_from_later_statistics() -> None:
+    """Statistics created after a crawler with default statistics don't persist under the crawler's key."""
+    crawler = BasicCrawler()
+    statistics = Statistics.with_default_state(persistence_enabled=True)
+
+    assert statistics._state._persist_state_key != crawler.statistics._state._persist_state_key
+
+
 async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> None:
     state_in_handler_one: dict[str, JsonSerializable] = {}
     state_in_handler_two: dict[str, JsonSerializable] = {}
