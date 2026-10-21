@@ -74,7 +74,7 @@ class BrowserController(ABC):
         self,
         browser_new_context_options: Mapping[str, Any] | None = None,
         proxy_info: ProxyInfo | None = None,
-    ) -> Page:
+    ) -> tuple[Page, dict[str, str]]:
         """Create a new page with the given context options.
 
         Args:
@@ -84,7 +84,8 @@ class BrowserController(ABC):
             proxy_info: The proxy configuration to use for the new page.
 
         Returns:
-            Page: The newly created page.
+            A tuple of the newly created page and the HTTP headers generated for its browser context by a
+            fingerprint or header generator (an empty dict if no headers were generated).
 
         Raises:
             ValueError: If the browser has reached the maximum number of open pages.
