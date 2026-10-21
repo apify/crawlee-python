@@ -109,22 +109,11 @@ class StatisticsState(BaseModel):
     ] = {}
 
     accumulated_runtime: Annotated[timedelta_ms, Field(alias='crawlerRuntimeMillis')] = timedelta()
-    """The runtime accumulated by the previous runs of the crawler, excluding the run in progress.
-
-    When serialized, the runtime of the run in progress is included, so that a persisted state always carries
-    the total runtime accumulated so far. Do not assign to it: it is restored from the persisted state, and
-    serialization derives the live total from the timestamps.
-    """
+    """The runtime accumulated by the previous runs of the crawler, excluding the run in progress."""
 
     @property
     def crawler_runtime(self) -> timedelta:
-        """The total runtime of the crawler, accumulated over all its runs, excluding the downtime between them.
-
-        The run in progress is measured by the `crawler_last_started_at` and `crawler_finished_at` timestamps.
-        In a loaded state, the timestamps describe the previous run, whose runtime `accumulated_runtime` already
-        contains, so they must be reset before a new run is measured. `Statistics` resets them on enter, before
-        the runtime is first read.
-        """
+        """The total runtime of the crawler, accumulated over all its runs."""
         if self.crawler_last_started_at is None:
             return self.accumulated_runtime
         finished_at = self.crawler_finished_at or datetime.now(UTC)
@@ -132,6 +121,7 @@ class StatisticsState(BaseModel):
 
     @field_serializer('accumulated_runtime')
     def _serialize_accumulated_runtime(self, _value: timedelta) -> float:
+        """Serialize the total runtime. Previously accumulated and current runtime."""
         return round(self.crawler_runtime.total_seconds() * 1000)
 
     @computed_field(alias='requestTotalDurationMillis', return_type=timedelta_ms)
