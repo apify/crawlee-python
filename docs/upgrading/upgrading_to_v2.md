@@ -5,6 +5,12 @@ title: Upgrading to v2
 
 This page summarizes the breaking changes between Crawlee for Python v1 and v2.
 
+## Session retirement is permanent
+
+`Session.retire()` permanently blocks the session. Calling `mark_good()` can still lower its error score, but cannot make it usable again. Create a new session to replace a retired one. Repeated calls to `retire()` leave the error score unchanged.
+
+Session state includes a `retired` flag, which is preserved when the session pool is saved and restored. Saved sessions without this field load with `retired=False` and retain their existing error scores and usage limits.
+
 ## Python version support
 
 We drop support for Python 3.10, which reached its end of life in October 2026. The minimum supported version is now Python 3.11.

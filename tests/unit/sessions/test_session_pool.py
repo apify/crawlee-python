@@ -83,6 +83,19 @@ async def test_get_session(session_pool: SessionPool) -> None:
     assert session.is_usable
 
 
+async def test_pool_does_not_reuse_retired_session_after_success() -> None:
+    """Neither pool lookup returns a retired session after a successful request."""
+    async with SessionPool(max_pool_size=1, persistence_enabled=False) as pool:
+        session = await pool.get_session()
+        session.retire()
+        session.mark_good()
+
+        assert await pool.get_session_by_id(session.id) is None
+        replacement = await pool.get_session()
+        assert replacement.id != session.id
+        assert replacement.is_usable
+
+
 async def test_get_session_no_usable(caplog: pytest.LogCaptureFixture, session_pool: SessionPool) -> None:
     """Ensure that retrieval of a non-existent or retired session returns None and logs warning."""
     session = await session_pool.get_session_by_id('non_existent')
@@ -168,6 +181,39 @@ async def test_session_pool_persist_and_restore(event_manager: EventManager, kvs
         await sp.reset_store()
         previous_state = await kvs.get_value(key=PERSIST_STATE_KEY)
         assert previous_state is None
+
+
+async def test_retired_session_is_not_restored(event_manager: EventManager, kvs: KeyValueStore) -> None:
+    """A saved retired session is excluded when the pool is reopened."""
+    service_locator.set_event_manager(event_manager)
+
+    async with SessionPool(
+        max_pool_size=1,
+        persistence_enabled=True,
+        persist_state_kvs_name=KVS_NAME,
+        persist_state_key=PERSIST_STATE_KEY,
+    ) as pool:
+        session = await pool.get_session()
+        session.retire()
+        session.mark_good()
+        event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
+        await event_manager.wait_for_all_listeners_to_complete()
+
+        saved_state = await kvs.get_value(PERSIST_STATE_KEY)
+        assert isinstance(saved_state, dict)
+        saved_pool = SessionPoolModel.model_validate(saved_state)
+        assert not saved_pool.sessions[session.id].is_usable
+
+    async with SessionPool(
+        max_pool_size=1,
+        persistence_enabled=True,
+        persist_state_kvs_name=KVS_NAME,
+        persist_state_key=PERSIST_STATE_KEY,
+    ) as restored_pool:
+        assert await restored_pool.get_session_by_id(session.id) is None
+        replacement = await restored_pool.get_session()
+        assert replacement.id != session.id
+        assert replacement.is_usable
 
 
 async def test_methods_raise_error_when_not_active() -> None:
