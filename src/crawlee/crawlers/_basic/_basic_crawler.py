@@ -218,9 +218,9 @@ class _BasicCrawlerOptions(TypedDict):
     """Allows overriding the default status message. The default status message is provided in the parameters.
     Returning `None` suppresses the status message."""
 
-    id: NotRequired[int]
-    """Identifier used for crawler state tracking. Use the same id across multiple crawlers to share state between
-    them."""
+    id: NotRequired[str]
+    """A unique identifier for the crawler instance. It isolates the `use_state` state and the default statistics from
+    other crawlers. Without it, the ID follows the order in which crawlers are created."""
 
 
 class _BasicCrawlerOptionsGeneric(TypedDict, Generic[TCrawlingContext, TStatisticsState]):
@@ -307,7 +307,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         status_message_logging_interval: timedelta = timedelta(seconds=10),
         status_message_callback: Callable[[StatisticsState, StatisticsState | None, str], Awaitable[str | None]]
         | None = None,
-        id: int | None = None,
+        id: str | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -362,8 +362,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             status_message_logging_interval: Interval for logging the crawler status messages.
             status_message_callback: Allows overriding the default status message. The default status message is
                 provided in the parameters. Returning `None` suppresses the status message.
-            id: Identifier used for crawler state tracking. Use the same id across multiple crawlers to share state
-                between them.
+            id: A unique identifier for the crawler instance. It isolates the `use_state` state and the default
+                statistics from other crawlers. Without it, the ID follows the order in which crawlers are created.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -371,11 +371,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             _logger: A logger instance, typically provided by a subclass, for consistent logging labels.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
-        if id is None:
-            self._id = BasicCrawler.__next_id
-            BasicCrawler.__next_id += 1
-        else:
-            self._id = id
+        self._id = str(BasicCrawler.__next_id) if id is None else id
+        BasicCrawler.__next_id += 1
 
         implicit_event_manager_with_explicit_config = False
         if not configuration:
@@ -485,6 +482,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     statistics_log_format=self._statistics_log_format,
                     log_message='Current request statistics:',
                     persist_state_kvs_factory=persist_state_factory,
+                    id=self._id,
                 ),
             )
 
@@ -1883,7 +1881,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             self._log_status_message(message, level='INFO')
 
         event_manager.emit(
-            event=Event.CRAWLER_STATUS, event_data=EventCrawlerStatusData(message=message, crawler_id=id(self))
+            event=Event.CRAWLER_STATUS, event_data=EventCrawlerStatusData(message=message, crawler_id=self._id)
         )
 
         self._previous_crawler_state = current_state
