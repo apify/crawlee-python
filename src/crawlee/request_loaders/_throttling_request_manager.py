@@ -311,7 +311,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         Requests of a domain in a cooldown count as outstanding work, so the crawl waits until the earliest cooldown
         ends. A domain is stalled once it has rate-limited every request for longer than `max_domain_stall`. It's
-        reported only when nothing else can be dispatched and no domain in a cooldown has requests left.
+        reported only when nothing else is ready or waiting, such as a domain in a cooldown with requests left, or
+        requests in progress or still being added.
         """
         await self._ensure_sub_managers()
         now = datetime.now(UTC)
@@ -359,6 +360,11 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             if readiness.status == 'ready'
         ]
 
+        # A candidate's requests that are in progress or still being added in the background aren't finished yet.
+        for readiness in candidate_statuses:
+            if readiness.status != 'ready':
+                probed = join_request_source_statuses(probed, readiness)
+
         if stalled:
             summary = ', '.join(
                 f'"{domain}" ({(now - since).total_seconds():.0f}s)'
@@ -366,15 +372,13 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 if (since := self._domain_states[domain].rate_limited_since) is not None
             )
             window = self._max_domain_stall.total_seconds()
-            return StalledStatus(
+            stall = StalledStatus(
                 f'{summary} rate-limited every request for longer than `max_domain_stall` ({window:.0f}s). Waiting '
                 "longer will not help - lower the crawler's concurrency, or drop these domains. Their requests are "
                 'still queued, so re-running with `purge_on_start` disabled will resume them if the rate limit lifts.'
             )
-
-        # A candidate's requests that are in progress or still being added in the background aren't finished yet.
-        for readiness in candidate_statuses:
-            probed = join_request_source_statuses(probed, readiness)
+            # Requests still in progress or being added elsewhere may yet bring work, so they outrank the stall.
+            return join_request_source_statuses(probed, stall)
 
         return probed
 

@@ -30,13 +30,18 @@ class WaitingStatus:
     """The status name, so a check doesn't need to import the class."""
 
     ready_at: datetime | None = None
-    """When the source expects to become ready, as a timezone-aware UTC time. `None` when the wait has no clock."""
+    """When the source expects to become ready, as a timezone-aware UTC time. It may become ready earlier, so a consumer
+    keeps polling either way. `None` when the wait has no clock.
+    """
 
 
 @docs_group('Request loaders')
 @dataclass(frozen=True)
 class StalledStatus:
-    """The source holds requests it can't make progress on. Only a manager that paces its own dispatch reports it."""
+    """The source holds requests it can't make progress on.
+
+    Only a manager that paces its own dispatch, or one that wraps such a manager, reports it.
+    """
 
     status: ClassVar[Literal['stalled']] = 'stalled'
     """The status name, so a check doesn't need to import the class."""

@@ -135,6 +135,16 @@ async def test_readiness_joins_sources(
     assert await RequestManagerTandem(loader, manager).check_readiness() == expected
 
 
+async def test_ready_loader_skips_manager() -> None:
+    """Test that a ready loader answers without probing the manager."""
+    loader = create_autospec(RequestLoader, instance=True, spec_set=True)
+    loader.check_readiness.return_value = ReadyStatus()
+    manager = create_autospec(RequestManager, instance=True, spec_set=True)
+
+    assert await RequestManagerTandem(loader, manager).check_readiness() == ReadyStatus()
+    manager.check_readiness.assert_not_awaited()
+
+
 async def test_transfers_only_when_loader_ready() -> None:
     """Test that a loader that isn't ready doesn't block the manager's requests."""
     loader = create_autospec(RequestLoader, instance=True, spec_set=True)

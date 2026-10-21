@@ -1194,9 +1194,11 @@ async def test_handled_request_clears_stall(
         await manager.add_request(f'https://{THROTTLED_DOMAIN}/page2')
 
         make_stalled(manager, clock, url)
-        assert isinstance(await manager.check_readiness(), StalledStatus)
+        state = manager._domain_states[THROTTLED_DOMAIN]
+        assert state.is_stall_candidate(clock.now.return_value, manager._max_domain_stall)
 
         await manager.mark_request_as_handled(request)
+        assert not state.is_stall_candidate(clock.now.return_value, manager._max_domain_stall)
         ready_at = manager._domain_states[THROTTLED_DOMAIN].throttled_until
         assert await manager.check_readiness() == WaitingStatus(ready_at=ready_at)
 
@@ -1311,8 +1313,8 @@ async def test_stall_candidate_not_ready(manager: ThrottlingRequestManager[Reque
     assert request.url == url
 
 
-async def test_stall_ignores_work_in_flight(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """Test that a request in progress elsewhere doesn't keep a stall from being reported."""
+async def test_work_in_progress_masks_stall(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """Test that a request in progress elsewhere keeps a stall from being reported."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     await manager.add_request(f'https://{NON_THROTTLED_DOMAIN}/page1')
     assert await manager.fetch_next_request() is not None
@@ -1320,7 +1322,7 @@ async def test_stall_ignores_work_in_flight(manager: ThrottlingRequestManager[Re
 
     with _frozen_clock() as clock:
         make_stalled(manager, clock, url)
-        assert isinstance(await manager.check_readiness(), StalledStatus)
+        assert await manager.check_readiness() == WaitingStatus()
 
 
 async def test_stall_candidate_adding_in_background(manager: ThrottlingRequestManager[RequestQueue]) -> None:
