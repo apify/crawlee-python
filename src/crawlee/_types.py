@@ -100,7 +100,7 @@ class HttpHeaders(RootModel, Mapping[str, str]):
 
 @docs_group('Configuration')
 class ConcurrencySettings:
-    """Concurrency settings for AutoscaledPool."""
+    """Concurrency settings for a `ConcurrencySystem`."""
 
     def __init__(
         self,
@@ -116,8 +116,8 @@ class ConcurrencySettings:
             min_concurrency: The minimum number of tasks running in parallel. If you set this value too high
                 with respect to the available system memory and CPU, your code might run extremely slow or crash.
             max_concurrency: The maximum number of tasks running in parallel.
-            max_tasks_per_minute: The maximum number of tasks per minute the pool can run. By default, this is set
-                to infinity, but you can pass any positive, non-zero number.
+            max_tasks_per_minute: The maximum number of tasks per minute the crawler can run. By default, this is set
+                to infinity, but you can pass any whole number of at least 1.
             desired_concurrency: The desired number of tasks that should be running parallel on the start of the pool,
                 if there is a large enough supply of them.
         """
@@ -133,8 +133,10 @@ class ConcurrencySettings:
         if desired_concurrency > max_concurrency:
             raise ValueError('desired_concurrency cannot be greater than max_concurrency')
 
-        if max_tasks_per_minute <= 0:
-            raise ValueError('max_tasks_per_minute must be positive')
+        if max_tasks_per_minute != float('inf') and (
+            max_tasks_per_minute < 1 or not float(max_tasks_per_minute).is_integer()
+        ):
+            raise ValueError('max_tasks_per_minute must be a whole number of at least 1, or infinity')
 
         self.min_concurrency = min_concurrency
         self.max_concurrency = max_concurrency

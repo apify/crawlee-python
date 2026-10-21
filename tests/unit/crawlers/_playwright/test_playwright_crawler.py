@@ -8,6 +8,7 @@ import pytest
 from crawlee import (
     service_locator,
 )
+from crawlee.autoscaling import ConcurrencySystem
 from crawlee.configuration import Configuration
 from crawlee.crawlers import (
     PlaywrightCrawler,
@@ -23,6 +24,14 @@ async def test_passing_configuration() -> None:
 
     assert service_locator.get_configuration().log_level == 'INFO'
     assert crawler._service_locator.get_configuration().log_level == 'WARNING'
+
+
+async def test_accepts_concurrency_system() -> None:
+    """A supplied concurrency system is used as is, since the lower default concurrency applies only without one."""
+    concurrency_system = ConcurrencySystem()
+    crawler = PlaywrightCrawler(concurrency_system=concurrency_system)
+
+    assert crawler.concurrency_system is concurrency_system
 
 
 def test_import_error_handled() -> None:

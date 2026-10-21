@@ -27,7 +27,7 @@ class LocalEventManager(EventManager):
 
     It extends the `EventManager` to emit `SystemInfo` events at regular intervals. The `LocalEventManager`
     is intended to be used in local environments, where the system metrics are required managing the `Snapshotter`
-    and `AutoscaledPool`.
+    and `ConcurrencySystem`.
     """
 
     def __init__(

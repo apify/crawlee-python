@@ -149,8 +149,8 @@ class AdaptivePlaywrightCrawler(
         self.result_checker = result_checker or (lambda _: True)
         self.result_comparator = result_comparator or create_default_comparator(result_checker)
 
-        # Set default concurrency settings for browser crawlers if not provided
-        if 'concurrency_settings' not in kwargs or kwargs['concurrency_settings'] is None:
+        # Lower the default concurrency for browser crawlers, unless the caller configured it themselves.
+        if kwargs.get('concurrency_settings') is None and kwargs.get('concurrency_system') is None:
             kwargs['concurrency_settings'] = ConcurrencySettings(desired_concurrency=1)
 
         adaptive_statistics = statistics or Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)
