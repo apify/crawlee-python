@@ -16,6 +16,7 @@ from parsel import Selector
 from typing_extensions import override
 
 from crawlee import Request
+from crawlee.autoscaling import ConcurrencySystem
 from crawlee.crawlers import (
     AdaptivePlaywrightCrawler,
     AdaptivePlaywrightCrawlingContext,
@@ -1073,6 +1074,14 @@ async def test_static_throttled_error_without_backoff_falls_back_to_browser(test
     await crawler.run(test_urls[:1])
 
     assert [c.args[0] for c in rendering_types.call_args_list] == ['static', 'client only']
+
+
+async def test_accepts_concurrency_system() -> None:
+    """A supplied concurrency system is used as is, since the lower default concurrency applies only without one."""
+    concurrency_system = ConcurrencySystem()
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(concurrency_system=concurrency_system)
+
+    assert crawler.concurrency_system is concurrency_system
 
 
 @pytest.mark.parametrize(

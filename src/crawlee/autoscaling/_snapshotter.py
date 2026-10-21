@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, TypeVar, cast
 import proclimits
 
 from crawlee import service_locator
-from crawlee._autoscaling._types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Ratio, Snapshot
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
@@ -18,6 +17,8 @@ from crawlee._utils.log import LoggerOnce
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.system import MemoryInfo, MemoryUsageInfo, get_memory_info
 from crawlee.events._types import Event, EventSystemInfoData
+
+from ._types import ClientSnapshot, CpuSnapshot, EventLoopSnapshot, MemorySnapshot, Ratio, Snapshot
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -44,7 +45,7 @@ class Snapshotter:
 
     The class monitors and records the state of various system resources (CPU, memory, event loop, and client API)
     at predefined intervals. This continuous monitoring helps in identifying resource overloads and ensuring optimal
-    performance of the application. It is utilized in the `AutoscaledPool` module to adjust task allocation
+    performance of the application. It is utilized by the `ConcurrencySystem` to adjust task allocation
     dynamically based on the current demand and system load.
     """
 
@@ -89,7 +90,7 @@ class Snapshotter:
                 value, the event loop is considered overloaded.
             max_client_errors: Sets the maximum number of client errors (HTTP 429). When the number of client errors
                 is higher than the provided number, the client is considered overloaded.
-            max_memory_size: Sets the maximum amount of system memory to be used by the `AutoscaledPool`. When of type
+            max_memory_size: Sets the maximum amount of system memory to be used by the crawlers. When of type
                 `ByteSize` then it is used as fixed memory size. When of type `Ratio` then it allows for dynamic memory
                 scaling based on the available system memory.
         """
