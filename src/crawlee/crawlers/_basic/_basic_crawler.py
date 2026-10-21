@@ -281,7 +281,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
     _request_handler_timeout_text = 'Request handler timed out after'
     __next_id = 0
-    __next_consumer_id = 0
 
     def __init__(
         self,
@@ -383,10 +382,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """
         self._id = str(BasicCrawler.__next_id) if id is None else id
         BasicCrawler.__next_id += 1
-
-        # Crawlers may share an `id` to share state, so the consumer gets an identifier of its own.
-        self._consumer = ConcurrencyConsumer(id=f'{type(self).__name__}-{BasicCrawler.__next_consumer_id}')
-        BasicCrawler.__next_consumer_id += 1
+        self._consumer = ConcurrencyConsumer(id=self._id)
 
         implicit_event_manager_with_explicit_config = False
         if not configuration:

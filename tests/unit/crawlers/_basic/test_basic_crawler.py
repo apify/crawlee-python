@@ -26,7 +26,7 @@ from crawlee._log_config import CrawleeLogFormatter
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpMethod
 from crawlee._utils.robots import RobotsTxtFile
-from crawlee.autoscaling import AutoscaledPool, ConcurrencySystem
+from crawlee.autoscaling import AutoscaledPool, ConcurrencyConsumer, ConcurrencySystem
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import (
@@ -3141,43 +3141,19 @@ async def test_borrowed_concurrency_system_reused() -> None:
         assert crawler.concurrency_system is concurrency_system
 
 
-async def test_consumer_unique_per_crawler() -> None:
-    """Crawlers sharing an `id` reach a shared system as different consumers."""
+async def test_consumer_carries_crawler_id() -> None:
+    """A crawler reaches the system as a consumer named by its `id`, on every run."""
     async with ConcurrencySystem() as concurrency_system:
-        first = BasicCrawler(id=1, concurrency_system=concurrency_system, request_handler=AsyncMock())
-        second = BasicCrawler(id=1, concurrency_system=concurrency_system, request_handler=AsyncMock())
-
-        with patch.object(
-            concurrency_system, 'try_register_task_start', wraps=concurrency_system.try_register_task_start
-        ) as try_register_task_start:
-            await first.run(['https://a.placeholder.com'])
-            first_consumers = {booking.args[0] for booking in try_register_task_start.call_args_list}
-            try_register_task_start.reset_mock()
-
-            await second.run(['https://b.placeholder.com'])
-            second_consumers = {booking.args[0] for booking in try_register_task_start.call_args_list}
-
-    assert len(first_consumers) == len(second_consumers) == 1
-    assert first_consumers != second_consumers
-
-
-async def test_consumer_kept_across_runs() -> None:
-    """A crawler reaches the system as the same consumer on every run."""
-    async with ConcurrencySystem() as concurrency_system:
-        crawler = BasicCrawler(concurrency_system=concurrency_system, request_handler=AsyncMock())
+        crawler = BasicCrawler(id='my-crawler', concurrency_system=concurrency_system, request_handler=AsyncMock())
 
         with patch.object(
             concurrency_system, 'try_register_task_start', wraps=concurrency_system.try_register_task_start
         ) as try_register_task_start:
             await crawler.run(['https://a.placeholder.com'])
-            first_run = {booking.args[0] for booking in try_register_task_start.call_args_list}
-            try_register_task_start.reset_mock()
-
             await crawler.run(['https://b.placeholder.com'])
-            second_run = {booking.args[0] for booking in try_register_task_start.call_args_list}
 
-    assert len(first_run) == 1
-    assert first_run == second_run
+    consumers = {booking.args[0] for booking in try_register_task_start.call_args_list}
+    assert consumers == {ConcurrencyConsumer(id='my-crawler')}
 
 
 async def test_stall_ignores_shared_concurrency() -> None:
