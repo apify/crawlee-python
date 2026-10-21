@@ -2949,7 +2949,9 @@ async def test_stall_waits_for_in_flight_work() -> None:
         if context.request.url == THROTTLED_URL:
             throttler.record_domain_delay(context.request.url)
             raise RequestThrottledError
-        if context.request.url == 'https://free.placeholder.com/slow':
+        # The slow request belongs to the stalled domain, since a request in progress elsewhere would keep the stall
+        # from being reported.
+        if context.request.url == 'https://throttled.placeholder.com/slow':
             stall_statuses.append(await poll_until_condition(throttler.check_readiness, is_stalled, timeout=10))
             # Two more pool checks, so at least one ran entirely while the stall was live and this request in flight.
             checks = is_finished.await_count
@@ -2961,7 +2963,8 @@ async def test_stall_waits_for_in_flight_work() -> None:
         patch.object(crawler, '_BasicCrawler__is_finished_function', wraps=is_finished_function) as is_finished,
         pytest.raises(PersistentRateLimitError),
     ):
-        await crawler.run([THROTTLED_URL, 'https://free.placeholder.com/slow'])
+        # The slow request goes first, since a deferred `THROTTLED_URL` returns to the front of the domain's queue.
+        await crawler.run(['https://throttled.placeholder.com/slow', THROTTLED_URL])
 
     assert isinstance(stall_statuses[0], StalledStatus)
     assert 'https://free.placeholder.com/next' in visited
@@ -2978,7 +2981,8 @@ async def test_max_requests_per_crawl_precedes_stall() -> None:
         concurrency_settings=ConcurrencySettings(min_concurrency=2, desired_concurrency=2),
     )
     calls = 0
-    stall_statuses = list[RequestSourceStatus]()
+    stall_live = list[bool]()
+    state = throttler._domain_states['throttled.placeholder.com']
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -2989,11 +2993,17 @@ async def test_max_requests_per_crawl_precedes_stall() -> None:
         if context.request.url == THROTTLED_URL:
             throttler.record_domain_delay(context.request.url)
             raise RequestThrottledError
-        stall_statuses.append(await poll_until_condition(throttler.check_readiness, is_stalled, timeout=10))
+        # This request keeps the stall from being reported while in flight, so watch the stall clock. It's of another
+        # domain, so handling it doesn't reset that clock and the stall is live once the limit is reached.
+        stall_live.append(
+            await poll_until_condition(
+                lambda: state.is_stall_candidate(datetime.now(UTC), MAX_DOMAIN_STALL), timeout=10
+            )
+        )
 
     stats = await crawler.run([THROTTLED_URL, 'https://free.placeholder.com/slow'])
 
-    assert isinstance(stall_statuses[0], StalledStatus)
+    assert stall_live == [True]
     assert stats.requests_finished == 1
 
 

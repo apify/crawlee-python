@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -47,10 +46,12 @@ class RequestManagerTandem(RequestManager):
 
     @override
     async def check_readiness(self) -> RequestSourceStatus:
-        loader_status, manager_status = await asyncio.gather(
-            self._read_only_loader.check_readiness(), self._read_write_manager.check_readiness()
-        )
-        return join_request_source_statuses(loader_status, manager_status)
+        loader_readiness = await self._read_only_loader.check_readiness()
+        if loader_readiness.status == 'ready':
+            return loader_readiness
+
+        manager_readiness = await self._read_write_manager.check_readiness()
+        return join_request_source_statuses(loader_readiness, manager_readiness)
 
     @override
     async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest | None:
@@ -80,20 +81,13 @@ class RequestManagerTandem(RequestManager):
     async def fetch_next_request(self) -> Request | None:
         # Only the loader's own readiness decides the transfer, so a loader that's still loading doesn't block the
         # manager's requests.
-        if (await self._read_only_loader.check_readiness()).status == 'ready':
-            transferred = await self._transfer_next_request()
-            # The request was dropped, so skip the manager this round. The next call picks up where this one left off.
-            if not transferred:
-                return None
+        if (await self._read_only_loader.check_readiness()).status != 'ready':
+            return await self._read_write_manager.fetch_next_request()
 
-        return await self._read_write_manager.fetch_next_request()
-
-    async def _transfer_next_request(self) -> bool:
-        """Move the loader's next request into the manager, returning `False` if it had to be dropped."""
         request = await self._read_only_loader.fetch_next_request()
 
         if not request:
-            return True
+            return await self._read_write_manager.fetch_next_request()
 
         try:
             await self._read_write_manager.add_request(request, forefront=True)
@@ -103,13 +97,13 @@ class RequestManagerTandem(RequestManager):
                 extra={'url': request.url, 'unique_key': request.unique_key},
             )
 
-            return False
+            return None
         finally:
             # Mark it as processed so that the `request` doesn't get stuck in the `in_progress` status
             # in `RequestLoader`
             await self._read_only_loader.mark_request_as_handled(request)
 
-        return True
+        return await self._read_write_manager.fetch_next_request()
 
     @override
     async def reclaim_request(self, request: Request, *, forefront: bool = False) -> None:
