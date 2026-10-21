@@ -5,7 +5,7 @@
     "separateMajorMinor": false,
     "dependencyDashboard": false,
     "semanticCommits": "enabled",
-    "minimumReleaseAge": "1 day",
+    "minimumReleaseAge": "7 days",
     "internalChecksFilter": "strict",
     "lockFileMaintenance": {
         "enabled": true,
