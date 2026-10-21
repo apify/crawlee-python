@@ -224,8 +224,9 @@ class _BasicCrawlerOptions(TypedDict):
     Returning `None` suppresses the status message."""
 
     id: NotRequired[str]
-    """A unique identifier for the crawler instance. It isolates the `use_state` state and the default statistics from
-    other crawlers. Without it, the ID follows the order in which crawlers are created."""
+    """Identifier of the crawler. Crawlers with the same ID share the `use_state` state and the default statistics, and
+    every crawler but the first uses it in the alias of its default request queue. Without it, the ID follows the order
+    in which crawlers are created."""
 
 
 class _BasicCrawlerOptionsGeneric(TypedDict, Generic[TCrawlingContext, TStatisticsState]):
@@ -371,8 +372,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             status_message_logging_interval: Interval for logging the crawler status messages.
             status_message_callback: Allows overriding the default status message. The default status message is
                 provided in the parameters. Returning `None` suppresses the status message.
-            id: A unique identifier for the crawler instance. It isolates the `use_state` state and the default
-                statistics from other crawlers. Without it, the ID follows the order in which crawlers are created.
+            id: Identifier of the crawler. Crawlers with the same ID share the `use_state` state and the default
+                statistics, and every crawler but the first uses it in the alias of its default request queue. Without
+                it, the ID follows the order in which crawlers are created.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
