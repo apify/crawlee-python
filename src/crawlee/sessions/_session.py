@@ -45,6 +45,7 @@ class Session:
         usage_count: int = 0,
         max_usage_count: int = 50,
         error_score: float = 0.0,
+        retired: bool = False,
         cookies: SessionCookies | CookieJar | dict[str, str] | list[CookieParam] | None = None,
         blocked_status_codes: list | None = None,
     ) -> None:
@@ -60,6 +61,7 @@ class Session:
             usage_count: Number of times the session has been used.
             max_usage_count: Maximum allowable uses of the session before it is considered expired.
             error_score: Current error score of the session.
+            retired: Whether the session has been permanently retired.
             cookies: Cookies associated with the session.
             blocked_status_codes: HTTP status codes that indicate a session should be blocked.
         """
@@ -72,6 +74,7 @@ class Session:
         self._usage_count = usage_count
         self._max_usage_count = max_usage_count
         self._error_score = error_score
+        self._retired = retired
         self._cookies = SessionCookies(cookies) or SessionCookies()
         self._blocked_status_codes = set(blocked_status_codes or self._DEFAULT_BLOCKED_STATUS_CODES)
 
@@ -145,8 +148,8 @@ class Session:
 
     @property
     def is_blocked(self) -> bool:
-        """Indicate whether the session is blocked based on the error score.."""
-        return self._error_score >= self._max_error_score
+        """Indicate whether the session is retired or blocked by its error score."""
+        return self._retired or self._error_score >= self._max_error_score
 
     @property
     def is_expired(self) -> bool:
@@ -183,6 +186,7 @@ class Session:
             usage_count=self._usage_count,
             max_usage_count=self._max_usage_count,
             error_score=self._error_score,
+            retired=self._retired,
             cookies=self._cookies.get_cookies_as_dicts(),
             blocked_status_codes=list(self._blocked_status_codes),
         )
@@ -211,14 +215,16 @@ class Session:
             self.retire()
 
     def retire(self) -> None:
-        """Retire the session by setting the error score to the maximum value.
+        """Permanently retire the session and increase its error score once.
 
         This method should be used if the session usage was unsuccessful and you are sure that it is because of
         the session configuration and not any external matters. For example when server returns 403 status code.
         If the session does not work due to some external factors as server error such as 5XX you probably want
         to use `mark_bad` method.
         """
-        self._error_score += self._max_error_score
+        if not self._retired:
+            self._retired = True
+            self._error_score += self._max_error_score
 
     def is_blocked_status_code(
         self,

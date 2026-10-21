@@ -27,6 +27,7 @@ class SessionModel(BaseModel):
     usage_count: int
     max_usage_count: int
     error_score: float
+    retired: bool = False
     cookies: list[CookieParam]
     blocked_status_codes: list[int]
 

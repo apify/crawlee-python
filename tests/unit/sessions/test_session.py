@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from crawlee.sessions._cookies import SessionCookies
+from crawlee.sessions._models import SessionModel
 from crawlee.sessions._session import Session
 
 
@@ -87,6 +88,49 @@ def test_retire_method(session: Session) -> None:
     assert not session.is_usable
     assert session.error_score == 3.0
     assert session.usage_count == initial_usage_count
+
+
+def test_retired_session_stays_blocked_after_success() -> None:
+    """A successful request cannot make a retired session usable again."""
+    session = Session()
+    session.retire()
+    session.mark_good()
+
+    assert session.error_score < 3.0
+    assert session.is_blocked
+    assert not session.is_usable
+
+
+def test_retirement_survives_serialization() -> None:
+    """Retirement survives a JSON round trip even with a reduced error score."""
+    session = Session()
+    session.retire()
+    session.mark_good()
+    state = session.get_state(as_dict=False).model_dump_json(by_alias=True)
+    restored = Session.from_model(SessionModel.model_validate_json(state))
+    restored.mark_good()
+
+    assert restored.is_blocked
+    assert not restored.is_usable
+
+
+def test_session_without_retirement_field_can_be_restored() -> None:
+    """Saved sessions without a retirement field remain loadable."""
+    state = Session().get_state(as_dict=True)
+    state.pop('retired', None)
+    restored = Session.from_model(SessionModel.model_validate(state))
+
+    assert restored.is_usable
+
+
+def test_retire_is_idempotent() -> None:
+    """Repeated retirement leaves the error score and usage count unchanged."""
+    session = Session()
+    session.retire()
+    state = session.get_state(as_dict=True)
+    session.retire()
+
+    assert session.get_state(as_dict=True) == state
 
 
 def test_mark_good_at_usage_limit_no_double_increment() -> None:
