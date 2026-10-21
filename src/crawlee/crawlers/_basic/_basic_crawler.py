@@ -530,6 +530,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._keep_alive = keep_alive
         self._running = False
         self._has_finished_before = False
+        self._handled_request_this_run = False
         self._failed = False
         self._unexpected_stop = False
         self._logger_once = LoggerOnce(self._logger)
@@ -736,6 +737,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             )
 
         self._running = True
+        self._handled_request_this_run = False
 
         try:
             if self._respect_robots_txt_file and not isinstance(self._request_manager, ThrottlingRequestManager):
@@ -815,8 +817,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 self._logger.info('Final request statistics:', extra=final_statistics.to_dict())
 
             # A crawl that did nothing while the manager holds only handled requests is a mistake, whoever handled them.
-            # Starting against handled requests is not, since that is what resuming a crawl looks like.
-            if final_statistics.requests_total == 0:
+            # Starting against handled requests is not, since that is what resuming a crawl looks like. The statistics
+            # can't tell, as they don't count skipped requests and may be restored from a previous process.
+            if not self._handled_request_this_run:
                 request_manager = await self.get_request_manager()
                 # The diagnostic must never fail the run.
                 try:
@@ -1950,3 +1953,4 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             logger=self._logger,
             max_retries=3,
         )
+        self._handled_request_this_run = True

@@ -30,6 +30,7 @@ from crawlee.autoscaling import AutoscaledPool, ConcurrencyConsumer, Concurrency
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import (
+    ContextPipelineInterruptedError,
     PersistentRateLimitError,
     RequestCollisionError,
     RequestThrottledError,
@@ -1629,6 +1630,36 @@ async def test_handled_count_error_does_not_fail_the_run(
 
     assert stats.requests_total == 0
     get_handled_count.assert_awaited_once()
+    assert processed_no_requests_warnings(caplog) == []
+
+
+@pytest.mark.parametrize(
+    ('method_name', 'skip'),
+    [
+        pytest.param('_is_allowed_based_on_robots_txt_file', AsyncMock(return_value=False), id='robots-disallowed'),
+        pytest.param(
+            '_run_request_handler', AsyncMock(side_effect=ContextPipelineInterruptedError), id='pipeline-interrupted'
+        ),
+    ],
+)
+async def test_run_that_only_skips_requests_does_not_warn(
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    method_name: str,
+    skip: AsyncMock,
+) -> None:
+    """A run that only skips requests marks them handled without warning that it processed nothing."""
+    queue = await RequestQueue.open()
+    await queue.add_request('https://a.placeholder.com')
+    crawler = BasicCrawler(request_manager=queue)
+    crawler.router.default_handler(AsyncMock())
+    monkeypatch.setattr(crawler, method_name, skip)
+
+    with caplog.at_level(logging.WARNING):
+        stats = await crawler.run()
+
+    assert stats.requests_total == 0
+    assert await queue.get_handled_count() == 1
     assert processed_no_requests_warnings(caplog) == []
 
 
