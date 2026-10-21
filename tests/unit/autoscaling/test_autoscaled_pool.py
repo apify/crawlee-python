@@ -285,6 +285,39 @@ async def test_propagates_exceptions(make_concurrency_system: type[ConcurrencySy
     assert done_count < 20
 
 
+async def test_failure_awaits_running_tasks(make_concurrency_system: type[ConcurrencySystem]) -> None:
+    """A failing task reaches the caller of `run` only after the tasks still running have finished."""
+    # The others finish out of the order they started in, so the list of running tasks shrinks unevenly.
+    durations = {'0': 0.05, '1': 0.3, '2': 0.1}
+    started = list[str]()
+    finished = list[str]()
+
+    async def run(task_id: str) -> None:
+        started.append(task_id)
+        if task_id == '3':
+            raise RuntimeError('Scheduled crash')
+
+        await asyncio.sleep(durations[task_id])
+        finished.append(task_id)
+
+    settings = ConcurrencySettings(min_concurrency=4, max_concurrency=4, desired_concurrency=4)
+
+    async with make_concurrency_system(settings) as concurrency_system:
+        pool = AutoscaledPool(
+            concurrency_system=concurrency_system,
+            consumer=CONSUMER,
+            run_task_function=run,
+            is_task_ready_function=lambda: future(len(started) < 4),
+            is_finished_function=lambda: future(False),
+        )
+
+        with pytest.raises(RuntimeError, match=r'Scheduled crash'):
+            await pool.run()
+
+        assert sorted(finished) == ['0', '1', '2']
+        assert concurrency_system.current_concurrency == 0
+
+
 async def test_orchestrator_error_awaits_workers(
     make_concurrency_system: type[ConcurrencySystem],
 ) -> None:

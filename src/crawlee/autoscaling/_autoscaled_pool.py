@@ -123,7 +123,8 @@ class AutoscaledPool:
 
             logger.debug('Waiting for remaining tasks to finish')
 
-            for task in run.worker_tasks:
+            # A copy, as the done callback of every task that finishes meanwhile removes it from the list.
+            for task in list(run.worker_tasks):
                 if not task.done():
                     with suppress(BaseException):
                         await task
