@@ -147,7 +147,7 @@ async def test_failed_run_keeps_pending_requests_for_the_retry(monkeypatch: pyte
     assert handled_urls == ['https://a.placeholder.com', 'https://b.placeholder.com']
 
 
-async def test_failure_after_the_crawl_marks_the_run_as_failed(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_crawler_is_usable_after_a_failure_after_the_crawl(monkeypatch: pytest.MonkeyPatch) -> None:
     """A failure after the crawl leaves the instance usable, and the next run continues the same queue."""
     queue = await RequestQueue.open()
     crawler = BasicCrawler(request_manager=queue)

@@ -816,11 +816,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             # A crawl that did nothing while the manager holds only handled requests is a mistake, whoever handled them.
             # Starting against handled requests is not, since that is what resuming a crawl looks like.
-            if final_statistics.requests_total == 0 and self._request_manager is not None:
-                try:
-                    is_finished = await self._request_manager.is_finished()
-                    handled_count = await self._request_manager.get_handled_count()
+            if final_statistics.requests_total == 0:
+                request_manager = await self.get_request_manager()
                 # The diagnostic must never fail the run.
+                try:
+                    is_finished = await request_manager.is_finished()
+                    handled_count = await request_manager.get_handled_count()
                 except Exception:
                     is_finished = False
                     handled_count = 0
