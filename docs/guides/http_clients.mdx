@@ -101,15 +101,14 @@ python -m pip install 'crawlee[all]'
 
 Crawlee provides an abstract base class, <ApiLink to="class/HttpClient">`HttpClient`</ApiLink>, which defines the interface that all HTTP clients must implement. This allows you to create custom HTTP clients tailored to your specific requirements.
 
-HTTP clients are responsible for several key operations:
+To create a custom HTTP client, inherit from <ApiLink to="class/HttpClient">`HttpClient`</ApiLink> and implement two methods:
 
-- sending HTTP requests and receiving responses,
-- managing cookies and sessions,
-- handling headers and authentication,
-- managing proxy configurations,
-- connection pooling with timeout management.
+- `_fetch` sends a single request, through the proxy from `proxy_info` if there is one, and returns the response without reading its body. It doesn't follow redirects or keep cookies of its own. Its `timeout` bounds both receiving the response and reading the body, and without one the default timeout of the underlying library applies.
+- `cleanup` closes the connections and other resources the client holds.
 
-To create a custom HTTP client, you need to inherit from the <ApiLink to="class/HttpClient">`HttpClient`</ApiLink> base class and implement all required abstract methods. Your implementation must be async-compatible and include proper cleanup and resource management to work seamlessly with Crawlee's concurrent processing model.
+The response implements the <ApiLink to="class/HttpResponse">`HttpResponse`</ApiLink> protocol. Its body is read on `read` or `read_stream`, and `aclose` releases the connection when the body isn't needed. Subclass the protocol to inherit the async context manager, which closes the response on exit.
+
+The base class provides `send_request` on top of `_fetch`. It sends the cookies of the session with every request, stores the cookies the server sets, and follows up to 10 redirects unless the client is created with `follow_redirects=False`. A custom client therefore handles redirects and cookies the same way as the built-in ones.
 
 ## Conclusion
 

@@ -86,6 +86,7 @@ if TYPE_CHECKING:
 
     from crawlee._types import (
         ConcurrencySettings,
+        DeferredCleanupCallback,
         EnqueueLinksFunction,
         ExtractLinksFunction,
         GetDataKwargs,
@@ -1395,6 +1396,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self,
         session: Session | None,
         proxy_info: ProxyInfo | None,
+        register_deferred_cleanup: Callable[[DeferredCleanupCallback], None],
     ) -> SendRequestFunction:
         async def send_request(
             url: str,
@@ -1404,7 +1406,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             headers: HttpHeaders | dict[str, str] | None = None,
             timeout: timedelta | None = None,
         ) -> HttpResponse:
-            return await self._http_client.send_request(
+            response = await self._http_client.send_request(
                 url=url,
                 method=method,
                 payload=payload,
@@ -1413,6 +1415,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 proxy_info=proxy_info,
                 timeout=timeout,
             )
+            # A response whose body the handler never read would hold its connection open.
+            register_deferred_cleanup(response.aclose)
+            return response
 
         return send_request
 
@@ -1563,7 +1568,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request=request,
             session=session,
             proxy_info=proxy_info,
-            send_request=self._prepare_send_request_function(session, proxy_info),
+            send_request=self._prepare_send_request_function(session, proxy_info, deferred_cleanup.append),
             add_requests=result.add_requests,
             push_data=result.push_data,
             get_key_value_store=result.get_key_value_store,

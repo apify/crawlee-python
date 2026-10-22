@@ -57,15 +57,18 @@ class RobotsTxtFile:
         try:
             response = await http_client.send_request(url, proxy_info=proxy_info)
 
-            status_code = response.status_code
-            if is_status_code_client_error(status_code):
-                # A 4xx response means the file is unavailable, so crawling is unrestricted (RFC 9309, section 2.3.1.3).
-                body = b'User-agent: *\nAllow: /'
-            elif is_status_code_server_error(status_code):
-                # A 5xx response means the file is unreachable, so assume complete disallow (RFC 9309, section 2.3.1.4).
-                body = b'User-agent: *\nDisallow: /'
-            else:
-                body = await response.read()
+            async with response:
+                status_code = response.status_code
+                if is_status_code_client_error(status_code):
+                    # A 4xx response means the file is unavailable, so crawling is unrestricted (RFC 9309, section
+                    # 2.3.1.3).
+                    body = b'User-agent: *\nAllow: /'
+                elif is_status_code_server_error(status_code):
+                    # A 5xx response means the file is unreachable, so assume complete disallow (RFC 9309, section
+                    # 2.3.1.4).
+                    body = b'User-agent: *\nDisallow: /'
+                else:
+                    body = await response.read()
             robots = Protego.parse(body.decode('utf-8'))
 
         except Exception as e:

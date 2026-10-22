@@ -10,6 +10,7 @@ from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+    from types import TracebackType
     from typing import NotRequired, Self
 
     from playwright.async_api import Response
@@ -38,9 +39,11 @@ class BlockRequestsFunction(Protocol):
 class PlaywrightHttpResponse:
     """Wrapper class for playwright `Response` and `APIResponse` objects to implement `HttpResponse` protocol."""
 
+    url: str
     http_version: str
     status_code: int
     headers: HttpHeaders
+    headers_set_cookie: list[str]
     _content: bytes
 
     async def read(self) -> bytes:
@@ -51,9 +54,27 @@ class PlaywrightHttpResponse:
         # This is a workaround to make it compatible with `HttpResponse` protocol.
         yield self._content
 
+    async def aclose(self) -> None:
+        # The body is read when the instance is created, so there is no connection to release.
+        return
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        await self.aclose()
+
     @classmethod
     async def from_playwright_response(cls, response: Response | APIResponse, protocol: str) -> Self:
         headers = HttpHeaders(response.headers)
+        # Unlike `headers`, the headers array lists every `Set-Cookie` header separately.
+        headers_array = response.headers_array if isinstance(response, APIResponse) else await response.headers_array()
+        headers_set_cookie = [header['value'] for header in headers_array if header['name'].lower() == 'set-cookie']
         status_code = response.status
         # Used http protocol version cannot be obtained from `Response` and has to be passed as additional argument.
         http_version = protocol
@@ -62,7 +83,14 @@ class PlaywrightHttpResponse:
         if isinstance(response, APIResponse):
             await response.dispose()
 
-        return cls(http_version=http_version, status_code=status_code, headers=headers, _content=_content)
+        return cls(
+            url=response.url,
+            http_version=http_version,
+            status_code=status_code,
+            headers=headers,
+            headers_set_cookie=headers_set_cookie,
+            _content=_content,
+        )
 
 
 class GotoOptions(TypedDict):

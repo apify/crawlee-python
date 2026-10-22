@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager
-from http.cookiejar import Cookie
-from typing import TYPE_CHECKING, Any, cast
+import warnings
+from contextvars import ContextVar
+from functools import cached_property
+from typing import TYPE_CHECKING, Any
 
-from curl_cffi import CurlInfo
-from curl_cffi.const import CurlHttpVersion
+from curl_cffi import AsyncCurl, CurlError
+from curl_cffi.const import CurlECode, CurlHttpVersion
 from curl_cffi.requests import AsyncSession
 from curl_cffi.requests.cookies import Cookies as CurlCookies
 from curl_cffi.requests.cookies import CurlMorsel
@@ -19,9 +20,8 @@ from typing_extensions import override
 from crawlee._types import HttpHeaders, HttpMethod, HttpPayload
 from crawlee._utils.blocked import ROTATE_PROXY_ERRORS
 from crawlee._utils.docs import docs_group
-from crawlee._utils.urls import validate_http_url
 from crawlee.errors import ProxyError
-from crawlee.http_clients import HttpClient, HttpCrawlingResult, HttpResponse
+from crawlee.http_clients import HttpClient, HttpResponse
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -32,11 +32,8 @@ if TYPE_CHECKING:
     from curl_cffi.requests import Response
     from curl_cffi.requests.session import HttpMethod as CurlHttpMethod
 
-    from crawlee import Request
     from crawlee._types import HttpMethod
     from crawlee.proxy_configuration import ProxyInfo
-    from crawlee.sessions import Session
-    from crawlee.statistics import Statistics
 
 
 _CURL_PROXY_ERRORS = [
@@ -44,6 +41,9 @@ _CURL_PROXY_ERRORS = [
     'CONNECT tunnel failed',
 ]
 """Content of `libcurl` proxy errors that `curl_cffi` does not report as `CurlProxyError`."""
+
+_transfers: ContextVar[list[asyncio.Future] | None] = ContextVar('_transfers', default=None)
+"""Collects the transfers started by the current `_fetch` call, so that it can abort them."""
 
 
 class _EmptyCookies(CurlCookies):
@@ -68,11 +68,40 @@ class _AsyncSession(AsyncSession):
         self._cookies = _EmptyCookies()
 
 
-class _CurlImpersonateResponse:
+class _AsyncCurl(AsyncCurl):
+    """`AsyncCurl` that hands every transfer it starts to the `_fetch` call that started it."""
+
+    @override
+    def add_handle(self, curl: Curl) -> asyncio.Future:
+        transfer = super().add_handle(curl)
+        if (transfers := _transfers.get()) is not None:
+            transfers.append(transfer)
+        return transfer
+
+
+def _abort(transfer: asyncio.Future) -> None:
+    """Abort a running transfer, which closes its connection and returns its handle to the pool.
+
+    A streamed transfer of `curl_cffi` keeps running when its request is cancelled or its response closed.
+    """
+    if not transfer.done():
+        transfer.set_exception(CurlError('The transfer was aborted.', CurlECode.ABORTED_BY_CALLBACK))
+
+
+class _CurlImpersonateResponse(HttpResponse):
     """Adapter class for `curl_cffi.requests.Response` to conform to the `HttpResponse` protocol."""
 
-    def __init__(self, response: Response) -> None:
+    def __init__(self, response: Response, *, transfer: asyncio.Future, deadline: float | None) -> None:
         self._response = response
+        self._transfer = transfer
+        self._deadline = deadline
+        # `curl_cffi` does not keep the body of a streamed response once it was read.
+        self._content: bytes | None = None
+        self._consumed = False
+
+    @property
+    def url(self) -> str:
+        return self._response.url
 
     @property
     def http_version(self) -> str:
@@ -97,32 +126,46 @@ class _CurlImpersonateResponse:
     def status_code(self) -> int:
         return self._response.status_code
 
-    @property
+    @cached_property
     def headers(self) -> HttpHeaders:
         return HttpHeaders({key: value for key, value in self._response.headers.items() if value})
 
-    async def read(self) -> bytes:
-        if self._response.astream_task:
-            raise RuntimeError('Use `read_stream` to read the body of the Response received from the `stream` method')
+    @property
+    def headers_set_cookie(self) -> list[str]:
+        return [value for value in self._response.headers.get_list('set-cookie') if value]
 
-        return self._response.content
+    async def read(self) -> bytes:
+        if self._content is None:
+            # `curl_cffi` returns an empty body to a second read of a failed transfer, so the body counts as consumed as
+            # soon as reading starts.
+            if self._consumed:
+                raise RuntimeError('Stream is already consumed.')
+            self._consumed = True
+            try:
+                async with asyncio.timeout_at(self._deadline):
+                    self._content = await self._response.acontent()
+            except Timeout as exc:
+                raise TimeoutError from exc
+        return self._content
 
     async def read_stream(self) -> AsyncGenerator[bytes, None]:
-        if not self._response.astream_task:
-            raise RuntimeError('Cannot read stream, Response not obtained from `stream` method.')
-
-        # A finished transfer task only means the whole body arrived into the response queue. The stream is consumed
-        # once the queue has also been drained.
-        if (
-            isinstance(self._response.astream_task, asyncio.Future)
-            and self._response.astream_task.done()
-            and self._response.queue is not None
-            and self._response.queue.empty()
-        ):
-            raise RuntimeError('Cannot read stream, it was already consumed.')
-
-        async for chunk in self._response.aiter_content():
+        if self._consumed:
+            raise RuntimeError('Stream is already consumed.')
+        self._consumed = True
+        chunks = self._response.aiter_content()
+        while True:
+            try:
+                async with asyncio.timeout_at(self._deadline):
+                    chunk = await anext(chunks)
+            except StopAsyncIteration:
+                return
+            except Timeout as exc:
+                raise TimeoutError from exc
             yield chunk
+
+    async def aclose(self) -> None:
+        _abort(self._transfer)
+        await self._response.aclose()
 
 
 @docs_group('HTTP clients')
@@ -149,153 +192,86 @@ class CurlImpersonateHttpClient(HttpClient):
         self,
         *,
         persist_cookies_per_session: bool = True,
+        follow_redirects: bool = True,
         **async_session_kwargs: Any,
     ) -> None:
         """Initialize a new instance.
 
         Args:
             persist_cookies_per_session: Whether to persist cookies per HTTP session.
-            async_session_kwargs: Additional keyword arguments for `curl_cffi.requests.AsyncSession`.
+            follow_redirects: Whether to follow HTTP redirects.
+            async_session_kwargs: Additional keyword arguments for `curl_cffi.requests.AsyncSession`. Some of them are
+                ignored with a warning. The `auth` and `params` arguments would reach every request of a redirect chain,
+                so pass credentials in the `Authorization` header and the query in the URL instead. The client aborts
+                transfers through an `AsyncCurl` of its own, so `async_curl` is ignored. Redirects are followed by
+                `send_request`, so `allow_redirects` and `max_redirects` are ignored.
         """
         super().__init__(
             persist_cookies_per_session=persist_cookies_per_session,
+            follow_redirects=follow_redirects,
+            headers=async_session_kwargs.pop('headers', None),
         )
+
+        for ignored_kwarg in ('auth', 'params', 'async_curl', 'allow_redirects', 'max_redirects'):
+            if async_session_kwargs.pop(ignored_kwarg, None) is not None:
+                warnings.warn(
+                    f'The `{ignored_kwarg}` argument of `CurlImpersonateHttpClient` is ignored.',
+                    UserWarning,
+                    stacklevel=2,
+                )
+
         self._async_session_kwargs = async_session_kwargs
 
         self._client_by_proxy_url = dict[str | None, AsyncSession]()
 
     @override
-    async def crawl(
+    async def _fetch(
         self,
-        request: Request,
+        url: str,
         *,
-        session: Session | None = None,
-        proxy_info: ProxyInfo | None = None,
-        statistics: Statistics | None = None,
-        timeout: timedelta | None = None,
-    ) -> HttpCrawlingResult:
+        method: HttpMethod,
+        headers: HttpHeaders,
+        payload: HttpPayload | None,
+        proxy_info: ProxyInfo | None,
+        timeout: timedelta | None,
+    ) -> _CurlImpersonateResponse:
         client = self._get_client(proxy_info.url if proxy_info else None)
-        self._raise_if_non_positive_timeout(timeout)
+        deadline = asyncio.get_running_loop().time() + timeout.total_seconds() if timeout is not None else None
 
-        try:
-            response = await client.request(
-                url=request.url,
-                method=self._convert_method(request.method),
-                headers=request.headers,
-                data=request.payload,
-                cookies=session.cookies.jar if session else None,
-                timeout=timeout.total_seconds() if timeout is not None else None,
-            )
-        except Timeout as exc:
-            raise TimeoutError from exc
-        except CurlRequestError as exc:
-            if self._is_proxy_error(exc):
-                raise ProxyError from exc
-            raise
+        # Without a timeout of its own, the request gets the default timeout of the session.
+        timeout_kwargs: dict[str, Any] = {}
+        if timeout is not None:
+            # `curl_cffi` cuts the timeout down to whole milliseconds, and `libcurl` reads 0 as no timeout.
+            timeout_kwargs['timeout'] = max(timeout.total_seconds(), 0.001)
 
-        if statistics:
-            statistics.register_status_code(response.status_code)
-
-        if self._persist_cookies_per_session and session and response.curl:
-            response_cookies = self._get_cookies(response.curl)
-            session.cookies.store_cookies(response_cookies)
-
-        request.loaded_url = response.url
-
-        return HttpCrawlingResult(
-            http_response=_CurlImpersonateResponse(response),
-        )
-
-    @override
-    async def send_request(
-        self,
-        url: str,
-        *,
-        method: HttpMethod = 'GET',
-        headers: HttpHeaders | dict[str, str] | None = None,
-        payload: HttpPayload | None = None,
-        session: Session | None = None,
-        proxy_info: ProxyInfo | None = None,
-        timeout: timedelta | None = None,
-    ) -> HttpResponse:
-        validate_http_url(url)
-
-        if isinstance(headers, dict) or headers is None:
-            headers = HttpHeaders(headers or {})
-
-        proxy_url = proxy_info.url if proxy_info else None
-        client = self._get_client(proxy_url)
-        self._raise_if_non_positive_timeout(timeout)
-
+        transfers: list[asyncio.Future] = []
+        token = _transfers.set(transfers)
         try:
             response = await client.request(
                 url=url,
                 method=self._convert_method(method),
-                headers=dict(headers) if headers else None,
+                headers=dict(headers) or None,
                 data=payload,
-                cookies=session.cookies.jar if session else None,
-                timeout=timeout.total_seconds() if timeout is not None else None,
-            )
-        except Timeout as exc:
-            raise TimeoutError from exc
-        except CurlRequestError as exc:
-            if self._is_proxy_error(exc):
-                raise ProxyError from exc
-            raise
-
-        if self._persist_cookies_per_session and session and response.curl:
-            response_cookies = self._get_cookies(response.curl)
-            session.cookies.store_cookies(response_cookies)
-
-        return _CurlImpersonateResponse(response)
-
-    @asynccontextmanager
-    @override
-    async def stream(
-        self,
-        url: str,
-        *,
-        method: HttpMethod = 'GET',
-        headers: HttpHeaders | dict[str, str] | None = None,
-        payload: HttpPayload | None = None,
-        session: Session | None = None,
-        proxy_info: ProxyInfo | None = None,
-        timeout: timedelta | None = None,
-    ) -> AsyncGenerator[HttpResponse]:
-        validate_http_url(url)
-
-        if isinstance(headers, dict) or headers is None:
-            headers = HttpHeaders(headers or {})
-
-        proxy_url = proxy_info.url if proxy_info else None
-        client = self._get_client(proxy_url)
-        self._raise_if_non_positive_timeout(timeout)
-
-        try:
-            response = await client.request(
-                url=url,
-                method=self._convert_method(method),
-                headers=dict(headers) if headers else None,
-                data=payload,
-                cookies=session.cookies.jar if session else None,
+                # Redirects are followed hop by hop by `send_request`.
+                allow_redirects=False,
                 stream=True,
-                timeout=timeout.total_seconds() if timeout is not None else None,
+                **timeout_kwargs,
             )
+        except asyncio.CancelledError:
+            for transfer in transfers:
+                _abort(transfer)
+            raise
         except Timeout as exc:
             raise TimeoutError from exc
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
                 raise ProxyError from exc
             raise
-
-        if self._persist_cookies_per_session and session and response.curl:
-            response_cookies = self._get_cookies(response.curl)
-            session.cookies.store_cookies(response_cookies)
-
-        try:
-            yield _CurlImpersonateResponse(response)
         finally:
-            await response.aclose()
+            _transfers.reset(token)
+
+        # With `retry`, `curl_cffi` starts a transfer per attempt, so the live one is the last.
+        return _CurlImpersonateResponse(response, transfer=transfers[-1], deadline=deadline)
 
     def _get_client(self, proxy_url: str | None) -> AsyncSession:
         """Retrieve or create an asynchronous HTTP session for the given proxy URL.
@@ -316,20 +292,11 @@ class CurlImpersonateHttpClient(HttpClient):
             # Update the default kwargs with any additional user-provided kwargs.
             kwargs.update(self._async_session_kwargs)
 
-            # Create and store the new session with the specified kwargs.
-            self._client_by_proxy_url[proxy_url] = _AsyncSession(**kwargs)
+            # Create and store the new session with the specified kwargs. Its `_AsyncCurl` lets `_fetch` abort the
+            # transfers.
+            self._client_by_proxy_url[proxy_url] = _AsyncSession(**kwargs, async_curl=_AsyncCurl())
 
         return self._client_by_proxy_url[proxy_url]
-
-    @staticmethod
-    def _raise_if_non_positive_timeout(timeout: timedelta | None) -> None:
-        """Raise `TimeoutError` for a non-positive timeout.
-
-        `curl_cffi` (like `libcurl`) treats an explicit `0` timeout as "no timeout", so a non-positive timeout
-        must be rejected here instead of being forwarded as-is.
-        """
-        if timeout is not None and timeout.total_seconds() <= 0:
-            raise TimeoutError
 
     def _convert_method(self, method: HttpMethod) -> CurlHttpMethod:
         """Convert from Crawlee HTTP method to curl-cffi HTTP method.
@@ -380,21 +347,9 @@ class CurlImpersonateHttpClient(HttpClient):
 
         return False
 
-    @staticmethod
-    def _get_cookies(curl: Curl) -> list[Cookie]:
-        cookies = list[Cookie]()
-
-        # Implementation of getinfo always returns list[bytes] for CurlInfo.COOKIELIST.
-        cookie_list = cast('list[bytes]', curl.getinfo(CurlInfo.COOKIELIST))
-
-        for curl_cookie in cookie_list:
-            curl_morsel = CurlMorsel.from_curl_format(curl_cookie)
-            cookie = curl_morsel.to_cookiejar_cookie()
-            cookies.append(cookie)
-
-        return cookies
-
     async def cleanup(self) -> None:
         for client in self._client_by_proxy_url.values():
             await client.close()
+            # A session does not close an `AsyncCurl` it was given.
+            await client.acurl.close()
         self._client_by_proxy_url.clear()

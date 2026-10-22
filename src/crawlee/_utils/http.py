@@ -3,11 +3,19 @@
 from __future__ import annotations
 
 import re
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from logging import getLogger
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from crawlee.http_clients import HttpResponse
 
 logger = getLogger(__name__)
+
+_MAX_DRAINED_BODY_SIZE = 64 * 1024
+"""The largest unread body that `drain_small_body` reads."""
 
 _CHARSET_PATTERN = re.compile(r'(?:^|;)\s*charset\s*=\s*(?:"([^"]*)"|([^;\s]*))', re.IGNORECASE)
 
@@ -66,3 +74,15 @@ def parse_retry_after_header(value: str | None) -> timedelta | None:
         pass
 
     return None
+
+
+async def drain_small_body(response: HttpResponse) -> None:
+    """Read the body of a response known to be small, so that closing the response keeps its HTTP/1.1 connection.
+
+    `httpx2` and `impit` drop the connection of a response closed before its body arrives.
+    """
+    content_length = response.headers.get('content-length', '')
+    if content_length.isdigit() and int(content_length) <= _MAX_DRAINED_BODY_SIZE:
+        # If reading fails, closing the response drops the connection anyway.
+        with suppress(Exception):
+            await response.read()
