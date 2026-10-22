@@ -167,3 +167,77 @@ current concurrency 3, desired 5, overloaded: cpu 58% of the time (limit 40%)
 To read the concurrency values in code, use `crawler.concurrency_system`.
 
 The autoscaling loggers moved together with the package. `crawlee._autoscaling.autoscaled_pool`, `crawlee._autoscaling.snapshotter` and `crawlee._autoscaling.system_status` are now `crawlee.autoscaling._autoscaled_pool`, `crawlee.autoscaling._snapshotter` and `crawlee.autoscaling._system_status`. The state log, along with the messages about scaling and free capacity, now comes from the new `crawlee.autoscaling._concurrency_system` logger. To configure all of them at once, use the `crawlee.autoscaling` logger.
+
+## HTTP clients
+
+`HttpClient` follows the design of Crawlee JS v4. A client implements a single request, and the base class handles redirects and cookies the same way for every client.
+
+### Custom HTTP clients
+
+The `crawl` and `stream` methods of `HttpClient` are removed. A custom client implements `_fetch`, which sends one request and returns the response without following redirects or keeping cookies, and `cleanup`. It inherits `send_request` from `HttpClient`.
+
+```python
+# v1
+class MyHttpClient(HttpClient):
+    async def crawl(self, request, **kwargs): ...
+
+    async def send_request(self, url, **kwargs): ...
+
+    def stream(self, url, **kwargs): ...
+
+    async def cleanup(self): ...
+
+
+# v2
+class MyHttpClient(HttpClient):
+    async def _fetch(self, url, *, method, headers, payload, proxy_info, timeout): ...
+
+    async def cleanup(self): ...
+```
+
+`HttpClient.__init__` is no longer abstract, so a custom client doesn't have to define it. A custom `__init__` must call `super().__init__()`, because `send_request` reads the `persist_cookies_per_session`, `follow_redirects` and `headers` options it stores.
+
+`HttpResponse` has three new members, `url`, `headers_set_cookie` and `aclose`, and works as an async context manager that closes the response. A custom response implements them too. Subclass `HttpResponse` to inherit the context manager.
+
+### Responses are read lazily
+
+`send_request` returns the response once its headers arrive, and the body is read on `read()` or `read_stream()`. To stream a body, call `send_request` and read the response with `read_stream()`. A response whose body you don't read holds its connection until you call `aclose()`, so use the response as an async context manager, which closes it:
+
+```python
+# v1
+async with http_client.stream(url) as response:
+    async for chunk in response.read_stream():
+        ...
+
+# v2
+async with await http_client.send_request(url) as response:
+    async for chunk in response.read_stream():
+        ...
+```
+
+Responses returned by `context.send_request()` are closed after the request is processed, so a request handler doesn't need to close them.
+
+### Timeouts
+
+The `timeout` of `send_request` is one deadline for the whole redirect chain and for reading the body, the same as in Crawlee JS. A body read past it raises `TimeoutError`. Without a `timeout`, the default timeout of the underlying library applies: 30 seconds for `ImpitHttpClient`, which counts reading the body too, and for `CurlImpersonateHttpClient`, and 5 seconds per operation for `HttpxHttpClient`. In v1, `ImpitHttpClient` and `CurlImpersonateHttpClient` disabled the timeout altogether in that case. To change the default, pass `timeout` to the client.
+
+The crawlers pass the remaining `navigation_timeout` to the HTTP client, so it bounds reading the body too. With `FileDownloadCrawler(stream=True)`, that includes the body streamed in the request handler, for every HTTP client. In v1, only `ImpitHttpClient` bounded the streamed body, while `HttpxHttpClient` and `CurlImpersonateHttpClient` bounded only the connection. For long downloads, raise `navigation_timeout` together with `request_handler_timeout`.
+
+### Redirects
+
+`send_request` follows up to 10 redirects and raises `RuntimeError` when a server redirects more often. The limit isn't configurable. Every client takes `follow_redirects`. With `follow_redirects=False`, `send_request` returns the first response as it is. The redirect options of the underlying libraries are ignored with a warning, see [Ignored client arguments](#ignored-client-arguments).
+
+### Cookies
+
+A `Cookie` header passed with a request replaces the session cookies for as long as the redirect chain stays on its origin, with every HTTP client. In v1, `CurlImpersonateHttpClient` also sent the session cookies, in a second `Cookie` header. Without a session, or with `persist_cookies_per_session=False`, the cookies a server sets during a redirect chain are sent with the following requests of that chain.
+
+### Ignored client arguments
+
+Some keyword arguments of the underlying libraries are now ignored with a warning:
+
+- `cookies` of `HttpxHttpClient`, since cookies are kept in sessions.
+- `auth` and `params` of `HttpxHttpClient` and `CurlImpersonateHttpClient`, which would reach every request of a redirect chain. Pass the credentials in the `Authorization` header and the query in the URL instead.
+- `async_curl` of `CurlImpersonateHttpClient`, since the client aborts transfers through an `AsyncCurl` of its own.
+- `max_redirects` of every client and `allow_redirects` of `CurlImpersonateHttpClient`, since `send_request` follows the redirects.
+
+The `headers` argument of a client still applies to every request. Its `Authorization`, `Proxy-Authorization` and `Cookie` headers are dropped when a redirect leaves the origin, the same as the headers passed with a request. With `HttpxHttpClient`, the headers of the client now win over the generated browser headers, which replaced them in v1.
