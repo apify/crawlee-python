@@ -530,7 +530,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._keep_alive = keep_alive
         self._running = False
         self._has_finished_before = False
-        self._last_run_failed = False
+        self._handled_request_this_run = False
         self._failed = False
         self._unexpected_stop = False
         self._logger_once = LoggerOnce(self._logger)
@@ -717,20 +717,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._on_skipped_request = callback
         return callback
 
-    async def run(
-        self,
-        requests: Sequence[str | Request] | None = None,
-        *,
-        purge_request_queue: bool = True,
-    ) -> FinalStatistics:
+    async def run(self, requests: Sequence[str | Request] | None = None) -> FinalStatistics:
         """Run the crawler until all requests are processed.
+
+        Calling `run()` again on the same instance keeps crawling the same request manager. Requests that a previous
+        run handled, failed ones included, aren't processed again. To crawl them again, purge the request manager, or
+        create a new crawler with a freshly opened request queue.
 
         Args:
             requests: The requests to be enqueued before the crawler starts.
-            purge_request_queue: If this is `True` and the crawler is not being run for the first time, the request
-                queue will be purged. A run that ended with an exception does not count as a previous run, so a
-                retry keeps the requests that were still pending even when this is `True`. Named request queues
-                are considered persistent and are never purged implicitly.
 
         Raises:
             PersistentRateLimitError: If a domain throttled by a `ThrottlingRequestManager` has rate-limited every
@@ -742,6 +737,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             )
 
         self._running = True
+        self._handled_request_this_run = False
 
         try:
             if self._respect_robots_txt_file and not isinstance(self._request_manager, ThrottlingRequestManager):
@@ -757,22 +753,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
                 if self._use_session_pool:
                     await self._session_pool.reset_store()
-
-                # A failed run does not count as a previous run, so its pending requests survive into the retry.
-                if purge_request_queue and not self._last_run_failed:
-                    request_manager = await self.get_request_manager()
-                    # A `ThrottlingRequestManager` delegates `purge` to the manager it wraps, so inspect the wrapped
-                    # manager when deciding whether the purge would hit a named queue.
-                    inner_manager = (
-                        request_manager.inner
-                        if isinstance(request_manager, ThrottlingRequestManager)
-                        else request_manager
-                    )
-                    # Named storages are persistent and shared across runs, so they are never purged implicitly
-                    # (the same named-storage exemption as in `StorageClient._purge_if_needed`).
-                    is_named_queue = isinstance(inner_manager, RequestQueue) and inner_manager.name is not None
-                    if not is_named_queue:
-                        await request_manager.purge()
 
             if requests is not None:
                 await self.add_requests(requests)
@@ -827,7 +807,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 )
 
             self._has_finished_before = True
-            self._last_run_failed = False
 
             await self._save_crawler_state()
 
@@ -836,10 +815,31 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 self._logger.info(f'Final request statistics:\n{final_statistics.to_table()}')
             else:
                 self._logger.info('Final request statistics:', extra=final_statistics.to_dict())
-        except BaseException:
-            self._last_run_failed = True
-            raise
-        else:
+
+            # A crawl that did nothing while the manager holds only handled requests is a mistake, whoever handled them.
+            # Starting against handled requests is not, since that is what resuming a crawl looks like. The statistics
+            # can't tell, as they don't count skipped requests and may be restored from a previous process.
+            if not self._handled_request_this_run:
+                request_manager = await self.get_request_manager()
+                # The diagnostic must never fail the run.
+                try:
+                    is_finished = await request_manager.is_finished()
+                    handled_count = await request_manager.get_handled_count()
+                except Exception:
+                    is_finished = False
+                    handled_count = 0
+
+                # Pending requests mean the crawl ended early, such as after an abort, not that everything was handled.
+                if is_finished and handled_count > 0:
+                    noun = 'request' if handled_count == 1 else 'requests'
+                    message = (
+                        f'This crawl processed no requests - the request manager holds {handled_count} {noun}, all of '
+                        'them already handled, and a failed request counts as handled too. Nothing empties a queue '
+                        'between runs, so to crawl them again, purge it (`await queue.purge()`) or use a fresh one '
+                        "(e.g. `RequestQueue.open(alias='second-run')`) with a freshly created crawler instance."
+                    )
+                    self._logger_once.log(message, key=message, level=logging.WARNING)
+
             return final_statistics
         finally:
             # A failed run must leave the instance usable, so that the caller can retry after handling the error.
@@ -1953,3 +1953,4 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             logger=self._logger,
             max_retries=3,
         )
+        self._handled_request_this_run = True

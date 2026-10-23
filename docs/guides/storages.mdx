@@ -206,7 +206,7 @@ Crawlee provides the following helper function to simplify interactions with the
 
 ## Cleaning up the storages
 
-By default, Crawlee cleans up all unnamed storages (including the default one) at the start of each run, so every crawl begins with a clean state. This behavior is controlled by <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink> (default: True). In contrast, named storages are never purged automatically and persist across runs. The exact behavior may vary depending on the storage client implementation.
+By default, Crawlee cleans up all unnamed storages (including the default one) once per process, when each one is first opened, so every process begins with a clean state. This behavior is controlled by <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink> (default: True). In contrast, named storages are never purged automatically and persist across runs. The exact behavior may vary depending on the storage client implementation.
 
 ### When purging happens
 
@@ -214,7 +214,7 @@ The cleanup occurs as soon as a storage is accessed:
 
 - When opening a storage explicitly (e.g., <ApiLink to="class/RequestQueue#open">`RequestQueue.open`</ApiLink>, <ApiLink to="class/Dataset#open">`Dataset.open`</ApiLink>, <ApiLink to="class/KeyValueStore#open">`KeyValueStore.open`</ApiLink>).
 - When using helper functions that implicitly open storages (e.g., <ApiLink to="class/PushDataFunction">`push_data`</ApiLink>).
-- Automatically when <ApiLink to="class/BasicCrawler#run">`BasicCrawler.run`</ApiLink> is invoked.
+- Automatically when <ApiLink to="class/BasicCrawler#run">`BasicCrawler.run`</ApiLink> opens the crawler's storages.
 
 ### Disabling automatic purging
 
