@@ -167,3 +167,15 @@ current concurrency 3, desired 5, overloaded: cpu 58% of the time (limit 40%)
 To read the concurrency values in code, use `crawler.concurrency_system`.
 
 The autoscaling loggers moved together with the package. `crawlee._autoscaling.autoscaled_pool`, `crawlee._autoscaling.snapshotter` and `crawlee._autoscaling.system_status` are now `crawlee.autoscaling._autoscaled_pool`, `crawlee.autoscaling._snapshotter` and `crawlee.autoscaling._system_status`. The state log, along with the messages about scaling and free capacity, now comes from the new `crawlee.autoscaling._concurrency_system` logger. To configure all of them at once, use the `crawlee.autoscaling` logger.
+
+## Only the first crawler uses the default request queue
+
+Only the first crawler created in a process opens the default request queue, the same as Crawlee JS. Every later crawler without a `request_manager` opens its own queue under the alias `__default_{id}__`. A crawler without an `id` uses its creation index there, such as `__default_1__`. In v1, all these crawlers shared the default queue, so a URL one crawler handled was skipped by the others.
+
+To reach a crawler's queue, call `crawler.get_request_manager()` instead of `RequestQueue.open()`. If your crawlers relied on the shared queue, open it yourself and pass it to each of them:
+
+```python
+queue = await RequestQueue.open()
+crawler_1 = BasicCrawler(request_manager=queue)
+crawler_2 = BasicCrawler(request_manager=queue)
+```

@@ -1270,6 +1270,39 @@ def test_default_statistics_key_differs_from_later_statistics() -> None:
     assert statistics._state._persist_state_key != crawler.statistics._state._persist_state_key
 
 
+async def test_only_first_crawler_uses_default_request_queue() -> None:
+    """Only the first crawler opens the default RQ, the later ones open their own under an alias from their ID."""
+    crawler_1 = BasicCrawler(id='first')
+    crawler_2 = BasicCrawler()
+    crawler_3 = BasicCrawler(id='custom')
+
+    assert await crawler_1.get_request_manager() is await RequestQueue.open()
+    assert await crawler_2.get_request_manager() is await RequestQueue.open(alias='__default_1__')
+    assert await crawler_3.get_request_manager() is await RequestQueue.open(alias='__default_custom__')
+
+
+async def test_crawlers_do_not_share_requests() -> None:
+    """Two crawlers without a request manager each crawl the same URL, since they don't share a queue."""
+    crawler_1 = BasicCrawler(request_handler=AsyncMock())
+    crawler_2 = BasicCrawler(request_handler=AsyncMock())
+
+    stats_1 = await crawler_1.run(['https://a.placeholder.com'])
+    stats_2 = await crawler_2.run(['https://a.placeholder.com'])
+
+    assert stats_1.requests_finished == 1
+    assert stats_2.requests_finished == 1
+
+
+async def test_id_invalid_as_request_queue_alias() -> None:
+    """A later crawler whose ID can't form an RQ alias fails to open its RQ, unless it gets a request manager."""
+    BasicCrawler()
+    with pytest.raises(ValueError, match='Invalid storage alias'):
+        await BasicCrawler(id='shop/products').get_request_manager()
+    request_manager = Mock()
+    crawler = BasicCrawler(id='shop/products', request_manager=request_manager)
+    assert await crawler.get_request_manager() is request_manager
+
+
 async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> None:
     state_in_handler_one: dict[str, JsonSerializable] = {}
     state_in_handler_two: dict[str, JsonSerializable] = {}
