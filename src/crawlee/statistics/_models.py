@@ -69,7 +69,8 @@ class StatisticsState(BaseModel):
     model_config = ConfigDict(
         alias_generator=to_camel, validate_by_name=True, validate_by_alias=True, ser_json_inf_nan='constants'
     )
-    stats_id: int | None = None
+    # Statistics persisted by crawlee v1 store the ID as a number.
+    stats_id: Annotated[str | None, Field(coerce_numbers_to_str=True)] = None
 
     requests_finished: int = 0
     requests_failed: int = 0

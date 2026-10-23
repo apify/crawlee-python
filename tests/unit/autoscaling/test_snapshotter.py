@@ -14,18 +14,17 @@ import proclimits
 import pytest
 
 from crawlee import service_locator
-from crawlee._autoscaling import Snapshotter
-from crawlee._autoscaling import snapshotter as snapshotter_module
-from crawlee._autoscaling._types import (
+from crawlee._utils.byte_size import ByteSize
+from crawlee._utils.log import LoggerOnce
+from crawlee._utils.system import CpuInfo, MemoryInfo, get_memory_info
+from crawlee.autoscaling import _snapshotter as snapshotter_module
+from crawlee.autoscaling._snapshotter import Snapshotter, SortedSnapshotList
+from crawlee.autoscaling._types import (
     SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD,
     ClientSnapshot,
     CpuSnapshot,
     MemorySnapshot,
 )
-from crawlee._autoscaling.snapshotter import SortedSnapshotList
-from crawlee._utils.byte_size import ByteSize
-from crawlee._utils.log import LoggerOnce
-from crawlee._utils.system import CpuInfo, MemoryInfo, get_memory_info
 from crawlee.configuration import Configuration
 from crawlee.events import LocalEventManager
 from crawlee.events._types import Event, EventSystemInfoData
@@ -239,7 +238,7 @@ async def test_snapshot_pruning_removes_outdated_records(
         time.sleep(0.05)
         return insort(*args, **kwargs)
 
-    with mock.patch('crawlee._autoscaling.snapshotter.insort', side_effect=randomly_delayed_insort):
+    with mock.patch('crawlee.autoscaling._snapshotter.insort', side_effect=randomly_delayed_insort):
         events_data = [
             EventSystemInfoData(
                 cpu_info=CpuInfo(used_ratio=0.5, created_at=now - timedelta(hours=delta)),
@@ -306,7 +305,7 @@ async def test_memory_load_evaluation_silent_on_acceptable_usage(
     default_cpu_info: CpuInfo,
 ) -> None:
     mock_logger_warn = MagicMock()
-    monkeypatch.setattr(getLogger('crawlee.autoscaling.snapshotter'), 'warning', mock_logger_warn)
+    monkeypatch.setattr(getLogger('crawlee.autoscaling._snapshotter'), 'warning', mock_logger_warn)
 
     service_locator.set_event_manager(event_manager)
     snapshotter = Snapshotter.from_config(Configuration(memory_mbytes=8192))

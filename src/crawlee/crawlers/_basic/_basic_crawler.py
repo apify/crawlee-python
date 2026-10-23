@@ -25,7 +25,6 @@ from typing_extensions import TypeVar
 from yarl import URL
 
 from crawlee import Glob, RequestTransformAction, service_locator
-from crawlee._autoscaling import AutoscaledPool, Snapshotter, SystemStatus
 from crawlee._log_config import configure_logger, string_to_log_level
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._service_locator import ServiceLocator
@@ -52,6 +51,7 @@ from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import UNSUPPORTED_SCHEME_MESSAGE, convert_to_absolute_url, filter_url, is_url_absolute
 from crawlee._utils.wait import wait_for
 from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
+from crawlee.autoscaling import AutoscaledPool, ConcurrencyConsumer, ConcurrencySystem
 from crawlee.errors import (
     ContextPipelineInitializationError,
     ContextPipelineInterruptedError,
@@ -93,6 +93,7 @@ if TYPE_CHECKING:
         JsonSerializable,
         PushDataKwargs,
     )
+    from crawlee.autoscaling._types import ConcurrencySystemInterface
     from crawlee.configuration import Configuration
     from crawlee.events import EventManager
     from crawlee.http_clients import HttpClient, HttpResponse
@@ -173,6 +174,10 @@ class _BasicCrawlerOptions(TypedDict):
     concurrency_settings: NotRequired[ConcurrencySettings]
     """Settings to fine-tune concurrency levels."""
 
+    concurrency_system: NotRequired[ConcurrencySystemInterface]
+    """A concurrency system to use instead of the default one, e.g. one shared between crawlers to cap their combined
+    concurrency. Cannot be combined with `concurrency_settings`."""
+
     request_handler_timeout: NotRequired[timedelta]
     """Maximum duration allowed for a single request handler to run."""
 
@@ -218,9 +223,9 @@ class _BasicCrawlerOptions(TypedDict):
     """Allows overriding the default status message. The default status message is provided in the parameters.
     Returning `None` suppresses the status message."""
 
-    id: NotRequired[int]
-    """Identifier used for crawler state tracking. Use the same id across multiple crawlers to share state between
-    them."""
+    id: NotRequired[str]
+    """A unique identifier for the crawler instance. It isolates the `use_state` state and the default statistics from
+    other crawlers. Without it, the ID follows the order in which crawlers are created."""
 
 
 class _BasicCrawlerOptionsGeneric(TypedDict, Generic[TCrawlingContext, TStatisticsState]):
@@ -297,6 +302,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         additional_http_error_status_codes: Iterable[int] | None = None,
         ignore_http_error_status_codes: Iterable[int] | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
+        concurrency_system: ConcurrencySystemInterface | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
         statistics: Statistics[TStatisticsState] | None = None,
         abort_on_error: bool = False,
@@ -307,7 +313,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         status_message_logging_interval: timedelta = timedelta(seconds=10),
         status_message_callback: Callable[[StatisticsState, StatisticsState | None, str], Awaitable[str | None]]
         | None = None,
-        id: int | None = None,
+        id: str | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
         _logger: logging.Logger | None = None,
@@ -347,6 +353,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 as successful responses. Doesn't apply to a 429 from a domain throttled by a `ThrottlingRequestManager`,
                 which is retried later.
             concurrency_settings: Settings to fine-tune concurrency levels.
+            concurrency_system: A concurrency system to use instead of the default one, e.g. one shared between
+                crawlers to cap their combined concurrency. Keep it open with `async with` until every crawler using it
+                has finished. Cannot be combined with `concurrency_settings`.
             request_handler_timeout: Maximum duration allowed for a single request handler to run.
             statistics: A custom `Statistics` instance, allowing the use of non-default configuration.
             abort_on_error: If True, the crawler stops immediately when any request handler error occurs.
@@ -362,8 +371,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             status_message_logging_interval: Interval for logging the crawler status messages.
             status_message_callback: Allows overriding the default status message. The default status message is
                 provided in the parameters. Returning `None` suppresses the status message.
-            id: Identifier used for crawler state tracking. Use the same id across multiple crawlers to share state
-                between them.
+            id: A unique identifier for the crawler instance. It isolates the `use_state` state and the default
+                statistics from other crawlers. Without it, the ID follows the order in which crawlers are created.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -371,11 +380,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             _logger: A logger instance, typically provided by a subclass, for consistent logging labels.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
-        if id is None:
-            self._id = BasicCrawler.__next_id
-            BasicCrawler.__next_id += 1
-        else:
-            self._id = id
+        self._id = str(BasicCrawler.__next_id) if id is None else id
+        BasicCrawler.__next_id += 1
+        self._consumer = ConcurrencyConsumer(id=self._id)
 
         implicit_event_manager_with_explicit_config = False
         if not configuration:
@@ -485,6 +492,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     statistics_log_format=self._statistics_log_format,
                     log_message='Current request statistics:',
                     persist_state_kvs_factory=persist_state_factory,
+                    id=self._id,
                 ),
             )
 
@@ -494,14 +502,21 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # Internal, not explicitly configurable components
         self._robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
         self._robots_txt_lock = asyncio.Lock()
-        self._snapshotter = Snapshotter.from_config(config)
-        self._autoscaled_pool = AutoscaledPool(
-            system_status=SystemStatus(self._snapshotter),
-            concurrency_settings=concurrency_settings,
-            is_finished_function=self.__is_finished_function,
-            is_task_ready_function=self.__is_task_ready_function,
-            run_task_function=self.__run_task_function,
-        )
+
+        if concurrency_system is not None and concurrency_settings is not None:
+            raise ValueError(
+                '`concurrency_settings` cannot be combined with `concurrency_system` - they configure the default '
+                'concurrency system that a supplied one replaces. Pass them to the `ConcurrencySystem` constructor '
+                'instead.'
+            )
+
+        self._concurrency_settings = concurrency_settings
+        self._borrowed_concurrency_system = concurrency_system
+
+        # The default system is built per run, so that a run is not scaled on the load and concurrency of the previous
+        # one. A supplied system is known up front.
+        self._concurrency_system: ConcurrencySystemInterface | None = concurrency_system
+        self._autoscaled_pool: AutoscaledPool | None = None
         self._crawler_state_rec_task = RecurringTask(
             func=self._crawler_state_task,
             delay=status_message_logging_interval,
@@ -536,6 +551,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             raise RuntimeError('A router is already set')
 
         self._router = router
+
+    @property
+    def concurrency_system(self) -> ConcurrencySystemInterface | None:
+        """The concurrency system in use, `None` before the first run unless one was passed to the constructor.
+
+        To retune a running crawl, pass in your own `ConcurrencySystem` and set its `min_concurrency` or
+        `max_concurrency`.
+        """
+        return self._concurrency_system
 
     @property
     def statistics(self) -> Statistics[TStatisticsState]:
@@ -815,6 +839,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return final_statistics
         finally:
             # A failed run must leave the instance usable, so that the caller can retry after handling the error.
+            self._autoscaled_pool = None
             self._running = False
 
     async def _run_crawler(self) -> None:
@@ -828,13 +853,34 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             [global_event_manager, local_event_manager] if local_event_manager else [global_event_manager]
         )
 
+        # A system supplied by the caller is only borrowed, and its lifecycle belongs to whoever created it. The one
+        # the crawler builds for this run is entered and exited below.
+        if self._borrowed_concurrency_system is not None:
+            concurrency_system: ConcurrencySystemInterface = self._borrowed_concurrency_system
+            owned_concurrency_system = None
+        else:
+            owned_concurrency_system = ConcurrencySystem(
+                self._concurrency_settings,
+                configuration=self._service_locator.get_configuration(),
+            )
+            concurrency_system = owned_concurrency_system
+
+        self._concurrency_system = concurrency_system
+        self._autoscaled_pool = autoscaled_pool = AutoscaledPool(
+            concurrency_system=concurrency_system,
+            consumer=self._consumer,
+            is_finished_function=self.__is_finished_function,
+            is_task_ready_function=self.__is_task_ready_function,
+            run_task_function=self.__run_task_function,
+        )
+
         # Collect the context managers to be entered. Context managers that are already active are excluded,
         # as they were likely entered by the caller, who will also be responsible for exiting them.
         contexts_to_enter.extend(
             [
                 cm
                 for cm in (
-                    self._snapshotter,
+                    owned_concurrency_system,
                     self._statistics,
                     self._session_pool if self._use_session_pool else None,
                     self._http_client,
@@ -849,7 +895,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             for context in contexts_to_enter:
                 await exit_stack.enter_async_context(context)
 
-            await self._autoscaled_pool.run()
+            await autoscaled_pool.run()
 
     async def add_requests(
         self,
@@ -1454,10 +1500,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return False
 
         # Check for a stall only when the pool is idle. An in-flight request can still enqueue new work or end the
-        # stall.
+        # stall. The pool's own requests are what counts, not those of another crawler sharing the budget.
         if (
             isinstance(self._request_manager, ThrottlingRequestManager)
-            and self._autoscaled_pool.current_concurrency == 0
+            and self._autoscaled_pool is not None
+            and self._autoscaled_pool.own_concurrency == 0
             and (reason := await self._request_manager.get_stall_reason()) is not None
         ):
             error = PersistentRateLimitError(f'Giving up: {reason}')
@@ -1481,7 +1528,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         request_manager = await self.get_request_manager()
         return not await request_manager.is_empty()
 
-    async def __run_task_function(self) -> None:
+    async def __run_task_function(self, task_id: str) -> None:  # noqa: ARG002
         request_manager = await self.get_request_manager()
 
         request = await wait_for(
@@ -1869,9 +1916,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             else:
                 pages_info = str(self._statistics.state.requests_finished)
 
+            desired_concurrency = (
+                self._concurrency_system.desired_concurrency if self._concurrency_system is not None else 0
+            )
+
             message = (
                 f'Crawled {pages_info} pages, {self._statistics.state.requests_failed} failed requests, '
-                f'desired concurrency {self._autoscaled_pool.desired_concurrency}.'
+                f'desired concurrency {desired_concurrency}.'
             )
 
         if self._status_message_callback:
@@ -1883,7 +1934,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             self._log_status_message(message, level='INFO')
 
         event_manager.emit(
-            event=Event.CRAWLER_STATUS, event_data=EventCrawlerStatusData(message=message, crawler_id=id(self))
+            event=Event.CRAWLER_STATUS, event_data=EventCrawlerStatusData(message=message, crawler_id=self._id)
         )
 
         self._previous_crawler_state = current_state

@@ -26,6 +26,7 @@ from crawlee._log_config import CrawleeLogFormatter
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs, HttpMethod
 from crawlee._utils.robots import RobotsTxtFile
+from crawlee.autoscaling import AutoscaledPool, ConcurrencyConsumer, ConcurrencySystem
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import (
@@ -39,7 +40,7 @@ from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
 from crawlee.http_clients import HttpClient
 from crawlee.request_loaders import RequestList, RequestManagerTandem, ThrottlingRequestManager
 from crawlee.sessions import Session, SessionPool
-from crawlee.statistics import FinalStatistics, StatisticsState
+from crawlee.statistics import FinalStatistics, Statistics, StatisticsState
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 from tests.unit.utils import open_throttler_held_until_reclaim, poll_until_condition
@@ -1187,14 +1188,14 @@ async def test_context_use_state_crawlers_share_state() -> None:
         assert isinstance(state['urls'], list)
         state['urls'].append(context.request.url)
 
-    crawler_1 = BasicCrawler(id=0, request_handler=handler)
-    crawler_2 = BasicCrawler(id=0, request_handler=handler)
+    crawler_1 = BasicCrawler(id='0', request_handler=handler)
+    crawler_2 = BasicCrawler(id='0', request_handler=handler)
 
     await crawler_1.run(['https://a.com'])
     await crawler_2.run(['https://b.com'])
 
     kvs = await KeyValueStore.open()
-    assert crawler_1._id == crawler_2._id == 0
+    assert crawler_1._id == crawler_2._id == '0'
     assert await kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_{crawler_1._id}') == {
         'urls': ['https://a.com', 'https://b.com']
     }
@@ -1204,8 +1205,8 @@ async def test_crawlers_share_stats() -> None:
     async def handler(context: BasicCrawlingContext) -> None:
         await context.use_state({'urls': []})
 
-    crawler_1 = BasicCrawler(id=0, request_handler=handler)
-    crawler_2 = BasicCrawler(id=0, request_handler=handler, statistics=crawler_1.statistics)
+    crawler_1 = BasicCrawler(id='0', request_handler=handler)
+    crawler_2 = BasicCrawler(id='0', request_handler=handler, statistics=crawler_1.statistics)
 
     result1 = await crawler_1.run(['https://a.com'])
     result2 = await crawler_2.run(['https://b.com'])
@@ -1230,6 +1231,43 @@ async def test_context_use_state_crawlers_own_state() -> None:
     kvs = await KeyValueStore.open()
     assert await kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0') == {'urls': ['https://a.com']}
     assert await kvs.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_1') == {'urls': ['https://b.com']}
+
+
+@pytest.mark.parametrize(
+    ('crawler_id', 'expected_id'),
+    [
+        pytest.param(None, '0', id='generated id'),
+        pytest.param('my-crawler', 'my-crawler', id='explicit id'),
+    ],
+)
+async def test_default_statistics_use_crawler_id(crawler_id: str | None, expected_id: str) -> None:
+    """The default statistics take the crawler ID and persist under it."""
+    # Advance the `Statistics` counter, so an ID the statistics generate themselves can't match the crawler ID.
+    Statistics.with_default_state()
+    crawler = BasicCrawler(request_handler=AsyncMock(), id=crawler_id)
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    assert crawler._id == expected_id
+    assert crawler.statistics.state.stats_id == expected_id
+    kvs = await crawler.get_key_value_store()
+    persisted_state = await kvs.get_value(f'__CRAWLER_STATISTICS_{expected_id}')
+    assert persisted_state['statsId'] == expected_id
+
+
+def test_generated_id_follows_creation_order() -> None:
+    """A crawler without an ID takes its creation index, which crawlers with an explicit ID advance too."""
+    assert BasicCrawler()._id == '0'
+    assert BasicCrawler(id='custom')._id == 'custom'
+    assert BasicCrawler()._id == '2'
+
+
+def test_default_statistics_key_differs_from_later_statistics() -> None:
+    """Statistics created after a crawler with default statistics don't persist under the crawler's key."""
+    crawler = BasicCrawler()
+    statistics = Statistics.with_default_state(persistence_enabled=True)
+
+    assert statistics._state._persist_state_key != crawler.statistics._state._persist_state_key
 
 
 async def test_context_handlers_use_state(key_value_store: KeyValueStore) -> None:
@@ -1882,7 +1920,8 @@ async def test_keep_alive(
 
     # Deterministically wait until the crawler has drained the initial queue.
     idle_signal = asyncio.Event()
-    original_is_finished = crawler._autoscaled_pool._is_finished_function
+    # The pool is built per run, so the hook goes on the crawler's own predicate, which the pool then picks up.
+    original_is_finished = cast('Any', crawler)._BasicCrawler__is_finished_function
 
     async def signal_idle_reached(*args: object, **kwargs: object) -> bool:
         try:
@@ -1891,8 +1930,8 @@ async def test_keep_alive(
             idle_signal.set()
 
     with patch.object(
-        crawler._autoscaled_pool,
-        '_is_finished_function',
+        crawler,
+        '_BasicCrawler__is_finished_function',
         side_effect=signal_idle_reached,
     ):
         crawler_run_task = asyncio.create_task(crawler.run())
@@ -2162,13 +2201,14 @@ async def test_status_message_emit() -> None:
 
     event_manager.on(event=Event.CRAWLER_STATUS, listener=listener)
 
-    crawler = BasicCrawler(request_handler=AsyncMock())
+    crawler = BasicCrawler(request_handler=AsyncMock(), id='my-crawler')
 
     await crawler.run(['https://a.placeholder.com'])
 
     event_manager.off(event=Event.CRAWLER_STATUS, listener=listener)
 
     assert status_message_listener.called
+    assert status_message_listener.call_args.args[0].crawler_id == 'my-crawler'
 
 
 async def test_status_message_reports_failed_request_count() -> None:
@@ -2283,7 +2323,7 @@ async def test_crawler_purge_request_queue_uses_same_storage_client() -> None:
     assert await unrelated_rq.fetch_next_request() == unrelated_request
 
 
-async def _run_crawler(crawler_id: int | None, requests: list[str], storage_dir: str) -> StatisticsState:
+async def _run_crawler(crawler_id: str | None, requests: list[str], storage_dir: str) -> StatisticsState:
     """Run crawler and return its statistics state.
 
     Must be defined like this to be pickable for ProcessPoolExecutor."""
@@ -2314,7 +2354,7 @@ async def _run_crawler(crawler_id: int | None, requests: list[str], storage_dir:
 @dataclass
 class _CrawlerInput:
     requests: list[str]
-    id: int | None = None
+    id: str | None = None
 
 
 def _process_run_crawlers(crawler_inputs: list[_CrawlerInput], storage_dir: str) -> list[StatisticsState]:
@@ -3018,3 +3058,114 @@ async def test_sigint_without_loop_signal_handlers(caplog: pytest.LogCaptureFixt
     assert 'Pausing...' in caplog.text
     assert 'The crawl was interrupted' in caplog.text
     assert signal.getsignal(signal.SIGINT) is sigint_handler_before_run
+
+
+async def test_concurrency_system_excludes_settings() -> None:
+    """The settings configure the default concurrency system, so a supplied one leaves them nowhere to go."""
+    with pytest.raises(ValueError, match='cannot be combined'):
+        BasicCrawler(concurrency_settings=ConcurrencySettings(), concurrency_system=ConcurrencySystem())
+
+
+async def test_inactive_concurrency_system_refused() -> None:
+    """The crawler does not own a supplied system, so it refuses to run against one that was never entered."""
+    crawler = BasicCrawler(concurrency_system=ConcurrencySystem(), request_handler=AsyncMock())
+
+    with pytest.raises(RuntimeError, match='not active'):
+        await crawler.run(['https://a.placeholder.com'])
+
+
+async def test_shared_concurrency_system_caps_total() -> None:
+    """Two crawlers sharing one system stay within its budget together, instead of each getting it in full."""
+    running_count = 0
+    max_running_count = 0
+
+    async def handler(context: BasicCrawlingContext) -> None:
+        nonlocal running_count, max_running_count
+        running_count += 1
+        max_running_count = max(max_running_count, running_count)
+        await asyncio.sleep(0.05)
+        running_count -= 1
+
+    first_queue = await RequestQueue.open(name='first')
+    second_queue = await RequestQueue.open(name='second')
+
+    settings = ConcurrencySettings(min_concurrency=2, max_concurrency=2, desired_concurrency=2)
+
+    async with ConcurrencySystem(settings) as concurrency_system:
+        first = BasicCrawler(
+            concurrency_system=concurrency_system,
+            request_manager=first_queue,
+            request_handler=handler,
+        )
+        second = BasicCrawler(
+            concurrency_system=concurrency_system,
+            request_manager=second_queue,
+            request_handler=handler,
+        )
+
+        first_statistics, second_statistics = await asyncio.gather(
+            first.run([f'https://a.placeholder.com/{i}' for i in range(5)]),
+            second.run([f'https://b.placeholder.com/{i}' for i in range(5)]),
+        )
+
+    assert first_statistics.requests_finished == 5
+    assert second_statistics.requests_finished == 5
+    assert max_running_count == 2
+
+
+async def test_concurrency_system_fresh_per_run() -> None:
+    """A run never inherits the concurrency the previous one scaled to, nor its load snapshots."""
+    crawler = BasicCrawler(request_handler=AsyncMock())
+
+    assert crawler.concurrency_system is None
+
+    await crawler.run(['https://a.placeholder.com'])
+    first_system = crawler.concurrency_system
+
+    await crawler.run(['https://b.placeholder.com'])
+
+    assert first_system is not None
+    assert crawler.concurrency_system is not first_system
+
+
+async def test_borrowed_concurrency_system_reused() -> None:
+    """A supplied system is exposed from the start and never replaced by a run."""
+    async with ConcurrencySystem() as concurrency_system:
+        crawler = BasicCrawler(concurrency_system=concurrency_system, request_handler=AsyncMock())
+
+        assert crawler.concurrency_system is concurrency_system
+
+        await crawler.run(['https://a.placeholder.com'])
+        await crawler.run(['https://b.placeholder.com'])
+
+        assert crawler.concurrency_system is concurrency_system
+
+
+async def test_consumer_carries_crawler_id() -> None:
+    """A crawler reaches the system as a consumer named by its `id`, on every run."""
+    async with ConcurrencySystem() as concurrency_system:
+        crawler = BasicCrawler(id='my-crawler', concurrency_system=concurrency_system, request_handler=AsyncMock())
+
+        with patch.object(
+            concurrency_system, 'try_register_task_start', wraps=concurrency_system.try_register_task_start
+        ) as try_register_task_start:
+            await crawler.run(['https://a.placeholder.com'])
+            await crawler.run(['https://b.placeholder.com'])
+
+    consumers = {booking.args[0] for booking in try_register_task_start.call_args_list}
+    assert consumers == {ConcurrencyConsumer(id='my-crawler')}
+
+
+async def test_stall_ignores_shared_concurrency() -> None:
+    """A stall is judged by the crawler's own requests, not by those of another crawler sharing the system."""
+    throttler = await open_throttler()
+    crawler = BasicCrawler(request_manager=throttler)
+    # Another crawler sharing the system has a request in flight, while this one has none.
+    pool = Mock(spec=AutoscaledPool, own_concurrency=0, current_concurrency=1)
+
+    with (
+        patch.object(crawler, '_autoscaled_pool', pool),
+        patch.object(throttler, 'get_stall_reason', AsyncMock(return_value='Domain stalled')),
+        pytest.raises(PersistentRateLimitError),
+    ):
+        await cast('Any', crawler)._BasicCrawler__is_finished_function()
