@@ -12,6 +12,7 @@ import traceback
 from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Sequence
 from contextlib import AsyncExitStack
+from dataclasses import replace as dataclass_replace
 from datetime import timedelta
 from functools import partial
 from http import HTTPStatus
@@ -57,6 +58,7 @@ from crawlee.errors import (
     ContextPipelineInterruptedError,
     HttpClientStatusCodeError,
     HttpStatusCodeError,
+    NavigationSkippedError,
     PersistentRateLimitError,
     RequestCollisionError,
     RequestHandlerError,
@@ -113,6 +115,33 @@ T = TypeVar('T')
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Request | None]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 SkippedRequestCallback = Callable[[str, SkippedReason], Awaitable[None]]
+
+
+class _NavigationSkippedRequestProxy:
+    """Wraps a `Request` whose navigation was skipped due to `skip_navigation`.
+
+    All attribute access is forwarded to the wrapped request, except `loaded_url`, which raises a
+    `NavigationSkippedError` — mirroring the JS SDK behavior for skipped navigations.
+    """
+
+    __slots__ = ('_raise_on_loaded_url', '_request')
+
+    def __init__(self, request: Request, raise_on_loaded_url: Callable[[], str]) -> None:
+        self._request = request
+        self._raise_on_loaded_url = raise_on_loaded_url
+
+    def __getattr__(self, name: str) -> Any:
+        # Attribute writes (e.g. `request.state = ...` in the router) must land on the wrapped request,
+        # so intercept only reads that the wrapped request cannot resolve itself.
+        if name == 'loaded_url':
+            return self._raise_on_loaded_url()
+        return getattr(self._request, name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in ('_request', '_raise_on_loaded_url'):
+            super().__setattr__(name, value)
+        else:
+            setattr(self._request, name, value)
 
 
 class _BasicCrawlerOptions(TypedDict):
@@ -1726,6 +1755,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def _run_request_handler(self, context: BasicCrawlingContext) -> None:
         context.request.state = RequestState.BEFORE_NAV
+
+        if context.request.skip_navigation:
+            await self._run_request_handler_with_skipped_navigation(context)
+            return
+
         await self._context_pipeline(
             context,
             lambda final_context: wait_for(
@@ -1735,6 +1769,37 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 f' {self._request_handler_timeout.total_seconds()} seconds',
                 logger=self._logger,
             ),
+        )
+
+    async def _run_request_handler_with_skipped_navigation(self, context: BasicCrawlingContext) -> None:
+        """Run the request handler without navigating, for requests with `skip_navigation` set.
+
+        The context pipeline is bypassed entirely: its middleware steps are responsible for the navigation,
+        so the crawling context they would produce does not contain the navigation results. Navigation-only
+        context members (`request.loaded_url`) raise a `NavigationSkippedError` instead of returning `None`.
+        """
+        self._logger.debug(f'Skipping navigation for request {context.request.url} (`skip_navigation` was used).')
+
+        def _raise_on_loaded_url() -> str:
+            raise NavigationSkippedError(
+                'The `request.loaded_url` property is not available - `skip_navigation` was used.'
+            )
+
+        guarded_request = cast(
+            'Request',
+            _NavigationSkippedRequestProxy(context.request, _raise_on_loaded_url),
+        )
+        guarded_context = cast(
+            'TCrawlingContext',
+            dataclass_replace(context, request=guarded_request),  # ty: ignore[invalid-argument-type]
+        )
+
+        await wait_for(
+            lambda: self.router(guarded_context),
+            timeout=self._request_handler_timeout,
+            timeout_message=f'{self._request_handler_timeout_text}'
+            f' {self._request_handler_timeout.total_seconds()} seconds',
+            logger=self._logger,
         )
 
     def _raise_for_error_status_code(self, status_code: int) -> None:
