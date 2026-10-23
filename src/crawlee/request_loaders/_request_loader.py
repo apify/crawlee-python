@@ -12,6 +12,8 @@ if TYPE_CHECKING:
     from crawlee.request_loaders import RequestManager, RequestManagerTandem
     from crawlee.storage_clients.models import ProcessedRequest
 
+    from ._types import RequestSourceStatus
+
 
 @docs_group('Request loaders')
 class RequestLoader(ABC):
@@ -34,19 +36,18 @@ class RequestLoader(ABC):
         """Get an offline approximation of the total number of requests in the loader (i.e. pending + handled)."""
 
     @abstractmethod
-    async def is_empty(self) -> bool:
-        """Return True if there are no more requests in the loader (there might still be unfinished requests)."""
+    async def check_readiness(self) -> RequestSourceStatus:
+        """Report whether the loader has a request to hand over, is waiting for one, or is done.
 
-    @abstractmethod
-    async def is_finished(self) -> bool:
-        """Return True if all requests have been handled."""
+        The crawler's task loop calls this often, so answer `ReadyStatus` before evaluating anything else.
+        `FinishedStatus` may arrive late, but never early.
+        """
 
     @abstractmethod
     async def fetch_next_request(self) -> Request | None:
-        """Return the next request to be processed, or `None` if there are no more pending requests.
+        """Return the next request to be processed, or `None` if no request is pending right now.
 
-        The method should return `None` if and only if `is_finished` would return `True`. In other cases, the method
-        should wait until a request appears.
+        `None` doesn't mean the loader is finished. Use `check_readiness` to tell a finished loader from a waiting one.
         """
 
     @abstractmethod

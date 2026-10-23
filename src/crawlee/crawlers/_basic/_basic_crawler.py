@@ -1503,22 +1503,21 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if self._keep_alive:
             return False
 
+        request_manager = await self.get_request_manager()
+        readiness = await request_manager.check_readiness()
+
         # Check for a stall only when the pool is idle. An in-flight request can still enqueue new work or end the
         # stall. The pool's own requests are what counts, not those of another crawler sharing the budget.
         if (
-            isinstance(self._request_manager, ThrottlingRequestManager)
+            readiness.status == 'stalled'
             and self._autoscaled_pool is not None
             and self._autoscaled_pool.own_concurrency == 0
-            and (reason := await self._request_manager.get_stall_reason()) is not None
         ):
-            error = PersistentRateLimitError(f'Giving up: {reason}')
-            self._logger.error(
-                'Giving up the crawl because a domain keeps rate-limiting every request.', exc_info=error
-            )
+            error = PersistentRateLimitError(f'Giving up: {readiness.reason}')
+            self._logger.error("Giving up the crawl because the request manager can't make progress.", exc_info=error)
             raise error
 
-        request_manager = await self.get_request_manager()
-        return await request_manager.is_finished()
+        return readiness.status == 'finished'
 
     async def __is_task_ready_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
@@ -1530,7 +1529,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return False
 
         request_manager = await self.get_request_manager()
-        return not await request_manager.is_empty()
+        return (await request_manager.check_readiness()).status == 'ready'
 
     async def __run_task_function(self, task_id: str) -> None:  # noqa: ARG002
         request_manager = await self.get_request_manager()
