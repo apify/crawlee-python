@@ -173,10 +173,15 @@ class Statistics(Generic[TStatisticsState]):
             raise RuntimeError(f'The {self.__class__.__name__} is already active.')
 
         await self._state.initialize()
-        # Reset `crawler_finished_at` to indicate a new run in progress.
+
+        # The restored timestamps belong to the previous run and must not measure this one: left in place,
+        # they would count the downtime between the runs (e.g. after a migration or resurrection) towards
+        # the runtime. Clear them, so that the initial periodic log reports exactly the runtime accumulated
+        # by the previous runs (zero for a fresh start).
+        self.state.crawler_last_started_at = None
         self.state.crawler_finished_at = None
 
-        # Start periodic logging and let it print initial state before activation.
+        # Start periodic logging and let it print the restored state before the new run starts being measured.
         self._periodic_logger.start()
         await asyncio.sleep(0.01)
         self._active = True
@@ -199,10 +204,7 @@ class Statistics(Generic[TStatisticsState]):
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        if not self.state.crawler_last_started_at:
-            raise RuntimeError('Statistics.state.crawler_last_started_at not set.')
-
-        # Stop logging and deactivate the statistics to prevent further changes to crawler_runtime
+        # Stop logging; the finish timestamp freezes the measured run before the final persist.
         await self._periodic_logger.stop()
         self.state.crawler_finished_at = datetime.now(UTC)
         self._active = False
