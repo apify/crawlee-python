@@ -224,8 +224,9 @@ class _BasicCrawlerOptions(TypedDict):
     Returning `None` suppresses the status message."""
 
     id: NotRequired[str]
-    """A unique identifier for the crawler instance. It isolates the `use_state` state and the default statistics from
-    other crawlers. Without it, the ID follows the order in which crawlers are created."""
+    """Identifier of the crawler. Crawlers with the same ID share the `use_state` state and the default statistics, and
+    every crawler but the first uses it in the alias of its default request queue. Without it, the ID follows the order
+    in which crawlers are created."""
 
 
 class _BasicCrawlerOptionsGeneric(TypedDict, Generic[TCrawlingContext, TStatisticsState]):
@@ -371,8 +372,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             status_message_logging_interval: Interval for logging the crawler status messages.
             status_message_callback: Allows overriding the default status message. The default status message is
                 provided in the parameters. Returning `None` suppresses the status message.
-            id: A unique identifier for the crawler instance. It isolates the `use_state` state and the default
-                statistics from other crawlers. Without it, the ID follows the order in which crawlers are created.
+            id: Identifier of the crawler. Crawlers with the same ID share the `use_state` state and the default
+                statistics, and every crawler but the first uses it in the alias of its default request queue. Without
+                it, the ID follows the order in which crawlers are created.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -381,6 +383,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
         self._id = str(BasicCrawler.__next_id) if id is None else id
+        self._default_rq_alias = None if BasicCrawler.__next_id == 0 else f'__default_{self._id}__'
         BasicCrawler.__next_id += 1
         self._consumer = ConcurrencyConsumer(id=self._id)
 
@@ -644,9 +647,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
     async def get_request_manager(self) -> RequestManager:
-        """Return the configured request manager. If none is configured, open and return the default request queue."""
+        """Return the configured request manager. If none is configured, open and return the crawler's own queue."""
         if not self._request_manager:
             self._request_manager = await RequestQueue.open(
+                alias=self._default_rq_alias,
                 storage_client=self._service_locator.get_storage_client(),
                 configuration=self._service_locator.get_configuration(),
             )
