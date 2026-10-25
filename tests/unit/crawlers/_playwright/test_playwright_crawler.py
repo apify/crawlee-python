@@ -39,7 +39,7 @@ from crawlee.fingerprint_suite._consts import BROWSER_TYPE_HEADER_KEYWORD
 from crawlee.fingerprint_suite._header_generator import fingerprint_browser_type_from_playwright_browser_type
 from crawlee.http_clients import ImpitHttpClient
 from crawlee.proxy_configuration import ProxyConfiguration
-from crawlee.sessions import Session, SessionPool
+from crawlee.sessions import CookieParam, Session, SessionCookies, SessionPool
 from crawlee.statistics import Statistics
 from crawlee.statistics._error_snapshotter import ErrorSnapshotter
 from crawlee.storages import RequestQueue
@@ -584,6 +584,24 @@ async def test_send_request_skips_cookies_deleted_by_page(server_url: URL) -> No
     await crawler.run([str(server_url.with_path('set_cookies').extend_query(a=1))])
 
     assert sent_cookies == [{}]
+
+
+async def test_send_request_cookies_argument_replaces_page_cookies(server_url: URL) -> None:
+    """Test that `context.send_request` with `cookies` sends none of the cookies of the browser context."""
+    crawler = PlaywrightCrawler()
+    sent_cookies: list[dict[str, str]] = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        cookies = SessionCookies([CookieParam(name='from_argument', value='1', domain=server_url.host or '')])
+        matching = await context.send_request(str(server_url / 'cookies'), cookies=cookies)
+        sent_cookies.append(json.loads(await matching.read())['cookies'])
+        empty = await context.send_request(str(server_url / 'cookies'), cookies=SessionCookies())
+        sent_cookies.append(json.loads(await empty.read())['cookies'])
+
+    await crawler.run([str(server_url.with_path('set_cookies').extend_query(a=1))])
+
+    assert sent_cookies == [{'from_argument': '1'}, {}]
 
 
 async def test_read_write_cookies(server_url: URL) -> None:

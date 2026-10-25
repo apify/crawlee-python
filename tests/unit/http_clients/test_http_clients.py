@@ -20,7 +20,7 @@ from crawlee.http_clients import CurlImpersonateHttpClient, HttpClient, HttpResp
 from crawlee.http_clients._base import _is_cross_origin, _redirect_method
 from crawlee.http_clients._httpx import _HttpxResponse
 from crawlee.http_clients._impit import _ImpitResponse
-from crawlee.sessions import CookieParam, Session
+from crawlee.sessions import CookieParam, Session, SessionCookies
 from tests.unit.server import generate_file_content
 from tests.unit.server_endpoints import HELLO_WORLD
 
@@ -599,6 +599,40 @@ async def test_cookies_not_persisted(custom_http_client: HttpClient, server_url:
     assert session.cookies.get_cookies_as_dicts() == []
 
 
+async def test_cookies_argument_replaces_session_cookies(http_client: HttpClient, server_url: URL) -> None:
+    """Test that the cookies passed in `cookies` are sent and stored instead of the cookies of the session."""
+    session = Session(cookies=[CookieParam(name='from_session', value='1', domain=server_url.host or '')])
+    cookies = SessionCookies([CookieParam(name='from_argument', value='1', domain=server_url.host or '')])
+
+    response = await http_client.send_request(
+        str((server_url / 'set_cookies').with_query(a='1')),
+        session=session,
+        cookies=cookies,
+    )
+
+    assert (await read_json(response))['cookies'] == {'from_argument': '1', 'a': '1'}
+    assert {item['name'] for item in cookies.get_cookies_as_dicts()} == {'from_argument', 'a'}
+    assert {item['name'] for item in session.cookies.get_cookies_as_dicts()} == {'from_session'}
+
+
+@pytest.mark.parametrize(
+    'custom_http_client',
+    [
+        pytest.param(lambda: CurlImpersonateHttpClient(persist_cookies_per_session=False), id='curl'),
+        pytest.param(lambda: HttpxHttpClient(persist_cookies_per_session=False), id='httpx'),
+        pytest.param(lambda: ImpitHttpClient(persist_cookies_per_session=False), id='impit'),
+    ],
+    indirect=['custom_http_client'],
+)
+async def test_cookies_argument_stored_when_not_persisted(custom_http_client: HttpClient, server_url: URL) -> None:
+    """Test that the response cookies are stored in `cookies` even with `persist_cookies_per_session` disabled."""
+    cookies = SessionCookies()
+
+    await custom_http_client.send_request(str((server_url / 'set_cookies').with_query(a='1')), cookies=cookies)
+
+    assert {item['name'] for item in cookies.get_cookies_as_dicts()} == {'a'}
+
+
 @pytest.mark.parametrize(
     'custom_http_client',
     [
@@ -643,7 +677,20 @@ async def test_cookie_header_rebuilt_per_hop(http_client: HttpClient, server_url
 
 
 async def test_cookie_header_wins_over_session(http_client: HttpClient, server_url: URL) -> None:
-    """Test that a `Cookie` header passed by the caller replaces the cookies of the session."""
+    """Test that a cookie in the `Cookie` header of the caller wins over a session cookie of the same name."""
+    session = Session(cookies=[CookieParam(name='manual', value='from_jar', domain=server_url.host or '')])
+
+    response = await http_client.send_request(
+        str(server_url / 'headers'),
+        session=session,
+        headers={'cookie': 'manual=value'},
+    )
+
+    assert (await read_json(response))['cookie'] == 'manual=value'
+
+
+async def test_cookie_header_merged_with_session(http_client: HttpClient, server_url: URL) -> None:
+    """Test that the `Cookie` header of the caller is sent along with the session cookies of other names."""
     session = Session(cookies=[CookieParam(name='from_jar', value='1', domain=server_url.host or '')])
 
     response = await http_client.send_request(
@@ -652,7 +699,7 @@ async def test_cookie_header_wins_over_session(http_client: HttpClient, server_u
         headers={'cookie': 'manual=value'},
     )
 
-    assert (await read_json(response))['cookies'] == {'manual': 'value'}
+    assert (await read_json(response))['cookies'] == {'from_jar': '1', 'manual': 'value'}
 
 
 async def test_cookie_header_not_stored_in_session(http_client: HttpClient, server_url: URL) -> None:
@@ -705,9 +752,9 @@ async def test_session_cookies_take_over_cross_origin(
 
 
 async def test_cookie_header_wins_over_session_on_redirect(http_client: HttpClient, server_url: URL) -> None:
-    """Test that a `Cookie` header of the caller keeps beating the session cookies after a redirect."""
-    session = Session(cookies=[CookieParam(name='from_jar', value='1', domain=server_url.host or '')])
-    redirect_url = (server_url / 'redirect').with_query(url=str(server_url / 'cookies'), status=302)
+    """Test that a cookie in the `Cookie` header of the caller keeps beating the session cookie after a redirect."""
+    session = Session(cookies=[CookieParam(name='manual', value='from_jar', domain=server_url.host or '')])
+    redirect_url = (server_url / 'redirect').with_query(url=str(server_url / 'headers'), status=302)
 
     response = await http_client.send_request(
         str(redirect_url),
@@ -715,19 +762,19 @@ async def test_cookie_header_wins_over_session_on_redirect(http_client: HttpClie
         headers={'cookie': 'manual=value'},
     )
 
-    assert (await read_json(response))['cookies'] == {'manual': 'value'}
+    assert (await read_json(response))['cookie'] == 'manual=value'
 
 
-async def test_empty_cookie_header_suppresses_session_cookies(http_client: HttpClient, server_url: URL) -> None:
-    """Test that an empty `Cookie` header of the caller keeps the session cookies out of every hop."""
+async def test_empty_cookie_header_keeps_session_cookies(http_client: HttpClient, server_url: URL) -> None:
+    """Test that an empty `Cookie` header of the caller doesn't keep the session cookies out of any hop."""
     session = Session(cookies=[CookieParam(name='from_jar', value='1', domain=server_url.host or '')])
     redirect_url = (server_url / 'redirect').with_query(url=str(server_url / 'cookies'), status=302)
 
     direct = await http_client.send_request(str(server_url / 'cookies'), session=session, headers={'cookie': ''})
     redirected = await http_client.send_request(str(redirect_url), session=session, headers={'cookie': ''})
 
-    assert (await read_json(direct))['cookies'] == {}
-    assert (await read_json(redirected))['cookies'] == {}
+    assert (await read_json(direct))['cookies'] == {'from_jar': '1'}
+    assert (await read_json(redirected))['cookies'] == {'from_jar': '1'}
 
 
 async def test_auth_kept_same_origin(http_client: HttpClient, server_url: URL) -> None:

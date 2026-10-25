@@ -83,11 +83,28 @@ def _redirect_method(status_code: int, method: HttpMethod) -> HttpMethod:
     return method
 
 
+def _split_cookie_header(value: str) -> list[tuple[str, str]]:
+    """Split a `Cookie` header into `(name, pair)` tuples, keeping each pair as it was written."""
+    pairs = [pair.strip() for pair in value.split(';')]
+    return [(pair.partition('=')[0].strip(), pair) for pair in pairs if pair]
+
+
 def _add_cookie_header(headers: HttpHeaders, cookies: SessionCookies, url: str) -> HttpHeaders:
-    """Add the stored cookies matching `url` as the `Cookie` header, unless the headers already have one."""
-    if 'cookie' in headers or not (cookie_header := cookies.get_cookie_string(url)):
+    """Add the stored cookies matching `url` to the `Cookie` header.
+
+    A cookie already in the header wins over a stored cookie of the same name.
+    """
+    explicit_pairs = _split_cookie_header(headers.get('cookie', ''))
+    explicit_names = {name for name, _ in explicit_pairs}
+    stored_pairs = [
+        pair for name, pair in _split_cookie_header(cookies.get_cookie_string(url)) if name not in explicit_names
+    ]
+
+    if not stored_pairs:
         return headers
 
+    explicit_values = [pair for _, pair in explicit_pairs]
+    cookie_header = '; '.join(stored_pairs + explicit_values)
     return headers | HttpHeaders({'cookie': cookie_header})
 
 
@@ -224,14 +241,15 @@ class HttpClient(ABC):
         headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
         session: Session | None = None,
+        cookies: SessionCookies | None = None,
         proxy_info: ProxyInfo | None = None,
         timeout: timedelta | None = None,
     ) -> HttpResponse:
         """Send an HTTP request via the client, following up to 10 redirects unless `follow_redirects` is disabled.
 
         Every request of the redirect chain sends the cookies matching its URL and stores the cookies of its response. A
-        `Cookie` header passed by the caller is sent instead of the stored cookies, and its cookies are not stored. The
-        `Authorization`, `Proxy-Authorization` and `Cookie` headers are dropped when a redirect leaves the origin.
+        cookie in the `Cookie` header passed by the caller wins over a stored cookie of the same name and is not stored.
+        The `Authorization`, `Proxy-Authorization` and `Cookie` headers are dropped when a redirect leaves the origin.
 
         The body of the returned response is not read yet. Read it, or call `aclose` on the response to release its
         connection.
@@ -244,6 +262,8 @@ class HttpClient(ABC):
             session: The session whose cookies are sent. The response cookies are stored in it when
                 `persist_cookies_per_session` is enabled. Otherwise, and without a session, they are kept only for the
                 redirect chain of this request.
+            cookies: The cookies to send and store instead of the cookies of `session`, even with
+                `persist_cookies_per_session` disabled.
             proxy_info: The information about the proxy to be used.
             timeout: Maximum time allowed to receive the response, including all redirects, and to read its body.
                 Without it, the default timeout of the HTTP client applies.
@@ -261,13 +281,14 @@ class HttpClient(ABC):
         # The headers of the client go through the redirect rules below too, so its credentials never leave the origin.
         headers = self._headers | HttpHeaders(headers or {})
 
-        if session is None:
-            cookies = SessionCookies()
-        elif self._persist_cookies_per_session:
-            cookies = session.cookies
-        else:
-            # The cookies of the session are still sent, but the response cookies go to a copy.
-            cookies = SessionCookies(session.cookies)
+        if cookies is None:
+            if session is None:
+                cookies = SessionCookies()
+            elif self._persist_cookies_per_session:
+                cookies = session.cookies
+            else:
+                # The cookies of the session are still sent, but the response cookies go to a copy.
+                cookies = SessionCookies(session.cookies)
 
         # `encoded=True` keeps the path and the query byte for byte, including a safe `%2F` in query.
         current_url = _with_ascii_host(URL(url, encoded=True))

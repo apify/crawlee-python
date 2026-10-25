@@ -143,15 +143,15 @@ async def test_client_headers_win_over_generated(server_url: URL) -> None:
     assert headers['user-agent'] == 'client'
 
 
-async def test_client_cookie_header_wins_over_session(server_url: URL) -> None:
-    """Test that a `Cookie` header set on the underlying client replaces the cookies of the session."""
+async def test_client_cookie_header_merged_with_session(server_url: URL) -> None:
+    """Test that a `Cookie` header set on the client is sent along with the cookies of the session."""
     session = Session(cookies=[CookieParam(name='from_jar', value='1', domain=server_url.host or '')])
 
     async with HttpxHttpClient(headers={'cookie': 'from_client=1'}) as client:
         response = await client.send_request(str(server_url / 'cookies'), session=session)
         cookies = (await read_json(response))['cookies']
 
-    assert cookies == {'from_client': '1'}
+    assert cookies == {'from_jar': '1', 'from_client': '1'}
 
 
 async def test_cookies_kwarg_ignored(server_url: URL) -> None:

@@ -100,7 +100,7 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.request_loaders import RequestManager
-    from crawlee.sessions import Session
+    from crawlee.sessions import Session, SessionCookies
     from crawlee.statistics import FinalStatistics
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients.models import DatasetItemsListPage
@@ -1411,6 +1411,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             method: HttpMethod = 'GET',
             payload: HttpPayload | None = None,
             headers: HttpHeaders | dict[str, str] | None = None,
+            cookies: SessionCookies | None = None,
             timeout: timedelta | None = None,
         ) -> HttpResponse:
             response = await self._http_client.send_request(
@@ -1419,6 +1420,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 payload=payload,
                 headers=headers,
                 session=session,
+                cookies=cookies,
                 proxy_info=proxy_info,
                 timeout=timeout,
             )
