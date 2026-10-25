@@ -1,7 +1,6 @@
 import asyncio
 import base64
 import gzip
-from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -25,7 +24,7 @@ from tests.unit.utils import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, AsyncIterator
+    from collections.abc import AsyncIterator
 
     from crawlee._types import JsonSerializable
 
@@ -49,8 +48,7 @@ async def test_nested_sitemap_chain_bounded_by_max_depth() -> None:
     """A malicious endless chain of unique nested sitemaps is followed only up to the default max depth."""
     fetched: list[str] = []
 
-    @asynccontextmanager
-    async def stream(url: str, **_kwargs: Any) -> 'AsyncGenerator[HttpResponse]':
+    async def send_request(url: str, **_kwargs: Any) -> HttpResponse:
         fetched.append(url)
         index = int(url.removesuffix('.xml').rsplit('-', 1)[-1])
         # Every sitemap is an index pointing at the next unique URL, so only the depth cap can stop the chain.
@@ -64,10 +62,10 @@ async def test_nested_sitemap_chain_bounded_by_max_depth() -> None:
         response.status_code = 200
         response.headers = {'content-type': 'application/xml; charset=utf-8'}
         response.read_stream = read_stream
-        yield cast('HttpResponse', response)
+        return cast('HttpResponse', response)
 
     client = AsyncMock(spec=HttpClient)
-    client.stream = stream
+    client.send_request.side_effect = send_request
 
     loader = SitemapRequestLoader([f'{DEFAULT_URL}sitemap-0.xml'], http_client=client)
     assert finished(await poll_until_condition(loader.check_readiness, finished))
