@@ -52,7 +52,7 @@
         "@docusaurus/types": "^3.10.2",
         "@types/react": "^19.3.0",
         "markdownlint": "^0.42.0",
-        "markdownlint-cli": "^0.49.1",
+        "markdownlint-cli": "^0.50.0",
         "oxfmt": "^0.72.0",
         "oxlint": "^1.87.0",
         "oxlint-tsgolint": "^7.0.2004",
