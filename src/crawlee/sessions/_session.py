@@ -142,14 +142,19 @@ class Session:
         return self._usage_count
 
     @property
+    def retired(self) -> bool:
+        """Indicate whether the session has been permanently retired."""
+        return self._retired
+
+    @property
     def expires_at(self) -> datetime:
         """Get the expiration datetime of the session."""
         return self._created_at + self._max_age
 
     @property
     def is_blocked(self) -> bool:
-        """Indicate whether the session is retired or blocked by its error score."""
-        return self._retired or self._error_score >= self._max_error_score
+        """Indicate whether the session is blocked by its error score."""
+        return self._error_score >= self._max_error_score
 
     @property
     def is_expired(self) -> bool:
@@ -164,7 +169,7 @@ class Session:
     @property
     def is_usable(self) -> bool:
         """Determine if the session is usable for next requests."""
-        return not (self.is_blocked or self.is_expired or self.is_max_usage_count_reached)
+        return not (self._retired or self.is_blocked or self.is_expired or self.is_max_usage_count_reached)
 
     @overload
     def get_state(self, *, as_dict: Literal[True]) -> dict: ...
@@ -196,6 +201,9 @@ class Session:
 
     def mark_good(self) -> None:
         """Mark the session as good. Should be called after a successful session usage."""
+        if self._retired:
+            return
+
         self._usage_count += 1
 
         if self._error_score > 0:
@@ -203,7 +211,7 @@ class Session:
 
         # Retire the session if it is not usable anymore
         if not self.is_usable:
-            self.retire()
+            self._retired = True
 
     def mark_bad(self) -> None:
         """Mark the session as bad after an unsuccessful session usage."""
@@ -212,7 +220,7 @@ class Session:
 
         # Retire the session if it is not usable anymore
         if not self.is_usable:
-            self.retire()
+            self._retired = True
 
     def retire(self) -> None:
         """Permanently retire the session and increase its error score once.

@@ -5,12 +5,6 @@ title: Upgrading to v2
 
 This page summarizes the breaking changes between Crawlee for Python v1 and v2.
 
-## Session retirement is permanent
-
-`Session.retire()` permanently blocks the session. Calling `mark_good()` can still lower its error score, but cannot make it usable again. Create a new session to replace a retired one. Repeated calls to `retire()` leave the error score unchanged.
-
-Session state includes a `retired` flag, which is preserved when the session pool is saved and restored. Saved sessions without this field load with `retired=False` and retain their existing error scores and usage limits.
-
 ## Python version support
 
 We drop support for Python 3.10, which reached its end of life in October 2026. The minimum supported version is now Python 3.11.
@@ -173,3 +167,11 @@ current concurrency 3, desired 5, overloaded: cpu 58% of the time (limit 40%)
 To read the concurrency values in code, use `crawler.concurrency_system`.
 
 The autoscaling loggers moved together with the package. `crawlee._autoscaling.autoscaled_pool`, `crawlee._autoscaling.snapshotter` and `crawlee._autoscaling.system_status` are now `crawlee.autoscaling._autoscaled_pool`, `crawlee.autoscaling._snapshotter` and `crawlee.autoscaling._system_status`. The state log, along with the messages about scaling and free capacity, now comes from the new `crawlee.autoscaling._concurrency_system` logger. To configure all of them at once, use the `crawlee.autoscaling` logger.
+
+## Session retirement is permanent
+
+`Session.retire()` permanently retires the session. Calling `mark_good()` on a retired session leaves its error score and usage count unchanged. Create a new session to replace a retired one. Repeated calls to `retire()` leave the error score unchanged.
+
+The `Session.retired` property indicates whether a session has been retired. Sessions that expire or reach their usage limit retire without an additional error score penalty, so `is_blocked` continues to indicate whether the error score reached its limit.
+
+Session state includes a `retired` flag, which is preserved when the session pool is saved and restored. Saved sessions without this field load with `retired=False` and retain their existing error scores and usage limits.

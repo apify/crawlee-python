@@ -36,6 +36,7 @@ def test_session_init(session: Session) -> None:
     assert not session.is_expired
     assert not session.is_max_usage_count_reached
     assert session.is_usable
+    assert not session.retired
 
 
 def test_session_get_state(session: Session) -> None:
@@ -90,37 +91,82 @@ def test_retire_method(session: Session) -> None:
     assert session.usage_count == initial_usage_count
 
 
-def test_retired_session_stays_blocked_after_success() -> None:
-    """A successful request cannot make a retired session usable again."""
+def test_mark_good_leaves_retired_session_unchanged() -> None:
+    """A successful request leaves a retired session's state unchanged."""
     session = Session()
     session.retire()
+    state = session.get_state(as_dict=True)
     session.mark_good()
 
-    assert session.error_score < 3.0
+    assert session.get_state(as_dict=True) == state
+    assert session.retired
     assert session.is_blocked
     assert not session.is_usable
 
 
 def test_retirement_survives_serialization() -> None:
     """Retirement survives a JSON round trip even with a reduced error score."""
-    session = Session()
-    session.retire()
-    session.mark_good()
+    session = Session(retired=True, error_score=1.0)
     state = session.get_state(as_dict=False).model_dump_json(by_alias=True)
     restored = Session.from_model(SessionModel.model_validate_json(state))
     restored.mark_good()
 
-    assert restored.is_blocked
+    assert restored.retired
+    assert restored.error_score == 1.0
+    assert restored.usage_count == 0
+    assert not restored.is_blocked
     assert not restored.is_usable
 
 
 def test_session_without_retirement_field_can_be_restored() -> None:
     """Saved sessions without a retirement field remain loadable."""
     state = Session().get_state(as_dict=True)
-    state.pop('retired', None)
+    del state['retired']
     restored = Session.from_model(SessionModel.model_validate(state))
 
     assert restored.is_usable
+    assert not restored.retired
+
+
+@pytest.mark.parametrize(
+    'mark_method',
+    [pytest.param('mark_good', id='successful-request'), pytest.param('mark_bad', id='failed-request')],
+)
+@pytest.mark.parametrize(
+    'expired',
+    [pytest.param(False, id='usage-limit'), pytest.param(True, id='expired')],
+)
+def test_automatic_retirement_preserves_error_score(mark_method: str, *, expired: bool) -> None:
+    """Expiration and usage limits retire sessions without adding a blocking penalty."""
+    session = Session(
+        error_score=0.5,
+        max_usage_count=10 if expired else 1,
+        created_at=datetime.now(UTC) - timedelta(hours=1) if expired else None,
+    )
+    getattr(session, mark_method)()
+
+    assert session.retired
+    assert not session.is_usable
+    assert not session.is_blocked
+    assert session.error_score == (0.0 if mark_method == 'mark_good' else 1.5)
+    assert session.usage_count == 1
+
+    state = session.get_state(as_dict=True)
+    session.mark_good()
+    session.retire()
+    assert session.get_state(as_dict=True) == state
+
+
+def test_automatic_retirement_at_error_limit_preserves_score() -> None:
+    """Reaching the error limit retires a session without a second error penalty."""
+    session = Session(max_error_score=1.0)
+    session.mark_bad()
+
+    assert session.retired
+    assert session.is_blocked
+    assert not session.is_usable
+    assert session.error_score == 1.0
+    assert session.usage_count == 1
 
 
 def test_retire_is_idempotent() -> None:
