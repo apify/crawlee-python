@@ -2834,11 +2834,12 @@ async def test_keep_alive_ignores_stall() -> None:
     assert stall_reasons[0] is not None
 
 
-async def test_stall_waits_for_in_flight_work() -> None:
+async def test_stall_waits_for_in_flight_work(monkeypatch: pytest.MonkeyPatch) -> None:
     """A stall isn't raised while a request is in flight, so the work it enqueues is still crawled."""
-    throttler = await open_throttler()
-    # An overloaded system still runs `min_concurrency` tasks, so the throttled request keeps being dispatched while the
-    # slow one is in flight.
+    # By its third dispatch, the throttled request's domain has rate-limited for longer than the stall window.
+    throttler = await open_throttler_held_until_reclaim(monkeypatch, max_domain_stall=timedelta(minutes=1.5))
+    # An overloaded system still runs `min_concurrency` tasks, so the throttled request is dispatched while the slow one
+    # is in flight.
     crawler = BasicCrawler(
         request_manager=throttler,
         concurrency_settings=ConcurrencySettings(min_concurrency=2, desired_concurrency=2),
