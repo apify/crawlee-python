@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.11.1 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Ignore a UTF-8 byte order mark in robots.txt ([#2351](https://github.com/apify/crawlee-python/pull/2351)) ([3e6ee66](https://github.com/apify/crawlee-python/commit/3e6ee66ff2949820a9e7480c0248b6aa36c04beb)) by [@RaphaelFakhri](https://github.com/RaphaelFakhri), closes [#2350](https://github.com/apify/crawlee-python/issues/2350)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.11.0](https://github.com/apify/crawlee-python/releases/tag/v1.11.0) (2026-10-15)
 
 ### 🚀 Features
