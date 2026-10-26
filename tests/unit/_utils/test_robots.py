@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from typing import TYPE_CHECKING
 
 from crawlee._utils.robots import RobotsTxtFile
@@ -33,6 +34,17 @@ async def test_server_error_disallows_all(server_url: URL, http_client: HttpClie
     robots = await RobotsTxtFile.load(str(server_url / 'status/500'), http_client)
     assert not robots.is_allowed(str(server_url / 'admin/page.html'))
     assert not robots.is_allowed(str(server_url / 'something/page.html'))
+
+
+async def test_load_robots_txt_with_utf8_bom(server_url: URL, http_client: HttpClient) -> None:
+    """A UTF-8 byte order mark at the start of robots.txt does not hide the first group's rules."""
+    content = b'\xef\xbb\xbfUser-agent: *\nDisallow: /private/\n'
+    robots_url = (server_url / 'echo_content').with_query(base64=base64.b64encode(content).decode())
+
+    robots = await RobotsTxtFile.load(str(robots_url), http_client)
+
+    assert not robots.is_allowed(str(server_url / 'private/page.html'))
+    assert robots.is_allowed(str(server_url / 'public/page.html'))
 
 
 async def test_extract_sitemaps_urls(server_url: URL, http_client: HttpClient) -> None:

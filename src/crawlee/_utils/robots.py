@@ -66,7 +66,8 @@ class RobotsTxtFile:
                 body = b'User-agent: *\nDisallow: /'
             else:
                 body = await response.read()
-            robots = Protego.parse(body.decode('utf-8'))
+            # `utf-8-sig` drops a leading byte order mark, which would otherwise hide the first rule line from Protego.
+            robots = Protego.parse(body.decode('utf-8-sig'))
 
         except Exception as e:
             logger.warning(f'Failed to fetch from robots.txt from "{url}" with error: "{e}"')
