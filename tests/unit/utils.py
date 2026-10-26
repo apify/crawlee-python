@@ -68,11 +68,15 @@ def make_status_stream_client(
 
 async def open_throttler_held_until_reclaim(
     monkeypatch: pytest.MonkeyPatch,
+    *,
+    max_domain_stall: timedelta = timedelta(minutes=15),
 ) -> ThrottlingRequestManager[RequestQueue]:
     """Open a throttler for `throttled.placeholder.com` whose backoff lasts until the crawler gives a request back.
 
     The throttler runs on a stopped clock, so a backoff can't run out before the crawler checks whether the domain is
     held back. Each reclaimed request moves the clock past the backoff, so a deferred request is dispatched right away.
+    Once the domain has rate-limited for longer than `max_domain_stall`, reclaims stop moving the clock, so a deferred
+    request sits out its cooldown in a stalled domain.
     """
     backoff = timedelta(minutes=1)
     clock = Mock()
@@ -84,11 +88,14 @@ async def open_throttler_held_until_reclaim(
         request_manager_opener=RequestQueue.open,
         base_delay=backoff,
         max_delay=backoff,
+        max_domain_stall=max_domain_stall,
     )
+    started_at = clock.now.return_value
     reclaim_request = throttler.reclaim_request
 
     async def reclaim_after_backoff(request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
-        clock.now.return_value += backoff
+        if clock.now.return_value - started_at <= max_domain_stall:
+            clock.now.return_value += backoff
         return await reclaim_request(request, forefront=forefront)
 
     monkeypatch.setattr(throttler, 'reclaim_request', reclaim_after_backoff)
