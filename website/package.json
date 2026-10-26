@@ -51,7 +51,7 @@
         "@docusaurus/module-type-aliases": "^3.10.2",
         "@docusaurus/types": "^3.10.2",
         "@types/react": "^19.3.0",
-        "markdownlint": "^0.41.1",
+        "markdownlint": "^0.42.0",
         "markdownlint-cli": "^0.49.1",
         "oxfmt": "^0.72.0",
         "oxlint": "^1.87.0",
