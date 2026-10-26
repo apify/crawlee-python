@@ -37,7 +37,12 @@ from crawlee.errors import (
 )
 from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
 from crawlee.http_clients import HttpClient
-from crawlee.request_loaders import RequestList, RequestManagerTandem, ThrottlingRequestManager
+from crawlee.request_loaders import (
+    RequestList,
+    RequestManagerTandem,
+    ThrottlingRequestManager,
+    _throttling_request_manager,
+)
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics, StatisticsState
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
@@ -51,6 +56,7 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee._types import JsonSerializable
+    from crawlee.storage_clients.models import ProcessedRequest
 
 
 async def test_processes_requests_from_explicit_queue() -> None:
@@ -2834,11 +2840,35 @@ async def test_keep_alive_ignores_stall() -> None:
     assert stall_reasons[0] is not None
 
 
-async def test_stall_waits_for_in_flight_work() -> None:
+async def test_stall_waits_for_in_flight_work(monkeypatch: pytest.MonkeyPatch) -> None:
     """A stall isn't raised while a request is in flight, so the work it enqueues is still crawled."""
-    throttler = await open_throttler()
-    # An overloaded system still runs `min_concurrency` tasks, so the throttled request keeps being dispatched while the
-    # slow one is in flight.
+    # The throttler runs on a stopped clock, so a backoff can't run out before the crawler checks whether the domain is
+    # held back. Each deferral moves the clock one backoff forward until the domain has rate-limited for longer than the
+    # stall window. Then the clock stops, and the throttled request sits out its cooldown in a stalled domain.
+    backoff = timedelta(minutes=1)
+    max_domain_stall = backoff * 1.5
+    clock = Mock()
+    clock.now.return_value = datetime.now(timezone.utc)
+    monkeypatch.setattr(_throttling_request_manager, 'datetime', clock)
+    throttler = ThrottlingRequestManager(
+        await RequestQueue.open(),
+        domains=['throttled.placeholder.com'],
+        request_manager_opener=RequestQueue.open,
+        base_delay=backoff,
+        max_delay=backoff,
+        max_domain_stall=max_domain_stall,
+    )
+    started_at = clock.now.return_value
+    reclaim_request = throttler.reclaim_request
+
+    async def reclaim_after_backoff(request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
+        if clock.now.return_value - started_at <= max_domain_stall:
+            clock.now.return_value += backoff
+        return await reclaim_request(request, forefront=forefront)
+
+    monkeypatch.setattr(throttler, 'reclaim_request', reclaim_after_backoff)
+    # An overloaded system still runs `min_concurrency` tasks, so the throttled request is dispatched while the slow one
+    # is in flight.
     crawler = BasicCrawler(
         request_manager=throttler,
         concurrency_settings=ConcurrencySettings(min_concurrency=2, desired_concurrency=2),
