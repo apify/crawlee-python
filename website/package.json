@@ -53,7 +53,7 @@
         "@types/react": "^19.3.0",
         "markdownlint": "^0.42.0",
         "markdownlint-cli": "^0.50.0",
-        "oxfmt": "^0.72.0",
+        "oxfmt": "^0.74.0",
         "oxlint": "^1.87.0",
         "oxlint-tsgolint": "^7.0.2004",
         "rimraf": "^6.1.3",
