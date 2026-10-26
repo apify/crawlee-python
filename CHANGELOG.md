@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Ignore a UTF-8 byte order mark in robots.txt ([#2351](https://github.com/apify/crawlee-python/pull/2351)) ([3e6ee66](https://github.com/apify/crawlee-python/commit/3e6ee66ff2949820a9e7480c0248b6aa36c04beb)) by [@RaphaelFakhri](https://github.com/RaphaelFakhri), closes [#2350](https://github.com/apify/crawlee-python/issues/2350)
+- **deps:** Drop the upper bound on sqlalchemy ([#2356](https://github.com/apify/crawlee-python/pull/2356)) ([cadd810](https://github.com/apify/crawlee-python/commit/cadd810428c735a33f4a0e0a64e7e00236cdf6db)) by [@vdusek](https://github.com/vdusek)
 
 
 <!-- git-cliff-unreleased-end -->
