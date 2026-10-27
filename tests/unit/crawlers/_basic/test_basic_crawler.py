@@ -40,14 +40,11 @@ from crawlee.errors import (
 from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
 from crawlee.http_clients import HttpClient
 from crawlee.request_loaders import (
-    FinishedStatus,
-    ReadyStatus,
     RequestList,
     RequestManagerTandem,
     RequestSourceStatus,
     StalledStatus,
     ThrottlingRequestManager,
-    WaitingStatus,
 )
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics, Statistics, StatisticsState
@@ -105,11 +102,11 @@ async def test_propagates_request_queue_status_errors(
         assert exc_info.value is error
 
     assert handled_urls == []
-    assert await queue.check_readiness() == ReadyStatus()
+    assert (await queue.check_readiness()).status == 'ready'
 
     await crawler.run()
     assert handled_urls == ['https://a.placeholder.com']
-    assert await queue.check_readiness() == FinishedStatus()
+    assert (await queue.check_readiness()).status == 'finished'
 
 
 async def test_crawler_is_usable_after_a_failed_run_setup(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -2977,7 +2974,7 @@ async def test_crawl_waits_out_backoff() -> None:
     await crawler.run(['https://throttled.placeholder.com/a', 'https://throttled.placeholder.com/b'])
 
     assert len(statuses_during_cooldown) == 1
-    assert isinstance(statuses_during_cooldown[0], WaitingStatus)
+    assert statuses_during_cooldown[0].status == 'waiting'
     assert statuses_during_cooldown[0].ready_at is not None
     assert len(dispatched_at) == 2
     assert dispatched_at[1] - dispatched_at[0] >= 0.5
@@ -2993,9 +2990,9 @@ MAX_DOMAIN_STALL = timedelta(milliseconds=1200)
 MAX_HANDLER_CALLS = 50
 
 
-def is_stalled(status: RequestSourceStatus) -> bool:
+def is_stalled(readiness: RequestSourceStatus) -> bool:
     """Tell whether a request manager reported a stall."""
-    return isinstance(status, StalledStatus)
+    return readiness.status == 'stalled'
 
 
 async def open_throttler() -> ThrottlingRequestManager[RequestQueue]:
@@ -3115,7 +3112,7 @@ async def test_keep_alive_ignores_stall() -> None:
     finally:
         stopper.cancel()
 
-    assert isinstance(stall_statuses[0], StalledStatus)
+    assert stall_statuses[0].status == 'stalled'
 
 
 async def test_stall_waits_for_in_flight_work() -> None:
@@ -3154,7 +3151,7 @@ async def test_stall_waits_for_in_flight_work() -> None:
         # The slow request goes first, since a deferred `THROTTLED_URL` returns to the front of the domain's queue.
         await crawler.run(['https://throttled.placeholder.com/slow', THROTTLED_URL])
 
-    assert isinstance(stall_statuses[0], StalledStatus)
+    assert stall_statuses[0].status == 'stalled'
     assert 'https://free.placeholder.com/next' in visited
 
 
@@ -3257,8 +3254,8 @@ async def test_inner_held_429_is_deferred_and_stalls() -> None:
     with pytest.raises(PersistentRateLimitError):
         await crawler.run()
 
-    assert await throttler.inner.check_readiness() == FinishedStatus()
-    assert await throttler.check_readiness() != FinishedStatus()
+    assert (await throttler.inner.check_readiness()).status == 'finished'
+    assert (await throttler.check_readiness()).status != 'finished'
 
 
 @pytest.mark.parametrize(

@@ -15,7 +15,7 @@ from crawlee._request import Request
 from crawlee._service_locator import ServiceLocator
 from crawlee._utils.http import parse_retry_after_header
 from crawlee.configuration import Configuration
-from crawlee.request_loaders import FinishedStatus, ReadyStatus, StalledStatus, WaitingStatus
+from crawlee.request_loaders import WaitingStatus
 from crawlee.request_loaders._throttling_request_manager import ThrottlingRequestManager
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import RequestQueue
@@ -127,7 +127,7 @@ async def test_add_request_routes_listed_domain_to_sub_manager(
     await manager.add_request(request)
 
     # Inner manager should be empty — the request went to a sub-manager.
-    assert await inner_queue.check_readiness() == FinishedStatus()
+    assert (await inner_queue.check_readiness()).status == 'finished'
     assert THROTTLED_DOMAIN in manager._sub_managers
 
     # The sub-manager should have the request.
@@ -142,7 +142,7 @@ async def test_add_request_routes_non_listed_domain_to_inner(
     request = _make_request(f'https://{NON_THROTTLED_DOMAIN}/page1')
     await manager.add_request(request)
 
-    assert await inner_queue.check_readiness() == ReadyStatus()
+    assert (await inner_queue.check_readiness()).status == 'ready'
     assert NON_THROTTLED_DOMAIN not in manager._sub_managers
 
 
@@ -171,7 +171,7 @@ async def test_domain_matching_is_case_insensitive(
 
     await manager.add_request('https://EXAMPLE.com/page1')
 
-    assert await inner_queue.check_readiness() == FinishedStatus()
+    assert (await inner_queue.check_readiness()).status == 'finished'
     assert 'example.com' in manager._sub_managers
     assert await manager._sub_managers['example.com'].get_total_count() == 1
 
@@ -278,7 +278,7 @@ async def test_add_requests_routes_mixed_domains(
     await manager.add_requests([throttled_req, free_req])
 
     # Inner gets the non-listed domain request.
-    assert await inner_queue.check_readiness() == ReadyStatus()
+    assert (await inner_queue.check_readiness()).status == 'ready'
 
     # Sub-manager gets the listed domain request.
     assert THROTTLED_DOMAIN in manager._sub_managers
@@ -628,10 +628,10 @@ async def test_expired_throttle_makes_the_domain_fetchable_again(
 
     with _frozen_clock() as clock:
         manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
-        assert isinstance(await manager.check_readiness(), WaitingStatus)
+        assert (await manager.check_readiness()).status == 'waiting'
 
         clock.now.return_value += timedelta(seconds=61)
-        assert await manager.check_readiness() == ReadyStatus()
+        assert (await manager.check_readiness()).status == 'ready'
         result = await manager.fetch_next_request()
 
     assert result is not None
@@ -664,7 +664,7 @@ async def test_empty_cooldown_not_waited(manager: ThrottlingRequestManager[Reque
     await manager.mark_request_as_handled(request)
 
     assert manager.is_throttled(url)
-    assert await manager.check_readiness() == FinishedStatus()
+    assert (await manager.check_readiness()).status == 'finished'
 
 
 async def test_fetch_prefers_longest_overdue_domain(
@@ -703,7 +703,7 @@ async def test_reclaim_request_routes_to_sub_manager(
     await manager.reclaim_request(request)
 
     # Should be back in the sub-manager.
-    assert await manager._sub_managers[THROTTLED_DOMAIN].check_readiness() == ReadyStatus()
+    assert (await manager._sub_managers[THROTTLED_DOMAIN].check_readiness()).status == 'ready'
 
 
 async def test_reclaim_request_routes_to_inner(
@@ -720,7 +720,7 @@ async def test_reclaim_request_routes_to_inner(
     await manager.reclaim_request(request)
 
     # Should be back in inner manager.
-    assert await inner_queue.check_readiness() == ReadyStatus()
+    assert (await inner_queue.check_readiness()).status == 'ready'
 
 
 async def test_mark_request_as_handled_routes_to_sub_manager(
@@ -767,8 +767,8 @@ async def test_reclaim_returns_inner_request_to_inner(
 
     await manager.reclaim_request(request)
 
-    assert await inner_queue.check_readiness() == ReadyStatus()
-    assert await manager._sub_managers[THROTTLED_DOMAIN].check_readiness() == FinishedStatus()
+    assert (await inner_queue.check_readiness()).status == 'ready'
+    assert (await manager._sub_managers[THROTTLED_DOMAIN].check_readiness()).status == 'finished'
 
 
 async def test_handled_inner_request_finishes_inner(
@@ -783,8 +783,8 @@ async def test_handled_inner_request_finishes_inner(
 
     await manager.mark_request_as_handled(request)
 
-    assert await inner_queue.check_readiness() == FinishedStatus()
-    assert await manager.check_readiness() == FinishedStatus()
+    assert (await inner_queue.check_readiness()).status == 'finished'
+    assert (await manager.check_readiness()).status == 'finished'
 
 
 async def test_purge_forgets_in_flight_inner_requests(
@@ -804,7 +804,7 @@ async def test_purge_forgets_in_flight_inner_requests(
     assert request is not None
     await manager.mark_request_as_handled(request)
 
-    assert await manager._sub_managers[THROTTLED_DOMAIN].check_readiness() == FinishedStatus()
+    assert (await manager._sub_managers[THROTTLED_DOMAIN].check_readiness()).status == 'finished'
 
 
 async def test_failed_completion_keeps_its_inner_routing_for_the_retry(
@@ -829,8 +829,8 @@ async def test_failed_completion_keeps_its_inner_routing_for_the_retry(
     monkeypatch.undo()
     await manager.mark_request_as_handled(request)
 
-    assert await inner_queue.check_readiness() == FinishedStatus()
-    assert await manager.check_readiness() == FinishedStatus()
+    assert (await inner_queue.check_readiness()).status == 'finished'
+    assert (await manager.check_readiness()).status == 'finished'
 
 
 async def test_shared_unique_key_does_not_reroute_sub_manager_request(
@@ -856,8 +856,8 @@ async def test_shared_unique_key_does_not_reroute_sub_manager_request(
     await manager.reclaim_request(sub_request)
 
     # The reclaim has to land in the sub-manager; inner keeps its own request in flight.
-    assert await manager._sub_managers[THROTTLED_DOMAIN].check_readiness() == ReadyStatus()
-    assert await inner_queue.check_readiness() == WaitingStatus()
+    assert (await manager._sub_managers[THROTTLED_DOMAIN].check_readiness()).status == 'ready'
+    assert (await inner_queue.check_readiness()).status == 'waiting'
 
 
 async def test_get_handled_count_aggregates(manager: ThrottlingRequestManager[RequestQueue]) -> None:
@@ -893,17 +893,17 @@ async def test_get_total_count_aggregates(manager: ThrottlingRequestManager[Requ
 
 async def test_readiness_aggregates(manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """Test that the readiness follows a request through the sub-manager it's routed to."""
-    assert await manager.check_readiness() == FinishedStatus()
+    assert (await manager.check_readiness()).status == 'finished'
 
     await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
-    assert await manager.check_readiness() == ReadyStatus()
+    assert (await manager.check_readiness()).status == 'ready'
 
     request = await manager.fetch_next_request()
     assert request is not None
-    assert await manager.check_readiness() == WaitingStatus()
+    assert (await manager.check_readiness()).status == 'waiting'
 
     await manager.mark_request_as_handled(request)
-    assert await manager.check_readiness() == FinishedStatus()
+    assert (await manager.check_readiness()).status == 'finished'
 
 
 async def test_drop_clears_all(
@@ -936,7 +936,7 @@ async def test_purge_clears_requests_and_resets_throttle_state(
     # Domain configuration is preserved.
     assert THROTTLED_DOMAIN in manager._domain_states
     # Manager is finished.
-    assert await manager.check_readiness() == FinishedStatus()
+    assert (await manager.check_readiness()).status == 'finished'
     # Transient backoff state is reset.
     assert state.consecutive_429_count == 0
     assert not manager._is_domain_throttled(THROTTLED_DOMAIN)
@@ -1007,7 +1007,7 @@ async def test_failed_open_keeps_successful_sub_managers(
     with pytest.raises(RuntimeError, match='storage unavailable'):
         await manager.check_readiness()
 
-    assert await manager.check_readiness() == FinishedStatus()
+    assert (await manager.check_readiness()).status == 'finished'
 
     # The domain that opened before its sibling failed is reused, not opened a second time.
     opened_aliases = [call.kwargs['alias'] for call in opener.await_args_list]
@@ -1023,7 +1023,7 @@ async def test_read_path_after_drop_reopens_sub_managers(
     await manager.drop()
     assert manager._sub_managers == {}
 
-    assert await manager.check_readiness() == FinishedStatus()
+    assert (await manager.check_readiness()).status == 'finished'
     assert set(manager._sub_managers) == set(TEST_DOMAINS)
 
 
@@ -1035,7 +1035,7 @@ async def test_read_paths_reopen_persisted_sub_queues(fs_service_locator: Servic
 
     restarted = await _restart_fs_manager(fs_service_locator)
 
-    assert await restarted.check_readiness() == ReadyStatus()
+    assert (await restarted.check_readiness()).status == 'ready'
     assert await restarted.get_total_count() == 2
 
     request = await restarted.fetch_next_request()
@@ -1052,12 +1052,12 @@ async def test_default_purge_on_start_empties_persisted_sub_queues(fs_service_lo
     fs_service_locator.storage_instance_manager.clear_cache()
     purging_locator = ServiceLocator(configuration=Configuration(), storage_client=FileSystemStorageClient())
     purged = await _open_fs_manager(purging_locator)
-    assert await purged.check_readiness() == FinishedStatus()
+    assert (await purged.check_readiness()).status == 'finished'
 
     # Reopen without purging: an empty queue proves the requests were deleted, not just hidden.
     restarted = await _restart_fs_manager(fs_service_locator)
     assert await restarted.get_total_count() == 0
-    assert await restarted.check_readiness() == FinishedStatus()
+    assert (await restarted.check_readiness()).status == 'finished'
 
 
 async def test_purge_empties_sub_queues_from_a_previous_run(fs_service_locator: ServiceLocator) -> None:
@@ -1103,8 +1103,8 @@ async def test_reclaim_routes_to_sub_manager_after_restart(fs_service_locator: S
 
     await restarted.reclaim_request(request)
 
-    assert await restarted._sub_managers[THROTTLED_DOMAIN].check_readiness() == ReadyStatus()
-    assert await restarted.inner.check_readiness() == FinishedStatus()
+    assert (await restarted._sub_managers[THROTTLED_DOMAIN].check_readiness()).status == 'ready'
+    assert (await restarted.inner.check_readiness()).status == 'finished'
 
 
 def make_stalled(manager: ThrottlingRequestManager[Any], clock: MagicMock, url: str) -> None:
@@ -1126,11 +1126,11 @@ async def test_stall_reported_after_window(manager: ThrottlingRequestManager[Req
 
         clock.now.return_value += manager._max_domain_stall + timedelta(seconds=1)
         manager.record_domain_delay(url)
-        status = await manager.check_readiness()
+        readiness = await manager.check_readiness()
 
-    assert isinstance(status, StalledStatus)
-    assert f'"{THROTTLED_DOMAIN}" (901s)' in status.reason
-    assert '`max_domain_stall` (900s)' in status.reason
+    assert readiness.status == 'stalled'
+    assert f'"{THROTTLED_DOMAIN}" (901s)' in readiness.reason
+    assert '`max_domain_stall` (900s)' in readiness.reason
 
 
 async def test_suppressed_429_extends_stall(manager: ThrottlingRequestManager[RequestQueue]) -> None:
@@ -1168,7 +1168,7 @@ async def test_old_rate_limit_not_stalled(manager: ThrottlingRequestManager[Requ
     with _frozen_clock() as clock:
         manager.record_domain_delay(url)
         clock.now.return_value += manager._max_domain_stall + timedelta(seconds=1)
-        assert await manager.check_readiness() == ReadyStatus()
+        assert (await manager.check_readiness()).status == 'ready'
 
 
 @pytest.mark.parametrize(
@@ -1214,7 +1214,7 @@ async def test_reclaim_keeps_stall(manager: ThrottlingRequestManager[RequestQueu
         make_stalled(manager, clock, url)
 
         await manager.reclaim_request(request)
-        assert isinstance(await manager.check_readiness(), StalledStatus)
+        assert (await manager.check_readiness()).status == 'stalled'
 
 
 async def test_record_success_keeps_stall(manager: ThrottlingRequestManager[RequestQueue]) -> None:
@@ -1225,7 +1225,7 @@ async def test_record_success_keeps_stall(manager: ThrottlingRequestManager[Requ
     with _frozen_clock() as clock:
         make_stalled(manager, clock, url)
         manager.record_success(url)
-        assert isinstance(await manager.check_readiness(), StalledStatus)
+        assert (await manager.check_readiness()).status == 'stalled'
 
 
 @pytest.mark.parametrize(
@@ -1245,7 +1245,7 @@ async def test_ready_work_masks_stall(
 
     with _frozen_clock() as clock:
         make_stalled(two_domain_manager, clock, url)
-        assert await two_domain_manager.check_readiness() == ReadyStatus()
+        assert (await two_domain_manager.check_readiness()).status == 'ready'
 
 
 async def test_waiting_domain_masks_stall(two_domain_manager: ThrottlingRequestManager[RequestQueue]) -> None:
@@ -1272,11 +1272,11 @@ async def test_empty_waiting_domain_does_not_mask_stall(
     with _frozen_clock() as clock:
         make_stalled(two_domain_manager, clock, url)
         two_domain_manager.record_domain_delay(f'https://{SECOND_THROTTLED_DOMAIN}/page1')
-        status = await two_domain_manager.check_readiness()
+        readiness = await two_domain_manager.check_readiness()
 
-    assert isinstance(status, StalledStatus)
-    assert THROTTLED_DOMAIN in status.reason
-    assert SECOND_THROTTLED_DOMAIN not in status.reason
+    assert readiness.status == 'stalled'
+    assert THROTTLED_DOMAIN in readiness.reason
+    assert SECOND_THROTTLED_DOMAIN not in readiness.reason
 
 
 async def test_lapsed_backoff_does_not_mask_stall(manager: ThrottlingRequestManager[RequestQueue]) -> None:
@@ -1287,14 +1287,14 @@ async def test_lapsed_backoff_does_not_mask_stall(manager: ThrottlingRequestMana
     with _frozen_clock() as clock:
         make_stalled(manager, clock, url)
         clock.now.return_value = manager._domain_states[THROTTLED_DOMAIN].throttled_until + timedelta(seconds=1)
-        assert isinstance(await manager.check_readiness(), StalledStatus)
+        assert (await manager.check_readiness()).status == 'stalled'
 
 
 async def test_empty_domain_not_stalled(manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """A domain with no requests left is finished, not stalled."""
     with _frozen_clock() as clock:
         make_stalled(manager, clock, f'https://{THROTTLED_DOMAIN}/page1')
-        assert await manager.check_readiness() == FinishedStatus()
+        assert (await manager.check_readiness()).status == 'finished'
 
 
 async def test_stall_candidate_not_ready(manager: ThrottlingRequestManager[RequestQueue]) -> None:
@@ -1306,7 +1306,7 @@ async def test_stall_candidate_not_ready(manager: ThrottlingRequestManager[Reque
         make_stalled(manager, clock, url)
         clock.now.return_value = manager._domain_states[THROTTLED_DOMAIN].throttled_until + timedelta(seconds=1)
 
-        assert isinstance(await manager.check_readiness(), StalledStatus)
+        assert (await manager.check_readiness()).status == 'stalled'
         request = await manager.fetch_next_request()
 
     assert request is not None
@@ -1322,7 +1322,7 @@ async def test_work_in_progress_masks_stall(manager: ThrottlingRequestManager[Re
 
     with _frozen_clock() as clock:
         make_stalled(manager, clock, url)
-        assert await manager.check_readiness() == WaitingStatus()
+        assert (await manager.check_readiness()).status == 'waiting'
 
 
 async def test_stall_candidate_adding_in_background(manager: ThrottlingRequestManager[RequestQueue]) -> None:
@@ -1333,9 +1333,9 @@ async def test_stall_candidate_adding_in_background(manager: ThrottlingRequestMa
 
     with _frozen_clock() as clock, patch.object(sub_manager, 'check_readiness', return_value=WaitingStatus()):
         make_stalled(manager, clock, url)
-        status = await manager.check_readiness()
+        readiness = await manager.check_readiness()
 
-    assert status == WaitingStatus()
+    assert readiness.status == 'waiting'
 
 
 async def test_purge_resets_stall_and_migrations(
@@ -1393,11 +1393,11 @@ async def test_inner_request_migrates_while_throttled(
 
     assert await manager.fetch_next_request() is None
 
-    assert await inner_queue.check_readiness() == FinishedStatus()
+    assert (await inner_queue.check_readiness()).status == 'finished'
     assert await manager._sub_managers[THROTTLED_DOMAIN].get_total_count() == 1
     assert await manager.get_total_count() == 1
     assert await manager.get_handled_count() == 0
-    assert isinstance(await manager.check_readiness(), WaitingStatus)
+    assert (await manager.check_readiness()).status == 'waiting'
 
 
 async def test_inner_request_dispatched_when_not_throttled(
@@ -1494,10 +1494,10 @@ async def test_stall_sees_migrated_inner_work(
         assert request is not None
         make_stalled(manager, clock, url)
         await manager.reclaim_request(request)
-        assert not isinstance(await manager.check_readiness(), StalledStatus)
+        assert (await manager.check_readiness()).status != 'stalled'
 
         assert await manager.fetch_next_request() is None
-        assert isinstance(await manager.check_readiness(), StalledStatus)
+        assert (await manager.check_readiness()).status == 'stalled'
 
 
 # ── Utility Tests ──────────────────────────────────────

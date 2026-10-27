@@ -9,7 +9,6 @@ import pytest
 
 from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
-from crawlee.request_loaders import FinishedStatus, ReadyStatus, WaitingStatus
 from crawlee.storage_clients import MemoryStorageClient, StorageClient
 from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, UnprocessedRequest
 from crawlee.storages import RequestQueue
@@ -548,19 +547,19 @@ async def test_reclaim_request_with_forefront(rq: RequestQueue) -> None:
 
 async def test_check_readiness(rq: RequestQueue) -> None:
     """Test that the readiness follows a request from adding to handling."""
-    assert await rq.check_readiness() == FinishedStatus()
+    assert (await rq.check_readiness()).status == 'finished'
 
     await rq.add_request('https://example.com')
-    assert await rq.check_readiness() == ReadyStatus()
+    assert (await rq.check_readiness()).status == 'ready'
 
     request = await rq.fetch_next_request()
     assert request is not None
 
     # Nothing to fetch, but the request is still in progress.
-    assert await rq.check_readiness() == WaitingStatus()
+    assert (await rq.check_readiness()).status == 'waiting'
 
     await rq.mark_request_as_handled(request)
-    assert await rq.check_readiness() == FinishedStatus()
+    assert (await rq.check_readiness()).status == 'finished'
 
 
 async def test_readiness_waits_for_background_adds(rq: RequestQueue) -> None:
@@ -579,10 +578,11 @@ async def test_readiness_waits_for_background_adds(rq: RequestQueue) -> None:
         request = await rq.fetch_next_request()
         assert request is not None
         await rq.mark_request_as_handled(request)
-        assert await rq.check_readiness() == WaitingStatus()
+        assert (await rq.check_readiness()).status == 'waiting'
 
         release.set()
-        assert await poll_until_condition(rq.check_readiness, lambda status: status == ReadyStatus()) == ReadyStatus()
+        readiness = await poll_until_condition(rq.check_readiness, lambda readiness: readiness.status == 'ready')
+        assert readiness.status == 'ready'
 
 
 async def test_empty_fetch_yields(rq: RequestQueue) -> None:
@@ -670,7 +670,7 @@ async def test_drop(
     )
 
     # Verify the queue is empty
-    assert await new_rq.check_readiness() == FinishedStatus()
+    assert (await new_rq.check_readiness()).status == 'finished'
     metadata = await new_rq.get_metadata()
     assert metadata.total_request_count == 0
     assert metadata.pending_request_count == 0
@@ -774,7 +774,7 @@ async def test_purge(
     assert metadata.total_request_count == 0
     assert metadata.pending_request_count == 0
     assert metadata.handled_request_count == 0
-    assert await rq.check_readiness() != ReadyStatus()
+    assert (await rq.check_readiness()).status != 'ready'
 
     # Verify we can add new requests after purging
     await rq.add_request('https://example.com/new-after-purge')
@@ -972,7 +972,7 @@ async def test_alias_request_operations(
 
     # Test fetching and handling requests
     processed_urls = []
-    while await rq.check_readiness() == ReadyStatus():
+    while (await rq.check_readiness()).status == 'ready':
         request = await rq.fetch_next_request()
         if request:
             processed_urls.append(request.url)
@@ -986,7 +986,7 @@ async def test_alias_request_operations(
     metadata = await rq.get_metadata()
     assert metadata.pending_request_count == 0
     assert metadata.handled_request_count == 3
-    assert await rq.check_readiness() == FinishedStatus()
+    assert (await rq.check_readiness()).status == 'finished'
 
     # Clean up
     await rq.drop()

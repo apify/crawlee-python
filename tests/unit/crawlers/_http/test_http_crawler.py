@@ -13,7 +13,7 @@ from crawlee import ConcurrencySettings, Request, RequestState
 from crawlee.crawlers import HttpCrawler
 from crawlee.errors import PersistentRateLimitError
 from crawlee.http_clients import HttpClient, HttpCrawlingResult
-from crawlee.request_loaders import FinishedStatus, ThrottlingRequestManager, _throttling_request_manager
+from crawlee.request_loaders import ThrottlingRequestManager, _throttling_request_manager
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storages import RequestQueue
@@ -791,7 +791,7 @@ async def test_persistent_429_raises_after_stall(
         await crawler.run([str(server_url / 'status/429')])
 
     assert any(record.levelno == logging.ERROR and record.exc_info for record in caplog.records)
-    assert await throttler.check_readiness() != FinishedStatus()
+    assert (await throttler.check_readiness()).status != 'finished'
     failed_request_handler.assert_not_called()
 
     # A failed run keeps the queue, and the stall clock still runs, so a re-run gives up again.

@@ -82,7 +82,7 @@ async def test_basic_functionality(test_input: TestInput) -> None:
     tandem = RequestManagerTandem(mock_request_loader, request_queue)
     processed = set[str]()
 
-    while not isinstance(await tandem.check_readiness(), FinishedStatus):
+    while (await tandem.check_readiness()).status != 'finished':
         request = await tandem.fetch_next_request()
         assert request is not None
         processed.add(request.url)
@@ -141,7 +141,7 @@ async def test_ready_loader_skips_manager() -> None:
     loader.check_readiness.return_value = ReadyStatus()
     manager = create_autospec(RequestManager, instance=True, spec_set=True)
 
-    assert await RequestManagerTandem(loader, manager).check_readiness() == ReadyStatus()
+    assert (await RequestManagerTandem(loader, manager).check_readiness()).status == 'ready'
     manager.check_readiness.assert_not_awaited()
 
 

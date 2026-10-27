@@ -13,7 +13,7 @@ from crawlee._types import BasicCrawlingContext
 from crawlee._utils.sitemap import DEFAULT_MAX_DEPTH
 from crawlee.crawlers import BasicCrawler
 from crawlee.http_clients._base import HttpClient, HttpResponse
-from crawlee.request_loaders import FinishedStatus, ReadyStatus, RequestSourceStatus, WaitingStatus
+from crawlee.request_loaders import RequestSourceStatus
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
 from crawlee.storages import KeyValueStore
 from tests.unit.utils import (
@@ -30,9 +30,9 @@ if TYPE_CHECKING:
     from crawlee._types import JsonSerializable
 
 
-def finished(status: RequestSourceStatus) -> bool:
+def finished(readiness: RequestSourceStatus) -> bool:
     """Tell whether a loader reported that every request has been handled."""
-    return isinstance(status, FinishedStatus)
+    return readiness.status == 'finished'
 
 
 def compress_gzip(data: str) -> bytes:
@@ -87,7 +87,7 @@ async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> No
         if item:
             await sitemap_loader.mark_request_as_handled(item)
 
-    assert await sitemap_loader.check_readiness() == FinishedStatus()
+    assert (await sitemap_loader.check_readiness()).status == 'finished'
     assert await sitemap_loader.get_total_count() == 5
     assert await sitemap_loader.get_handled_count() == 5
 
@@ -208,12 +208,12 @@ async def test_readiness_during_traversal(server_url: URL, http_client: HttpClie
         assert not finished(await sitemap_loader.check_readiness())
         items.append(item)
 
-    assert await sitemap_loader.check_readiness() == WaitingStatus()
+    assert (await sitemap_loader.check_readiness()).status == 'waiting'
 
     for item in items:
         await sitemap_loader.mark_request_as_handled(item)
 
-    assert await sitemap_loader.check_readiness() != ReadyStatus()
+    assert (await sitemap_loader.check_readiness()).status != 'ready'
     assert finished(await poll_until_condition(sitemap_loader.check_readiness, finished))
 
 
@@ -228,7 +228,7 @@ async def test_fetch_none_while_in_progress(server_url: URL, http_client: HttpCl
         assert await sitemap_loader.fetch_next_request() is not None
 
     assert await asyncio.wait_for(sitemap_loader.fetch_next_request(), timeout=5) is None
-    assert await sitemap_loader.check_readiness() == WaitingStatus()
+    assert (await sitemap_loader.check_readiness()).status == 'waiting'
 
 
 async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -> None:
@@ -243,7 +243,7 @@ async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -
     assert item is not None
     await sitemap_loader.mark_request_as_handled(item)
 
-    assert await sitemap_loader.check_readiness() == ReadyStatus()
+    assert (await sitemap_loader.check_readiness()).status == 'ready'
 
     await sitemap_loader.abort_loading()
 
@@ -251,7 +251,7 @@ async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -
     assert item is not None
     await sitemap_loader.mark_request_as_handled(item)
 
-    assert await sitemap_loader.check_readiness() == FinishedStatus()
+    assert (await sitemap_loader.check_readiness()).status == 'finished'
 
 
 async def test_create_persist_state_for_sitemap_loading(
@@ -286,7 +286,9 @@ async def test_data_persistence_for_sitemap_loading(
     )
 
     # Give time to load.
-    await poll_until_condition(sitemap_loader.check_readiness, lambda status: status == ReadyStatus(), timeout=10)
+    await poll_until_condition(
+        sitemap_loader.check_readiness, lambda readiness: readiness.status == 'ready', timeout=10
+    )
 
     await sitemap_loader.close()
 
@@ -387,7 +389,7 @@ async def test_transform_request_function_with_skip(server_url: URL, http_client
 
     # Even though the sitemap had URLs, all were skipped, so the loader should be empty and finished with
     # 0 handled requests.
-    assert await sitemap_loader.check_readiness() == FinishedStatus()
+    assert (await sitemap_loader.check_readiness()).status == 'finished'
     assert await sitemap_loader.get_total_count() == 0
     assert await sitemap_loader.get_handled_count() == 0
 
@@ -409,9 +411,9 @@ async def test_sitemap_loader_to_tandem(
         if request:
             await request_manager.mark_request_as_handled(request)
 
-    assert await sitemap_loader.check_readiness() == FinishedStatus()
+    assert (await sitemap_loader.check_readiness()).status == 'finished'
 
-    assert await request_manager.check_readiness() == FinishedStatus()
+    assert (await request_manager.check_readiness()).status == 'finished'
 
 
 async def test_sitemap_loader_to_tandem_with_request_dropped(
@@ -438,9 +440,9 @@ async def test_sitemap_loader_to_tandem_with_request_dropped(
             if request:
                 await request_manager.mark_request_as_handled(request)
 
-        assert await sitemap_loader.check_readiness() == FinishedStatus()
+        assert (await sitemap_loader.check_readiness()).status == 'finished'
 
-        assert await request_manager.check_readiness() == FinishedStatus()
+        assert (await request_manager.check_readiness()).status == 'finished'
 
 
 def _make_urlset(urls: list[str]) -> str:

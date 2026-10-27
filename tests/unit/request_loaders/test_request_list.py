@@ -1,6 +1,5 @@
 from collections.abc import AsyncGenerator
 
-from crawlee.request_loaders import FinishedStatus, ReadyStatus, WaitingStatus
 from crawlee.request_loaders._request_list import RequestList
 from crawlee.storages import KeyValueStore
 
@@ -9,7 +8,7 @@ async def test_sync_traversal() -> None:
     """Test that a list built from a sync iterable is traversed to the end."""
     request_list = RequestList(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
 
-    while not isinstance(await request_list.check_readiness(), FinishedStatus):
+    while (await request_list.check_readiness()).status != 'finished':
         item = await request_list.fetch_next_request()
         assert item is not None
 
@@ -28,7 +27,7 @@ async def test_async_traversal() -> None:
 
     request_list = RequestList(generator())
 
-    while not isinstance(await request_list.check_readiness(), FinishedStatus):
+    while (await request_list.check_readiness()).status != 'finished':
         item = await request_list.fetch_next_request()
         assert item is not None
 
@@ -43,17 +42,17 @@ async def test_readiness_during_traversal() -> None:
 
     items = []
     for _ in range(3):
-        assert await request_list.check_readiness() == ReadyStatus()
+        assert (await request_list.check_readiness()).status == 'ready'
         item = await request_list.fetch_next_request()
         assert item is not None
         items.append(item)
 
-    assert await request_list.check_readiness() == WaitingStatus()
+    assert (await request_list.check_readiness()).status == 'waiting'
 
     for item in items:
         await request_list.mark_request_as_handled(item)
 
-    assert await request_list.check_readiness() == FinishedStatus()
+    assert (await request_list.check_readiness()).status == 'finished'
 
 
 async def test_persist_requests_key_with_sync_iterable() -> None:
@@ -84,7 +83,7 @@ async def test_persist_requests_key_with_empty_iterator() -> None:
     request_list = RequestList([], persist_requests_key=persist_key)
 
     # Should be finished immediately
-    assert await request_list.check_readiness() == FinishedStatus()
+    assert (await request_list.check_readiness()).status == 'finished'
 
     # Check that empty requests were persisted
     kvs = await KeyValueStore.open()
