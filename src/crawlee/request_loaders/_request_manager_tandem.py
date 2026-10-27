@@ -109,3 +109,12 @@ class RequestManagerTandem(RequestManager):
     @override
     async def drop(self) -> None:
         await self._read_write_manager.drop()
+
+    @override
+    async def purge(self) -> None:
+        """Purge the wrapped request manager.
+
+        The loader can't be purged. Requests it already passed to the manager don't come back, and the ones it still
+        holds are fetched as usual.
+        """
+        await self._read_write_manager.purge()
