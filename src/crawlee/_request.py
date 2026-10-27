@@ -404,6 +404,20 @@ class Request(BaseModel):
         self.crawlee_data.enqueue_strategy = new_enqueue_strategy
 
     @property
+    def skip_navigation(self) -> bool:
+        """Tells the crawler processing this request to skip the navigation and process the request directly.
+
+        When this is set to `True`, the crawling context will not contain the results of the navigation
+        (e.g. the HTTP response, parsed content or `loaded_url`). Accessing these properties will raise
+        a `NavigationSkippedError` at runtime.
+        """
+        return self.crawlee_data.skip_navigation
+
+    @skip_navigation.setter
+    def skip_navigation(self, new_value: bool) -> None:
+        self.crawlee_data.skip_navigation = new_value
+
+    @property
     def was_already_handled(self) -> bool:
         """Indicates whether the request was handled."""
         return self.handled_at is not None
