@@ -1434,7 +1434,8 @@ async def test_abort_on_error(
 
 async def test_abort_on_error_applies_to_one_run() -> None:
     """An abort on error ends only the run it happened in, so the next run crawls again."""
-    crawler = BasicCrawler(abort_on_error=True)
+    # Without retries, the failed request isn't left in the queue for the second run.
+    crawler = BasicCrawler(abort_on_error=True, max_request_retries=0)
     handled_urls = list[str]()
 
     @crawler.router.default_handler
