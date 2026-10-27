@@ -472,7 +472,7 @@ async def test_orchestrator_error_logged_on_cancel(
 
 
 async def test_propagates_exceptions_after_finished(make_concurrency_system: type[ConcurrencySystem]) -> None:
-    """A task that fails once no work is left still fails the run, instead of the pool just finishing."""
+    """A task that fails once no work is left still fails the run."""
     is_finished = AsyncMock(return_value=True)
 
     async def run(_task_id: str) -> None:
