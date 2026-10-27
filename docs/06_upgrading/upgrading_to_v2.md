@@ -179,3 +179,39 @@ queue = await RequestQueue.open()
 crawler_1 = BasicCrawler(request_manager=queue)
 crawler_2 = BasicCrawler(request_manager=queue)
 ```
+
+## Repeated `run()` calls no longer purge the request queue
+
+In v1, calling `crawler.run()` again on the same instance purged the request queue, unless the queue was named or the previous run had failed. In v2, nothing is purged between runs, the same as Crawlee JS. A repeated `run()` continues with the same request manager and skips the requests an earlier run handled, failed ones included.
+
+The `purge_request_queue` argument of `run()` is removed. If you passed `purge_request_queue=False`, drop the argument. To crawl the same requests again, purge the request manager yourself:
+
+```python
+# v1
+await crawler.run(urls)
+await crawler.run(urls)
+
+# v2
+await crawler.run(urls)
+request_manager = await crawler.get_request_manager()
+await request_manager.purge()
+await crawler.run(urls)
+```
+
+`RequestManagerTandem.purge()` now purges the manager it wraps, where v1 did nothing. The loader isn't purged, so requests it has already passed to the manager don't come back.
+
+Instead of purging, you can create a new crawler for each crawl. Every crawler after the first opens a request queue of its own, as described in [Only the first crawler uses the default request queue](#only-the-first-crawler-uses-the-default-request-queue). Crawlers created with the same `id` share that queue, so leave `id` unset or give each crawler a different one:
+
+```python
+for urls in batches:
+    crawler = BasicCrawler()
+    await crawler.run(urls)
+```
+
+When a crawl processes no requests because its request manager holds only handled ones, the crawler now logs a warning that explains how to crawl them again.
+
+`Configuration.purge_on_start` isn't affected. Unnamed storages are still purged once per process, when they're first opened.
+
+## `RequestQueue.purge` raises when the storage client can't purge
+
+In v1, `RequestQueue.purge()` worked around a storage client that didn't support purging. It dropped an unnamed queue and opened the default queue in its place, and it skipped a named queue with a warning. In v2, it raises the client's `NotImplementedError`, the same as Crawlee JS. The Apify platform's storage client doesn't support purging, so on the platform, call `drop()` or open a new queue instead.

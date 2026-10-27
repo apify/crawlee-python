@@ -6,7 +6,7 @@ from unittest.mock import create_autospec
 import pytest
 
 from crawlee import Request
-from crawlee.request_loaders import RequestLoader, RequestManagerTandem
+from crawlee.request_loaders import RequestLoader, RequestManager, RequestManagerTandem
 from crawlee.storages import RequestQueue
 
 
@@ -80,3 +80,14 @@ async def test_basic_functionality(test_input: TestInput) -> None:
         await tandem.mark_request_as_handled(request)
 
     assert processed == test_input.expected_result
+
+
+async def test_purge_forwards_to_the_manager() -> None:
+    """Test that purging the tandem purges its manager and leaves the loader alone."""
+    loader = create_autospec(RequestLoader, instance=True, spec_set=True)
+    manager = create_autospec(RequestManager, instance=True, spec_set=True)
+
+    await RequestManagerTandem(loader, manager).purge()
+
+    manager.purge.assert_awaited_once_with()
+    assert loader.mock_calls == []
