@@ -108,7 +108,7 @@ A crawler without an `id` gets its creation index, such as `'0'`, and crawlers w
 
 Load monitoring and concurrency scaling moved from `AutoscaledPool` to the new `ConcurrencySystem`. A crawler builds a default system from its `concurrency_settings` for each run, so a crawler configured through `concurrency_settings` works as before. To cap the combined concurrency of several crawlers, pass one shared `ConcurrencySystem` to all of them through the new `concurrency_system` option.
 
-The autoscaling classes now live in the public `crawlee.autoscaling` package, which replaces the private `crawlee._autoscaling`. Import `AutoscaledPool`, `ConcurrencySystem`, `ConcurrencyConsumer`, `SystemInfo` and `LoadRatioInfo` from there. `Snapshotter` and `SystemStatus` stay internal.
+The autoscaling classes now live in the public `crawlee.autoscaling` package, which replaces the private `crawlee._autoscaling`. Import `AutoscaledPool`, `ConcurrencySystem`, `ConcurrencyConsumer`, `SystemInfo` and `LoadRatioInfo` from there, along with the new load signal API: the built-in signals (`MemoryLoadSignal`, `EventLoopLoadSignal`, `CpuLoadSignal`, `StorageClientLoadSignal`) and their options, `LoadSignalsOptions`, `SnapshotStore`, `LoadSnapshot` and `LoadSignalStartContext`. `Snapshotter` and `SystemStatus` stay internal.
 
 `AutoscaledPool` now only runs the task loop. If you create a pool yourself, note that:
 
@@ -116,6 +116,7 @@ The autoscaling classes now live in the public `crawlee.autoscaling` package, wh
 - `run_task_function` receives the id the task is booked under.
 - `current_concurrency` comes from the concurrency system, so a shared system may count the tasks of other pools too. The pool's own tasks are counted by the new `own_concurrency`.
 - `is_finished_function` is called only when no new task can start and none of the pool's own tasks are in flight, and never while the pool is paused. In v1, it was called on every loop iteration, so a paused pool could finish. A pool whose `is_task_ready_function` keeps resolving to `True` doesn't finish, so make it resolve to `False` once the work runs out.
+- The `cpu_overload_threshold`, `memory_overload_threshold`, `event_loop_overload_threshold` and `client_overload_threshold` options of `SystemStatus` are now the `overloaded_ratio` of the matching signal options in `load_signals`, such as `CpuLoadSignalOptions`. Its `max_snapshot_age` is now the `current_history` of the `ConcurrencySystem`. For details, see [Load signals](../guides/scaling-crawlers#load-signals).
 
 For example:
 
@@ -154,6 +155,14 @@ async with ConcurrencySystem(settings) as concurrency_system:
 `ConcurrencySettings.max_tasks_per_minute` now caps the tasks started over the last 60 seconds, the same as Crawlee JS. In v1, the pool spaced task starts evenly, `60 / max_tasks_per_minute` seconds apart. In v2, tasks start as fast as the concurrency allows until the cap is reached. The next ones wait until the oldest starts age out of the window. The rate over a minute stays the same, but tasks start in bursts. For details, see [Max tasks per minute](../guides/scaling-crawlers#max-tasks-per-minute).
 
 The value has to be a whole number of at least 1, or infinity, which is the default. A fractional value, such as `0.5` or `7.5`, now raises `ValueError`.
+
+## `SystemInfo.client_info` is renamed
+
+`SystemInfo.client_info` is renamed to `storage_client_info`, after the `StorageClientLoadSignal` that reports it. The new `load_signal_info` holds the verdicts of custom load signals by name. For how to configure the signals or add your own, see [Load signals](../guides/scaling-crawlers#load-signals).
+
+## `max_client_errors` defaults to 3
+
+`Configuration.max_client_errors` now defaults to 3, the same as Crawlee JS. A snapshot of the storage client counts as overloaded only once its rate-limit errors grow by more than 3 between two snapshots, which are taken a second apart by default. In v1, the limit was 1. The change affects only a storage client that reports rate-limit errors through `get_rate_limit_errors`, which none of the built-in ones do. To keep the old limit, set `max_client_errors=1` or the `CRAWLEE_MAX_CLIENT_ERRORS` environment variable.
 
 ## Only the first crawler uses the default request queue
 
@@ -207,7 +216,7 @@ If you configure loggers by name or match log messages, update them for the foll
 
 ### Logger names
 
-The autoscaling loggers moved together with the package. `crawlee._autoscaling.autoscaled_pool`, `crawlee._autoscaling.snapshotter` and `crawlee._autoscaling.system_status` are now `crawlee.autoscaling._autoscaled_pool`, `crawlee.autoscaling._snapshotter` and `crawlee.autoscaling._system_status`. The state log, along with the messages about scaling and free capacity, now comes from the new `crawlee.autoscaling._concurrency_system` logger. To configure all of them at once, use the `crawlee.autoscaling` logger.
+The autoscaling loggers moved together with the package. `crawlee._autoscaling.autoscaled_pool` and `crawlee._autoscaling.system_status` are now `crawlee.autoscaling._autoscaled_pool` and `crawlee.autoscaling._system_status`. The memory warnings of `crawlee._autoscaling.snapshotter` now come from `crawlee.autoscaling._memory_load_signal`. The state log, along with the messages about scaling and free capacity, now comes from the new `crawlee.autoscaling._concurrency_system` logger. To configure all of them at once, use the `crawlee.autoscaling` logger.
 
 ### Log levels
 

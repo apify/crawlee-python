@@ -1,479 +1,134 @@
 from __future__ import annotations
 
-import asyncio
-import time
-from bisect import insort
-from datetime import UTC, datetime, timedelta
-from logging import WARNING, getLogger
-from math import floor
-from typing import TYPE_CHECKING, Any, cast
-from unittest import mock
-from unittest.mock import MagicMock, Mock
+from datetime import timedelta
+from unittest.mock import Mock, patch
 
-import proclimits
 import pytest
 
 from crawlee import service_locator
-from crawlee._utils.byte_size import ByteSize
-from crawlee._utils.log import LoggerOnce
-from crawlee._utils.system import CpuInfo, MemoryInfo, get_memory_info
-from crawlee.autoscaling import _snapshotter as snapshotter_module
-from crawlee.autoscaling._snapshotter import Snapshotter, SortedSnapshotList
-from crawlee.autoscaling._types import (
-    SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD,
-    ClientSnapshot,
-    CpuSnapshot,
-    MemorySnapshot,
+from crawlee.autoscaling import (
+    CpuLoadSignal,
+    EventLoopLoadSignal,
+    LoadSignalsOptions,
+    LoadSignalStartContext,
+    MemoryLoadSignal,
+    MemoryLoadSignalOptions,
+    StorageClientLoadSignal,
 )
+from crawlee.autoscaling._load_signal import LoadSignal
+from crawlee.autoscaling._snapshotter import Snapshotter
 from crawlee.configuration import Configuration
-from crawlee.events import LocalEventManager
-from crawlee.events._types import Event, EventSystemInfoData
 
-if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+WINDOW = timedelta(seconds=30)
 
 
-@pytest.fixture
-async def event_manager() -> AsyncGenerator[LocalEventManager, None]:
-    # Use a long interval to avoid interference from periodic system info events during tests and ensure the first
-    # automatic event is consumed before yielding.
+def test_builds_builtin_signals() -> None:
+    """Every built-in signal is enabled by default."""
+    snapshotter = Snapshotter(LoadSignalsOptions(), max_sample_window=WINDOW)
 
-    event_manager = LocalEventManager(system_info_interval=timedelta(hours=9999))
-
-    initial_system_info_consumed = asyncio.Event()
-
-    async def consume_automatic_system_info(_: EventSystemInfoData) -> None:
-        initial_system_info_consumed.set()
-
-    event_manager.on(event=Event.SYSTEM_INFO, listener=consume_automatic_system_info)
-
-    async with event_manager:
-        await initial_system_info_consumed.wait()
-        event_manager.off(event=Event.SYSTEM_INFO, listener=consume_automatic_system_info)
-
-        yield event_manager
+    signal_types = [type(signal) for signal in snapshotter.load_signals]
+    assert signal_types == [MemoryLoadSignal, EventLoopLoadSignal, CpuLoadSignal, StorageClientLoadSignal]
 
 
-@pytest.fixture
-async def snapshotter(event_manager: LocalEventManager) -> AsyncGenerator[Snapshotter, None]:
-    config = Configuration(available_memory_ratio=0.25)
-    service_locator.set_event_manager(event_manager)
-    async with Snapshotter.from_config(config) as snapshotter:
-        yield snapshotter
+def test_false_switches_signal_off() -> None:
+    """A built-in signal switched off with `False` is not built at all."""
+    snapshotter = Snapshotter(LoadSignalsOptions(cpu=False, storage_client=False), max_sample_window=WINDOW)
+
+    signal_types = [type(signal) for signal in snapshotter.load_signals]
+    assert signal_types == [MemoryLoadSignal, EventLoopLoadSignal]
 
 
-@pytest.fixture
-def default_cpu_info() -> CpuInfo:
-    return CpuInfo(used_ratio=0.5)
+def test_custom_signals_follow_builtin() -> None:
+    """Custom signals are driven together with the built-in ones, after them."""
+    custom_signal = Mock(spec=LoadSignal)
+    load_signals = LoadSignalsOptions(event_loop=False, cpu=False, storage_client=False, custom=[custom_signal])
+    snapshotter = Snapshotter(load_signals, max_sample_window=WINDOW)
+
+    assert snapshotter.load_signals[1:] == [custom_signal]
 
 
-@pytest.fixture
-def default_memory_info() -> MemoryInfo:
-    return MemoryInfo(
-        total_size=ByteSize.from_gb(8),
-        current_size=ByteSize.from_gb(4),
-        system_wide_used_size=ByteSize.from_gb(5),
+def test_options_reach_signal() -> None:
+    """The options of a built-in signal are passed to its constructor."""
+    memory_options = MemoryLoadSignalOptions(overloaded_ratio=0.1)
+    snapshotter = Snapshotter(LoadSignalsOptions(memory=memory_options), max_sample_window=WINDOW)
+
+    memory_signal = snapshotter.load_signals[0]
+    assert isinstance(memory_signal, MemoryLoadSignal)
+    assert memory_signal.overloaded_ratio == 0.1
+
+
+async def test_signals_start_with_context() -> None:
+    """Every signal starts with the window and configuration the snapshotter was given, and stops on exit."""
+    custom_signal = Mock(spec=LoadSignal)
+    load_signals = LoadSignalsOptions(
+        memory=False,
+        event_loop=False,
+        cpu=False,
+        storage_client=False,
+        custom=[custom_signal],
+    )
+    configuration = Configuration()
+
+    async with Snapshotter(load_signals, max_sample_window=WINDOW, configuration=configuration):
+        context = LoadSignalStartContext(max_sample_window=WINDOW, configuration=configuration)
+        custom_signal.start.assert_awaited_once_with(context)
+        custom_signal.stop.assert_not_awaited()
+
+    custom_signal.stop.assert_awaited_once()
+
+
+async def test_signals_start_with_global_configuration() -> None:
+    """Without a configuration of its own, the snapshotter hands the signals the global one."""
+    custom_signal = Mock(spec=LoadSignal)
+    load_signals = LoadSignalsOptions(
+        memory=False,
+        event_loop=False,
+        cpu=False,
+        storage_client=False,
+        custom=[custom_signal],
     )
 
-
-@pytest.fixture
-def event_system_data_info(default_cpu_info: CpuInfo, default_memory_info: MemoryInfo) -> EventSystemInfoData:
-    return EventSystemInfoData(
-        cpu_info=default_cpu_info,
-        memory_info=default_memory_info,
-    )
+    async with Snapshotter(load_signals, max_sample_window=WINDOW):
+        context = custom_signal.start.await_args.args[0]
+        assert context.configuration is service_locator.get_configuration()
 
 
-async def test_start_stop_lifecycle() -> None:
-    config = Configuration(available_memory_ratio=0.25)
+async def test_failed_start_stops_started_signals() -> None:
+    """A signal that fails to start is stopped along with the ones started before it."""
+    started_signal = Mock(spec=LoadSignal)
+    failing_signal = Mock(spec=LoadSignal)
+    failing_signal.start.side_effect = RuntimeError('Signal failure')
 
-    async with Snapshotter.from_config(config):
-        pass
+    with (
+        patch('crawlee.autoscaling._snapshotter.MemoryLoadSignal', return_value=started_signal),
+        patch('crawlee.autoscaling._snapshotter.CpuLoadSignal', return_value=failing_signal),
+    ):
+        snapshotter = Snapshotter(LoadSignalsOptions(event_loop=False, storage_client=False), max_sample_window=WINDOW)
 
-
-async def test_snapshot_cpu(
-    snapshotter: Snapshotter, event_system_data_info: EventSystemInfoData, event_manager: LocalEventManager
-) -> None:
-    event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_data_info)
-    await event_manager.wait_for_all_listeners_to_complete()
-    cpu_snapshots = cast('list[CpuSnapshot]', snapshotter.get_cpu_sample())
-    assert len(cpu_snapshots) == 1
-    assert cpu_snapshots[0].used_ratio == event_system_data_info.cpu_info.used_ratio
-
-
-async def test_snapshot_memory(
-    snapshotter: Snapshotter, event_system_data_info: EventSystemInfoData, event_manager: LocalEventManager
-) -> None:
-    event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_system_data_info)
-    await event_manager.wait_for_all_listeners_to_complete()
-    memory_snapshots = cast('list[MemorySnapshot]', snapshotter.get_memory_sample())
-    assert len(memory_snapshots) == 1
-    assert memory_snapshots[0].current_size == event_system_data_info.memory_info.current_size
-
-
-async def test_snapshot_memory_with_memory_info_sets_system_wide_fields(
-    snapshotter: Snapshotter, event_manager: LocalEventManager
-) -> None:
-    memory_info = MemoryInfo(
-        total_size=ByteSize.from_gb(16),
-        current_size=ByteSize.from_gb(4),
-        system_wide_used_size=ByteSize.from_gb(12),
-    )
-
-    event_data = EventSystemInfoData(
-        cpu_info=CpuInfo(used_ratio=0.5),
-        memory_info=memory_info,
-    )
-
-    event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_data)
-    await event_manager.wait_for_all_listeners_to_complete()
-
-    memory_snapshots = cast('list[MemorySnapshot]', snapshotter.get_memory_sample())
-
-    assert len(memory_snapshots) == 1
-    memory_snapshot = memory_snapshots[0]
-
-    # Test that system-wide fields are properly set
-    assert memory_snapshot.system_wide_used_size == memory_info.system_wide_used_size
-    assert memory_snapshot.system_wide_memory_size == memory_info.total_size
-
-
-def test_snapshot_event_loop(snapshotter: Snapshotter) -> None:
-    # A first event loop snapshot is created when an instance is created.
-    event_loop_snapshots = snapshotter.get_event_loop_sample()
-    assert len(event_loop_snapshots) == 1
-
-
-def test_snapshot_client(snapshotter: Snapshotter) -> None:
-    # A first client snapshot is created when an instance is created.
-    client_snapshots = snapshotter.get_client_sample()
-    assert len(client_snapshots) == 1
-
-
-def test_snapshot_client_overloaded() -> None:
-    assert not ClientSnapshot(error_count=1, new_error_count=1, max_error_count=2).is_overloaded
-    assert not ClientSnapshot(error_count=2, new_error_count=1, max_error_count=2).is_overloaded
-    assert not ClientSnapshot(error_count=4, new_error_count=2, max_error_count=2).is_overloaded
-    assert ClientSnapshot(error_count=7, new_error_count=3, max_error_count=2).is_overloaded
-
-
-@pytest.mark.run_alone
-async def test_get_cpu_sample(
-    snapshotter: Snapshotter, event_manager: LocalEventManager, default_memory_info: MemoryInfo
-) -> None:
-    now = datetime.now(UTC)
-    snapshotter._SNAPSHOT_HISTORY = timedelta(hours=10)  # Extend history for testing
-
-    events_data = [
-        EventSystemInfoData(
-            cpu_info=CpuInfo(
-                used_ratio=0.5,
-                created_at=now - timedelta(hours=delta),
-            ),
-            memory_info=default_memory_info,
-        )
-        for delta in range(5, 0, -1)
-    ]
-    for event_data in events_data:
-        event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_data)
-    await event_manager.wait_for_all_listeners_to_complete()
-
-    # When no sample duration is provided it should return all snapshots
-    samples = snapshotter.get_cpu_sample()
-    assert len(samples) == len(events_data)
-
-    duration = timedelta(hours=0.5)
-    samples = snapshotter.get_cpu_sample(duration)
-    assert len(samples) == 1
-
-    duration = timedelta(hours=2.5)
-    samples = snapshotter.get_cpu_sample(duration)
-    assert len(samples) == 3
-
-    duration = timedelta(hours=10)
-    samples = snapshotter.get_cpu_sample(duration)
-    assert len(samples) == len(events_data)
-
-
-async def test_methods_raise_error_when_not_active() -> None:
-    snapshotter = Snapshotter.from_config(Configuration(available_memory_ratio=0.25))
-    assert snapshotter.active is False
-
-    with pytest.raises(RuntimeError, match=r'Snapshotter is not active.'):
-        snapshotter.get_cpu_sample()
-
-    with pytest.raises(RuntimeError, match=r'Snapshotter is not active.'):
-        snapshotter.get_memory_sample()
-
-    with pytest.raises(RuntimeError, match=r'Snapshotter is not active.'):
-        snapshotter.get_event_loop_sample()
-
-    with pytest.raises(RuntimeError, match=r'Snapshotter is not active.'):
-        snapshotter.get_client_sample()
-
-    with pytest.raises(RuntimeError, match=r'Snapshotter is already active.'):
-        async with snapshotter, snapshotter:
+    with pytest.raises(RuntimeError, match='Signal failure'):
+        async with snapshotter:
             pass
 
-    async with snapshotter:
-        snapshotter.get_cpu_sample()
-        snapshotter.get_memory_sample()
-        snapshotter.get_event_loop_sample()
-        snapshotter.get_client_sample()
-
-        assert snapshotter.active is True
+    started_signal.stop.assert_awaited_once()
+    failing_signal.stop.assert_awaited_once()
 
 
-async def test_snapshot_pruning_removes_outdated_records(
-    snapshotter: Snapshotter, event_manager: LocalEventManager, default_memory_info: MemoryInfo
-) -> None:
-    # Set the snapshot history to 2 hours
-    snapshotter._SNAPSHOT_HISTORY = timedelta(hours=2)
+async def test_failed_stop_stops_other_signals() -> None:
+    """A signal that fails to stop leaves none of the others running."""
+    memory_signal = Mock(spec=LoadSignal)
+    failing_signal = Mock(spec=LoadSignal)
+    failing_signal.stop.side_effect = RuntimeError('Signal failure')
+    storage_client_signal = Mock(spec=LoadSignal)
 
-    # Create timestamps for testing
-    now = datetime.now(UTC)
+    with (
+        patch('crawlee.autoscaling._snapshotter.MemoryLoadSignal', return_value=memory_signal),
+        patch('crawlee.autoscaling._snapshotter.CpuLoadSignal', return_value=failing_signal),
+        patch('crawlee.autoscaling._snapshotter.StorageClientLoadSignal', return_value=storage_client_signal),
+    ):
+        snapshotter = Snapshotter(LoadSignalsOptions(event_loop=False), max_sample_window=WINDOW)
 
-    def randomly_delayed_insort(*args: Any, **kwargs: Any) -> None:
-        """Sort with injected delay to provoke otherwise hard to reproduce race condition."""
-        time.sleep(0.05)
-        return insort(*args, **kwargs)
+    with pytest.raises(RuntimeError, match='Signal failure'):
+        await snapshotter.__aexit__(None, None, None)
 
-    with mock.patch('crawlee.autoscaling._snapshotter.insort', side_effect=randomly_delayed_insort):
-        events_data = [
-            EventSystemInfoData(
-                cpu_info=CpuInfo(used_ratio=0.5, created_at=now - timedelta(hours=delta)),
-                memory_info=default_memory_info,
-            )
-            for delta in [0, 3, 2, 5]  # Out of order timestamps. Snapshotter can not rely on natural ordering.
-        ]
-
-        for event_data in events_data:
-            event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_data)
-        await event_manager.wait_for_all_listeners_to_complete()
-
-    cpu_snapshots = cast('list[CpuSnapshot]', snapshotter.get_cpu_sample())
-
-    # Check that only the last two snapshots remain
-    assert len(cpu_snapshots) == 2
-    assert cpu_snapshots[0].created_at == now - timedelta(hours=2)
-    assert cpu_snapshots[1].created_at == now
-
-
-async def test_memory_load_evaluation_logs_warning_on_high_usage(
-    caplog: pytest.LogCaptureFixture,
-    event_manager: LocalEventManager,
-    default_cpu_info: CpuInfo,
-) -> None:
-    config = Configuration(memory_mbytes=8192)
-
-    service_locator.set_event_manager(event_manager)
-    snapshotter = Snapshotter.from_config(config)
-
-    high_memory_usage = ByteSize.from_gb(8) * 0.95  # 95% of 8 GB
-
-    event_data = EventSystemInfoData(
-        cpu_info=default_cpu_info,
-        memory_info=MemoryInfo(
-            total_size=ByteSize.from_gb(8),
-            current_size=high_memory_usage,
-            system_wide_used_size=ByteSize.from_gb(7),
-        ),
-    )
-
-    async with snapshotter:
-        event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_data)
-        await event_manager.wait_for_all_listeners_to_complete()
-
-        # Filter log records to only include those from snapshotter
-        log_records = [record for record in caplog.records if 'snapshotter' in record.pathname.lower()]
-
-        assert len(log_records) == 1
-        assert log_records[0].levelname.lower() == 'warning'
-        assert 'Memory is critically overloaded' in log_records[0].msg
-
-        event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_data)
-        await event_manager.wait_for_all_listeners_to_complete()
-
-        log_records = [record for record in caplog.records if 'snapshotter' in record.pathname.lower()]
-
-        assert len(log_records) == 1
-
-
-async def test_memory_load_evaluation_silent_on_acceptable_usage(
-    monkeypatch: pytest.MonkeyPatch,
-    event_manager: LocalEventManager,
-    default_cpu_info: CpuInfo,
-) -> None:
-    mock_logger_warn = MagicMock()
-    monkeypatch.setattr(getLogger('crawlee.autoscaling._snapshotter'), 'warning', mock_logger_warn)
-
-    service_locator.set_event_manager(event_manager)
-    snapshotter = Snapshotter.from_config(Configuration(memory_mbytes=8192))
-
-    low_memory_usage = ByteSize.from_gb(8) * 0.8  # 80% of 8 GB
-
-    event_data = EventSystemInfoData(
-        cpu_info=default_cpu_info,
-        memory_info=MemoryInfo(
-            total_size=ByteSize.from_gb(8),
-            current_size=low_memory_usage,
-            system_wide_used_size=ByteSize.from_gb(7),
-        ),
-    )
-
-    async with snapshotter:
-        event_manager.emit(event=Event.SYSTEM_INFO, event_data=event_data)
-        await event_manager.wait_for_all_listeners_to_complete()
-
-        assert mock_logger_warn.call_count == 0
-
-
-async def test_snapshots_time_ordered(snapshotter: Snapshotter, event_manager: LocalEventManager) -> None:
-    # All internal snapshot list should be ordered by creation time in ascending order.
-    # Scenario where older emitted event arrives after newer event.
-    # Snapshotter should not trust the event order and check events' times.
-    time_new = datetime.now(tz=UTC)
-    time_old = datetime.now(tz=UTC) - timedelta(milliseconds=50)
-
-    def create_event_data(creation_time: datetime) -> EventSystemInfoData:
-        return EventSystemInfoData(
-            cpu_info=CpuInfo(used_ratio=0.5, created_at=creation_time),
-            memory_info=MemoryInfo(
-                current_size=ByteSize(bytes=1),
-                created_at=creation_time,
-                total_size=ByteSize(bytes=2),
-                system_wide_used_size=ByteSize.from_gb(5),
-            ),
-        )
-
-    event_manager.emit(event=Event.SYSTEM_INFO, event_data=create_event_data(time_new))
-    event_manager.emit(event=Event.SYSTEM_INFO, event_data=create_event_data(time_old))
-    await event_manager.wait_for_all_listeners_to_complete()
-
-    memory_samples = snapshotter.get_memory_sample()
-    cpu_samples = snapshotter.get_cpu_sample()
-    assert memory_samples[0].created_at == time_old
-    assert cpu_samples[0].created_at == time_old
-    assert memory_samples[1].created_at == time_new
-    assert cpu_samples[1].created_at == time_new
-
-
-def test_sorted_snapshot_list_add_maintains_order() -> None:
-    """Test that SortedSnapshotList.add method maintains sorted order by created_at with multiple items."""
-    sorted_list = SortedSnapshotList[CpuSnapshot]()
-
-    # Create snapshots with different timestamps (more items to test binary search better)
-    now = datetime.now(UTC)
-    snapshots = [
-        CpuSnapshot(used_ratio=0.1, max_used_ratio=0.95, created_at=now - timedelta(seconds=50)),  # oldest
-        CpuSnapshot(used_ratio=0.2, max_used_ratio=0.95, created_at=now - timedelta(seconds=40)),
-        CpuSnapshot(used_ratio=0.3, max_used_ratio=0.95, created_at=now - timedelta(seconds=30)),
-        CpuSnapshot(used_ratio=0.4, max_used_ratio=0.95, created_at=now - timedelta(seconds=20)),
-        CpuSnapshot(used_ratio=0.5, max_used_ratio=0.95, created_at=now - timedelta(seconds=10)),
-        CpuSnapshot(used_ratio=0.6, max_used_ratio=0.95, created_at=now - timedelta(seconds=5)),
-        CpuSnapshot(used_ratio=0.7, max_used_ratio=0.95, created_at=now),  # newest
-    ]
-
-    # Add snapshots in random order to test binary search insertion
-    add_order = [3, 0, 5, 1, 6, 2, 4]  # indices in random order
-    for i in add_order:
-        sorted_list.add(snapshots[i])
-
-    # Verify the list is sorted by created_at (should be in original order)
-    assert len(sorted_list) == 7
-    for i, snapshot in enumerate(sorted_list):
-        assert snapshot == snapshots[i], f'Item at index {i} is not correctly sorted'
-        if i > 0:
-            prev_time = sorted_list[i - 1].created_at
-            curr_time = snapshot.created_at
-            assert prev_time <= curr_time, f'Items at indices {i - 1} and {i} are not in chronological order'
-
-
-@pytest.mark.parametrize('dynamic_memory', [True, False])
-async def test_dynamic_memory(
-    *,
-    default_cpu_info: CpuInfo,
-    event_manager: LocalEventManager,
-    dynamic_memory: bool,
-) -> None:
-    """Test dynamic memory scaling scenario where the system-wide memory can change.
-
-    Create two memory snapshots. They have same memory usage, but different available memory.
-    First snapshot is created with insufficient memory, so it is overloaded.
-    Second snapshot is created with sufficient memory.
-
-    Based on the Snapshotter configuration, it will either take into account the increased available memory or not.
-    """
-    _initial_memory_info = get_memory_info()
-    ratio_just_below_system_wide_overload = 0.99 * SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD
-
-    memory_mbytes = 0 if dynamic_memory else floor(_initial_memory_info.total_size.to_mb())
-
-    service_locator.set_event_manager(event_manager)
-
-    async with Snapshotter.from_config(
-        Configuration(memory_mbytes=memory_mbytes, available_memory_ratio=ratio_just_below_system_wide_overload)
-    ) as snapshotter:
-        # Default state, memory usage exactly at the overload threshold -> overloaded, but not system-wide overloaded
-        memory_infos = [
-            # Overloaded sample
-            MemoryInfo(
-                total_size=_initial_memory_info.total_size,
-                current_size=_initial_memory_info.total_size * ratio_just_below_system_wide_overload,
-                system_wide_used_size=_initial_memory_info.total_size * ratio_just_below_system_wide_overload,
-            ),
-            # Same as first sample, with twice as memory available in the system
-            MemoryInfo(
-                total_size=_initial_memory_info.total_size * 2,  # Simulate increased total memory
-                current_size=_initial_memory_info.total_size * ratio_just_below_system_wide_overload,
-                system_wide_used_size=_initial_memory_info.total_size * ratio_just_below_system_wide_overload,
-            ),
-        ]
-
-        for memory_info in memory_infos:
-            event_manager.emit(
-                event=Event.SYSTEM_INFO,
-                event_data=EventSystemInfoData(
-                    cpu_info=default_cpu_info,
-                    memory_info=memory_info,
-                ),
-            )
-
-        await event_manager.wait_for_all_listeners_to_complete()
-
-        memory_samples = snapshotter.get_memory_sample()
-        assert len(memory_samples) == 2
-        # First sample will be overloaded.
-        assert memory_samples[0].is_overloaded
-        # Second sample can reflect the increased available memory based on the configuration used to create Snapshotter
-        assert memory_samples[1].is_overloaded == (not dynamic_memory)
-
-
-@pytest.mark.parametrize(
-    ('config_options', 'limit_bytes', 'expected_warning'),
-    [
-        pytest.param({}, 512 * 1024**2, True, id='default ratio under a limit'),
-        pytest.param({'available_memory_ratio': 0.25}, 512 * 1024**2, False, id='ratio set explicitly'),
-        pytest.param({'memory_mbytes': 1024}, 512 * 1024**2, False, id='memory_mbytes set'),
-        pytest.param({}, None, False, id='no limit'),
-    ],
-)
-def test_from_config_warns_on_default_ratio_under_limit(
-    *,
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-    config_options: dict[str, Any],
-    limit_bytes: int | None,
-    expected_warning: bool,
-) -> None:
-    """Warns when the default `available_memory_ratio` stacks on top of a memory limit."""
-    budget = None if limit_bytes is None else proclimits.MemoryBudget(limit=limit_bytes, used=0, available=limit_bytes)
-    monkeypatch.setattr(proclimits, 'get_memory_budget', Mock(return_value=budget))
-    monkeypatch.setattr(snapshotter_module, 'logger_once', LoggerOnce(snapshotter_module.logger))
-
-    with caplog.at_level(WARNING, logger=snapshotter_module.logger.name):
-        Snapshotter.from_config(Configuration(**config_options))
-
-    warnings = [record.message for record in caplog.records if 'Setting max memory of this run' in record.message]
-    assert len(warnings) == int(expected_warning)
-    assert all('to 128.00 MB, 25% of the 512.00 MB memory limit' in warning for warning in warnings)
+    memory_signal.stop.assert_awaited_once()
+    storage_client_signal.stop.assert_awaited_once()

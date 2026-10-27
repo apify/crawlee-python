@@ -1,254 +1,197 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from unittest.mock import Mock
 
 import pytest
 
-from crawlee._utils.byte_size import ByteSize
+from crawlee.autoscaling import LoadRatioInfo, LoadSnapshot, SnapshotStore, SystemInfo
+from crawlee.autoscaling._load_signal import LoadSignal
 from crawlee.autoscaling._snapshotter import Snapshotter
 from crawlee.autoscaling._system_status import SystemStatus
-from crawlee.autoscaling._types import (
-    ClientSnapshot,
-    CpuSnapshot,
-    EventLoopSnapshot,
-    LoadRatioInfo,
-    MemorySnapshot,
-    SystemInfo,
-)
-from crawlee.configuration import Configuration
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
 
 
-@pytest.fixture
-async def snapshotter() -> AsyncGenerator[Snapshotter, None]:
-    config = Configuration(available_memory_ratio=0.25)
-    async with Snapshotter.from_config(config) as snapshotter:
-        yield snapshotter
+def load_signal(name: str, snapshots: list[tuple[timedelta, bool]], *, overloaded_ratio: float = 0.5) -> Mock:
+    """Build a signal sampling the given `(age, is_overloaded)` snapshots through a real `SnapshotStore`."""
+    now = datetime.now(UTC)
+    store = SnapshotStore[LoadSnapshot]()
+
+    for age, is_overloaded in snapshots:
+        store.push(LoadSnapshot(is_overloaded=is_overloaded, created_at=now - age))
+
+    signal = Mock(spec=LoadSignal)
+    signal.name = name
+    signal.overloaded_ratio = overloaded_ratio
+    signal.get_sample.side_effect = store.get_sample
+    return signal
 
 
-@pytest.fixture
-def now() -> datetime:
-    return datetime.now(UTC)
+def snapshotter(*load_signals: LoadSignal) -> Mock:
+    """Build a snapshotter owning the given signals."""
+    return Mock(spec=Snapshotter, load_signals=list(load_signals))
 
 
-async def test_start_stop_lifecycle() -> None:
-    config = Configuration(available_memory_ratio=0.25)
-
-    async with Snapshotter.from_config(config) as snapshotter:
-        system_status = SystemStatus(snapshotter)
-        system_status.get_current_system_info()
-        system_status.get_historical_system_info()
-
-
-def test_cpu_is_overloaded(snapshotter: Snapshotter, now: datetime) -> None:
-    system_status = SystemStatus(snapshotter, cpu_overload_threshold=0.5)
-    system_status._snapshotter._cpu_snapshots = Snapshotter._get_sorted_list_by_created_at(
+def test_cpu_is_overloaded() -> None:
+    """A signal is overloaded once its weighted share of overloaded time exceeds its ratio."""
+    cpu_signal = load_signal(
+        'cpu_info',
         [
-            CpuSnapshot(used_ratio=0.6, max_used_ratio=0.75, created_at=now - timedelta(minutes=3)),
-            CpuSnapshot(used_ratio=0.7, max_used_ratio=0.75, created_at=now - timedelta(minutes=2)),
-            CpuSnapshot(used_ratio=0.8, max_used_ratio=0.75, created_at=now - timedelta(minutes=1)),
-            CpuSnapshot(used_ratio=0.9, max_used_ratio=0.75, created_at=now),
-        ]
+            (timedelta(minutes=3), False),
+            (timedelta(minutes=2), False),
+            (timedelta(minutes=1), True),
+            (timedelta(0), True),
+        ],
     )
-    cpu_info = system_status._is_cpu_overloaded()
+    system_status = SystemStatus(snapshotter(cpu_signal), snapshot_history=timedelta(minutes=10))
+
+    cpu_info = system_status.get_historical_system_info().cpu_info
 
     assert cpu_info == LoadRatioInfo(limit_ratio=0.5, actual_ratio=0.667)
     assert cpu_info.is_overloaded is True
 
 
-def test_cpu_is_not_overloaded(snapshotter: Snapshotter, now: datetime) -> None:
-    system_status = SystemStatus(snapshotter, cpu_overload_threshold=0.5)
-    system_status._snapshotter._cpu_snapshots = Snapshotter._get_sorted_list_by_created_at(
+def test_cpu_is_not_overloaded() -> None:
+    """A signal is not overloaded while its weighted share of overloaded time stays below its ratio."""
+    cpu_signal = load_signal(
+        'cpu_info',
         [
-            CpuSnapshot(used_ratio=0.7, max_used_ratio=0.75, created_at=now - timedelta(minutes=3)),
-            CpuSnapshot(used_ratio=0.8, max_used_ratio=0.75, created_at=now - timedelta(minutes=2)),
-            CpuSnapshot(used_ratio=0.6, max_used_ratio=0.75, created_at=now - timedelta(minutes=1)),
-            CpuSnapshot(used_ratio=0.5, max_used_ratio=0.75, created_at=now),
-        ]
+            (timedelta(minutes=3), True),
+            (timedelta(minutes=2), True),
+            (timedelta(minutes=1), False),
+            (timedelta(0), False),
+        ],
     )
-    cpu_info = system_status._is_cpu_overloaded()
+    system_status = SystemStatus(snapshotter(cpu_signal), snapshot_history=timedelta(minutes=10))
+
+    cpu_info = system_status.get_historical_system_info().cpu_info
 
     assert cpu_info == LoadRatioInfo(limit_ratio=0.5, actual_ratio=0.333)
     assert cpu_info.is_overloaded is False
 
 
-def test_get_system_info(snapshotter: Snapshotter, now: datetime) -> None:
+def test_get_system_info() -> None:
+    """The current status looks back `current_history`, the historical one `snapshot_history`."""
+    minutes = [timedelta(minutes=age) for age in (3, 2, 1, 0)]
+    seconds = [timedelta(seconds=age) for age in (90, 60, 30, 0)]
+
+    signals = [
+        load_signal('cpu_info', list(zip(minutes, [False, False, True, True], strict=True))),
+        load_signal('memory_info', list(zip(seconds, [False, True, True, False], strict=True))),
+        load_signal('event_loop_info', list(zip(minutes, [True, True, False, False], strict=True))),
+        load_signal('storage_client_info', list(zip(minutes, [False, False, False, False], strict=True))),
+    ]
     system_status = SystemStatus(
-        snapshotter,
-        max_snapshot_age=timedelta(minutes=1),
-        cpu_overload_threshold=0.5,
-        memory_overload_threshold=0.5,
-        event_loop_overload_threshold=0.5,
-        client_overload_threshold=0.5,
+        snapshotter(*signals),
+        current_history=timedelta(minutes=1),
+        snapshot_history=timedelta(minutes=10),
     )
 
-    # Add CPU snapshots
-    system_status._snapshotter._cpu_snapshots = Snapshotter._get_sorted_list_by_created_at(
-        [
-            CpuSnapshot(used_ratio=0.6, max_used_ratio=0.75, created_at=now - timedelta(minutes=3)),
-            CpuSnapshot(used_ratio=0.7, max_used_ratio=0.75, created_at=now - timedelta(minutes=2)),
-            CpuSnapshot(used_ratio=0.8, max_used_ratio=0.75, created_at=now - timedelta(minutes=1)),
-            CpuSnapshot(used_ratio=0.9, max_used_ratio=0.75, created_at=now),
-        ]
-    )
-
-    # Add memory snapshots
-    system_status._snapshotter._memory_snapshots = Snapshotter._get_sorted_list_by_created_at(
-        [
-            MemorySnapshot(
-                current_size=ByteSize.from_gb(4),
-                max_memory_size=ByteSize.from_gb(12),
-                max_used_memory_ratio=0.8,
-                created_at=now - timedelta(seconds=90),
-                system_wide_used_size=None,
-                system_wide_memory_size=None,
-            ),
-            MemorySnapshot(
-                current_size=ByteSize.from_gb(7),
-                max_memory_size=ByteSize.from_gb(8),
-                max_used_memory_ratio=0.8,
-                created_at=now - timedelta(seconds=60),
-                system_wide_used_size=None,
-                system_wide_memory_size=None,
-            ),
-            MemorySnapshot(
-                current_size=ByteSize.from_gb(28),
-                max_memory_size=ByteSize.from_gb(30),
-                max_used_memory_ratio=0.8,
-                created_at=now - timedelta(seconds=30),
-                system_wide_used_size=None,
-                system_wide_memory_size=None,
-            ),
-            MemorySnapshot(
-                current_size=ByteSize.from_gb(48),
-                max_memory_size=ByteSize.from_gb(60),
-                max_used_memory_ratio=0.8,
-                created_at=now,
-                system_wide_used_size=None,
-                system_wide_memory_size=None,
-            ),
-        ]
-    )
-
-    # Add event loop snapshots
-    system_status._snapshotter._event_loop_snapshots = Snapshotter._get_sorted_list_by_created_at(
-        [
-            EventLoopSnapshot(
-                delay=timedelta(milliseconds=700),
-                max_delay=timedelta(milliseconds=500),
-                created_at=now - timedelta(minutes=3),
-            ),
-            EventLoopSnapshot(
-                delay=timedelta(milliseconds=600),
-                max_delay=timedelta(milliseconds=500),
-                created_at=now - timedelta(minutes=2),
-            ),
-            EventLoopSnapshot(
-                delay=timedelta(milliseconds=200),
-                max_delay=timedelta(milliseconds=500),
-                created_at=now - timedelta(minutes=1),
-            ),
-            EventLoopSnapshot(
-                delay=timedelta(milliseconds=100),
-                max_delay=timedelta(milliseconds=500),
-                created_at=now,
-            ),
-        ]
-    )
-
-    # Add client snapshots
-    system_status._snapshotter._client_snapshots = Snapshotter._get_sorted_list_by_created_at(
-        [
-            ClientSnapshot(error_count=1, new_error_count=1, max_error_count=2, created_at=now - timedelta(minutes=3)),
-            ClientSnapshot(error_count=2, new_error_count=1, max_error_count=2, created_at=now - timedelta(minutes=2)),
-            ClientSnapshot(error_count=4, new_error_count=2, max_error_count=2, created_at=now - timedelta(minutes=1)),
-            ClientSnapshot(error_count=4, new_error_count=0, max_error_count=2, created_at=now),
-        ]
-    )
-
-    # Test current system info
     current_system_info = system_status.get_current_system_info()
     assert current_system_info == SystemInfo(
-        cpu_info=LoadRatioInfo(limit_ratio=system_status._cpu_overload_threshold, actual_ratio=1.0),
-        memory_info=LoadRatioInfo(limit_ratio=system_status._memory_overload_threshold, actual_ratio=0.5),
-        event_loop_info=LoadRatioInfo(limit_ratio=system_status._event_loop_overload_threshold, actual_ratio=0),
-        client_info=LoadRatioInfo(limit_ratio=system_status._client_overload_threshold, actual_ratio=0),
+        cpu_info=LoadRatioInfo(limit_ratio=0.5, actual_ratio=1.0),
+        memory_info=LoadRatioInfo(limit_ratio=0.5, actual_ratio=0.5),
+        event_loop_info=LoadRatioInfo(limit_ratio=0.5, actual_ratio=0),
+        storage_client_info=LoadRatioInfo(limit_ratio=0.5, actual_ratio=0),
         created_at=current_system_info.created_at,
     )
     assert current_system_info.is_system_idle is False
 
-    # Test historical system info
     historical_system_info = system_status.get_historical_system_info()
     assert historical_system_info == SystemInfo(
-        cpu_info=LoadRatioInfo(limit_ratio=system_status._cpu_overload_threshold, actual_ratio=0.667),
-        memory_info=LoadRatioInfo(limit_ratio=system_status._memory_overload_threshold, actual_ratio=0.667),
-        event_loop_info=LoadRatioInfo(limit_ratio=system_status._event_loop_overload_threshold, actual_ratio=0.333),
-        client_info=LoadRatioInfo(limit_ratio=system_status._client_overload_threshold, actual_ratio=0),
+        cpu_info=LoadRatioInfo(limit_ratio=0.5, actual_ratio=0.667),
+        memory_info=LoadRatioInfo(limit_ratio=0.5, actual_ratio=0.667),
+        event_loop_info=LoadRatioInfo(limit_ratio=0.5, actual_ratio=0.333),
+        storage_client_info=LoadRatioInfo(limit_ratio=0.5, actual_ratio=0),
         created_at=historical_system_info.created_at,
     )
     assert historical_system_info.is_system_idle is False
 
 
-@pytest.mark.parametrize(('client_overload_threshold', 'is_overloaded'), [(0.66, True), (0.67, False)])
-def test_client_overloaded(
-    *, snapshotter: Snapshotter, now: datetime, client_overload_threshold: float, is_overloaded: bool
-) -> None:
-    system_status = SystemStatus(
-        snapshotter,
-        max_snapshot_age=timedelta(minutes=1),
-        client_overload_threshold=client_overload_threshold,
-    )
-
-    system_status._snapshotter._client_snapshots = Snapshotter._get_sorted_list_by_created_at(
+@pytest.mark.parametrize(
+    ('snapshot_history', 'is_system_idle'),
+    [
+        pytest.param(timedelta(seconds=30), True, id='old overload outside the window'),
+        pytest.param(timedelta(minutes=5), False, id='old overload within the window'),
+    ],
+)
+def test_historical_window(*, snapshot_history: timedelta, is_system_idle: bool) -> None:
+    """The historical status looks back only `snapshot_history`, however much history a signal keeps."""
+    signal = load_signal(
+        'proxy_health',
         [
-            ClientSnapshot(error_count=1, new_error_count=1, max_error_count=0, created_at=now - timedelta(minutes=3)),
-            ClientSnapshot(error_count=2, new_error_count=1, max_error_count=0, created_at=now - timedelta(minutes=2)),
-            ClientSnapshot(error_count=3, new_error_count=1, max_error_count=0, created_at=now - timedelta(minutes=1)),
-            ClientSnapshot(error_count=3, new_error_count=0, max_error_count=0, created_at=now),
-        ]
+            (timedelta(minutes=2), True),
+            (timedelta(minutes=1, seconds=59), True),
+            (timedelta(seconds=1), False),
+            (timedelta(0), False),
+        ],
+        overloaded_ratio=0,
     )
+    system_status = SystemStatus(snapshotter(signal), snapshot_history=snapshot_history)
+
+    assert system_status.get_historical_system_info().is_system_idle is is_system_idle
+
+
+@pytest.mark.parametrize(
+    ('overloaded_ratio', 'is_overloaded'),
+    [
+        pytest.param(0.66, True, id='below the share'),
+        pytest.param(0.67, False, id='above the share'),
+    ],
+)
+def test_overloaded_ratio(*, overloaded_ratio: float, is_overloaded: bool) -> None:
+    """The signal's own ratio decides whether its share of overloaded time counts as overloaded."""
+    signal = load_signal(
+        'storage_client_info',
+        [
+            (timedelta(minutes=3), True),
+            (timedelta(minutes=2), True),
+            (timedelta(minutes=1), True),
+            (timedelta(0), False),
+        ],
+        overloaded_ratio=overloaded_ratio,
+    )
+    system_status = SystemStatus(snapshotter(signal), snapshot_history=timedelta(minutes=10))
 
     # Ratio of overloaded snapshots is 2/3 (2 minutes out of 3)
-    assert system_status._is_client_overloaded().is_overloaded == is_overloaded
+    assert system_status.get_historical_system_info().storage_client_info.is_overloaded == is_overloaded
 
 
-def test_memory_overloaded_system_wide(snapshotter: Snapshotter, now: datetime) -> None:
-    """Test that system-wide memory overload is detected when system-wide memory utilization exceeds threshold."""
-    system_status = SystemStatus(
-        snapshotter,
-        max_snapshot_age=timedelta(minutes=1),
-        memory_overload_threshold=0.5,  # Set high threshold so process memory won't trigger overload
-    )
+def test_simultaneous_snapshots_count() -> None:
+    """Snapshots taken at the same time still carry weight in the average."""
+    signal = load_signal('cpu_info', [(timedelta(0), False), (timedelta(0), True)])
+    system_status = SystemStatus(snapshotter(signal))
 
-    # Add memory snapshots with system-wide memory usage above threshold (97%)
-    system_status._snapshotter._memory_snapshots = Snapshotter._get_sorted_list_by_created_at(
-        [
-            MemorySnapshot(
-                current_size=ByteSize.from_gb(1),  # Process memory is low
-                max_memory_size=ByteSize.from_gb(8),  # Max memory is high
-                max_used_memory_ratio=0.8,  # Ratio is fine
-                created_at=now - timedelta(minutes=1),
-                system_wide_used_size=ByteSize.from_gb(31),  # System-wide used is high
-                system_wide_memory_size=ByteSize.from_gb(32),  # System-wide total (31/32 = 96.875% < 97%)
-            ),
-            MemorySnapshot(
-                current_size=ByteSize.from_gb(1),  # Process memory is low
-                max_memory_size=ByteSize.from_gb(8),  # Max memory is high
-                max_used_memory_ratio=0.8,  # Ratio is fine
-                created_at=now,
-                system_wide_used_size=ByteSize.from_gb(31.5),  # System-wide used is high
-                system_wide_memory_size=ByteSize.from_gb(32),  # System-wide total (31.5/32 = 98.4% > 97%)
-            ),
-        ]
-    )
+    assert system_status.get_historical_system_info().cpu_info.actual_ratio == 1.0
 
-    memory_info = system_status._is_memory_overloaded()
 
-    # Should be overloaded due to system-wide memory usage exceeding 97% threshold
-    assert memory_info.is_overloaded is True
-    # The actual ratio should be 1.0 (the entire time period from first to second snapshot is overloaded)
-    assert memory_info.actual_ratio == 1.0
-    assert memory_info.limit_ratio == 0.5
+def test_custom_signal_reported_by_name() -> None:
+    """A custom signal is reported under its name, a built-in one switched off as not overloaded."""
+    custom_signal = load_signal('proxy_health', [(timedelta(seconds=1), True), (timedelta(0), True)])
+    system_status = SystemStatus(snapshotter(custom_signal))
+
+    system_info = system_status.get_current_system_info()
+
+    assert system_info.load_signal_info == {'proxy_health': LoadRatioInfo(limit_ratio=0.5, actual_ratio=1.0)}
+    assert system_info.cpu_info == LoadRatioInfo(limit_ratio=0, actual_ratio=0)
+    assert system_info.is_system_idle is False
+    assert str(system_info) == 'overloaded: proxy_health 100% of the time (limit 50%)'
+
+
+def test_custom_signal_named_like_resource_keeps_builtin_in_log() -> None:
+    """A custom signal named like a built-in resource does not hide that resource's overload in the log line."""
+    cpu_signal = load_signal('cpu_info', [(timedelta(seconds=1), True), (timedelta(0), True)])
+    custom_signal = load_signal('cpu', [(timedelta(seconds=1), False), (timedelta(0), False)])
+    system_status = SystemStatus(snapshotter(cpu_signal, custom_signal))
+
+    assert str(system_status.get_current_system_info()) == 'overloaded: cpu 100% of the time (limit 50%)'
+
+
+def test_custom_signal_takes_builtin_name() -> None:
+    """A custom signal named after a built-in one that was switched off is reported in its field."""
+    custom_signal = load_signal('cpu_info', [(timedelta(seconds=1), True), (timedelta(0), True)])
+    system_status = SystemStatus(snapshotter(custom_signal))
+
+    system_info = system_status.get_current_system_info()
+
+    assert system_info.cpu_info == LoadRatioInfo(limit_ratio=0.5, actual_ratio=1.0)
+    assert system_info.load_signal_info == {}

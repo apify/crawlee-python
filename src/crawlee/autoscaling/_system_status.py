@@ -1,5 +1,3 @@
-# Inspiration: https://github.com/apify/crawlee/blob/v3.7.3/packages/core/src/autoscaling/system_status.ts
-
 from __future__ import annotations
 
 from datetime import timedelta
@@ -10,162 +8,121 @@ from more_itertools import pairwise
 
 from crawlee._utils.docs import docs_group
 
-from ._types import LoadRatioInfo, Snapshot, SystemInfo
+from ._cpu_load_signal import CpuLoadSignal
+from ._event_loop_load_signal import EventLoopLoadSignal
+from ._memory_load_signal import MemoryLoadSignal
+from ._storage_client_load_signal import StorageClientLoadSignal
+from ._types import LoadRatioInfo, SystemInfo
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from ._load_signal import LoadSnapshot
     from ._snapshotter import Snapshotter
 
 logger = getLogger(__name__)
 
+_BUILTIN_SIGNAL_OPTION_KEYS = {
+    MemoryLoadSignal.name: 'memory',
+    EventLoopLoadSignal.name: 'event_loop',
+    CpuLoadSignal.name: 'cpu',
+    StorageClientLoadSignal.name: 'storage_client',
+}
+"""The names of the built-in signals, which map to `SystemInfo` fields, and the options that switch each off."""
+
 
 @docs_group('Autoscaling')
 class SystemStatus:
-    """Provides a simple interface for evaluating system resource usage from snapshots collected by `Snapshotter`.
+    """Evaluates the load signals of a `ConcurrencySystem` and combines them into a `SystemInfo`.
 
-    This class aggregates and interprets snapshots from a Snapshotter instance to evaluate the current and historical
-    status of system resources like CPU, memory, event loop, and client API usage. It exposes two methods
-    `get_current_system_info` and `get_historical_system_info`. The system information is computed using a weighted
-    average of overloaded messages in the snapshots, with the weights being the time intervals between the snapshots.
-    Each resource is computed separately, and the system is considered as overloaded whenever at least one resource
-    is overloaded.
+    Each signal is evaluated as a weighted average of its overloaded snapshots, with the weights being the time
+    intervals between the snapshots. The system is considered as overloaded whenever at least one signal is overloaded.
 
-    `get_current_system_info` returns a `SystemInfo` data structure that represents the current status
-    of the system. The length of the current timeframe in seconds is configurable by the `max_snapshot_age` option
-    and represents the max age of snapshots to be considered for the computation.
-
-    `SystemStatus.get_historical_system_info` returns a `SystemInfo` that represents the long-term status of the system.
-    It considers the full snapshot history available in the `Snapshotter` instance.
+    Every signal is evaluated over two windows. `get_current_system_info` looks back `current_history` and gates the
+    start of each new task. `get_historical_system_info` looks back `snapshot_history` and drives the autoscaling.
     """
 
     def __init__(
         self,
         snapshotter: Snapshotter,
         *,
-        max_snapshot_age: timedelta = timedelta(seconds=5),
-        cpu_overload_threshold: float = 0.4,
-        memory_overload_threshold: float = 0.2,
-        event_loop_overload_threshold: float = 0.6,
-        client_overload_threshold: float = 0.3,
+        current_history: timedelta = timedelta(seconds=5),
+        snapshot_history: timedelta = timedelta(seconds=30),
     ) -> None:
         """Initialize a new instance.
 
         Args:
-            snapshotter: The `Snapshotter` instance to be queried for `SystemStatus`.
-            max_snapshot_age: Defines max age of snapshots used in the `SystemStatus.get_current_system_info`
-                measurement.
-            cpu_overload_threshold: Sets the threshold of overloaded snapshots in the CPU sample.
-                If the sample exceeds this threshold, the system will be considered overloaded.
-            memory_overload_threshold: Sets the threshold of overloaded snapshots in the memory sample.
-                If the sample exceeds this threshold, the system will be considered overloaded.
-            event_loop_overload_threshold: Sets the threshold of overloaded snapshots in the event loop sample.
-                If the sample exceeds this threshold, the system will be considered overloaded.
-            client_overload_threshold: Sets the threshold of overloaded snapshots in the Client sample.
-                If the sample exceeds this threshold, the system will be considered overloaded.
+            snapshotter: The `Snapshotter` whose signals are evaluated.
+            current_history: How far back `get_current_system_info` looks.
+            snapshot_history: How far back `get_historical_system_info` looks.
+
+        Raises:
+            ValueError: If two signals share a name.
         """
-        self._snapshotter = snapshotter
-        self._max_snapshot_age = max_snapshot_age
-        self._cpu_overload_threshold = cpu_overload_threshold
-        self._memory_overload_threshold = memory_overload_threshold
-        self._event_loop_overload_threshold = event_loop_overload_threshold
-        self._client_overload_threshold = client_overload_threshold
+        self._load_signals = snapshotter.load_signals
+        self._current_history = current_history
+        self._snapshot_history = snapshot_history
+        self._raise_on_duplicate_names()
 
     def get_current_system_info(self) -> SystemInfo:
-        """Retrieve and evaluates the current status of system resources.
-
-        Considers snapshots within the `_max_snapshot_age` timeframe and determines if the system is currently
-        overloaded based on predefined thresholds for each resource type.
+        """Retrieve and evaluate the current status of system resources, over the last `current_history`.
 
         Returns:
             An object representing the current system status.
         """
-        return self._get_system_info(sample_duration=self._max_snapshot_age)
+        return self._get_system_info(self._current_history)
 
     def get_historical_system_info(self) -> SystemInfo:
-        """Retrieve and evaluates the historical status of system resources.
-
-        Considers the entire history of snapshots from the Snapshotter to assess long-term system performance and
-        determines if the system has been historically overloaded.
+        """Retrieve and evaluate the historical status of system resources, over the last `snapshot_history`.
 
         Returns:
             An object representing the historical system status.
         """
-        return self._get_system_info()
+        return self._get_system_info(self._snapshot_history)
 
-    def _get_system_info(self, *, sample_duration: timedelta | None = None) -> SystemInfo:
-        """Get system information based on the overload state of different resources within a specified duration.
+    def _raise_on_duplicate_names(self) -> None:
+        """Refuse signals sharing a name, as only the last of them would show in the reported `SystemInfo`."""
+        seen_names = set[str]()
 
-        Args:
-            sample_duration: Specific duration for which to evaluate the system status. If None, evaluates across
-                the entire history available in the snapshotter.
+        for signal in self._load_signals:
+            if signal.name not in seen_names:
+                seen_names.add(signal.name)
+                continue
 
-        Returns:
-            Aggregated system status indicating whether the system is idle or overloaded.
+            option_key = _BUILTIN_SIGNAL_OPTION_KEYS.get(signal.name)
+
+            if option_key is None:
+                hint = 'two custom signals cannot share a name, so rename one of them.'
+            else:
+                hint = (
+                    f'it is the name of a built-in signal. To replace that signal, switch it off with '
+                    f'`LoadSignalsOptions({option_key}=False)` and keep your implementation in `custom`. To run yours '
+                    f'alongside it, give it a different name.'
+                )
+
+            raise ValueError(f'Duplicate load signal name {signal.name!r}: {hint}')
+
+    def _get_system_info(self, sample_duration: timedelta) -> SystemInfo:
+        """Get system information based on the overload state of the signals within `sample_duration`.
+
+        A built-in signal that was switched off is reported as not overloaded.
         """
-        mem_info = self._is_memory_overloaded(sample_duration)
-        event_loop_info = self._is_event_loop_overloaded(sample_duration)
-        cpu_info = self._is_cpu_overloaded(sample_duration)
-        client_info = self._is_client_overloaded(sample_duration)
+        load_signal_info = {
+            signal.name: self._is_sample_overloaded(signal.get_sample(sample_duration), signal.overloaded_ratio)
+            for signal in self._load_signals
+        }
+
+        unwatched = LoadRatioInfo(limit_ratio=0, actual_ratio=0)
 
         return SystemInfo(
-            memory_info=mem_info,
-            event_loop_info=event_loop_info,
-            cpu_info=cpu_info,
-            client_info=client_info,
+            memory_info=load_signal_info.pop(MemoryLoadSignal.name, unwatched),
+            event_loop_info=load_signal_info.pop(EventLoopLoadSignal.name, unwatched),
+            cpu_info=load_signal_info.pop(CpuLoadSignal.name, unwatched),
+            storage_client_info=load_signal_info.pop(StorageClientLoadSignal.name, unwatched),
+            load_signal_info=load_signal_info,
         )
 
-    def _is_cpu_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
-        """Determine if the CPU has been overloaded within a specified time duration.
-
-        Args:
-            sample_duration: The duration within which to analyze CPU snapshots. If None, evaluates across
-                the entire history available in the snapshotter.
-
-        Returns:
-            CPU load ratio information.
-        """
-        sample = self._snapshotter.get_cpu_sample(sample_duration)
-        return self._is_sample_overloaded(sample, self._cpu_overload_threshold)
-
-    def _is_memory_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
-        """Determine if memory has been overloaded within a specified time duration.
-
-        Args:
-            sample_duration: The duration within which to analyze memory snapshots. If None, evaluates across
-                the entire history available in the snapshotter.
-
-        Returns:
-            Memory load ratio information.
-        """
-        sample = self._snapshotter.get_memory_sample(sample_duration)
-        return self._is_sample_overloaded(sample, self._memory_overload_threshold)
-
-    def _is_event_loop_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
-        """Determine if the event loop has been overloaded within a specified time duration.
-
-        Args:
-            sample_duration: The duration within which to analyze event loop snapshots. If None, evaluates across
-                the entire history available in the snapshotter.
-
-        Returns:
-            Event loop load ratio information.
-        """
-        sample = self._snapshotter.get_event_loop_sample(sample_duration)
-        return self._is_sample_overloaded(sample, self._event_loop_overload_threshold)
-
-    def _is_client_overloaded(self, sample_duration: timedelta | None = None) -> LoadRatioInfo:
-        """Determine if the client has been overloaded within a specified time duration.
-
-        Args:
-            sample_duration: The duration within which to analyze client snapshots. If None, evaluates across
-                the entire history available in the snapshotter.
-
-        Returns:
-            Client load ratio information.
-        """
-        sample = self._snapshotter.get_client_sample(sample_duration)
-        return self._is_sample_overloaded(sample, self._client_overload_threshold)
-
-    def _is_sample_overloaded(self, sample: list[Snapshot], threshold: float) -> LoadRatioInfo:
+    def _is_sample_overloaded(self, sample: Sequence[LoadSnapshot], threshold: float) -> LoadRatioInfo:
         """Determine if a sample of snapshot data is overloaded based on a specified ratio.
 
         Args:
@@ -182,21 +139,19 @@ class SystemStatus:
         if len(sample) == 1:
             return LoadRatioInfo(limit_ratio=threshold, actual_ratio=float(sample[0].is_overloaded))
 
-        overloaded_time = 0.0
-        non_overloaded_time = 0.0
+        overloaded_time = timedelta(0)
+        total_time = timedelta(0)
 
         for previous, current in pairwise(sample):
-            time = (current.created_at - previous.created_at).total_seconds()
-            if time < 0:
+            time = current.created_at - previous.created_at
+            if time < timedelta(0):
                 raise ValueError('Negative time. Code assumptions are not valid. Expected time sorted samples.')
+
+            # Snapshots taken at the same time still carry weight, so they are not dropped from the average.
+            time = time or timedelta(milliseconds=1)
+
+            total_time += time
             if current.is_overloaded:
                 overloaded_time += time
-            else:
-                non_overloaded_time += time
 
-        if (total_time := overloaded_time + non_overloaded_time) == 0:
-            overloaded_ratio = 0.0
-        else:
-            overloaded_ratio = overloaded_time / total_time
-
-        return LoadRatioInfo(limit_ratio=threshold, actual_ratio=round(overloaded_ratio, 3))
+        return LoadRatioInfo(limit_ratio=threshold, actual_ratio=round(overloaded_time / total_time, 3))

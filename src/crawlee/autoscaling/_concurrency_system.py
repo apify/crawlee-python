@@ -16,7 +16,7 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.log import LoggerOnce
 from crawlee._utils.recurring_task import RecurringTask
 
-from ._snapshotter import Snapshotter
+from ._snapshotter import LoadSignalsOptions, Snapshotter
 from ._system_status import SystemStatus
 
 if TYPE_CHECKING:
@@ -42,8 +42,8 @@ def _validate_concurrency(value: int, name: str) -> int:
 class ConcurrencySystem:
     """Decides whether there is free compute for one more task, and scales the concurrency budget over time.
 
-    The system combines live system load, measured by an internal `Snapshotter`, with a concurrency budget that it
-    scales up while the system is idle and down while it is overloaded.
+    The system combines live system load, reported by its load signals, with a concurrency budget that it scales up
+    while the system is idle and down while it is overloaded.
 
     Sharing one instance between several crawlers caps their combined concurrency, instead of letting each of them
     scale independently and oversubscribe the machine. Whoever creates the instance owns its lifecycle: a crawler
@@ -109,7 +109,9 @@ class ConcurrencySystem:
         scale_down_step_ratio: float = 0.05,
         autoscale_interval: timedelta = timedelta(seconds=10),
         logging_interval: timedelta | None = timedelta(minutes=1),
-        max_snapshot_age: timedelta = timedelta(seconds=5),
+        load_signals: LoadSignalsOptions | None = None,
+        snapshot_history: timedelta = timedelta(seconds=30),
+        current_history: timedelta = timedelta(seconds=5),
         configuration: Configuration | None = None,
     ) -> None:
         """Initialize a new instance.
@@ -122,10 +124,16 @@ class ConcurrencySystem:
             scale_down_step_ratio: Fraction of the desired concurrency removed on each scale-down.
             autoscale_interval: Interval at which the desired concurrency is adjusted to the system load.
             logging_interval: Interval at which the system logs its state. `None` turns the logging off.
-            max_snapshot_age: Age of the snapshots that decide whether the system is overloaded before one more task
-                starts. Scaling looks at the whole 30-second snapshot history instead, so keep this shorter.
-            configuration: The `Configuration` the internal `Snapshotter` is set up from. Uses the global one if not
-                provided.
+            load_signals: The signals that decide whether the machine is overloaded: options of the built-in memory,
+                event loop, CPU and storage client signals, `False` to switch one off, and custom signals of your own.
+            snapshot_history: How far back the autoscaling looks. The signals keep at least this much history.
+            current_history: How far back the check before each new task looks. Keep it shorter than
+                `snapshot_history`, so that task starts react to load spikes quickly while scaling stays stable.
+            configuration: The `Configuration` the load signals read their limits from, custom ones included. Uses
+                the global one if not provided.
+
+        Raises:
+            ValueError: If an option is out of its range, or if two load signals share a name.
         """
         concurrency_settings = concurrency_settings or ConcurrencySettings()
 
@@ -135,9 +143,11 @@ class ConcurrencySystem:
         if logging_interval is not None and logging_interval <= timedelta(0):
             raise ValueError('logging_interval must be positive')
 
-        # A non-positive age leaves no snapshots to judge the current load by, so nothing would ever look overloaded.
-        if max_snapshot_age <= timedelta(0):
-            raise ValueError('max_snapshot_age must be positive')
+        if snapshot_history <= timedelta(0):
+            raise ValueError('snapshot_history must be positive')
+
+        if current_history <= timedelta(0):
+            raise ValueError('current_history must be positive')
 
         if not 0 < desired_concurrency_ratio < 1:
             raise ValueError('desired_concurrency_ratio must be between 0 and 1, exclusive')
@@ -158,8 +168,18 @@ class ConcurrencySystem:
         self._autoscale_interval = autoscale_interval
         self._current_concurrency = 0
 
-        self._snapshotter = Snapshotter.from_config(configuration)
-        self._system_status = SystemStatus(self._snapshotter, max_snapshot_age=max_snapshot_age)
+        load_signals = load_signals or LoadSignalsOptions()
+
+        self._snapshotter = Snapshotter(
+            load_signals,
+            max_sample_window=max(current_history, snapshot_history),
+            configuration=configuration,
+        )
+        self._system_status = SystemStatus(
+            self._snapshotter,
+            current_history=current_history,
+            snapshot_history=snapshot_history,
+        )
 
         self._current_load: TTLCache[tuple, SystemInfo] = TTLCache(
             maxsize=1,

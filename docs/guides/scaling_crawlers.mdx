@@ -10,6 +10,9 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 import MaxTasksPerMinuteExample from '!!raw-loader!roa-loader!./code_examples/scaling_crawlers/max_tasks_per_minute_example.py';
 import MinAndMaxConcurrencyExample from '!!raw-loader!roa-loader!./code_examples/scaling_crawlers/min_and_max_concurrency_example.py';
 import SharedConcurrencySystemExample from '!!raw-loader!roa-loader!./code_examples/scaling_crawlers/shared_concurrency_system_example.py';
+import LoadSignalsOffExample from '!!raw-loader!roa-loader!./code_examples/scaling_crawlers/load_signals_off_example.py';
+import CustomLoadSignalExample from '!!raw-loader!roa-loader!./code_examples/scaling_crawlers/custom_load_signal_example.py';
+import WrapLoadSignalExample from '!!raw-loader!roa-loader!./code_examples/scaling_crawlers/wrap_load_signal_example.py';
 
 As we build our crawler, we may want to control how many tasks it performs at any given time. In other words, how many requests it makes to the web we are trying to scrape. Crawlee offers several options to fine-tune the number of parallel tasks, limit the number of requests per minute, and optimize scaling based on available system resources.
 
@@ -47,13 +50,43 @@ The `desired_concurrency` option in the <ApiLink to="class/ConcurrencySettings">
 
 ## Concurrency system
 
-Every crawler runs its requests through an <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink>, and the pool asks a <ApiLink to="class/ConcurrencySystem">`ConcurrencySystem`</ApiLink> whether there is room for one more request. The system is what keeps `min_concurrency` requests running even while the machine is overloaded, starts further ones only when there is enough free CPU and memory, and scales the budget up and down as the load changes. To monitor system resources, it leverages the <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> and <ApiLink to="class/SystemStatus">`SystemStatus`</ApiLink> classes. If any task raises an exception, the error is propagated and the pool is stopped.
+Every crawler runs its requests through an <ApiLink to="class/AutoscaledPool">`AutoscaledPool`</ApiLink>, and the pool asks a <ApiLink to="class/ConcurrencySystem">`ConcurrencySystem`</ApiLink> whether there is room for one more request. The system is what keeps `min_concurrency` requests running even while the machine is overloaded, starts further ones only while no [load signal](#load-signals) reports overload, and scales the budget up and down as the load changes. If any task raises an exception, the error is propagated and the pool is stopped.
 
 The crawler builds its own system from the `ConcurrencySettings` described above. Build one yourself and pass it as `concurrency_system` to go beyond those settings, or to share a single budget between several crawlers that would otherwise each scale against the whole machine and oversubscribe it. The budget goes to whoever asks for it first, so a crawler that joins a saturated system late may have to wait. Browser crawlers default to a lower `desired_concurrency` than the rest, and a supplied system replaces that default too, so set it in the `ConcurrencySettings` you build the system from. Holding the instance also lets you retune `min_concurrency` and `max_concurrency` while the crawl runs. The lifecycle of such a system belongs to you, so keep it open until every crawler using it has finished.
 
 <RunnableCodeBlock className="language-python" language="python">
     {SharedConcurrencySystemExample}
 </RunnableCodeBlock>
+
+## Load signals
+
+Whether the machine counts as overloaded is decided by load signals. Four of them are built in: <ApiLink to="class/MemoryLoadSignal">`MemoryLoadSignal`</ApiLink>, <ApiLink to="class/EventLoopLoadSignal">`EventLoopLoadSignal`</ApiLink>, <ApiLink to="class/CpuLoadSignal">`CpuLoadSignal`</ApiLink> and <ApiLink to="class/StorageClientLoadSignal">`StorageClientLoadSignal`</ApiLink>, which watches the rate-limit errors of the storage client. Each signal takes snapshots of its resource. A snapshot is overloaded when the resource is above its limit, such as `max_used_memory_ratio` or `max_event_loop_delay` in the <ApiLink to="class/Configuration">`Configuration`</ApiLink>. The signal is overloaded once the resource has spent more than `overloaded_ratio` of the recent time above its limit. If any signal is overloaded, the system is overloaded and the concurrency is held down.
+
+You configure the signals through the `load_signals` option of the `ConcurrencySystem`, which takes <ApiLink to="class/LoadSignalsOptions">`LoadSignalsOptions`</ApiLink>. It has a field for each built-in signal that takes the options of that signal, such as <ApiLink to="class/EventLoopLoadSignalOptions">`EventLoopLoadSignalOptions`</ApiLink>. `False` switches a signal off, so it's neither collected nor evaluated, and the reported status shows it as not overloaded. The following example switches the storage client signal off and relaxes the event loop signal:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {LoadSignalsOffExample}
+</RunnableCodeBlock>
+
+To watch a resource of your own, write a class that matches the <ApiLink to="class/LoadSignal">`LoadSignal`</ApiLink> protocol and pass it in the `custom` field of `LoadSignalsOptions`. It doesn't have to subclass anything. The <ApiLink to="class/SnapshotStore">`SnapshotStore`</ApiLink> keeps the snapshots for the window the signal is sampled over. The following signal reports overload while the disk is nearly full:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {CustomLoadSignalExample}
+</RunnableCodeBlock>
+
+The built-in signals are public classes too. Construct one yourself to wrap it rather than reimplement it, switch the original off, and pass your signal in `custom`. The following signal keeps reporting CPU overload for a while after the CPU recovers:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {WrapLoadSignalExample}
+</RunnableCodeBlock>
+
+:::info Signal names are the keys of the reported status
+
+The `name` of a signal is the key of its verdict in the <ApiLink to="class/SystemInfo">`SystemInfo`</ApiLink>, so two signals can't share one, and the `ConcurrencySystem` raises a `ValueError` on a duplicate. Taking over a built-in name (`memory_info`, `event_loop_info`, `cpu_info` or `storage_client_info`) therefore requires switching that built-in signal off. A custom signal under any other name is reported in `SystemInfo.load_signal_info`.
+
+:::
+
+The signals are evaluated over two windows of the `ConcurrencySystem`. `current_history`, 5 seconds by default, decides whether one more request may start. `snapshot_history`, 30 seconds by default, drives the scaling. Requests therefore start or wait as soon as the load changes, while the scaling stays stable. Both windows apply to every signal, and the signals keep as much history as the longer of them, so raising `snapshot_history` costs memory.
 
 ## Running under a resource limit
 
