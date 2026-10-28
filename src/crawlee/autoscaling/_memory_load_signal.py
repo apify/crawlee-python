@@ -6,20 +6,20 @@ from logging import WARNING, getLogger
 from typing import TYPE_CHECKING
 
 import proclimits
-from typing_extensions import override
 
 from crawlee import service_locator
 from crawlee._utils.byte_size import ByteSize
 from crawlee._utils.docs import docs_group
 from crawlee._utils.log import LoggerOnce
 from crawlee._utils.system import MemoryInfo, MemoryUsageInfo, get_memory_info
-from crawlee.events._types import Event, EventSystemInfoData
+from crawlee.events._types import Event
 
-from ._load_signal import LoadSignal, LoadSnapshot, SnapshotStore
+from ._load_signal import LoadSnapshot, SnapshotStore
 from ._types import Ratio
 
 if TYPE_CHECKING:
     from crawlee.events import EventManager
+    from crawlee.events._types import EventSystemInfoData
 
     from ._load_signal import LoadSignalStartContext
 
@@ -47,7 +47,7 @@ class MemoryLoadSignalOptions:
 
 
 @docs_group('Autoscaling')
-class MemoryLoadSignal(LoadSignal):
+class MemoryLoadSignal:
     """Tracks the memory usage reported by `SYSTEM_INFO` events, and warns when it becomes critical.
 
     The memory budget is `Configuration.memory_mbytes`, or `Configuration.available_memory_ratio` of the memory
@@ -80,12 +80,12 @@ class MemoryLoadSignal(LoadSignal):
         self._timestamp_of_last_memory_warning: datetime = datetime.now(UTC) - timedelta(hours=1)
 
     @property
-    @override
     def overloaded_ratio(self) -> float:
+        """The `overloaded_ratio` from the options of the signal."""
         return self._options.overloaded_ratio
 
-    @override
     async def start(self, context: LoadSignalStartContext) -> None:
+        """Start recording snapshots, with the limits from `context.configuration`."""
         self._store.use_sample_window(context.max_sample_window)
         self._store.clear()
 
@@ -120,14 +120,14 @@ class MemoryLoadSignal(LoadSignal):
         self._event_manager = service_locator.get_event_manager()
         self._event_manager.on(event=Event.SYSTEM_INFO, listener=self._snapshot)
 
-    @override
     async def stop(self) -> None:
+        """Stop recording snapshots."""
         if self._event_manager is not None:
             self._event_manager.off(event=Event.SYSTEM_INFO, listener=self._snapshot)
             self._event_manager = None
 
-    @override
     def get_sample(self, duration: timedelta | None = None) -> list[MemorySnapshot]:
+        """Return the snapshots taken within `duration` of the latest one, or all of them if omitted."""
         return self._store.get_sample(duration)
 
     async def _snapshot(self, event_data: EventSystemInfoData) -> None:

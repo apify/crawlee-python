@@ -4,12 +4,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
-from typing_extensions import override
-
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
 
-from ._load_signal import LoadSignal, LoadSnapshot, SnapshotStore
+from ._load_signal import LoadSnapshot, SnapshotStore
 
 if TYPE_CHECKING:
     from ._load_signal import LoadSignalStartContext
@@ -36,7 +34,7 @@ class EventLoopLoadSignalOptions:
 
 
 @docs_group('Autoscaling')
-class EventLoopLoadSignal(LoadSignal):
+class EventLoopLoadSignal:
     """Measures how long the event loop is blocked.
 
     Every `snapshot_interval`, the signal measures how much later than scheduled it got to run, and the event loop
@@ -59,12 +57,12 @@ class EventLoopLoadSignal(LoadSignal):
         self._snapshot_task = RecurringTask(self._snapshot, self._options.snapshot_interval)
 
     @property
-    @override
     def overloaded_ratio(self) -> float:
+        """The `overloaded_ratio` from the options of the signal."""
         return self._options.overloaded_ratio
 
-    @override
     async def start(self, context: LoadSignalStartContext) -> None:
+        """Start recording snapshots, with the limits from `context.configuration`."""
         self._store.use_sample_window(context.max_sample_window)
         # Otherwise the first measurement charges the downtime to the event loop.
         self._store.clear()
@@ -73,12 +71,12 @@ class EventLoopLoadSignal(LoadSignal):
 
         self._snapshot_task.start()
 
-    @override
     async def stop(self) -> None:
+        """Stop recording snapshots."""
         await self._snapshot_task.stop()
 
-    @override
     def get_sample(self, duration: timedelta | None = None) -> list[EventLoopSnapshot]:
+        """Return the snapshots taken within `duration` of the latest one, or all of them if omitted."""
         return self._store.get_sample(duration)
 
     def _snapshot(self) -> None:
