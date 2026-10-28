@@ -129,14 +129,14 @@ async def test_own_concurrency_excludes_others(
 
 async def test_finishes_only_when_idle(make_concurrency_system: type[ConcurrencySystem]) -> None:
     """The pool asks whether it's finished only while none of its tasks are in flight."""
-    started = 0
+    # The second task outlives the first, so the pool looks for new work while a task is still running.
+    durations = iter([0.01, 0.1])
     own_concurrency_at_checks = list[int]()
 
-    async def run(_task_id: str) -> None:
-        nonlocal started
-        started += 1
-        # The second task outlives the first, so the pool looks for new work while a task is still running.
-        await asyncio.sleep(0.01 if started == 1 else 0.1)
+    async def sleep(_task_id: str) -> None:
+        await asyncio.sleep(next(durations))
+
+    run = AsyncMock(side_effect=sleep)
 
     async def is_finished() -> bool:
         own_concurrency_at_checks.append(pool.own_concurrency)
@@ -153,7 +153,7 @@ async def test_finishes_only_when_idle(make_concurrency_system: type[Concurrency
 
         await asyncio.wait_for(pool.run(), timeout=5)
 
-    assert started == 2
+    assert run.await_count == 2
     assert own_concurrency_at_checks == [0]
 
 

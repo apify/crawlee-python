@@ -66,9 +66,9 @@ class AutoscaledPool:
                 function is called every time there is free capacity for a new task and it should indicate whether
                 it should start a new task or not by resolving to either `True` or `False`. Besides its obvious use,
                 it is also useful for task throttling to save resources.
-            is_finished_function: A function that is called only when there are no tasks to be processed. If it
-                resolves to `True` then the pool's run finishes. Being called only when there are no tasks being
-                processed means that as long as `is_task_ready_function` keeps resolving to `True`,
+            is_finished_function: A function that is called only when there are no tasks to be processed and the
+                pool is not paused. If it resolves to `True` then the pool's run finishes. Being called only when there
+                are no tasks being processed means that as long as `is_task_ready_function` keeps resolving to `True`,
                 `is_finished_function` will never be called. To abort a run, use the `abort` method.
         """
         self._concurrency_system = concurrency_system

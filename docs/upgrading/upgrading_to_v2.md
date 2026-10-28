@@ -233,7 +233,7 @@ No new requests are allowed because the `stop()` method has been called. Ongoing
 The crawler has finished all the remaining ongoing requests and will shut down now.
 ```
 
-The crawler logs the first message once per run, right after the stop. It logs the second one once the ongoing requests have finished, where v1 logged it right after the stop. In `Crawler.stop() was called with following reason: ...`, a trailing period or space in the reason is dropped, so the default reason and the `max_requests_per_crawl` one no longer end with a double period.
+The crawler logs the first message once per run, the next time it looks for a new request after the stop. It logs the second one once the ongoing requests have finished, where v1 logged it right after the stop. In `Crawler.stop() was called with following reason: ...`, a trailing period or space in the reason is dropped, so the default reason and the `max_requests_per_crawl` one no longer end with a double period.
 
 When a crawl processes no requests because its request manager holds only handled ones, the crawler logs a new warning. It starts with `This crawl processed no requests` and explains how to crawl the requests again.
 
