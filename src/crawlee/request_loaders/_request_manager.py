@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 
     from crawlee._request import Request
 
+    from ._types import PacingSignal
+
 
 @docs_group('Request loaders')
 class RequestManager(RequestLoader, ABC):
@@ -78,4 +80,21 @@ class RequestManager(RequestLoader, ABC):
         """Reclaims a failed request back to the source, so that it can be returned for processing later again.
 
         It is possible to modify the request data by supplying an updated request as a parameter.
+        """
+
+    @abstractmethod
+    def record_pacing_signal(self, signal: PacingSignal) -> bool:
+        """Record a signal about the pace at which requests may go out.
+
+        A manager that doesn't pace its requests, or doesn't handle the signal's `reason`, returns `False`. More signals
+        may be added in a minor release. A manager wrapping another forwards every signal to it without inspecting it,
+        so a pacer nested in a composition still receives it. A manager may apply a signal to a wider scope than the
+        one given, but never to a narrower one, and raises for a scope it can't honor.
+
+        Args:
+            signal: The signal to record.
+
+        Returns:
+            `True` if anything in the composition took responsibility for the signal. For a `RateLimitedSignal`, the
+                URL then isn't dispatched again until a positive delay has passed.
         """

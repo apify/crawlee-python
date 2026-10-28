@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from crawlee import Request
     from crawlee.configuration import Configuration
-    from crawlee.request_loaders import RequestLoaderStatus
+    from crawlee.request_loaders import PacingSignal, RequestLoaderStatus
     from crawlee.storage_backends import StorageBackend
     from crawlee.storage_backends._base import RequestQueueBackend
     from crawlee.storage_backends.models import ProcessedRequest, RequestQueueMetadata
@@ -299,6 +299,14 @@ class RequestQueue(Storage, RequestManager):
             Information about the queue operation.
         """
         return await self._backend.reclaim_request(request, forefront=forefront)
+
+    @override
+    def record_pacing_signal(self, signal: PacingSignal) -> bool:
+        """Refuse the signal, since a queue hands requests out as fast as they're asked for.
+
+        Pacing is the job of a manager wrapped around the queue, such as `ThrottlingRequestManager`.
+        """
+        return False
 
     @override
     async def check_readiness(self) -> RequestLoaderStatus:
