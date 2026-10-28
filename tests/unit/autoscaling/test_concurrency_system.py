@@ -345,7 +345,7 @@ async def test_keeps_min_when_overloaded(make_concurrency_system: type[Concurren
             concurrency_system=concurrency_system,
             consumer=CONSUMER,
             run_task_function=run,
-            is_task_ready_function=lambda: future(True),
+            is_task_ready_function=lambda: future(done_count < 5),
             is_finished_function=lambda: future(done_count >= 5),
         )
 

@@ -83,7 +83,7 @@ async def test_retries_refused_booking() -> None:
         concurrency_system=concurrency_system,
         consumer=CONSUMER,
         run_task_function=run,
-        is_task_ready_function=lambda: future(True),
+        is_task_ready_function=lambda: future(run.await_count < 1),
         is_finished_function=lambda: future(run.await_count >= 1),
     )
 
@@ -112,7 +112,7 @@ async def test_own_concurrency_excludes_others(
             concurrency_system=concurrency_system,
             consumer=CONSUMER,
             run_task_function=run,
-            is_task_ready_function=lambda: future(True),
+            is_task_ready_function=lambda: future(not release.is_set()),
             is_finished_function=lambda: future(release.is_set()),
         )
 
@@ -125,6 +125,87 @@ async def test_own_concurrency_excludes_others(
         finally:
             release.set()
             await asyncio.gather(pool_run_task, return_exceptions=True)
+
+
+async def test_finishes_only_when_idle(make_concurrency_system: type[ConcurrencySystem]) -> None:
+    """The pool asks whether it's finished only while none of its tasks are in flight."""
+    # The second task outlives the first, so the pool looks for new work while a task is still running.
+    durations = iter([0.01, 0.1])
+    own_concurrency_at_checks = list[int]()
+
+    async def sleep(_task_id: str) -> None:
+        await asyncio.sleep(next(durations))
+
+    run = AsyncMock(side_effect=sleep)
+
+    async def is_finished() -> bool:
+        own_concurrency_at_checks.append(pool.own_concurrency)
+        return True
+
+    async with make_concurrency_system() as concurrency_system:
+        pool = AutoscaledPool(
+            concurrency_system=concurrency_system,
+            consumer=CONSUMER,
+            run_task_function=run,
+            is_task_ready_function=AsyncMock(side_effect=chain([True, True], repeat(False))),
+            is_finished_function=is_finished,
+        )
+
+        await asyncio.wait_for(pool.run(), timeout=5)
+
+    assert run.await_count == 2
+    assert own_concurrency_at_checks == [0]
+
+
+async def test_finishes_while_system_saturated(make_concurrency_system: type[ConcurrencySystem]) -> None:
+    """A pool out of work finishes even while another pool keeps a shared system saturated."""
+    settings = ConcurrencySettings(min_concurrency=1, max_concurrency=1, desired_concurrency=1)
+    is_task_ready = AsyncMock(return_value=False)
+
+    async with make_concurrency_system(settings) as concurrency_system:
+        # Another pool sharing the system holds the only slot.
+        assert concurrency_system.try_register_task_start(ConcurrencyConsumer(id='other-pool'), '0')
+
+        pool = AutoscaledPool(
+            concurrency_system=concurrency_system,
+            consumer=CONSUMER,
+            run_task_function=AsyncMock(),
+            is_task_ready_function=is_task_ready,
+            is_finished_function=lambda: future(True),
+        )
+
+        await asyncio.wait_for(pool.run(), timeout=5)
+
+    # The pool never had capacity to ask for a task, so it finished from the saturated branch.
+    is_task_ready.assert_not_awaited()
+
+
+async def test_does_not_finish_while_paused(make_concurrency_system: type[ConcurrencySystem]) -> None:
+    """A paused pool with no work left finishes only once it's resumed."""
+    is_finished = AsyncMock(return_value=True)
+
+    async with make_concurrency_system() as concurrency_system:
+        pool = AutoscaledPool(
+            concurrency_system=concurrency_system,
+            consumer=CONSUMER,
+            run_task_function=AsyncMock(),
+            is_task_ready_function=lambda: future(False),
+            is_finished_function=is_finished,
+        )
+        pool.pause()
+
+        pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
+        try:
+            await asyncio.sleep(0.1)
+            is_finished.assert_not_awaited()
+
+            pool.resume()
+            await asyncio.wait_for(pool_run_task, timeout=5)
+        finally:
+            pool_run_task.cancel()
+            await asyncio.gather(pool_run_task, return_exceptions=True)
+
+    is_finished.assert_awaited_once()
 
 
 @pytest.mark.run_alone
@@ -149,7 +230,7 @@ async def test_runs_concurrently(make_concurrency_system: type[ConcurrencySystem
             concurrency_system=concurrency_system,
             consumer=CONSUMER,
             run_task_function=run,
-            is_task_ready_function=lambda: future(True),
+            is_task_ready_function=lambda: future(done_count < 10),
             is_finished_function=lambda: future(done_count >= 10),
         )
 
@@ -273,7 +354,7 @@ async def test_propagates_exceptions(make_concurrency_system: type[ConcurrencySy
             concurrency_system=concurrency_system,
             consumer=CONSUMER,
             run_task_function=run,
-            is_task_ready_function=lambda: future(True),
+            is_task_ready_function=lambda: future(done_count < 20),
             is_finished_function=lambda: future(done_count >= 20),
         )
 
@@ -333,22 +414,22 @@ async def test_orchestrator_error_awaits_workers(
         await release_worker.wait()
         worker_finished.set()
 
-    async def is_finished() -> bool:
+    async def is_task_ready() -> bool:
         nonlocal checks
         checks += 1
         if checks > 1:
             await worker_started.wait()
             check_failed.set()
             raise RuntimeError('Queue status unavailable')
-        return False
+        return True
 
     async with make_concurrency_system() as concurrency_system:
         pool = AutoscaledPool(
             concurrency_system=concurrency_system,
             consumer=CONSUMER,
             run_task_function=run,
-            is_task_ready_function=lambda: future(True),
-            is_finished_function=is_finished,
+            is_task_ready_function=is_task_ready,
+            is_finished_function=lambda: future(False),
         )
         pool_run_task = asyncio.create_task(pool.run())
         try:
@@ -391,30 +472,27 @@ async def test_orchestrator_error_logged_on_cancel(
 
 
 async def test_propagates_exceptions_after_finished(make_concurrency_system: type[ConcurrencySystem]) -> None:
-    """A task that fails after the pool is already finished still fails the run."""
-    started_count = 0
+    """A task that fails once no work is left still fails the run."""
+    is_finished = AsyncMock(return_value=True)
 
     async def run(_task_id: str) -> None:
-        nonlocal started_count
-        started_count += 1
-
-        await asyncio.sleep(1)
-
+        await asyncio.sleep(0.1)
         raise RuntimeError('Scheduled crash')
 
-    async with make_concurrency_system(
-        ConcurrencySettings(min_concurrency=1, max_concurrency=1, desired_concurrency=1)
-    ) as concurrency_system:
+    async with make_concurrency_system() as concurrency_system:
         pool = AutoscaledPool(
             concurrency_system=concurrency_system,
             consumer=CONSUMER,
             run_task_function=run,
-            is_task_ready_function=lambda: future(True),
-            is_finished_function=lambda: future(started_count > 0),
+            is_task_ready_function=AsyncMock(side_effect=chain([True], repeat(False))),
+            is_finished_function=is_finished,
         )
 
         with pytest.raises(RuntimeError, match=r'Scheduled crash'):
-            await pool.run()
+            await asyncio.wait_for(pool.run(), timeout=5)
+
+    # The pool never asked whether it was finished while the failing task was still running.
+    is_finished.assert_not_awaited()
 
 
 async def test_propagates_task_timeout_error(
@@ -435,7 +513,7 @@ async def test_propagates_task_timeout_error(
             concurrency_system=concurrency_system,
             consumer=CONSUMER,
             run_task_function=run,
-            is_task_ready_function=lambda: future(True),
+            is_task_ready_function=lambda: future(started_count == 0),
             is_finished_function=lambda: future(started_count > 0),
         )
 
