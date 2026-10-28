@@ -48,8 +48,8 @@ class LoadSignalsOptions:
     """Options of the built-in `StorageClientLoadSignal`, or `False` to switch it off."""
 
     custom: Sequence[LoadSignal] = ()
-    """Additional load signals, evaluated alongside the built-in ones. Their names must not collide with the name of
-    an enabled built-in signal."""
+    """Additional load signals, evaluated alongside the built-in ones. Their names must be unique and must not collide
+    with the name of an enabled built-in signal."""
 
 
 @docs_group('Autoscaling')

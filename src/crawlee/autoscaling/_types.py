@@ -48,7 +48,8 @@ class SystemInfo:
     """The storage client load ratio."""
 
     load_signal_info: dict[str, LoadRatioInfo] = field(default_factory=dict)
-    """The load ratios of the custom load signals, keyed by signal name."""
+    """The load ratios of the custom load signals, keyed by signal name. A custom signal named after a built-in one
+    is reported in that built-in field instead."""
 
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     """The time at which the system load information was measured."""

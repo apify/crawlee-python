@@ -132,8 +132,8 @@ class SnapshotStore(Generic[TSnapshot]):
         Args:
             duration: How far back to look. All snapshots are returned if omitted.
         """
-        if not duration:
-            return self._snapshots
+        if duration is None:
+            return list(self._snapshots)
 
         if not self._snapshots:
             return []
