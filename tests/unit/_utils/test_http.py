@@ -52,6 +52,8 @@ async def test_drain_small_body_ignores_failed_read() -> None:
 
     await drain_small_body(response)
 
+    response.read.assert_awaited_once()
+
 
 async def test_drain_small_body_gives_up_on_slow_body(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that `drain_small_body` stops waiting for a body that doesn't arrive in time."""
@@ -61,3 +63,5 @@ async def test_drain_small_body_gives_up_on_slow_body(monkeypatch: pytest.Monkey
 
     async with asyncio.timeout(1):
         await drain_small_body(response)
+
+    response.read.assert_awaited_once()
