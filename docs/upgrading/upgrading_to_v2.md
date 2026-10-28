@@ -115,6 +115,7 @@ The autoscaling classes now live in the public `crawlee.autoscaling` package, wh
 - `system_status` and `concurrency_settings` are replaced by `concurrency_system`, which has to be active when the pool runs, and `consumer`, which identifies the pool to the system.
 - `run_task_function` receives the id the task is booked under.
 - `current_concurrency` comes from the concurrency system, so a shared system may count the tasks of other pools too. The pool's own tasks are counted by the new `own_concurrency`.
+- `is_finished_function` is called only when no new task can start and none of the pool's own tasks are in flight, and never while the pool is paused. In v1, it was called on every loop iteration, so a paused pool could finish. A pool whose `is_task_ready_function` keeps resolving to `True` doesn't finish, so make it resolve to `False` once the work runs out.
 
 For example:
 
@@ -153,20 +154,6 @@ async with ConcurrencySystem(settings) as concurrency_system:
 `ConcurrencySettings.max_tasks_per_minute` now caps the tasks started over the last 60 seconds, the same as Crawlee JS. In v1, the pool spaced task starts evenly, `60 / max_tasks_per_minute` seconds apart. In v2, tasks start as fast as the concurrency allows until the cap is reached. The next ones wait until the oldest starts age out of the window. The rate over a minute stays the same, but tasks start in bursts. For details, see [Max tasks per minute](../guides/scaling-crawlers#max-tasks-per-minute).
 
 The value has to be a whole number of at least 1, or infinity, which is the default. A fractional value, such as `0.5` or `7.5`, now raises `ValueError`.
-
-## Autoscaling logs changed
-
-The periodic log of the autoscaling state and the `Waiting for remaining tasks to finish` message are now logged at DEBUG instead of INFO. The crawler's status message at INFO still reports the desired concurrency.
-
-The state log also has a new format. Instead of raw ratios for every resource, it names only the overloaded ones, with the share of time each spent over its threshold and its limit:
-
-```text
-current concurrency 3, desired 5, overloaded: cpu 58% of the time (limit 40%)
-```
-
-To read the concurrency values in code, use `crawler.concurrency_system`.
-
-The autoscaling loggers moved together with the package. `crawlee._autoscaling.autoscaled_pool`, `crawlee._autoscaling.snapshotter` and `crawlee._autoscaling.system_status` are now `crawlee.autoscaling._autoscaled_pool`, `crawlee.autoscaling._snapshotter` and `crawlee.autoscaling._system_status`. The state log, along with the messages about scaling and free capacity, now comes from the new `crawlee.autoscaling._concurrency_system` logger. To configure all of them at once, use the `crawlee.autoscaling` logger.
 
 ## Only the first crawler uses the default request queue
 
@@ -208,10 +195,46 @@ for urls in batches:
     await crawler.run(urls)
 ```
 
-When a crawl processes no requests because its request manager holds only handled ones, the crawler now logs a warning that explains how to crawl them again.
-
 `Configuration.purge_on_start` isn't affected. Unnamed storages are still purged once per process, when they're first opened.
 
 ## `RequestQueue.purge` raises when the storage client can't purge
 
 In v1, `RequestQueue.purge()` worked around a storage client that didn't support purging. It dropped an unnamed queue and opened the default queue in its place, and it skipped a named queue with a warning. In v2, it raises the client's `NotImplementedError`, the same as Crawlee JS. The Apify platform's storage client doesn't support purging, so on the platform, call `drop()` or open a new queue instead.
+
+## Logs changed
+
+If you configure loggers by name or match log messages, update them for the following changes.
+
+### Logger names
+
+The autoscaling loggers moved together with the package. `crawlee._autoscaling.autoscaled_pool`, `crawlee._autoscaling.snapshotter` and `crawlee._autoscaling.system_status` are now `crawlee.autoscaling._autoscaled_pool`, `crawlee.autoscaling._snapshotter` and `crawlee.autoscaling._system_status`. The state log, along with the messages about scaling and free capacity, now comes from the new `crawlee.autoscaling._concurrency_system` logger. To configure all of them at once, use the `crawlee.autoscaling` logger.
+
+### Log levels
+
+The periodic log of the autoscaling state and the `Waiting for remaining tasks to finish` message are now logged at DEBUG instead of INFO. The crawler's status message at INFO still reports the desired concurrency. To read the concurrency values in code, use `crawler.concurrency_system`.
+
+### Log messages
+
+In v1, the autoscaling state log listed raw ratios for every resource. In v2, it names only the overloaded resources, with the share of time each spent over its threshold and its limit:
+
+```text
+current concurrency 3, desired 5, overloaded: cpu 58% of the time (limit 40%)
+```
+
+The INFO messages the crawler logs after `stop()` is called or `max_requests_per_crawl` is reached have new wording:
+
+```text
+# v1
+No new requests are allowed because crawler `stop` method was called. Ongoing requests will be allowed to complete.
+The crawler will finish any remaining ongoing requests and shut down.
+
+# v2
+No new requests are allowed because the `stop()` method has been called. Ongoing requests will be allowed to complete.
+The crawler has finished all the remaining ongoing requests and will shut down now.
+```
+
+The crawler logs the first message once per run, the next time it looks for a new request after the stop. It logs the second one once the ongoing requests have finished, where v1 logged it right after the stop. In `Crawler.stop() was called with following reason: ...`, a trailing period or space in the reason is dropped, so the default reason and the `max_requests_per_crawl` one no longer end with a double period.
+
+When a crawl processes no requests because its request manager holds only handled ones, the crawler logs a new warning. It starts with `This crawl processed no requests` and explains how to crawl the requests again.
+
+`RequestQueue.purge()` no longer logs the `Storage client "..." does not support purging the request queue.` warnings. It raises `NotImplementedError` instead. For details, see [`RequestQueue.purge` raises when the storage client can't purge](#requestqueuepurge-raises-when-the-storage-client-cant-purge).

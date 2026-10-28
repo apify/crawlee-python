@@ -66,9 +66,9 @@ class AutoscaledPool:
                 function is called every time there is free capacity for a new task and it should indicate whether
                 it should start a new task or not by resolving to either `True` or `False`. Besides its obvious use,
                 it is also useful for task throttling to save resources.
-            is_finished_function: A function that is called only when there are no tasks to be processed. If it
-                resolves to `True` then the pool's run finishes. Being called only when there are no tasks being
-                processed means that as long as `is_task_ready_function` keeps resolving to `True`,
+            is_finished_function: A function that is called only when there are no tasks to be processed and the
+                pool is not paused. If it resolves to `True` then the pool's run finishes. Being called only when there
+                are no tasks being processed means that as long as `is_task_ready_function` keeps resolving to `True`,
                 `is_finished_function` will never be called. To abort a run, use the `abort` method.
         """
         self._concurrency_system = concurrency_system
@@ -188,15 +188,21 @@ class AutoscaledPool:
         orchestrator_error: Exception | None = None
 
         try:
-            while not (finished := await self._is_finished_function()) and not run.result.done():
+            while not run.result.done():
                 run.worker_tasks_updated.clear()
 
                 if self._is_paused:
                     logger.debug('Not scheduling new tasks - the autoscaled pool is paused')
                 elif not self._concurrency_system.has_capacity_for_task(self._consumer):
                     logger.debug('Not scheduling new tasks - no free capacity')
+                    # Another pool can keep a shared system saturated indefinitely, so this pool still has to notice
+                    # that it has run out of work.
+                    if finished := await self._maybe_finish(run):
+                        break
                 elif not await self._is_task_ready_function():
                     logger.debug('Not scheduling new task - no task is ready')
+                    if finished := await self._maybe_finish(run):
+                        break
                 else:
                     task_id = str(self._next_task_id)
                     self._next_task_id += 1
@@ -241,6 +247,13 @@ class AutoscaledPool:
             elif orchestrator_error is not None:
                 # A worker failure or an abort already decided the run, so this error has no way out.
                 logger.error('Unpropagated exception in worker task orchestrator', exc_info=orchestrator_error)
+
+    async def _maybe_finish(self, run: _AutoscaledPoolRun) -> bool:
+        """Ask `is_finished_function` whether the run is over, but only while none of this pool's tasks is in flight.
+
+        A running task can still produce new work, and with a shared system only this pool's own tasks count.
+        """
+        return not run.worker_tasks and await self._is_finished_function()
 
     def _reap_worker_task(self, task: asyncio.Task, *, run: _AutoscaledPoolRun, task_id: str) -> None:
         """Handle cleanup and tracking of a completed worker task.
