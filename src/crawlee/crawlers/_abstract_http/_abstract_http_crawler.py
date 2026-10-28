@@ -300,7 +300,7 @@ class AbstractHttpCrawler(
             await response.aclose()
 
     async def _read_http_response(self, context: HttpCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
-        """Read the body of the HTTP response, which still counts towards the navigation timeout."""
+        """Read the body of the HTTP response within the navigation timeout."""
         async with self._shared_navigation_timeouts[id(context.request)]:
             await context.http_response.read()
 
