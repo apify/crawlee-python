@@ -224,8 +224,9 @@ class _BasicCrawlerOptions(TypedDict):
     Returning `None` suppresses the status message."""
 
     id: NotRequired[str]
-    """A unique identifier for the crawler instance. It isolates the `use_state` state and the default statistics from
-    other crawlers. Without it, the ID follows the order in which crawlers are created."""
+    """Identifier of the crawler. Crawlers with the same ID share the `use_state` state and the default statistics, and
+    every crawler but the first uses it in the alias of its default request queue. Without it, the ID follows the order
+    in which crawlers are created."""
 
 
 class _BasicCrawlerOptionsGeneric(TypedDict, Generic[TCrawlingContext, TStatisticsState]):
@@ -371,8 +372,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             status_message_logging_interval: Interval for logging the crawler status messages.
             status_message_callback: Allows overriding the default status message. The default status message is
                 provided in the parameters. Returning `None` suppresses the status message.
-            id: A unique identifier for the crawler instance. It isolates the `use_state` state and the default
-                statistics from other crawlers. Without it, the ID follows the order in which crawlers are created.
+            id: Identifier of the crawler. Crawlers with the same ID share the `use_state` state and the default
+                statistics, and every crawler but the first uses it in the alias of its default request queue. Without
+                it, the ID follows the order in which crawlers are created.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
@@ -381,6 +383,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
         self._id = str(BasicCrawler.__next_id) if id is None else id
+        self._default_rq_alias = None if BasicCrawler.__next_id == 0 else f'__default_{self._id}__'
         BasicCrawler.__next_id += 1
         self._consumer = ConcurrencyConsumer(id=self._id)
 
@@ -516,7 +519,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # The default system is built per run, so that a run is not scaled on the load and concurrency of the previous
         # one. A supplied system is known up front.
         self._concurrency_system: ConcurrencySystemInterface | None = concurrency_system
-        self._autoscaled_pool: AutoscaledPool | None = None
         self._crawler_state_rec_task = RecurringTask(
             func=self._crawler_state_task,
             delay=status_message_logging_interval,
@@ -527,10 +529,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._keep_alive = keep_alive
         self._running = False
         self._has_finished_before = False
-        self._last_run_failed = False
+        self._handled_request_this_run = False
         self._failed = False
         self._unexpected_stop = False
         self._logger_once = LoggerOnce(self._logger)
+        self._run_logger_once = LoggerOnce(self._logger)
 
     @property
     def log(self) -> logging.Logger:
@@ -574,7 +577,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Args:
             reason: Reason for stopping that will be used in logs.
         """
-        self._logger.info(f'Crawler.stop() was called with following reason: {reason}.')
+        self._logger.info(f'Crawler.stop() was called with following reason: {reason.rstrip(" .")}.')
         self._unexpected_stop = True
 
     def _wrap_handler_with_error_context(
@@ -597,7 +600,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     def _stop_if_max_requests_count_exceeded(self) -> None:
         """Call `stop` when the maximum number of requests to crawl has been reached."""
-        if self._max_requests_per_crawl is None:
+        if self._max_requests_per_crawl is None or self._unexpected_stop:
             return
 
         if self._statistics.state.requests_total >= self._max_requests_per_crawl:
@@ -644,9 +647,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
     async def get_request_manager(self) -> RequestManager:
-        """Return the configured request manager. If none is configured, open and return the default request queue."""
+        """Return the configured request manager. If none is configured, open and return the crawler's own queue."""
         if not self._request_manager:
             self._request_manager = await RequestQueue.open(
+                alias=self._default_rq_alias,
                 storage_client=self._service_locator.get_storage_client(),
                 configuration=self._service_locator.get_configuration(),
             )
@@ -713,20 +717,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._on_skipped_request = callback
         return callback
 
-    async def run(
-        self,
-        requests: Sequence[str | Request] | None = None,
-        *,
-        purge_request_queue: bool = True,
-    ) -> FinalStatistics:
+    async def run(self, requests: Sequence[str | Request] | None = None) -> FinalStatistics:
         """Run the crawler until all requests are processed.
+
+        Calling `run()` again on the same instance keeps crawling the same request manager. Requests that a previous
+        run handled, failed ones included, aren't processed again. To crawl them again, purge the request manager, or
+        create a new crawler with a freshly opened request queue.
 
         Args:
             requests: The requests to be enqueued before the crawler starts.
-            purge_request_queue: If this is `True` and the crawler is not being run for the first time, the request
-                queue will be purged. A run that ended with an exception does not count as a previous run, so a
-                retry keeps the requests that were still pending even when this is `True`. Named request queues
-                are considered persistent and are never purged implicitly.
 
         Raises:
             PersistentRateLimitError: If a domain throttled by a `ThrottlingRequestManager` has rate-limited every
@@ -738,6 +737,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             )
 
         self._running = True
+        self._handled_request_this_run = False
 
         try:
             if self._respect_robots_txt_file and not isinstance(self._request_manager, ThrottlingRequestManager):
@@ -753,22 +753,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
                 if self._use_session_pool:
                     await self._session_pool.reset_store()
-
-                # A failed run does not count as a previous run, so its pending requests survive into the retry.
-                if purge_request_queue and not self._last_run_failed:
-                    request_manager = await self.get_request_manager()
-                    # A `ThrottlingRequestManager` delegates `purge` to the manager it wraps, so inspect the wrapped
-                    # manager when deciding whether the purge would hit a named queue.
-                    inner_manager = (
-                        request_manager.inner
-                        if isinstance(request_manager, ThrottlingRequestManager)
-                        else request_manager
-                    )
-                    # Named storages are persistent and shared across runs, so they are never purged implicitly
-                    # (the same named-storage exemption as in `StorageClient._purge_if_needed`).
-                    is_named_queue = isinstance(inner_manager, RequestQueue) and inner_manager.name is not None
-                    if not is_named_queue:
-                        await request_manager.purge()
 
             if requests is not None:
                 await self.add_requests(requests)
@@ -823,7 +807,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 )
 
             self._has_finished_before = True
-            self._last_run_failed = False
 
             await self._save_crawler_state()
 
@@ -832,15 +815,39 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 self._logger.info(f'Final request statistics:\n{final_statistics.to_table()}')
             else:
                 self._logger.info('Final request statistics:', extra=final_statistics.to_dict())
-        except BaseException:
-            self._last_run_failed = True
-            raise
-        else:
+
+            # A crawl that did nothing while the manager holds only handled requests is a mistake, whoever handled them.
+            # Starting against handled requests is not, since that is what resuming a crawl looks like. The statistics
+            # can't tell, as they don't count skipped requests and may be restored from a previous process.
+            if not self._handled_request_this_run:
+                request_manager = await self.get_request_manager()
+                # The diagnostic must never fail the run.
+                try:
+                    is_finished = await request_manager.is_finished()
+                    handled_count = await request_manager.get_handled_count()
+                except Exception:
+                    is_finished = False
+                    handled_count = 0
+
+                # Pending requests mean the crawl ended early, such as after an abort, not that everything was handled.
+                if is_finished and handled_count > 0:
+                    noun = 'request' if handled_count == 1 else 'requests'
+                    message = (
+                        f'This crawl processed no requests - the request manager holds {handled_count} {noun}, all of '
+                        'them already handled, and a failed request counts as handled too. Nothing empties a queue '
+                        'between runs, so to crawl them again, purge it (`await queue.purge()`) or use a fresh one '
+                        "(e.g. `RequestQueue.open(alias='second-run')`) with a freshly created crawler instance."
+                    )
+                    self._logger_once.log(message, key=message, level=logging.WARNING)
+
             return final_statistics
         finally:
             # A failed run must leave the instance usable, so that the caller can retry after handling the error.
-            self._autoscaled_pool = None
             self._running = False
+
+            self._unexpected_stop = False
+            self._failed = False
+            self._run_logger_once = LoggerOnce(self._logger)
 
     async def _run_crawler(self) -> None:
         local_event_manager = self._service_locator.get_event_manager()
@@ -866,7 +873,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             concurrency_system = owned_concurrency_system
 
         self._concurrency_system = concurrency_system
-        self._autoscaled_pool = autoscaled_pool = AutoscaledPool(
+        autoscaled_pool = AutoscaledPool(
             concurrency_system=concurrency_system,
             consumer=self._consumer,
             is_finished_function=self.__is_finished_function,
@@ -1489,22 +1496,19 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def __is_finished_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
         if self._unexpected_stop:
-            self._logger.info('The crawler will finish any remaining ongoing requests and shut down.')
+            self._logger.info('The crawler has finished all the remaining ongoing requests and will shut down now.')
             return True
 
         if self._abort_on_error and self._failed:
-            self._failed = False
             return True
 
         if self._keep_alive:
             return False
 
-        # Check for a stall only when the pool is idle. An in-flight request can still enqueue new work or end the
-        # stall. The pool's own requests are what counts, not those of another crawler sharing the budget.
+        # The pool asks only while none of this crawler's requests are in flight, so none of them can still enqueue
+        # new work or end the stall.
         if (
             isinstance(self._request_manager, ThrottlingRequestManager)
-            and self._autoscaled_pool is not None
-            and self._autoscaled_pool.own_concurrency == 0
             and (reason := await self._request_manager.get_stall_reason()) is not None
         ):
             error = PersistentRateLimitError(f'Giving up: {reason}')
@@ -1519,10 +1523,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def __is_task_ready_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
         if self._unexpected_stop:
-            self._logger.info(
-                'No new requests are allowed because crawler `stop` method was called. '
-                'Ongoing requests will be allowed to complete.'
+            self._run_logger_once.log(
+                'No new requests are allowed because the `stop()` method has been called. '
+                'Ongoing requests will be allowed to complete.',
+                key='shutting_down',
             )
+            return False
+
+        # The pool asks whether the run is finished only once nothing is in flight, so stop taking new requests here.
+        if self._abort_on_error and self._failed:
             return False
 
         request_manager = await self.get_request_manager()
@@ -1949,3 +1958,4 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             logger=self._logger,
             max_retries=3,
         )
+        self._handled_request_this_run = True

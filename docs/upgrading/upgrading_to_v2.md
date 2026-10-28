@@ -115,6 +115,7 @@ The autoscaling classes now live in the public `crawlee.autoscaling` package, wh
 - `system_status` and `concurrency_settings` are replaced by `concurrency_system`, which has to be active when the pool runs, and `consumer`, which identifies the pool to the system.
 - `run_task_function` receives the id the task is booked under.
 - `current_concurrency` comes from the concurrency system, so a shared system may count the tasks of other pools too. The pool's own tasks are counted by the new `own_concurrency`.
+- `is_finished_function` is called only when no new task can start and none of the pool's own tasks are in flight, and never while the pool is paused. In v1, it was called on every loop iteration, so a paused pool could finish. A pool whose `is_task_ready_function` keeps resolving to `True` doesn't finish, so make it resolve to `False` once the work runs out.
 
 For example:
 
@@ -154,19 +155,89 @@ async with ConcurrencySystem(settings) as concurrency_system:
 
 The value has to be a whole number of at least 1, or infinity, which is the default. A fractional value, such as `0.5` or `7.5`, now raises `ValueError`.
 
-## Autoscaling logs changed
+## Only the first crawler uses the default request queue
 
-The periodic log of the autoscaling state and the `Waiting for remaining tasks to finish` message are now logged at DEBUG instead of INFO. The crawler's status message at INFO still reports the desired concurrency.
+Only the first crawler created in a process opens the default request queue, the same as Crawlee JS. Every later crawler without a `request_manager` opens its own queue under the alias `__default_{id}__`. A crawler without an `id` uses its creation index there, such as `__default_1__`. In v1, all these crawlers shared the default queue, so a URL one crawler handled was skipped by the others.
 
-The state log also has a new format. Instead of raw ratios for every resource, it names only the overloaded ones, with the share of time each spent over its threshold and its limit:
+To reach a crawler's queue, call `crawler.get_request_manager()` instead of `RequestQueue.open()`. If your crawlers relied on the shared queue, open it yourself and pass it to each of them:
+
+```python
+queue = await RequestQueue.open()
+crawler_1 = BasicCrawler(request_manager=queue)
+crawler_2 = BasicCrawler(request_manager=queue)
+```
+
+## Repeated `run()` calls no longer purge the request queue
+
+In v1, calling `crawler.run()` again on the same instance purged the request queue, unless the queue was named or the previous run had failed. In v2, nothing is purged between runs, the same as Crawlee JS. A repeated `run()` continues with the same request manager and skips the requests an earlier run handled, failed ones included.
+
+The `purge_request_queue` argument of `run()` is removed. If you passed `purge_request_queue=False`, drop the argument. To crawl the same requests again, purge the request manager yourself:
+
+```python
+# v1
+await crawler.run(urls)
+await crawler.run(urls)
+
+# v2
+await crawler.run(urls)
+request_manager = await crawler.get_request_manager()
+await request_manager.purge()
+await crawler.run(urls)
+```
+
+`RequestManagerTandem.purge()` now purges the manager it wraps, where v1 did nothing. The loader isn't purged, so requests it has already passed to the manager don't come back.
+
+Instead of purging, you can create a new crawler for each crawl. Every crawler after the first opens a request queue of its own, as described in [Only the first crawler uses the default request queue](#only-the-first-crawler-uses-the-default-request-queue). Crawlers created with the same `id` share that queue, so leave `id` unset or give each crawler a different one:
+
+```python
+for urls in batches:
+    crawler = BasicCrawler()
+    await crawler.run(urls)
+```
+
+`Configuration.purge_on_start` isn't affected. Unnamed storages are still purged once per process, when they're first opened.
+
+## `RequestQueue.purge` raises when the storage client can't purge
+
+In v1, `RequestQueue.purge()` worked around a storage client that didn't support purging. It dropped an unnamed queue and opened the default queue in its place, and it skipped a named queue with a warning. In v2, it raises the client's `NotImplementedError`, the same as Crawlee JS. The Apify platform's storage client doesn't support purging, so on the platform, call `drop()` or open a new queue instead.
+
+## Logs changed
+
+If you configure loggers by name or match log messages, update them for the following changes.
+
+### Logger names
+
+The autoscaling loggers moved together with the package. `crawlee._autoscaling.autoscaled_pool`, `crawlee._autoscaling.snapshotter` and `crawlee._autoscaling.system_status` are now `crawlee.autoscaling._autoscaled_pool`, `crawlee.autoscaling._snapshotter` and `crawlee.autoscaling._system_status`. The state log, along with the messages about scaling and free capacity, now comes from the new `crawlee.autoscaling._concurrency_system` logger. To configure all of them at once, use the `crawlee.autoscaling` logger.
+
+### Log levels
+
+The periodic log of the autoscaling state and the `Waiting for remaining tasks to finish` message are now logged at DEBUG instead of INFO. The crawler's status message at INFO still reports the desired concurrency. To read the concurrency values in code, use `crawler.concurrency_system`.
+
+### Log messages
+
+In v1, the autoscaling state log listed raw ratios for every resource. In v2, it names only the overloaded resources, with the share of time each spent over its threshold and its limit:
 
 ```text
 current concurrency 3, desired 5, overloaded: cpu 58% of the time (limit 40%)
 ```
 
-To read the concurrency values in code, use `crawler.concurrency_system`.
+The INFO messages the crawler logs after `stop()` is called or `max_requests_per_crawl` is reached have new wording:
 
-The autoscaling loggers moved together with the package. `crawlee._autoscaling.autoscaled_pool`, `crawlee._autoscaling.snapshotter` and `crawlee._autoscaling.system_status` are now `crawlee.autoscaling._autoscaled_pool`, `crawlee.autoscaling._snapshotter` and `crawlee.autoscaling._system_status`. The state log, along with the messages about scaling and free capacity, now comes from the new `crawlee.autoscaling._concurrency_system` logger. To configure all of them at once, use the `crawlee.autoscaling` logger.
+```text
+# v1
+No new requests are allowed because crawler `stop` method was called. Ongoing requests will be allowed to complete.
+The crawler will finish any remaining ongoing requests and shut down.
+
+# v2
+No new requests are allowed because the `stop()` method has been called. Ongoing requests will be allowed to complete.
+The crawler has finished all the remaining ongoing requests and will shut down now.
+```
+
+The crawler logs the first message once per run, the next time it looks for a new request after the stop. It logs the second one once the ongoing requests have finished, where v1 logged it right after the stop. In `Crawler.stop() was called with following reason: ...`, a trailing period or space in the reason is dropped, so the default reason and the `max_requests_per_crawl` one no longer end with a double period.
+
+When a crawl processes no requests because its request manager holds only handled ones, the crawler logs a new warning. It starts with `This crawl processed no requests` and explains how to crawl the requests again.
+
+`RequestQueue.purge()` no longer logs the `Storage client "..." does not support purging the request queue.` warnings. It raises `NotImplementedError` instead. For details, see [`RequestQueue.purge` raises when the storage client can't purge](#requestqueuepurge-raises-when-the-storage-client-cant-purge).
 
 ## Session retirement is permanent
 
