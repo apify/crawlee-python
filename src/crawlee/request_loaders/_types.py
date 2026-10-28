@@ -60,7 +60,7 @@ class FinishedStatus:
 
 
 RequestLoaderStatus = ReadyStatus | WaitingStatus | FinishedStatus
-"""Readiness of a request loader. Loaders never stall."""
+"""Readiness of a request source that never stalls, such as `RequestList`, `SitemapRequestLoader` or `RequestQueue`."""
 
 RequestSourceStatus = ReadyStatus | WaitingStatus | StalledStatus | FinishedStatus
 """Readiness of a request source, as reported by `RequestLoader.check_readiness`."""

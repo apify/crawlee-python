@@ -212,7 +212,7 @@ In v1, `RequestQueue.purge()` worked around a storage client that didn't support
 
 Each of these classes also has a `status` attribute set to `'ready'`, `'waiting'`, `'stalled'` or `'finished'`, so a check doesn't need an import.
 
-The change covers `RequestQueue`, `RequestList`, `SitemapRequestLoader`, `RequestManagerTandem` and `ThrottlingRequestManager`. `ThrottlingRequestManager.get_stall_reason` is removed too, since a stall is now reported as `StalledStatus`. Storage clients keep `is_empty` and `is_finished`.
+The change covers `RequestQueue`, `RequestList`, `SitemapRequestLoader`, `RequestManagerTandem` and `ThrottlingRequestManager`. `ThrottlingRequestManager.get_stall_reason` is removed too, since a stall is now reported as `StalledStatus`. Unlike `get_stall_reason`, the manager reports a stall only while no request outside the stalled domains is in progress or still being added, since such a request may still add work. Storage clients keep `is_empty` and `is_finished`.
 
 ```python
 # v1
