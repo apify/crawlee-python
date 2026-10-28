@@ -20,7 +20,7 @@ def test_store_keeps_time_order() -> None:
     for delta in [3, 0, 5, 1, 6, 2, 4]:
         store.push(snapshot(now - timedelta(seconds=delta)))
 
-    created_at = [item.created_at for item in store.get_all()]
+    created_at = [item.created_at for item in store.get_sample()]
     assert created_at == [now - timedelta(seconds=delta) for delta in range(6, -1, -1)]
 
 
@@ -33,7 +33,7 @@ def test_store_prunes_outside_window() -> None:
     for delta in [0, 3, 2, 5]:
         store.push(snapshot(now - timedelta(hours=delta)))
 
-    assert [item.created_at for item in store.get_all()] == [now - timedelta(hours=2), now]
+    assert [item.created_at for item in store.get_sample()] == [now - timedelta(hours=2), now]
 
 
 def test_store_keeps_all_without_window() -> None:
@@ -44,7 +44,7 @@ def test_store_keeps_all_without_window() -> None:
     for delta in [0, 30, 60]:
         store.push(snapshot(now - timedelta(days=delta)))
 
-    assert len(store.get_all()) == 3
+    assert len(store.get_sample()) == 3
 
 
 @pytest.mark.parametrize(

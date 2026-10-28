@@ -49,6 +49,9 @@ class StorageClientLoadSignal(LoadSignal):
     by default, so construct one only to wrap or adapt it.
     """
 
+    name = 'storage_client_info'
+    """The key of the signal in the reported `SystemInfo`."""
+
     _RATE_LIMIT_ERROR_RETRY_COUNT = 2
     """Number of retries for a client request before considering it a failure due to rate limiting."""
 
@@ -63,9 +66,6 @@ class StorageClientLoadSignal(LoadSignal):
         self._store = SnapshotStore[StorageClientSnapshot]()
         self._snapshot_task = RecurringTask(self._snapshot, self._options.snapshot_interval)
         self._storage_client: StorageClient | None = None
-
-    name = 'storage_client_info'
-    """The key of the signal in the reported `SystemInfo`."""
 
     @property
     @override
@@ -97,7 +97,7 @@ class StorageClientLoadSignal(LoadSignal):
         rate_limit_errors = self._storage_client.get_rate_limit_errors() if self._storage_client else {}
         error_count = rate_limit_errors.get(self._RATE_LIMIT_ERROR_RETRY_COUNT, 0)
 
-        snapshots = self._store.get_all()
+        snapshots = self._store.get_sample()
         new_error_count = error_count - snapshots[-1].rate_limit_error_count if snapshots else 0
 
         snapshot = StorageClientSnapshot(

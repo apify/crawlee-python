@@ -44,6 +44,9 @@ class EventLoopLoadSignal(LoadSignal):
     builds this signal by default, so construct one only to wrap or adapt it.
     """
 
+    name = 'event_loop_info'
+    """The key of the signal in the reported `SystemInfo`."""
+
     def __init__(self, options: EventLoopLoadSignalOptions | None = None) -> None:
         """Initialize a new instance.
 
@@ -54,9 +57,6 @@ class EventLoopLoadSignal(LoadSignal):
         self._max_blocked = timedelta(0)
         self._store = SnapshotStore[EventLoopSnapshot]()
         self._snapshot_task = RecurringTask(self._snapshot, self._options.snapshot_interval)
-
-    name = 'event_loop_info'
-    """The key of the signal in the reported `SystemInfo`."""
 
     @property
     @override
@@ -84,7 +84,7 @@ class EventLoopLoadSignal(LoadSignal):
     def _snapshot(self) -> None:
         """Record how long the event loop was blocked since the previous snapshot."""
         now = datetime.now(UTC)
-        snapshots = self._store.get_all()
+        snapshots = self._store.get_sample()
         delay = now - snapshots[-1].created_at - self._options.snapshot_interval if snapshots else timedelta(0)
 
         snapshot = EventLoopSnapshot(

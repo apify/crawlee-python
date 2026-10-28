@@ -44,6 +44,9 @@ class CpuLoadSignal(LoadSignal):
     builds this signal by default, so construct one only to wrap or adapt it.
     """
 
+    name = 'cpu_info'
+    """The key of the signal in the reported `SystemInfo`."""
+
     def __init__(self, options: CpuLoadSignalOptions | None = None) -> None:
         """Initialize a new instance.
 
@@ -54,9 +57,6 @@ class CpuLoadSignal(LoadSignal):
         self._store = SnapshotStore[CpuSnapshot]()
         self._max_used_ratio = 0.0
         self._event_manager: EventManager | None = None
-
-    name = 'cpu_info'
-    """The key of the signal in the reported `SystemInfo`."""
 
     @property
     @override

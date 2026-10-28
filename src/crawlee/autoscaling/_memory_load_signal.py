@@ -57,6 +57,9 @@ class MemoryLoadSignal(LoadSignal):
     adapt it.
     """
 
+    name = 'memory_info'
+    """The key of the signal in the reported `SystemInfo`."""
+
     _RESERVE_MEMORY_RATIO = 0.5
     """Fraction of memory kept in reserve. Used to calculate critical memory overload threshold."""
 
@@ -75,9 +78,6 @@ class MemoryLoadSignal(LoadSignal):
         self._max_memory_size: ByteSize | Ratio | None = None
         self._event_manager: EventManager | None = None
         self._timestamp_of_last_memory_warning: datetime = datetime.now(UTC) - timedelta(hours=1)
-
-    name = 'memory_info'
-    """The key of the signal in the reported `SystemInfo`."""
 
     @property
     @override

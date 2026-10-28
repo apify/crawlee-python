@@ -141,10 +141,6 @@ class SnapshotStore(Generic[TSnapshot]):
         latest_time = self._snapshots[-1].created_at
         return [snapshot for snapshot in self._snapshots if latest_time - snapshot.created_at <= duration]
 
-    def get_all(self) -> list[TSnapshot]:
-        """Return all snapshots, for a signal that measures the change since its previous snapshot."""
-        return self._snapshots
-
     def clear(self) -> None:
         """Drop all snapshots.
 
