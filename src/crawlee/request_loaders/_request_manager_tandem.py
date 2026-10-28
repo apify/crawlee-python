@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from crawlee.request_loaders import RequestLoader
     from crawlee.storage_clients.models import ProcessedRequest
 
-    from ._types import RequestSourceStatus
+    from ._types import PacingSignal, RequestSourceStatus
 
 
 logger = getLogger(__name__)
@@ -108,6 +108,11 @@ class RequestManagerTandem(RequestManager):
     @override
     async def reclaim_request(self, request: Request, *, forefront: bool = False) -> None:
         await self._read_write_manager.reclaim_request(request, forefront=forefront)
+
+    @override
+    def record_pacing_signal(self, signal: PacingSignal) -> bool:
+        """Forward the signal to the manager. The loader side is read-only and dispatches nothing of its own."""
+        return self._read_write_manager.record_pacing_signal(signal)
 
     @override
     async def mark_request_as_handled(self, request: Request) -> None:

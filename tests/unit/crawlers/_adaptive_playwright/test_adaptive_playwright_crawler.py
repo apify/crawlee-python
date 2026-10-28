@@ -1012,6 +1012,7 @@ async def test_throttled_static_429_is_deferred(monkeypatch: pytest.MonkeyPatch)
     assert http_client.crawl.await_count == 2
     assert len(handled) == 1
     assert handled[0].request.retry_count == 0
+    assert throttler._domain_states['throttled.placeholder.com'].consecutive_429_count == 1
 
 
 async def test_static_handler_raised_throttled_error_is_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1040,16 +1041,16 @@ async def test_static_handler_raised_throttled_error_is_deferred(monkeypatch: py
             browser_navigations()
 
     @crawler.router.default_handler
-    async def handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+    async def handler(_context: AdaptivePlaywrightCrawlingContext) -> None:
         handler_calls()
         if handler_calls.call_count == 1:
-            throttler.record_domain_delay(context.request.url)
             raise RequestThrottledError
 
     await crawler.run([url])
 
     browser_navigations.assert_not_called()
     assert handler_calls.call_count == 2
+    assert throttler._domain_states['throttled.placeholder.com'].consecutive_429_count == 1
 
 
 async def test_static_throttled_error_without_backoff_falls_back_to_browser(test_urls: list[str]) -> None:

@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
@@ -15,7 +15,7 @@ from crawlee._request import Request
 from crawlee._service_locator import ServiceLocator
 from crawlee._utils.http import parse_retry_after_header
 from crawlee.configuration import Configuration
-from crawlee.request_loaders import WaitingStatus
+from crawlee.request_loaders import MinIntervalSignal, PacingSignal, RateLimitedSignal, WaitingStatus
 from crawlee.request_loaders._throttling_request_manager import ThrottlingRequestManager
 from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
 from crawlee.storages import RequestQueue
@@ -176,25 +176,8 @@ async def test_domain_matching_is_case_insensitive(
     assert await manager._sub_managers['example.com'].get_total_count() == 1
 
     # 429 bookkeeping must also flow through the lowercased state.
-    manager.record_domain_delay('https://Example.Com/page2')
-    assert manager._is_domain_throttled('example.com')
-
-
-@pytest.mark.parametrize(
-    ('url', 'expected'),
-    [
-        pytest.param(f'https://{THROTTLED_DOMAIN}/page2', True, id='rate-limited'),
-        pytest.param(f'https://{NON_THROTTLED_DOMAIN}/page1', False, id='unconfigured'),
-    ],
-)
-async def test_is_throttled(manager: ThrottlingRequestManager[RequestQueue], url: str, *, expected: bool) -> None:
-    """Only a configured domain in a cooldown is reported as throttled."""
-    assert manager.is_throttled(f'https://{THROTTLED_DOMAIN}/page1') is False
-
-    manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/page1')
-    manager.record_domain_delay(f'https://{NON_THROTTLED_DOMAIN}/page1')
-
-    assert manager.is_throttled(url) is expected
+    manager.record_pacing_signal(RateLimitedSignal('https://Example.Com/page2'))
+    assert manager._domain_states['example.com'].throttled_until > datetime.now(UTC)
 
 
 @pytest.mark.parametrize(
@@ -225,7 +208,7 @@ async def test_domain_matching_normalizes_spelling(
         service_locator=service_locator,
     )
 
-    assert manager.record_domain_delay(url) is True
+    assert manager.record_pacing_signal(RateLimitedSignal(url)) is True
 
 
 @pytest.mark.parametrize(
@@ -289,24 +272,25 @@ async def test_add_requests_routes_mixed_domains(
 
 
 async def test_429_triggers_domain_delay(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """After record_domain_delay(), the domain should be throttled and the call should report success."""
-    assert manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/page1') is True
-    assert manager._is_domain_throttled(THROTTLED_DOMAIN)
+    """After a rate-limited signal, the domain should be throttled and the call should report success."""
+    assert manager.record_pacing_signal(RateLimitedSignal(f'https://{THROTTLED_DOMAIN}/page1')) is True
+    assert manager._domain_states[THROTTLED_DOMAIN].throttled_until > datetime.now(UTC)
 
 
-async def test_record_domain_delay_returns_false_for_unconfigured_domain(
+async def test_rate_limit_refused_unconfigured(
     manager: ThrottlingRequestManager[RequestQueue],
 ) -> None:
-    """record_domain_delay should return False (no-op) when the URL's domain is not in the configured list."""
-    assert manager.record_domain_delay(f'https://{NON_THROTTLED_DOMAIN}/page1') is False
-    assert not manager._is_domain_throttled(NON_THROTTLED_DOMAIN)
+    """A rate-limited signal should return False (no-op) when the URL's domain is not in the configured list."""
+    assert manager.record_pacing_signal(RateLimitedSignal(f'https://{NON_THROTTLED_DOMAIN}/page1')) is False
+    assert manager._domain_states[THROTTLED_DOMAIN].consecutive_429_count == 0
 
 
-async def test_different_domains_independent(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+async def test_different_domains_independent(two_domain_manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """Throttling one domain should NOT affect other domains."""
-    manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/page1')
-    assert manager._is_domain_throttled(THROTTLED_DOMAIN)
-    assert not manager._is_domain_throttled(NON_THROTTLED_DOMAIN)
+    two_domain_manager.record_pacing_signal(RateLimitedSignal(f'https://{THROTTLED_DOMAIN}/page1'))
+    now = datetime.now(UTC)
+    assert two_domain_manager._domain_states[THROTTLED_DOMAIN].throttled_until > now
+    assert two_domain_manager._domain_states[SECOND_THROTTLED_DOMAIN].throttled_until <= now
 
 
 async def test_exponential_backoff(manager: ThrottlingRequestManager[RequestQueue]) -> None:
@@ -315,12 +299,12 @@ async def test_exponential_backoff(manager: ThrottlingRequestManager[RequestQueu
     state = manager._domain_states[THROTTLED_DOMAIN]
 
     with _frozen_clock() as clock:
-        manager.record_domain_delay(url)
+        manager.record_pacing_signal(RateLimitedSignal(url))
         assert state.backoff_until == clock.now.return_value + manager._base_delay
 
         # Past the first window, but well before it decays.
         clock.now.return_value += manager._base_delay + timedelta(seconds=1)
-        manager.record_domain_delay(url)
+        manager.record_pacing_signal(RateLimitedSignal(url))
 
         assert state.consecutive_429_count == 2
         assert state.backoff_until == clock.now.return_value + manager._base_delay * 2
@@ -333,7 +317,7 @@ async def test_burst_of_429s_counts_once(manager: ThrottlingRequestManager[Reque
 
     with _frozen_clock() as clock:
         for _ in range(8):
-            assert manager.record_domain_delay(url) is True
+            assert manager.record_pacing_signal(RateLimitedSignal(url)) is True
 
         assert state.consecutive_429_count == 1
         assert state.backoff_until == clock.now.return_value + manager._base_delay
@@ -345,13 +329,13 @@ async def test_backoff_decays_when_quiet(manager: ThrottlingRequestManager[Reque
     state = manager._domain_states[THROTTLED_DOMAIN]
 
     with _frozen_clock() as clock:
-        manager.record_domain_delay(url)
+        manager.record_pacing_signal(RateLimitedSignal(url))
         clock.now.return_value += manager._base_delay + timedelta(seconds=1)
-        manager.record_domain_delay(url)
+        manager.record_pacing_signal(RateLimitedSignal(url))
         assert state.consecutive_429_count == 2
 
         clock.now.return_value = state.backoff_decays_at
-        manager.record_domain_delay(url)
+        manager.record_pacing_signal(RateLimitedSignal(url))
 
         assert state.consecutive_429_count == 1
         assert state.backoff_until == clock.now.return_value + manager._base_delay
@@ -385,7 +369,7 @@ async def test_max_delay_cap(
     with _frozen_clock() as clock:
         for _ in range(windows):
             armed_at = clock.now.return_value
-            manager.record_domain_delay(url)
+            manager.record_pacing_signal(RateLimitedSignal(url))
             # Step just past the window, staying short of its decay deadline.
             clock.now.return_value = state.backoff_until + timedelta(milliseconds=1)
 
@@ -397,7 +381,7 @@ async def test_retry_after_header_priority(manager: ThrottlingRequestManager[Req
     """Explicit Retry-After should override exponential backoff."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
 
-    manager.record_domain_delay(url, retry_after=timedelta(seconds=30))
+    manager.record_pacing_signal(RateLimitedSignal(url, wait=timedelta(seconds=30)))
 
     state = manager._domain_states[THROTTLED_DOMAIN]
     now = datetime.now(UTC)
@@ -415,7 +399,7 @@ async def test_retry_after_exceeding_max_delay_logs_warning(
     url = f'https://{THROTTLED_DOMAIN}/page1'
 
     with caplog.at_level('WARNING', logger='crawlee.request_loaders._throttling_request_manager'):
-        manager.record_domain_delay(url, retry_after=manager._max_delay + timedelta(seconds=240))
+        manager.record_pacing_signal(RateLimitedSignal(url, wait=manager._max_delay + timedelta(seconds=240)))
 
     state = manager._domain_states[THROTTLED_DOMAIN]
     actual_delay = state.throttled_until - datetime.now(UTC)
@@ -423,7 +407,7 @@ async def test_retry_after_exceeding_max_delay_logs_warning(
 
     warnings = [r for r in caplog.records if r.levelname == 'WARNING']
     assert len(warnings) == 1
-    assert 'Retry-After header' in warnings[0].message
+    assert 'requested wait' in warnings[0].message
     assert THROTTLED_DOMAIN in warnings[0].message
 
 
@@ -433,10 +417,9 @@ async def test_retry_after_zero_falls_back_to_backoff(manager: ThrottlingRequest
     state = manager._domain_states[THROTTLED_DOMAIN]
 
     with _frozen_clock() as clock:
-        manager.record_domain_delay(url, retry_after=timedelta(0))
+        manager.record_pacing_signal(RateLimitedSignal(url, wait=timedelta(0)))
 
         assert state.backoff_until == clock.now.return_value + manager._base_delay
-        assert manager._is_domain_throttled(THROTTLED_DOMAIN)
 
 
 async def test_capping_warning_names_the_backoff_on_zero_retry_after(
@@ -449,7 +432,7 @@ async def test_capping_warning_names_the_backoff_on_zero_retry_after(
 
     with caplog.at_level('WARNING', logger=MANAGER_MODULE), _frozen_clock() as clock:
         for _ in range(20):
-            manager.record_domain_delay(url, retry_after=timedelta(0))
+            manager.record_pacing_signal(RateLimitedSignal(url, wait=timedelta(0)))
             clock.now.return_value = state.backoff_until + timedelta(milliseconds=1)
 
     warnings = [r for r in caplog.records if r.levelname == 'WARNING']
@@ -457,26 +440,11 @@ async def test_capping_warning_names_the_backoff_on_zero_retry_after(
     assert all('exponential backoff' in r.message for r in warnings)
 
 
-async def test_success_resets_backoff(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """An explicit `record_success` should reset the consecutive 429 count."""
-    url = f'https://{THROTTLED_DOMAIN}/page1'
-    state = manager._domain_states[THROTTLED_DOMAIN]
-
-    with _frozen_clock() as clock:
-        manager.record_domain_delay(url)
-        clock.now.return_value += manager._base_delay + timedelta(seconds=1)
-        manager.record_domain_delay(url)
-        assert state.consecutive_429_count == 2
-
-    manager.record_success(url)
-    assert state.consecutive_429_count == 0
-
-
 async def test_handled_request_keeps_backoff(manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """Marking a request as handled must not reset the backoff, since failed requests are marked handled too."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     await manager.add_request(url)
-    manager.record_domain_delay(url)
+    manager.record_pacing_signal(RateLimitedSignal(url))
 
     request = await manager._sub_managers[THROTTLED_DOMAIN].fetch_next_request()
     assert request is not None
@@ -489,32 +457,90 @@ async def test_handled_request_keeps_backoff(manager: ThrottlingRequestManager[R
 
 
 async def test_crawl_delay_integration(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """set_crawl_delay() should record the delay for the domain."""
+    """A min-interval signal should record the delay for the domain."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
-    manager.set_crawl_delay(url, 5)
+    manager.record_pacing_signal(MinIntervalSignal(url, interval=timedelta(seconds=5), scope='hostname'))
 
     state = manager._domain_states[THROTTLED_DOMAIN]
     assert state.crawl_delay == timedelta(seconds=5)
 
 
+async def test_min_interval_keeps_first_value(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A later min-interval signal is accepted but doesn't change the crawl-delay."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    manager.record_pacing_signal(MinIntervalSignal(url, interval=timedelta(seconds=5), scope='hostname'))
+
+    accepted = manager.record_pacing_signal(MinIntervalSignal(url, interval=timedelta(seconds=9), scope='hostname'))
+
+    assert accepted is True
+    assert manager._domain_states[THROTTLED_DOMAIN].crawl_delay == timedelta(seconds=5)
+
+
+async def test_min_interval_refused_unconfigured(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A min-interval signal for a domain not in the configured list is a no-op."""
+    signal = MinIntervalSignal(f'https://{NON_THROTTLED_DOMAIN}/page1', interval=timedelta(seconds=5), scope='hostname')
+
+    assert manager.record_pacing_signal(signal) is False
+    assert manager._domain_states[THROTTLED_DOMAIN].crawl_delay is None
+
+
+@pytest.mark.parametrize(
+    'signal',
+    [
+        pytest.param(RateLimitedSignal(f'https://{THROTTLED_DOMAIN}/page1', scope='site'), id='rate-limited'),
+        pytest.param(
+            MinIntervalSignal(f'https://{THROTTLED_DOMAIN}/page1', interval=timedelta(seconds=5), scope='site'),
+            id='min-interval',
+        ),
+        pytest.param(RateLimitedSignal(f'https://{NON_THROTTLED_DOMAIN}/page1', scope='site'), id='unconfigured'),
+        pytest.param(
+            RateLimitedSignal(f'https://{THROTTLED_DOMAIN}/page1', scope='registrable_domain'), id='registrable-domain'
+        ),
+    ],
+)
+async def test_unknown_scope_raises(manager: ThrottlingRequestManager[RequestQueue], signal: PacingSignal) -> None:
+    """A signal scoped wider than a hostname, or in a vocabulary the manager doesn't know, is rejected."""
+    with pytest.raises(ValueError, match='Cannot honor a pacing signal scoped to'):
+        manager.record_pacing_signal(signal)
+
+
+@pytest.mark.parametrize(
+    'scope',
+    [
+        pytest.param(None, id='no-scope'),
+        pytest.param('hostname', id='hostname'),
+    ],
+)
+async def test_hostname_scope_is_honored(manager: ThrottlingRequestManager[RequestQueue], scope: str | None) -> None:
+    """A signal with no scope or scoped to a hostname is applied to the URL's domain."""
+    assert manager.record_pacing_signal(RateLimitedSignal(f'https://{THROTTLED_DOMAIN}/page1', scope=scope)) is True
+
+
+async def test_unknown_reason_is_refused(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A signal with a reason the manager doesn't handle is refused, even with a scope it can't honor."""
+    signal = Mock(reason='future', scope='site', url=f'https://{THROTTLED_DOMAIN}/page1')
+
+    assert manager.record_pacing_signal(signal) is False
+
+
 async def test_crawl_delay_throttles_after_dispatch(manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """After dispatching a request, crawl-delay should throttle the next one."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
-    manager.set_crawl_delay(url, 5)
+    manager.record_pacing_signal(MinIntervalSignal(url, interval=timedelta(seconds=5), scope='hostname'))
 
     manager._mark_domain_dispatched(THROTTLED_DOMAIN)
 
-    assert manager._is_domain_throttled(THROTTLED_DOMAIN)
+    assert manager._domain_states[THROTTLED_DOMAIN].throttled_until > datetime.now(UTC)
 
 
 async def test_dispatch_does_not_shorten_active_backoff(manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """A short crawl-delay armed on dispatch must not cut an active 429 backoff short."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
-    manager.set_crawl_delay(url, 1)
+    manager.record_pacing_signal(MinIntervalSignal(url, interval=timedelta(seconds=1), scope='hostname'))
     state = manager._domain_states[THROTTLED_DOMAIN]
 
     with _frozen_clock() as clock:
-        manager.record_domain_delay(url, retry_after=timedelta(seconds=30))
+        manager.record_pacing_signal(RateLimitedSignal(url, wait=timedelta(seconds=30)))
         manager._mark_domain_dispatched(THROTTLED_DOMAIN)
 
         assert state.crawl_delay_until == clock.now.return_value + timedelta(seconds=1)
@@ -524,7 +550,7 @@ async def test_dispatch_does_not_shorten_active_backoff(manager: ThrottlingReque
 async def test_backoff_escalates_under_a_long_crawl_delay(manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """A crawl-delay longer than the backoff sets the retry cadence, and the exponent must still escalate."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
-    manager.set_crawl_delay(url, 10)
+    manager.record_pacing_signal(MinIntervalSignal(url, interval=timedelta(seconds=10), scope='hostname'))
     state = manager._domain_states[THROTTLED_DOMAIN]
     latency = timedelta(milliseconds=200)
 
@@ -534,7 +560,7 @@ async def test_backoff_escalates_under_a_long_crawl_delay(manager: ThrottlingReq
             clock.now.return_value = max(clock.now.return_value, state.throttled_until)
             manager._mark_domain_dispatched(THROTTLED_DOMAIN)
             clock.now.return_value += latency
-            manager.record_domain_delay(url)
+            manager.record_pacing_signal(RateLimitedSignal(url))
 
         assert state.consecutive_429_count == 5
         assert state.backoff_until == clock.now.return_value + manager._base_delay * 2**4
@@ -580,7 +606,7 @@ async def test_fetch_skips_throttled_sub_manager(
     await manager.add_request(throttled_url)
     await manager.add_request(free_url)
 
-    manager.record_domain_delay(throttled_url)
+    manager.record_pacing_signal(RateLimitedSignal(throttled_url))
 
     result = await manager.fetch_next_request()
 
@@ -592,7 +618,7 @@ async def test_fetch_returns_none_when_all_throttled(manager: ThrottlingRequestM
     """A throttled domain must release the caller's concurrency slot instead of waiting out its cooldown."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     await manager.add_request(url)
-    manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
+    manager.record_pacing_signal(RateLimitedSignal(url, wait=timedelta(seconds=60)))
 
     assert await asyncio.wait_for(manager.fetch_next_request(), timeout=1.0) is None
 
@@ -601,7 +627,7 @@ async def test_cooldown_reads_as_waiting(manager: ThrottlingRequestManager[Reque
     """Test that requests waiting out a cooldown make the manager wait until the cooldown ends."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     await manager.add_request(url)
-    manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
+    manager.record_pacing_signal(RateLimitedSignal(url, wait=timedelta(seconds=60)))
 
     ready_at = manager._domain_states[THROTTLED_DOMAIN].throttled_until
     assert await manager.check_readiness() == WaitingStatus(ready_at=ready_at)
@@ -609,7 +635,9 @@ async def test_cooldown_reads_as_waiting(manager: ThrottlingRequestManager[Reque
 
 async def test_crawl_delay_reads_as_waiting(manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """A crawl-delay armed on dispatch makes the manager wait before the domain's next request."""
-    manager.set_crawl_delay(f'https://{THROTTLED_DOMAIN}/', 30)
+    manager.record_pacing_signal(
+        MinIntervalSignal(f'https://{THROTTLED_DOMAIN}/', interval=timedelta(seconds=30), scope='hostname')
+    )
     await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
     await manager.add_request(f'https://{THROTTLED_DOMAIN}/page2')
 
@@ -627,7 +655,7 @@ async def test_expired_throttle_makes_the_domain_fetchable_again(
     await manager.add_request(url)
 
     with _frozen_clock() as clock:
-        manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
+        manager.record_pacing_signal(RateLimitedSignal(url, wait=timedelta(seconds=60)))
         assert (await manager.check_readiness()).status == 'waiting'
 
         clock.now.return_value += timedelta(seconds=61)
@@ -646,8 +674,8 @@ async def test_waits_for_earliest_cooldown(two_domain_manager: ThrottlingRequest
     await two_domain_manager.add_request(early_url)
 
     with _frozen_clock():
-        two_domain_manager.record_domain_delay(late_url, retry_after=timedelta(seconds=30))
-        two_domain_manager.record_domain_delay(early_url, retry_after=timedelta(seconds=10))
+        two_domain_manager.record_pacing_signal(RateLimitedSignal(late_url, wait=timedelta(seconds=30)))
+        two_domain_manager.record_pacing_signal(RateLimitedSignal(early_url, wait=timedelta(seconds=10)))
         status = await two_domain_manager.check_readiness()
 
     assert status == WaitingStatus(ready_at=CLOCK_START + timedelta(seconds=10))
@@ -656,14 +684,14 @@ async def test_waits_for_earliest_cooldown(two_domain_manager: ThrottlingRequest
 async def test_empty_cooldown_not_waited(manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """Test that a domain in a cooldown with nothing left to do doesn't keep the manager from finishing."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
-    manager.set_crawl_delay(url, 30)
+    manager.record_pacing_signal(MinIntervalSignal(url, interval=timedelta(seconds=30), scope='hostname'))
     await manager.add_request(url)
 
     request = await manager.fetch_next_request()
     assert request is not None
     await manager.mark_request_as_handled(request)
 
-    assert manager.is_throttled(url)
+    assert manager._domain_states[THROTTLED_DOMAIN].throttled_until > datetime.now(UTC)
     assert (await manager.check_readiness()).status == 'finished'
 
 
@@ -925,11 +953,11 @@ async def test_purge_clears_requests_and_resets_throttle_state(
     """purge should empty inner and sub-managers, reset transient backoff, and preserve domain configuration."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     await manager.add_request(url)
-    manager.record_domain_delay(url)
+    manager.record_pacing_signal(RateLimitedSignal(url))
 
     state = manager._domain_states[THROTTLED_DOMAIN]
     assert state.consecutive_429_count == 1
-    assert manager._is_domain_throttled(THROTTLED_DOMAIN)
+    assert state.throttled_until > datetime.now(UTC)
 
     await manager.purge()
 
@@ -939,7 +967,7 @@ async def test_purge_clears_requests_and_resets_throttle_state(
     assert (await manager.check_readiness()).status == 'finished'
     # Transient backoff state is reset.
     assert state.consecutive_429_count == 0
-    assert not manager._is_domain_throttled(THROTTLED_DOMAIN)
+    assert state.throttled_until <= datetime.now(UTC)
 
 
 async def test_sub_managers_opened_for_every_configured_domain(
@@ -1109,9 +1137,9 @@ async def test_reclaim_routes_to_sub_manager_after_restart(fs_service_locator: S
 
 def make_stalled(manager: ThrottlingRequestManager[Any], clock: MagicMock, url: str) -> None:
     """Rate-limit `url` twice, a full stall window apart, so its domain counts as stalled."""
-    manager.record_domain_delay(url)
+    manager.record_pacing_signal(RateLimitedSignal(url))
     clock.now.return_value += manager._max_domain_stall + timedelta(seconds=1)
-    manager.record_domain_delay(url)
+    manager.record_pacing_signal(RateLimitedSignal(url))
 
 
 async def test_stall_reported_after_window(manager: ThrottlingRequestManager[RequestQueue]) -> None:
@@ -1120,12 +1148,12 @@ async def test_stall_reported_after_window(manager: ThrottlingRequestManager[Req
     await manager.add_request(url)
 
     with _frozen_clock() as clock:
-        manager.record_domain_delay(url)
+        manager.record_pacing_signal(RateLimitedSignal(url))
         ready_at = manager._domain_states[THROTTLED_DOMAIN].throttled_until
         assert await manager.check_readiness() == WaitingStatus(ready_at=ready_at)
 
         clock.now.return_value += manager._max_domain_stall + timedelta(seconds=1)
-        manager.record_domain_delay(url)
+        manager.record_pacing_signal(RateLimitedSignal(url))
         readiness = await manager.check_readiness()
 
     assert readiness.status == 'stalled'
@@ -1139,9 +1167,9 @@ async def test_suppressed_429_extends_stall(manager: ThrottlingRequestManager[Re
     state = manager._domain_states[THROTTLED_DOMAIN]
 
     with _frozen_clock() as clock:
-        manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
+        manager.record_pacing_signal(RateLimitedSignal(url, wait=timedelta(seconds=60)))
         clock.now.return_value += timedelta(seconds=30)
-        manager.record_domain_delay(url)
+        manager.record_pacing_signal(RateLimitedSignal(url))
 
     assert state.consecutive_429_count == 1
     assert state.rate_limited_since == CLOCK_START
@@ -1155,7 +1183,7 @@ async def test_first_429_after_idle_not_stalled(manager: ThrottlingRequestManage
 
     with _frozen_clock() as clock:
         clock.now.return_value += manager._max_domain_stall * 2
-        manager.record_domain_delay(url)
+        manager.record_pacing_signal(RateLimitedSignal(url))
         ready_at = manager._domain_states[THROTTLED_DOMAIN].throttled_until
         assert await manager.check_readiness() == WaitingStatus(ready_at=ready_at)
 
@@ -1166,7 +1194,7 @@ async def test_old_rate_limit_not_stalled(manager: ThrottlingRequestManager[Requ
     await manager.add_request(url)
 
     with _frozen_clock() as clock:
-        manager.record_domain_delay(url)
+        manager.record_pacing_signal(RateLimitedSignal(url))
         clock.now.return_value += manager._max_domain_stall + timedelta(seconds=1)
         assert (await manager.check_readiness()).status == 'ready'
 
@@ -1217,17 +1245,6 @@ async def test_reclaim_keeps_stall(manager: ThrottlingRequestManager[RequestQueu
         assert (await manager.check_readiness()).status == 'stalled'
 
 
-async def test_record_success_keeps_stall(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """`record_success` doesn't reset the stall clock."""
-    url = f'https://{THROTTLED_DOMAIN}/page1'
-    await manager.add_request(url)
-
-    with _frozen_clock() as clock:
-        make_stalled(manager, clock, url)
-        manager.record_success(url)
-        assert (await manager.check_readiness()).status == 'stalled'
-
-
 @pytest.mark.parametrize(
     'ready_url',
     [
@@ -1257,7 +1274,7 @@ async def test_waiting_domain_masks_stall(two_domain_manager: ThrottlingRequestM
 
     with _frozen_clock() as clock:
         make_stalled(two_domain_manager, clock, url)
-        two_domain_manager.record_domain_delay(waiting_url, retry_after=timedelta(seconds=60))
+        two_domain_manager.record_pacing_signal(RateLimitedSignal(waiting_url, wait=timedelta(seconds=60)))
         ready_at = two_domain_manager._domain_states[SECOND_THROTTLED_DOMAIN].throttled_until
         assert await two_domain_manager.check_readiness() == WaitingStatus(ready_at=ready_at)
 
@@ -1271,7 +1288,7 @@ async def test_empty_waiting_domain_does_not_mask_stall(
 
     with _frozen_clock() as clock:
         make_stalled(two_domain_manager, clock, url)
-        two_domain_manager.record_domain_delay(f'https://{SECOND_THROTTLED_DOMAIN}/page1')
+        two_domain_manager.record_pacing_signal(RateLimitedSignal(f'https://{SECOND_THROTTLED_DOMAIN}/page1'))
         readiness = await two_domain_manager.check_readiness()
 
     assert readiness.status == 'stalled'
@@ -1382,6 +1399,37 @@ async def test_max_domain_stall_must_be_positive(
         )
 
 
+@pytest.mark.parametrize(
+    'option',
+    [
+        pytest.param('base_delay', id='base-delay'),
+        pytest.param('max_delay', id='max-delay'),
+    ],
+)
+@pytest.mark.parametrize(
+    'delay',
+    [
+        pytest.param(timedelta(0), id='zero'),
+        pytest.param(timedelta(seconds=-1), id='negative'),
+    ],
+)
+async def test_delays_must_be_positive(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+    option: str,
+    delay: timedelta,
+) -> None:
+    """A non-positive `base_delay` or `max_delay` is rejected."""
+    with pytest.raises(ValueError, match=option):
+        ThrottlingRequestManager(
+            inner_queue,
+            domains=TEST_DOMAINS,
+            request_manager_opener=RequestQueue.open,
+            service_locator=service_locator,
+            **{option: delay},
+        )
+
+
 async def test_inner_request_migrates_while_throttled(
     manager: ThrottlingRequestManager[RequestQueue],
     inner_queue: RequestQueue,
@@ -1389,7 +1437,7 @@ async def test_inner_request_migrates_while_throttled(
     """An inner request whose domain is in a cooldown moves into the domain's sub-manager instead of being fetched."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     await inner_queue.add_request(url)
-    manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
+    manager.record_pacing_signal(RateLimitedSignal(url, wait=timedelta(seconds=60)))
 
     assert await manager.fetch_next_request() is None
 
@@ -1424,7 +1472,7 @@ async def test_migrated_copy_is_unhandled(
     await inner_queue.add_request(url)
 
     with _frozen_clock() as clock:
-        manager.record_domain_delay(url)
+        manager.record_pacing_signal(RateLimitedSignal(url))
         assert await manager.fetch_next_request() is None
 
         clock.now.return_value = manager._domain_states[THROTTLED_DOMAIN].throttled_until
@@ -1441,7 +1489,7 @@ async def test_migration_count_is_capped(
 ) -> None:
     """One fetch moves at most `_MAX_INNER_MIGRATIONS` requests out of inner."""
     await inner_queue.add_requests([f'https://{THROTTLED_DOMAIN}/page{i}' for i in range(3)])
-    manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/', retry_after=timedelta(seconds=60))
+    manager.record_pacing_signal(RateLimitedSignal(f'https://{THROTTLED_DOMAIN}/', wait=timedelta(seconds=60)))
 
     with patch(f'{MANAGER_MODULE}._MAX_INNER_MIGRATIONS', 2):
         assert await manager.fetch_next_request() is None
@@ -1467,7 +1515,7 @@ async def test_migration_failure_reclaims_request(
     """A request whose migration fails goes back to inner before the error is raised."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     await inner_queue.add_request(url)
-    manager.record_domain_delay(url, retry_after=timedelta(seconds=60))
+    manager.record_pacing_signal(RateLimitedSignal(url, wait=timedelta(seconds=60)))
     await manager._ensure_sub_managers()
 
     sub_manager = manager._sub_managers[THROTTLED_DOMAIN]

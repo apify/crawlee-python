@@ -17,7 +17,7 @@ from datetime import UTC, datetime, timedelta
 from itertools import product
 from multiprocessing import get_context
 from typing import TYPE_CHECKING, Any, Literal, cast
-from unittest.mock import ANY, AsyncMock, Mock, call, patch
+from unittest.mock import ANY, AsyncMock, Mock, call, create_autospec, patch
 
 import pytest
 
@@ -40,7 +40,10 @@ from crawlee.errors import (
 from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
 from crawlee.http_clients import HttpClient
 from crawlee.request_loaders import (
+    MinIntervalSignal,
+    RateLimitedSignal,
     RequestList,
+    RequestManager,
     RequestManagerTandem,
     RequestSourceStatus,
     StalledStatus,
@@ -2905,42 +2908,62 @@ async def test_global_and_local_event_manager_in_crawler_run() -> None:
     assert global_event_manager.active is False
 
 
-async def test_warn_no_throttling_manager_once_on_429(caplog: pytest.LogCaptureFixture) -> None:
-    """A 429 from a crawler without ThrottlingRequestManager logs a recommendation, only once per instance."""
-    crawler = BasicCrawler(configure_logging=False)
-    with caplog.at_level(logging.WARNING, logger='crawlee'):
-        crawler._record_rate_limit_status_code(429, request_url='https://a.test/')
-        crawler._record_rate_limit_status_code(429, request_url='https://b.test/')
-
-    matching = [
-        r for r in caplog.records if 'ThrottlingRequestManager' in r.getMessage() and 'HTTP 429' in r.getMessage()
-    ]
-    assert len(matching) == 1
-
-
-async def test_warn_unconfigured_throttle_domain_once_per_domain(caplog: pytest.LogCaptureFixture) -> None:
-    """A 429 from a domain not in `ThrottlingRequestManager.domains` logs once per domain; repeats are suppressed."""
-    inner = await RequestQueue.open(name='test-inner-warn', storage_client=MemoryStorageClient())
-    throttler = ThrottlingRequestManager(
-        inner,
-        domains=['only-this.test'],
-        request_manager_opener=RequestQueue.open,
-    )
-    crawler = BasicCrawler(configure_logging=False, request_manager=throttler)
+@pytest.mark.parametrize(
+    'use_throttler',
+    [
+        pytest.param(False, id='no-manager'),
+        pytest.param(True, id='unconfigured-domain'),
+    ],
+)
+async def test_unpaced_429_warns_once(caplog: pytest.LogCaptureFixture, *, use_throttler: bool) -> None:
+    """A 429 the request manager doesn't pace logs a warning once per domain."""
+    request_manager: ThrottlingRequestManager[RequestQueue] | None = None
+    if use_throttler:
+        inner = await RequestQueue.open(name='test-inner-warn', storage_client=MemoryStorageClient())
+        request_manager = ThrottlingRequestManager(
+            inner, domains=['only-this.test'], request_manager_opener=RequestQueue.open
+        )
+    crawler = BasicCrawler(configure_logging=False, request_manager=request_manager)
 
     with caplog.at_level(logging.WARNING, logger='crawlee'):
         crawler._record_rate_limit_status_code(429, request_url='https://A.example.com/page1')
         crawler._record_rate_limit_status_code(429, request_url='https://a.example.com/page2')
         crawler._record_rate_limit_status_code(429, request_url='https://other.example.com/page1')
 
-    matching = [
-        r
-        for r in caplog.records
-        if 'not in the' in r.getMessage() and 'ThrottlingRequestManager.domains' in r.getMessage()
-    ]
+    matching = [r for r in caplog.records if 'does not pace that domain' in r.getMessage()]
     assert len(matching) == 2
     assert any('a.example.com' in r.getMessage() for r in matching)
     assert any('other.example.com' in r.getMessage() for r in matching)
+
+
+async def test_429_reports_requested_wait() -> None:
+    """A 429 is reported to the request manager with the wait from its `Retry-After` header."""
+    request_manager = create_autospec(RequestManager, instance=True, spec_set=True)
+    request_manager.record_pacing_signal.return_value = True
+    crawler = BasicCrawler(configure_logging=False, request_manager=request_manager)
+    url = 'https://a.example.com/page1'
+
+    assert crawler._record_rate_limit_status_code(429, request_url=url, retry_after_header='30') is True
+    request_manager.record_pacing_signal.assert_called_once_with(RateLimitedSignal(url, wait=timedelta(seconds=30)))
+
+
+async def test_unpaced_crawl_delay_warns_once(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A robots.txt crawl-delay the request manager doesn't pace logs a warning once per domain."""
+    crawler = BasicCrawler(configure_logging=False, respect_robots_txt_file=True)
+    robots_txt_file = Mock(spec=RobotsTxtFile)
+    robots_txt_file.get_crawl_delay.return_value = 5
+    robots_txt_file.is_allowed.return_value = True
+    monkeypatch.setattr(crawler, '_get_robots_txt_file_for_url', AsyncMock(return_value=robots_txt_file))
+
+    with caplog.at_level(logging.WARNING, logger='crawlee'):
+        for url in ['https://a.example.com/page1', 'https://a.example.com/page2', 'https://b.example.com/page1']:
+            await crawler._is_allowed_based_on_robots_txt_file(url)
+
+    matching = [r for r in caplog.records if 'defines a crawl-delay' in r.getMessage()]
+    assert len(matching) == 2
 
 
 async def test_crawl_waits_out_backoff() -> None:
@@ -2968,7 +2991,7 @@ async def test_crawl_waits_out_backoff() -> None:
     async def handler(context: BasicCrawlingContext) -> None:
         dispatched_at.append(time.monotonic())
         if len(dispatched_at) == 1:
-            throttler.record_domain_delay(context.request.url, retry_after=timedelta(milliseconds=500))
+            throttler.record_pacing_signal(RateLimitedSignal(context.request.url, wait=timedelta(milliseconds=500)))
             statuses_during_cooldown.append(await throttler.check_readiness())
 
     await crawler.run(['https://throttled.placeholder.com/a', 'https://throttled.placeholder.com/b'])
@@ -3008,7 +3031,7 @@ async def open_throttler() -> ThrottlingRequestManager[RequestQueue]:
 
 
 async def test_handler_raised_throttled_error_is_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A `RequestThrottledError` from the handler costs neither a retry nor session reputation."""
+    """A `RequestThrottledError` from the handler starts a backoff without costing a retry or session reputation."""
     throttler = await open_throttler_held_until_reclaim(monkeypatch)
     failed_request_handler = AsyncMock()
     crawler = BasicCrawler(
@@ -3017,25 +3040,20 @@ async def test_handler_raised_throttled_error_is_deferred(monkeypatch: pytest.Mo
         max_request_retries=0,
     )
     crawler.failed_request_handler(failed_request_handler)
-    contexts = list[BasicCrawlingContext]()
-
-    @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
-        contexts.append(context)
-        if len(contexts) == 1:
-            throttler.record_domain_delay(context.request.url)
-            raise RequestThrottledError
+    handler = AsyncMock(side_effect=[RequestThrottledError, None])
+    crawler.router.default_handler(handler)
 
     stats = await crawler.run([THROTTLED_URL])
 
-    assert len(contexts) == 2
+    assert handler.await_count == 2
     failed_request_handler.assert_not_called()
-    assert contexts[1].request.retry_count == 0
+    context = handler.call_args.args[0]
+    assert context.request.retry_count == 0
     assert stats.requests_finished == 1
     assert stats.requests_failed == 0
-    session = contexts[1].session
-    assert session is not None
-    assert session.error_score == 0
+    assert context.session is not None
+    assert context.session.error_score == 0
+    assert throttler._domain_states['throttled.placeholder.com'].consecutive_429_count == 1
 
 
 async def test_deferred_request_is_reclaimed_to_the_front(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -3050,7 +3068,6 @@ async def test_deferred_request_is_reclaimed_to_the_front(monkeypatch: pytest.Mo
     async def handler(context: BasicCrawlingContext) -> None:
         handled.append(context.request)
         if len(handled) == 1:
-            throttler.record_domain_delay(context.request.url)
             raise RequestThrottledError
 
     await crawler.run([THROTTLED_URL])
@@ -3062,7 +3079,7 @@ async def test_deferred_request_is_reclaimed_to_the_front(monkeypatch: pytest.Mo
 @pytest.mark.parametrize(
     'use_throttler',
     [
-        pytest.param(True, id='no-recorded-delay'),
+        pytest.param(True, id='unconfigured-domain'),
         pytest.param(False, id='no-throttler'),
     ],
 )
@@ -3071,8 +3088,13 @@ async def test_throttled_error_without_backoff_is_ordinary_error(
     *,
     use_throttler: bool,
 ) -> None:
-    """A `RequestThrottledError` whose domain nothing holds back is retried and failed like any other error."""
-    request_manager = await open_throttler() if use_throttler else None
+    """A `RequestThrottledError` whose domain nothing paces is retried and failed like any other error."""
+    request_manager: ThrottlingRequestManager[RequestQueue] | None = None
+    if use_throttler:
+        inner = await RequestQueue.open()
+        request_manager = ThrottlingRequestManager(
+            inner, domains=['other.placeholder.com'], request_manager_opener=RequestQueue.open
+        )
     failed_request_handler = AsyncMock()
     crawler = BasicCrawler(request_manager=request_manager, max_request_retries=1)
     crawler.failed_request_handler(failed_request_handler)
@@ -3085,7 +3107,52 @@ async def test_throttled_error_without_backoff_is_ordinary_error(
     assert handler.await_count == 2
     failed_request_handler.assert_called_once()
     assert stats.requests_failed == 1
-    assert any('no `ThrottlingRequestManager` holds its domain back' in record.message for record in caplog.records)
+    assert any('does not pace its domain' in record.message for record in caplog.records)
+
+
+async def test_pacing_failure_is_ordinary_error(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A request manager that fails to record a rate limit doesn't end the crawl, and the error is retried as usual."""
+    queue = await RequestQueue.open()
+    monkeypatch.setattr(queue, 'record_pacing_signal', Mock(side_effect=RuntimeError('pacing failed')))
+    failed_request_handler = AsyncMock()
+    crawler = BasicCrawler(request_manager=queue, max_request_retries=1)
+    crawler.failed_request_handler(failed_request_handler)
+    handler = AsyncMock(side_effect=RequestThrottledError)
+    crawler.router.default_handler(handler)
+
+    stats = await crawler.run([THROTTLED_URL])
+
+    assert handler.await_count == 2
+    failed_request_handler.assert_called_once()
+    assert stats.requests_failed == 1
+    assert any(
+        record.levelno == logging.ERROR and 'failed to record a rate limit' in record.message
+        for record in caplog.records
+    )
+
+
+@pytest.mark.parametrize(
+    'wrap_in_tandem',
+    [
+        pytest.param(False, id='direct'),
+        pytest.param(True, id='tandem'),
+    ],
+)
+async def test_robots_crawl_delay_reaches_throttler(monkeypatch: pytest.MonkeyPatch, *, wrap_in_tandem: bool) -> None:
+    """A robots.txt crawl-delay reaches the throttler, also when it's wrapped in a `RequestManagerTandem`."""
+    throttler = await open_throttler()
+    request_manager = RequestManagerTandem(RequestList(), throttler) if wrap_in_tandem else throttler
+    crawler = BasicCrawler(request_manager=request_manager, respect_robots_txt_file=True)
+    robots_txt_file = Mock(spec=RobotsTxtFile)
+    robots_txt_file.get_crawl_delay.return_value = 5
+    robots_txt_file.is_allowed.return_value = True
+    monkeypatch.setattr(crawler, '_get_robots_txt_file_for_url', AsyncMock(return_value=robots_txt_file))
+
+    assert await crawler._is_allowed_based_on_robots_txt_file(THROTTLED_URL)
+    assert throttler._domain_states['throttled.placeholder.com'].crawl_delay == timedelta(seconds=5)
 
 
 async def test_keep_alive_ignores_stall() -> None:
@@ -3096,7 +3163,6 @@ async def test_keep_alive_ignores_stall() -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        throttler.record_domain_delay(context.request.url)
         raise RequestThrottledError
 
     async def stop_after_stall() -> None:
@@ -3133,7 +3199,6 @@ async def test_stall_waits_for_in_flight_work() -> None:
         if len(visited) > MAX_HANDLER_CALLS:
             crawler.stop()
         if context.request.url == THROTTLED_URL:
-            throttler.record_domain_delay(context.request.url)
             raise RequestThrottledError
         # The slow request belongs to the stalled domain, since a request in progress elsewhere would keep the stall
         # from being reported.
@@ -3176,7 +3241,6 @@ async def test_max_requests_per_crawl_precedes_stall() -> None:
         if calls > MAX_HANDLER_CALLS:
             crawler.stop()
         if context.request.url == THROTTLED_URL:
-            throttler.record_domain_delay(context.request.url)
             raise RequestThrottledError
         # This request keeps the stall from being reported while in flight, so watch the stall clock. It's of another
         # domain, so handling it doesn't reset that clock and the stall is live once the limit is reached.
@@ -3203,7 +3267,7 @@ async def test_stall_waits_for_paced_domain() -> None:
         max_delay=timedelta(milliseconds=100),
         max_domain_stall=MAX_DOMAIN_STALL,
     )
-    throttler.set_crawl_delay(paced_urls[0], 1)
+    throttler.record_pacing_signal(MinIntervalSignal(paced_urls[0], interval=timedelta(seconds=1), scope='hostname'))
     crawler = BasicCrawler(request_manager=throttler)
     visited = list[str]()
 
@@ -3214,7 +3278,6 @@ async def test_stall_waits_for_paced_domain() -> None:
         if len(visited) > 200:
             crawler.stop()
         if context.request.url == THROTTLED_URL:
-            throttler.record_domain_delay(context.request.url)
             raise RequestThrottledError
 
     with pytest.raises(PersistentRateLimitError):
@@ -3248,7 +3311,6 @@ async def test_inner_held_429_is_deferred_and_stalls() -> None:
         calls += 1
         if calls > MAX_HANDLER_CALLS:
             crawler.stop()
-        throttler.record_domain_delay(context.request.url)
         raise RequestThrottledError
 
     with pytest.raises(PersistentRateLimitError):
@@ -3278,7 +3340,6 @@ async def test_deferral_not_counted_as_retry(
         if outcome == 'error':
             raise RuntimeError('Handler failed')
         if outcome == '429':
-            throttler.record_domain_delay(context.request.url)
             raise RequestThrottledError
 
     stats = await crawler.run([THROTTLED_URL])

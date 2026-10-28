@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients.models import ProcessedRequest
 
-    from ._types import RequestSourceStatus
+    from ._types import PacingScope, PacingSignal, RequestSourceStatus
 
 logger = getLogger(__name__)
 
@@ -61,14 +61,13 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     right now, it returns `None` rather than waiting, so the caller's task slot is released. `check_readiness()` then
     reports the crawl as waiting until the earliest cooldown ends, so it idles instead of ending early.
 
-    Delay sources:
-    - HTTP 429 responses (via `record_domain_delay`)
-    - robots.txt crawl-delay directives (via `set_crawl_delay`)
+    The crawler reports HTTP 429 responses and robots.txt crawl-delay directives through `record_pacing_signal`, which
+    wrapping managers such as `RequestManagerTandem` forward, so the throttler paces its domains wherever it sits.
 
     The class is generic over the wrapped manager type. The first asynchronous operation opens one sub-manager per
     configured domain through `request_manager_opener`, so all of them share the subclass and backing store of `inner`;
-    the synchronous delay methods never open anything. The opener must accept `alias`, `storage_client`, and
-    `configuration` keyword arguments (as `RequestQueue.open` does) and return the same concrete subclass as `inner`.
+    `record_pacing_signal` never opens anything. The opener must accept `alias`, `storage_client`, and `configuration`
+    keyword arguments (as `RequestQueue.open` does) and return the same concrete subclass as `inner`.
 
     Requests a previous run left in a persistent store become visible again at open. The default `purge_on_start=True`
     empties them; `purge_on_start=False` resumes them. Named stores are exempt from that purge and aliased ones are not,
@@ -118,16 +117,23 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 concrete subclass as `inner` (e.g. `RequestQueue.open` when `inner` is a `RequestQueue`).
             service_locator: Service locator for creating sub-managers. If not provided, defaults to the global service
                 locator, ensuring consistency with the crawler's storage backend.
-            base_delay: Initial delay after the first 429 response from a domain.
-            max_delay: Maximum delay between requests to a rate-limited domain.
+            base_delay: Initial delay after the first 429 response from a domain. Must be positive.
+            max_delay: Maximum delay between requests to a rate-limited domain. Must be positive.
             max_domain_stall: How long a domain may rate-limit every request before the crawler raises
                 `PersistentRateLimitError`. A crawler running with `keep_alive` never raises it. The crawler checks
                 for a stall about twice a second, so a window under a second may not be detected.
 
         Raises:
             ValueError: If a non-blank entry of `domains` does not yield a hostname a crawled URL could match, or if
-                `max_domain_stall` is not positive.
+                `base_delay`, `max_delay` or `max_domain_stall` is not positive.
         """
+        # A zero delay would let the crawler defer a rate-limited request and dispatch it again at once.
+        if base_delay <= timedelta(0):
+            raise ValueError(f'base_delay must be positive, got {base_delay}.')
+
+        if max_delay <= timedelta(0):
+            raise ValueError(f'max_delay must be positive, got {max_delay}.')
+
         if max_domain_stall <= timedelta(0):
             raise ValueError(f'max_domain_stall must be positive, got {max_domain_stall}.')
 
@@ -382,22 +388,49 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         return probed
 
-    def record_domain_delay(self, url: str, *, retry_after: timedelta | None = None) -> bool:
-        """Record a 429 Too Many Requests response for the domain of the given URL.
+    @override
+    def record_pacing_signal(self, signal: PacingSignal) -> bool:
+        """Record a pacing signal for the domain of its URL.
 
-        Advances the consecutive 429 count and calculates the next allowed request time using exponential backoff or
-        the `Retry-After` value. Only the first 429 of a burst advances the count, so the delay tracks how hard the
-        domain pushes back, not how many requests were in flight. Every call, including a manual one or a 429 inside a
-        burst, also starts or extends the domain's stall clock.
-
-        Args:
-            url: The URL that received a 429 response.
-            retry_after: Optional delay from the `Retry-After` header. If it describes a positive delay, it takes
-                priority over the calculated exponential backoff.
+        A `RateLimitedSignal` backs the domain off for the signal's `wait` if it's positive, and exponentially from
+        `base_delay` otherwise. Only the first refusal of a burst advances the backoff. A `MinIntervalSignal` becomes
+        the domain's crawl-delay. The first one wins, so a robots.txt re-fetch can't change the dispatch cadence
+        mid-crawl.
 
         Returns:
-            True if the URL's domain is configured for throttling, whether or not this 429 advanced the backoff; False
-            if the domain is not in the configured `domains` list, in which case the call is a no-op.
+            `True` if the URL's domain is in `domains`, so the manager paces it by the signal. `False` if the domain
+                isn't in `domains` or the signal's `reason` isn't one this manager handles, in which case the call is a
+                no-op.
+
+        Raises:
+            ValueError: If the signal's `scope` is wider than a hostname, or one this manager doesn't know.
+        """
+        if signal.reason == 'rate_limited':
+            self._check_scope(signal.scope)
+            return self._record_rate_limit(signal.url, signal.wait)
+
+        if signal.reason == 'min_interval':
+            self._check_scope(signal.scope)
+            return self._record_declared_interval(signal.url, signal.interval)
+
+        return False
+
+    @staticmethod
+    def _check_scope(scope: PacingScope | None) -> None:
+        """Raise unless a signal scoped to `scope` can be honored as declared or wider."""
+        # No scope means the reporter can't tell how far the signal reaches, so the hostname grouping is as good as any.
+        if scope is None or scope == 'hostname':
+            return
+
+        raise ValueError(
+            f'Cannot honor a pacing signal scoped to "{scope}": this manager paces by hostname, so it would leave part '
+            f'of what the signal covers unpaced. Pace by "{scope}" with a request manager that groups requests by it.'
+        )
+
+    def _record_rate_limit(self, url: str, wait: timedelta | None) -> bool:
+        """Put the URL's domain into a backoff after a refusal, doubling from `base_delay` while it keeps refusing.
+
+        Every call, including one inside a burst, also starts or extends the domain's stall clock.
         """
         state = self._get_domain_state(url)
         if state is None:
@@ -413,10 +446,6 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         # advances the exponent. Checking `crawl_delay_until` too would swallow every 429, as it is armed on every
         # dispatch.
         if now < state.backoff_until:
-            logger.debug(
-                f'Ignoring an HTTP 429 from domain "{state.domain}" received during an active backoff '
-                f'(consecutive: {state.consecutive_429_count}).'
-            )
             return True
 
         # The domain has been quiet for a full extra window, so this 429 opens a new run instead of continuing the old.
@@ -425,10 +454,10 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         state.consecutive_429_count += 1
 
-        # A non-positive `Retry-After` is no delay at all, so fall back to the backoff and let it engage.
-        if retry_after is not None and retry_after > timedelta(0):
-            delay = retry_after
-            source = 'Retry-After header'
+        # A non-positive wait is no delay at all, so fall back to the backoff and let it engage.
+        if wait is not None and wait > timedelta(0):
+            delay = wait
+            source = 'requested wait'
         else:
             delay = self._base_delay * 2 ** min(state.consecutive_429_count - 1, _MAX_BACKOFF_EXPONENT)
             source = 'exponential backoff'
@@ -449,44 +478,17 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         )
         return True
 
-    def record_success(self, url: str) -> None:
-        """Reset a domain's consecutive 429 count, so the next 429 starts the backoff over at `base_delay`.
-
-        An active backoff window is not lifted. The manager does not call this itself; the count decays on its own once
-        the domain has stopped rate-limiting for a full extra window. It doesn't affect the stall clock.
-
-        Args:
-            url: The URL that received a successful response.
-        """
+    def _record_declared_interval(self, url: str, interval: timedelta) -> bool:
+        """Record a declared minimum interval as the crawl-delay of the URL's domain, unless it already has one."""
         state = self._get_domain_state(url)
-        if state is not None and state.consecutive_429_count > 0:
-            logger.debug(f'Resetting rate limit state for domain "{state.domain}" after successful request')
-            state.consecutive_429_count = 0
+        if state is None:
+            return False
 
-    def is_throttled(self, url: str) -> bool:
-        """Check whether the URL's domain is in a cooldown, so requests to it are held back.
+        if state.crawl_delay is None:
+            state.crawl_delay = interval
+            logger.debug(f'Set crawl-delay for domain "{state.domain}" to {interval.total_seconds():.1f}s')
 
-        Args:
-            url: A URL from the domain to check.
-        """
-        return self._is_domain_throttled(self._extract_domain(url))
-
-    def set_crawl_delay(self, url: str, delay_seconds: int) -> None:
-        """Set the robots.txt crawl-delay for a domain.
-
-        The delay is locked once set so robots.txt re-fetches (e.g. after LRU eviction) can't change the in-flight
-        dispatch cadence and cause oscillation mid-crawl. Subsequent calls for the same domain are no-ops.
-
-        Args:
-            url: A URL from the domain to throttle.
-            delay_seconds: The crawl-delay value in seconds.
-        """
-        state = self._get_domain_state(url)
-        if state is None or state.crawl_delay is not None:
-            return
-
-        state.crawl_delay = timedelta(seconds=delay_seconds)
-        logger.debug(f'Set crawl-delay for domain "{state.domain}" to {delay_seconds}s')
+        return True
 
     @staticmethod
     def _normalize_domain(hostname: str) -> str:
@@ -601,13 +603,6 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         await self._inner.mark_request_as_handled(request)
         self._migrated_from_inner += 1
-
-    def _is_domain_throttled(self, domain: str) -> bool:
-        """Check if a domain is currently throttled."""
-        state = self._domain_states.get(domain)
-        if state is None:
-            return False
-        return datetime.now(UTC) < state.throttled_until
 
     def _fetchable_domains(self) -> list[str]:
         """Return the configured domains that are not in a cooldown right now, longest-overdue first."""

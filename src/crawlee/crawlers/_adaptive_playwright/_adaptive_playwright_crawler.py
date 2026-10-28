@@ -401,7 +401,7 @@ class AdaptivePlaywrightCrawler(
                 if (
                     isinstance(static_run.exception, (ContextPipelineInitializationError, RequestHandlerError))
                     and isinstance(static_run.exception.wrapped_exception, RequestThrottledError)
-                    and self._is_held_back(context.request)
+                    and await self._report_rate_limit(context.request)
                 ):
                     raise static_run.exception
                 if static_run.exception:
