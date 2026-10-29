@@ -19,7 +19,7 @@ We drop support for Python 3.10, which reached its end of life in October 2026. 
 
 ## `StatisticsState.crawler_runtime_for_serialization` is removed
 
-`StatisticsState.crawler_runtime_for_serialization` is removed, and the persisted `crawlerRuntimeMillis` value is a number of milliseconds instead of an ISO 8601 duration string. Read the runtime from the `crawler_runtime` property instead.
+`StatisticsState.crawler_runtime_for_serialization` is removed, and the persisted `crawlerRuntimeMillis` value is a number of milliseconds instead of an ISO 8601 duration string. Read the runtime from the `crawler_runtime` property instead. Statistics persisted by v1 are still restored.
 
 ## `RequestQueueClient.is_finished` is abstract
 
