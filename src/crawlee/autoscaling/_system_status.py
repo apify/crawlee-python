@@ -96,8 +96,8 @@ class SystemStatus:
             else:
                 hint = (
                     f'it is the name of a built-in signal. To replace that signal, switch it off with '
-                    f'`LoadSignalsOptions({option_key}=False)` and keep your implementation in `custom`. To run yours '
-                    f'alongside it, give it a different name.'
+                    f'`LoadSignalsOptions({option_key}=False)` and keep a single implementation in `custom`. To run '
+                    f'yours alongside it, give it a different name.'
                 )
 
             raise ValueError(f'Duplicate load signal name {signal.name!r}: {hint}')
