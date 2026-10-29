@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
     from crawlee import Request
     from crawlee.request_loaders import RequestLoader
-    from crawlee.storage_clients.models import ProcessedRequest
+    from crawlee.storage_backends.models import ProcessedRequest
 
 
 logger = getLogger(__name__)

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, TypeVar
 from weakref import WeakValueDictionary
 
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
-from crawlee.storage_clients._base import DatasetClient, KeyValueStoreClient, RequestQueueClient
+from crawlee.storage_backends._base import DatasetBackend, KeyValueStoreBackend, RequestQueueBackend
 
 from ._utils import validate_storage_alias, validate_storage_name
 
@@ -62,8 +62,8 @@ class _StorageCache:
                         del self.by_alias[storage_type][alias_key][additional_key]
 
 
-ClientOpenerCoro = Coroutine[None, None, DatasetClient | KeyValueStoreClient | RequestQueueClient]
-"""Type alias for the client opener function."""
+BackendOpenerCoro = Coroutine[None, None, DatasetBackend | KeyValueStoreBackend | RequestQueueBackend]
+"""Type alias for the backend opener function."""
 
 
 class StorageInstanceManager:
@@ -87,8 +87,8 @@ class StorageInstanceManager:
         id: str | None,
         name: str | None,
         alias: str | None,
-        client_opener_coro: ClientOpenerCoro,
-        storage_client_cache_key: Hashable = '',
+        backend_opener_coro: BackendOpenerCoro,
+        storage_backend_cache_key: Hashable = '',
     ) -> T:
         """Open a storage instance with caching support.
 
@@ -99,8 +99,8 @@ class StorageInstanceManager:
                 the digits "0" through "9", and the hyphen ("-") but only in the middle of the string
                 (e.g. "my-value-1").
             alias: Storage alias (run scope, creates unnamed storage).
-            client_opener_coro: Coroutine to open the storage client when storage instance not found in cache.
-            storage_client_cache_key: Additional optional key from storage client to differentiate cache entries.
+            backend_opener_coro: Coroutine to open the storage backend when storage instance not found in cache.
+            storage_backend_cache_key: Additional optional key from storage backend to differentiate cache entries.
 
         Returns:
             The storage instance.
@@ -127,7 +127,7 @@ class StorageInstanceManager:
                 id=id,
                 name=name,
                 alias=alias,
-                storage_client_cache_key=storage_client_cache_key,
+                storage_backend_cache_key=storage_backend_cache_key,
             ):
                 return cached_instance
 
@@ -140,7 +140,7 @@ class StorageInstanceManager:
                 validate_storage_alias(alias)
 
             # Acquire lock for this opener
-            opener_lock_key = (cls, str(id or name or alias), storage_client_cache_key)
+            opener_lock_key = (cls, str(id or name or alias), storage_backend_cache_key)
             if not (lock := self._opener_locks.get(opener_lock_key)):
                 lock = Lock()
                 self._opener_locks[opener_lock_key] = lock
@@ -153,7 +153,7 @@ class StorageInstanceManager:
                     id=id,
                     name=name,
                     alias=alias,
-                    storage_client_cache_key=storage_client_cache_key,
+                    storage_backend_cache_key=storage_backend_cache_key,
                 ):
                     return cached_instance
 
@@ -162,16 +162,16 @@ class StorageInstanceManager:
                     cls,
                     name=name,
                     alias=alias,
-                    storage_client_cache_key=storage_client_cache_key,
+                    storage_backend_cache_key=storage_backend_cache_key,
                 )
 
                 # Create new instance
-                client: KeyValueStoreClient | DatasetClient | RequestQueueClient
-                client = await client_opener_coro
+                backend: KeyValueStoreBackend | DatasetBackend | RequestQueueBackend
+                backend = await backend_opener_coro
 
-                metadata = await client.get_metadata()
+                metadata = await backend.get_metadata()
 
-                instance = cls(client, metadata.id, metadata.name)  # ty: ignore[too-many-positional-arguments]
+                instance = cls(backend, metadata.id, metadata.name)  # ty: ignore[too-many-positional-arguments]
                 instance_name = getattr(instance, 'name', None)
 
                 # Cache the instance.
@@ -179,22 +179,22 @@ class StorageInstanceManager:
                 # atomically to ensure pre-checks outside the lock see consistent state.
 
                 # Always cache by id.
-                self._cache.by_id[cls][instance.id][storage_client_cache_key] = instance
+                self._cache.by_id[cls][instance.id][storage_backend_cache_key] = instance
 
                 # Cache named storage.
                 if instance_name is not None:
-                    self._cache.by_name[cls][instance_name][storage_client_cache_key] = instance
+                    self._cache.by_name[cls][instance_name][storage_backend_cache_key] = instance
 
                 # Cache unnamed storage.
                 if alias is not None:
-                    self._cache.by_alias[cls][alias][storage_client_cache_key] = instance
+                    self._cache.by_alias[cls][alias][storage_backend_cache_key] = instance
 
                 return instance
 
         finally:
-            # Make sure the client opener is closed.
+            # Make sure the backend opener is closed.
             # If it was awaited, then closing is no operation, if it was not awaited, this is the cleanup.
-            client_opener_coro.close()
+            backend_opener_coro.close()
 
     def remove_from_cache(self, storage_instance: Storage) -> None:
         """Remove a storage instance from the cache.
@@ -215,20 +215,20 @@ class StorageInstanceManager:
         id: str | None = None,
         name: str | None = None,
         alias: str | None = None,
-        storage_client_cache_key: Hashable = '',
+        storage_backend_cache_key: Hashable = '',
     ) -> T | None:
         """Get a storage instance from the cache."""
-        if id is not None and (cached_instance := self._cache.by_id[cls][id].get(storage_client_cache_key)):
+        if id is not None and (cached_instance := self._cache.by_id[cls][id].get(storage_backend_cache_key)):
             if isinstance(cached_instance, cls):
                 return cached_instance
             raise RuntimeError('Cached instance type mismatch.')
 
-        if name is not None and (cached_instance := self._cache.by_name[cls][name].get(storage_client_cache_key)):
+        if name is not None and (cached_instance := self._cache.by_name[cls][name].get(storage_backend_cache_key)):
             if isinstance(cached_instance, cls):
                 return cached_instance
             raise RuntimeError('Cached instance type mismatch.')
 
-        if alias is not None and (cached_instance := self._cache.by_alias[cls][alias].get(storage_client_cache_key)):
+        if alias is not None and (cached_instance := self._cache.by_alias[cls][alias].get(storage_backend_cache_key)):
             if isinstance(cached_instance, cls):
                 return cached_instance
             raise RuntimeError('Cached instance type mismatch.')
@@ -241,16 +241,16 @@ class StorageInstanceManager:
         *,
         name: str | None = None,
         alias: str | None = None,
-        storage_client_cache_key: Hashable = '',
+        storage_backend_cache_key: Hashable = '',
     ) -> None:
         """Check for conflicts between named and alias storages."""
-        if alias and (self._cache.by_name[cls][alias].get(storage_client_cache_key)):
+        if alias and (self._cache.by_name[cls][alias].get(storage_backend_cache_key)):
             raise ValueError(
                 f'Cannot create alias storage "{alias}" because a named storage with the same name already exists. '
                 f'Use a different alias or drop the existing named storage first.'
             )
 
-        if name and (self._cache.by_alias[cls][name].get(storage_client_cache_key)):
+        if name and (self._cache.by_alias[cls][name].get(storage_backend_cache_key)):
             raise ValueError(
                 f'Cannot create named storage "{name}" because an alias storage with the same name already exists. '
                 f'Use a different name or drop the existing alias storage first.'

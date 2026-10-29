@@ -19,7 +19,7 @@ const GROUP_ORDER = [
     'Request loaders',
     'Session management',
     'Statistics',
-    'Storage clients',
+    'Storage backends',
     'Storage data',
     'Storages',
     'Other',

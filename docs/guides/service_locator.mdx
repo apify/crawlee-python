@@ -11,21 +11,21 @@ import TabItem from '@theme/TabItem';
 import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
 import ServiceLocatorConfiguration from '!!raw-loader!roa-loader!./code_examples/service_locator/service_locator_configuration.py';
-import ServiceLocatorStorageClient from '!!raw-loader!roa-loader!./code_examples/service_locator/service_locator_storage_client.py';
+import ServiceLocatorStorageBackend from '!!raw-loader!roa-loader!./code_examples/service_locator/service_locator_storage_backend.py';
 import ServiceLocatorEventManager from '!!raw-loader!roa-loader!./code_examples/service_locator/service_locator_event_manager.py';
 
 import ServiceCrawlerConfiguration from '!!raw-loader!roa-loader!./code_examples/service_locator/service_crawler_configuration.py';
-import ServiceCrawlerStorageClient from '!!raw-loader!roa-loader!./code_examples/service_locator/service_crawler_storage_client.py';
+import ServiceCrawlerStorageBackend from '!!raw-loader!roa-loader!./code_examples/service_locator/service_crawler_storage_backend.py';
 import ServiceCrawlerEventManager from '!!raw-loader!roa-loader!./code_examples/service_locator/service_crawler_event_manager.py';
 
 import ServiceStorageConfiguration from '!!raw-loader!roa-loader!./code_examples/service_locator/service_storage_configuration.py';
-import ServiceStorageStorageClient from '!!raw-loader!roa-loader!./code_examples/service_locator/service_storage_storage_client.py';
+import ServiceStorageStorageBackend from '!!raw-loader!roa-loader!./code_examples/service_locator/service_storage_storage_backend.py';
 
 import ServiceConflicts from '!!raw-loader!roa-loader!./code_examples/service_locator/service_conflicts.py';
 
 The <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> is a central registry for global services. It manages and provides access to these services throughout the framework, ensuring their consistent configuration and across all components.
 
-The service locator manages three core services: <ApiLink to="class/Configuration">`Configuration`</ApiLink>, <ApiLink to="class/EventManager">`EventManager`</ApiLink>, and <ApiLink to="class/StorageClient">`StorageClient`</ApiLink>. All services are initialized lazily with defaults when first accessed.
+The service locator manages three core services: <ApiLink to="class/Configuration">`Configuration`</ApiLink>, <ApiLink to="class/EventManager">`EventManager`</ApiLink>, and <ApiLink to="class/StorageBackend">`StorageBackend`</ApiLink>. All services are initialized lazily with defaults when first accessed.
 
 ## Services
 
@@ -35,11 +35,11 @@ There are three core services that are managed by the service locator:
 
 <ApiLink to="class/Configuration">`Configuration`</ApiLink> is a class that provides access to application-wide settings and parameters. It allows you to configure various aspects of Crawlee, such as timeouts, logging level, persistence intervals, and various other settings. The configuration can be set directly in the code or via environment variables.
 
-### StorageClient
+### StorageBackend
 
-<ApiLink to="class/StorageClient">`StorageClient`</ApiLink> is the backend implementation for storages in Crawlee. It provides a unified interface for <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, regardless of the underlying storage implementation. Storage clients were already explained in the storage clients section.
+<ApiLink to="class/StorageBackend">`StorageBackend`</ApiLink> is the backend implementation for storages in Crawlee. It provides a unified interface for <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, regardless of the underlying storage implementation. Storage backends were already explained in the storage backends section.
 
-Refer to the [Storage clients guide](./storage-clients) for more information about storage clients and how to use them.
+Refer to the [Storage backends guide](./storage-backends) for more information about storage backends and how to use them.
 
 ### EventManager
 
@@ -55,9 +55,9 @@ Services can be registered globally through the <ApiLink to="class/ServiceLocato
 
 <Tabs>
 
-<TabItem value="storage-client" label="Storage client">
+<TabItem value="storage-backend" label="Storage backend">
     <RunnableCodeBlock className="language-python" language="python">
-        {ServiceLocatorStorageClient}
+        {ServiceLocatorStorageBackend}
     </RunnableCodeBlock>
 </TabItem>
 
@@ -81,9 +81,9 @@ Alternatively services can be passed to the crawler constructors. They will be r
 
 <Tabs>
 
-<TabItem value="storage-client" label="Storage client">
+<TabItem value="storage-backend" label="Storage backend">
     <RunnableCodeBlock className="language-python" language="python">
-        {ServiceCrawlerStorageClient}
+        {ServiceCrawlerStorageBackend}
     </RunnableCodeBlock>
 </TabItem>
 
@@ -107,9 +107,9 @@ Alternatively, services can be provided when opening specific storage instances,
 
 <Tabs>
 
-<TabItem value="storage-client" label="Storage client">
+<TabItem value="storage-backend" label="Storage backend">
     <RunnableCodeBlock className="language-python" language="python">
-        {ServiceStorageStorageClient}
+        {ServiceStorageStorageBackend}
     </RunnableCodeBlock>
 </TabItem>
 

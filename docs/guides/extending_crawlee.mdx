@@ -54,22 +54,22 @@ class HttpClient {
 }
 
 %% ========================
-%% Storage clients
+%% Storage backends
 %% ========================
 
-class StorageClient {
+class StorageBackend {
     <<extension point>>
 }
 
-class DatasetClient {
+class DatasetBackend {
     <<extension point>>
 }
 
-class KeyValueStoreClient {
+class KeyValueStoreBackend {
     <<extension point>>
 }
 
-class RequestQueueClient {
+class RequestQueueBackend {
     <<extension point>>
 }
 
@@ -100,10 +100,10 @@ BasicCrawler --|> PlaywrightCrawler
 AbstractHttpCrawler --> AbstractHttpParser : parses with
 PlaywrightCrawler --|> StagehandCrawler
 BasicCrawler --> HttpClient : uses
-BasicCrawler --> StorageClient : uses
-StorageClient --> DatasetClient : creates
-StorageClient --> KeyValueStoreClient : creates
-StorageClient --> RequestQueueClient : creates
+BasicCrawler --> StorageBackend : uses
+StorageBackend --> DatasetBackend : creates
+StorageBackend --> KeyValueStoreBackend : creates
+StorageBackend --> RequestQueueBackend : creates
 PlaywrightCrawler --> BrowserPool : uses
 BrowserPool --> BrowserPlugin : manages
 BrowserPlugin --|> PlaywrightBrowserPlugin
@@ -141,19 +141,19 @@ Crawlee ships <ApiLink to="class/ImpitHttpClient">`ImpitHttpClient`</ApiLink>, <
 
 See the [HTTP clients guide](./http-clients) for the libraries these clients wrap and their installation requirements.
 
-### Storage clients
+### Storage backends
 
-A storage client is the backend behind Crawlee's three storages. <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> are the API you write against, and the storage client decides where that data actually lives. That separation is what lets you move a crawler from the local file system to a database or a cloud service without changing crawl code.
+A storage backend is the backend behind Crawlee's three storages. <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> are the API you write against, and the storage backend decides where that data actually lives. That separation is what lets you move a crawler from the local file system to a database or a cloud service without changing crawl code.
 
-The <ApiLink to="class/StorageClient">`StorageClient`</ApiLink> contract defines three factory methods: `create_dataset_client`, `create_kvs_client`, and `create_rq_client`. The returned clients define the rest of the contract:
+The <ApiLink to="class/StorageBackend">`StorageBackend`</ApiLink> contract defines three factory methods: `create_dataset_backend`, `create_kvs_backend`, and `create_rq_backend`. The returned clients define the rest of the contract:
 
-- <ApiLink to="class/DatasetClient">`DatasetClient`</ApiLink> handles appending and reading items.
-- <ApiLink to="class/KeyValueStoreClient">`KeyValueStoreClient`</ApiLink> handles record access and iteration.
-- <ApiLink to="class/RequestQueueClient">`RequestQueueClient`</ApiLink> handles adding, fetching, and marking requests as handled.
+- <ApiLink to="class/DatasetBackend">`DatasetBackend`</ApiLink> handles appending and reading items.
+- <ApiLink to="class/KeyValueStoreBackend">`KeyValueStoreBackend`</ApiLink> handles record access and iteration.
+- <ApiLink to="class/RequestQueueBackend">`RequestQueueBackend`</ApiLink> handles adding, fetching, and marking requests as handled.
 
 A custom backend implements all four classes.
 
-See the [Storage clients guide](./storage-clients) for the built-in implementations and a custom client example.
+See the [Storage backends guide](./storage-backends) for the built-in implementations and a custom client example.
 
 ### Browser plugins
 
@@ -179,7 +179,7 @@ Start with configuration before writing a subclass. You can parse a response wit
 - If reusable HTTP parsing and the handler context both need to change, extend <ApiLink to="class/AbstractHttpCrawler">`AbstractHttpCrawler`</ApiLink> and implement <ApiLink to="class/AbstractHttpParser">`AbstractHttpParser`</ApiLink>.
 - If browser-level orchestration or the handler context needs to change, extend <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.
 - If the network transport needs to change while crawler behavior stays the same, implement <ApiLink to="class/HttpClient">`HttpClient`</ApiLink> and pass it to the crawler.
-- If the storage backend needs to change while the storage API stays the same, implement <ApiLink to="class/StorageClient">`StorageClient`</ApiLink> and its three per-storage clients.
+- If the storage backend needs to change while the storage API stays the same, implement <ApiLink to="class/StorageBackend">`StorageBackend`</ApiLink> and its three per-storage backends.
 - If browser launch needs to change while the Playwright lifecycle stays the same, extend <ApiLink to="class/PlaywrightBrowserPlugin">`PlaywrightBrowserPlugin`</ApiLink>. Implement <ApiLink to="class/BrowserPlugin">`BrowserPlugin`</ApiLink> directly only when the Playwright plugin's launch and lifecycle contract needs a different implementation.
 
 When more than one fits, pick the narrowest. A custom HTTP client works with every HTTP crawler, so it's easier to maintain than a crawler subclass that hard-codes the same transport.

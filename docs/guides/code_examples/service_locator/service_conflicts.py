@@ -1,21 +1,21 @@
 import asyncio
 
 from crawlee import service_locator
-from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
+from crawlee.storage_backends import FileSystemStorageBackend, MemoryStorageBackend
 
 
 async def main() -> None:
-    # Register the storage client via service locator.
-    memory_storage_client = MemoryStorageClient()
-    service_locator.set_storage_client(memory_storage_client)
+    # Register the storage backend via service locator.
+    memory_storage_backend = MemoryStorageBackend()
+    service_locator.set_storage_backend(memory_storage_backend)
 
-    # Retrieve the storage client.
-    current_storage_client = service_locator.get_storage_client()
+    # Retrieve the storage backend.
+    current_storage_backend = service_locator.get_storage_backend()
 
-    # Try to set a different storage client, which will raise ServiceConflictError
-    # if storage client was already retrieved.
-    file_system_storage_client = FileSystemStorageClient()
-    service_locator.set_storage_client(file_system_storage_client)
+    # Try to set a different storage backend, which will raise ServiceConflictError
+    # if storage backend was already retrieved.
+    file_system_storage_backend = FileSystemStorageBackend()
+    service_locator.set_storage_backend(file_system_storage_backend)
 
 
 if __name__ == '__main__':

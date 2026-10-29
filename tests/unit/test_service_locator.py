@@ -6,7 +6,7 @@ from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.errors import ServiceConflictError
 from crawlee.events import LocalEventManager
-from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
+from crawlee.storage_backends import FileSystemStorageBackend, MemoryStorageBackend
 
 
 def test_default_configuration() -> None:
@@ -68,30 +68,30 @@ def test_event_manager_conflict() -> None:
         service_locator.set_event_manager(custom_event_manager)
 
 
-def test_default_storage_client() -> None:
-    default_storage_client = service_locator.get_storage_client()
-    assert isinstance(default_storage_client, FileSystemStorageClient)
+def test_default_storage_backend() -> None:
+    default_storage_backend = service_locator.get_storage_backend()
+    assert isinstance(default_storage_backend, FileSystemStorageBackend)
 
 
-def test_custom_storage_client() -> None:
-    custom_storage_client = MemoryStorageClient()
-    service_locator.set_storage_client(custom_storage_client)
-    storage_client = service_locator.get_storage_client()
-    assert storage_client is custom_storage_client
+def test_custom_storage_backend() -> None:
+    custom_storage_backend = MemoryStorageBackend()
+    service_locator.set_storage_backend(custom_storage_backend)
+    storage_backend = service_locator.get_storage_backend()
+    assert storage_backend is custom_storage_backend
 
 
-def test_storage_client_overwrite_not_possible() -> None:
-    custom_storage_client = MemoryStorageClient()
-    service_locator.set_storage_client(custom_storage_client)
+def test_storage_backend_overwrite_not_possible() -> None:
+    custom_storage_backend = MemoryStorageBackend()
+    service_locator.set_storage_backend(custom_storage_backend)
 
-    another_custom_storage_client = MemoryStorageClient()
+    another_custom_storage_backend = MemoryStorageBackend()
     with pytest.raises(ServiceConflictError):
-        service_locator.set_storage_client(another_custom_storage_client)
+        service_locator.set_storage_backend(another_custom_storage_backend)
 
 
-def test_storage_client_conflict() -> None:
-    service_locator.get_storage_client()
-    custom_storage_client = MemoryStorageClient()
+def test_storage_backend_conflict() -> None:
+    service_locator.get_storage_backend()
+    custom_storage_backend = MemoryStorageBackend()
 
-    with pytest.raises(ServiceConflictError, match=r'StorageClient is already in use.'):
-        service_locator.set_storage_client(custom_storage_client)
+    with pytest.raises(ServiceConflictError, match=r'StorageBackend is already in use.'):
+        service_locator.set_storage_backend(custom_storage_backend)

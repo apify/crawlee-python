@@ -42,7 +42,7 @@ from crawlee.http_clients import HttpClient
 from crawlee.request_loaders import RequestList, RequestManagerTandem, ThrottlingRequestManager
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics, Statistics, StatisticsState
-from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
+from crawlee.storage_backends import FileSystemStorageBackend, MemoryStorageBackend
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 from tests.unit.utils import open_throttler_held_until_reclaim, poll_until_condition
 
@@ -560,9 +560,9 @@ async def test_calls_failed_request_handler() -> None:
 async def test_handlers_use_context_helpers(tmp_path: Path, handler: str) -> None:
     """Test that context helpers used in `failed_request_handler` and in `error_handler` have effect."""
     # Prepare crawler
-    storage_client = FileSystemStorageClient()
+    storage_backend = FileSystemStorageBackend()
     crawler = BasicCrawler(
-        max_request_retries=1, storage_client=storage_client, configuration=Configuration(storage_dir=str(tmp_path))
+        max_request_retries=1, storage_backend=storage_backend, configuration=Configuration(storage_dir=str(tmp_path))
     )
     # Test data
     rq_alias = 'other'
@@ -587,9 +587,9 @@ async def test_handlers_use_context_helpers(tmp_path: Path, handler: str) -> Non
     await crawler.run(['https://b.placeholder.com'])
 
     # Verify that the context helpers used in handlers had effect on used storages
-    dataset = await Dataset.open(storage_client=storage_client)
-    kvs = await KeyValueStore.open(storage_client=storage_client)
-    rq = await RequestQueue.open(alias=rq_alias, storage_client=storage_client)
+    dataset = await Dataset.open(storage_backend=storage_backend)
+    kvs = await KeyValueStore.open(storage_backend=storage_backend)
+    rq = await RequestQueue.open(alias=rq_alias, storage_backend=storage_backend)
 
     assert test_value == await kvs.get_value(test_key)
     assert [test_data] == (await dataset.get_data()).items
@@ -1901,17 +1901,17 @@ async def test_stop_before_run_starts() -> None:
 async def test_services_no_side_effect_on_crawler_init() -> None:
     custom_configuration = Configuration()
     custom_event_manager = LocalEventManager.from_config(custom_configuration)
-    custom_storage_client = MemoryStorageClient()
+    custom_storage_backend = MemoryStorageBackend()
 
     _ = BasicCrawler(
         configuration=custom_configuration,
         event_manager=custom_event_manager,
-        storage_client=custom_storage_client,
+        storage_backend=custom_storage_backend,
     )
 
     assert service_locator.get_configuration() is not custom_configuration
     assert service_locator.get_event_manager() is not custom_event_manager
-    assert service_locator.get_storage_client() is not custom_storage_client
+    assert service_locator.get_storage_backend() is not custom_storage_backend
 
 
 async def test_crawler_uses_default_services() -> None:
@@ -1921,35 +1921,35 @@ async def test_crawler_uses_default_services() -> None:
     custom_event_manager = LocalEventManager.from_config(custom_configuration)
     service_locator.set_event_manager(custom_event_manager)
 
-    custom_storage_client = MemoryStorageClient()
-    service_locator.set_storage_client(custom_storage_client)
+    custom_storage_backend = MemoryStorageBackend()
+    service_locator.set_storage_backend(custom_storage_backend)
 
     basic_crawler = BasicCrawler()
 
     assert basic_crawler._service_locator.get_configuration() is custom_configuration
     assert basic_crawler._service_locator.get_event_manager() is custom_event_manager
-    assert basic_crawler._service_locator.get_storage_client() is custom_storage_client
+    assert basic_crawler._service_locator.get_storage_backend() is custom_storage_backend
 
 
 async def test_services_crawlers_can_use_different_services() -> None:
     custom_configuration_1 = Configuration()
     custom_event_manager_1 = LocalEventManager.from_config(custom_configuration_1)
-    custom_storage_client_1 = MemoryStorageClient()
+    custom_storage_backend_1 = MemoryStorageBackend()
 
     custom_configuration_2 = Configuration()
     custom_event_manager_2 = LocalEventManager.from_config(custom_configuration_2)
-    custom_storage_client_2 = MemoryStorageClient()
+    custom_storage_backend_2 = MemoryStorageBackend()
 
     _ = BasicCrawler(
         configuration=custom_configuration_1,
         event_manager=custom_event_manager_1,
-        storage_client=custom_storage_client_1,
+        storage_backend=custom_storage_backend_1,
     )
 
     _ = BasicCrawler(
         configuration=custom_configuration_2,
         event_manager=custom_event_manager_2,
-        storage_client=custom_storage_client_2,
+        storage_backend=custom_storage_backend_2,
     )
 
 
@@ -1982,7 +1982,7 @@ async def test_crawler_can_use_other_storages(tmp_path: Path) -> None:
     kvs = await KeyValueStore.open()
     rq = await RequestQueue.open()
 
-    crawler = BasicCrawler(storage_client=MemoryStorageClient())
+    crawler = BasicCrawler(storage_backend=MemoryStorageBackend())
 
     assert dataset is not await crawler.get_dataset()
     assert kvs is not await crawler.get_key_value_store()
@@ -2011,14 +2011,14 @@ async def test_crawler_can_use_other_storages_of_same_type(tmp_path: Path) -> No
 
     # Set global configuration
     service_locator.set_configuration(configuration_a)
-    service_locator.set_storage_client(FileSystemStorageClient())
+    service_locator.set_storage_backend(FileSystemStorageBackend())
     # Create storages based on the global services
     dataset = await Dataset.open()
     kvs = await KeyValueStore.open()
     rq = await RequestQueue.open()
 
-    # Set the crawler to use different storage client
-    crawler = BasicCrawler(storage_client=FileSystemStorageClient(), configuration=configuration_b)
+    # Set the crawler to use different storage backend
+    crawler = BasicCrawler(storage_backend=FileSystemStorageBackend(), configuration=configuration_b)
 
     # Assert that the storages are different
     assert dataset is not await crawler.get_dataset()
@@ -2030,23 +2030,23 @@ async def test_crawler_can_use_other_storages_of_same_type(tmp_path: Path) -> No
         assert path.is_dir()
 
 
-async def test_allows_storage_client_overwrite_before_run(monkeypatch: pytest.MonkeyPatch) -> None:
-    custom_storage_client = MemoryStorageClient()
+async def test_allows_storage_backend_overwrite_before_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    custom_storage_backend = MemoryStorageBackend()
 
     crawler = BasicCrawler(
-        storage_client=custom_storage_client,
+        storage_backend=custom_storage_backend,
     )
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
         await context.push_data({'foo': 'bar'})
 
-    other_storage_client = MemoryStorageClient()
-    service_locator.set_storage_client(other_storage_client)
+    other_storage_backend = MemoryStorageBackend()
+    service_locator.set_storage_backend(other_storage_backend)
 
     with monkeypatch.context() as monkey:
-        spy = Mock(wraps=service_locator.get_storage_client)
-        monkey.setattr(service_locator, 'get_storage_client', spy)
+        spy = Mock(wraps=service_locator.get_storage_backend)
+        monkey.setattr(service_locator, 'get_storage_backend', spy)
         await crawler.run(['https://does-not-matter.com'])
         assert spy.call_count >= 1
 
@@ -2106,7 +2106,7 @@ async def test_timeout_in_handler(sleep_type: str) -> None:
     crawler = BasicCrawler(
         request_handler_timeout=handler_timeout,
         max_request_retries=max_request_retries,
-        storage_client=MemoryStorageClient(),
+        storage_backend=MemoryStorageBackend(),
     )
 
     mocked_handler_before_sleep = Mock()
@@ -2156,7 +2156,7 @@ async def test_keep_alive(
         max_requests_per_crawl=max_requests_per_crawl,
         # If more request can run in parallel, then max_requests_per_crawl is not deterministic.
         concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
-        storage_client=MemoryStorageClient(),
+        storage_backend=MemoryStorageBackend(),
     )
     mocked_handler = Mock()
 
@@ -2601,7 +2601,7 @@ async def test_crawler_state_persistence(tmp_path: Path) -> None:
     This test simulates starting the crawler process twice, and checks that the statistics include first run."""
 
     state_kvs = await KeyValueStore.open(
-        storage_client=FileSystemStorageClient(), configuration=Configuration(storage_dir=str(tmp_path))
+        storage_backend=FileSystemStorageBackend(), configuration=Configuration(storage_dir=str(tmp_path))
     )
 
     with ProcessPoolExecutor(mp_context=get_context('spawn')) as executor:
@@ -2650,7 +2650,7 @@ async def test_crawler_state_persistence_2_crawlers_with_migration(tmp_path: Pat
     This test simulates starting the crawler process twice, and checks that the statistics include first run.
     Each time two distinct crawlers are running, and they should keep using their own statistics and state."""
     state_kvs = await KeyValueStore.open(
-        storage_client=FileSystemStorageClient(), configuration=Configuration(storage_dir=str(tmp_path))
+        storage_backend=FileSystemStorageBackend(), configuration=Configuration(storage_dir=str(tmp_path))
     )
 
     with ProcessPoolExecutor(mp_context=get_context('spawn')) as executor:
@@ -2921,7 +2921,7 @@ async def test_warn_no_throttling_manager_once_on_429(caplog: pytest.LogCaptureF
 
 async def test_warn_unconfigured_throttle_domain_once_per_domain(caplog: pytest.LogCaptureFixture) -> None:
     """A 429 from a domain not in `ThrottlingRequestManager.domains` logs once per domain; repeats are suppressed."""
-    inner = await RequestQueue.open(name='test-inner-warn', storage_client=MemoryStorageClient())
+    inner = await RequestQueue.open(name='test-inner-warn', storage_backend=MemoryStorageBackend())
     throttler = ThrottlingRequestManager(
         inner,
         domains=['only-this.test'],
@@ -2946,10 +2946,10 @@ async def test_warn_unconfigured_throttle_domain_once_per_domain(caplog: pytest.
 
 async def test_throttled_domain_waits_out_backoff_without_ending_the_crawl() -> None:
     """A domain in a cooldown reads as empty to the autoscaled pool, yet its queued requests are still crawled."""
-    storage_client = MemoryStorageClient()
-    # The throttler opens its sub-managers through the global service locator, so point that at the same client.
-    service_locator.set_storage_client(storage_client)
-    inner = await RequestQueue.open(name='test-inner-backoff', storage_client=storage_client)
+    storage_backend = MemoryStorageBackend()
+    # The throttler opens its sub-managers through the global service locator, so point that at the same backend.
+    service_locator.set_storage_backend(storage_backend)
+    inner = await RequestQueue.open(name='test-inner-backoff', storage_backend=storage_backend)
     throttler = ThrottlingRequestManager(
         inner,
         domains=['throttled.placeholder.com'],

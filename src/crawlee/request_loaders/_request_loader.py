@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee.request_loaders import RequestManager, RequestManagerTandem
-    from crawlee.storage_clients.models import ProcessedRequest
+    from crawlee.storage_backends.models import ProcessedRequest
 
 
 @docs_group('Request loaders')

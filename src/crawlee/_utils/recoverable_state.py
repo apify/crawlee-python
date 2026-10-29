@@ -66,8 +66,8 @@ class RecoverableState(Generic[TStateModel]):
         if not persist_state_kvs_factory:
             logger.debug(
                 'No explicit key_value_store set for recoverable state. Recovery will use a system-wide KeyValueStore '
-                'based on service_locator configuration, potentially calling service_locator.set_storage_client in the '
-                'process. It is recommended to initialize RecoverableState with explicit key_value_store to avoid '
+                'based on service_locator configuration, potentially calling service_locator.set_storage_backend in '
+                'the process. It is recommended to initialize RecoverableState with explicit key_value_store to avoid '
                 'global side effects.'
             )
 

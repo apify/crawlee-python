@@ -10,8 +10,8 @@ from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
 from crawlee.statistics import Statistics
-from crawlee.storage_clients import MemoryStorageClient
-from crawlee.storage_clients._file_system._storage_client import FileSystemStorageClient
+from crawlee.storage_backends import MemoryStorageBackend
+from crawlee.storage_backends._file_system._storage_backend import FileSystemStorageBackend
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -60,9 +60,9 @@ def test_global_configuration_works_reversed() -> None:
 
 
 async def test_storage_not_persisted_when_non_persistable_storage_used(tmp_path: Path, server_url: URL) -> None:
-    """Make the Crawler use MemoryStorageClient which can't persist state."""
+    """Make the Crawler use MemoryStorageBackend which can't persist state."""
     service_locator.set_configuration(Configuration(storage_dir=str(tmp_path)))
-    crawler = HttpCrawler(storage_client=MemoryStorageClient())
+    crawler = HttpCrawler(storage_backend=MemoryStorageBackend())
 
     @crawler.router.default_handler
     async def default_handler(context: HttpCrawlingContext) -> None:
@@ -78,15 +78,15 @@ async def test_storage_not_persisted_when_non_persistable_storage_used(tmp_path:
 async def test_storage_persisted_with_explicit_statistics_with_persistable_storage(
     tmp_path: Path, server_url: URL
 ) -> None:
-    """Make the Crawler use MemoryStorageClient which can't persist state,
-    but pass explicit statistics to it which will use global FileSystemStorageClient() that can persist state."""
+    """Make the Crawler use MemoryStorageBackend which can't persist state,
+    but pass explicit statistics to it which will use global FileSystemStorageBackend() that can persist state."""
 
     configuration = Configuration(storage_dir=str(tmp_path))
     service_locator.set_configuration(configuration)
-    service_locator.set_storage_client(FileSystemStorageClient())
+    service_locator.set_storage_backend(FileSystemStorageBackend())
 
     crawler = HttpCrawler(
-        storage_client=MemoryStorageClient(), statistics=Statistics.with_default_state(persistence_enabled=True)
+        storage_backend=MemoryStorageBackend(), statistics=Statistics.with_default_state(persistence_enabled=True)
     )
 
     @crawler.router.default_handler
@@ -105,11 +105,11 @@ async def test_storage_persisted_when_enabled(tmp_path: Path, server_url: URL) -
         storage_dir=str(tmp_path),
     )
 
-    storage_client = FileSystemStorageClient()
+    storage_backend = FileSystemStorageBackend()
 
     crawler = HttpCrawler(
         configuration=configuration,
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     @crawler.router.default_handler

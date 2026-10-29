@@ -11,7 +11,7 @@ from crawlee import Request, service_locator
 from crawlee._utils.docs import docs_group
 from crawlee._utils.wait import wait_for_all_tasks_to_finish
 from crawlee.request_loaders import RequestManager
-from crawlee.storage_clients.models import AddRequestsResponse
+from crawlee.storage_backends.models import AddRequestsResponse
 
 from ._base import Storage
 from ._utils import validate_storage_name
@@ -21,9 +21,9 @@ if TYPE_CHECKING:
 
     from crawlee import Request
     from crawlee.configuration import Configuration
-    from crawlee.storage_clients import StorageClient
-    from crawlee.storage_clients._base import RequestQueueClient
-    from crawlee.storage_clients.models import ProcessedRequest, RequestQueueMetadata
+    from crawlee.storage_backends import StorageBackend
+    from crawlee.storage_backends._base import RequestQueueBackend
+    from crawlee.storage_backends.models import ProcessedRequest, RequestQueueMetadata
 
 logger = getLogger(__name__)
 
@@ -47,7 +47,7 @@ class RequestQueue(Storage, RequestManager):
     processing fails.
 
     You can open a request queue using the `open` class method, specifying either a name or ID to identify
-    the queue. The underlying storage implementation is determined by the configured storage client.
+    the queue. The underlying storage implementation is determined by the configured storage backend.
 
     ### Usage
 
@@ -72,19 +72,19 @@ class RequestQueue(Storage, RequestManager):
     ```
     """
 
-    def __init__(self, client: RequestQueueClient, id: str, name: str | None) -> None:
+    def __init__(self, backend: RequestQueueBackend, id: str, name: str | None) -> None:
         """Initialize a new instance.
 
         Preferably use the `RequestQueue.open` constructor to create a new instance.
 
         Args:
-            client: An instance of a storage client.
+            backend: An instance of a storage backend.
             id: The unique identifier of the storage.
             name: The name of the storage, if available.
         """
         validate_storage_name(name)
 
-        self._client = client
+        self._backend = backend
         self._id = id
         self._name = name
 
@@ -103,16 +103,16 @@ class RequestQueue(Storage, RequestManager):
 
     @override
     async def get_metadata(self) -> RequestQueueMetadata:
-        return await self._client.get_metadata()
+        return await self._backend.get_metadata()
 
     @override
     async def get_handled_count(self) -> int:
-        metadata = await self._client.get_metadata()
+        metadata = await self._backend.get_metadata()
         return metadata.handled_request_count
 
     @override
     async def get_total_count(self) -> int:
-        metadata = await self._client.get_metadata()
+        metadata = await self._backend.get_metadata()
         return metadata.total_request_count
 
     @override
@@ -124,21 +124,23 @@ class RequestQueue(Storage, RequestManager):
         name: str | None = None,
         alias: str | None = None,
         configuration: Configuration | None = None,
-        storage_client: StorageClient | None = None,
+        storage_backend: StorageBackend | None = None,
     ) -> RequestQueue:
         configuration = service_locator.get_configuration() if configuration is None else configuration
-        storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
+        storage_backend = service_locator.get_storage_backend() if storage_backend is None else storage_backend
 
-        client_opener_coro = storage_client.create_rq_client(id=id, name=name, alias=alias, configuration=configuration)
-        additional_cache_key = storage_client.get_storage_client_cache_key(configuration=configuration)
+        backend_opener_coro = storage_backend.create_rq_backend(
+            id=id, name=name, alias=alias, configuration=configuration
+        )
+        additional_cache_key = storage_backend.get_storage_backend_cache_key(configuration=configuration)
 
         return await service_locator.storage_instance_manager.open_storage_instance(
             cls,
             id=id,
             name=name,
             alias=alias,
-            client_opener_coro=client_opener_coro,
-            storage_client_cache_key=additional_cache_key,
+            backend_opener_coro=backend_opener_coro,
+            storage_backend_cache_key=additional_cache_key,
         )
 
     @override
@@ -147,11 +149,11 @@ class RequestQueue(Storage, RequestManager):
         storage_instance_manager = service_locator.storage_instance_manager
         storage_instance_manager.remove_from_cache(self)
 
-        await self._client.drop()
+        await self._backend.drop()
 
     @override
     async def purge(self) -> None:
-        await self._client.purge()
+        await self._backend.purge()
 
     @override
     async def add_request(
@@ -171,8 +173,8 @@ class RequestQueue(Storage, RequestManager):
         # (neither processed nor unprocessed) is unexpected here.
         if not response.unprocessed_requests:
             logger.warning(
-                f'Request {request.url} was not processed by storage client '
-                f'"{self._client.__class__.__name__}" (received an empty response).'
+                f'Request {request.url} was not processed by storage backend '
+                f'"{self._backend.__class__.__name__}" (received an empty response).'
             )
         return None
 
@@ -242,7 +244,7 @@ class RequestQueue(Storage, RequestManager):
         Returns:
             The next request to process, or `None` if there are no more pending requests.
         """
-        return await self._client.fetch_next_request()
+        return await self._backend.fetch_next_request()
 
     async def get_request(self, unique_key: str) -> Request | None:
         """Retrieve a specific request from the queue by its ID.
@@ -253,7 +255,7 @@ class RequestQueue(Storage, RequestManager):
         Returns:
             The request with the specified ID, or `None` if no such request exists.
         """
-        return await self._client.get_request(unique_key)
+        return await self._backend.get_request(unique_key)
 
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         """Mark a request as handled after successful processing.
@@ -268,7 +270,7 @@ class RequestQueue(Storage, RequestManager):
         Returns:
             Information about the queue operation.
         """
-        return await self._client.mark_request_as_handled(request)
+        return await self._backend.mark_request_as_handled(request)
 
     async def reclaim_request(
         self,
@@ -290,7 +292,7 @@ class RequestQueue(Storage, RequestManager):
         Returns:
             Information about the queue operation.
         """
-        return await self._client.reclaim_request(request, forefront=forefront)
+        return await self._backend.reclaim_request(request, forefront=forefront)
 
     async def is_empty(self) -> bool:
         """Check if the request queue is empty.
@@ -302,7 +304,7 @@ class RequestQueue(Storage, RequestManager):
         Returns:
             True if the request queue is empty, False otherwise.
         """
-        return await self._client.is_empty()
+        return await self._backend.is_empty()
 
     async def is_finished(self) -> bool:
         """Check if the request queue is finished.
@@ -317,7 +319,7 @@ class RequestQueue(Storage, RequestManager):
             logger.debug('Background add requests tasks are still in progress.')
             return False
 
-        if await self._client.is_finished():
+        if await self._backend.is_finished():
             logger.debug('The request queue is finished.')
             return True
 
@@ -338,7 +340,7 @@ class RequestQueue(Storage, RequestManager):
             retries are exhausted.
         """
         max_attempts = 5
-        response = await self._client.add_batch_of_requests(batch, forefront=forefront)
+        response = await self._backend.add_batch_of_requests(batch, forefront=forefront)
 
         request_count = len(batch) - len(response.unprocessed_requests)
         if request_count:

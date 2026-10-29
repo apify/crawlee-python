@@ -7,7 +7,7 @@ import pytest
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
+from crawlee.storage_backends import FileSystemStorageBackend, MemoryStorageBackend
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 from crawlee.storages._base import Storage
 
@@ -23,37 +23,37 @@ def storage_type(request: pytest.FixtureRequest) -> type[Storage]:
     return cast('type[Storage]', request.param)
 
 
-async def test_unique_storage_by_storage_client(tmp_path: Path, storage_type: type[Storage]) -> None:
+async def test_unique_storage_by_storage_backend(tmp_path: Path, storage_type: type[Storage]) -> None:
     config = Configuration(purge_on_start=True, storage_dir=str(tmp_path))
 
-    storage_1 = await storage_type.open(storage_client=MemoryStorageClient(), configuration=config)
-    storage_2 = await storage_type.open(storage_client=FileSystemStorageClient(), configuration=config)
+    storage_1 = await storage_type.open(storage_backend=MemoryStorageBackend(), configuration=config)
+    storage_2 = await storage_type.open(storage_backend=FileSystemStorageBackend(), configuration=config)
     assert storage_1 is not storage_2
 
 
-async def test_same_storage_when_different_client(tmp_path: Path, storage_type: type[Storage]) -> None:
+async def test_same_storage_when_different_backend(tmp_path: Path, storage_type: type[Storage]) -> None:
     config = Configuration(purge_on_start=True, storage_dir=str(tmp_path))
 
-    storage_1 = await storage_type.open(storage_client=MemoryStorageClient(), configuration=config)
-    storage_2 = await storage_type.open(storage_client=MemoryStorageClient(), configuration=config)
+    storage_1 = await storage_type.open(storage_backend=MemoryStorageBackend(), configuration=config)
+    storage_2 = await storage_type.open(storage_backend=MemoryStorageBackend(), configuration=config)
     assert storage_1 is storage_2
 
 
 async def test_unique_storage_by_storage_type(tmp_path: Path) -> None:
     config = Configuration(purge_on_start=True, storage_dir=str(tmp_path))
-    storage_client = MemoryStorageClient()
+    storage_backend = MemoryStorageBackend()
 
-    kvs = await KeyValueStore.open(storage_client=storage_client, configuration=config)
-    dataset = await Dataset.open(storage_client=storage_client, configuration=config)
+    kvs = await KeyValueStore.open(storage_backend=storage_backend, configuration=config)
+    dataset = await Dataset.open(storage_backend=storage_backend, configuration=config)
     assert kvs is not dataset
 
 
 async def test_unique_storage_by_name(storage_type: type[Storage]) -> None:
-    """Test that StorageInstanceManager support different storage clients at the same time."""
-    storage_client = MemoryStorageClient()
+    """Test that StorageInstanceManager support different storage backends at the same time."""
+    storage_backend = MemoryStorageBackend()
 
-    storage_1 = await storage_type.open(storage_client=storage_client, name='kvs1')
-    storage_2 = await storage_type.open(storage_client=storage_client, name='kvs2')
+    storage_1 = await storage_type.open(storage_backend=storage_backend, name='kvs1')
+    storage_2 = await storage_type.open(storage_backend=storage_backend, name='kvs2')
     assert storage_1 is not storage_2
 
 
@@ -68,10 +68,10 @@ async def test_unique_storage_by_unique_cache_key_different_path(tmp_path: Path,
 
     config_2 = Configuration(storage_dir=str(path_2))
 
-    storage_client = FileSystemStorageClient()
+    storage_backend = FileSystemStorageBackend()
 
-    storage_1 = await storage_type.open(storage_client=storage_client, configuration=config_1)
-    storage_2 = await storage_type.open(storage_client=storage_client, configuration=config_2)
+    storage_1 = await storage_type.open(storage_backend=storage_backend, configuration=config_1)
+    storage_2 = await storage_type.open(storage_backend=storage_backend, configuration=config_2)
     assert storage_1 is not storage_2
 
 
@@ -82,24 +82,24 @@ async def test_unique_storage_by_unique_cache_key_same_path(tmp_path: Path, stor
 
     config_2 = Configuration(storage_dir=str(tmp_path))
 
-    storage_client = FileSystemStorageClient()
+    storage_backend = FileSystemStorageBackend()
 
-    storage_1 = await storage_type.open(storage_client=storage_client, configuration=config_1)
-    storage_2 = await storage_type.open(storage_client=storage_client, configuration=config_2)
+    storage_1 = await storage_type.open(storage_backend=storage_backend, configuration=config_1)
+    storage_2 = await storage_type.open(storage_backend=storage_backend, configuration=config_2)
     assert storage_1 is storage_2
 
 
 async def test_identical_storage_default_config(storage_type: type[Storage]) -> None:
-    """Test that StorageInstanceManager correctly caches storage based on the storage client."""
-    storage_client = MemoryStorageClient()
+    """Test that StorageInstanceManager correctly caches storage based on the storage backend."""
+    storage_backend = MemoryStorageBackend()
 
-    storage_1 = await storage_type.open(storage_client=storage_client)
-    storage_2 = await storage_type.open(storage_client=storage_client)
+    storage_1 = await storage_type.open(storage_backend=storage_backend)
+    storage_2 = await storage_type.open(storage_backend=storage_backend)
     assert storage_1 is storage_2
 
 
 async def test_identical_storage_default_storage(storage_type: type[Storage]) -> None:
-    """Test that StorageInstanceManager correctly caches storage based on the storage client."""
+    """Test that StorageInstanceManager correctly caches storage based on the storage backend."""
     storage_1 = await storage_type.open()
     storage_2 = await storage_type.open()
     assert storage_1 is storage_2
@@ -121,13 +121,13 @@ async def test_identical_storage_remove_from_cache(storage_type: type[Storage]) 
 
 async def test_preexisting_unnamed_storage_open_by_id(storage_type: type[Storage]) -> None:
     """Test that persisted pre-existing unnamed storage can be opened by ID."""
-    storage_client = FileSystemStorageClient()
-    storage_1 = await storage_type.open(alias='custom_name', storage_client=storage_client)
+    storage_backend = FileSystemStorageBackend()
+    storage_1 = await storage_type.open(alias='custom_name', storage_backend=storage_backend)
 
     # Make service_locator unaware of this storage
     service_locator.storage_instance_manager.clear_cache()
 
-    storage_1_again = await storage_type.open(id=storage_1.id, storage_client=storage_client)
+    storage_1_again = await storage_type.open(id=storage_1.id, storage_backend=storage_backend)
 
     assert storage_1.id == storage_1_again.id
 
@@ -189,21 +189,21 @@ async def test_concurrent_open_datasets_with_same_name_and_alias() -> None:
 async def test_drop_only_evicts_own_cache_entry(
     tmp_path: Path, storage_type: type[Storage], name: str | None, *, drop_first: bool
 ) -> None:
-    """Dropping a storage evicts only its own cache entry; siblings with the same name but a different client stay."""
+    """Dropping a storage evicts only its own cache entry; siblings with the same name but a different backend stay."""
     config = Configuration(purge_on_start=True, storage_dir=str(tmp_path))
-    mem_client = MemoryStorageClient()
-    fs_client = FileSystemStorageClient()
+    mem_client = MemoryStorageBackend()
+    fs_client = FileSystemStorageBackend()
 
-    # Two different client types produce different cache keys under the same name.
-    storage_mem = await storage_type.open(name=name, storage_client=mem_client, configuration=config)
-    storage_fs = await storage_type.open(name=name, storage_client=fs_client, configuration=config)
+    # Two different backend types produce different cache keys under the same name.
+    storage_mem = await storage_type.open(name=name, storage_backend=mem_client, configuration=config)
+    storage_fs = await storage_type.open(name=name, storage_backend=fs_client, configuration=config)
     assert storage_mem is not storage_fs
 
     if drop_first:
         await storage_mem.drop()
-        assert await storage_type.open(name=name, storage_client=fs_client, configuration=config) is storage_fs
-        assert await storage_type.open(name=name, storage_client=mem_client, configuration=config) is not storage_mem
+        assert await storage_type.open(name=name, storage_backend=fs_client, configuration=config) is storage_fs
+        assert await storage_type.open(name=name, storage_backend=mem_client, configuration=config) is not storage_mem
     else:
         await storage_fs.drop()
-        assert await storage_type.open(name=name, storage_client=mem_client, configuration=config) is storage_mem
-        assert await storage_type.open(name=name, storage_client=fs_client, configuration=config) is not storage_fs
+        assert await storage_type.open(name=name, storage_backend=mem_client, configuration=config) is storage_mem
+        assert await storage_type.open(name=name, storage_backend=fs_client, configuration=config) is not storage_fs

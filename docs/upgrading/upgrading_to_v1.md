@@ -111,82 +111,82 @@ Some changes in the related model classes:
 - `stats` field in `RequestQueueMetadata` - removed as it was unused.
 - `RequestQueueHead` - replaced by `RequestQueueHeadWithLocks`.
 
-## New architecture of storage clients
+## New architecture of storage backends
 
-In v1.0, the storage client system has been completely reworked to simplify implementation and make custom storage clients easier to write.
+In v1.0, the storage backend system has been completely reworked to simplify implementation and make custom storage backends easier to write.
 
-See the [Storage clients guide](https://crawlee.dev/python/docs/guides/storage-clients) for more details.
+See the [Storage backends guide](https://crawlee.dev/python/docs/guides/storage-backends) for more details.
 
-### New dedicated storage clients
+### New dedicated storage backends
 
-Previously, `MemoryStorageClient` handled both in-memory storage and optional file system persistence. This has now been split into two distinct storage clients:
+Previously, `MemoryStorageBackend` handled both in-memory storage and optional file system persistence. This has now been split into two distinct storage backends:
 
-- **`MemoryStorageClient`** - Stores all data in memory only.
-- **`FileSystemStorageClient`** - Persists data on the file system, with in-memory caching for better performance.
+- **`MemoryStorageBackend`** - Stores all data in memory only.
+- **`FileSystemStorageBackend`** - Persists data on the file system, with in-memory caching for better performance.
 
 **Before (v0.6):**
 
 ```python
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storage_backends import MemoryStorageBackend
 
 # In-memory only
 configuration = Configuration(persist_storage=False)
-storage_client = MemoryStorageClient.from_config(configuration)
+storage_backend = MemoryStorageBackend.from_config(configuration)
 
 # File-system persistence
 configuration = Configuration(persist_storage=True)
-storage_client = MemoryStorageClient.from_config(configuration)
+storage_backend = MemoryStorageBackend.from_config(configuration)
 ```
 
 **Now (v1.0):**
 
 ```python
-from crawlee.storage_clients import MemoryStorageClient, FileSystemStorageClient
+from crawlee.storage_backends import MemoryStorageBackend, FileSystemStorageBackend
 
 # In-memory only
-storage_client = MemoryStorageClient()
+storage_backend = MemoryStorageBackend()
 
 # File-system persistence
-storage_client = FileSystemStorageClient()
+storage_backend = FileSystemStorageBackend()
 ```
 
-### Registering a storage client
+### Registering a storage backend
 
-The way you register a storage client remains unchanged:
+The way you register a storage backend remains unchanged:
 
 ```python
 from crawlee import service_locator
 from crawlee.crawlers import ParselCrawler
-from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storage_backends import MemoryStorageBackend
 from crawlee.storages import Dataset
 
-# Create custom storage client
-storage_client = MemoryStorageClient()
+# Create custom storage backend
+storage_backend = MemoryStorageBackend()
 
 # Then register it globally
-service_locator.set_storage_client(storage_client)
+service_locator.set_storage_backend(storage_backend)
 
 # Or use it for a single crawler only
-crawler = ParselCrawler(storage_client=storage_client)
+crawler = ParselCrawler(storage_backend=storage_backend)
 
 # Or use it for a single storage only
 dataset = await Dataset.open(
     name='my-dataset',
-    storage_client=storage_client,
+    storage_backend=storage_backend,
 )
 ```
 
 ### Instance caching
 
-Instance caching of `Dataset.open`, `KeyValueStore.open`, and `RequestQueue.open` now return the same instance for the same arguments. Direct calls to `StorageClient.open_*` always return new instances.
+Instance caching of `Dataset.open`, `KeyValueStore.open`, and `RequestQueue.open` now return the same instance for the same arguments. Direct calls to `StorageBackend.open_*` always return new instances.
 
-### Writing custom storage clients
+### Writing custom storage backends
 
-The interface for custom storage clients has been simplified:
+The interface for custom storage backends has been simplified:
 
-- One storage client per storage type (`RequestQueue`, `KeyValueStore`, `Dataset`).
-- Collection storage clients have been removed.
+- One storage backend per storage type (`RequestQueue`, `KeyValueStore`, `Dataset`).
+- Collection storage backends have been removed.
 - The number of methods that have to be implemented have been reduced.
 
 ## ServiceLocator changes
@@ -199,20 +199,20 @@ You can register the services just once, and you can no longer override already 
 
 ```python
 from crawlee import service_locator
-from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storage_backends import MemoryStorageBackend
 
-service_locator.set_storage_client(MemoryStorageClient())
-service_locator.set_storage_client(MemoryStorageClient())
+service_locator.set_storage_backend(MemoryStorageBackend())
+service_locator.set_storage_backend(MemoryStorageBackend())
 ```
 
 **Now (v1.0):**
 
 ```python
 from crawlee import service_locator
-from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storage_backends import MemoryStorageBackend
 
-service_locator.set_storage_client(MemoryStorageClient())
-service_locator.set_storage_client(MemoryStorageClient())  # Raises an error
+service_locator.set_storage_backend(MemoryStorageBackend())
+service_locator.set_storage_backend(MemoryStorageBackend())  # Raises an error
 ```
 
 ### BasicCrawler has its own instance of ServiceLocator to track its own services
@@ -224,15 +224,15 @@ Explicitly passed services to the crawler can be different the global ones acces
 ```python
 from crawlee import service_locator
 from crawlee.crawlers import BasicCrawler
-from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storage_backends import MemoryStorageBackend
 from crawlee.storages import Dataset
 
 
 async def main() -> None:
-    custom_storage_client = MemoryStorageClient()
-    crawler = BasicCrawler(storage_client=custom_storage_client)
+    custom_storage_backend = MemoryStorageBackend()
+    crawler = BasicCrawler(storage_backend=custom_storage_backend)
 
-    assert service_locator.get_storage_client() is custom_storage_client
+    assert service_locator.get_storage_backend() is custom_storage_backend
     assert await crawler.get_dataset() is await Dataset.open()
 ```
 
@@ -241,15 +241,15 @@ async def main() -> None:
 ```python
 from crawlee import service_locator
 from crawlee.crawlers import BasicCrawler
-from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storage_backends import MemoryStorageBackend
 from crawlee.storages import Dataset
 
 
 async def main() -> None:
-    custom_storage_client = MemoryStorageClient()
-    crawler = BasicCrawler(storage_client=custom_storage_client)
+    custom_storage_backend = MemoryStorageBackend()
+    crawler = BasicCrawler(storage_backend=custom_storage_backend)
 
-    assert service_locator.get_storage_client() is not custom_storage_client
+    assert service_locator.get_storage_backend() is not custom_storage_backend
     assert await crawler.get_dataset() is not await Dataset.open()
 ```
 
@@ -259,28 +259,28 @@ This allows two crawlers with different services at the same time.
 
 ```python
 from crawlee.crawlers import BasicCrawler
-from crawlee.storage_clients import MemoryStorageClient, FileSystemStorageClient
+from crawlee.storage_backends import MemoryStorageBackend, FileSystemStorageBackend
 from crawlee.configuration import Configuration
 from crawlee.events import LocalEventManager
 
 custom_configuration_1 = Configuration()
 custom_event_manager_1 = LocalEventManager.from_config(custom_configuration_1)
-custom_storage_client_1 = MemoryStorageClient()
+custom_storage_backend_1 = MemoryStorageBackend()
 
 custom_configuration_2 = Configuration()
 custom_event_manager_2 = LocalEventManager.from_config(custom_configuration_2)
-custom_storage_client_2 = FileSystemStorageClient()
+custom_storage_backend_2 = FileSystemStorageBackend()
 
 crawler_1 = BasicCrawler(
     configuration=custom_configuration_1,
     event_manager=custom_event_manager_1,
-    storage_client=custom_storage_client_1,
+    storage_backend=custom_storage_backend_1,
 )
 
 crawler_2 = BasicCrawler(
     configuration=custom_configuration_2,
     event_manager=custom_event_manager_2,
-    storage_client=custom_storage_client_2,
+    storage_backend=custom_storage_backend_2,
 )
 
 # use crawlers without runtime crash...
@@ -296,7 +296,7 @@ We drop support for Python 3.9. The minimum supported version is now Python 3.10
 
 ### Changes in Configuration
 
-The fields `persist_storage` and `persist_metadata` have been removed from the `Configuration`. Persistence is now determined only by which storage client class you use.
+The fields `persist_storage` and `persist_metadata` have been removed from the `Configuration`. Persistence is now determined only by which storage backend class you use.
 
 ### Changes in Request
 

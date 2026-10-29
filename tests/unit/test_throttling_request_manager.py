@@ -16,7 +16,7 @@ from crawlee._service_locator import ServiceLocator
 from crawlee._utils.http import parse_retry_after_header
 from crawlee.configuration import Configuration
 from crawlee.request_loaders._throttling_request_manager import ThrottlingRequestManager
-from crawlee.storage_clients import FileSystemStorageClient, MemoryStorageClient
+from crawlee.storage_backends import FileSystemStorageBackend, MemoryStorageBackend
 from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
@@ -32,21 +32,21 @@ CLOCK_START = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 @pytest.fixture
-def memory_storage_client() -> MemoryStorageClient:
-    """Create a MemoryStorageClient for testing."""
-    return MemoryStorageClient()
+def memory_storage_backend() -> MemoryStorageBackend:
+    """Create a MemoryStorageBackend for testing."""
+    return MemoryStorageBackend()
 
 
 @pytest.fixture
-def service_locator(memory_storage_client: MemoryStorageClient) -> ServiceLocator:
-    """Create a ServiceLocator with MemoryStorageClient for testing."""
-    return ServiceLocator(storage_client=memory_storage_client)
+def service_locator(memory_storage_backend: MemoryStorageBackend) -> ServiceLocator:
+    """Create a ServiceLocator with MemoryStorageBackend for testing."""
+    return ServiceLocator(storage_backend=memory_storage_backend)
 
 
 @pytest.fixture
-async def inner_queue(memory_storage_client: MemoryStorageClient) -> RequestQueue:
-    """Create a real RequestQueue with MemoryStorageClient."""
-    return await RequestQueue.open(name='test-inner', storage_client=memory_storage_client)
+async def inner_queue(memory_storage_backend: MemoryStorageBackend) -> RequestQueue:
+    """Create a real RequestQueue with MemoryStorageBackend."""
+    return await RequestQueue.open(name='test-inner', storage_backend=memory_storage_backend)
 
 
 @pytest.fixture
@@ -63,7 +63,7 @@ async def manager(inner_queue: RequestQueue, service_locator: ServiceLocator) ->
 @pytest.fixture
 def fs_service_locator() -> ServiceLocator:
     """Create a ServiceLocator backed by the file system, so storages survive a simulated restart."""
-    return ServiceLocator(configuration=Configuration(purge_on_start=False), storage_client=FileSystemStorageClient())
+    return ServiceLocator(configuration=Configuration(purge_on_start=False), storage_backend=FileSystemStorageBackend())
 
 
 @pytest.fixture
@@ -97,7 +97,7 @@ async def _open_fs_manager(service_locator: ServiceLocator) -> ThrottlingRequest
     """Open a throttling manager over the persistent storage directory, as a fresh process would."""
     inner_queue = await RequestQueue.open(
         name='persistent-inner',
-        storage_client=service_locator.get_storage_client(),
+        storage_backend=service_locator.get_storage_backend(),
         configuration=service_locator.get_configuration(),
     )
     return ThrottlingRequestManager(
@@ -1029,7 +1029,7 @@ async def test_default_purge_on_start_empties_persisted_sub_queues(fs_service_lo
 
     # Restart under the default configuration, which purges an aliased store as it opens.
     fs_service_locator.storage_instance_manager.clear_cache()
-    purging_locator = ServiceLocator(configuration=Configuration(), storage_client=FileSystemStorageClient())
+    purging_locator = ServiceLocator(configuration=Configuration(), storage_backend=FileSystemStorageBackend())
     purged = await _open_fs_manager(purging_locator)
     assert await purged.is_empty() is True
 
@@ -1049,7 +1049,7 @@ async def test_purge_empties_sub_queues_from_a_previous_run(fs_service_locator: 
 
     sub_queue = await RequestQueue.open(
         alias=f'throttled-{THROTTLED_DOMAIN}',
-        storage_client=fs_service_locator.get_storage_client(),
+        storage_backend=fs_service_locator.get_storage_backend(),
         configuration=fs_service_locator.get_configuration(),
     )
     assert await sub_queue.get_total_count() == 0

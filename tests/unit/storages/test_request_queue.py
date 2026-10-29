@@ -9,8 +9,8 @@ import pytest
 
 from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import MemoryStorageClient, StorageClient
-from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, UnprocessedRequest
+from crawlee.storage_backends import MemoryStorageBackend, StorageBackend
+from crawlee.storage_backends.models import AddRequestsResponse, ProcessedRequest, UnprocessedRequest
 from crawlee.storages import RequestQueue
 from crawlee.storages._storage_instance_manager import StorageInstanceManager
 from tests.unit.utils import poll_until_condition
@@ -18,16 +18,16 @@ from tests.unit.utils import poll_until_condition
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Sequence
 
-    from crawlee.storage_clients import StorageClient
+    from crawlee.storage_backends import StorageBackend
 
 
 @pytest.fixture
 async def rq(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> AsyncGenerator[RequestQueue, None]:
     """Fixture that provides a request queue instance for each test."""
     rq = await RequestQueue.open(
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     yield rq
@@ -35,12 +35,12 @@ async def rq(
 
 
 async def test_open_creates_new_rq(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test that open() creates a new request queue with proper metadata."""
     rq = await RequestQueue.open(
         name='new-request-queue',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Verify request queue properties
@@ -56,13 +56,13 @@ async def test_open_creates_new_rq(
 
 async def test_open_existing_rq(
     rq: RequestQueue,
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test that open() loads an existing request queue correctly."""
     # Open the same request queue again
     reopened_rq = await RequestQueue.open(
         name=rq.name,
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Verify request queue properties
@@ -74,7 +74,7 @@ async def test_open_existing_rq(
 
 
 async def test_open_with_id_and_name(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test that open() raises an error when both id and name are provided."""
     with pytest.raises(
@@ -85,18 +85,18 @@ async def test_open_with_id_and_name(
         await RequestQueue.open(
             id='some-id',
             name='some-name',
-            storage_client=storage_client,
+            storage_backend=storage_backend,
         )
 
 
 async def test_open_by_id(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test opening a request queue by its ID."""
     # First create a request queue by name
     rq1 = await RequestQueue.open(
         name='rq-by-id-test',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Add a request to identify it
@@ -105,7 +105,7 @@ async def test_open_by_id(
     # Open the request queue by ID
     rq2 = await RequestQueue.open(
         id=rq1.id,
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Verify it's the same request queue
@@ -270,7 +270,7 @@ async def test_add_requests_retry_preserves_forefront(
 ) -> None:
     """Regression test: when ``add_batch_of_requests`` returns unprocessed requests, the retry must preserve the
     original `forefront` value rather than silently falling back to the parameter default."""
-    rq = await RequestQueue.open(storage_client=MemoryStorageClient())
+    rq = await RequestQueue.open(storage_backend=MemoryStorageBackend())
     forefront_calls: list[bool] = []
 
     async def patched_add_batch(
@@ -296,7 +296,7 @@ async def test_add_requests_retry_preserves_forefront(
             unprocessed_requests=[],
         )
 
-    monkeypatch.setattr(rq._client, 'add_batch_of_requests', patched_add_batch)
+    monkeypatch.setattr(rq._backend, 'add_batch_of_requests', patched_add_batch)
 
     try:
         await rq.add_requests(
@@ -318,7 +318,7 @@ async def _no_sleep(_seconds: float) -> None:
 
 async def test_add_request_retries_unprocessed(monkeypatch: pytest.MonkeyPatch) -> None:
     """`add_request` must retry an unprocessed request (like `add_requests`) instead of silently dropping it."""
-    rq = await RequestQueue.open(storage_client=MemoryStorageClient())
+    rq = await RequestQueue.open(storage_backend=MemoryStorageBackend())
     monkeypatch.setattr('crawlee.storages._request_queue.asyncio.sleep', _no_sleep)
     calls = 0
 
@@ -343,7 +343,7 @@ async def test_add_request_retries_unprocessed(monkeypatch: pytest.MonkeyPatch) 
             unprocessed_requests=[],
         )
 
-    monkeypatch.setattr(rq._client, 'add_batch_of_requests', patched_add_batch)
+    monkeypatch.setattr(rq._backend, 'add_batch_of_requests', patched_add_batch)
 
     try:
         result = await rq.add_request('https://example.com/retry')
@@ -357,7 +357,7 @@ async def test_add_request_retries_unprocessed(monkeypatch: pytest.MonkeyPatch) 
 
 async def test_add_request_returns_none_after_exhausting_retries(monkeypatch: pytest.MonkeyPatch) -> None:
     """When a request stays unprocessed across all retries, `add_request` returns `None` rather than raising."""
-    rq = await RequestQueue.open(storage_client=MemoryStorageClient())
+    rq = await RequestQueue.open(storage_backend=MemoryStorageBackend())
     monkeypatch.setattr('crawlee.storages._request_queue.asyncio.sleep', _no_sleep)
     calls = 0
 
@@ -373,7 +373,7 @@ async def test_add_request_returns_none_after_exhausting_retries(monkeypatch: py
             unprocessed_requests=[UnprocessedRequest(unique_key=r.unique_key, url=r.url) for r in requests],
         )
 
-    monkeypatch.setattr(rq._client, 'add_batch_of_requests', patched_add_batch)
+    monkeypatch.setattr(rq._backend, 'add_batch_of_requests', patched_add_batch)
 
     try:
         result = await rq.add_request('https://example.com/doomed')
@@ -661,12 +661,12 @@ async def test_reclaim_non_existent_request(rq: RequestQueue) -> None:
 
 
 async def test_drop(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test dropping a request queue removes it from cache and clears its data."""
     rq = await RequestQueue.open(
         name='drop-test',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Add a request
@@ -678,7 +678,7 @@ async def test_drop(
     # Verify request queue is empty (by creating a new one with the same name)
     new_rq = await RequestQueue.open(
         name='drop-test',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Verify the queue is empty
@@ -690,7 +690,7 @@ async def test_drop(
 
 
 async def test_reopen_default(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test reopening the default request queue."""
     # First clean up any storage instance caches
@@ -699,7 +699,7 @@ async def test_reopen_default(
 
     # Open the default request queue
     rq1 = await RequestQueue.open(
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # If a request queue already exists (due to previous test run), purge it to start fresh
@@ -709,7 +709,7 @@ async def test_reopen_default(
         # If purge fails, try dropping and recreating
         await rq1.drop()
         rq1 = await RequestQueue.open(
-            storage_client=storage_client,
+            storage_backend=storage_backend,
         )
 
     # Verify we're starting fresh
@@ -725,7 +725,7 @@ async def test_reopen_default(
 
     # Open the default request queue again
     rq2 = await RequestQueue.open(
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Verify they are the same queue
@@ -747,13 +747,13 @@ async def test_reopen_default(
 
 
 async def test_purge(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test purging a request queue removes all requests but keeps the queue itself."""
     # First create a request queue
     rq = await RequestQueue.open(
         name='purge-test-queue',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Add some requests
@@ -806,16 +806,16 @@ async def test_purge(
         pytest.param('purge-unsupported-named-test', id='named'),
     ],
 )
-async def test_purge_unsupported_by_client_raises(
-    storage_client: StorageClient,
+async def test_purge_unsupported_by_backend_raises(
+    storage_backend: StorageBackend,
     monkeypatch: pytest.MonkeyPatch,
     name: str | None,
 ) -> None:
-    """Test that `purge` raises when the storage client doesn't support it, leaving the queue intact."""
-    rq = await RequestQueue.open(name=name, storage_client=storage_client)
+    """Test that `purge` raises when the storage backend doesn't support it, leaving the queue intact."""
+    rq = await RequestQueue.open(name=name, storage_backend=storage_backend)
     original_id = rq.id
     await rq.add_requests(['https://example.com/1', 'https://example.com/2'])
-    monkeypatch.setattr(rq._client, 'purge', AsyncMock(side_effect=NotImplementedError('Purge is not supported.')))
+    monkeypatch.setattr(rq._backend, 'purge', AsyncMock(side_effect=NotImplementedError('Purge is not supported.')))
 
     with pytest.raises(NotImplementedError, match='Purge is not supported'):
         await rq.purge()
@@ -828,17 +828,17 @@ async def test_purge_unsupported_by_client_raises(
 
 
 async def test_open_with_alias(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test opening request queues with alias parameter for NDU functionality."""
     # Create request queues with different aliases
     rq_1 = await RequestQueue.open(
         alias='test_alias_1',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
     rq_2 = await RequestQueue.open(
         alias='test_alias_2',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Verify they have different IDs but no names (unnamed)
@@ -866,19 +866,19 @@ async def test_open_with_alias(
 
 
 async def test_alias_caching(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test that request queues with same alias return same instance (cached)."""
     # Open rq with alias
     rq_1 = await RequestQueue.open(
         alias='cache_test',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Open again with same alias
     rq_2 = await RequestQueue.open(
         alias='cache_test',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Should be same instance
@@ -890,7 +890,7 @@ async def test_alias_caching(
 
 
 async def test_alias_with_id_error(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test that providing both alias and id raises error."""
     with pytest.raises(
@@ -901,12 +901,12 @@ async def test_alias_with_id_error(
         await RequestQueue.open(
             id='some-id',
             alias='some-alias',
-            storage_client=storage_client,
+            storage_backend=storage_backend,
         )
 
 
 async def test_alias_with_name_error(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test that providing both alias and name raises error."""
     with pytest.raises(
@@ -917,12 +917,12 @@ async def test_alias_with_name_error(
         await RequestQueue.open(
             name='some-name',
             alias='some-alias',
-            storage_client=storage_client,
+            storage_backend=storage_backend,
         )
 
 
 async def test_alias_with_special_characters(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test alias functionality with special characters."""
     special_aliases = [
@@ -937,7 +937,7 @@ async def test_alias_with_special_characters(
     for alias in special_aliases:
         rq = await RequestQueue.open(
             alias=alias,
-            storage_client=storage_client,
+            storage_backend=storage_backend,
         )
         queues.append(rq)
 
@@ -956,12 +956,12 @@ async def test_alias_with_special_characters(
 
 
 async def test_alias_request_operations(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test that request operations work correctly with alias queues."""
     rq = await RequestQueue.open(
         alias='request_ops_test',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Test adding multiple requests
@@ -1005,12 +1005,12 @@ async def test_alias_request_operations(
 
 
 async def test_alias_forefront_operations(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test forefront operations work correctly with alias queues."""
     rq = await RequestQueue.open(
         alias='forefront_test',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Add normal requests
@@ -1035,12 +1035,12 @@ async def test_alias_forefront_operations(
 
 
 async def test_alias_batch_operations(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test batch operations work correctly with alias queues."""
     rq = await RequestQueue.open(
         alias='batch_test',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Test batch adding
@@ -1064,30 +1064,30 @@ async def test_alias_batch_operations(
 
 
 async def test_named_vs_alias_conflict_detection(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test that conflicts between named and alias storages are detected."""
     # Test 1: Create named storage first, then try alias with same name
     named_rq = await RequestQueue.open(
         name='conflict-test',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
     assert named_rq.name == 'conflict-test'
 
     # Try to create alias with same name - should raise error
     with pytest.raises(ValueError, match=r'Cannot create alias storage "conflict-test".*already exists'):
-        await RequestQueue.open(alias='conflict-test', storage_client=storage_client)
+        await RequestQueue.open(alias='conflict-test', storage_backend=storage_backend)
 
     # Clean up
     await named_rq.drop()
 
     # Test 2: Create alias first, then try named with same name
-    alias_rq = await RequestQueue.open(alias='conflict-test2', storage_client=storage_client)
+    alias_rq = await RequestQueue.open(alias='conflict-test2', storage_backend=storage_backend)
     assert alias_rq.name is None  # Alias storages have no name
 
     # Try to create named with same name - should raise error
     with pytest.raises(ValueError, match=r'Cannot create named storage "conflict-test2".*already exists'):
-        await RequestQueue.open(name='conflict-test2', storage_client=storage_client)
+        await RequestQueue.open(name='conflict-test2', storage_backend=storage_backend)
 
     # Clean up
     await alias_rq.drop()
@@ -1105,13 +1105,13 @@ async def test_named_vs_alias_conflict_detection(
 
 
 async def test_alias_parameter(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test request queue creation and operations with alias parameter."""
     # Create request queue with alias
     alias_rq = await RequestQueue.open(
         alias='test_alias',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Verify alias request queue properties
@@ -1127,13 +1127,13 @@ async def test_alias_parameter(
 
 
 async def test_alias_vs_named_isolation(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test that alias and named request queues with same identifier are isolated."""
     # Create named request queue
     named_rq = await RequestQueue.open(
         name='test-identifier',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Verify named request queue
@@ -1146,7 +1146,7 @@ async def test_alias_vs_named_isolation(
     # Now create alias request queue with same identifier (should work after cleanup)
     alias_rq = await RequestQueue.open(
         alias='test-identifier',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Should be different instance
@@ -1162,17 +1162,17 @@ async def test_alias_vs_named_isolation(
 
 
 async def test_default_vs_alias_default_equivalence(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test that default request queue and alias='default' are equivalent."""
     # Open default request queue
     default_rq = await RequestQueue.open(
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     alias_default_rq = await RequestQueue.open(
         alias=StorageInstanceManager._DEFAULT_STORAGE_ALIAS,
-        storage_client=storage_client,
+        storage_backend=storage_backend,
     )
 
     # Should be the same
@@ -1189,7 +1189,7 @@ async def test_default_vs_alias_default_equivalence(
 
 
 async def test_multiple_alias_isolation(
-    storage_client: StorageClient,
+    storage_backend: StorageBackend,
 ) -> None:
     """Test that different aliases create separate request queues."""
     request_queues = []
@@ -1197,7 +1197,7 @@ async def test_multiple_alias_isolation(
     for i in range(3):
         rq = await RequestQueue.open(
             alias=f'alias_{i}',
-            storage_client=storage_client,
+            storage_backend=storage_backend,
         )
         await rq.add_request(f'https://example.com/alias_{i}')
         request_queues.append(rq)
@@ -1215,30 +1215,30 @@ async def test_multiple_alias_isolation(
         await rq.drop()
 
 
-async def test_purge_on_start_enabled(storage_client: StorageClient) -> None:
+async def test_purge_on_start_enabled(storage_backend: StorageBackend) -> None:
     """Test purge behavior when purge_on_start=True: named storages retain data, unnamed storages are purged."""
 
-    # Skip this test for memory storage since it doesn't persist data between client instances.
-    if isinstance(storage_client, MemoryStorageClient):
-        raise pytest.skip.Exception('Memory storage does not persist data between client instances.')
+    # Skip this test for memory storage since it doesn't persist data between backend instances.
+    if isinstance(storage_backend, MemoryStorageBackend):
+        raise pytest.skip.Exception('Memory storage does not persist data between backend instances.')
 
     configuration = Configuration(purge_on_start=True)
 
     # First, create all storage types with purge enabled and add data.
     default_rq = await RequestQueue.open(
-        storage_client=storage_client,
+        storage_backend=storage_backend,
         configuration=configuration,
     )
 
     alias_rq = await RequestQueue.open(
         alias='purge-test-alias',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
         configuration=configuration,
     )
 
     named_rq = await RequestQueue.open(
         name='purge-test-named',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
         configuration=configuration,
     )
 
@@ -1303,17 +1303,17 @@ async def test_purge_on_start_enabled(storage_client: StorageClient) -> None:
 
     # Now "reopen" all storages
     default_rq_2 = await RequestQueue.open(
-        storage_client=storage_client,
+        storage_backend=storage_backend,
         configuration=configuration,
     )
     alias_rq_2 = await RequestQueue.open(
         alias='purge-test-alias',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
         configuration=configuration,
     )
     named_rq_2 = await RequestQueue.open(
         name='purge-test-named',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
         configuration=configuration,
     )
 
@@ -1341,30 +1341,30 @@ async def test_purge_on_start_enabled(storage_client: StorageClient) -> None:
     await default_rq_2.drop()
 
 
-async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
+async def test_purge_on_start_disabled(storage_backend: StorageBackend) -> None:
     """Test purge behavior when purge_on_start=False: all storages retain data regardless of type."""
 
-    # Skip this test for memory storage since it doesn't persist data between client instances.
-    if isinstance(storage_client, MemoryStorageClient):
-        raise pytest.skip.Exception('Memory storage does not persist data between client instances.')
+    # Skip this test for memory storage since it doesn't persist data between backend instances.
+    if isinstance(storage_backend, MemoryStorageBackend):
+        raise pytest.skip.Exception('Memory storage does not persist data between backend instances.')
 
     configuration = Configuration(purge_on_start=False)
 
     # First, create all storage types with purge disabled and add data.
     default_rq = await RequestQueue.open(
-        storage_client=storage_client,
+        storage_backend=storage_backend,
         configuration=configuration,
     )
 
     alias_rq = await RequestQueue.open(
         alias='purge-test-alias',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
         configuration=configuration,
     )
 
     named_rq = await RequestQueue.open(
         name='purge-test-named',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
         configuration=configuration,
     )
 
@@ -1429,17 +1429,17 @@ async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
 
     # Now "reopen" all storages
     default_rq_2 = await RequestQueue.open(
-        storage_client=storage_client,
+        storage_backend=storage_backend,
         configuration=configuration,
     )
     alias_rq_2 = await RequestQueue.open(
         alias='purge-test-alias',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
         configuration=configuration,
     )
     named_rq_2 = await RequestQueue.open(
         name='purge-test-named',
-        storage_client=storage_client,
+        storage_backend=storage_backend,
         configuration=configuration,
     )
 
@@ -1467,14 +1467,14 @@ async def test_purge_on_start_disabled(storage_client: StorageClient) -> None:
     await default_rq_2.drop()
 
 
-async def test_name_default_not_allowed(storage_client: StorageClient) -> None:
+async def test_name_default_not_allowed(storage_backend: StorageBackend) -> None:
     """Test that storage can't have default alias as name, to prevent collisions with unnamed storage alias."""
     with pytest.raises(
         ValueError,
         match=f'Storage name cannot be "{StorageInstanceManager._DEFAULT_STORAGE_ALIAS}" as '
         f'it is reserved for default alias.',
     ):
-        await RequestQueue.open(name=StorageInstanceManager._DEFAULT_STORAGE_ALIAS, storage_client=storage_client)
+        await RequestQueue.open(name=StorageInstanceManager._DEFAULT_STORAGE_ALIAS, storage_backend=storage_backend)
 
 
 @pytest.mark.parametrize(
@@ -1499,16 +1499,16 @@ async def test_name_default_not_allowed(storage_client: StorageClient) -> None:
         pytest.param('with/slash', False, id='slash'),
     ],
 )
-async def test_validate_name(storage_client: StorageClient, name: str, *, is_valid: bool) -> None:
+async def test_validate_name(storage_backend: StorageBackend, name: str, *, is_valid: bool) -> None:
     """Test name validation logic."""
     if is_valid:
         # Should not raise
-        dataset = await RequestQueue.open(name=name, storage_client=storage_client)
+        dataset = await RequestQueue.open(name=name, storage_backend=storage_backend)
         assert dataset.name == name
         await dataset.drop()
     else:
         with pytest.raises(ValueError, match=rf'Invalid storage name "{name}".*'):
-            await RequestQueue.open(name=name, storage_client=storage_client)
+            await RequestQueue.open(name=name, storage_backend=storage_backend)
 
 
 @pytest.mark.parametrize(
@@ -1525,15 +1525,15 @@ async def test_validate_name(storage_client: StorageClient, name: str, *, is_val
         pytest.param('back\\slash', False, id='backslash'),
     ],
 )
-async def test_validate_alias(storage_client: StorageClient, alias: str, *, is_valid: bool) -> None:
+async def test_validate_alias(storage_backend: StorageBackend, alias: str, *, is_valid: bool) -> None:
     """Test alias validation logic, including rejection of values that would resolve outside the storage dir."""
     if is_valid:
         # Should not raise.
-        rq = await RequestQueue.open(alias=alias, storage_client=storage_client)
+        rq = await RequestQueue.open(alias=alias, storage_backend=storage_backend)
         await rq.drop()
     else:
         with pytest.raises(ValueError, match=r'Invalid storage alias'):
-            await RequestQueue.open(alias=alias, storage_client=storage_client)
+            await RequestQueue.open(alias=alias, storage_backend=storage_backend)
 
 
 async def test_reclaim_request_with_change_state(rq: RequestQueue) -> None:

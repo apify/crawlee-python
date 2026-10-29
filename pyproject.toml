@@ -288,7 +288,7 @@ python-version = "3.11"
 include = ["src", "tests", "scripts", "docs", "website"]
 exclude = [
     "src/crawlee/project_template",
-    "docs/guides/code_examples/storage_clients/custom_storage_client_example.py",
+    "docs/guides/code_examples/storage_backends/custom_storage_backend_example.py",
     "website/versioned_docs",
 ]
 

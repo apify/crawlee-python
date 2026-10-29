@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 async def suppress_user_warning() -> AsyncGenerator[None, None]:
     """Suppress user warnings during tests.
 
-    Mostly to suppress warnings about the experimental status of the SqlStorageClient.
+    Mostly to suppress warnings about the experimental status of the SqlStorageBackend.
     """
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', UserWarning)
@@ -69,7 +69,7 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
         # Reset the services in the service locator.
         service_locator._configuration = None
         service_locator._event_manager = None
-        service_locator._storage_client = None
+        service_locator._storage_backend = None
         service_locator.storage_instance_manager.clear_cache()
 
         # Verify that the test environment was set up correctly.

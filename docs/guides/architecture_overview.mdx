@@ -200,7 +200,7 @@ They have a similar inheritance structure as the crawlers, with the base class b
 Storages are the components that manage data in Crawlee. They provide a way to store and retrieve data during the crawling process. Crawlee's storage system consists of two main layers:
 
 - **Storages**: High-level interfaces for interacting with different storage types
-- **Storage clients**: Backend implementations that handle the actual data persistence and management (you will learn more about them in the next section)
+- **Storage backends**: Backend implementations that handle the actual data persistence and management (you will learn more about them in the next section)
 
 Crawlee provides three built-in storage types for managing data:
 
@@ -246,14 +246,14 @@ Storage --|> KeyValueStore
 Storage --|> RequestQueue
 ```
 
-## Storage clients
+## Storage backends
 
-Storage clients are the backend implementations for storages that handle interactions with different storage systems. They provide a unified interface for <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, regardless of the underlying storage implementation.
+Storage backends are the backend implementations for storages that handle interactions with different storage systems. They provide a unified interface for <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, regardless of the underlying storage implementation.
 
-Crawlee provides several built-in storage client implementations:
+Crawlee provides several built-in storage backend implementations:
 
-- <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> - Stores data in memory with no persistence (ideal for testing and fast operations).
-- <ApiLink to="class/FileSystemStorageClient">`FileSystemStorageClient`</ApiLink> - Provides persistent file system storage with caching (default client).
+- <ApiLink to="class/MemoryStorageBackend">`MemoryStorageBackend`</ApiLink> - Stores data in memory with no persistence (ideal for testing and fast operations).
+- <ApiLink to="class/FileSystemStorageBackend">`FileSystemStorageBackend`</ApiLink> - Provides persistent file system storage with caching (default backend).
 - [`ApifyStorageClient`](https://docs.apify.com/sdk/python/reference/class/ApifyStorageClient) - Manages storage on the [Apify platform](https://apify.com/) (cloud-based). It is implemented in the [Apify SDK](https://github.com/apify/apify-sdk-python). You can find more information about it in the [Apify SDK documentation](https://docs.apify.com/sdk/python/).
 
 ```mermaid
@@ -269,7 +269,7 @@ classDiagram
 %% Abstract classes
 %% ========================
 
-class StorageClient {
+class StorageBackend {
     <<abstract>>
 }
 
@@ -277,9 +277,9 @@ class StorageClient {
 %% Specific classes
 %% ========================
 
-class MemoryStorageClient
+class MemoryStorageBackend
 
-class FileSystemStorageClient
+class FileSystemStorageBackend
 
 class ApifyStorageClient
 
@@ -287,14 +287,14 @@ class ApifyStorageClient
 %% Inheritance arrows
 %% ========================
 
-StorageClient --|> MemoryStorageClient
-StorageClient --|> FileSystemStorageClient
-StorageClient --|> ApifyStorageClient
+StorageBackend --|> MemoryStorageBackend
+StorageBackend --|> FileSystemStorageBackend
+StorageBackend --|> ApifyStorageClient
 ```
 
-Storage clients can be registered globally with the <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> (you will learn more about the <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> in the next section), passed directly to crawlers, or specified when opening individual storage instances. You can also create custom storage clients by implementing the <ApiLink to="class/StorageClient">`StorageClient`</ApiLink> interface.
+Storage backends can be registered globally with the <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> (you will learn more about the <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> in the next section), passed directly to crawlers, or specified when opening individual storage instances. You can also create custom storage backends by implementing the <ApiLink to="class/StorageBackend">`StorageBackend`</ApiLink> interface.
 
-See the [Storage clients guide](./storage-clients) for more details.
+See the [Storage backends guide](./storage-backends) for more details.
 
 ## Request router
 
@@ -319,7 +319,7 @@ See the [Request router guide](./request-router) for detailed information and ex
 The <ApiLink to="class/ServiceLocator">`ServiceLocator`</ApiLink> is a central registry for global services in Crawlee. It manages and provides access to core services throughout the framework, ensuring consistent configuration across all components. The service locator coordinates these three services:
 
 - <ApiLink to="class/Configuration">`Configuration`</ApiLink> - Application-wide settings and parameters that control various aspects of Crawlee behavior.
-- <ApiLink to="class/StorageClient">`StorageClient`</ApiLink> - Backend implementation for data storage across datasets, key-value stores, and request queues.
+- <ApiLink to="class/StorageBackend">`StorageBackend`</ApiLink> - Backend implementation for data storage across datasets, key-value stores, and request queues.
 - <ApiLink to="class/EventManager">`EventManager`</ApiLink> - Event coordination system for internal framework events and custom user hooks.
 
 Services can be registered globally through the `service_locator` singleton instance, passed to crawler constructors, or provided when opening individual storage instances. The service locator includes conflict prevention mechanisms to ensure configuration consistency and prevent accidental service conflicts during runtime.
