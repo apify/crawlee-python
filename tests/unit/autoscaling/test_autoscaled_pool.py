@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import timedelta
 from itertools import chain, repeat
 from typing import TYPE_CHECKING, TypeVar
 from unittest.mock import AsyncMock, Mock, patch
@@ -192,7 +193,7 @@ async def test_does_not_finish_while_paused(make_concurrency_system: type[Concur
             is_task_ready_function=lambda: future(False),
             is_finished_function=is_finished,
         )
-        pool.pause()
+        await pool.pause()
 
         pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
         try:
@@ -206,6 +207,234 @@ async def test_does_not_finish_while_paused(make_concurrency_system: type[Concur
             await asyncio.gather(pool_run_task, return_exceptions=True)
 
     is_finished.assert_awaited_once()
+
+
+async def test_pause_waits_for_running_tasks(make_concurrency_system: type[ConcurrencySystem]) -> None:
+    """`pause` returns once the tasks in progress finish."""
+    release = asyncio.Event()
+
+    async def wait_for_release(_task_id: str) -> None:
+        await release.wait()
+
+    settings = ConcurrencySettings(min_concurrency=2, max_concurrency=2, desired_concurrency=2)
+
+    async with make_concurrency_system(settings) as concurrency_system:
+        pool = AutoscaledPool(
+            concurrency_system=concurrency_system,
+            consumer=CONSUMER,
+            run_task_function=AsyncMock(side_effect=wait_for_release),
+            is_task_ready_function=lambda: future(True),
+            is_finished_function=lambda: future(False),
+        )
+
+        pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
+        try:
+            assert await poll_until_condition(lambda: pool.own_concurrency == 2)
+
+            pause_task = asyncio.create_task(pool.pause(), name='pause task')
+            await asyncio.sleep(0.1)
+            assert not pause_task.done()
+
+            release.set()
+            await asyncio.wait_for(pause_task, timeout=5)
+
+            assert pool.own_concurrency == 0
+        finally:
+            pool_run_task.cancel()
+            await asyncio.gather(pool_run_task, return_exceptions=True)
+
+
+async def test_repeated_pause_waits(make_concurrency_system: type[ConcurrencySystem]) -> None:
+    """A `pause` on a pool that's already paused waits for the tasks in progress too."""
+    release = asyncio.Event()
+
+    async def wait_for_release(_task_id: str) -> None:
+        await release.wait()
+
+    settings = ConcurrencySettings(min_concurrency=1, max_concurrency=1, desired_concurrency=1)
+
+    async with make_concurrency_system(settings) as concurrency_system:
+        pool = AutoscaledPool(
+            concurrency_system=concurrency_system,
+            consumer=CONSUMER,
+            run_task_function=AsyncMock(side_effect=wait_for_release),
+            is_task_ready_function=lambda: future(True),
+            is_finished_function=lambda: future(False),
+        )
+
+        pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
+        try:
+            assert await poll_until_condition(lambda: pool.own_concurrency == 1)
+
+            first_pause = asyncio.create_task(pool.pause(), name='first pause task')
+            second_pause = asyncio.create_task(pool.pause(), name='second pause task')
+            await asyncio.sleep(0.1)
+            assert not second_pause.done()
+
+            release.set()
+            await asyncio.wait_for(asyncio.gather(first_pause, second_pause), timeout=5)
+        finally:
+            pool_run_task.cancel()
+            await asyncio.gather(pool_run_task, return_exceptions=True)
+
+
+async def test_pause_times_out(make_concurrency_system: type[ConcurrencySystem]) -> None:
+    """A `pause` that its tasks outlast raises `TimeoutError`, and the pool stays paused."""
+    release = asyncio.Event()
+
+    async def wait_for_release(_task_id: str) -> None:
+        await release.wait()
+
+    run = AsyncMock(side_effect=wait_for_release)
+    settings = ConcurrencySettings(min_concurrency=1, max_concurrency=1, desired_concurrency=1)
+
+    async with make_concurrency_system(settings) as concurrency_system:
+        pool = AutoscaledPool(
+            concurrency_system=concurrency_system,
+            consumer=CONSUMER,
+            run_task_function=run,
+            is_task_ready_function=lambda: future(True),
+            is_finished_function=lambda: future(False),
+        )
+
+        pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
+        try:
+            assert await poll_until_condition(lambda: pool.own_concurrency == 1)
+
+            with pytest.raises(TimeoutError, match='did not finish'):
+                await pool.pause(timeout=timedelta(milliseconds=50))
+
+            release.set()
+            assert await poll_until_condition(lambda: pool.own_concurrency == 0)
+            await asyncio.sleep(0.1)
+            run.assert_awaited_once()
+        finally:
+            pool_run_task.cancel()
+            await asyncio.gather(pool_run_task, return_exceptions=True)
+
+
+async def test_resume_during_pause(make_concurrency_system: type[ConcurrencySystem]) -> None:
+    """A `pause` overtaken by `resume` returns once the tasks it found finish, while newer tasks keep running."""
+    first_release = asyncio.Event()
+    later_release = asyncio.Event()
+
+    async def wait_for_release(task_id: str) -> None:
+        release = first_release if task_id == '0' else later_release
+        await release.wait()
+
+    run = AsyncMock(side_effect=wait_for_release)
+    settings = ConcurrencySettings(min_concurrency=1, max_concurrency=1, desired_concurrency=1)
+
+    async with make_concurrency_system(settings) as concurrency_system:
+        pool = AutoscaledPool(
+            concurrency_system=concurrency_system,
+            consumer=CONSUMER,
+            run_task_function=run,
+            is_task_ready_function=lambda: future(True),
+            is_finished_function=lambda: future(False),
+        )
+
+        pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
+        try:
+            assert await poll_until_condition(lambda: pool.own_concurrency == 1)
+
+            pause_task = asyncio.create_task(pool.pause(), name='pause task')
+            await asyncio.sleep(0.1)
+            pool.resume()
+
+            first_release.set()
+            await asyncio.wait_for(pause_task, timeout=5)
+
+            assert await poll_until_condition(lambda: run.await_count == 2)
+            assert pool.own_concurrency == 1
+        finally:
+            later_release.set()
+            pool_run_task.cancel()
+            await asyncio.gather(pool_run_task, return_exceptions=True)
+
+
+@pytest.mark.parametrize(
+    'is_ready',
+    [
+        pytest.param(True, id='task ready'),
+        pytest.param(False, id='no task ready'),
+    ],
+)
+async def test_pause_during_readiness_check(
+    make_concurrency_system: type[ConcurrencySystem], *, is_ready: bool
+) -> None:
+    """A pool paused while `is_task_ready_function` was awaited neither starts a task nor asks if it's finished."""
+    checking = asyncio.Event()
+    answer = asyncio.Event()
+
+    async def answer_after_pause() -> bool:
+        checking.set()
+        await answer.wait()
+        return is_ready
+
+    run = AsyncMock()
+    is_finished = AsyncMock(return_value=False)
+
+    async with make_concurrency_system() as concurrency_system:
+        pool = AutoscaledPool(
+            concurrency_system=concurrency_system,
+            consumer=CONSUMER,
+            run_task_function=run,
+            is_task_ready_function=AsyncMock(side_effect=answer_after_pause),
+            is_finished_function=is_finished,
+        )
+
+        pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
+        try:
+            await asyncio.wait_for(checking.wait(), timeout=5)
+            await pool.pause()
+
+            answer.set()
+            await asyncio.sleep(0.1)
+            run.assert_not_awaited()
+            is_finished.assert_not_awaited()
+        finally:
+            pool_run_task.cancel()
+            await asyncio.gather(pool_run_task, return_exceptions=True)
+
+
+async def test_pause_during_finish_check(make_concurrency_system: type[ConcurrencySystem]) -> None:
+    """A pool paused while `is_finished_function` was awaited finishes only once it's resumed."""
+    checking = asyncio.Event()
+    answer = asyncio.Event()
+
+    async def answer_after_pause() -> bool:
+        checking.set()
+        await answer.wait()
+        return True
+
+    is_finished = AsyncMock(side_effect=answer_after_pause)
+
+    async with make_concurrency_system() as concurrency_system:
+        pool = AutoscaledPool(
+            concurrency_system=concurrency_system,
+            consumer=CONSUMER,
+            run_task_function=AsyncMock(),
+            is_task_ready_function=lambda: future(False),
+            is_finished_function=is_finished,
+        )
+
+        pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
+        try:
+            await asyncio.wait_for(checking.wait(), timeout=5)
+            await pool.pause()
+
+            answer.set()
+            await asyncio.sleep(0.1)
+            assert not pool_run_task.done()
+
+            pool.resume()
+            await asyncio.wait_for(pool_run_task, timeout=5)
+        finally:
+            pool_run_task.cancel()
+            await asyncio.gather(pool_run_task, return_exceptions=True)
+
+    assert is_finished.await_count == 2
 
 
 @pytest.mark.run_alone

@@ -197,6 +197,7 @@ The autoscaling classes now live in the public `crawlee.autoscaling` package, wh
 - `current_concurrency` comes from the concurrency system, so a shared system may count the tasks of other pools too. The pool's own tasks are counted by the new `own_concurrency`.
 - `is_finished_function` is called only when no new task can start and none of the pool's own tasks are in flight, and never while the pool is paused. In v1, it was called on every loop iteration, so a paused pool could finish. A pool whose `is_task_ready_function` keeps resolving to `True` doesn't finish, so make it resolve to `False` once the work runs out.
 - The `cpu_overload_threshold`, `memory_overload_threshold`, `event_loop_overload_threshold` and `client_overload_threshold` options of `SystemStatus` are now the `overloaded_ratio` of the matching signal options in `load_signals`, such as `CpuLoadSignalOptions`. Its `max_snapshot_age` is now the `current_history` of the `ConcurrencySystem`. For details, see [Load signals](../guides/scaling-crawlers#load-signals).
+- `pause()` is a coroutine that returns once the pool's tasks in progress finish. With the new `timeout` option, it raises `TimeoutError` if they take longer, and the pool stays paused. Await it, since a call without `await` doesn't pause the pool.
 
 For example:
 
