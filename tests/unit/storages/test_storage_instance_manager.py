@@ -191,19 +191,19 @@ async def test_drop_only_evicts_own_cache_entry(
 ) -> None:
     """Dropping a storage evicts only its own cache entry; siblings with the same name but a different backend stay."""
     config = Configuration(purge_on_start=True, storage_dir=str(tmp_path))
-    mem_client = MemoryStorageBackend()
-    fs_client = FileSystemStorageBackend()
+    mem_backend = MemoryStorageBackend()
+    fs_backend = FileSystemStorageBackend()
 
     # Two different backend types produce different cache keys under the same name.
-    storage_mem = await storage_type.open(name=name, storage_backend=mem_client, configuration=config)
-    storage_fs = await storage_type.open(name=name, storage_backend=fs_client, configuration=config)
+    storage_mem = await storage_type.open(name=name, storage_backend=mem_backend, configuration=config)
+    storage_fs = await storage_type.open(name=name, storage_backend=fs_backend, configuration=config)
     assert storage_mem is not storage_fs
 
     if drop_first:
         await storage_mem.drop()
-        assert await storage_type.open(name=name, storage_backend=fs_client, configuration=config) is storage_fs
-        assert await storage_type.open(name=name, storage_backend=mem_client, configuration=config) is not storage_mem
+        assert await storage_type.open(name=name, storage_backend=fs_backend, configuration=config) is storage_fs
+        assert await storage_type.open(name=name, storage_backend=mem_backend, configuration=config) is not storage_mem
     else:
         await storage_fs.drop()
-        assert await storage_type.open(name=name, storage_backend=mem_client, configuration=config) is storage_mem
-        assert await storage_type.open(name=name, storage_backend=fs_client, configuration=config) is not storage_fs
+        assert await storage_type.open(name=name, storage_backend=mem_backend, configuration=config) is storage_mem
+        assert await storage_type.open(name=name, storage_backend=fs_backend, configuration=config) is not storage_fs

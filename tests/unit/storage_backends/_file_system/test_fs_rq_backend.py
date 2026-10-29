@@ -174,7 +174,7 @@ async def test_data_persistence_across_reopens() -> None:
     storage_backend = FileSystemStorageBackend()
 
     # Create RQ and add requests
-    original_client = await storage_backend.create_rq_backend(
+    original_backend = await storage_backend.create_rq_backend(
         name='persistence-test',
     )
 
@@ -182,27 +182,27 @@ async def test_data_persistence_across_reopens() -> None:
         Request.from_url('https://example.com/1'),
         Request.from_url('https://example.com/2'),
     ]
-    await original_client.add_batch_of_requests(test_requests)
+    await original_backend.add_batch_of_requests(test_requests)
 
-    rq_id = (await original_client.get_metadata()).id
+    rq_id = (await original_backend.get_metadata()).id
 
     # Reopen by ID and verify requests persist
-    reopened_client = await storage_backend.create_rq_backend(
+    reopened_backend = await storage_backend.create_rq_backend(
         id=rq_id,
     )
 
-    metadata = await reopened_client.get_metadata()
+    metadata = await reopened_backend.get_metadata()
     assert metadata.total_request_count == 2
 
     # Fetch requests to verify they're still there
-    request1 = await reopened_client.fetch_next_request()
-    request2 = await reopened_client.fetch_next_request()
+    request1 = await reopened_backend.fetch_next_request()
+    request2 = await reopened_backend.fetch_next_request()
 
     assert request1 is not None
     assert request2 is not None
     assert {request1.url, request2.url} == {'https://example.com/1', 'https://example.com/2'}
 
-    await reopened_client.drop()
+    await reopened_backend.drop()
 
 
 async def test_snake_case_files_from_v1_are_still_read() -> None:
@@ -221,16 +221,16 @@ async def test_snake_case_files_from_v1_are_still_read() -> None:
         snake_case_data = model.model_validate(data).model_dump(mode='json', by_alias=False)
         path.write_text(json.dumps(snake_case_data))
 
-    reopened_client = await storage_backend.create_rq_backend(id=rq_id)
-    assert (await reopened_client.get_metadata()).total_request_count == 1
+    reopened_backend = await storage_backend.create_rq_backend(id=rq_id)
+    assert (await reopened_backend.get_metadata()).total_request_count == 1
 
-    fetched = await reopened_client.fetch_next_request()
+    fetched = await reopened_backend.fetch_next_request()
     assert fetched is not None
     assert fetched.unique_key == request.unique_key
     assert fetched.label == 'detail'
     assert fetched.crawl_depth == 2
 
-    await reopened_client.drop()
+    await reopened_backend.drop()
 
 
 async def test_in_progress_requests_recovered_after_crash() -> None:
@@ -242,40 +242,40 @@ async def test_in_progress_requests_recovered_after_crash() -> None:
     storage_backend = FileSystemStorageBackend()
 
     # Create RQ and add requests.
-    original_client = await storage_backend.create_rq_backend(name='crash-recovery-test')
+    original_backend = await storage_backend.create_rq_backend(name='crash-recovery-test')
 
     test_requests = [
         Request.from_url('https://example.com/1'),
         Request.from_url('https://example.com/2'),
         Request.from_url('https://example.com/3'),
     ]
-    await original_client.add_batch_of_requests(test_requests)
+    await original_backend.add_batch_of_requests(test_requests)
 
     # Fetch one request, putting it in-progress (simulating work before crash).
-    fetched = await original_client.fetch_next_request()
+    fetched = await original_backend.fetch_next_request()
     assert fetched is not None
 
     # Persist state explicitly (simulating what happens periodically or at crash boundary).
-    await original_client._state.persist_state()
+    await original_backend._state.persist_state()
 
-    rq_id = (await original_client.get_metadata()).id
+    rq_id = (await original_backend.get_metadata()).id
 
     # Simulate crash: reopen the queue without calling mark_request_as_handled or reclaim_request.
-    reopened_client = await storage_backend.create_rq_backend(id=rq_id)
+    reopened_backend = await storage_backend.create_rq_backend(id=rq_id)
 
     # All 3 requests should be fetchable (the in-progress one should have been reclaimed).
     fetched_urls = set()
     for _ in range(3):
-        req = await reopened_client.fetch_next_request()
+        req = await reopened_backend.fetch_next_request()
         assert req is not None, f'Expected 3 fetchable requests, only got {len(fetched_urls)}'
         fetched_urls.add(req.url)
 
     assert fetched_urls == {'https://example.com/1', 'https://example.com/2', 'https://example.com/3'}
 
     # No more requests should be available.
-    assert await reopened_client.fetch_next_request() is None
+    assert await reopened_backend.fetch_next_request() is None
 
-    await reopened_client.drop()
+    await reopened_backend.drop()
 
 
 async def test_get_request_does_not_mark_in_progress(rq_backend: FileSystemRequestQueueBackend) -> None:

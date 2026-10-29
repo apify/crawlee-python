@@ -24,22 +24,22 @@ async def dataset_backend() -> AsyncGenerator[MemoryDatasetBackend, None]:
 async def test_memory_specific_purge_behavior() -> None:
     """Test memory-specific purge behavior and in-memory storage characteristics."""
     # Create dataset and add data
-    dataset_client1 = await MemoryStorageBackend().create_dataset_backend(
+    dataset_backend1 = await MemoryStorageBackend().create_dataset_backend(
         name='test-purge-dataset',
     )
-    await dataset_client1.push_data({'item': 'initial data'})
+    await dataset_backend1.push_data({'item': 'initial data'})
 
     # Verify data was added
-    items = await dataset_client1.get_data()
+    items = await dataset_backend1.get_data()
     assert len(items.items) == 1
 
     # Reopen with same storage backend instance
-    dataset_client2 = await MemoryStorageBackend().create_dataset_backend(
+    dataset_backend2 = await MemoryStorageBackend().create_dataset_backend(
         name='test-purge-dataset',
     )
 
     # Verify data was purged (memory storage specific behavior)
-    items = await dataset_client2.get_data()
+    items = await dataset_backend2.get_data()
     assert len(items.items) == 0
 
 

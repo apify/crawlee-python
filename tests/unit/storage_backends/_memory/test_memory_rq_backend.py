@@ -26,22 +26,22 @@ async def rq_backend() -> AsyncGenerator[MemoryRequestQueueBackend, None]:
 async def test_memory_specific_purge_behavior() -> None:
     """Test memory-specific purge behavior and in-memory storage characteristics."""
     # Create RQ and add data
-    rq_client1 = await MemoryStorageBackend().create_rq_backend(
+    rq_backend1 = await MemoryStorageBackend().create_rq_backend(
         name='test-purge-rq',
     )
     request = Request.from_url(url='https://example.com/initial')
-    await rq_client1.add_batch_of_requests([request])
+    await rq_backend1.add_batch_of_requests([request])
 
     # Verify request was added
-    assert await rq_client1.is_empty() is False
+    assert await rq_backend1.is_empty() is False
 
     # Reopen with same storage backend instance
-    rq_client2 = await MemoryStorageBackend().create_rq_backend(
+    rq_backend2 = await MemoryStorageBackend().create_rq_backend(
         name='test-purge-rq',
     )
 
     # Verify queue was purged (memory storage specific behavior)
-    assert await rq_client2.is_empty() is True
+    assert await rq_backend2.is_empty() is True
 
 
 async def test_add_existing_pending_request_returns_single_processed_request(

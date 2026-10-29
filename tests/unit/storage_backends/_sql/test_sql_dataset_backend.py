@@ -213,26 +213,26 @@ async def test_metadata_record_updates(dataset_backend: SqlDatasetBackend) -> No
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
     """Test that data persists correctly when reopening the same dataset."""
     async with SqlStorageBackend() as storage_backend:
-        original_client = await storage_backend.create_dataset_backend(
+        original_backend = await storage_backend.create_dataset_backend(
             name='persistence-test',
             configuration=configuration,
         )
 
         test_data = {'test_item': 'test_value', 'id': 123}
-        await original_client.push_data(test_data)
+        await original_backend.push_data(test_data)
 
-        dataset_id = (await original_client.get_metadata()).id
+        dataset_id = (await original_backend.get_metadata()).id
 
-        reopened_client = await storage_backend.create_dataset_backend(
+        reopened_backend = await storage_backend.create_dataset_backend(
             id=dataset_id,
             configuration=configuration,
         )
 
-        data = await reopened_client.get_data()
+        data = await reopened_backend.get_data()
         assert len(data.items) == 1
         assert data.items[0] == test_data
 
-        await reopened_client.drop()
+        await reopened_backend.drop()
 
 
 async def test_error_handling_on_push_failure(dataset_backend: SqlDatasetBackend) -> None:

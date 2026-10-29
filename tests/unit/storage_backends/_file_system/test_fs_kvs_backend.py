@@ -209,24 +209,24 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
     storage_backend = FileSystemStorageBackend()
 
     # Create KVS and add data
-    original_client = await storage_backend.create_kvs_backend(name='persistence-test', configuration=configuration)
+    original_backend = await storage_backend.create_kvs_backend(name='persistence-test', configuration=configuration)
 
     test_key = 'persistent-key'
     test_value = 'persistent-value'
-    await original_client.set_value(key=test_key, value=test_value)
+    await original_backend.set_value(key=test_key, value=test_value)
 
-    kvs_id = (await original_client.get_metadata()).id
+    kvs_id = (await original_backend.get_metadata()).id
 
     # Reopen by ID and verify data persists
-    reopened_client = await storage_backend.create_kvs_backend(
+    reopened_backend = await storage_backend.create_kvs_backend(
         id=kvs_id,
     )
 
-    record = await reopened_client.get_value(key=test_key)
+    record = await reopened_backend.get_value(key=test_key)
     assert record is not None
     assert record.value == test_value
 
-    await reopened_client.drop()
+    await reopened_backend.drop()
 
 
 async def test_snake_case_files_from_v1_are_still_read(configuration: Configuration) -> None:
@@ -242,13 +242,13 @@ async def test_snake_case_files_from_v1_are_still_read(configuration: Configurat
         snake_case_data = model.model_validate_json(path.read_text()).model_dump(mode='json', by_alias=False)
         path.write_text(json.dumps(snake_case_data))
 
-    reopened_client = await storage_backend.create_kvs_backend(id=kvs_id, configuration=configuration)
-    assert (await reopened_client.get_metadata()).id == kvs_id
+    reopened_backend = await storage_backend.create_kvs_backend(id=kvs_id, configuration=configuration)
+    assert (await reopened_backend.get_metadata()).id == kvs_id
 
-    record = await reopened_client.get_value(key='key')
+    record = await reopened_backend.get_value(key='key')
     assert record is not None
     assert record.value == 'value'
     assert record.content_type == 'text/plain; charset=utf-8'
-    assert [key.key async for key in reopened_client.iterate_keys()] == ['key']
+    assert [key.key async for key in reopened_backend.iterate_keys()] == ['key']
 
-    await reopened_client.drop()
+    await reopened_backend.drop()

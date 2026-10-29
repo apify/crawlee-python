@@ -25,23 +25,23 @@ async def test_memory_specific_purge_behavior() -> None:
     """Test memory-specific purge behavior and in-memory storage characteristics."""
 
     # Create KVS and add data
-    kvs_client1 = await MemoryStorageBackend().create_kvs_backend(
+    kvs_backend1 = await MemoryStorageBackend().create_kvs_backend(
         name='test-purge-kvs',
     )
-    await kvs_client1.set_value(key='test-key', value='initial value')
+    await kvs_backend1.set_value(key='test-key', value='initial value')
 
     # Verify value was set
-    record = await kvs_client1.get_value(key='test-key')
+    record = await kvs_backend1.get_value(key='test-key')
     assert record is not None
     assert record.value == 'initial value'
 
     # Reopen with same storage backend instance
-    kvs_client2 = await MemoryStorageBackend().create_kvs_backend(
+    kvs_backend2 = await MemoryStorageBackend().create_kvs_backend(
         name='test-purge-kvs',
     )
 
     # Verify value was purged (memory storage specific behavior)
-    record = await kvs_client2.get_value(key='test-key')
+    record = await kvs_backend2.get_value(key='test-key')
     assert record is None
 
 

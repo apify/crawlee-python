@@ -126,10 +126,10 @@ async def test_request_records_persistence(rq_backend: SqlRequestQueueBackend) -
 
     await rq_backend.add_batch_of_requests(requests)
 
-    metadata_client = await rq_backend.get_metadata()
+    metadata = await rq_backend.get_metadata()
 
     async with rq_backend.get_session() as session:
-        stmt = select(RequestDb).where(RequestDb.request_queue_id == metadata_client.id)
+        stmt = select(RequestDb).where(RequestDb.request_queue_id == metadata.id)
         result = await session.execute(stmt)
         db_requests = result.scalars().all()
         assert len(db_requests) == 3
@@ -204,7 +204,7 @@ async def test_metadata_record_updates(rq_backend: SqlRequestQueueBackend) -> No
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
     """Test that data persists correctly when reopening the same request queue."""
     async with SqlStorageBackend() as storage_backend:
-        original_client = await storage_backend.create_rq_backend(
+        original_backend = await storage_backend.create_rq_backend(
             name='persistence-test',
             configuration=configuration,
         )
@@ -213,28 +213,28 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
             Request.from_url('https://example.com/1'),
             Request.from_url('https://example.com/2'),
         ]
-        await original_client.add_batch_of_requests(test_requests)
+        await original_backend.add_batch_of_requests(test_requests)
 
-        rq_id = (await original_client.get_metadata()).id
+        rq_id = (await original_backend.get_metadata()).id
 
         # Reopen by ID and verify data persists
-        reopened_client = await storage_backend.create_rq_backend(
+        reopened_backend = await storage_backend.create_rq_backend(
             id=rq_id,
             configuration=configuration,
         )
 
-        metadata = await reopened_client.get_metadata()
+        metadata = await reopened_backend.get_metadata()
         assert metadata.total_request_count == 2
 
         # Fetch requests to verify they're still there
-        request1 = await reopened_client.fetch_next_request()
-        request2 = await reopened_client.fetch_next_request()
+        request1 = await reopened_backend.fetch_next_request()
+        request2 = await reopened_backend.fetch_next_request()
 
         assert request1 is not None
         assert request2 is not None
         assert {request1.url, request2.url} == {'https://example.com/1', 'https://example.com/2'}
 
-        await reopened_client.drop()
+        await reopened_backend.drop()
 
 
 async def test_error_handling_on_get_metadata_failure(rq_backend: SqlRequestQueueBackend) -> None:

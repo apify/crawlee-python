@@ -125,8 +125,8 @@ async def test_drop_preserves_sibling_index_entries(
 ) -> None:
     """Test that dropping a dataset does not wipe the shared index entries of other datasets."""
     storage_backend = RedisStorageBackend(redis=redis_client)
-    sibling_client = await storage_backend.create_dataset_backend(name='sibling_dataset')
-    sibling_metadata = await sibling_client.get_metadata()
+    sibling_backend = await storage_backend.create_dataset_backend(name='sibling_dataset')
+    sibling_metadata = await sibling_backend.get_metadata()
 
     await dataset_backend.drop()
 

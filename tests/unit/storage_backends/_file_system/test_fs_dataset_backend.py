@@ -163,18 +163,18 @@ async def test_data_persistence_across_reopens() -> None:
     storage_backend = FileSystemStorageBackend()
 
     # Create dataset and add data
-    original_client = await storage_backend.create_dataset_backend(name='persistence-test')
+    original_backend = await storage_backend.create_dataset_backend(name='persistence-test')
 
     test_data = {'test_item': 'test_value', 'id': 123}
-    await original_client.push_data(test_data)
+    await original_backend.push_data(test_data)
 
-    dataset_id = (await original_client.get_metadata()).id
+    dataset_id = (await original_backend.get_metadata()).id
 
     # Reopen by ID and verify data persists
-    reopened_client = await storage_backend.create_dataset_backend(id=dataset_id)
+    reopened_backend = await storage_backend.create_dataset_backend(id=dataset_id)
 
-    data = await reopened_client.get_data()
+    data = await reopened_backend.get_data()
     assert len(data.items) == 1
     assert data.items[0] == test_data
 
-    await reopened_client.drop()
+    await reopened_backend.drop()

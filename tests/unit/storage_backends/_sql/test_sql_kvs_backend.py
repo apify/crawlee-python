@@ -261,28 +261,28 @@ async def test_metadata_record_updates(kvs_backend: SqlKeyValueStoreBackend) -> 
 async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
     """Test that data persists correctly when reopening the same key-value store."""
     async with SqlStorageBackend() as storage_backend:
-        original_client = await storage_backend.create_kvs_backend(
+        original_backend = await storage_backend.create_kvs_backend(
             name='persistence-test',
             configuration=configuration,
         )
 
         test_key = 'persistent-key'
         test_value = 'persistent-value'
-        await original_client.set_value(key=test_key, value=test_value)
+        await original_backend.set_value(key=test_key, value=test_value)
 
-        kvs_id = (await original_client.get_metadata()).id
+        kvs_id = (await original_backend.get_metadata()).id
 
         # Reopen by ID and verify data persists
-        reopened_client = await storage_backend.create_kvs_backend(
+        reopened_backend = await storage_backend.create_kvs_backend(
             id=kvs_id,
             configuration=configuration,
         )
 
-        record = await reopened_client.get_value(key=test_key)
+        record = await reopened_backend.get_value(key=test_key)
         assert record is not None
         assert record.value == test_value
 
-        await reopened_client.drop()
+        await reopened_backend.drop()
 
 
 async def test_error_handling_on_set_failure(kvs_backend: SqlKeyValueStoreBackend) -> None:
