@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Iterable
 from logging import getLogger
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from pydantic.alias_generators import to_camel
@@ -13,6 +13,11 @@ from typing_extensions import override
 from crawlee._request import Request
 from crawlee._utils.docs import docs_group
 from crawlee.request_loaders._request_loader import RequestLoader
+
+from ._types import FinishedStatus, ReadyStatus, WaitingStatus
+
+if TYPE_CHECKING:
+    from ._types import RequestLoaderStatus
 
 logger = getLogger(__name__)
 
@@ -155,14 +160,13 @@ class RequestList(RequestLoader):
         return self._assumed_total_count
 
     @override
-    async def is_empty(self) -> bool:
+    async def check_readiness(self) -> RequestLoaderStatus:
         await self._ensure_next_request()
-        return self._next[0] is None
+        if self._next[0] is not None:
+            return ReadyStatus()
 
-    @override
-    async def is_finished(self) -> bool:
         state = await self._get_state()
-        return len(state.in_progress) == 0 and await self.is_empty()
+        return WaitingStatus() if state.in_progress else FinishedStatus()
 
     @override
     async def fetch_next_request(self) -> Request | None:

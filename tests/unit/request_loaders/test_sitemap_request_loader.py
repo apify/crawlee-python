@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import gzip
 from contextlib import asynccontextmanager
@@ -12,6 +13,7 @@ from crawlee._types import BasicCrawlingContext
 from crawlee._utils.sitemap import DEFAULT_MAX_DEPTH
 from crawlee.crawlers import BasicCrawler
 from crawlee.http_clients._base import HttpClient, HttpResponse
+from crawlee.request_loaders import RequestSourceStatus
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
 from crawlee.storages import KeyValueStore
 from tests.unit.utils import (
@@ -26,6 +28,11 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, AsyncIterator
 
     from crawlee._types import JsonSerializable
+
+
+def finished(readiness: RequestSourceStatus) -> bool:
+    """Tell whether a loader reported that every request has been handled."""
+    return readiness.status == 'finished'
 
 
 def compress_gzip(data: str) -> bytes:
@@ -63,7 +70,7 @@ async def test_nested_sitemap_chain_bounded_by_max_depth() -> None:
     client.stream = stream
 
     loader = SitemapRequestLoader([f'{DEFAULT_URL}sitemap-0.xml'], http_client=client)
-    assert await poll_until_condition(loader.is_finished)
+    assert finished(await poll_until_condition(loader.check_readiness, finished))
 
     assert len(fetched) == DEFAULT_MAX_DEPTH + 1
 
@@ -74,14 +81,13 @@ async def test_sitemap_traversal(server_url: URL, http_client: HttpClient) -> No
     )
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, enqueue_strategy='all')
 
-    while not await sitemap_loader.is_finished():
+    while not finished(await sitemap_loader.check_readiness()):
         item = await sitemap_loader.fetch_next_request()
 
         if item:
             await sitemap_loader.mark_request_as_handled(item)
 
-    assert await sitemap_loader.is_empty()
-    assert await sitemap_loader.is_finished()
+    assert (await sitemap_loader.check_readiness()).status == 'finished'
     assert await sitemap_loader.get_total_count() == 5
     assert await sitemap_loader.get_handled_count() == 5
 
@@ -95,7 +101,7 @@ async def test_sitemap_http_error_is_retried_before_loading_requests(monkeypatch
     )
     loader = SitemapRequestLoader([sitemap_url], http_client=client)
 
-    while not await loader.is_finished():
+    while not finished(await loader.check_readiness()):
         request = await loader.fetch_next_request()
         if request:
             await loader.mark_request_as_handled(request)
@@ -135,11 +141,11 @@ async def test_sitemap_loader_drains_requests_after_later_source_fails(monkeypat
         assert request is not None
         requests.append(request)
 
-    assert not await loader.is_finished()
+    assert not finished(await loader.check_readiness())
     for request in requests:
         await loader.mark_request_as_handled(request)
 
-    assert await poll_until_condition(loader.is_finished)
+    assert finished(await poll_until_condition(loader.check_readiness, finished))
 
 
 async def test_sitemap_loader_continues_after_earlier_source_fails(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -154,7 +160,7 @@ async def test_sitemap_loader_continues_after_earlier_source_fails(monkeypatch: 
     loader = SitemapRequestLoader([f'{DEFAULT_URL}broken.xml', f'{DEFAULT_URL}sitemap.xml'], http_client=client)
 
     urls = []
-    while not await loader.is_finished():
+    while not finished(await loader.check_readiness()):
         request = await loader.fetch_next_request()
         if request:
             urls.append(request.url)
@@ -187,7 +193,8 @@ async def test_crawler_tandem_continues_when_sitemap_is_dead(monkeypatch: pytest
     assert stats.requests_failed == 0
 
 
-async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL, http_client: HttpClient) -> None:
+async def test_readiness_during_traversal(server_url: URL, http_client: HttpClient) -> None:
+    """Test that the loader waits for fetched requests and finishes once they're all handled."""
     sitemap_url = (server_url / 'sitemap.xml').with_query(
         base64=encode_base64(get_basic_sitemap(url=server_url).encode())
     )
@@ -198,18 +205,30 @@ async def test_is_empty_does_not_depend_on_fetch_next_request(server_url: URL, h
     for _ in range(5):
         item = await sitemap_loader.fetch_next_request()
         assert item is not None
-        assert not await sitemap_loader.is_finished()
+        assert not finished(await sitemap_loader.check_readiness())
         items.append(item)
 
-    assert await sitemap_loader.is_empty()
-    assert not await sitemap_loader.is_finished()
+    assert (await sitemap_loader.check_readiness()).status == 'waiting'
 
     for item in items:
         await sitemap_loader.mark_request_as_handled(item)
 
-    assert await sitemap_loader.is_empty()
+    assert (await sitemap_loader.check_readiness()).status != 'ready'
+    assert finished(await poll_until_condition(sitemap_loader.check_readiness, finished))
 
-    assert await poll_until_condition(sitemap_loader.is_finished)
+
+async def test_fetch_none_while_in_progress(server_url: URL, http_client: HttpClient) -> None:
+    """Test that a fetch after the last URL returns `None` while that URL is still in progress."""
+    sitemap_url = (server_url / 'sitemap.xml').with_query(
+        base64=encode_base64(get_basic_sitemap(url=server_url).encode())
+    )
+    sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, enqueue_strategy='all')
+
+    for _ in range(5):
+        assert await sitemap_loader.fetch_next_request() is not None
+
+    assert await asyncio.wait_for(sitemap_loader.fetch_next_request(), timeout=5) is None
+    assert (await sitemap_loader.check_readiness()).status == 'waiting'
 
 
 async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -> None:
@@ -224,8 +243,7 @@ async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -
     assert item is not None
     await sitemap_loader.mark_request_as_handled(item)
 
-    assert not await sitemap_loader.is_empty()
-    assert not await sitemap_loader.is_finished()
+    assert (await sitemap_loader.check_readiness()).status == 'ready'
 
     await sitemap_loader.abort_loading()
 
@@ -233,7 +251,7 @@ async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -
     assert item is not None
     await sitemap_loader.mark_request_as_handled(item)
 
-    assert await sitemap_loader.is_finished()
+    assert (await sitemap_loader.check_readiness()).status == 'finished'
 
 
 async def test_create_persist_state_for_sitemap_loading(
@@ -246,7 +264,7 @@ async def test_create_persist_state_for_sitemap_loading(
     sitemap_loader = SitemapRequestLoader(
         [str(sitemap_url)], http_client=http_client, persist_state_key=persist_key, enqueue_strategy='all'
     )
-    assert await sitemap_loader.is_finished() is False
+    assert not finished(await sitemap_loader.check_readiness())
 
     await sitemap_loader.close()
 
@@ -268,7 +286,9 @@ async def test_data_persistence_for_sitemap_loading(
     )
 
     # Give time to load.
-    await poll_until_condition(sitemap_loader.is_empty, lambda is_empty: not is_empty, timeout=10)
+    await poll_until_condition(
+        sitemap_loader.check_readiness, lambda readiness: readiness.status == 'ready', timeout=10
+    )
 
     await sitemap_loader.close()
 
@@ -332,7 +352,7 @@ async def test_transform_request_function(server_url: URL, http_client: HttpClie
 
     extracted_urls = set()
 
-    while not await sitemap_loader.is_finished():
+    while not finished(await sitemap_loader.check_readiness()):
         request = await sitemap_loader.fetch_next_request()
 
         if request:
@@ -361,7 +381,7 @@ async def test_transform_request_function_with_skip(server_url: URL, http_client
         enqueue_strategy='all',
     )
 
-    while not await sitemap_loader.is_finished():
+    while not finished(await sitemap_loader.check_readiness()):
         request = await sitemap_loader.fetch_next_request()
 
         if request:
@@ -369,8 +389,7 @@ async def test_transform_request_function_with_skip(server_url: URL, http_client
 
     # Even though the sitemap had URLs, all were skipped, so the loader should be empty and finished with
     # 0 handled requests.
-    assert await sitemap_loader.is_empty()
-    assert await sitemap_loader.is_finished()
+    assert (await sitemap_loader.check_readiness()).status == 'finished'
     assert await sitemap_loader.get_total_count() == 0
     assert await sitemap_loader.get_handled_count() == 0
 
@@ -386,17 +405,15 @@ async def test_sitemap_loader_to_tandem(
     sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, enqueue_strategy='all')
     request_manager = await sitemap_loader.to_tandem()
 
-    while not await sitemap_loader.is_finished():
+    while not finished(await sitemap_loader.check_readiness()):
         request = await request_manager.fetch_next_request()
 
         if request:
             await request_manager.mark_request_as_handled(request)
 
-    assert await sitemap_loader.is_empty()
-    assert await sitemap_loader.is_finished()
+    assert (await sitemap_loader.check_readiness()).status == 'finished'
 
-    assert await request_manager.is_empty()
-    assert await request_manager.is_finished()
+    assert (await request_manager.check_readiness()).status == 'finished'
 
 
 async def test_sitemap_loader_to_tandem_with_request_dropped(
@@ -417,17 +434,15 @@ async def test_sitemap_loader_to_tandem_with_request_dropped(
     with patch.object(
         request_manager._read_write_manager, 'add_request', side_effect=Exception('Failed to add request')
     ):
-        while not await sitemap_loader.is_finished():
+        while not finished(await sitemap_loader.check_readiness()):
             request = await request_manager.fetch_next_request()
 
             if request:
                 await request_manager.mark_request_as_handled(request)
 
-        assert await sitemap_loader.is_empty()
-        assert await sitemap_loader.is_finished()
+        assert (await sitemap_loader.check_readiness()).status == 'finished'
 
-        assert await request_manager.is_empty()
-        assert await request_manager.is_finished()
+        assert (await request_manager.check_readiness()).status == 'finished'
 
 
 def _make_urlset(urls: list[str]) -> str:
@@ -462,7 +477,7 @@ async def test_sitemap_loader_filters_cross_host_urls(server_url: URL, http_clie
     loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client)
 
     fetched: list[str] = []
-    while not await loader.is_finished():
+    while not finished(await loader.check_readiness()):
         request = await loader.fetch_next_request()
         if request is not None:
             fetched.append(request.url)
@@ -482,7 +497,7 @@ async def test_sitemap_loader_filters_cross_host_nested_sitemap(server_url: URL,
     loader = SitemapRequestLoader([index_url], http_client=http_client)
 
     fetched: list[str] = []
-    while not await loader.is_finished():
+    while not finished(await loader.check_readiness()):
         request = await loader.fetch_next_request()
         if request is not None:
             fetched.append(request.url)
@@ -513,7 +528,7 @@ async def test_sitemap_loader_strategy_all_disables_filtering(server_url: URL, h
     loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, enqueue_strategy='all')
 
     fetched: list[str] = []
-    while not await loader.is_finished():
+    while not finished(await loader.check_readiness()):
         request = await loader.fetch_next_request()
         if request is not None:
             fetched.append(request.url)
@@ -535,7 +550,7 @@ async def test_sitemap_loader_drops_non_http_scheme_under_strategy_all(
     loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, enqueue_strategy='all')
 
     fetched: list[str] = []
-    while not await loader.is_finished():
+    while not finished(await loader.check_readiness()):
         request = await loader.fetch_next_request()
         if request is not None:
             fetched.append(request.url)

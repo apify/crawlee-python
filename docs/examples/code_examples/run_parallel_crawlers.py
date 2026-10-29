@@ -79,7 +79,7 @@ async def main() -> None:
         await parsel_crawler.run(['https://crawlee.dev/blog'])
 
         # Wait for the Playwright crawler to finish processing all requests
-        while not await playwright_rq.is_empty():
+        while (await playwright_rq.check_readiness()).status != 'finished':
             playwright_crawler.log.info('Waiting for Playwright crawler to finish...')
             await asyncio.sleep(5)
 

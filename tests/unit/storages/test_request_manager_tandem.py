@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from unittest.mock import create_autospec
 
 import pytest
 
 from crawlee import Request
-from crawlee.request_loaders import RequestLoader, RequestManager, RequestManagerTandem
+from crawlee.request_loaders import (
+    FinishedStatus,
+    ReadyStatus,
+    RequestLoader,
+    RequestManager,
+    RequestManagerTandem,
+    RequestSourceStatus,
+    StalledStatus,
+    WaitingStatus,
+)
 from crawlee.storages import RequestQueue
 
 
@@ -57,6 +67,7 @@ class TestInput:
     ],
 )
 async def test_basic_functionality(test_input: TestInput) -> None:
+    """Test that the tandem serves requests from both the loader and the manager."""
     request_queue = await RequestQueue.open()
 
     if test_input.request_manager_items:
@@ -64,12 +75,14 @@ async def test_basic_functionality(test_input: TestInput) -> None:
 
     mock_request_loader = create_autospec(RequestLoader, instance=True, spec_set=True)
     mock_request_loader.fetch_next_request.side_effect = lambda: test_input.request_loader_items.pop(0)
-    mock_request_loader.is_finished.side_effect = lambda: len(test_input.request_loader_items) == 0
+    mock_request_loader.check_readiness.side_effect = lambda: (
+        ReadyStatus() if test_input.request_loader_items else FinishedStatus()
+    )
 
     tandem = RequestManagerTandem(mock_request_loader, request_queue)
     processed = set[str]()
 
-    while not await tandem.is_finished():
+    while (await tandem.check_readiness()).status != 'finished':
         request = await tandem.fetch_next_request()
         assert request is not None
         processed.add(request.url)
@@ -91,3 +104,56 @@ async def test_purge_forwards_to_the_manager() -> None:
 
     manager.purge.assert_awaited_once_with()
     assert loader.mock_calls == []
+
+
+READY_AT = datetime(2026, 1, 1, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ('loader_status', 'manager_status', 'expected'),
+    [
+        pytest.param(ReadyStatus(), FinishedStatus(), ReadyStatus(), id='ready loader'),
+        pytest.param(
+            FinishedStatus(), WaitingStatus(ready_at=READY_AT), WaitingStatus(ready_at=READY_AT), id='waiting'
+        ),
+        pytest.param(WaitingStatus(), StalledStatus('stuck'), WaitingStatus(), id='waiting masks stalled'),
+        pytest.param(FinishedStatus(), StalledStatus('stuck'), StalledStatus('stuck'), id='stalled'),
+        pytest.param(FinishedStatus(), FinishedStatus(), FinishedStatus(), id='finished'),
+    ],
+)
+async def test_readiness_joins_sources(
+    loader_status: RequestSourceStatus,
+    manager_status: RequestSourceStatus,
+    expected: RequestSourceStatus,
+) -> None:
+    """Test that the tandem reports the loader and the manager as one source."""
+    loader = create_autospec(RequestLoader, instance=True, spec_set=True)
+    loader.check_readiness.return_value = loader_status
+    manager = create_autospec(RequestManager, instance=True, spec_set=True)
+    manager.check_readiness.return_value = manager_status
+
+    assert await RequestManagerTandem(loader, manager).check_readiness() == expected
+
+
+async def test_ready_loader_skips_manager() -> None:
+    """Test that a ready loader answers without probing the manager."""
+    loader = create_autospec(RequestLoader, instance=True, spec_set=True)
+    loader.check_readiness.return_value = ReadyStatus()
+    manager = create_autospec(RequestManager, instance=True, spec_set=True)
+
+    assert (await RequestManagerTandem(loader, manager).check_readiness()).status == 'ready'
+    manager.check_readiness.assert_not_awaited()
+
+
+async def test_transfers_only_when_loader_ready() -> None:
+    """Test that a loader that isn't ready doesn't block the manager's requests."""
+    loader = create_autospec(RequestLoader, instance=True, spec_set=True)
+    loader.check_readiness.return_value = WaitingStatus()
+    manager = create_autospec(RequestManager, instance=True, spec_set=True)
+    manager.fetch_next_request.return_value = Request.from_url('https://a.placeholder.com')
+
+    request = await RequestManagerTandem(loader, manager).fetch_next_request()
+
+    assert request is not None
+    assert request.url == 'https://a.placeholder.com'
+    loader.fetch_next_request.assert_not_awaited()
