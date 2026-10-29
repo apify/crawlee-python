@@ -143,9 +143,9 @@ See the [HTTP clients guide](./http-clients) for the libraries these clients wra
 
 ### Storage backends
 
-A storage backend is the backend behind Crawlee's three storages. <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> are the API you write against, and the storage backend decides where that data actually lives. That separation is what lets you move a crawler from the local file system to a database or a cloud service without changing crawl code.
+A storage backend is the layer behind Crawlee's three storages. <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> are the API you write against, and the storage backend decides where that data actually lives. That separation is what lets you move a crawler from the local file system to a database or a cloud service without changing crawl code.
 
-The <ApiLink to="class/StorageBackend">`StorageBackend`</ApiLink> contract defines three factory methods: `create_dataset_backend`, `create_kvs_backend`, and `create_rq_backend`. The returned clients define the rest of the contract:
+The <ApiLink to="class/StorageBackend">`StorageBackend`</ApiLink> contract defines three factory methods: `create_dataset_backend`, `create_kvs_backend`, and `create_rq_backend`. The returned backends define the rest of the contract:
 
 - <ApiLink to="class/DatasetBackend">`DatasetBackend`</ApiLink> handles appending and reading items.
 - <ApiLink to="class/KeyValueStoreBackend">`KeyValueStoreBackend`</ApiLink> handles record access and iteration.
@@ -153,7 +153,7 @@ The <ApiLink to="class/StorageBackend">`StorageBackend`</ApiLink> contract defin
 
 A custom backend implements all four classes.
 
-See the [Storage backends guide](./storage-backends) for the built-in implementations and a custom client example.
+See the [Storage backends guide](./storage-backends) for the built-in implementations and a custom backend example.
 
 ### Browser plugins
 

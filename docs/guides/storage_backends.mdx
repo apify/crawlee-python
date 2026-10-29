@@ -553,6 +553,6 @@ You can also register different storage backends for each storage instance, allo
 
 ## Conclusion
 
-Storage backends in Crawlee provide different backends for data storage. Use <ApiLink to="class/MemoryStorageBackend">`MemoryStorageBackend`</ApiLink> for testing and fast operations without persistence, or <ApiLink to="class/FileSystemStorageBackend">`FileSystemStorageBackend`</ApiLink> for environments where data needs to persist. You can also create custom storage backends for specialized backends by implementing the <ApiLink to="class/StorageBackend">`StorageBackend`</ApiLink> interface.
+Storage backends in Crawlee decide where your data is stored. Use <ApiLink to="class/MemoryStorageBackend">`MemoryStorageBackend`</ApiLink> for testing and fast operations without persistence, or <ApiLink to="class/FileSystemStorageBackend">`FileSystemStorageBackend`</ApiLink> for environments where data needs to persist. You can also create custom storage backends for specialized storage systems by implementing the <ApiLink to="class/StorageBackend">`StorageBackend`</ApiLink> interface.
 
 If you have questions or need assistance, feel free to reach out on our [GitHub](https://github.com/apify/crawlee-python) or join our [Discord community](https://discord.com/invite/jyEM2PRvMU). Happy scraping!

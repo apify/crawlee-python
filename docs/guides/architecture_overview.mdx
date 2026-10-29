@@ -200,7 +200,7 @@ They have a similar inheritance structure as the crawlers, with the base class b
 Storages are the components that manage data in Crawlee. They provide a way to store and retrieve data during the crawling process. Crawlee's storage system consists of two main layers:
 
 - **Storages**: High-level interfaces for interacting with different storage types
-- **Storage backends**: Backend implementations that handle the actual data persistence and management (you will learn more about them in the next section)
+- **Storage backends**: Implementations that handle the actual data persistence and management (you will learn more about them in the next section)
 
 Crawlee provides three built-in storage types for managing data:
 
@@ -248,7 +248,7 @@ Storage --|> RequestQueue
 
 ## Storage backends
 
-Storage backends are the backend implementations for storages that handle interactions with different storage systems. They provide a unified interface for <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, regardless of the underlying storage implementation.
+Storage backends are the implementations behind storages that handle interactions with different storage systems. They provide a unified interface for <ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, and <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, regardless of the underlying storage implementation.
 
 Crawlee provides several built-in storage backend implementations:
 
