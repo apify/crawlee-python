@@ -201,6 +201,36 @@ for urls in batches:
 
 In v1, `RequestQueue.purge()` worked around a storage client that didn't support purging. It dropped an unnamed queue and opened the default queue in its place, and it skipped a named queue with a warning. In v2, it raises the client's `NotImplementedError`, the same as Crawlee JS. The Apify platform's storage client doesn't support purging, so on the platform, call `drop()` or open a new queue instead.
 
+## `check_readiness` replaces `is_empty` and `is_finished`
+
+`RequestLoader` and `RequestManager` no longer have `is_empty` and `is_finished`. A single `check_readiness` method replaces them and returns one of four statuses:
+
+- `ReadyStatus`: the next `fetch_next_request` call is expected to return a request.
+- `WaitingStatus`: nothing can be fetched right now, but the source isn't done. Requests are in progress, are being added in the background, or are held back until `ready_at`.
+- `StalledStatus`: the source holds requests it can't make progress on, as explained in `reason`. `ThrottlingRequestManager` reports it, and `RequestManagerTandem` passes it on from the manager it wraps.
+- `FinishedStatus`: every request has been handled.
+
+Each of these classes also has a `status` attribute set to `'ready'`, `'waiting'`, `'stalled'` or `'finished'`, so a check doesn't need an import.
+
+The change covers `RequestQueue`, `RequestList`, `SitemapRequestLoader`, `RequestManagerTandem` and `ThrottlingRequestManager`. `ThrottlingRequestManager.get_stall_reason` is removed too, since a stall is now reported as `StalledStatus`. Unlike `get_stall_reason`, the manager reports a stall only while no request outside the stalled domains is in progress or still being added, since such a request may still add work. Storage clients keep `is_empty` and `is_finished`.
+
+```python
+# v1
+has_requests = not await rq.is_empty()
+done = await rq.is_finished()
+
+# v2
+readiness = await rq.check_readiness()
+has_requests = readiness.status == 'ready'
+done = readiness.status == 'finished'
+```
+
+If you have a custom request loader or manager, replace `is_empty` and `is_finished` with `check_readiness`. Return `ReadyStatus` as soon as a request can be fetched, before checking anything else, since the crawler calls the method often. Never return `FinishedStatus` while requests are still pending or in progress. A loader doesn't return `StalledStatus`.
+
+A `None` from `fetch_next_request` no longer means the loader is finished. It only means nothing is pending right now. `RequestManagerTandem` now moves a request from its loader only when the loader is ready, so a `SitemapRequestLoader` that's still loading sitemaps no longer holds up the requests already in the manager.
+
+The crawler now reads a stall from the status, so it also sees a `ThrottlingRequestManager` wrapped in a `RequestManagerTandem`. Such a crawl now ends with `PersistentRateLimitError` once a domain stalls, as it already did with a `ThrottlingRequestManager` passed directly. Before, the crawler didn't detect the stall.
+
 ## Logs changed
 
 If you configure loggers by name or match log messages, update them for the following changes.
@@ -238,3 +268,7 @@ The crawler logs the first message once per run, the next time it looks for a ne
 When a crawl processes no requests because its request manager holds only handled ones, the crawler logs a new warning. It starts with `This crawl processed no requests` and explains how to crawl the requests again.
 
 `RequestQueue.purge()` no longer logs the `Storage client "..." does not support purging the request queue.` warnings. It raises `NotImplementedError` instead. For details, see [`RequestQueue.purge` raises when the storage client can't purge](#requestqueuepurge-raises-when-the-storage-client-cant-purge).
+
+The ERROR message the crawler logs before raising `PersistentRateLimitError` now reads "Giving up the crawl because the request manager can't make progress." instead of "Giving up the crawl because a domain keeps rate-limiting every request."
+
+The two DEBUG messages that `RequestQueue.is_finished` logged, "Background add requests tasks are still in progress." and "The request queue is finished.", are removed together with the method.

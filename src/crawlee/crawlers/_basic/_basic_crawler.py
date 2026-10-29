@@ -823,7 +823,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 request_manager = await self.get_request_manager()
                 # The diagnostic must never fail the run.
                 try:
-                    is_finished = await request_manager.is_finished()
+                    is_finished = (await request_manager.check_readiness()).status == 'finished'
                     handled_count = await request_manager.get_handled_count()
                 except Exception:
                     is_finished = False
@@ -1505,20 +1505,17 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if self._keep_alive:
             return False
 
+        request_manager = await self.get_request_manager()
+        readiness = await request_manager.check_readiness()
+
         # The pool asks only while none of this crawler's requests are in flight, so none of them can still enqueue
         # new work or end the stall.
-        if (
-            isinstance(self._request_manager, ThrottlingRequestManager)
-            and (reason := await self._request_manager.get_stall_reason()) is not None
-        ):
-            error = PersistentRateLimitError(f'Giving up: {reason}')
-            self._logger.error(
-                'Giving up the crawl because a domain keeps rate-limiting every request.', exc_info=error
-            )
+        if readiness.status == 'stalled':
+            error = PersistentRateLimitError(f'Giving up: {readiness.reason}')
+            self._logger.error("Giving up the crawl because the request manager can't make progress.", exc_info=error)
             raise error
 
-        request_manager = await self.get_request_manager()
-        return await request_manager.is_finished()
+        return readiness.status == 'finished'
 
     async def __is_task_ready_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
@@ -1535,7 +1532,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return False
 
         request_manager = await self.get_request_manager()
-        return not await request_manager.is_empty()
+        return (await request_manager.check_readiness()).status == 'ready'
 
     async def __run_task_function(self, task_id: str) -> None:  # noqa: ARG002
         request_manager = await self.get_request_manager()
