@@ -157,6 +157,50 @@ async def test_runtime_stops_growing_after_run_finishes() -> None:
     assert statistics.state.crawler_runtime == runtime_after_exit
 
 
+async def test_validated_finished_state_reports_persisted_runtime() -> None:
+    """A state persisted after a finished run reports the same runtime when validated back into the model."""
+    async with Statistics.with_default_state() as statistics:
+        assert statistics.state.crawler_last_started_at
+        statistics.state.crawler_last_started_at -= timedelta(seconds=10)
+
+    serialized = statistics.state.model_dump(mode='json', by_alias=True)
+    restored = StatisticsState.model_validate(serialized)
+
+    assert abs(restored.crawler_runtime - statistics.state.crawler_runtime) < timedelta(milliseconds=1)
+
+
+async def test_validated_mid_run_checkpoint_excludes_downtime() -> None:
+    """A state checkpointed mid-run reports the runtime up to the persist, without the downtime that follows."""
+    now = datetime.now(UTC)
+    run_started_at = now - timedelta(hours=2)
+    runtime_at_persist = timedelta(seconds=10)
+
+    restored = StatisticsState.model_validate(
+        {
+            'crawlerStartedAt': run_started_at.isoformat(),
+            'crawlerLastStartTimestamp': run_started_at.isoformat(),
+            'crawlerFinishedAt': None,
+            'statsPersistedAt': (run_started_at + runtime_at_persist).isoformat(),
+            'crawlerRuntimeMillis': runtime_at_persist.total_seconds() * 1000,
+        }
+    )
+
+    assert restored.crawler_runtime == runtime_at_persist
+
+
+def test_state_built_from_timestamps_measures_the_run() -> None:
+    """A state that was never persisted measures its run from the start and finish timestamps."""
+    run_started_at = datetime(2026, 1, 1, tzinfo=UTC)
+    run_duration = timedelta(seconds=10)
+
+    state = StatisticsState(
+        crawler_last_started_at=run_started_at,
+        crawler_finished_at=run_started_at + run_duration,
+    )
+
+    assert state.crawler_runtime == run_duration
+
+
 async def test_runtime_carries_over_between_runs() -> None:
     """A second run continues accumulating the runtime from the total persisted by the first run."""
     key = 'statistics_restored_runtime'

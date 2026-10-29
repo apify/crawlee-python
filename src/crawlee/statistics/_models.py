@@ -110,12 +110,16 @@ class StatisticsState(BaseModel):
     ] = {}
 
     accumulated_runtime: Annotated[timedelta_ms, Field(alias='crawlerRuntimeMillis')] = timedelta()
-    """The runtime accumulated by the previous runs of the crawler, excluding the run in progress."""
+    """The runtime accumulated by the previous runs of the crawler, up to the last persist."""
 
     @property
     def crawler_runtime(self) -> timedelta:
         """The total runtime of the crawler, accumulated over all its runs."""
         if self.crawler_last_started_at is None:
+            return self.accumulated_runtime
+        # Every persist checkpoints the live total, so in a state restored from a persist, the run that was in
+        # progress at that time is already included in `accumulated_runtime`. Its timestamps must not add it again.
+        if self.stats_persisted_at is not None and self.crawler_last_started_at <= self.stats_persisted_at:
             return self.accumulated_runtime
         finished_at = self.crawler_finished_at or datetime.now(UTC)
         return self.accumulated_runtime + max(timedelta(), finished_at - self.crawler_last_started_at)
