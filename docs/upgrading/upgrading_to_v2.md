@@ -275,8 +275,8 @@ The two DEBUG messages that `RequestQueue.is_finished` logged, "Background add r
 
 ## Session retirement is permanent
 
-`Session.retire()` permanently retires the session. Calling `mark_good()` on a retired session leaves its error score and usage count unchanged. Create a new session to replace a retired one. Repeated calls to `retire()` leave the error score unchanged.
+`Session.retire()` permanently retires the session. Calling `mark_good()` on a retired session leaves its error score and usage count unchanged. Create a new session to replace a retired one. Calling `retire()` on a session that is already retired leaves its error score unchanged.
 
-The `Session.retired` property indicates whether a session has been retired. Sessions that expire or reach their usage limit retire without an additional error score penalty, so `is_blocked` continues to indicate whether the error score reached its limit.
+The `Session.retired` property indicates whether a session has been retired. Sessions that expire, reach their usage limit, or reach their error score limit through `mark_bad()` retire without an additional `max_error_score` penalty, so `is_blocked` continues to indicate whether the error score reached its limit.
 
 Session state includes a `retired` flag, which is preserved when the session pool is saved and restored. Saved sessions without this field load with `retired=False` and retain their existing error scores and usage limits.

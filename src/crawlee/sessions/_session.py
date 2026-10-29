@@ -200,7 +200,10 @@ class Session:
         return model
 
     def mark_good(self) -> None:
-        """Mark the session as good. Should be called after a successful session usage."""
+        """Mark the session as good. Should be called after a successful session usage.
+
+        A retired session is left unchanged.
+        """
         if self._retired:
             return
 
@@ -223,7 +226,7 @@ class Session:
             self._retired = True
 
     def retire(self) -> None:
-        """Permanently retire the session and increase its error score once.
+        """Permanently retire the session and add `max_error_score` to its error score, unless it is already retired.
 
         This method should be used if the session usage was unsuccessful and you are sure that it is because of
         the session configuration and not any external matters. For example when server returns 403 status code.
