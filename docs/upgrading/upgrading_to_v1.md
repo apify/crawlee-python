@@ -115,7 +115,7 @@ Some changes in the related model classes:
 
 In v1.0, the storage client system has been completely reworked to simplify implementation and make custom storage clients easier to write.
 
-See the [Storage backends guide](https://crawlee.dev/python/docs/guides/storage-backends) for more details.
+See the [Storage clients guide](https://crawlee.dev/python/docs/guides/storage-clients) for more details.
 
 ### New dedicated storage clients
 
