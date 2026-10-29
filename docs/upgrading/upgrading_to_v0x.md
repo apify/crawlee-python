@@ -39,7 +39,7 @@ CLI dependencies have been moved to optional dependencies. If you need the CLI, 
 
 We decided to move away from [Hungarian notation](https://en.wikipedia.org/wiki/Hungarian_notation) and remove all the `Base` prefixes from the abstract classes. It includes the following public classes:
 
-- `BaseStorageBackend` -> `StorageBackend`
+- `BaseStorageClient` -> `StorageClient`
 - `BaseBrowserController` -> `BrowserController`
 - `BaseBrowserPlugin` -> `BrowserPlugin`
 
@@ -63,16 +63,16 @@ Example update:
 + from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 ```
 
-### Storage backends
+### Storage clients
 
-- All storage backend classes have been moved into a single sub-package called `storage_backends`.
-- The affected classes include: `MemoryStorageBackend`, `BaseStorageBackend`.
+- All storage client classes have been moved into a single sub-package called `storage_clients`.
+- The affected classes include: `MemoryStorageClient`, `BaseStorageClient`.
 
 Example update:
 
 ```diff
-- from crawlee.memory_storage_backend import MemoryStorageBackend
-+ from crawlee.storage_backends import MemoryStorageBackend
+- from crawlee.memory_storage_client import MemoryStorageClient
++ from crawlee.storage_clients import MemoryStorageClient
 ```
 
 ### CurlImpersonateHttpClient
@@ -94,7 +94,7 @@ Example update:
 ### Service locator
 
 - The `crawlee.service_container` was completely refactored and renamed to `crawlee.service_locator`.
-- You can use it to set the configuration, event manager or storage backend globally. Or you can pass them to your crawler instance directly and it will use the service locator under the hood.
+- You can use it to set the configuration, event manager or storage client globally. Or you can pass them to your crawler instance directly and it will use the service locator under the hood.
 
 ### Statistics
 
@@ -103,7 +103,7 @@ Example update:
 
 ### Request
 
-- The properties `json_` and `order_no` were removed. They were there only for the internal purpose of the memory storage backend, you should not need them.
+- The properties `json_` and `order_no` were removed. They were there only for the internal purpose of the memory storage client, you should not need them.
 
 ### Request storages and loaders
 
@@ -166,9 +166,9 @@ Here is a list of the updated public imports:
 
 There were internal changes that should not affect the intended usage:
 
-- The unused `BaseRequestQueueBackend.list_requests()` method was removed
+- The unused `BaseRequestQueueClient.list_requests()` method was removed
 - `RequestQueue` internals were updated to match the "Request Queue V2" implementation in Crawlee for JS
 
 ### Service container
 
-A new module, `crawlee.service_container`, was added to allow management of "global instances" - currently it contains `Configuration`, `EventManager` and `BaseStorageBackend`. The module also replaces the `StorageBackendManager` static class. It is likely that its interface will change in the future. If your use case requires working with it, please get in touch - we'll be glad to hear any feedback.
+A new module, `crawlee.service_container`, was added to allow management of "global instances" - currently it contains `Configuration`, `EventManager` and `BaseStorageClient`. The module also replaces the `StorageClientManager` static class. It is likely that its interface will change in the future. If your use case requires working with it, please get in touch - we'll be glad to hear any feedback.
