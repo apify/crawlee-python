@@ -45,6 +45,7 @@ class Session:
         usage_count: int = 0,
         max_usage_count: int = 50,
         error_score: float = 0.0,
+        retired: bool = False,
         cookies: SessionCookies | CookieJar | dict[str, str] | list[CookieParam] | None = None,
         blocked_status_codes: list | None = None,
     ) -> None:
@@ -60,6 +61,7 @@ class Session:
             usage_count: Number of times the session has been used.
             max_usage_count: Maximum allowable uses of the session before it is considered expired.
             error_score: Current error score of the session.
+            retired: Whether the session has been permanently retired.
             cookies: Cookies associated with the session.
             blocked_status_codes: HTTP status codes that indicate a session should be blocked.
         """
@@ -72,6 +74,7 @@ class Session:
         self._usage_count = usage_count
         self._max_usage_count = max_usage_count
         self._error_score = error_score
+        self._retired = retired
         self._cookies = SessionCookies(cookies) or SessionCookies()
         self._blocked_status_codes = set(blocked_status_codes or self._DEFAULT_BLOCKED_STATUS_CODES)
 
@@ -139,13 +142,18 @@ class Session:
         return self._usage_count
 
     @property
+    def retired(self) -> bool:
+        """Indicate whether the session has been permanently retired."""
+        return self._retired
+
+    @property
     def expires_at(self) -> datetime:
         """Get the expiration datetime of the session."""
         return self._created_at + self._max_age
 
     @property
     def is_blocked(self) -> bool:
-        """Indicate whether the session is blocked based on the error score.."""
+        """Indicate whether the session is blocked by its error score."""
         return self._error_score >= self._max_error_score
 
     @property
@@ -161,7 +169,7 @@ class Session:
     @property
     def is_usable(self) -> bool:
         """Determine if the session is usable for next requests."""
-        return not (self.is_blocked or self.is_expired or self.is_max_usage_count_reached)
+        return not (self._retired or self.is_blocked or self.is_expired or self.is_max_usage_count_reached)
 
     @overload
     def get_state(self, *, as_dict: Literal[True]) -> dict: ...
@@ -183,6 +191,7 @@ class Session:
             usage_count=self._usage_count,
             max_usage_count=self._max_usage_count,
             error_score=self._error_score,
+            retired=self._retired,
             cookies=self._cookies.get_cookies_as_dicts(),
             blocked_status_codes=list(self._blocked_status_codes),
         )
@@ -191,7 +200,13 @@ class Session:
         return model
 
     def mark_good(self) -> None:
-        """Mark the session as good. Should be called after a successful session usage."""
+        """Mark the session as good. Should be called after a successful session usage.
+
+        A retired session is left unchanged.
+        """
+        if self._retired:
+            return
+
         self._usage_count += 1
 
         if self._error_score > 0:
@@ -199,7 +214,7 @@ class Session:
 
         # Retire the session if it is not usable anymore
         if not self.is_usable:
-            self.retire()
+            self._retired = True
 
     def mark_bad(self) -> None:
         """Mark the session as bad after an unsuccessful session usage."""
@@ -208,17 +223,19 @@ class Session:
 
         # Retire the session if it is not usable anymore
         if not self.is_usable:
-            self.retire()
+            self._retired = True
 
     def retire(self) -> None:
-        """Retire the session by setting the error score to the maximum value.
+        """Permanently retire the session and add `max_error_score` to its error score, unless it is already retired.
 
         This method should be used if the session usage was unsuccessful and you are sure that it is because of
         the session configuration and not any external matters. For example when server returns 403 status code.
         If the session does not work due to some external factors as server error such as 5XX you probably want
         to use `mark_bad` method.
         """
-        self._error_score += self._max_error_score
+        if not self._retired:
+            self._retired = True
+            self._error_score += self._max_error_score
 
     def is_blocked_status_code(
         self,

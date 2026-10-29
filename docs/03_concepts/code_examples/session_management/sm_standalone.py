@@ -14,11 +14,11 @@ async def main() -> None:
         # Increase the error_score.
         session.mark_bad()
 
-        # Throw away the session.
-        session.retire()
-
         # Lower the error_score and mark the session good.
         session.mark_good()
+
+        # Throw away the session.
+        session.retire()
 
 
 if __name__ == '__main__':
