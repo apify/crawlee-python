@@ -9,6 +9,7 @@ from crawlee._types import BasicCrawlingContext
 from crawlee._utils.sitemap import DEFAULT_MAX_DEPTH
 from crawlee.crawlers import BasicCrawler
 from crawlee.http_clients._base import HttpClient, HttpResponse
+from crawlee.request_loaders import RequestSourceStatus
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
 from tests._utils import (
     DEFAULT_URL,
@@ -20,6 +21,11 @@ from tests._utils import (
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, AsyncIterator
+
+
+def finished(readiness: RequestSourceStatus) -> bool:
+    """Tell whether a loader reported that every request has been handled."""
+    return readiness.status == 'finished'
 
 
 def compress_gzip(data: str) -> bytes:
@@ -52,7 +58,7 @@ async def test_nested_sitemap_chain_bounded_by_max_depth() -> None:
     client.stream = stream
 
     loader = SitemapRequestLoader([f'{DEFAULT_URL}sitemap-0.xml'], http_client=client)
-    assert await poll_until_condition(loader.is_finished)
+    assert finished(await poll_until_condition(loader.check_readiness, finished))
 
     assert len(fetched) == DEFAULT_MAX_DEPTH + 1
 
@@ -66,7 +72,7 @@ async def test_sitemap_http_error_is_retried_before_loading_requests(monkeypatch
     )
     loader = SitemapRequestLoader([sitemap_url], http_client=client)
 
-    while not await loader.is_finished():
+    while not finished(await loader.check_readiness()):
         request = await loader.fetch_next_request()
         if request:
             await loader.mark_request_as_handled(request)
@@ -106,11 +112,11 @@ async def test_sitemap_loader_drains_requests_after_later_source_fails(monkeypat
         assert request is not None
         requests.append(request)
 
-    assert not await loader.is_finished()
+    assert not finished(await loader.check_readiness())
     for request in requests:
         await loader.mark_request_as_handled(request)
 
-    assert await poll_until_condition(loader.is_finished)
+    assert finished(await poll_until_condition(loader.check_readiness, finished))
 
 
 async def test_sitemap_loader_continues_after_earlier_source_fails(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -125,7 +131,7 @@ async def test_sitemap_loader_continues_after_earlier_source_fails(monkeypatch: 
     loader = SitemapRequestLoader([f'{DEFAULT_URL}broken.xml', f'{DEFAULT_URL}sitemap.xml'], http_client=client)
 
     urls = []
-    while not await loader.is_finished():
+    while not finished(await loader.check_readiness()):
         request = await loader.fetch_next_request()
         if request:
             urls.append(request.url)

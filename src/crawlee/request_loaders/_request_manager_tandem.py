@@ -9,12 +9,16 @@ from typing_extensions import override
 from crawlee._utils.docs import docs_group
 from crawlee.request_loaders import RequestManager
 
+from ._utils import join_request_source_statuses
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from crawlee import Request
     from crawlee.request_loaders import RequestLoader
     from crawlee.storage_clients.models import ProcessedRequest
+
+    from ._types import RequestSourceStatus
 
 
 logger = getLogger(__name__)
@@ -41,12 +45,13 @@ class RequestManagerTandem(RequestManager):
         return (await self._read_only_loader.get_total_count()) + (await self._read_write_manager.get_total_count())
 
     @override
-    async def is_empty(self) -> bool:
-        return (await self._read_only_loader.is_empty()) and (await self._read_write_manager.is_empty())
+    async def check_readiness(self) -> RequestSourceStatus:
+        loader_readiness = await self._read_only_loader.check_readiness()
+        if loader_readiness.status == 'ready':
+            return loader_readiness
 
-    @override
-    async def is_finished(self) -> bool:
-        return (await self._read_only_loader.is_finished()) and (await self._read_write_manager.is_finished())
+        manager_readiness = await self._read_write_manager.check_readiness()
+        return join_request_source_statuses(loader_readiness, manager_readiness)
 
     @override
     async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest | None:
@@ -74,7 +79,9 @@ class RequestManagerTandem(RequestManager):
 
     @override
     async def fetch_next_request(self) -> Request | None:
-        if await self._read_only_loader.is_finished():
+        # Only the loader's own readiness decides the transfer, so a loader that's still loading doesn't block the
+        # manager's requests.
+        if (await self._read_only_loader.check_readiness()).status != 'ready':
             return await self._read_write_manager.fetch_next_request()
 
         request = await self._read_only_loader.fetch_next_request()

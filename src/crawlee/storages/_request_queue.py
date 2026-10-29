@@ -10,7 +10,7 @@ from typing_extensions import override
 from crawlee import Request, service_locator
 from crawlee._utils.docs import docs_group
 from crawlee._utils.wait import wait_for_all_tasks_to_finish
-from crawlee.request_loaders import RequestManager
+from crawlee.request_loaders import FinishedStatus, ReadyStatus, RequestManager, WaitingStatus
 from crawlee.storage_clients.models import AddRequestsResponse
 
 from ._base import Storage
@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
     from crawlee import Request
     from crawlee.configuration import Configuration
+    from crawlee.request_loaders import RequestLoaderStatus
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients._base import RequestQueueClient
     from crawlee.storage_clients.models import ProcessedRequest, RequestQueueMetadata
@@ -236,7 +237,7 @@ class RequestQueue(Storage, RequestManager):
         in another call to the `fetch_next_request` method.
 
         Note that the `None` return value does not mean the queue processing finished, it means there are currently
-        no pending requests. To check whether all requests in queue were finished, use `RequestQueue.is_finished`
+        no pending requests. To check whether all requests in queue were finished, use `RequestQueue.check_readiness`
         instead.
 
         Returns:
@@ -292,36 +293,24 @@ class RequestQueue(Storage, RequestManager):
         """
         return await self._client.reclaim_request(request, forefront=forefront)
 
-    async def is_empty(self) -> bool:
-        """Check if the request queue is empty.
+    @override
+    async def check_readiness(self) -> RequestLoaderStatus:
+        """Report whether the queue has a request to hand over, is waiting for one, or is done.
 
-        An empty queue means that there are no requests currently available to fetch. However, this does not
-        necessarily mean that the crawling operation is finished, as there still might be requests being processed
-        or tasks that could add additional requests to the queue.
-
-        Returns:
-            True if the request queue is empty, False otherwise.
+        The queue waits while requests are in progress, possibly in another client sharing it, or while requests are
+        still being added in the background. Neither has a clock, so `WaitingStatus.ready_at` stays `None`.
         """
-        return await self._client.is_empty()
+        # A fetchable request outranks everything below, so this is the only backend call a ready queue needs.
+        if not await self._client.is_empty():
+            return ReadyStatus()
 
-    async def is_finished(self) -> bool:
-        """Check if the request queue is finished.
-
-        A finished queue means that all requests have been processed and there are no more tasks that could add
-        additional requests to the queue. This is the definitive way to check if a crawling operation is complete.
-
-        Returns:
-            True if the request queue is finished and no pending add operations, False otherwise.
-        """
         if self._add_requests_tasks:
-            logger.debug('Background add requests tasks are still in progress.')
-            return False
+            return WaitingStatus()
 
         if await self._client.is_finished():
-            logger.debug('The request queue is finished.')
-            return True
+            return FinishedStatus()
 
-        return False
+        return WaitingStatus()
 
     async def _process_batch(
         self,
