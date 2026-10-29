@@ -275,8 +275,10 @@ The two DEBUG messages that `RequestQueue.is_finished` logged, "Background add r
 
 ## Session retirement is permanent
 
-`Session.retire()` permanently retires the session. Calling `mark_good()` on a retired session leaves its error score and usage count unchanged. Create a new session to replace a retired one. Calling `retire()` on a session that is already retired leaves its error score unchanged.
+In v1, `Session.retire()` only added `max_error_score` to the error score, so a later `mark_good()` could lower it again and make the retired session usable. In v2, a separate `retired` flag tracks retirement, exposed as the `Session.retired` property, and a retired session is never usable again. Create a new session to replace it.
 
-The `Session.retired` property indicates whether a session has been retired. Sessions that expire, reach their usage limit, or reach their error score limit through `mark_bad()` retire without an additional `max_error_score` penalty, so `is_blocked` continues to indicate whether the error score reached its limit.
+On a retired session, `mark_good()` does nothing, so its error score and usage count stay as they are. Calling `retire()` on a session that is already retired also leaves the error score unchanged.
 
-Session state includes a `retired` flag, which is preserved when the session pool is saved and restored. Saved sessions without this field load with `retired=False` and retain their existing error scores and usage limits.
+When `mark_good()` or `mark_bad()` retires a session because it expired, reached its usage limit, or reached its error score limit, it only sets the flag. In v1, it also added `max_error_score`. As a result, such sessions have a lower error score in v2, and `is_blocked` is `True` only when the error score itself reached `max_error_score`.
+
+Session state, including the persisted session pool state, has a new `retired` field. Sessions saved by v1 load with `retired=False` and keep their error score.
