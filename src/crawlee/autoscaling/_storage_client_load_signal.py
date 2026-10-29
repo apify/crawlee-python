@@ -35,6 +35,10 @@ class StorageClientLoadSignalOptions:
     overloaded_ratio: float = 0.3
     """The share of the sample window the storage client may spend overloaded before the signal reports overload."""
 
+    def __post_init__(self) -> None:
+        if self.snapshot_interval <= timedelta(0):
+            raise ValueError('snapshot_interval must be positive')
+
 
 @docs_group('Autoscaling')
 class StorageClientLoadSignal:

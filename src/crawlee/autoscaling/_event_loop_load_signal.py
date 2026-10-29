@@ -32,6 +32,10 @@ class EventLoopLoadSignalOptions:
     overloaded_ratio: float = 0.6
     """The share of the sample window the event loop may spend overloaded before the signal reports overload."""
 
+    def __post_init__(self) -> None:
+        if self.snapshot_interval <= timedelta(0):
+            raise ValueError('snapshot_interval must be positive')
+
 
 @docs_group('Autoscaling')
 class EventLoopLoadSignal:

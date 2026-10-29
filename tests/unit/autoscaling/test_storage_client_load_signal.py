@@ -2,16 +2,14 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
-from typing import TYPE_CHECKING
 from unittest.mock import Mock
+
+import pytest
 
 from crawlee import service_locator
 from crawlee.autoscaling import LoadSignalStartContext, StorageClientLoadSignal, StorageClientLoadSignalOptions
 from crawlee.configuration import Configuration
 from crawlee.storage_clients import StorageClient
-
-if TYPE_CHECKING:
-    import pytest
 
 
 async def test_overloaded_when_errors_grow(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -58,3 +56,16 @@ async def test_restart_ignores_errors_of_previous_session(monkeypatch: pytest.Mo
     await signal.stop()
 
     assert [snapshot.is_overloaded for snapshot in signal.get_sample()] == [False]
+
+
+@pytest.mark.parametrize(
+    'snapshot_interval',
+    [
+        pytest.param(timedelta(0), id='zero'),
+        pytest.param(timedelta(seconds=-1), id='negative'),
+    ],
+)
+def test_rejects_non_positive_interval(snapshot_interval: timedelta) -> None:
+    """A non-positive snapshot interval is refused, as the measuring task would spin on the event loop."""
+    with pytest.raises(ValueError, match='snapshot_interval must be positive'):
+        StorageClientLoadSignalOptions(snapshot_interval=snapshot_interval)

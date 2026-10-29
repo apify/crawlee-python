@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
 from unittest.mock import Mock
+
+import pytest
 
 from crawlee.autoscaling import EventLoopLoadSignal, EventLoopLoadSignalOptions, LoadSignalStartContext
 from crawlee.autoscaling import _event_loop_load_signal as event_loop_load_signal_module
 from crawlee.configuration import Configuration
-
-if TYPE_CHECKING:
-    import pytest
 
 
 def start_context(configuration: Configuration | None = None) -> LoadSignalStartContext:
@@ -75,3 +73,16 @@ async def test_event_loop_restart_ignores_downtime(monkeypatch: pytest.MonkeyPat
     await signal.stop()
 
     assert [snapshot.is_overloaded for snapshot in signal.get_sample()] == [False]
+
+
+@pytest.mark.parametrize(
+    'snapshot_interval',
+    [
+        pytest.param(timedelta(0), id='zero'),
+        pytest.param(timedelta(seconds=-1), id='negative'),
+    ],
+)
+def test_rejects_non_positive_interval(snapshot_interval: timedelta) -> None:
+    """A non-positive snapshot interval is refused, as the measuring task would spin on the event loop."""
+    with pytest.raises(ValueError, match='snapshot_interval must be positive'):
+        EventLoopLoadSignalOptions(snapshot_interval=snapshot_interval)
