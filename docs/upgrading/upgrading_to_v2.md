@@ -9,6 +9,35 @@ This page summarizes the breaking changes between Crawlee for Python v1 and v2.
 
 We drop support for Python 3.10, which reached its end of life in October 2026. The minimum supported version is now Python 3.11.
 
+## Storage clients are renamed to storage backends
+
+The pluggable storage implementations are called storage backends, and the `crawlee.storage_clients` package is now `crawlee.storage_backends`. The v1 names don't exist in v2, so update your imports and arguments:
+
+- `StorageClient`, `MemoryStorageClient`, `FileSystemStorageClient`, `SqlStorageClient` and `RedisStorageClient` are now `StorageBackend`, `MemoryStorageBackend`, `FileSystemStorageBackend`, `SqlStorageBackend` and `RedisStorageBackend`.
+- `DatasetClient`, `KeyValueStoreClient` and `RequestQueueClient` are now `DatasetBackend`, `KeyValueStoreBackend` and `RequestQueueBackend`. Their built-in implementations follow the same pattern, for example `FileSystemDatasetClient` is now `FileSystemDatasetBackend`.
+- The `storage_client` argument is now `storage_backend`. That covers `BasicCrawler`, `ServiceLocator`, `Dataset.open`, `KeyValueStore.open` and `RequestQueue.open`. The `to_kvs_storage_client` argument of `Dataset.export_to` is now `to_kvs_storage_backend`.
+- `ServiceLocator.get_storage_client` and `ServiceLocator.set_storage_client` are now `get_storage_backend` and `set_storage_backend`.
+
+For example:
+
+```python
+# v1
+from crawlee import service_locator
+from crawlee.storage_clients import MemoryStorageClient
+
+service_locator.set_storage_client(MemoryStorageClient())
+crawler = ParselCrawler(storage_client=MemoryStorageClient())
+
+# v2
+from crawlee import service_locator
+from crawlee.storage_backends import MemoryStorageBackend
+
+service_locator.set_storage_backend(MemoryStorageBackend())
+crawler = ParselCrawler(storage_backend=MemoryStorageBackend())
+```
+
+A custom storage backend has more names to update. The `StorageBackend` methods `create_dataset_client`, `create_kvs_client`, `create_rq_client` and `get_storage_client_cache_key` are now `create_dataset_backend`, `create_kvs_backend`, `create_rq_backend` and `get_storage_backend_cache_key`. The `client` argument of the `Dataset`, `KeyValueStore` and `RequestQueue` constructors is now `backend`.
+
 ## `Event` is a `StrEnum`
 
 `Event` now subclasses `enum.StrEnum`. Calling `str()` on a member or formatting it in an f-string returns its value, for example `'systemInfo'`, where v1 returned `'Event.SYSTEM_INFO'`. Comparisons with plain strings work the same way as in v1.
@@ -200,35 +229,6 @@ for urls in batches:
 ## `RequestQueue.purge` raises when the storage backend can't purge
 
 In v1, `RequestQueue.purge()` worked around a storage backend that didn't support purging. It dropped an unnamed queue and opened the default queue in its place, and it skipped a named queue with a warning. In v2, it raises the backend's `NotImplementedError`, the same as Crawlee JS. The Apify platform's storage backend doesn't support purging, so on the platform, call `drop()` or open a new queue instead.
-
-## Storage clients are renamed to storage backends
-
-The pluggable storage implementations are called storage backends, and the `crawlee.storage_clients` package is now `crawlee.storage_backends`. The v1 names don't exist in v2, so update your imports and arguments:
-
-- `StorageClient`, `MemoryStorageClient`, `FileSystemStorageClient`, `SqlStorageClient` and `RedisStorageClient` are now `StorageBackend`, `MemoryStorageBackend`, `FileSystemStorageBackend`, `SqlStorageBackend` and `RedisStorageBackend`.
-- `DatasetClient`, `KeyValueStoreClient` and `RequestQueueClient` are now `DatasetBackend`, `KeyValueStoreBackend` and `RequestQueueBackend`. Their built-in implementations follow the same pattern, for example `FileSystemDatasetClient` is now `FileSystemDatasetBackend`.
-- The `storage_client` argument is now `storage_backend`. That covers `BasicCrawler`, `ServiceLocator`, `Dataset.open`, `KeyValueStore.open` and `RequestQueue.open`. The `to_kvs_storage_client` argument of `Dataset.export_to` is now `to_kvs_storage_backend`.
-- `ServiceLocator.get_storage_client` and `ServiceLocator.set_storage_client` are now `get_storage_backend` and `set_storage_backend`.
-
-For example:
-
-```python
-# v1
-from crawlee import service_locator
-from crawlee.storage_clients import MemoryStorageClient
-
-service_locator.set_storage_client(MemoryStorageClient())
-crawler = ParselCrawler(storage_client=MemoryStorageClient())
-
-# v2
-from crawlee import service_locator
-from crawlee.storage_backends import MemoryStorageBackend
-
-service_locator.set_storage_backend(MemoryStorageBackend())
-crawler = ParselCrawler(storage_backend=MemoryStorageBackend())
-```
-
-A custom storage backend has more names to update. The `StorageBackend` methods `create_dataset_client`, `create_kvs_client`, `create_rq_client` and `get_storage_client_cache_key` are now `create_dataset_backend`, `create_kvs_backend`, `create_rq_backend` and `get_storage_backend_cache_key`. The `client` argument of the `Dataset`, `KeyValueStore` and `RequestQueue` constructors is now `backend`.
 
 ## Logs changed
 
