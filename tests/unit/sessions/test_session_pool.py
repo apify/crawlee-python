@@ -202,6 +202,7 @@ async def test_retired_session_is_not_restored(event_manager: EventManager, kvs:
         saved_state = await kvs.get_value(PERSIST_STATE_KEY)
         assert isinstance(saved_state, dict)
         saved_pool = SessionPoolModel.model_validate(saved_state)
+        assert saved_pool.sessions[session.id].retired
         assert not saved_pool.sessions[session.id].is_usable
 
     async with SessionPool(
