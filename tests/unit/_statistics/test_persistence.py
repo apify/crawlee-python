@@ -147,7 +147,7 @@ async def test_backwards_clock_jump_does_not_regress_runtime() -> None:
 
 
 async def test_runtime_stops_growing_after_run_finishes() -> None:
-    """The runtime measured by a finished run stays frozen instead of following the clock."""
+    """The runtime of a finished run stays fixed as time passes."""
     async with Statistics.with_default_state() as statistics:
         pass
 
@@ -172,6 +172,32 @@ async def test_runtime_carries_over_between_runs() -> None:
         pass
 
     assert previous_runtime <= statistics.state.crawler_runtime < previous_runtime + timedelta(minutes=1)
+
+
+async def test_persisted_finished_state_validates_to_same_runtime() -> None:
+    """A state persisted after a finished run reports the same runtime when validated back into the model."""
+    async with Statistics.with_default_state() as statistics:
+        assert statistics.state.crawler_last_started_at
+        statistics.state.crawler_last_started_at -= timedelta(seconds=10)
+
+    serialized = statistics.state.model_dump(mode='json', by_alias=True)
+    restored = StatisticsState.model_validate(serialized)
+
+    assert abs(restored.crawler_runtime - statistics.state.crawler_runtime) < timedelta(milliseconds=1)
+
+
+async def test_runtime_restored_from_v1_iso_duration() -> None:
+    """A runtime persisted by crawlee v1 as an ISO 8601 duration string is restored on resume."""
+    key = 'statistics_v1_runtime'
+    previous_runtime = timedelta(seconds=10)
+
+    kvs = await KeyValueStore.open()
+    await kvs.set_value(key, {'crawlerRuntimeMillis': 'PT10S'})
+
+    async with Statistics.with_default_state(persistence_enabled=True, persist_state_key=key) as statistics:
+        runtime = statistics.state.crawler_runtime
+
+    assert previous_runtime <= runtime < previous_runtime + timedelta(minutes=1)
 
 
 @pytest.mark.parametrize(

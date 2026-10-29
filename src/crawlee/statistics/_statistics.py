@@ -174,10 +174,8 @@ class Statistics(Generic[TStatisticsState]):
 
         await self._state.initialize()
 
-        # The restored timestamps belong to the previous run and must not measure this one: left in place,
-        # they would count the downtime between the runs (e.g. after a migration or resurrection) towards
-        # the runtime. Clear them, so that the initial periodic log reports exactly the runtime accumulated
-        # by the previous runs (zero for a fresh start).
+        # The restored timestamps belong to the previous run. Clear them, so that the downtime since then (e.g. a
+        # migration or resurrection) doesn't count towards the runtime.
         self.state.crawler_last_started_at = None
         self.state.crawler_finished_at = None
 

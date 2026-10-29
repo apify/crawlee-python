@@ -5,15 +5,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Any
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    PlainSerializer,
-    PlainValidator,
-    computed_field,
-    field_serializer,
-)
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator, computed_field, field_serializer
 from pydantic.alias_generators import to_camel
 from typing_extensions import override
 
@@ -121,8 +113,8 @@ class StatisticsState(BaseModel):
         return self.accumulated_runtime + max(timedelta(), finished_at - self.crawler_last_started_at)
 
     @field_serializer('accumulated_runtime')
-    def _serialize_accumulated_runtime(self, _value: timedelta) -> float:
-        """Serialize the total runtime. Previously accumulated and current runtime."""
+    def _serialize_accumulated_runtime(self, _value: timedelta) -> int:
+        """Serialize the total runtime including the run in progress, so that every persist checkpoints it."""
         return round(self.crawler_runtime.total_seconds() * 1000)
 
     @computed_field(alias='requestTotalDurationMillis', return_type=timedelta_ms)
