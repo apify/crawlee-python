@@ -31,7 +31,7 @@ class StorageBackend(ABC):
     """
 
     def get_storage_backend_cache_key(self, configuration: Configuration) -> Hashable:  # noqa: ARG002
-        """Return a cache key that can differentiate between different storages of this and other clients.
+        """Return a cache key that can differentiate between different storages of this and other backends.
 
         Can be based on configuration or on the backend itself. By default, returns a module and name of the backend
         class.
@@ -80,14 +80,14 @@ class StorageBackend(ABC):
         backend: DatasetBackend | KeyValueStoreBackend | RequestQueueBackend,
         configuration: Configuration,
     ) -> None:
-        """Purge the storage backend if needed.
+        """Purge the storage behind the backend if needed.
 
-        The purge is only performed if the configuration indicates that it should be done and the backend
+        The purge is only performed if the configuration indicates that it should be done and the storage
         is not a named storage. Named storages are considered global and will typically outlive the run,
         so they are not purged.
 
         Args:
-            backend: The storage backend to potentially purge.
+            backend: The dataset, key-value store, or request queue backend to potentially purge.
             configuration: Configuration that determines whether purging should occur.
         """
         metadata = await backend.get_metadata()

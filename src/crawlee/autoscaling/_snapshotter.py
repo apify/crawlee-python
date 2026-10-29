@@ -387,9 +387,9 @@ class Snapshotter:
         Must be `async` to ensure it is not scheduled to be run in own thread by the event manager, which could cause
         race conditions in snapshots manipulation(sorting and pruning).
         """
-        client = service_locator.get_storage_backend()
+        storage_backend = service_locator.get_storage_backend()
 
-        rate_limit_errors: dict[int, int] = client.get_rate_limit_errors()
+        rate_limit_errors: dict[int, int] = storage_backend.get_rate_limit_errors()
 
         error_count = rate_limit_errors.get(self._CLIENT_RATE_LIMIT_ERROR_RETRY_COUNT, 0)
         previous_error_count = self._client_snapshots[-1].error_count if self._client_snapshots else 0
