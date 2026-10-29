@@ -272,3 +272,13 @@ When a crawl processes no requests because its request manager holds only handle
 The ERROR message the crawler logs before raising `PersistentRateLimitError` now reads "Giving up the crawl because the request manager can't make progress." instead of "Giving up the crawl because a domain keeps rate-limiting every request."
 
 The two DEBUG messages that `RequestQueue.is_finished` logged, "Background add requests tasks are still in progress." and "The request queue is finished.", are removed together with the method.
+
+## Session retirement is permanent
+
+In v1, `Session.retire()` only added `max_error_score` to the error score, so a later `mark_good()` could lower it again and make the retired session usable. In v2, a separate `retired` flag tracks retirement, exposed as the `Session.retired` property, and a retired session is never usable again. Create a new session to replace it.
+
+On a retired session, `mark_good()` does nothing, so its error score and usage count stay as they are. Calling `retire()` on a session that is already retired also leaves the error score unchanged.
+
+When `mark_good()` or `mark_bad()` retires a session because it expired, reached its usage limit, or reached its error score limit, it only sets the flag. In v1, it also added `max_error_score`. As a result, such sessions have a lower error score in v2, and `is_blocked` is `True` only when the error score itself reached `max_error_score`.
+
+Session state, including the persisted session pool state, has a new `retired` field. Sessions saved by v1 load with `retired=False` and keep their error score.
