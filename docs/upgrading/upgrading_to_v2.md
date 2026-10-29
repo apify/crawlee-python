@@ -116,6 +116,7 @@ The autoscaling classes now live in the public `crawlee.autoscaling` package, wh
 - `run_task_function` receives the id the task is booked under.
 - `current_concurrency` comes from the concurrency system, so a shared system may count the tasks of other pools too. The pool's own tasks are counted by the new `own_concurrency`.
 - `is_finished_function` is called only when no new task can start and none of the pool's own tasks are in flight, and never while the pool is paused. In v1, it was called on every loop iteration, so a paused pool could finish. A pool whose `is_task_ready_function` keeps resolving to `True` doesn't finish, so make it resolve to `False` once the work runs out.
+- `pause()` is a coroutine that returns once the pool's tasks in progress finish. With the new `timeout` option, it raises `TimeoutError` if they take longer, and the pool stays paused. Await it, since a call without `await` doesn't pause the pool.
 
 For example:
 
