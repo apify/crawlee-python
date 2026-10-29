@@ -25,7 +25,7 @@ The [`request_loaders`](https://github.com/apify/crawlee-python/tree/master/src/
 The [`request_loaders`](https://github.com/apify/crawlee-python/tree/master/src/crawlee/request_loaders) sub-package introduces the following abstract classes:
 
 - <ApiLink to="class/RequestLoader">`RequestLoader`</ApiLink>: The base interface for reading requests in a crawl.
-- <ApiLink to="class/RequestManager">`RequestManager`</ApiLink>: Extends `RequestLoader` with write capabilities.
+- <ApiLink to="class/RequestManager">`RequestManager`</ApiLink>: Extends `RequestLoader` with write capabilities, and with the pacing signals a crawler reports back.
 - <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink>: Combines a read-only `RequestLoader` with a writable `RequestManager`.
 
 And specific request loader implementations:
@@ -71,6 +71,7 @@ class RequestManager {
     + add_request()
     + add_requests_batched()
     + reclaim_request()
+    + record_pacing_signal()
     + purge()
     + drop()
 }
@@ -155,6 +156,21 @@ When using persistence with `SitemapRequestLoader`, make sure to use the context
 ## Request managers
 
 The <ApiLink to="class/RequestManager">`RequestManager`</ApiLink> extends `RequestLoader` with write capabilities. In addition to reading requests, a request manager can add and reclaim them. This is essential for dynamic crawling projects where new URLs may emerge during the crawl process, or when certain requests fail and need to be retried. For more details, refer to the <ApiLink to="class/RequestManager">`RequestManager`</ApiLink> API reference.
+
+### Pacing signals
+
+A request manager decides when each request goes out, so the crawler reports back to it what a site said about the pace it wants. The crawler does so through <ApiLink to="class/RequestManager#record_pacing_signal">`RequestManager.record_pacing_signal`</ApiLink>, with one of two signals:
+
+- <ApiLink to="class/RateLimitedSignal">`RateLimitedSignal`</ApiLink>: a site refused a request because the crawler was going too fast. It carries the wait the site asked for, if any.
+- <ApiLink to="class/MinIntervalSignal">`MinIntervalSignal`</ApiLink>: a site declared a minimum interval between requests, such as a robots.txt `Crawl-delay`.
+
+Each signal also has a `scope`, which says how much of the URL space it covers. A manager may apply a signal to a wider scope than it was given, but never to a narrower one, which would leave part of what the signal covers unpaced. A manager that can't honor a scope raises an error.
+
+To implement `record_pacing_signal` in your own request manager:
+
+- Return `False` when the manager doesn't pace its requests, as <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> does. The crawler then logs that the signal was dropped. New signals may be added in a minor release, so also return `False` for a signal you don't handle.
+- Return `True` for a `RateLimitedSignal` only if the URL won't be dispatched again until a positive delay has passed. The crawler defers such a request without spending a retry.
+- If the manager wraps another one, forward every signal to it without inspecting it, as <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> does. Otherwise a pacer nested inside it never receives the signal.
 
 ## Request manager tandem
 

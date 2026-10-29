@@ -13,7 +13,12 @@ from crawlee import ConcurrencySettings, Request, RequestState
 from crawlee.crawlers import HttpCrawler
 from crawlee.errors import PersistentRateLimitError
 from crawlee.http_clients import HttpClient, HttpCrawlingResult
-from crawlee.request_loaders import ThrottlingRequestManager, _throttling_request_manager
+from crawlee.request_loaders import (
+    RequestList,
+    RequestManagerTandem,
+    ThrottlingRequestManager,
+    _throttling_request_manager,
+)
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storages import RequestQueue
@@ -738,6 +743,32 @@ async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any], monkeyp
     assert session is not None
     assert session.error_score == 0
     assert session.is_usable
+
+
+async def test_tandem_429_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A 429 reaches a throttler wrapped in a `RequestManagerTandem`, so the request is deferred without a retry."""
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
+    http_client = AsyncMock(spec=HttpClient)
+    http_client.crawl.side_effect = [crawl_result(429), crawl_result(200)]
+    failed_request_handler = AsyncMock()
+    crawler = HttpCrawler(
+        http_client=http_client,
+        request_manager=RequestManagerTandem(RequestList(['https://throttled.placeholder.com/page']), throttler),
+        max_request_retries=0,
+    )
+    crawler.failed_request_handler(failed_request_handler)
+    handler = AsyncMock()
+    crawler.router.default_handler(handler)
+
+    await crawler.run()
+
+    handler.assert_awaited_once()
+    context = handler.call_args.args[0]
+    assert context.http_response.status_code == 200
+    failed_request_handler.assert_not_called()
+    assert context.request.retry_count == 0
+    assert (context.request.session_rotation_count or 0) == 0
+    assert throttler._domain_states['throttled.placeholder.com'].consecutive_429_count == 1
 
 
 @pytest.mark.parametrize(

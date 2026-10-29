@@ -67,7 +67,7 @@ from crawlee.errors import (
 )
 from crawlee.events._types import Event, EventCrawlerStatusData
 from crawlee.http_clients import ImpitHttpClient
-from crawlee.request_loaders import ThrottlingRequestManager
+from crawlee.request_loaders import MinIntervalSignal, RateLimitedSignal
 from crawlee.router import Router
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics, StatisticsState
@@ -740,14 +740,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._handled_request_this_run = False
 
         try:
-            if self._respect_robots_txt_file and not isinstance(self._request_manager, ThrottlingRequestManager):
-                self._logger.warning(
-                    'The `respect_robots_txt_file` option is enabled, but the crawler is not using '
-                    '`ThrottlingRequestManager`. Crawl-delay directives from robots.txt will not be enforced. To '
-                    'enable crawl-delay support, configure the crawler to use `ThrottlingRequestManager` as the '
-                    'request manager.'
-                )
-
             if self._has_finished_before:
                 await self._statistics.reset()
 
@@ -1606,7 +1598,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             await self._handle_request_error(context, request_error)
 
         except RequestHandlerError as primary_error:
-            if isinstance(primary_error.wrapped_exception, RequestThrottledError) and self._is_held_back(request):
+            if isinstance(primary_error.wrapped_exception, RequestThrottledError) and await self._report_rate_limit(
+                request
+            ):
                 await self._defer_throttled_request(request, primary_error.wrapped_exception)
                 return
 
@@ -1672,7 +1666,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         except ContextPipelineInitializationError as initialization_error:
             wrapped = initialization_error.wrapped_exception
-            if isinstance(wrapped, RequestThrottledError) and self._is_held_back(request):
+            if isinstance(wrapped, RequestThrottledError) and await self._report_rate_limit(request):
                 await self._defer_throttled_request(request, wrapped)
                 return
 
@@ -1697,19 +1691,30 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 except Exception:
                     self._logger.exception('Error in deferred cleanup')
 
-    def _is_held_back(self, request: Request) -> bool:
-        """Check whether a `ThrottlingRequestManager` holds the request's domain back, so a deferral can't spin.
+    async def _report_rate_limit(self, request: Request) -> bool:
+        """Report a rate limit for the request's URL and check whether the request manager took responsibility for it.
 
-        Logs a one-time warning when it doesn't, since the `RequestThrottledError` is then handled as an ordinary error.
+        Only then is a `RequestThrottledError` deferred, since otherwise the request would be dispatched again at once.
+        Logs a one-time warning when the manager refuses, since the error is then handled as an ordinary error.
         """
-        manager = self._request_manager
-        if isinstance(manager, ThrottlingRequestManager) and manager.is_throttled(request.url):
+        request_manager = await self.get_request_manager()
+        # An error raised from here would bypass the request error handling and end the crawl.
+        try:
+            accepted = request_manager.record_pacing_signal(RateLimitedSignal(request.url))
+        except Exception:
+            self._logger.exception(
+                f'The request manager failed to record a rate limit for {request.url}, so the '
+                '`RequestThrottledError` is handled as an ordinary error.'
+            )
+            return False
+
+        if accepted:
             return True
 
         self._logger_once.log(
-            f'`RequestThrottledError` was raised for {request.url}, but no `ThrottlingRequestManager` holds its domain '
-            "back, so it's handled as an ordinary error. Raise it only for a configured domain, after "
-            '`ThrottlingRequestManager.record_domain_delay` has put the domain into a backoff.',
+            f"`RequestThrottledError` was raised for {request.url}, but the crawler's request manager does not pace "
+            "its domain, so it's handled as an ordinary error. Pass a `ThrottlingRequestManager` covering the domain "
+            'as `request_manager` to retry such requests once the domain stops rate-limiting.',
             key='throttled_error_without_backoff',
             level=logging.WARNING,
         )
@@ -1779,37 +1784,28 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             retry_after_header: The value of the `Retry-After` response header, if present.
 
         Returns:
-            True if a `ThrottlingRequestManager` recorded the 429 for the request's domain, so the request should be
-                deferred.
+            True if the request manager took responsibility for the 429, so the request should be deferred.
         """
         if status_code != HTTPStatus.TOO_MANY_REQUESTS:
             return False
 
-        if not isinstance(self._request_manager, ThrottlingRequestManager):
-            self._logger_once.log(
-                'Received an HTTP 429 (Too Many Requests) response, but the crawler is not using '
-                '`ThrottlingRequestManager`. Per-domain backoff and `Retry-After` headers will not be honored. '
-                'To enable per-domain rate limiting, configure the crawler to use `ThrottlingRequestManager` '
-                'as the request manager.',
-                key='no_throttling_manager_on_429',
-                level=logging.WARNING,
-            )
-            return False
+        # Not `get_request_manager()`: the sub crawlers of `AdaptivePlaywrightCrawler` run this without a manager of
+        # their own, and opening one would leave an unused queue behind.
+        manager = self._request_manager
+        signal = RateLimitedSignal(request_url, wait=parse_retry_after_header(retry_after_header))
+        if manager is not None and manager.record_pacing_signal(signal):
+            return True
 
-        retry_after = parse_retry_after_header(retry_after_header)
-        if not self._request_manager.record_domain_delay(request_url, retry_after=retry_after):
-            domain = (URL(request_url).host or '').lower().removesuffix('.')
-            if domain:
-                self._logger_once.log(
-                    f'Received an HTTP 429 (Too Many Requests) response from domain "{domain}", but it is '
-                    f'not in the `ThrottlingRequestManager.domains` list. Per-domain backoff will not be '
-                    f'applied for this domain. Add it to `domains=` to enable throttling.',
-                    key=f'unconfigured_throttle_domain:{domain}',
-                    level=logging.WARNING,
-                )
-            return False
-
-        return True
+        domain = URL(request_url).host or request_url
+        self._logger_once.log(
+            f'"{domain}" responded with HTTP 429 (Too Many Requests), but the crawler\'s request manager does not pace '
+            'that domain, so the response is handled like any other, with no per-domain delay. Pass a '
+            f'`ThrottlingRequestManager` covering "{domain}" as `request_manager` to honor `Retry-After` and apply '
+            'exponential backoff instead.',
+            key=f'rate_limit_not_paced:{domain}',
+            level=logging.WARNING,
+        )
+        return False
 
     def _raise_for_session_blocked_status_code(self, session: Session | None, status_code: int) -> None:
         """Raise an exception if the given status code indicates the session is blocked.
@@ -1854,12 +1850,29 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if not robots_txt_file:
             return True
 
-        if isinstance(self._request_manager, ThrottlingRequestManager):
-            crawl_delay = robots_txt_file.get_crawl_delay()
-            if crawl_delay is not None:
-                self._request_manager.set_crawl_delay(url, crawl_delay)
+        crawl_delay = robots_txt_file.get_crawl_delay()
+        if crawl_delay is not None:
+            await self._apply_crawl_delay(url, crawl_delay)
 
         return robots_txt_file.is_allowed(url)
+
+    async def _apply_crawl_delay(self, url: str, delay_seconds: int) -> None:
+        """Hand a robots.txt crawl-delay to the request manager, warning if it won't be honored."""
+        # robots.txt is per origin. `hostname` is the closest pacing scope and errs wide, as HTTP and HTTPS to one host
+        # share a clock.
+        signal = MinIntervalSignal(url, interval=timedelta(seconds=delay_seconds), scope='hostname')
+        request_manager = await self.get_request_manager()
+        if request_manager.record_pacing_signal(signal):
+            return
+
+        domain = URL(url).host or url
+        self._logger_once.log(
+            f'robots.txt for "{domain}" defines a crawl-delay of {delay_seconds}s, but the crawler\'s request manager '
+            'does not pace that domain, so its requests will not be paced. Pass a `ThrottlingRequestManager` covering '
+            f'"{domain}" as `request_manager`.',
+            key=f'crawl_delay_not_paced:{domain}',
+            level=logging.WARNING,
+        )
 
     async def _get_robots_txt_file_for_url(self, url: str) -> RobotsTxtFile | None:
         """Get the RobotsTxtFile for a given URL.

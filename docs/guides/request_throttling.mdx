@@ -42,6 +42,8 @@ To use request throttling, create a <ApiLink to="class/ThrottlingRequestManager"
 
 5. **Cooldown handling**: While a domain is in a cooldown, its queued requests don't count as dispatchable, so the crawler's autoscaled pool idles instead of keeping a worker slot blocked. The requests still count towards completion, so the crawl waits for them and finishes only once every one has been handled. A domain that never stops rate-limiting doesn't keep the crawl running forever. For details, see [Persistent rate limiting](#persistent-rate-limiting).
 
+The crawler reports 429 responses and crawl-delays through <ApiLink to="class/RequestManager#record_pacing_signal">`RequestManager.record_pacing_signal`</ApiLink>, which <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> forwards to the manager it wraps, so a `ThrottlingRequestManager` also paces its domains as the writable side of a tandem. For details, see [Pacing signals](./request-loaders#pacing-signals).
+
 ## Persistent rate limiting
 
 A 429 from a throttled domain doesn't fail the request. The request goes back to its queue and waits out the backoff, while the crawler keeps crawling other domains. The retry doesn't count towards `max_request_retries` or `max_session_rotations`, and the session isn't marked as bad. The 429 doesn't reach `error_handler` or `failed_request_handler`. Setting `ignore_http_error_status_codes={429}` doesn't pass the response to your request handler either, because the request is retried once the backoff ends.

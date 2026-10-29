@@ -9,6 +9,7 @@ import pytest
 
 from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
+from crawlee.request_loaders import RateLimitedSignal
 from crawlee.storage_clients import MemoryStorageClient, StorageClient
 from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, UnprocessedRequest
 from crawlee.storages import RequestQueue
@@ -543,6 +544,11 @@ async def test_reclaim_request_with_forefront(rq: RequestQueue) -> None:
     next_request = await rq.fetch_next_request()
     assert next_request is not None
     assert next_request.url == 'https://example.com/first'
+
+
+async def test_record_pacing_signal_is_refused(rq: RequestQueue) -> None:
+    """Test that a plain queue refuses a pacing signal, since it doesn't pace its dispatch."""
+    assert rq.record_pacing_signal(RateLimitedSignal('https://example.com')) is False
 
 
 async def test_check_readiness(rq: RequestQueue) -> None:
