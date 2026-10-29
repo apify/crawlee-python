@@ -40,7 +40,7 @@ async def test_init(playwright: Playwright) -> None:
 async def test_delete_temp_folder_with_close_browser(playwright: Playwright, monkeypatch: pytest.MonkeyPatch) -> None:
     """Closing the browser removes its temporary user data directory."""
     # On a loaded Windows runner the browser helper processes can hold the files longer than the default retry budget,
-    # so the test allows up to 30 seconds. `test_warn_when_temp_folder_cannot_be_deleted` covers the budget itself.
+    # so the test allows up to 30 seconds. `test_warn_when_temp_folder_cannot_be_deleted` covers running out of it.
     monkeypatch.setattr(PlaywrightPersistentBrowser, '_TMP_DIR_DELETE_ATTEMPTS', 300)
     persist_browser = PlaywrightPersistentBrowser(
         playwright.chromium, user_data_dir=None, browser_launch_options={'headless': True}
