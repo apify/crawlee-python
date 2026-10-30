@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from datetime import timedelta
 from http import HTTPStatus
 from time import monotonic
@@ -166,19 +165,6 @@ class HttpResponse(ABC):
     ) -> None:
         """Close the response."""
         await self.aclose()
-
-
-@dataclass(frozen=True)
-@docs_group('Crawling contexts')
-class HttpCrawlingResult:
-    """Result of an HTTP-only crawl.
-
-    Mainly for the purpose of composing specific crawling contexts (e.g. `BeautifulSoupCrawlingContext`,
-    `ParselCrawlingContext`, ...).
-    """
-
-    http_response: HttpResponse
-    """The HTTP response received from the server."""
 
 
 @docs_group('HTTP clients')

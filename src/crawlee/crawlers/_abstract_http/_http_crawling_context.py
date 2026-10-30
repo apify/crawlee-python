@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
-from typing import Generic, Self, TypeVar
+from typing import TYPE_CHECKING, Generic, Self, TypeVar
 
 from crawlee._types import BasicCrawlingContext, EnqueueLinksFunction, ExtractLinksFunction, PageSnapshot
 from crawlee._utils.docs import docs_group
-from crawlee.http_clients import HttpCrawlingResult, HttpResponse
+
+if TYPE_CHECKING:
+    from crawlee.http_clients import HttpResponse
 
 TParseResult = TypeVar('TParseResult')
 TSelectResult = TypeVar('TSelectResult')
@@ -13,8 +15,11 @@ TSelectResult = TypeVar('TSelectResult')
 
 @dataclass(frozen=True)
 @docs_group('Crawling contexts')
-class HttpCrawlingContext(BasicCrawlingContext, HttpCrawlingResult):
+class HttpCrawlingContext(BasicCrawlingContext):
     """The crawling context used by the `AbstractHttpCrawler`."""
+
+    http_response: HttpResponse
+    """The HTTP response received from the server."""
 
     @classmethod
     def from_basic_crawling_context(cls, context: BasicCrawlingContext, http_response: HttpResponse) -> Self:
