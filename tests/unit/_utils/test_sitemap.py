@@ -759,7 +759,40 @@ def test_xml_handler_resets_current_tag_on_end_element() -> None:
 
     # Stray text between elements must not be buffered.
     handler.characters('   stray text   ')
-    assert handler._buffer == 'https://example.com/'
+    assert handler._buffer == ['https://example.com/']
+
+
+def test_xml_handler_joins_text_split_across_callbacks() -> None:
+    """A text node delivered in many `characters()` callbacks is joined into one value."""
+    handler = _XMLSaxSitemapHandler()
+    handler.startElement('urlset', MagicMock())
+    handler.startElement('url', MagicMock())
+    handler.startElement('loc', MagicMock())
+    handler.characters('  https://example.com/')
+    for _ in range(1000):
+        handler.characters('a')
+    handler.characters('  ')
+    handler.endElement('loc')
+    handler.endElement('url')
+
+    assert handler.items == [{'type': 'url', 'loc': 'https://example.com/' + 'a' * 1000}]
+
+
+async def test_sitemap_with_entity_declaration_is_rejected(caplog: pytest.LogCaptureFixture) -> None:
+    """A sitemap declaring an internal entity yields no URLs, so the entity is never expanded."""
+    sitemap_xml = (
+        '<?xml version="1.0"?>\n'
+        '<!DOCTYPE urlset [<!ENTITY a "XXXXXXXXXX"><!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;">]>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f'<url><loc>{DEFAULT_URL}&b;</loc></url>'
+        '</urlset>'
+    )
+
+    with caplog.at_level(logging.WARNING):
+        sitemap = await Sitemap.from_xml_string(sitemap_xml)
+
+    assert sitemap.urls == []
+    assert 'Entity declarations are not allowed in sitemaps' in caplog.text
 
 
 def test_xml_handler_discards_metadata_from_url_without_loc() -> None:

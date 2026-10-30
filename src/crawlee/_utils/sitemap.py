@@ -118,7 +118,7 @@ class _XMLSaxSitemapHandler(ContentHandler):
         self._root_tag_name: str | None = None
         self._current_tag: str | None = None
         self._current_url: _SitemapItem = {}
-        self._buffer: str = ''
+        self._buffer: list[str] = []
         self._items: list[_SitemapItem] = []
 
     @property
@@ -132,16 +132,17 @@ class _XMLSaxSitemapHandler(ContentHandler):
 
         if name in ('loc', 'lastmod', 'changefreq', 'priority'):
             self._current_tag = name
-            self._buffer = ''
+            self._buffer = []
 
     def characters(self, content: str) -> None:
+        # Expat splits one text node into many callbacks, so the pieces are joined once in `endElement`.
         if self._current_tag:
-            self._buffer += content
+            self._buffer.append(content)
 
     @override
     def endElement(self, name: str) -> None:
         if name == self._current_tag:
-            text = self._buffer.strip()
+            text = ''.join(self._buffer).strip()
 
             if name == 'loc':
                 if self._root_tag_name == 'sitemapindex':
@@ -166,6 +167,21 @@ class _XMLSaxSitemapHandler(ContentHandler):
             if 'loc' in self._current_url:
                 self.items.append({'type': 'url', **self._current_url})
             self._current_url = {}
+
+
+class _SitemapExpatParser(ExpatParser):
+    """Expat SAX parser that rejects entity declarations.
+
+    Sitemaps never declare entities, and an internal entity lets a few kilobytes of input expand into megabytes of text.
+    """
+
+    @override
+    def reset(self) -> None:
+        super().reset()
+        self._parser.EntityDeclHandler = self._reject_entity_declaration  # ty: ignore[unresolved-attribute]
+
+    def _reject_entity_declaration(self, name: str, *_args: object) -> None:
+        raise ValueError(f'Entity declarations are not allowed in sitemaps, found {name!r}')
 
 
 class _TxtSitemapParser:
@@ -206,7 +222,7 @@ class _XmlSitemapParser:
     """Parser for XML sitemaps using SAX to process data as a stream."""
 
     def __init__(self) -> None:
-        self._parser = ExpatParser()
+        self._parser = _SitemapExpatParser()
         self._handler = _XMLSaxSitemapHandler()
         self._parser.setContentHandler(self._handler)
 
