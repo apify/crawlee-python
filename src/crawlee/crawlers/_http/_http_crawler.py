@@ -10,7 +10,7 @@ from ._http_parser import NoParser
 if TYPE_CHECKING:
     from typing import Unpack
 
-    from crawlee.crawlers import BasicCrawlerOptions
+    from crawlee.crawlers import HttpCrawlerOptions
 
 
 @docs_group('Crawlers')
@@ -48,7 +48,7 @@ class HttpCrawler(AbstractHttpCrawler[ParsedHttpCrawlingContext[bytes], bytes, b
 
     def __init__(
         self,
-        **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[bytes]]],
+        **kwargs: Unpack[HttpCrawlerOptions[ParsedHttpCrawlingContext[bytes]]],
     ) -> None:
         """Initialize a new instance.
 

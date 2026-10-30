@@ -115,7 +115,6 @@ class HttpxHttpClient(HttpClient):
     def __init__(
         self,
         *,
-        persist_cookies_per_session: bool = True,
         http1: bool = True,
         http2: bool = True,
         verify: str | bool | SSLContext = True,
@@ -126,7 +125,6 @@ class HttpxHttpClient(HttpClient):
         """Initialize a new instance.
 
         Args:
-            persist_cookies_per_session: Whether to persist cookies per HTTP session.
             http1: Whether to enable HTTP/1.1 support.
             http2: Whether to enable HTTP/2 support.
             verify: SSL certificates used to verify the identity of requested hosts.
@@ -141,7 +139,6 @@ class HttpxHttpClient(HttpClient):
                 `limits` argument applies per proxy, because every proxy gets a connection pool of its own.
         """
         super().__init__(
-            persist_cookies_per_session=persist_cookies_per_session,
             follow_redirects=follow_redirects,
             headers=async_client_kwargs.pop('headers', None),
         )

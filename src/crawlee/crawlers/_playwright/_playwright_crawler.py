@@ -123,6 +123,7 @@ class PlaywrightCrawler(
         headless: bool | None = None,
         use_incognito_pages: bool | None = None,
         navigation_timeout: timedelta | None = None,
+        save_response_cookies: bool = True,
         **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext, StatisticsState]],
     ) -> None:
         """Initialize a new instance.
@@ -155,9 +156,11 @@ class PlaywrightCrawler(
                 the request handler)
             goto_options: Additional options to pass to Playwright's `Page.goto()` method. The `timeout` option is
                 not supported, use `navigation_timeout` instead.
+            save_response_cookies: Whether to save the cookies of the page to the session after the request handler.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         self._shared_navigation_timeouts: dict[int, SharedTimeout] = {}
+        self._save_response_cookies = save_response_cookies
 
         if browser_pool:
             # Raise an exception if browser_pool is provided together with other browser-related arguments.
@@ -565,7 +568,7 @@ class PlaywrightCrawler(
     async def _create_crawling_context(self, context: TPostNavContext) -> AsyncGenerator[TCrawlingContext, None]:
         yield self._build_crawling_context(context)
 
-        if context.session:
+        if context.session and self._save_response_cookies:
             pw_cookies = await self._get_cookies(context.page)
             context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
 
@@ -649,3 +652,8 @@ class PlaywrightCrawlerOptions(
 
     It is intended for typing forwarded `__init__` arguments in the subclasses.
     """
+
+    # Kept out of `_PlaywrightCrawlerAdditionalOptions`, since `AdaptivePlaywrightCrawler` passes those to its browser
+    # sub-crawler only, while its static sub-crawler would keep saving the response cookies.
+    save_response_cookies: NotRequired[bool]
+    """Whether to save the cookies of the page to the session after the request handler."""

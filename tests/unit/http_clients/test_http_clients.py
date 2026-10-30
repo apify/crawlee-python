@@ -49,10 +49,9 @@ def http_client_class(request: SubRequest) -> type[HttpClient]:
 async def custom_http_client(request: SubRequest) -> AsyncGenerator[HttpClient]:
     """Helper fixture to reduce code duplication.
 
-    If clients are not initialized, create their default instances.
     Return client in active context, leave the context after the test."""
 
-    client = request.param if isinstance(request.param, HttpClient) else request.param()
+    client = request.param
     async with client as _:
         yield _
 
@@ -581,24 +580,6 @@ async def test_cookies_of_non_ascii_host_sent_back(monkeypatch: pytest.MonkeyPat
     assert fetch.call_args.kwargs['headers']['cookie'] == 'sid=1'
 
 
-@pytest.mark.parametrize(
-    'custom_http_client',
-    [
-        pytest.param(lambda: CurlImpersonateHttpClient(persist_cookies_per_session=False), id='curl'),
-        pytest.param(lambda: HttpxHttpClient(persist_cookies_per_session=False), id='httpx'),
-        pytest.param(lambda: ImpitHttpClient(persist_cookies_per_session=False), id='impit'),
-    ],
-    indirect=['custom_http_client'],
-)
-async def test_cookies_not_persisted(custom_http_client: HttpClient, server_url: URL) -> None:
-    """Test that `persist_cookies_per_session` keeps the session jar untouched."""
-    session = Session()
-
-    await custom_http_client.send_request(str((server_url / 'set_cookies').with_query(a='1')), session=session)
-
-    assert session.cookies.get_cookies_as_dicts() == []
-
-
 async def test_cookies_argument_replaces_session_cookies(http_client: HttpClient, server_url: URL) -> None:
     """Test that the cookies passed in `cookies` are sent and stored instead of the cookies of the session."""
     session = Session(cookies=[CookieParam(name='from_session', value='1', domain=server_url.host or '')])
@@ -613,54 +594,6 @@ async def test_cookies_argument_replaces_session_cookies(http_client: HttpClient
     assert (await read_json(response))['cookies'] == {'from_argument': '1', 'a': '1'}
     assert {item['name'] for item in cookies.get_cookies_as_dicts()} == {'from_argument', 'a'}
     assert {item['name'] for item in session.cookies.get_cookies_as_dicts()} == {'from_session'}
-
-
-@pytest.mark.parametrize(
-    'custom_http_client',
-    [
-        pytest.param(lambda: CurlImpersonateHttpClient(persist_cookies_per_session=False), id='curl'),
-        pytest.param(lambda: HttpxHttpClient(persist_cookies_per_session=False), id='httpx'),
-        pytest.param(lambda: ImpitHttpClient(persist_cookies_per_session=False), id='impit'),
-    ],
-    indirect=['custom_http_client'],
-)
-async def test_cookies_argument_stored_when_not_persisted(custom_http_client: HttpClient, server_url: URL) -> None:
-    """Test that the response cookies are stored in `cookies` even with `persist_cookies_per_session` disabled."""
-    cookies = SessionCookies()
-
-    await custom_http_client.send_request(str((server_url / 'set_cookies').with_query(a='1')), cookies=cookies)
-
-    assert {item['name'] for item in cookies.get_cookies_as_dicts()} == {'a'}
-
-
-@pytest.mark.parametrize(
-    'custom_http_client',
-    [
-        pytest.param(lambda: CurlImpersonateHttpClient(persist_cookies_per_session=False), id='curl'),
-        pytest.param(lambda: HttpxHttpClient(persist_cookies_per_session=False), id='httpx'),
-        pytest.param(lambda: ImpitHttpClient(persist_cookies_per_session=False), id='impit'),
-    ],
-    indirect=['custom_http_client'],
-)
-async def test_cookies_sent_when_not_persisted(custom_http_client: HttpClient, server_url: URL) -> None:
-    """Test that `persist_cookies_per_session` gates storing the response cookies, not sending the session ones."""
-    session = Session(cookies=[CookieParam(name='from_jar', value='1', domain=server_url.host or '')])
-
-    response = await custom_http_client.send_request(str(server_url / 'cookies'), session=session)
-
-    assert (await read_json(response))['cookies'] == {'from_jar': '1'}
-
-
-async def test_redirect_cookies_sent_when_not_persisted(server_url: URL, http_client_class: type[HttpClient]) -> None:
-    """Test that with `persist_cookies_per_session` off the cookies set during a redirect chain reach its next hops."""
-    session = Session()
-
-    async with http_client_class(persist_cookies_per_session=False) as client:
-        response = await client.send_request(str((server_url / 'set_cookies').with_query(a='1')), session=session)
-        cookies = (await read_json(response))['cookies']
-
-    assert cookies == {'a': '1'}
-    assert session.cookies.get_cookies_as_dicts() == []
 
 
 async def test_cookie_header_rebuilt_per_hop(http_client: HttpClient, server_url: URL) -> None:

@@ -16,7 +16,7 @@ from crawlee.crawlers import HttpCrawler
 from crawlee.errors import PersistentRateLimitError
 from crawlee.http_clients import HttpClient, HttpResponse
 from crawlee.request_loaders import ThrottlingRequestManager, _throttling_request_manager
-from crawlee.sessions import SessionPool
+from crawlee.sessions import CookieParam, SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storages import RequestQueue
 from tests.unit.server_endpoints import HELLO_WORLD
@@ -591,6 +591,45 @@ async def test_store_complex_cookies(server_url: URL) -> None:
             'secure': False,
             'http_only': False,
         }
+
+
+async def test_save_response_cookies_disabled(server_url: URL) -> None:
+    """Test that `save_response_cookies=False` keeps the response cookies out of the session, but sends its cookies."""
+    preset_cookie = CookieParam(name='preset', value='1', domain=server_url.host or '')
+    crawler = HttpCrawler(
+        session_pool=SessionPool(max_pool_size=1, create_session_settings={'cookies': [preset_cookie]}),
+        save_response_cookies=False,
+    )
+    handler_call = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: HttpCrawlingContext) -> None:
+        session_cookies = context.session.cookies.get_cookies_as_dicts() if context.session else []
+        handler_call(
+            sent_cookies=json.loads(await context.http_response.read())['cookies'],
+            session_cookies={cookie['name'] for cookie in session_cookies},
+        )
+
+    # The cookie set by the redirecting response is still sent to the redirect target.
+    await crawler.run([str(server_url.with_path('set_cookies').extend_query(a=1))])
+
+    handler_call.assert_called_once_with(sent_cookies={'preset': '1', 'a': '1'}, session_cookies={'preset'})
+
+
+async def test_context_send_request_saves_cookies(server_url: URL) -> None:
+    """Test that `context.send_request` stores the response cookies in the session despite `save_response_cookies`."""
+    crawler = HttpCrawler(session_pool=SessionPool(max_pool_size=1), save_response_cookies=False)
+    handler_call = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: HttpCrawlingContext) -> None:
+        await context.send_request(str(server_url.with_path('set_cookies').extend_query(b=2)))
+        session_cookies = context.session.cookies.get_cookies_as_dicts() if context.session else []
+        handler_call(session_cookies={cookie['name'] for cookie in session_cookies})
+
+    await crawler.run([str(server_url / 'cookies')])
+
+    handler_call.assert_called_once_with(session_cookies={'b'})
 
 
 def test_default_logger() -> None:

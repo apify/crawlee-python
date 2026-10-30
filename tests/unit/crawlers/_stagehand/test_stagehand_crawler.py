@@ -91,6 +91,13 @@ def test_init_with_valid_browser_pool() -> None:
     StagehandCrawler(browser_pool=pool)
 
 
+def test_forwards_save_response_cookies() -> None:
+    """`save_response_cookies` reaches the `PlaywrightCrawler` that saves the cookies of the page."""
+    crawler = StagehandCrawler(save_response_cookies=False)
+
+    assert crawler._save_response_cookies is False
+
+
 async def test_context_type(patched_crawler: StagehandCrawler, server_url: URL) -> None:
     handler_mock = AsyncMock()
     pre_navigation_hook_mock = AsyncMock()

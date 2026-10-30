@@ -549,6 +549,25 @@ async def test_save_cookies_after_handler_processing(server_url: URL) -> None:
         assert session_cookies == {'check': 'test'}
 
 
+async def test_save_response_cookies_disabled(server_url: URL) -> None:
+    """Test that `save_response_cookies=False` keeps the cookies of the page out of the session."""
+    async with SessionPool(max_pool_size=1) as session_pool:
+        crawler = PlaywrightCrawler(session_pool=session_pool, save_response_cookies=False)
+        handler_call = Mock()
+
+        @crawler.router.default_handler
+        async def request_handler(context: PlaywrightCrawlingContext) -> None:
+            await context.page.context.add_cookies([{'name': 'check', 'value': 'test', 'url': str(server_url)}])
+            handler_call(page_cookies={cookie['name'] for cookie in await context.page.context.cookies()})
+
+        await crawler.run([str(server_url.with_path('set_cookies').extend_query(a=1))])
+
+        session = await session_pool.get_session()
+
+        handler_call.assert_called_once_with(page_cookies={'a', 'check'})
+        assert session.cookies.get_cookies_as_dicts() == []
+
+
 async def test_send_request_sends_page_cookies(server_url: URL) -> None:
     """Test that `context.send_request` sends the cookies set by the navigation and by the page in the handler."""
     crawler = PlaywrightCrawler()

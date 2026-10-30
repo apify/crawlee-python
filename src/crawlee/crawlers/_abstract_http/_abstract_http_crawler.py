@@ -16,6 +16,7 @@ from crawlee._utils.time import SharedTimeout
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute, to_absolute_url_iterator
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
 from crawlee.errors import RequestThrottledError, SessionError
+from crawlee.sessions import SessionCookies
 from crawlee.statistics import StatisticsState
 
 from ._http_crawling_context import HttpCrawlingContext, ParsedHttpCrawlingContext, TParseResult, TSelectResult
@@ -45,6 +46,11 @@ class HttpCrawlerOptions(
     navigation_timeout: NotRequired[timedelta | None]
     """Timeout for the HTTP request."""
 
+    save_response_cookies: NotRequired[bool]
+    """Whether to save the cookies set by the responses to the session. The session cookies are sent either way. The
+    option doesn't apply to `context.send_request`.
+    """
+
 
 @docs_group('Crawlers')
 class AbstractHttpCrawler(
@@ -71,10 +77,12 @@ class AbstractHttpCrawler(
         *,
         parser: AbstractHttpParser[TParseResult, TSelectResult],
         navigation_timeout: timedelta | None = None,
+        save_response_cookies: bool = True,
         **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext, StatisticsState]],
     ) -> None:
         self._parser = parser
         self._navigation_timeout = navigation_timeout or timedelta(minutes=1)
+        self._save_response_cookies = save_response_cookies
         self._pre_navigation_hooks: list[Callable[[BasicCrawlingContext], Awaitable[None]]] = []
         self._post_navigation_hooks: list[Callable[[HttpCrawlingContext], Awaitable[None]]] = []
         self._shared_navigation_timeouts: dict[int, SharedTimeout] = {}
@@ -104,7 +112,7 @@ class AbstractHttpCrawler(
             def __init__(
                 self,
                 parser: AbstractHttpParser[TParseResult, TSelectResult] = static_parser,  # ty: ignore[invalid-parameter-default]
-                **kwargs: Unpack[BasicCrawlerOptions[ParsedHttpCrawlingContext[TParseResult]]],
+                **kwargs: Unpack[HttpCrawlerOptions[ParsedHttpCrawlingContext[TParseResult]]],
             ) -> None:
                 kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline()
                 super().__init__(
@@ -280,6 +288,11 @@ class AbstractHttpCrawler(
         Yields:
             The original crawling context enhanced by HTTP response.
         """
+        # Without saving, the session cookies are still sent, but the response cookies go to a copy.
+        cookies = None
+        if context.session is not None and not self._save_response_cookies:
+            cookies = SessionCookies(context.session.cookies)
+
         async with self._shared_navigation_timeouts[id(context.request)] as remaining_timeout:
             response = await self._http_client.send_request(
                 context.request.url,
@@ -287,6 +300,7 @@ class AbstractHttpCrawler(
                 headers=context.request.headers,
                 payload=context.request.payload,
                 session=context.session,
+                cookies=cookies,
                 proxy_info=context.proxy_info,
                 timeout=remaining_timeout,
             )

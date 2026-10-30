@@ -71,7 +71,7 @@ class PlaywrightHttpClient(HttpClient):
         try:
             # The browser context holds the cookies of the session, added before the navigation, with the changes the
             # page made since. The browser stores the response cookies there too, and the crawler saves them to the
-            # session after the request handler.
+            # session after the request handler unless `save_response_cookies` is disabled.
             if page is not None and cookies is None:
                 context_cookies = await page.context.cookies()
                 cookies = SessionCookies()

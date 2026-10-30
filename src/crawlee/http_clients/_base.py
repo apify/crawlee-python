@@ -209,19 +209,16 @@ class HttpClient(ABC):
     def __init__(
         self,
         *,
-        persist_cookies_per_session: bool = True,
         follow_redirects: bool = True,
         headers: Mapping[str, str] | None = None,
     ) -> None:
         """Initialize a new instance.
 
         Args:
-            persist_cookies_per_session: Whether to persist cookies per HTTP session.
             follow_redirects: Whether `send_request` follows redirects. Without following them, it returns the first
                 response as it is.
             headers: The headers to include in every request. The headers passed to `send_request` win over them.
         """
-        self._persist_cookies_per_session = persist_cookies_per_session
         self._follow_redirects = follow_redirects
         self._headers = HttpHeaders(headers or {})
 
@@ -259,11 +256,9 @@ class HttpClient(ABC):
             method: The HTTP method to use.
             headers: The headers to include in the request.
             payload: The data to be sent as the request body.
-            session: The session whose cookies are sent. The response cookies are stored in it when
-                `persist_cookies_per_session` is enabled. Otherwise, and without a session, they are kept only for the
-                redirect chain of this request.
-            cookies: The cookies to send and store instead of the cookies of `session`, even with
-                `persist_cookies_per_session` disabled.
+            session: The session whose cookies are sent and stored. Without a session or `cookies`, the response
+                cookies are kept only for the redirect chain of this request.
+            cookies: The cookies to send and store instead of the cookies of `session`.
             proxy_info: The information about the proxy to be used.
             timeout: Maximum time allowed to receive the response, including all redirects, and to read its body.
                 Without it, the default timeout of the HTTP client applies.
@@ -282,13 +277,7 @@ class HttpClient(ABC):
         headers = self._headers | HttpHeaders(headers or {})
 
         if cookies is None:
-            if session is None:
-                cookies = SessionCookies()
-            elif self._persist_cookies_per_session:
-                cookies = session.cookies
-            else:
-                # The cookies of the session are still sent, but the response cookies go to a copy.
-                cookies = SessionCookies(session.cookies)
+            cookies = session.cookies if session is not None else SessionCookies()
 
         # `encoded=True` keeps the path and the query byte for byte, including a safe `%2F` in query.
         current_url = _with_ascii_host(URL(url, encoded=True))

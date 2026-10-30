@@ -113,7 +113,6 @@ class ImpitHttpClient(HttpClient):
     def __init__(
         self,
         *,
-        persist_cookies_per_session: bool = True,
         http3: bool = False,
         verify: bool = True,
         browser: Browser | None = 'firefox',
@@ -123,7 +122,6 @@ class ImpitHttpClient(HttpClient):
         """Initialize a new instance.
 
         Args:
-            persist_cookies_per_session: Whether to persist cookies per HTTP session.
             http3: Whether to enable HTTP/3 support.
             verify: SSL certificates used to verify the identity of requested hosts.
             browser: Browser to impersonate.
@@ -133,7 +131,6 @@ class ImpitHttpClient(HttpClient):
                 by `send_request`, so `max_redirects` is ignored.
         """
         super().__init__(
-            persist_cookies_per_session=persist_cookies_per_session,
             follow_redirects=follow_redirects,
             headers=async_client_kwargs.pop('headers', None),
         )
