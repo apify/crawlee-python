@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
 import pytest
@@ -201,3 +202,17 @@ def test_html_to_text_parsel() -> None:
 
 def test_html_to_text_beautifulsoup() -> None:
     assert html_to_text_beautifulsoup(BeautifulSoup(_EXAMPLE_HTML, features='lxml')) == _EXPECTED_TEXT
+
+
+@pytest.mark.parametrize('html_to_text', [html_to_text_parsel, html_to_text_beautifulsoup])
+def test_html_to_text_is_linear_in_node_count(html_to_text: Callable[[str], str]) -> None:
+    """A document with many sibling nodes converts in time proportional to the node count, not its square."""
+    repeats = 160_000
+    source = '<html><body><div>' + '<i> a</i>' * repeats + '</div></body></html>'
+
+    started = time.perf_counter()
+    text = html_to_text(source)
+    elapsed = time.perf_counter() - started
+
+    assert text == ' '.join(['a'] * repeats)
+    assert elapsed < 2
