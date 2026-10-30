@@ -108,10 +108,9 @@ class StatisticsState(BaseModel):
     def crawler_runtime(self) -> timedelta:
         """The total runtime of the crawler, accumulated over all its runs."""
         if self.crawler_last_started_at is None:
-            # Crawler is not running.
             return self.accumulated_runtime
         if self.stats_persisted_at is not None and self.crawler_last_started_at <= self.stats_persisted_at:
-            # Accumulated runtime before persistence is already included, do not count it twice.
+            # A restored snapshot already checkpoints this run in `accumulated_runtime`, do not count it twice.
             return self.accumulated_runtime
 
         finished_at = self.crawler_finished_at or datetime.now(UTC)

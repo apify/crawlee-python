@@ -122,6 +122,28 @@ async def test_runtime_after_unclean_shutdown_excludes_downtime() -> None:
     assert previous_runtime <= runtime < previous_runtime + timedelta(minutes=1)
 
 
+async def test_runtime_counts_after_resume_on_host_with_clock_behind() -> None:
+    """A resumed run is measured even when the persist timestamp of the previous host lies in the future."""
+    key = 'statistics_clock_behind'
+    run_in_progress_duration = timedelta(seconds=10)
+
+    kvs = await KeyValueStore.open()
+    await kvs.set_value(
+        key,
+        {
+            'statsPersistedAt': (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+            'crawlerRuntimeMillis': 0,
+        },
+    )
+
+    async with Statistics.with_default_state(persistence_enabled=True, persist_state_key=key) as statistics:
+        assert statistics.state.crawler_last_started_at
+        statistics.state.crawler_last_started_at -= run_in_progress_duration
+        runtime = statistics.state.crawler_runtime
+
+    assert runtime >= run_in_progress_duration
+
+
 async def test_serialized_state_includes_runtime_of_run_in_progress() -> None:
     """A state serialized during a run carries the runtime up to that moment, so every persist is a checkpoint."""
     run_in_progress_duration = timedelta(hours=1)

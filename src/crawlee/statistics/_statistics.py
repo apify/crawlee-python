@@ -175,9 +175,11 @@ class Statistics(Generic[TStatisticsState]):
         await self._state.initialize()
 
         # The restored timestamps belong to the previous run. Clear them, so that the downtime since then (e.g. a
-        # migration or resurrection) doesn't count towards the runtime.
+        # migration or resurrection) doesn't count towards the runtime, and a clock that is behind the previous
+        # host's doesn't make `crawler_runtime` treat the new run as already checkpointed.
         self.state.crawler_last_started_at = None
         self.state.crawler_finished_at = None
+        self.state.stats_persisted_at = None
 
         # Start periodic logging and let it print the restored state before the new run starts being measured.
         self._periodic_logger.start()
