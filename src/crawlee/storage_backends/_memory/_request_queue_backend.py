@@ -213,7 +213,7 @@ class MemoryRequestQueueBackend(RequestQueueBackend):
     @override
     async def fetch_next_request(self) -> Request | None:
         if not self._pending_requests:
-            # Yield to the event loop like the other clients do, so a caller polling an empty queue can't starve the
+            # Yield to the event loop like the other backends do, so a caller polling an empty queue can't starve the
             # tasks that would fill it.
             await asyncio.sleep(0)
             return None

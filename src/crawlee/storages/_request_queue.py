@@ -79,7 +79,7 @@ class RequestQueue(Storage, RequestManager):
         Preferably use the `RequestQueue.open` constructor to create a new instance.
 
         Args:
-            backend: An instance of a storage backend.
+            backend: The request queue backend to use.
             id: The unique identifier of the storage.
             name: The name of the storage, if available.
         """

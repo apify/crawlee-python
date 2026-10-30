@@ -252,7 +252,7 @@ class FileSystemRequestQueueBackend(RequestQueueBackend):
                 await backend._discover_existing_requests()
                 await backend._update_metadata(update_accessed_at=True)
 
-            # Otherwise, create a new dataset backend.
+            # Otherwise, create a new request queue backend.
             else:
                 now = datetime.now(UTC)
                 metadata = RequestQueueMetadata(
@@ -490,7 +490,7 @@ class FileSystemRequestQueueBackend(RequestQueueBackend):
                 self._is_empty_cache = None
                 return next_request
 
-        # Yield to the event loop like the other clients do, so a caller polling an empty queue can't starve the
+        # Yield to the event loop like the other backends do, so a caller polling an empty queue can't starve the
         # tasks that would fill it.
         await asyncio.sleep(0)
         return None

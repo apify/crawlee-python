@@ -99,7 +99,7 @@ class StorageInstanceManager:
                 the digits "0" through "9", and the hyphen ("-") but only in the middle of the string
                 (e.g. "my-value-1").
             alias: Storage alias (run scope, creates unnamed storage).
-            backend_opener_coro: Coroutine to open the storage backend when storage instance not found in cache.
+            backend_opener_coro: Coroutine to open the dataset, KVS or RQ backend when the instance is not cached.
             storage_backend_cache_key: Additional optional key from storage backend to differentiate cache entries.
 
         Returns:

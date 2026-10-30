@@ -17,7 +17,7 @@ class DatasetBackend(ABC):
     Dataset backends provide an interface for accessing and manipulating dataset storage. They handle
     operations like adding and getting dataset items across different storage backends.
 
-    Storage backends are specific to the type of storage they manage (`Dataset`, `KeyValueStore`,
+    These backends are specific to the type of storage they manage (`Dataset`, `KeyValueStore`,
     `RequestQueue`), and can operate with various storage systems including memory, file system,
     databases, and cloud storage solutions.
 

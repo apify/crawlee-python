@@ -15,7 +15,7 @@ The pluggable storage implementations are called storage backends, and the `craw
 
 - `StorageClient`, `MemoryStorageClient`, `FileSystemStorageClient`, `SqlStorageClient` and `RedisStorageClient` are now `StorageBackend`, `MemoryStorageBackend`, `FileSystemStorageBackend`, `SqlStorageBackend` and `RedisStorageBackend`.
 - `DatasetClient`, `KeyValueStoreClient` and `RequestQueueClient` are now `DatasetBackend`, `KeyValueStoreBackend` and `RequestQueueBackend`. Their built-in implementations follow the same pattern, for example `FileSystemDatasetClient` is now `FileSystemDatasetBackend`.
-- The `storage_client` argument is now `storage_backend`. That covers `BasicCrawler`, `ServiceLocator`, `Dataset.open`, `KeyValueStore.open` and `RequestQueue.open`. The `to_kvs_storage_client` argument of `Dataset.export_to` is now `to_kvs_storage_backend`.
+- The `storage_client` argument is now `storage_backend`. That covers `BasicCrawler`, `ServiceLocator`, `Dataset.open`, `KeyValueStore.open` and `RequestQueue.open`. The `to_kvs_storage_client` argument of `Dataset.export_to` is now `to_kvs_storage_backend`. A custom request manager opener passed to `ThrottlingRequestManager` must accept `storage_backend`.
 - `ServiceLocator.get_storage_client` and `ServiceLocator.set_storage_client` are now `get_storage_backend` and `set_storage_backend`.
 
 For example:
