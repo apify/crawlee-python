@@ -317,7 +317,7 @@ class BrowserPool:
                 self._pre_page_create_hooks, page_id, browser_controller, browser_new_context_options, proxy_info
             )
 
-            page = await asyncio.wait_for(
+            page, generated_headers = await asyncio.wait_for(
                 browser_controller.new_page(
                     browser_new_context_options=browser_new_context_options,
                     proxy_info=proxy_info,
@@ -332,7 +332,9 @@ class BrowserPool:
         if browser_controller.total_opened_pages >= self._retire_browser_after_page_count:
             self._retire_browser(browser_controller)
 
-        crawlee_page = CrawleePage(id=page_id, page=page, browser_type=plugin.browser_type)
+        crawlee_page = CrawleePage(
+            id=page_id, page=page, browser_type=plugin.browser_type, generated_headers=generated_headers
+        )
         self._pages[page_id] = crawlee_page
         self._total_pages_count += 1
 
