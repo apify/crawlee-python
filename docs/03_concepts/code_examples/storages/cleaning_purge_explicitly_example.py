@@ -4,7 +4,7 @@ from crawlee.storages import Dataset
 
 
 async def main() -> None:
-    # Create storage client with configuration
+    # Create storage backend with configuration
     dataset = await Dataset.open(name='my-dataset')
 
     # Purge the dataset explicitly - purging will remove all items from the dataset.

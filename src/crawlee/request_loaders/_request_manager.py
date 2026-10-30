@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
 from crawlee.request_loaders._request_loader import RequestLoader
-from crawlee.storage_clients.models import ProcessedRequest
+from crawlee.storage_backends.models import ProcessedRequest
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

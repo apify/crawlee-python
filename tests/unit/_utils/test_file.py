@@ -153,7 +153,7 @@ async def test_export_csv_to_stream_warns_about_dropped_keys(caplog: pytest.LogC
 async def test_export_csv_to_stream_warns_about_dropped_keys_that_are_not_strings(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Dropped keys are reported even when they are not strings, which a storage client may hand over as pushed."""
+    """Dropped keys are reported even when they are not strings, which a storage backend may hand over as pushed."""
     dst = StringIO()
     items = cast('list[Mapping[str, JsonSerializable]]', [{'name': 'Alice'}, {1: 'x', 'city': 'NYC'}])
 

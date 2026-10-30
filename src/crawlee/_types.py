@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions import Session
-    from crawlee.storage_clients import StorageClient
+    from crawlee.storage_backends import StorageBackend
     from crawlee.storages import KeyValueStore
 
     JsonSerializable = Mapping[str, 'JsonSerializable'] | Sequence['JsonSerializable'] | str | int | float | bool | None
@@ -750,8 +750,8 @@ class ExportToKwargs(TypedDict):
     to_kvs_name: NotRequired[str]
     """Name of the key-value store to save the exported file."""
 
-    to_kvs_storage_client: NotRequired[StorageClient]
-    """The storage client to use for saving the exported file."""
+    to_kvs_storage_backend: NotRequired[StorageBackend]
+    """The storage backend to use for saving the exported file."""
 
     to_kvs_configuration: NotRequired[Configuration]
     """The configuration to use for saving the exported file."""

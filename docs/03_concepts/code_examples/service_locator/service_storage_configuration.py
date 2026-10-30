@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
-from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storage_backends import MemoryStorageBackend
 from crawlee.storages import Dataset
 
 
@@ -22,7 +22,7 @@ async def main() -> None:
     # Or set explicitly specific configuration if
     # you do not want to rely on global defaults.
     dataset_2 = await Dataset.open(
-        storage_client=MemoryStorageClient(), configuration=configuration
+        storage_backend=MemoryStorageBackend(), configuration=configuration
     )
 
 

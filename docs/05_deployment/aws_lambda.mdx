@@ -22,7 +22,7 @@ For simple crawlers that don't require browser rendering, you can deploy using a
 
 ### Updating the code
 
-When instantiating a crawler, use <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink>. By default, Crawlee uses file-based storage, but the Lambda filesystem is read-only (except for `/tmp`). Using `MemoryStorageClient` tells Crawlee to use in-memory storage instead.
+When instantiating a crawler, use <ApiLink to="class/MemoryStorageBackend">`MemoryStorageBackend`</ApiLink>. By default, Crawlee uses file-based storage, but the Lambda filesystem is read-only (except for `/tmp`). Using `MemoryStorageBackend` tells Crawlee to use in-memory storage instead.
 
 Wrap the crawler logic in a `lambda_handler` function. This is the entry point that AWS will execute.
 
@@ -113,7 +113,7 @@ For crawlers that require browser rendering, you need to deploy using Docker con
 
 ### Updating the code
 
-As with <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, use <ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink> and wrap the logic in a `lambda_handler` function. Additionally, configure `browser_launch_options` with flags optimized for serverless environments. These flags disable sandboxing and GPU features that aren't available in Lambda's containerized runtime.
+As with <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink>, use <ApiLink to="class/MemoryStorageBackend">`MemoryStorageBackend`</ApiLink> and wrap the logic in a `lambda_handler` function. Additionally, configure `browser_launch_options` with flags optimized for serverless environments. These flags disable sandboxing and GPU features that aren't available in Lambda's containerized runtime.
 
 <CodeBlock language="python" title="main.py">
     {PlaywrightCrawlerLambda}

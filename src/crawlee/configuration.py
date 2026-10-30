@@ -85,7 +85,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = True
-    """Whether to purge the storage on the start. This option is utilized by the storage clients."""
+    """Whether to purge the storage on the start. This option is utilized by the storage backends."""
 
     persist_state_interval: Annotated[
         timedelta_ms,
@@ -199,7 +199,7 @@ class Configuration(BaseSettings):
             ),
         ),
     ] = './storage'
-    """The path to the storage directory. This option is utilized by the storage clients."""
+    """The path to the storage directory. This option is utilized by the storage backends."""
 
     headless: Annotated[
         bool,

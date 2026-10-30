@@ -23,8 +23,8 @@ if TYPE_CHECKING:
 
     from crawlee._request import Request
     from crawlee.configuration import Configuration
-    from crawlee.storage_clients import StorageClient
-    from crawlee.storage_clients.models import ProcessedRequest
+    from crawlee.storage_backends import StorageBackend
+    from crawlee.storage_backends.models import ProcessedRequest
 
     from ._types import RequestSourceStatus
 
@@ -67,7 +67,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
     The class is generic over the wrapped manager type. The first asynchronous operation opens one sub-manager per
     configured domain through `request_manager_opener`, so all of them share the subclass and backing store of `inner`;
-    the synchronous delay methods never open anything. The opener must accept `alias`, `storage_client`, and
+    the synchronous delay methods never open anything. The opener must accept `alias`, `storage_backend`, and
     `configuration` keyword arguments (as `RequestQueue.open` does) and return the same concrete subclass as `inner`.
 
     Requests a previous run left in a persistent store become visible again at open. The default `purge_on_start=True`
@@ -114,7 +114,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 and a trailing root dot are all normalized away. Subdomain wildcards such as `*.example.com` are not
                 supported — list each subdomain explicitly if needed.
             request_manager_opener: Async callable used to open one sub-manager per configured domain on first use.
-                Must accept `alias`, `storage_client`, and `configuration` keyword arguments and return the same
+                Must accept `alias`, `storage_backend`, and `configuration` keyword arguments and return the same
                 concrete subclass as `inner` (e.g. `RequestQueue.open` when `inner` is a `RequestQueue`).
             service_locator: Service locator for creating sub-managers. If not provided, defaults to the global service
                 locator, ensuring consistency with the crawler's storage backend.
@@ -543,7 +543,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """Open the sub-manager for a single domain using the configured `request_manager_opener`."""
         self._sub_managers[domain] = await self._request_manager_opener(
             alias=f'throttled-{domain}',
-            storage_client=self._service_locator.get_storage_client(),
+            storage_backend=self._service_locator.get_storage_backend(),
             configuration=self._service_locator.get_configuration(),
         )
 
@@ -587,7 +587,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """Move a request fetched from `inner` into its domain's sub-manager."""
         sub_manager = self._sub_managers[self._extract_domain(request.url)]
         try:
-            # A copy, because some storage clients keep the added object and `inner` marks this one handled below.
+            # A copy, because some storage backends keep the added object and `inner` marks this one handled below.
             processed = await sub_manager.add_request(request.model_copy(deep=True))
         # Includes cancellation, which would otherwise leave the request in progress in `inner`.
         except BaseException:
@@ -651,7 +651,7 @@ class _RequestManagerOpener(Protocol[TRequestManager_co]):
         self,
         *,
         alias: str | None = ...,
-        storage_client: StorageClient | None = ...,
+        storage_backend: StorageBackend | None = ...,
         configuration: Configuration | None = ...,
     ) -> TRequestManager_co: ...
 

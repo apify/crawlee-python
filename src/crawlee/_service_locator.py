@@ -6,7 +6,7 @@ from crawlee._utils.docs import docs_group
 from crawlee.configuration import Configuration
 from crawlee.errors import ServiceConflictError
 from crawlee.events import EventManager, LocalEventManager
-from crawlee.storage_clients import FileSystemStorageClient, StorageClient
+from crawlee.storage_backends import FileSystemStorageBackend, StorageBackend
 
 if TYPE_CHECKING:
     from crawlee.storages._storage_instance_manager import StorageInstanceManager
@@ -29,11 +29,11 @@ class ServiceLocator:
         self,
         configuration: Configuration | None = None,
         event_manager: EventManager | None = None,
-        storage_client: StorageClient | None = None,
+        storage_backend: StorageBackend | None = None,
     ) -> None:
         self._configuration = configuration
         self._event_manager = event_manager
-        self._storage_client = storage_client
+        self._storage_backend = storage_backend
 
     def get_configuration(self) -> Configuration:
         """Get the configuration."""
@@ -90,35 +90,35 @@ class ServiceLocator:
 
         self._event_manager = event_manager
 
-    def get_storage_client(self) -> StorageClient:
-        """Get the storage client."""
-        if self._storage_client is None:
-            logger.debug('No storage client set, implicitly creating and using default FileSystemStorageClient.')
+    def get_storage_backend(self) -> StorageBackend:
+        """Get the storage backend."""
+        if self._storage_backend is None:
+            logger.debug('No storage backend set, implicitly creating and using default FileSystemStorageBackend.')
             if self._configuration is None:
                 logger.warning(
-                    'Implicit creation of storage client will implicitly set configuration as side effect. '
+                    'Implicit creation of storage backend will implicitly set configuration as side effect. '
                     'It is advised to explicitly first set the configuration instead.'
                 )
-            self._storage_client = FileSystemStorageClient()
+            self._storage_backend = FileSystemStorageBackend()
 
-        return self._storage_client
+        return self._storage_backend
 
-    def set_storage_client(self, storage_client: StorageClient) -> None:
-        """Set the storage client.
+    def set_storage_backend(self, storage_backend: StorageBackend) -> None:
+        """Set the storage backend.
 
         Args:
-            storage_client: The storage client to set.
+            storage_backend: The storage backend to set.
 
         Raises:
-            ServiceConflictError: If the storage client has already been retrieved before.
+            ServiceConflictError: If the storage backend has already been retrieved before.
         """
-        if self._storage_client is storage_client:
+        if self._storage_backend is storage_backend:
             # Same instance, no need to anything
             return
-        if self._storage_client:
-            raise ServiceConflictError(StorageClient, storage_client, self._storage_client)
+        if self._storage_backend:
+            raise ServiceConflictError(StorageBackend, storage_backend, self._storage_backend)
 
-        self._storage_client = storage_client
+        self._storage_backend = storage_backend
 
     @property
     def storage_instance_manager(self) -> StorageInstanceManager:

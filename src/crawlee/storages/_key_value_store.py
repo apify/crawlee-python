@@ -12,7 +12,7 @@ from crawlee import service_locator
 from crawlee._types import JsonSerializable  # noqa: TC001
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recoverable_state import RecoverableState
-from crawlee.storage_clients.models import KeyValueStoreMetadata
+from crawlee.storage_backends.models import KeyValueStoreMetadata
 
 from ._base import Storage
 from ._utils import validate_storage_name
@@ -21,9 +21,9 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from crawlee.configuration import Configuration
-    from crawlee.storage_clients import StorageClient
-    from crawlee.storage_clients._base import KeyValueStoreClient
-    from crawlee.storage_clients.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
+    from crawlee.storage_backends import StorageBackend
+    from crawlee.storage_backends._base import KeyValueStoreBackend
+    from crawlee.storage_backends.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
 else:
     from crawlee._utils.recoverable_state import RecoverableState
 
@@ -51,7 +51,7 @@ class KeyValueStore(Storage):
 
     You can instantiate a key-value store using the `open` class method, which will create a store
     with the specified name or id. The underlying storage implementation is determined by the configured
-    storage client.
+    storage backend.
 
     ### Usage
 
@@ -75,19 +75,19 @@ class KeyValueStore(Storage):
     ] = {}
     """Cache for recoverable (auto-saved) values."""
 
-    def __init__(self, client: KeyValueStoreClient, id: str, name: str | None) -> None:
+    def __init__(self, backend: KeyValueStoreBackend, id: str, name: str | None) -> None:
         """Initialize a new instance.
 
         Preferably use the `KeyValueStore.open` constructor to create a new instance.
 
         Args:
-            client: An instance of a storage client.
+            backend: The key-value store backend to use.
             id: The unique identifier of the storage.
             name: The name of the storage, if available.
         """
         validate_storage_name(name)
 
-        self._client = client
+        self._backend = backend
         self._id = id
         self._name = name
 
@@ -106,7 +106,7 @@ class KeyValueStore(Storage):
 
     @override
     async def get_metadata(self) -> KeyValueStoreMetadata:
-        return await self._client.get_metadata()
+        return await self._backend.get_metadata()
 
     @override
     @classmethod
@@ -117,23 +117,23 @@ class KeyValueStore(Storage):
         name: str | None = None,
         alias: str | None = None,
         configuration: Configuration | None = None,
-        storage_client: StorageClient | None = None,
+        storage_backend: StorageBackend | None = None,
     ) -> KeyValueStore:
         configuration = service_locator.get_configuration() if configuration is None else configuration
-        storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
+        storage_backend = service_locator.get_storage_backend() if storage_backend is None else storage_backend
 
-        client_opener_coro = storage_client.create_kvs_client(
+        backend_opener_coro = storage_backend.create_kvs_backend(
             id=id, name=name, alias=alias, configuration=configuration
         )
-        additional_cache_key = storage_client.get_storage_client_cache_key(configuration=configuration)
+        additional_cache_key = storage_backend.get_storage_backend_cache_key(configuration=configuration)
 
         return await service_locator.storage_instance_manager.open_storage_instance(
             cls,
             id=id,
             name=name,
             alias=alias,
-            client_opener_coro=client_opener_coro,
-            storage_client_cache_key=additional_cache_key,
+            backend_opener_coro=backend_opener_coro,
+            storage_backend_cache_key=additional_cache_key,
         )
 
     @override
@@ -142,11 +142,11 @@ class KeyValueStore(Storage):
         storage_instance_manager.remove_from_cache(self)
 
         await self._clear_cache()  # Clear cache with persistent values.
-        await self._client.drop()
+        await self._backend.drop()
 
     @override
     async def purge(self) -> None:
-        await self._client.purge()
+        await self._backend.purge()
 
     @overload
     async def get_value(self, key: str) -> Any: ...
@@ -167,7 +167,7 @@ class KeyValueStore(Storage):
         Returns:
             The value associated with the given key. `default_value` is used in case the record does not exist.
         """
-        record = await self._client.get_value(key=key)
+        record = await self._backend.get_value(key=key)
         return record.value if record else default_value
 
     async def set_value(
@@ -184,7 +184,7 @@ class KeyValueStore(Storage):
             value: Value to set.
             content_type: The MIME content type string.
         """
-        await self._client.set_value(key=key, value=value, content_type=content_type)
+        await self._backend.set_value(key=key, value=value, content_type=content_type)
 
     async def delete_value(self, key: str) -> None:
         """Delete a value from the KVS.
@@ -192,7 +192,7 @@ class KeyValueStore(Storage):
         Args:
             key: Key of the record to delete.
         """
-        await self._client.delete_value(key=key)
+        await self._backend.delete_value(key=key)
 
     async def iterate_keys(
         self,
@@ -209,7 +209,7 @@ class KeyValueStore(Storage):
         Yields:
             Information about the key.
         """
-        async for item in self._client.iterate_keys(
+        async for item in self._backend.iterate_keys(
             exclusive_start_key=exclusive_start_key,
             limit=limit,
         ):
@@ -225,7 +225,7 @@ class KeyValueStore(Storage):
 
         The records are fetched lazily as the iteration advances, so only a bounded number of values is held in
         memory at a time. By default this means one request per record on top of the key listing, unless the storage
-        client reads the values in bounded batches instead.
+        backend reads the values in bounded batches instead.
 
         Args:
             exclusive_start_key: Key to start the iteration from.
@@ -247,7 +247,7 @@ class KeyValueStore(Storage):
 
         The records are fetched lazily as the iteration advances, so only a bounded number of values is held in
         memory at a time. By default this means one request per record on top of the key listing, unless the storage
-        client reads the values in bounded batches instead. A record deleted while the iteration is in
+        backend reads the values in bounded batches instead. A record deleted while the iteration is in
         progress may or may not be yielded, depending on whether its value was already read.
 
         Args:
@@ -257,7 +257,7 @@ class KeyValueStore(Storage):
         Yields:
             A `(key, value)` tuple for each record.
         """
-        async for record in self._client.iterate_entries(exclusive_start_key=exclusive_start_key, limit=limit):
+        async for record in self._backend.iterate_entries(exclusive_start_key=exclusive_start_key, limit=limit):
             yield record.key, record.value
 
     def __aiter__(self) -> AsyncIterator[str]:
@@ -284,7 +284,7 @@ class KeyValueStore(Storage):
     ) -> list[KeyValueStoreRecordMetadata]:
         """List all the existing keys in the KVS.
 
-        It uses client's `iterate_keys` method to get the keys.
+        It uses the backend's `iterate_keys` method to get the keys.
 
         Args:
             exclusive_start_key: Key to start the iteration from.
@@ -295,7 +295,7 @@ class KeyValueStore(Storage):
         """
         return [
             key
-            async for key in self._client.iterate_keys(
+            async for key in self._backend.iterate_keys(
                 exclusive_start_key=exclusive_start_key,
                 limit=limit,
             )
@@ -310,7 +310,7 @@ class KeyValueStore(Storage):
         Returns:
             True if a record with the given key exists, False otherwise.
         """
-        return await self._client.record_exists(key=key)
+        return await self._backend.record_exists(key=key)
 
     async def get_public_url(self, key: str) -> str:
         """Get the public URL for the given key.
@@ -321,7 +321,7 @@ class KeyValueStore(Storage):
         Returns:
             The public URL for the given key.
         """
-        return await self._client.get_public_url(key=key)
+        return await self._backend.get_public_url(key=key)
 
     async def get_auto_saved_value(
         self,
