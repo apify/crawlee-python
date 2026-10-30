@@ -206,13 +206,19 @@ def test_html_to_text_beautifulsoup() -> None:
 
 @pytest.mark.parametrize('html_to_text', [html_to_text_parsel, html_to_text_beautifulsoup])
 def test_html_to_text_is_linear_in_node_count(html_to_text: Callable[[str], str]) -> None:
-    """A document with many sibling nodes converts in time proportional to the node count, not its square."""
-    repeats = 160_000
-    source = '<html><body><div>' + '<i> a</i>' * repeats + '</div></body></html>'
+    """Converting four times as many sibling nodes takes about four times as long, not sixteen times."""
 
-    started = time.perf_counter()
-    text = html_to_text(source)
-    elapsed = time.perf_counter() - started
+    def convert(repeats: int) -> float:
+        source = '<html><body><div>' + '<i> a</i>' * repeats + '</div></body></html>'
+        started = time.perf_counter()
+        text = html_to_text(source)
+        elapsed = time.perf_counter() - started
+        assert text == ' '.join(['a'] * repeats)
+        return elapsed
 
-    assert text == ' '.join(['a'] * repeats)
-    assert elapsed < 2
+    # Warm up the parser so one-off setup costs do not skew the small run.
+    convert(1000)
+    small = convert(20_000)
+    large = convert(80_000)
+
+    assert large / small < 10
