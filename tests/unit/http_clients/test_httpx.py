@@ -53,19 +53,21 @@ async def test_proxy_kwarg_routes_requests(server_url: URL) -> None:
 
 async def test_proxy_kwarg_works_against_a_real_proxy(proxy: ProxyInfo, server_url: URL) -> None:
     """Test that a `proxy` kwarg still gets the response through once the proxy accepts the connection."""
-    async with HttpxHttpClient(proxy=proxy.url) as client:
-        response = await client.send_request(str(server_url / 'status/222'))
-
-    assert response.status_code == 222
+    async with (
+        HttpxHttpClient(proxy=proxy.url) as client,
+        await client.send_request(str(server_url / 'status/222')) as response,
+    ):
+        assert response.status_code == 222
 
 
 async def test_proxy_info_wins_over_the_proxy_kwarg(proxy: ProxyInfo, server_url: URL) -> None:
     """Test that the `ProxyInfo` of a request takes precedence over the `proxy` kwarg of the client."""
     # Port 1 refuses every connection, so the request only succeeds if the `ProxyInfo` is the one being used.
-    async with HttpxHttpClient(proxy='http://127.0.0.1:1') as client:
-        response = await client.send_request(str(server_url / 'status/222'), proxy_info=proxy)
-
-    assert response.status_code == 222
+    async with (
+        HttpxHttpClient(proxy='http://127.0.0.1:1') as client,
+        await client.send_request(str(server_url / 'status/222'), proxy_info=proxy) as response,
+    ):
+        assert response.status_code == 222
 
 
 def test_silences_httpx_request_logging() -> None:
@@ -85,8 +87,8 @@ async def test_common_headers_and_user_agent(server_url: URL, header_network: di
     """
     client = HttpxHttpClient()
 
-    response = await client.send_request(str(server_url / 'headers'))
-    response_headers = json.loads((await response.read()).decode())
+    async with await client.send_request(str(server_url / 'headers')) as response:
+        response_headers = json.loads((await response.read()).decode())
 
     assert 'accept' in response_headers
     assert response_headers['accept'] in get_available_header_values(header_network, {'Accept', 'accept'})
@@ -107,8 +109,10 @@ async def test_headers_come_from_one_sample(server_url: URL) -> None:
         {'Accept': 'text/html', 'Accept-Language': 'en-GB', 'User-Agent': 'Mozilla/5.0 (Test)'}
     )
 
-    async with HttpxHttpClient(header_generator=generator) as client:
-        response = await client.send_request(str(server_url / 'headers'))
+    async with (
+        HttpxHttpClient(header_generator=generator) as client,
+        await client.send_request(str(server_url / 'headers')) as response,
+    ):
         headers = await read_json(response)
 
     assert headers['accept'] == 'text/html'
@@ -126,8 +130,10 @@ async def test_headers_generated_once_per_redirect_chain(server_url: URL) -> Non
     ]
     redirect_url = (server_url / 'redirect').with_query(url=str(server_url / 'headers'), status=302)
 
-    async with HttpxHttpClient(header_generator=generator) as client:
-        response = await client.send_request(str(redirect_url))
+    async with (
+        HttpxHttpClient(header_generator=generator) as client,
+        await client.send_request(str(redirect_url)) as response,
+    ):
         headers = await read_json(response)
 
     assert headers['user-agent'] == 'Mozilla/5.0 (First)'
@@ -136,8 +142,10 @@ async def test_headers_generated_once_per_redirect_chain(server_url: URL) -> Non
 
 async def test_client_headers_win_over_generated(server_url: URL) -> None:
     """Test that the headers given to the client win over the generated browser headers."""
-    async with HttpxHttpClient(headers={'user-agent': 'client'}) as client:
-        response = await client.send_request(str(server_url / 'headers'))
+    async with (
+        HttpxHttpClient(headers={'user-agent': 'client'}) as client,
+        await client.send_request(str(server_url / 'headers')) as response,
+    ):
         headers = await read_json(response)
 
     assert headers['user-agent'] == 'client'
@@ -147,8 +155,10 @@ async def test_client_cookie_header_wins_over_session(server_url: URL) -> None:
     """Test that a `Cookie` header set on the underlying client replaces the cookies of the session."""
     session = Session(cookies=[CookieParam(name='from_jar', value='1', domain=server_url.host or '')])
 
-    async with HttpxHttpClient(headers={'cookie': 'from_client=1'}) as client:
-        response = await client.send_request(str(server_url / 'cookies'), session=session)
+    async with (
+        HttpxHttpClient(headers={'cookie': 'from_client=1'}) as client,
+        await client.send_request(str(server_url / 'cookies'), session=session) as response,
+    ):
         cookies = (await read_json(response))['cookies']
 
     assert cookies == {'from_client': '1'}
@@ -159,8 +169,7 @@ async def test_cookies_kwarg_ignored(server_url: URL) -> None:
     with pytest.warns(UserWarning, match='`cookies` argument'):
         client = HttpxHttpClient(cookies={'from_client': '1'})
 
-    async with client:
-        response = await client.send_request(str(server_url / 'cookies'))
+    async with client, await client.send_request(str(server_url / 'cookies')) as response:
         cookies = (await read_json(response))['cookies']
 
     assert cookies == {}
@@ -172,7 +181,8 @@ async def test_own_cookie_jar_stays_empty(server_url: URL) -> None:
     client = HttpxHttpClient()
 
     async with client:
-        await client.send_request(str((server_url / 'set_cookies').with_query(a='1')), session=session)
+        async with await client.send_request(str((server_url / 'set_cookies').with_query(a='1')), session=session):
+            pass
 
         assert list(client._get_client(None).cookies.jar) == []
 
@@ -181,8 +191,10 @@ async def test_own_cookie_jar_stays_empty(server_url: URL) -> None:
 
 async def test_no_headers_without_generator(server_url: URL) -> None:
     """Test that no browser-like headers are sent once the header generator is turned off."""
-    async with HttpxHttpClient(header_generator=None) as client:
-        response = await client.send_request(str(server_url / 'headers'))
+    async with (
+        HttpxHttpClient(header_generator=None) as client,
+        await client.send_request(str(server_url / 'headers')) as response,
+    ):
         headers = await read_json(response)
 
     assert 'python-httpx2' in headers['user-agent']

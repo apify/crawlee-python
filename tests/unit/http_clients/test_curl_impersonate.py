@@ -26,7 +26,8 @@ async def test_internal_session_cookie_jar_stays_empty(server_url: URL) -> None:
     async with client:
         for index in range(5):
             url = server_url.with_path('set_cookies').extend_query(**{f'c{index}': index})
-            await client.send_request(str(url), session=session)
+            async with await client.send_request(str(url), session=session):
+                pass
 
         curl_session = client._client_by_proxy_url[None]
         assert list(curl_session._cookies.jar) == []
