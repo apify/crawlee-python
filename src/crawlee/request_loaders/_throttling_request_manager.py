@@ -15,6 +15,9 @@ from crawlee._service_locator import service_locator as global_service_locator
 from crawlee._utils.docs import docs_group
 from crawlee.request_loaders._request_manager import RequestManager
 
+from ._types import FinishedStatus, StalledStatus, WaitingStatus
+from ._utils import join_request_source_statuses
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -22,6 +25,8 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.storage_backends import StorageBackend
     from crawlee.storage_backends.models import ProcessedRequest
+
+    from ._types import RequestSourceStatus
 
 logger = getLogger(__name__)
 
@@ -53,9 +58,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
     `fetch_next_request()` takes from the sub-manager whose domain has been waiting the longest, skipping domains in a
     cooldown, and falls back to the inner manager when no sub-manager yields a request. If nothing can be dispatched
-    right now, it returns `None` rather than waiting, so the caller's task slot is released. `is_empty()` reads as
-    empty while every remaining request sits in a cooldown or belongs to a stalled domain, whereas `is_finished()`
-    counts those requests, so the crawl idles until they are dispatchable instead of ending early.
+    right now, it returns `None` rather than waiting, so the caller's task slot is released. `check_readiness()` then
+    reports the crawl as waiting until the earliest cooldown ends, so it idles instead of ending early.
 
     Delay sources:
     - HTTP 429 responses (via `record_domain_delay`)
@@ -248,10 +252,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         cooldown are skipped, so the call returns `None` when nothing is dispatchable right now.
 
         Note:
-            Unlike the `RequestLoader.fetch_next_request` contract, a `None` result does not imply that `is_finished()`
-            is `True` - it only means nothing is dispatchable right now. Since the manager never waits out a cooldown
-            itself, the dispatch cadence is only as precise as the caller's polling interval: a cooldown expiring
-            between two polls is picked up on the next one.
+            Since the manager never waits out a cooldown itself, the dispatch cadence is only as precise as the
+            caller's polling interval: a cooldown expiring between two polls is picked up on the next one.
         """
         await self._ensure_sub_managers()
 
@@ -304,43 +306,18 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         return sum(counts) - self._migrated_from_inner
 
     @override
-    async def is_empty(self) -> bool:
-        """Report whether anything can be dispatched right now.
+    async def check_readiness(self) -> RequestSourceStatus:
+        """Report whether anything can be dispatched now, and otherwise when it can be or why it never will.
 
-        Requests queued for a domain in a cooldown don't count. They still count towards `is_finished`, so the crawl
-        waits for them. Requests of a domain that has rate-limited every request for longer than `max_domain_stall`
-        don't count either.
-        """
-        await self._ensure_sub_managers()
-        now = datetime.now(UTC)
-        results = await asyncio.gather(
-            self._inner.is_empty(),
-            *(
-                self._sub_managers[d].is_empty()
-                for d in self._fetchable_domains()
-                if not self._domain_states[d].is_stall_candidate(now, self._max_domain_stall)
-            ),
-        )
-        return all(results)
-
-    @override
-    async def is_finished(self) -> bool:
-        await self._ensure_sub_managers()
-        results = await asyncio.gather(
-            self._inner.is_finished(), *(sm.is_finished() for sm in self._sub_managers.values())
-        )
-        return all(results)
-
-    async def get_stall_reason(self) -> str | None:
-        """Explain why the crawl can't make progress, or return `None` if it can.
-
-        A domain is stalled once it has rate-limited every request for longer than `max_domain_stall`. It's reported
-        only when nothing else can be dispatched and no domain in a cooldown has requests left.
+        Requests of a domain in a cooldown count as outstanding work, so the crawl waits until the earliest cooldown
+        ends. A domain is stalled once it has rate-limited every request for longer than `max_domain_stall`. It's
+        reported only when nothing else is ready or waiting, such as a domain in a cooldown with requests left, or
+        requests in progress or still being added.
         """
         await self._ensure_sub_managers()
         now = datetime.now(UTC)
         dispatchable: list[RequestManager] = [self._inner]
-        cooling: list[RequestManager] = []
+        cooling: list[str] = []
         candidates: list[str] = []
 
         for domain, state in self._domain_states.items():
@@ -351,36 +328,59 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             elif now >= state.throttled_until:
                 dispatchable.append(self._sub_managers[domain])
             else:
-                cooling.append(self._sub_managers[domain])
+                cooling.append(domain)
 
-        if not candidates:
-            return None
+        probed: RequestSourceStatus = FinishedStatus()
+        for readiness in await asyncio.gather(*(manager.check_readiness() for manager in dispatchable)):
+            probed = join_request_source_statuses(probed, readiness)
+        if probed.status == 'ready':
+            return probed
 
-        all_dispatchable_empty = all(await asyncio.gather(*(manager.is_empty() for manager in dispatchable)))
-        if not all_dispatchable_empty:
-            return None
+        cooling_statuses = await asyncio.gather(*(self._sub_managers[domain].check_readiness() for domain in cooling))
+
+        ready_at = min(
+            (
+                self._domain_states[domain].throttled_until
+                for domain, readiness in zip(cooling, cooling_statuses, strict=True)
+                if readiness.status != 'finished'
+            ),
+            default=None,
+        )
 
         # A domain waiting out a cooldown with work left will still make progress, so the crawl isn't stuck yet.
-        all_cooling_finished = all(await asyncio.gather(*(manager.is_finished() for manager in cooling)))
-        if not all_cooling_finished:
-            return None
+        if ready_at is not None:
+            return join_request_source_statuses(probed, WaitingStatus(ready_at=ready_at))
 
-        candidates_empty = await asyncio.gather(*(self._sub_managers[domain].is_empty() for domain in candidates))
-        stalled = [domain for domain, is_empty in zip(candidates, candidates_empty, strict=True) if not is_empty]
-        if not stalled:
-            return None
+        candidate_statuses = await asyncio.gather(
+            *(self._sub_managers[domain].check_readiness() for domain in candidates)
+        )
+        stalled = [
+            domain
+            for domain, readiness in zip(candidates, candidate_statuses, strict=True)
+            if readiness.status == 'ready'
+        ]
 
-        summary = ', '.join(
-            f'"{domain}" ({(now - since).total_seconds():.0f}s)'
-            for domain in stalled
-            if (since := self._domain_states[domain].rate_limited_since) is not None
-        )
-        window = self._max_domain_stall.total_seconds()
-        return (
-            f'{summary} rate-limited every request for longer than `max_domain_stall` ({window:.0f}s). Waiting '
-            "longer will not help - lower the crawler's concurrency, or drop these domains. Their requests are "
-            'still queued, so re-running with `purge_on_start` disabled will resume them if the rate limit lifts.'
-        )
+        # A candidate's requests that are in progress or still being added in the background aren't finished yet.
+        for readiness in candidate_statuses:
+            if readiness.status != 'ready':
+                probed = join_request_source_statuses(probed, readiness)
+
+        if stalled:
+            summary = ', '.join(
+                f'"{domain}" ({(now - since).total_seconds():.0f}s)'
+                for domain in stalled
+                if (since := self._domain_states[domain].rate_limited_since) is not None
+            )
+            window = self._max_domain_stall.total_seconds()
+            stall = StalledStatus(
+                f'{summary} rate-limited every request for longer than `max_domain_stall` ({window:.0f}s). Waiting '
+                "longer will not help - lower the crawler's concurrency, or drop these domains. Their requests are "
+                'still queued, so re-running with `purge_on_start` disabled will resume them if the rate limit lifts.'
+            )
+            # Requests still in progress or being added elsewhere may yet bring work, so they outrank the stall.
+            return join_request_source_statuses(probed, stall)
+
+        return probed
 
     def record_domain_delay(self, url: str, *, retry_after: timedelta | None = None) -> bool:
         """Record a 429 Too Many Requests response for the domain of the given URL.

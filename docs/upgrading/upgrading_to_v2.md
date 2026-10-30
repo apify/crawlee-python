@@ -44,7 +44,11 @@ A custom storage backend has more names to update. The `StorageBackend` methods 
 
 ## `StatisticsState.crawler_runtime` is read-only
 
-`StatisticsState.crawler_runtime` is computed from the crawler's start and finish timestamps. In v1, assigning to it only emitted a `DeprecationWarning` and the value was ignored. In v2, the property has no setter, so an assignment raises `AttributeError`. Remove any such assignments.
+`StatisticsState.crawler_runtime` is computed from the runtime accumulated by previous runs and the start timestamp of the run in progress. In v1, assigning to it only emitted a `DeprecationWarning` and the value was ignored. In v2, the property has no setter, so an assignment raises `AttributeError`. Remove any such assignments.
+
+## `StatisticsState.crawler_runtime_for_serialization` is removed
+
+`StatisticsState.crawler_runtime_for_serialization` is removed, and the persisted `crawlerRuntimeMillis` value is a number of milliseconds instead of an ISO 8601 duration string. Read the runtime from the `crawler_runtime` property instead. Statistics persisted by v1 are still restored.
 
 ## `RequestQueueBackend.is_finished` is abstract
 
@@ -230,6 +234,36 @@ for urls in batches:
 
 In v1, `RequestQueue.purge()` worked around a storage backend that didn't support purging. It dropped an unnamed queue and opened the default queue in its place, and it skipped a named queue with a warning. In v2, it raises the backend's `NotImplementedError`, the same as Crawlee JS. The Apify platform's storage backend doesn't support purging, so on the platform, call `drop()` or open a new queue instead.
 
+## `check_readiness` replaces `is_empty` and `is_finished`
+
+`RequestLoader` and `RequestManager` no longer have `is_empty` and `is_finished`. A single `check_readiness` method replaces them and returns one of four statuses:
+
+- `ReadyStatus`: the next `fetch_next_request` call is expected to return a request.
+- `WaitingStatus`: nothing can be fetched right now, but the source isn't done. Requests are in progress, are being added in the background, or are held back until `ready_at`.
+- `StalledStatus`: the source holds requests it can't make progress on, as explained in `reason`. `ThrottlingRequestManager` reports it, and `RequestManagerTandem` passes it on from the manager it wraps.
+- `FinishedStatus`: every request has been handled.
+
+Each of these classes also has a `status` attribute set to `'ready'`, `'waiting'`, `'stalled'` or `'finished'`, so a check doesn't need an import.
+
+The change covers `RequestQueue`, `RequestList`, `SitemapRequestLoader`, `RequestManagerTandem` and `ThrottlingRequestManager`. `ThrottlingRequestManager.get_stall_reason` is removed too, since a stall is now reported as `StalledStatus`. Unlike `get_stall_reason`, the manager reports a stall only while no request outside the stalled domains is in progress or still being added, since such a request may still add work. Storage backends keep `is_empty` and `is_finished`.
+
+```python
+# v1
+has_requests = not await rq.is_empty()
+done = await rq.is_finished()
+
+# v2
+readiness = await rq.check_readiness()
+has_requests = readiness.status == 'ready'
+done = readiness.status == 'finished'
+```
+
+If you have a custom request loader or manager, replace `is_empty` and `is_finished` with `check_readiness`. Return `ReadyStatus` as soon as a request can be fetched, before checking anything else, since the crawler calls the method often. Never return `FinishedStatus` while requests are still pending or in progress. A loader doesn't return `StalledStatus`.
+
+A `None` from `fetch_next_request` no longer means the loader is finished. It only means nothing is pending right now. `RequestManagerTandem` now moves a request from its loader only when the loader is ready, so a `SitemapRequestLoader` that's still loading sitemaps no longer holds up the requests already in the manager.
+
+The crawler now reads a stall from the status, so it also sees a `ThrottlingRequestManager` wrapped in a `RequestManagerTandem`. Such a crawl now ends with `PersistentRateLimitError` once a domain stalls, as it already did with a `ThrottlingRequestManager` passed directly. Before, the crawler didn't detect the stall.
+
 ## Logs changed
 
 If you configure loggers by name or match log messages, update them for the following changes.
@@ -269,3 +303,17 @@ When a crawl processes no requests because its request manager holds only handle
 Messages that mentioned a storage client name the storage backend instead. The DEBUG message about the implicit default backend now reads `No storage backend set, implicitly creating and using default FileSystemStorageBackend.` The warning about unsupported arguments of a dataset backend ends with the backend class name, for example `... of get_data are not supported by MemoryDatasetBackend.`
 
 `RequestQueue.purge()` no longer logs the `Storage client "..." does not support purging the request queue.` warnings. It raises `NotImplementedError` instead. For details, see [`RequestQueue.purge` raises when the storage backend can't purge](#requestqueuepurge-raises-when-the-storage-backend-cant-purge).
+
+The ERROR message the crawler logs before raising `PersistentRateLimitError` now reads "Giving up the crawl because the request manager can't make progress." instead of "Giving up the crawl because a domain keeps rate-limiting every request."
+
+The two DEBUG messages that `RequestQueue.is_finished` logged, "Background add requests tasks are still in progress." and "The request queue is finished.", are removed together with the method.
+
+## Session retirement is permanent
+
+In v1, `Session.retire()` only added `max_error_score` to the error score, so a later `mark_good()` could lower it again and make the retired session usable. In v2, a separate `retired` flag tracks retirement, exposed as the `Session.retired` property, and a retired session is never usable again. Create a new session to replace it.
+
+On a retired session, `mark_good()` does nothing, so its error score and usage count stay as they are. Calling `retire()` on a session that is already retired also leaves the error score unchanged.
+
+When `mark_good()` or `mark_bad()` retires a session because it expired, reached its usage limit, or reached its error score limit, it only sets the flag. In v1, it also added `max_error_score`. As a result, such sessions have a lower error score in v2, and `is_blocked` is `True` only when the error score itself reached `max_error_score`.
+
+Session state, including the persisted session pool state, has a new `retired` field. Sessions saved by v1 load with `retired=False` and keep their error score.

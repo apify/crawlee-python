@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlencode
 
@@ -770,13 +770,6 @@ async def test_persistent_429_raises_after_stall(
         max_delay=backoff,
         max_domain_stall=backoff * 1.5,
     )
-    get_stall_reason = throttler.get_stall_reason
-
-    async def get_stall_reason_after_backoff() -> str | None:
-        clock.now.return_value += backoff
-        return await get_stall_reason()
-
-    monkeypatch.setattr(throttler, 'get_stall_reason', get_stall_reason_after_backoff)
     failed_request_handler = AsyncMock()
     crawler = HttpCrawler(
         request_handler=AsyncMock(),
@@ -786,12 +779,19 @@ async def test_persistent_429_raises_after_stall(
         max_session_rotations=0,
     )
     crawler.failed_request_handler(failed_request_handler)
+    is_finished = cast('Any', crawler)._BasicCrawler__is_finished_function
+
+    async def is_finished_after_backoff() -> bool:
+        clock.now.return_value += backoff
+        return await is_finished()
+
+    monkeypatch.setattr(crawler, '_BasicCrawler__is_finished_function', is_finished_after_backoff)
 
     with caplog.at_level(logging.ERROR), pytest.raises(PersistentRateLimitError, match='Giving up: '):
         await crawler.run([str(server_url / 'status/429')])
 
     assert any(record.levelno == logging.ERROR and record.exc_info for record in caplog.records)
-    assert await throttler.is_finished() is False
+    assert (await throttler.check_readiness()).status != 'finished'
     failed_request_handler.assert_not_called()
 
     # A failed run keeps the queue, and the stall clock still runs, so a re-run gives up again.

@@ -26,6 +26,8 @@ from crawlee._utils.sitemap import (
 from crawlee._utils.urls import filter_url
 from crawlee.request_loaders._request_loader import RequestLoader
 
+from ._types import FinishedStatus, ReadyStatus, WaitingStatus
+
 if TYPE_CHECKING:
     import re
     from collections.abc import Callable, Sequence
@@ -36,6 +38,8 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpClient
     from crawlee.proxy_configuration import ProxyInfo
     from crawlee.storage_backends.models import ProcessedRequest
+
+    from ._types import RequestLoaderStatus
 
 
 logger = getLogger(__name__)
@@ -206,23 +210,26 @@ class SitemapRequestLoader(RequestLoader):
         return state.handled_count
 
     @override
-    async def is_empty(self) -> bool:
-        """Check if there are no more URLs to process."""
+    async def check_readiness(self) -> RequestLoaderStatus:
         state = await self._get_state()
-        return not state.url_queue
+        if state.url_queue:
+            return ReadyStatus()
 
-    @override
-    async def is_finished(self) -> bool:
-        """Check if all URLs have been processed."""
-        state = await self._get_state()
-        return not state.url_queue and len(state.in_progress) == 0 and self._loading_task.done()
+        # More URLs may arrive while the sitemaps are still being loaded.
+        if not self._loading_task.done():
+            return WaitingStatus()
+
+        return WaitingStatus() if state.in_progress else FinishedStatus()
 
     @override
     async def fetch_next_request(self) -> Request | None:
         """Fetch the next request to process."""
-        while not (await self.is_finished()):
+        while True:
             state = await self._get_state()
             if not state.url_queue:
+                # More URLs may arrive while the sitemaps are still being loaded.
+                if self._loading_task.done():
+                    return None
                 await asyncio.sleep(0.1)
                 continue
 
@@ -249,8 +256,6 @@ class SitemapRequestLoader(RequestLoader):
                 state.in_progress.add(request.url)
 
             return request
-
-        return None
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
@@ -449,6 +454,6 @@ class SitemapRequestLoader(RequestLoader):
             state.completed = True
 
         except Exception:
-            # Not re-raised: nothing retrieves the task's exception (`is_finished` only checks doneness), so it
+            # Not re-raised: nothing retrieves the task's exception (`check_readiness` only checks doneness), so it
             # would only resurface as an "exception was never retrieved" asyncio error when the task is collected.
             logger.exception('Error loading sitemaps')

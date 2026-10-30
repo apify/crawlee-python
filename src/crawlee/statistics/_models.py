@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator, computed_field
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator, computed_field, field_serializer
 from pydantic.alias_generators import to_camel
 from typing_extensions import override
 
@@ -101,25 +101,25 @@ class StatisticsState(BaseModel):
         ),
     ] = {}
 
-    # Used to track the crawler runtime, that had already been persisted. This is the runtime from previous runs.
-    _runtime_offset: Annotated[timedelta, Field(exclude=True)] = timedelta()
-
-    def model_post_init(self, /, __context: Any) -> None:
-        self._runtime_offset = self.crawler_runtime or self._runtime_offset
+    accumulated_runtime: Annotated[timedelta_ms, Field(alias='crawlerRuntimeMillis')] = timedelta()
+    """The runtime accumulated by the previous runs of the crawler, excluding the run in progress."""
 
     @property
     def crawler_runtime(self) -> timedelta:
-        if self.crawler_last_started_at:
-            finished_at = self.crawler_finished_at or datetime.now(UTC)
-            return self._runtime_offset + finished_at - self.crawler_last_started_at
-        return self._runtime_offset
+        """The total runtime of the crawler, accumulated over all its runs."""
+        if self.crawler_last_started_at is None:
+            return self.accumulated_runtime
+        if self.stats_persisted_at is not None and self.crawler_last_started_at <= self.stats_persisted_at:
+            # A restored snapshot already checkpoints this run in `accumulated_runtime`, do not count it twice.
+            return self.accumulated_runtime
 
-    @computed_field(alias='crawlerRuntimeMillis')
-    def crawler_runtime_for_serialization(self) -> timedelta:
-        if self.crawler_last_started_at:
-            finished_at = self.crawler_finished_at or datetime.now(UTC)
-            return self._runtime_offset + finished_at - self.crawler_last_started_at
-        return self._runtime_offset
+        finished_at = self.crawler_finished_at or datetime.now(UTC)
+        return self.accumulated_runtime + max(timedelta(), finished_at - self.crawler_last_started_at)
+
+    @field_serializer('accumulated_runtime')
+    def _serialize_accumulated_runtime(self, _value: timedelta) -> int:
+        """Serialize the total runtime including the run in progress, so that every persist checkpoints it."""
+        return round(self.crawler_runtime.total_seconds() * 1000)
 
     @computed_field(alias='requestTotalDurationMillis', return_type=timedelta_ms)
     @property

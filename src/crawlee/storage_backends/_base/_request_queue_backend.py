@@ -78,8 +78,7 @@ class RequestQueueBackend(ABC):
         in another call to the `fetch_next_request` method.
 
         Note that the `None` return value does not mean the queue processing finished, it means there are currently
-        no pending requests. To check whether all requests in queue were finished, use `RequestQueue.is_finished`
-        instead.
+        no pending requests. To check whether all requests in queue were finished, use `is_finished` instead.
 
         Returns:
             The request or `None` if there are no more pending requests.
