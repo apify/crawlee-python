@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
-    from crawlee.sessions import Session
+    from crawlee.sessions import Session, SessionCookies
     from crawlee.storage_clients import StorageClient
     from crawlee.storages import KeyValueStore
 
@@ -566,7 +566,9 @@ class SendRequestFunction(Protocol):
     """A function for sending HTTP requests.
 
     It simplifies the process of sending HTTP requests. It is implemented by the crawling context and is used
-    within request handlers to send additional HTTP requests to target URLs.
+    within request handlers to send additional HTTP requests to target URLs. The body of the response is not read yet.
+    The response is closed once the request is processed, and until then it stays in memory with the body read by
+    `read`, so a handler that sends many requests keeps all of their responses.
     """
 
     def __call__(
@@ -576,6 +578,7 @@ class SendRequestFunction(Protocol):
         method: HttpMethod = 'GET',
         payload: HttpPayload | None = None,
         headers: HttpHeaders | dict[str, str] | None = None,
+        cookies: SessionCookies | None = None,
         timeout: timedelta | None = None,
     ) -> Coroutine[None, None, HttpResponse]:
         """Call send request function.
@@ -585,7 +588,10 @@ class SendRequestFunction(Protocol):
             method: The HTTP method to use.
             headers: The headers to include in the request.
             payload: The payload to include in the request.
-            timeout: Maximum time allowed to process the request.
+            cookies: The cookies to send and store instead of the cookies of the session. With `PlaywrightCrawler`,
+                the response cookies are stored in the browser context as well.
+            timeout: Maximum time allowed to receive the response, including all redirects, and to read its body.
+                Without it, the default timeout of the HTTP client applies.
 
         Returns:
             The HTTP response received from the server.

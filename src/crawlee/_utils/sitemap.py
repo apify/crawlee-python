@@ -400,9 +400,10 @@ async def _fetch_and_process_sitemap(
     while retries_left > 0:
         retries_left -= 1
         try:
-            async with http_client.stream(
+            response = await http_client.send_request(
                 sitemap_url, method='GET', headers=SITEMAP_HEADERS, proxy_info=proxy_info, timeout=timeout
-            ) as response:
+            )
+            async with response:
                 status_code = response.status_code
                 if not _is_successful_sitemap_status(status_code):
                     # Retryable statuses raise and route to the retry handler below; the rest skip this source.
@@ -740,6 +741,8 @@ async def _discover_for_hostname(
                 response = await http_client.send_request(
                     candidate, method=method_for_checking, proxy_info=proxy_info, timeout=request_timeout
                 )
+                # Only the status code is checked, the body is never read.
+                await response.aclose()
                 if is_status_code_successful(response.status_code) and _check_and_add(candidate):
                     yield candidate
             except ProxyError:

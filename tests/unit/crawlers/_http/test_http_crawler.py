@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import time
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, call
 from urllib.parse import parse_qs, urlencode
 
 import pytest
@@ -12,9 +14,9 @@ import pytest
 from crawlee import ConcurrencySettings, Request, RequestState
 from crawlee.crawlers import HttpCrawler
 from crawlee.errors import PersistentRateLimitError
-from crawlee.http_clients import HttpClient, HttpCrawlingResult
+from crawlee.http_clients import HttpClient, HttpResponse
 from crawlee.request_loaders import ThrottlingRequestManager, _throttling_request_manager
-from crawlee.sessions import SessionPool
+from crawlee.sessions import CookieParam, SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storages import RequestQueue
 from tests.unit.server_endpoints import HELLO_WORLD
@@ -591,6 +593,45 @@ async def test_store_complex_cookies(server_url: URL) -> None:
         }
 
 
+async def test_save_response_cookies_disabled(server_url: URL) -> None:
+    """Test that `save_response_cookies=False` keeps the response cookies out of the session, but sends its cookies."""
+    preset_cookie = CookieParam(name='preset', value='1', domain=server_url.host or '')
+    crawler = HttpCrawler(
+        session_pool=SessionPool(max_pool_size=1, create_session_settings={'cookies': [preset_cookie]}),
+        save_response_cookies=False,
+    )
+    handler_call = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: HttpCrawlingContext) -> None:
+        session_cookies = context.session.cookies.get_cookies_as_dicts() if context.session else []
+        handler_call(
+            sent_cookies=json.loads(await context.http_response.read())['cookies'],
+            session_cookies={cookie['name'] for cookie in session_cookies},
+        )
+
+    # The cookie set by the redirecting response is still sent to the redirect target.
+    await crawler.run([str(server_url.with_path('set_cookies').extend_query(a=1))])
+
+    handler_call.assert_called_once_with(sent_cookies={'preset': '1', 'a': '1'}, session_cookies={'preset'})
+
+
+async def test_context_send_request_saves_cookies(server_url: URL) -> None:
+    """Test that `context.send_request` stores the response cookies in the session despite `save_response_cookies`."""
+    crawler = HttpCrawler(session_pool=SessionPool(max_pool_size=1), save_response_cookies=False)
+    handler_call = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: HttpCrawlingContext) -> None:
+        await context.send_request(str(server_url.with_path('set_cookies').extend_query(b=2)))
+        session_cookies = context.session.cookies.get_cookies_as_dicts() if context.session else []
+        handler_call(session_cookies={cookie['name'] for cookie in session_cookies})
+
+    await crawler.run([str(server_url / 'cookies')])
+
+    handler_call.assert_called_once_with(session_cookies={'b'})
+
+
 def test_default_logger() -> None:
     assert HttpCrawler().log.name == 'HttpCrawler'
 
@@ -693,9 +734,58 @@ async def test_request_state(server_url: URL) -> None:
     await queue.drop()
 
 
-def crawl_result(status_code: int) -> HttpCrawlingResult:
-    """Build an HTTP client result with the given status code and an empty body."""
-    return HttpCrawlingResult(http_response=Mock(status_code=status_code, headers={}, read=AsyncMock(return_value=b'')))
+def mock_response(status_code: int, url: str) -> Mock:
+    """Build an HTTP response with the given status code and an empty body."""
+    return Mock(spec=HttpResponse, status_code=status_code, headers={}, url=url, read=AsyncMock(return_value=b''))
+
+
+@pytest.mark.parametrize(
+    ('status_code', 'expected_handler_calls'),
+    [
+        pytest.param(200, [call(closed=False)], id='handled'),
+        pytest.param(500, [], id='error_status'),
+    ],
+)
+async def test_navigation_response_closed_after_request(*, status_code: int, expected_handler_calls: list) -> None:
+    """Test that the response of the navigation request stays open in the handler and is closed after the request."""
+    url = 'https://a.placeholder.com'
+    response = mock_response(status_code, url)
+    http_client = AsyncMock(spec=HttpClient)
+    http_client.send_request.return_value = response
+    crawler = HttpCrawler(http_client=http_client, max_request_retries=0)
+    handler_call = Mock()
+
+    @crawler.router.default_handler
+    async def handler(_context: HttpCrawlingContext) -> None:
+        handler_call(closed=response.aclose.called)
+
+    await crawler.run([url])
+
+    assert handler_call.call_args_list == expected_handler_calls
+    response.aclose.assert_awaited_once()
+
+
+async def test_body_read_bound_by_navigation_timeout() -> None:
+    """Test that reading the body of the navigation response fails once the navigation timeout runs out."""
+    url = 'https://a.placeholder.com'
+    response = mock_response(200, url)
+    response.read.side_effect = asyncio.Event().wait
+    http_client = AsyncMock(spec=HttpClient)
+    http_client.send_request.return_value = response
+    crawler = HttpCrawler(
+        http_client=http_client,
+        navigation_timeout=timedelta(milliseconds=100),
+        max_request_retries=0,
+    )
+    handler = AsyncMock()
+    crawler.router.default_handler(handler)
+    failed_request_handler = AsyncMock()
+    crawler.failed_request_handler(failed_request_handler)
+
+    await crawler.run([url])
+
+    handler.assert_not_called()
+    assert isinstance(failed_request_handler.call_args.args[1], TimeoutError)
 
 
 @pytest.mark.parametrize(
@@ -710,7 +800,8 @@ async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any], monkeyp
     """A throttled 429 is retried later without spending a retry, a session rotation or session reputation."""
     throttler = await open_throttler_held_until_reclaim(monkeypatch)
     http_client = AsyncMock(spec=HttpClient)
-    http_client.crawl.side_effect = [crawl_result(429), crawl_result(200)]
+    url = 'https://throttled.placeholder.com/page'
+    http_client.send_request.side_effect = [mock_response(429, url), mock_response(200, url)]
     failed_request_handler = AsyncMock()
     crawler = HttpCrawler(
         http_client=http_client,
@@ -727,7 +818,7 @@ async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any], monkeyp
     async def handler(context: HttpCrawlingContext) -> None:
         handled.append(context)
 
-    await crawler.run(['https://throttled.placeholder.com/page'])
+    await crawler.run([url])
 
     assert [context.http_response.status_code for context in handled] == [200]
     failed_request_handler.assert_not_called()
@@ -797,3 +888,19 @@ async def test_persistent_429_raises_after_stall(
     # A failed run keeps the queue, and the stall clock still runs, so a re-run gives up again.
     with pytest.raises(PersistentRateLimitError):
         await crawler.run()
+
+
+async def test_navigation_timeout_cancels_request(http_client: HttpClient, server_url: URL) -> None:
+    """Test that the navigation timeout cancels a request whose response doesn't arrive in time."""
+    failed_request_handler = AsyncMock()
+    crawler = HttpCrawler(
+        http_client=http_client, navigation_timeout=timedelta(milliseconds=300), max_request_retries=0
+    )
+    crawler.failed_request_handler(failed_request_handler)
+    started = time.monotonic()
+
+    await crawler.run([str((server_url / 'slow').with_query(delay=5))])
+
+    assert time.monotonic() - started < 5
+    failed_request_handler.assert_called_once()
+    assert isinstance(failed_request_handler.call_args.args[1], TimeoutError)
