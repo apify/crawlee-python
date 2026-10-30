@@ -86,6 +86,7 @@ if TYPE_CHECKING:
 
     from crawlee._types import (
         ConcurrencySettings,
+        DeferredCleanupCallback,
         EnqueueLinksFunction,
         ExtractLinksFunction,
         GetDataKwargs,
@@ -99,7 +100,7 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.request_loaders import RequestManager
-    from crawlee.sessions import Session
+    from crawlee.sessions import Session, SessionCookies
     from crawlee.statistics import FinalStatistics
     from crawlee.storage_clients import StorageClient
     from crawlee.storage_clients.models import DatasetItemsListPage
@@ -1402,6 +1403,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self,
         session: Session | None,
         proxy_info: ProxyInfo | None,
+        register_deferred_cleanup: Callable[[DeferredCleanupCallback], None],
     ) -> SendRequestFunction:
         async def send_request(
             url: str,
@@ -1409,17 +1411,22 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             method: HttpMethod = 'GET',
             payload: HttpPayload | None = None,
             headers: HttpHeaders | dict[str, str] | None = None,
+            cookies: SessionCookies | None = None,
             timeout: timedelta | None = None,
         ) -> HttpResponse:
-            return await self._http_client.send_request(
+            response = await self._http_client.send_request(
                 url=url,
                 method=method,
                 payload=payload,
                 headers=headers,
                 session=session,
+                cookies=cookies,
                 proxy_info=proxy_info,
                 timeout=timeout,
             )
+            # A response whose body the handler never read would hold its connection open.
+            register_deferred_cleanup(response.aclose)
+            return response
 
         return send_request
 
@@ -1569,7 +1576,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request=request,
             session=session,
             proxy_info=proxy_info,
-            send_request=self._prepare_send_request_function(session, proxy_info),
+            send_request=self._prepare_send_request_function(session, proxy_info, deferred_cleanup.append),
             add_requests=result.add_requests,
             push_data=result.push_data,
             get_key_value_store=result.get_key_value_store,
