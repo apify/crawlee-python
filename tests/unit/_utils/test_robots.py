@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
 from crawlee._utils.robots import RobotsTxtFile
+from crawlee.http_clients import HttpClient, HttpResponse
 
 
 async def test_extract_same_host_sitemaps_urls() -> None:
@@ -67,3 +72,24 @@ async def test_bind_robots_txt_url() -> None:
     robots = await RobotsTxtFile.from_content('http://check.com/robots.txt', content)
     assert not robots.is_allowed('http://check.com/test.html')
     assert robots.is_allowed('http://othercheck.com/robots.txt')
+
+
+@pytest.mark.parametrize(
+    'status_code',
+    [
+        pytest.param(200, id='success'),
+        pytest.param(404, id='client-error'),
+        pytest.param(500, id='server-error'),
+    ],
+)
+async def test_load_closes_response(status_code: int) -> None:
+    """Test that `RobotsTxtFile.load` closes the response, also when the status code leaves the body unread."""
+    response = MagicMock(spec=HttpResponse)
+    response.status_code = status_code
+    response.read = AsyncMock(return_value=b'User-agent: *\nAllow: /')
+    http_client = AsyncMock(spec=HttpClient)
+    http_client.send_request.return_value = response
+
+    await RobotsTxtFile.load('http://example.com/robots.txt', http_client)
+
+    response.__aexit__.assert_awaited_once()

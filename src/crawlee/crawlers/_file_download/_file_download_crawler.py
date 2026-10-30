@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from contextlib import AsyncExitStack
 from typing import TYPE_CHECKING
 
-from crawlee._request import RequestState
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers._abstract_http import AbstractHttpCrawler
-from crawlee.crawlers._abstract_http._http_crawling_context import HttpCrawlingContext
 from crawlee.crawlers._basic import ContextPipeline
 from crawlee.crawlers._http._http_parser import NoParser
 
@@ -16,8 +13,8 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
     from typing import Unpack
 
-    from crawlee._types import BasicCrawlingContext
     from crawlee.crawlers._abstract_http import HttpCrawlerOptions
+    from crawlee.crawlers._abstract_http._http_crawling_context import HttpCrawlingContext
 
 
 @docs_group('Crawlers')
@@ -32,7 +29,8 @@ class FileDownloadCrawler(AbstractHttpCrawler[FileDownloadCrawlingContext, bytes
     `await context.http_response.read()`. For large files, construct the crawler with `stream=True`. The request
     handler then receives a response whose body has not been read yet and can consume it in chunks via
     `context.http_response.read_stream()`. The connection stays open while the handler runs and is closed
-    afterwards. A handler that returns without consuming the body just skips the download.
+    afterwards. A handler that returns without consuming the body just skips the download. In both modes, reading
+    the body counts towards `navigation_timeout`, so raise it for long downloads.
 
     ### Usage
 
@@ -108,47 +106,20 @@ class FileDownloadCrawler(AbstractHttpCrawler[FileDownloadCrawlingContext, bytes
 
     def _create_file_download_pipeline(self) -> ContextPipeline[FileDownloadCrawlingContext]:
         """Create the file download context pipeline with expected pipeline steps."""
-        make_http_request = self._make_http_stream_request if self._stream_response_body else self._make_http_request
-
-        return (
+        pipeline = (
             ContextPipeline()
             .compose(self._manage_shared_navigation_timeout)
             .compose(self._execute_pre_navigation_hooks)
-            .compose(make_http_request)
+            .compose(self._make_http_request)
             .compose(self._execute_post_navigation_hooks)
             .compose(self._handle_status_code_response)
-            .compose(self._to_file_download_crawling_context)
         )
 
-    async def _make_http_stream_request(
-        self, context: BasicCrawlingContext
-    ) -> AsyncGenerator[HttpCrawlingContext, None]:
-        """Make a streamed HTTP request and create context enhanced by the streamed HTTP response.
+        # In stream mode the request handler consumes the body.
+        if not self._stream_response_body:
+            pipeline = pipeline.compose(self._read_http_response)
 
-        Args:
-            context: The current crawling context.
-
-        Yields:
-            The original crawling context enhanced by the streamed HTTP response.
-        """
-        async with AsyncExitStack() as exit_stack:
-            async with self._shared_navigation_timeouts[id(context.request)] as remaining_timeout:
-                response = await exit_stack.enter_async_context(
-                    self._http_client.stream(
-                        url=context.request.url,
-                        method=context.request.method,
-                        headers=context.request.headers,
-                        payload=context.request.payload,
-                        session=context.session,
-                        proxy_info=context.proxy_info,
-                        timeout=remaining_timeout,
-                    )
-                )
-
-            self._statistics.register_status_code(response.status_code)
-            context.request.state = RequestState.AFTER_NAV
-
-            yield HttpCrawlingContext.from_basic_crawling_context(context=context, http_response=response)
+        return pipeline.compose(self._to_file_download_crawling_context)
 
     async def _to_file_download_crawling_context(
         self, context: HttpCrawlingContext

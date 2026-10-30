@@ -7,23 +7,6 @@ import httpx2
 import pytest
 
 from crawlee.http_clients import HttpxHttpClient
-from crawlee.http_clients._httpx import _HttpxTransport, _same_origin
-
-
-@pytest.mark.parametrize(
-    ('url', 'other', 'expected'),
-    [
-        pytest.param('http://a.com/x', 'http://a.com/x', True, id='same'),
-        pytest.param('http://a.com/x', 'https://a.com/x', False, id='different-scheme'),
-        pytest.param('http://a.com/x', 'http://b.com/x', False, id='different-host'),
-        pytest.param('http://a.com/x', 'http://a.com:8080/x', False, id='different-port'),
-        pytest.param('http://a.com:80/x', 'http://a.com/y', True, id='explicit-default-port'),
-        pytest.param('http://a.com/x', 'http://a.com/y', True, id='different-path'),
-    ],
-)
-def test_same_origin(url: str, other: str, *, expected: bool) -> None:
-    """Test that two URLs share an origin only when their scheme, host and port match."""
-    assert _same_origin(httpx2.URL(url), httpx2.URL(other)) is expected
 
 
 @pytest.mark.parametrize(
@@ -34,13 +17,13 @@ def test_same_origin(url: str, other: str, *, expected: bool) -> None:
     ],
 )
 async def test_transport_kwargs_do_not_reach_the_client(client_kwargs: dict[str, Any], expected_warning: str) -> None:
-    """Test that kwargs mounting a transport of their own are rejected with a warning, so the cookies keep working."""
+    """Test that kwargs mounting a transport of their own are rejected with a warning, so the proxy keeps working."""
     with pytest.warns(UserWarning, match=expected_warning):
         client = HttpxHttpClient(**client_kwargs)
 
     async with client:
         assert client._get_client(None)._mounts == {}
-        assert isinstance(client._get_client(None)._transport, _HttpxTransport)
+        assert client._get_client(None)._transport is not client_kwargs.get('transport')
 
 
 def test_silences_httpx_request_logging() -> None:

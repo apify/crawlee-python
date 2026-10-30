@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, Mock
@@ -26,6 +27,9 @@ if TYPE_CHECKING:
     from crawlee._types import BasicCrawlingContext
     from crawlee.crawlers import HttpCrawlingContext
     from crawlee.http_clients import HttpClient
+
+# Payload, e.g. data for a form submission.
+
 
 # Payload, e.g. data for a form submission.
 PAYLOAD = {
@@ -734,3 +738,19 @@ async def test_persistent_429_raises_after_stall(
     # A failed run keeps the queue, and the stall clock still runs, so a re-run gives up again.
     with pytest.raises(PersistentRateLimitError):
         await crawler.run()
+
+
+async def test_navigation_timeout_cancels_request(http_client: HttpClient, server_url: URL) -> None:
+    """Test that the navigation timeout cancels a request whose response doesn't arrive in time."""
+    failed_request_handler = AsyncMock()
+    crawler = HttpCrawler(
+        http_client=http_client, navigation_timeout=timedelta(milliseconds=300), max_request_retries=0
+    )
+    crawler.failed_request_handler(failed_request_handler)
+    started = time.monotonic()
+
+    await crawler.run([str((server_url / 'slow').with_query(delay=5))])
+
+    assert time.monotonic() - started < 5
+    failed_request_handler.assert_called_once()
+    assert isinstance(failed_request_handler.call_args.args[1], TimeoutError)

@@ -152,6 +152,7 @@ async def app(scope: dict[str, Any], receive: Receive, send: Send) -> None:
         'get_compressed': get_compressed,
         'file': file_endpoint,
         'slow': slow_response,
+        'slow_body': slow_body,
         'infinite_scroll': infinite_scroll_endpoint,
         'resource_loading_page': resource_loading_endpoint,
     }
@@ -545,6 +546,24 @@ async def slow_response(scope: dict[str, Any], _receive: Receive, send: Send) ->
 
     await asyncio.sleep(delay)
     await send_html_response(send, HELLO_WORLD)
+
+
+async def slow_body(scope: dict[str, Any], _receive: Receive, send: Send) -> None:
+    """Send the headers at once and then the body in small chunks with a configurable delay between them."""
+    query_params = get_query_params(scope.get('query_string', b''))
+    chunks = int(query_params.get('chunks', '50'))
+    delay = float(query_params.get('delay', '0.1'))
+
+    await send(
+        {
+            'type': 'http.response.start',
+            'status': 200,
+            'headers': [[b'content-type', b'text/plain'], [b'content-length', str(chunks).encode()]],
+        }
+    )
+    for index in range(chunks):
+        await asyncio.sleep(delay)
+        await send({'type': 'http.response.body', 'body': b'x', 'more_body': index < chunks - 1})
 
 
 async def infinite_scroll_endpoint(_scope: dict[str, Any], _receive: Receive, send: Send) -> None:

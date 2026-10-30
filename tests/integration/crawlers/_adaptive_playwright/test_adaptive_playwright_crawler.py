@@ -30,7 +30,7 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statisti
 )
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import AdaptiveContextError
 from crawlee.errors import RequestThrottledError
-from crawlee.http_clients import HttpClient, HttpCrawlingResult
+from crawlee.http_clients import HttpClient, HttpResponse
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storage_backends import SqlStorageBackend
@@ -45,12 +45,22 @@ if TYPE_CHECKING:
 
 
 _H1_TEXT = 'Static'
+
+
 _H2_TEXT = 'Only in browser'
+
+
 _H3_CHANGED_TEXT = 'Changed by JS'
+
+
 _INJECTED_JS_DELAY_MS = 100
+
+
 # Generous wait for the JS-injected element. Resolves as soon as it appears, so it stays robust on
 # slow CI without slowing the happy path.
 _ELEMENT_WAIT_TIMEOUT = timedelta(milliseconds=50 * _INJECTED_JS_DELAY_MS)
+
+
 _PAGE_CONTENT_STATIC = f"""
 <h1>{_H1_TEXT}</h1>
 <h3>Initial text</h3>
@@ -975,10 +985,17 @@ async def test_throttled_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> Non
 
 async def test_throttled_static_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
     """A throttled 429 from the static sub crawler defers the request without falling back to the browser."""
+    url = 'https://throttled.placeholder.com/page'
     throttler = await open_throttler_held_until_reclaim(monkeypatch)
     http_client = AsyncMock(spec=HttpClient)
-    http_client.crawl.side_effect = [
-        HttpCrawlingResult(http_response=Mock(status_code=status, headers={}, read=AsyncMock(return_value=b'')))
+    http_client.send_request.side_effect = [
+        Mock(
+            spec=HttpResponse,
+            status_code=status,
+            headers={},
+            url=url,
+            read=AsyncMock(return_value=b''),
+        )
         for status in (429, 200)
     ]
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
@@ -1004,10 +1021,10 @@ async def test_throttled_static_429_is_deferred(monkeypatch: pytest.MonkeyPatch)
     async def handler(context: AdaptivePlaywrightCrawlingContext) -> None:
         handled.append(context)
 
-    await crawler.run(['https://throttled.placeholder.com/page'])
+    await crawler.run([url])
 
     browser_navigations.assert_not_called()
-    assert http_client.crawl.await_count == 2
+    assert http_client.send_request.await_count == 2
     assert len(handled) == 1
     assert handled[0].request.retry_count == 0
 
@@ -1017,8 +1034,12 @@ async def test_static_handler_raised_throttled_error_is_deferred(monkeypatch: py
     url = 'https://throttled.placeholder.com/page'
     throttler = await open_throttler_held_until_reclaim(monkeypatch)
     http_client = AsyncMock(spec=HttpClient)
-    http_client.crawl.return_value = HttpCrawlingResult(
-        http_response=Mock(status_code=200, headers={}, read=AsyncMock(return_value=b''))
+    http_client.send_request.return_value = Mock(
+        spec=HttpResponse,
+        status_code=200,
+        headers={},
+        url=url,
+        read=AsyncMock(return_value=b''),
     )
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         rendering_type_predictor=_SimpleRenderingTypePredictor(

@@ -152,6 +152,29 @@ async def test_error_status_code(server_url: URL, *, stream: bool) -> None:
     handler.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    'stream',
+    [
+        pytest.param(False, id='buffered'),
+        pytest.param(True, id='stream'),
+    ],
+)
+async def test_loaded_url_after_redirect(server_url: URL, *, stream: bool) -> None:
+    """Test that `loaded_url` of a redirected request is the URL the file was downloaded from."""
+    crawler = FileDownloadCrawler(stream=stream)
+    handler_call = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: FileDownloadCrawlingContext) -> None:
+        handler_call(loaded_url=context.request.loaded_url)
+
+    file_url = str(server_url.with_path('file').with_query(size=1024))
+    stats = await crawler.run([str(server_url.with_path('redirect').with_query(url=file_url))])
+
+    assert stats.requests_failed == 0
+    handler_call.assert_called_once_with(loaded_url=file_url)
+
+
 @pytest.mark.parametrize('content_type', ['application/pdf', 'image/png', 'video/mp4'])
 async def test_any_content_type(server_url: URL, content_type: str) -> None:
     """Any content type is downloaded as-is."""

@@ -37,7 +37,7 @@ from crawlee.errors import (
     UserDefinedErrorHandlerError,
 )
 from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
-from crawlee.http_clients import HttpClient
+from crawlee.http_clients import HttpClient, HttpResponse
 from crawlee.request_loaders import (
     RequestList,
     RequestManagerTandem,
@@ -610,7 +610,7 @@ async def test_handles_error_in_failed_request_handler() -> None:
 
 async def test_send_request_forwards_timeout_to_http_client() -> None:
     http_client = AsyncMock(spec=HttpClient)
-    response = Mock()
+    response = Mock(spec=HttpResponse)
     http_client.send_request.return_value = response
     crawler = BasicCrawler(http_client=http_client, use_session_pool=False, max_requests_per_crawl=1)
     timeout = timedelta(seconds=12)
@@ -639,6 +639,34 @@ async def test_send_request_forwards_timeout_to_http_client() -> None:
         proxy_info=None,
         timeout=timeout,
     )
+
+
+@pytest.mark.parametrize(
+    'handler_fails',
+    [
+        pytest.param(False, id='handled'),
+        pytest.param(True, id='failed'),
+    ],
+)
+async def test_send_request_response_closed_after_request(*, handler_fails: bool) -> None:
+    """Test that a response of `context.send_request` stays open in the handler and is closed after the request."""
+    http_client = AsyncMock(spec=HttpClient)
+    response = Mock(spec=HttpResponse)
+    http_client.send_request.return_value = response
+    crawler = BasicCrawler(http_client=http_client, max_request_retries=0, max_requests_per_crawl=1)
+    handler_call = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await context.send_request('https://example.com')
+        handler_call(closed=response.aclose.called)
+        if handler_fails:
+            raise RuntimeError('Arbitrary crash for testing purposes')
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    handler_call.assert_called_once_with(closed=False)
+    response.aclose.assert_awaited_once()
 
 
 @dataclass

@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import inspect
 import time
-from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 from unittest.mock import AsyncMock, MagicMock, Mock
@@ -13,7 +12,7 @@ from crawlee.request_loaders import ThrottlingRequestManager, _throttling_reques
 from crawlee.storages import RequestQueue
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
+    from collections.abc import AsyncIterator, Awaitable, Callable
 
     import pytest
     from yarl import URL
@@ -35,8 +34,7 @@ def make_status_stream_client(
     attempts: list[int] = []
     indexes: dict[str, int] = {}
 
-    @asynccontextmanager
-    async def stream(url: str, **_kwargs: Any) -> AsyncGenerator[HttpResponse]:
+    async def send_request(url: str, **_kwargs: Any) -> HttpResponse:
         sequence = responses[url]
         index = indexes.get(url, 0)
         indexes[url] = index + 1
@@ -55,10 +53,10 @@ def make_status_stream_client(
         response.status_code = status
         response.headers = {'content-type': 'application/xml; charset=utf-8'}
         response.read_stream = read_stream
-        yield cast('HttpResponse', response)
+        return cast('HttpResponse', response)
 
     client = AsyncMock(spec=HttpClient)
-    client.stream = stream
+    client.send_request.side_effect = send_request
     return client, attempts
 
 
