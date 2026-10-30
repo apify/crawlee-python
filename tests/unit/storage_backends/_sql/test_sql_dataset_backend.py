@@ -1,0 +1,277 @@
+from __future__ import annotations
+
+import asyncio
+from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, patch
+
+import pytest
+from sqlalchemy import inspect, select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from crawlee.configuration import Configuration
+from crawlee.storage_backends import SqlStorageBackend
+from crawlee.storage_backends._sql._db_models import DatasetItemDb, DatasetMetadataDb
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+    from pathlib import Path
+
+    from sqlalchemy import Connection
+
+    from crawlee.storage_backends._sql import SqlDatasetBackend
+
+
+@pytest.fixture
+def configuration(tmp_path: Path) -> Configuration:
+    """Temporary configuration for tests."""
+    return Configuration(
+        storage_dir=str(tmp_path),
+    )
+
+
+# Helper function that allows you to use inspect with an asynchronous engine
+def get_tables(sync_conn: Connection) -> list[str]:
+    inspector = inspect(sync_conn)
+    return inspector.get_table_names()
+
+
+@pytest.fixture
+async def dataset_backend(
+    configuration: Configuration,
+) -> AsyncGenerator[SqlDatasetBackend, None]:
+    """A fixture for a SQL dataset backend."""
+    async with SqlStorageBackend() as storage_backend:
+        backend = await storage_backend.create_dataset_backend(
+            name='test-dataset',
+            configuration=configuration,
+        )
+        yield backend
+        await backend.drop()
+
+
+async def test_create_tables_with_connection_string(configuration: Configuration, tmp_path: Path) -> None:
+    """Test that SQL dataset backend creates tables with a connection string."""
+    storage_dir = tmp_path / 'test_table.db'
+
+    async with SqlStorageBackend(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_backend:
+        await storage_backend.create_dataset_backend(
+            name='new-dataset',
+            configuration=configuration,
+        )
+
+        async with storage_backend.engine.begin() as conn:
+            tables = await conn.run_sync(get_tables)
+            assert 'dataset_records' in tables
+            assert 'datasets' in tables
+
+
+async def test_create_tables_with_engine(configuration: Configuration, tmp_path: Path) -> None:
+    """Test that SQL dataset backend creates tables with a pre-configured engine."""
+    storage_dir = tmp_path / 'test_table.db'
+
+    engine = create_async_engine(f'sqlite+aiosqlite:///{storage_dir}', future=True, echo=False)
+
+    async with SqlStorageBackend(engine=engine) as storage_backend:
+        await storage_backend.create_dataset_backend(
+            name='new-dataset',
+            configuration=configuration,
+        )
+
+        async with engine.begin() as conn:
+            tables = await conn.run_sync(get_tables)
+            assert 'dataset_records' in tables
+            assert 'datasets' in tables
+
+
+async def test_tables_and_metadata_record(configuration: Configuration) -> None:
+    """Test that SQL dataset creates proper tables and metadata records."""
+    async with SqlStorageBackend() as storage_backend:
+        backend = await storage_backend.create_dataset_backend(
+            name='new-dataset',
+            configuration=configuration,
+        )
+
+        backend_metadata = await backend.get_metadata()
+
+        async with storage_backend.engine.begin() as conn:
+            tables = await conn.run_sync(get_tables)
+            assert 'dataset_records' in tables
+            assert 'datasets' in tables
+
+        async with backend.get_session() as session:
+            stmt = select(DatasetMetadataDb).where(DatasetMetadataDb.name == 'new-dataset')
+            result = await session.execute(stmt)
+            orm_metadata = result.scalar_one_or_none()
+            assert orm_metadata is not None
+            assert orm_metadata.id == backend_metadata.id
+            assert orm_metadata.name == 'new-dataset'
+            assert orm_metadata.item_count == 0
+
+        await backend.drop()
+
+
+async def test_record_and_content_verification(dataset_backend: SqlDatasetBackend) -> None:
+    """Test that dataset backend can push data and verify its content."""
+    item = {'key': 'value', 'number': 42}
+    await dataset_backend.push_data(item)
+
+    # Verify metadata record
+    metadata = await dataset_backend.get_metadata()
+    assert metadata.item_count == 1
+    assert metadata.created_at is not None
+    assert metadata.modified_at is not None
+    assert metadata.accessed_at is not None
+
+    async with dataset_backend.get_session() as session:
+        stmt = select(DatasetItemDb).where(DatasetItemDb.dataset_id == metadata.id)
+        result = await session.execute(stmt)
+        records = result.scalars().all()
+        assert len(records) == 1
+        saved_item = records[0].data
+        assert saved_item == item
+
+    # Test pushing multiple items and verify total count
+    items = [{'id': 1, 'name': 'Item 1'}, {'id': 2, 'name': 'Item 2'}, {'id': 3, 'name': 'Item 3'}]
+    await dataset_backend.push_data(items)
+
+    async with dataset_backend.get_session() as session:
+        stmt = select(DatasetItemDb).where(DatasetItemDb.dataset_id == metadata.id)
+        result = await session.execute(stmt)
+        records = result.scalars().all()
+        assert len(records) == 4
+
+
+async def test_drop_removes_records(dataset_backend: SqlDatasetBackend) -> None:
+    """Test that dropping a dataset removes all records from the database."""
+    await dataset_backend.push_data({'test': 'data'})
+
+    backend_metadata = await dataset_backend.get_metadata()
+
+    async with dataset_backend.get_session() as session:
+        stmt = select(DatasetItemDb).where(DatasetItemDb.dataset_id == backend_metadata.id)
+        result = await session.execute(stmt)
+        records = result.scalars().all()
+        assert len(records) == 1
+
+    # Drop the dataset
+    await dataset_backend.drop()
+
+    async with dataset_backend.get_session() as session:
+        stmt = select(DatasetItemDb).where(DatasetItemDb.dataset_id == backend_metadata.id)
+        result = await session.execute(stmt)
+        records = result.scalars().all()
+        assert len(records) == 0
+        metadata = await session.get(DatasetMetadataDb, backend_metadata.id)
+        assert metadata is None
+
+
+async def test_metadata_record_updates(dataset_backend: SqlDatasetBackend) -> None:
+    """Test that metadata record is updated correctly after operations."""
+    # Record initial timestamps
+    metadata = await dataset_backend.get_metadata()
+    initial_created = metadata.created_at
+    initial_accessed = metadata.accessed_at
+    initial_modified = metadata.modified_at
+
+    # Wait a moment to ensure timestamps can change
+    await asyncio.sleep(0.01)
+
+    # Perform an operation that updates accessed_at
+    await dataset_backend.get_data()
+
+    # Verify timestamps
+    metadata = await dataset_backend.get_metadata()
+    assert metadata.created_at == initial_created
+    assert metadata.accessed_at > initial_accessed
+    assert metadata.modified_at == initial_modified
+
+    accessed_after_get = metadata.accessed_at
+
+    # Wait a moment to ensure timestamps can change
+    await asyncio.sleep(0.01)
+
+    # Perform an operation that updates modified_at
+    await dataset_backend.push_data({'new': 'item'})
+
+    # Verify timestamps again
+    metadata = await dataset_backend.get_metadata()
+    assert metadata.created_at == initial_created
+    assert metadata.modified_at > initial_modified
+    assert metadata.accessed_at > accessed_after_get
+
+    # Verify metadata record is updated in db
+    async with dataset_backend.get_session() as session:
+        orm_metadata = await session.get(DatasetMetadataDb, metadata.id)
+        assert orm_metadata is not None
+        orm_metadata.item_count = 1
+        assert orm_metadata.created_at == initial_created
+        assert orm_metadata.accessed_at == metadata.accessed_at
+        assert orm_metadata.modified_at == metadata.modified_at
+
+
+async def test_data_persistence_across_reopens(configuration: Configuration) -> None:
+    """Test that data persists correctly when reopening the same dataset."""
+    async with SqlStorageBackend() as storage_backend:
+        original_backend = await storage_backend.create_dataset_backend(
+            name='persistence-test',
+            configuration=configuration,
+        )
+
+        test_data = {'test_item': 'test_value', 'id': 123}
+        await original_backend.push_data(test_data)
+
+        dataset_id = (await original_backend.get_metadata()).id
+
+        reopened_backend = await storage_backend.create_dataset_backend(
+            id=dataset_id,
+            configuration=configuration,
+        )
+
+        data = await reopened_backend.get_data()
+        assert len(data.items) == 1
+        assert data.items[0] == test_data
+
+        await reopened_backend.drop()
+
+
+async def test_error_handling_on_push_failure(dataset_backend: SqlDatasetBackend) -> None:
+    """Test that push_data properly handles SQL errors and retries."""
+    with patch(
+        'crawlee.storage_backends._sql._dataset_backend.SqlDatasetBackend.get_session',
+    ) as mock_get_session:
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.execute = AsyncMock(side_effect=SQLAlchemyError('db error'))
+        mock_get_session.return_value = mock_session
+
+        with (
+            patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
+            pytest.raises(SQLAlchemyError),
+        ):
+            await dataset_backend.push_data({'test': 'data'})
+
+    # Verify that retry logic was attempted
+    assert mock_sleep.call_count == 2  # Assuming default max_attempts=3
+
+
+async def test_push_data_does_not_retry_on_unexpected_exception(dataset_backend: SqlDatasetBackend) -> None:
+    """Test that push_data does not retry on unexpected exceptions."""
+    with patch(
+        'crawlee.storage_backends._sql._dataset_backend.SqlDatasetBackend.get_session',
+    ) as mock_get_session:
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.execute = AsyncMock(side_effect=ValueError('unexpected error'))
+        mock_get_session.return_value = mock_session
+
+        with (
+            patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
+            pytest.raises(ValueError, match='unexpected error'),
+        ):
+            await dataset_backend.push_data({'test': 'data'})
+
+    # Verify that retry logic was not attempted
+    assert mock_sleep.call_count == 0

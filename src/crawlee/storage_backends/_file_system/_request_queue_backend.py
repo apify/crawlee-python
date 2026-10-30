@@ -1,0 +1,850 @@
+from __future__ import annotations
+
+import asyncio
+import json
+import shutil
+from collections import deque
+from datetime import UTC, datetime
+from hashlib import sha256
+from logging import getLogger
+from pathlib import Path
+from typing import TYPE_CHECKING, Self
+
+from pydantic import BaseModel, ValidationError
+from typing_extensions import override
+
+from crawlee import Request
+from crawlee._consts import METADATA_FILENAME
+from crawlee._utils.crypto import crypto_random_object_id
+from crawlee._utils.file import atomic_write, json_dumps, validate_subdirectory
+from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
+from crawlee._utils.recoverable_state import RecoverableState
+from crawlee.storage_backends._base import RequestQueueBackend
+from crawlee.storage_backends.models import (
+    AddRequestsResponse,
+    ProcessedRequest,
+    RequestQueueMetadata,
+    UnprocessedRequest,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from crawlee.configuration import Configuration
+    from crawlee.storages import KeyValueStore
+
+logger = getLogger(__name__)
+
+
+class RequestQueueState(BaseModel):
+    """State model for the `FileSystemRequestQueueBackend`."""
+
+    sequence_counter: int = 0
+    """Counter for regular request ordering."""
+
+    forefront_sequence_counter: int = 0
+    """Counter for forefront request ordering."""
+
+    forefront_requests: dict[str, int] = {}
+    """Mapping of forefront request unique keys to their sequence numbers."""
+
+    regular_requests: dict[str, int] = {}
+    """Mapping of regular request unique keys to their sequence numbers."""
+
+    in_progress_requests: set[str] = set()
+    """Set of request unique keys currently being processed."""
+
+    handled_requests: set[str] = set()
+    """Set of request unique keys that have been handled."""
+
+
+class FileSystemRequestQueueBackend(RequestQueueBackend):
+    """A file system implementation of the request queue backend.
+
+    This backend persists requests to the file system as individual JSON files, making it suitable for scenarios
+    where data needs to survive process restarts. Each request is stored as a separate file in a directory
+    structure following the pattern:
+
+    ```
+    {STORAGE_DIR}/request_queues/{QUEUE_ID}/{REQUEST_ID}.json
+    ```
+
+    The implementation uses `RecoverableState` to maintain ordering information, in-progress status, and
+    request handling status. This allows for proper state recovery across process restarts without
+    embedding metadata in individual request files. File system storage provides durability at the cost of
+    slower I/O operations compared to memory only-based storage.
+
+    This implementation is ideal for long-running crawlers where persistence is important and for situations
+    where you need to resume crawling after process termination.
+    """
+
+    _STORAGE_SUBDIR = 'request_queues'
+    """The name of the subdirectory where request queues are stored."""
+
+    _STORAGE_SUBSUBDIR_DEFAULT = 'default'
+    """The name of the subdirectory for the default request queue."""
+
+    _MAX_REQUESTS_IN_CACHE = 100_000
+    """Maximum number of requests to keep in cache for faster access."""
+
+    def __init__(
+        self,
+        *,
+        metadata: RequestQueueMetadata,
+        path_to_rq: Path,
+        lock: asyncio.Lock,
+        recoverable_state: RecoverableState[RequestQueueState],
+    ) -> None:
+        """Initialize a new instance.
+
+        Preferably use the `FileSystemRequestQueueBackend.open` class method to create a new instance.
+        """
+        self._metadata = metadata
+
+        self._path_to_rq = path_to_rq
+        """The full path to the request queue directory."""
+
+        self._lock = lock
+        """A lock to ensure that only one operation is performed at a time."""
+
+        self._request_cache = deque[Request]()
+        """Cache for requests: forefront requests at the beginning, regular requests at the end."""
+
+        self._request_cache_needs_refresh = True
+        """Flag indicating whether the cache needs to be refreshed from filesystem."""
+
+        self._is_empty_cache: bool | None = None
+        """Cache for is_empty result: None means unknown, True/False is cached state."""
+
+        self._state = recoverable_state
+        """Recoverable state to maintain request ordering, in-progress status, and handled status."""
+
+    @override
+    async def get_metadata(self) -> RequestQueueMetadata:
+        return self._metadata
+
+    @property
+    def path_to_rq(self) -> Path:
+        """The full path to the request queue directory."""
+        return self._path_to_rq
+
+    @property
+    def path_to_metadata(self) -> Path:
+        """The full path to the request queue metadata file."""
+        return self.path_to_rq / METADATA_FILENAME
+
+    @classmethod
+    async def _create_recoverable_state(cls, id: str, configuration: Configuration) -> RecoverableState:
+        async def kvs_factory() -> KeyValueStore:
+            from crawlee.storage_backends import FileSystemStorageBackend  # noqa: PLC0415 avoid circular import
+            from crawlee.storages import KeyValueStore  # noqa: PLC0415 avoid circular import
+
+            return await KeyValueStore.open(storage_backend=FileSystemStorageBackend(), configuration=configuration)
+
+        return RecoverableState[RequestQueueState](
+            default_state=RequestQueueState(),
+            persist_state_key=f'__RQ_STATE_{id}',
+            persist_state_kvs_factory=kvs_factory,
+            persistence_enabled=True,
+            logger=logger,
+        )
+
+    @classmethod
+    async def open(
+        cls,
+        *,
+        id: str | None,
+        name: str | None,
+        alias: str | None,
+        configuration: Configuration,
+    ) -> Self:
+        """Open or create a file system request queue backend.
+
+        This method attempts to open an existing request queue from the file system. If a queue with the specified
+        ID or name exists, it loads the metadata and state from the stored files. If no existing queue is found,
+        a new one is created.
+
+        Args:
+            id: The ID of the request queue to open. If provided, searches for existing queue by ID.
+            name: The name of the request queue for named (global scope) storages.
+            alias: The alias of the request queue for unnamed (run scope) storages.
+            configuration: The configuration object containing storage directory settings.
+
+        Returns:
+            An instance for the opened or created storage backend.
+
+        Raises:
+            ValueError: If a queue with the specified ID is not found, if metadata is invalid,
+                or if both name and alias are provided.
+        """
+        # Validate input parameters.
+        raise_if_too_many_kwargs(id=id, name=name, alias=alias)
+
+        rq_base_path = Path(configuration.storage_dir) / cls._STORAGE_SUBDIR
+
+        if not rq_base_path.exists():
+            await asyncio.to_thread(rq_base_path.mkdir, parents=True, exist_ok=True)
+
+        # Open an existing RQ by its ID, raise an error if not found.
+        if id:
+            found = False
+            for rq_dir in rq_base_path.iterdir():
+                if not rq_dir.is_dir():
+                    continue
+
+                path_to_metadata = rq_dir / METADATA_FILENAME
+                if not path_to_metadata.exists():
+                    continue
+
+                try:
+                    file = await asyncio.to_thread(path_to_metadata.open, mode='r', encoding='utf-8')
+                    try:
+                        file_content = json.load(file)
+                        metadata = RequestQueueMetadata(**file_content)
+
+                        if metadata.id == id:
+                            backend = cls(
+                                metadata=metadata,
+                                path_to_rq=rq_base_path / rq_dir,
+                                lock=asyncio.Lock(),
+                                recoverable_state=await cls._create_recoverable_state(
+                                    id=id, configuration=configuration
+                                ),
+                            )
+                            await backend._state.initialize()
+                            await backend._discover_existing_requests()
+                            await backend._update_metadata(update_accessed_at=True)
+                            found = True
+                            break
+                    finally:
+                        await asyncio.to_thread(file.close)
+                except (json.JSONDecodeError, ValidationError):
+                    continue
+
+            if not found:
+                raise ValueError(f'Request queue with ID "{id}" not found')
+
+        # Open an existing RQ by its name or alias, or create a new one if not found.
+        else:
+            path_to_rq = validate_subdirectory(rq_base_path, name or alias or 'default')
+            path_to_metadata = path_to_rq / METADATA_FILENAME
+
+            # If the RQ directory exists, reconstruct the backend from the metadata file.
+            if path_to_rq.exists() and path_to_metadata.exists():
+                file = await asyncio.to_thread(path_to_metadata.open, encoding='utf-8')
+                try:
+                    file_content = json.load(file)
+                finally:
+                    await asyncio.to_thread(file.close)
+                try:
+                    metadata = RequestQueueMetadata(**file_content)
+                except ValidationError as exc:
+                    raise ValueError(f'Invalid metadata file for request queue "{name or alias}"') from exc
+
+                backend = cls(
+                    metadata=metadata,
+                    path_to_rq=path_to_rq,
+                    lock=asyncio.Lock(),
+                    recoverable_state=await cls._create_recoverable_state(id=metadata.id, configuration=configuration),
+                )
+
+                await backend._state.initialize()
+                await backend._discover_existing_requests()
+                await backend._update_metadata(update_accessed_at=True)
+
+            # Otherwise, create a new request queue backend.
+            else:
+                now = datetime.now(UTC)
+                metadata = RequestQueueMetadata(
+                    id=crypto_random_object_id(),
+                    name=name,
+                    created_at=now,
+                    accessed_at=now,
+                    modified_at=now,
+                    had_multiple_clients=False,
+                    handled_request_count=0,
+                    pending_request_count=0,
+                    total_request_count=0,
+                )
+                backend = cls(
+                    metadata=metadata,
+                    path_to_rq=path_to_rq,
+                    lock=asyncio.Lock(),
+                    recoverable_state=await cls._create_recoverable_state(id=metadata.id, configuration=configuration),
+                )
+                await backend._state.initialize()
+                await backend._update_metadata()
+
+        return backend
+
+    @override
+    async def drop(self) -> None:
+        async with self._lock:
+            # Remove the RQ dir recursively if it exists.
+            if self.path_to_rq.exists():
+                await asyncio.to_thread(shutil.rmtree, self.path_to_rq)
+
+            # Clear recoverable state
+            await self._state.reset()
+            await self._state.teardown()
+            self._request_cache.clear()
+            self._request_cache_needs_refresh = True
+
+            # Invalidate is_empty cache.
+            self._is_empty_cache = None
+
+    @override
+    async def purge(self) -> None:
+        async with self._lock:
+            request_files = await self._get_request_files(self.path_to_rq)
+
+            for file_path in request_files:
+                await asyncio.to_thread(file_path.unlink, missing_ok=True)
+
+            # Clear recoverable state
+            await self._state.reset()
+            self._request_cache.clear()
+            self._request_cache_needs_refresh = True
+
+            await self._update_metadata(
+                update_modified_at=True,
+                update_accessed_at=True,
+                new_pending_request_count=0,
+                new_handled_request_count=0,
+                new_total_request_count=0,
+            )
+
+            # Invalidate is_empty cache.
+            self._is_empty_cache = None
+
+    @override
+    async def add_batch_of_requests(
+        self,
+        requests: Sequence[Request],
+        *,
+        forefront: bool = False,
+    ) -> AddRequestsResponse:
+        async with self._lock:
+            self._is_empty_cache = None
+            new_total_request_count = self._metadata.total_request_count
+            new_pending_request_count = self._metadata.pending_request_count
+            processed_requests = list[ProcessedRequest]()
+            unprocessed_requests = list[UnprocessedRequest]()
+            state = self._state.current_value
+
+            def is_in_queue(unique_key: str) -> bool:
+                return unique_key in state.forefront_requests or unique_key in state.regular_requests
+
+            requests_to_enqueue = {}
+
+            # Determine which requests can be added or are modified.
+            for request in requests:
+                # Check if the request has already been handled.
+                if request.unique_key in state.handled_requests:
+                    processed_requests.append(
+                        ProcessedRequest(
+                            unique_key=request.unique_key,
+                            was_already_present=True,
+                            was_already_handled=True,
+                        )
+                    )
+                # Check if the request is already in progress.
+                # Or if the request is already in the queue and the `forefront` flag is not used, we do not change the
+                # position of the request.
+                elif (request.unique_key in state.in_progress_requests) or (
+                    not forefront and is_in_queue(request.unique_key)
+                ):
+                    processed_requests.append(
+                        ProcessedRequest(
+                            unique_key=request.unique_key,
+                            was_already_present=True,
+                            was_already_handled=False,
+                        )
+                    )
+                # These requests must either be added or update their position.
+                else:
+                    requests_to_enqueue[request.unique_key] = request
+
+            # Process each request in the batch.
+            for request in requests_to_enqueue.values():
+                # If the request is not already in the RQ, this is a new request.
+                if not is_in_queue(request.unique_key):
+                    request_path = self._get_request_path(request.unique_key)
+                    # Add sequence number to ensure FIFO ordering using state.
+                    if forefront:
+                        sequence_number = state.forefront_sequence_counter
+                        state.forefront_sequence_counter += 1
+                        state.forefront_requests[request.unique_key] = sequence_number
+                    else:
+                        sequence_number = state.sequence_counter
+                        state.sequence_counter += 1
+                        state.regular_requests[request.unique_key] = sequence_number
+
+                    # Save the clean request without extra fields
+                    request_data = await json_dumps(request.model_dump(by_alias=True))
+                    await atomic_write(request_path, request_data)
+
+                    # A new forefront request belongs to the very front of the queue, so it can go straight
+                    # to the cache without a full refresh, unless the cache is at capacity or a refresh is
+                    # already pending. New regular requests must not be appended to the cache: it may be
+                    # truncated, so its tail is not necessarily the end of the queue; they are picked up by a
+                    # refresh once the cache drains.
+                    if forefront and not self._request_cache_needs_refresh:
+                        if len(self._request_cache) < self._MAX_REQUESTS_IN_CACHE:
+                            self._request_cache.appendleft(request)
+                        else:
+                            self._request_cache_needs_refresh = True
+
+                    # Update the metadata counts.
+                    new_total_request_count += 1
+                    new_pending_request_count += 1
+
+                    processed_requests.append(
+                        ProcessedRequest(
+                            unique_key=request.unique_key,
+                            was_already_present=False,
+                            was_already_handled=False,
+                        )
+                    )
+
+                # If the request already exists in the RQ and use the forefront flag to update its position
+                elif forefront:
+                    # If the request is among `regular`, remove it from its current position.
+                    if request.unique_key in state.regular_requests:
+                        state.regular_requests.pop(request.unique_key)
+
+                    # If the request is already in `forefront`, we just need to update its position.
+                    state.forefront_requests[request.unique_key] = state.forefront_sequence_counter
+                    state.forefront_sequence_counter += 1
+
+                    # The request may already sit elsewhere in the cache, so its position must be recomputed.
+                    self._request_cache_needs_refresh = True
+
+                    processed_requests.append(
+                        ProcessedRequest(
+                            unique_key=request.unique_key,
+                            was_already_present=True,
+                            was_already_handled=False,
+                        )
+                    )
+
+                else:
+                    logger.warning(f'Request with unique key "{request.unique_key}" could not be processed.')
+                    unprocessed_requests.append(
+                        UnprocessedRequest(
+                            unique_key=request.unique_key,
+                            url=request.url,
+                            method=request.method,
+                        )
+                    )
+
+            await self._update_metadata(
+                update_modified_at=True,
+                update_accessed_at=True,
+                new_total_request_count=new_total_request_count,
+                new_pending_request_count=new_pending_request_count,
+            )
+
+            # Invalidate is_empty cache.
+            self._is_empty_cache = None
+
+            return AddRequestsResponse(
+                processed_requests=processed_requests,
+                unprocessed_requests=unprocessed_requests,
+            )
+
+    @override
+    async def get_request(self, unique_key: str) -> Request | None:
+        async with self._lock:
+            request_path = self._get_request_path(unique_key)
+            request = await self._parse_request_file(request_path)
+
+            if request is None:
+                logger.warning(f'Request with unique key "{unique_key}" not found in the queue.')
+                return None
+
+            await self._update_metadata(update_accessed_at=True)
+            return request
+
+    @override
+    async def fetch_next_request(self) -> Request | None:
+        async with self._lock:
+            # Refresh cache if needed or if it's empty.
+            if self._request_cache_needs_refresh or not self._request_cache:
+                await self._refresh_cache()
+
+            next_request: Request | None = None
+            state = self._state.current_value
+
+            # Fetch from the front of the deque (forefront requests are at the beginning).
+            while self._request_cache and next_request is None:
+                candidate = self._request_cache.popleft()
+
+                # Skip requests that are already in progress, however this should not happen.
+                if candidate.unique_key not in state.in_progress_requests:
+                    next_request = candidate
+
+            if next_request is not None:
+                state.in_progress_requests.add(next_request.unique_key)
+                # `in_progress_requests` is updated, so we need to invalidate the `is_empty` cache.
+                self._is_empty_cache = None
+                return next_request
+
+        # Yield to the event loop like the other backends do, so a caller polling an empty queue can't starve the
+        # tasks that would fill it.
+        await asyncio.sleep(0)
+        return None
+
+    @override
+    async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
+        async with self._lock:
+            self._is_empty_cache = None
+            state = self._state.current_value
+
+            # Check if the request is in progress.
+            if request.unique_key not in state.in_progress_requests:
+                logger.warning(f'Marking request {request.unique_key} as handled that is not in progress.')
+                return None
+
+            # Update the request's handled_at timestamp.
+            if request.handled_at is None:
+                request.handled_at = datetime.now(UTC)
+
+            # Dump the updated request to the file.
+            request_path = self._get_request_path(request.unique_key)
+
+            if not await asyncio.to_thread(request_path.exists):
+                logger.warning(f'Request file for {request.unique_key} does not exist, cannot mark as handled.')
+                return None
+
+            request_data = await json_dumps(request.model_dump(by_alias=True))
+            await atomic_write(request_path, request_data)
+
+            # Update state: remove from in-progress and pending, and add to handled. Dropping the key from
+            # the pending mappings keeps them (and the persisted state) sized by the backlog rather than by
+            # every request ever processed.
+            state.in_progress_requests.discard(request.unique_key)
+            state.forefront_requests.pop(request.unique_key, None)
+            state.regular_requests.pop(request.unique_key, None)
+            state.handled_requests.add(request.unique_key)
+
+            # Update RQ metadata.
+            await self._update_metadata(
+                update_modified_at=True,
+                update_accessed_at=True,
+                new_handled_request_count=self._metadata.handled_request_count + 1,
+                new_pending_request_count=self._metadata.pending_request_count - 1,
+            )
+
+            return ProcessedRequest(
+                unique_key=request.unique_key,
+                was_already_present=True,
+                was_already_handled=True,
+            )
+
+    @override
+    async def reclaim_request(
+        self,
+        request: Request,
+        *,
+        forefront: bool = False,
+    ) -> ProcessedRequest | None:
+        async with self._lock:
+            self._is_empty_cache = None
+            state = self._state.current_value
+
+            # Check if the request is in progress.
+            if request.unique_key not in state.in_progress_requests:
+                logger.info(f'Reclaiming request {request.unique_key} that is not in progress.')
+                return None
+
+            request_path = self._get_request_path(request.unique_key)
+
+            if not await asyncio.to_thread(request_path.exists):
+                logger.warning(f'Request file for {request.unique_key} does not exist, cannot reclaim.')
+                return None
+
+            # Update sequence number and state to ensure proper ordering.
+            if forefront:
+                # Remove from regular requests if it was there
+                state.regular_requests.pop(request.unique_key, None)
+                sequence_number = state.forefront_sequence_counter
+                state.forefront_sequence_counter += 1
+                state.forefront_requests[request.unique_key] = sequence_number
+            else:
+                # Remove from forefront requests if it was there
+                state.forefront_requests.pop(request.unique_key, None)
+                sequence_number = state.sequence_counter
+                state.sequence_counter += 1
+                state.regular_requests[request.unique_key] = sequence_number
+
+            # Save the clean request without extra fields
+            request_data = await json_dumps(request.model_dump(by_alias=True))
+            await atomic_write(request_path, request_data)
+
+            # Remove from in-progress.
+            state.in_progress_requests.discard(request.unique_key)
+
+            # Update RQ metadata.
+            await self._update_metadata(
+                update_modified_at=True,
+                update_accessed_at=True,
+            )
+
+            # Add the request back to the cache.
+            if forefront:
+                self._request_cache.appendleft(request)
+            else:
+                self._request_cache.append(request)
+
+            return ProcessedRequest(
+                unique_key=request.unique_key,
+                was_already_present=True,
+                was_already_handled=False,
+            )
+
+    @override
+    async def is_empty(self) -> bool:
+        async with self._lock:
+            # If we have a cached value, return it immediately.
+            if self._is_empty_cache is not None:
+                return self._is_empty_cache
+
+            state = self._state.current_value
+
+            # If we have a cached requests, check them first (fast path).
+            if self._request_cache:
+                for req in self._request_cache:
+                    if req.unique_key not in state.handled_requests:
+                        self._is_empty_cache = False
+                        return False
+                self._is_empty_cache = True
+                return True
+
+            # Fallback: check state for unhandled requests.
+            await self._update_metadata(update_accessed_at=True)
+
+            # Check pending requests in state.
+            queue_requests = (
+                set(state.forefront_requests.keys()) | set(state.regular_requests.keys())
+            ) - state.in_progress_requests
+
+            pending_requests = queue_requests - state.handled_requests
+
+            if pending_requests:
+                self._is_empty_cache = False
+                return False
+
+            self._is_empty_cache = True
+            return True
+
+    @override
+    async def is_finished(self) -> bool:
+        # If there are requests available to fetch, the queue is not finished.
+        if not await self.is_empty():
+            return False
+
+        async with self._lock:
+            # Check, if cache changed while waiting for the lock.
+            if self._is_empty_cache is not True:
+                return False
+
+            # If there are any in-progress requests, the queue is not finished.
+            return not self._state.current_value.in_progress_requests
+
+    def _get_request_path(self, unique_key: str) -> Path:
+        """Get the path to a specific request file.
+
+        Args:
+            unique_key: Unique key of the request.
+
+        Returns:
+            The path to the request file.
+        """
+        return self.path_to_rq / f'{self._get_file_base_name_from_unique_key(unique_key)}.json'
+
+    async def _update_metadata(
+        self,
+        *,
+        new_handled_request_count: int | None = None,
+        new_pending_request_count: int | None = None,
+        new_total_request_count: int | None = None,
+        update_had_multiple_clients: bool = False,
+        update_accessed_at: bool = False,
+        update_modified_at: bool = False,
+    ) -> None:
+        """Update the dataset metadata file with current information.
+
+        Args:
+            new_handled_request_count: If provided, update the handled_request_count to this value.
+            new_pending_request_count: If provided, update the pending_request_count to this value.
+            new_total_request_count: If provided, update the total_request_count to this value.
+            update_had_multiple_clients: If True, set had_multiple_clients to True.
+            update_accessed_at: If True, update the `accessed_at` timestamp to the current time.
+            update_modified_at: If True, update the `modified_at` timestamp to the current time.
+        """
+        # Always create a new timestamp to ensure it's truly updated
+        now = datetime.now(UTC)
+
+        # Update timestamps according to parameters
+        if update_accessed_at:
+            self._metadata.accessed_at = now
+
+        if update_modified_at:
+            self._metadata.modified_at = now
+
+        # Update request counts if provided
+        if new_handled_request_count is not None:
+            self._metadata.handled_request_count = new_handled_request_count
+
+        if new_pending_request_count is not None:
+            self._metadata.pending_request_count = new_pending_request_count
+
+        if new_total_request_count is not None:
+            self._metadata.total_request_count = new_total_request_count
+
+        if update_had_multiple_clients:
+            self._metadata.had_multiple_clients = True
+
+        # Ensure the parent directory for the metadata file exists.
+        await asyncio.to_thread(self.path_to_metadata.parent.mkdir, parents=True, exist_ok=True)
+
+        # Dump the serialized metadata to the file.
+        data = await json_dumps(self._metadata.model_dump(by_alias=True))
+        await atomic_write(self.path_to_metadata, data)
+
+    async def _refresh_cache(self) -> None:
+        """Refresh the request cache from the filesystem.
+
+        This method loads up to `_MAX_REQUESTS_IN_CACHE` requests from the filesystem, prioritizing forefront
+        requests and maintaining proper ordering. Only requests that are pending according to the state are
+        read, so files of already handled or in-progress requests are not touched at all.
+        """
+        self._request_cache.clear()
+        state = self._state.current_value
+
+        def is_pending(unique_key: str) -> bool:
+            return unique_key not in state.handled_requests and unique_key not in state.in_progress_requests
+
+        # Forefront requests are fetched newest first (LIFO), regular requests oldest first (FIFO).
+        forefront_keys = sorted(
+            filter(is_pending, state.forefront_requests),
+            key=lambda unique_key: state.forefront_requests[unique_key],
+            reverse=True,
+        )
+        regular_keys = sorted(
+            filter(is_pending, state.regular_requests),
+            key=lambda unique_key: state.regular_requests[unique_key],
+        )
+
+        for unique_key in forefront_keys + regular_keys:
+            if len(self._request_cache) >= self._MAX_REQUESTS_IN_CACHE:
+                break
+
+            request = await self._parse_request_file(self._get_request_path(unique_key))
+            if request is None:
+                logger.warning(f'Request file for "{unique_key}" is missing or invalid, skipping.')
+                continue
+
+            self._request_cache.append(request)
+
+        self._request_cache_needs_refresh = False
+
+    @classmethod
+    async def _get_request_files(cls, path_to_rq: Path) -> list[Path]:
+        """Get all request files from the RQ.
+
+        Args:
+            path_to_rq: The path to the request queue directory.
+
+        Returns:
+            A list of paths to all request files.
+        """
+        # Create the requests directory if it doesn't exist.
+        await asyncio.to_thread(path_to_rq.mkdir, parents=True, exist_ok=True)
+
+        # List all the json files.
+        files = list(await asyncio.to_thread(path_to_rq.glob, '*.json'))
+
+        # Filter out metadata file and non-file entries.
+        filtered = filter(lambda request_file: request_file.is_file() and request_file.name != METADATA_FILENAME, files)
+
+        return list(filtered)
+
+    @classmethod
+    async def _parse_request_file(cls, file_path: Path) -> Request | None:
+        """Parse a request file and return the `Request` object.
+
+        Args:
+            file_path: The path to the request file.
+
+        Returns:
+            The parsed `Request` object or `None` if the file could not be read or parsed.
+        """
+        # Read the request file in a thread to avoid blocking the event loop.
+        try:
+            file_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
+        except FileNotFoundError:
+            logger.warning(f'Request file "{file_path}" not found.')
+            return None
+
+        # Parse the file content as JSON.
+        try:
+            parsed = json.loads(file_content)
+        except json.JSONDecodeError as exc:
+            logger.warning(f'Failed to parse request file {file_path}: {exc!s}')
+            return None
+
+        # Validate the content against the Request model.
+        try:
+            return Request.model_validate(parsed)
+        except ValidationError as exc:
+            logger.warning(f'Failed to validate request file {file_path}: {exc!s}')
+            return None
+
+    async def _discover_existing_requests(self) -> None:
+        """Discover and load existing requests into the state when opening an existing request queue.
+
+        On recovery after a crash, any requests that were previously in-progress are reclaimed as pending,
+        since there is no active processing after a restart.
+        """
+        request_files = await self._get_request_files(self.path_to_rq)
+        state = self._state.current_value
+
+        if state.in_progress_requests:
+            logger.info(
+                f'Reclaiming {len(state.in_progress_requests)} in-progress request(s) from previous run.',
+            )
+            state.in_progress_requests.clear()
+
+        for request_file in request_files:
+            request = await self._parse_request_file(request_file)
+            if request is None:
+                continue
+
+            # Already handled requests are tracked only for deduplication, not as pending work.
+            if request.handled_at is not None:
+                state.handled_requests.add(request.unique_key)
+
+            # Add pending request to state as regular request (assign sequence numbers)
+            elif (
+                request.unique_key not in state.regular_requests and request.unique_key not in state.forefront_requests
+            ):
+                state.regular_requests[request.unique_key] = state.sequence_counter
+                state.sequence_counter += 1
+
+    @staticmethod
+    def _get_file_base_name_from_unique_key(unique_key: str) -> str:
+        """Generate a deterministic file name for a unique_key.
+
+        Args:
+            unique_key: Unique key to be used to generate filename.
+
+        Returns:
+            A file name based on the unique_key.
+        """
+        # hexdigest produces filenames compliant strings
+        hashed_key = sha256(unique_key.encode('utf-8')).hexdigest()
+        name_length = 15
+        # Truncate the key to the desired length
+        return hashed_key[:name_length]

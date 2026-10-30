@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from crawlee._types import EnqueueStrategy
     from crawlee.http_clients import HttpClient
     from crawlee.proxy_configuration import ProxyInfo
-    from crawlee.storage_clients.models import ProcessedRequest
+    from crawlee.storage_backends.models import ProcessedRequest
 
     from ._types import RequestLoaderStatus
 

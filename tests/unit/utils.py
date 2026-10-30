@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from crawlee import Request
-    from crawlee.storage_clients.models import ProcessedRequest
+    from crawlee.storage_backends.models import ProcessedRequest
 
 T = TypeVar('T')
 

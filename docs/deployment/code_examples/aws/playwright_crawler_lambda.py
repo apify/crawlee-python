@@ -6,22 +6,22 @@ from typing import Any
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
 from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
-from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storage_backends import MemoryStorageBackend
 from crawlee.storages import Dataset, RequestQueue
 
 
 async def main() -> str:
     # highlight-start
     # Disable writing storage data to the file system
-    storage_client = MemoryStorageClient()
+    storage_backend = MemoryStorageBackend()
     # highlight-end
 
     # Initialize storages
-    dataset = await Dataset.open(storage_client=storage_client)
-    request_queue = await RequestQueue.open(storage_client=storage_client)
+    dataset = await Dataset.open(storage_backend=storage_backend)
+    request_queue = await RequestQueue.open(storage_backend=storage_backend)
 
     crawler = PlaywrightCrawler(
-        storage_client=storage_client,
+        storage_backend=storage_backend,
         max_request_retries=1,
         request_handler_timeout=timedelta(seconds=30),
         max_requests_per_crawl=10,

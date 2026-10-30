@@ -35,7 +35,7 @@ from crawlee.errors import RequestThrottledError
 from crawlee.http_clients import HttpClient, HttpCrawlingResult
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
-from crawlee.storage_clients import SqlStorageClient
+from crawlee.storage_backends import SqlStorageBackend
 from crawlee.storages import KeyValueStore, RequestQueue
 from tests.unit.utils import open_throttler_held_until_reclaim
 
@@ -923,12 +923,12 @@ async def test_change_context_state_after_handling(
 
 
 async def test_adaptive_playwright_crawler_with_sql_storage(test_urls: list[str], tmp_path: Path) -> None:
-    """Tests that AdaptivePlaywrightCrawler can be initialized with SqlStorageClient."""
+    """Tests that AdaptivePlaywrightCrawler can be initialized with SqlStorageBackend."""
     storage_dir = tmp_path / 'test_table.db'
 
-    async with SqlStorageClient(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_client:
+    async with SqlStorageBackend(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_backend:
         crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
-            storage_client=storage_client,
+            storage_backend=storage_backend,
         )
 
         mocked_handler = Mock()

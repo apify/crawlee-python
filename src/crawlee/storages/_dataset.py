@@ -20,9 +20,9 @@ if TYPE_CHECKING:
 
     from crawlee._types import ExportDataCsvKwargs, ExportDataJsonKwargs, JsonSerializable
     from crawlee.configuration import Configuration
-    from crawlee.storage_clients import StorageClient
-    from crawlee.storage_clients._base import DatasetClient
-    from crawlee.storage_clients.models import DatasetItemsListPage, DatasetMetadata
+    from crawlee.storage_backends import StorageBackend
+    from crawlee.storage_backends._base import DatasetBackend
+    from crawlee.storage_backends.models import DatasetItemsListPage, DatasetMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class Dataset(Storage):
     The class provides methods for adding data, retrieving data with various filtering options,
     and exporting data to different formats. You can create a dataset using the `open` class method,
     specifying either a name or ID. The underlying storage implementation is determined by
-    the configured storage client.
+    the configured storage backend.
 
     ### Usage
 
@@ -64,19 +64,19 @@ class Dataset(Storage):
     ```
     """
 
-    def __init__(self, client: DatasetClient, id: str, name: str | None) -> None:
+    def __init__(self, backend: DatasetBackend, id: str, name: str | None) -> None:
         """Initialize a new instance.
 
         Preferably use the `Dataset.open` constructor to create a new instance.
 
         Args:
-            client: An instance of a storage client.
+            backend: The dataset backend to use.
             id: The unique identifier of the storage.
             name: The name of the storage, if available.
         """
         validate_storage_name(name)
 
-        self._client = client
+        self._backend = backend
         self._id = id
         self._name = name
 
@@ -92,7 +92,7 @@ class Dataset(Storage):
 
     @override
     async def get_metadata(self) -> DatasetMetadata:
-        return await self._client.get_metadata()
+        return await self._backend.get_metadata()
 
     @override
     @classmethod
@@ -103,39 +103,39 @@ class Dataset(Storage):
         name: str | None = None,
         alias: str | None = None,
         configuration: Configuration | None = None,
-        storage_client: StorageClient | None = None,
+        storage_backend: StorageBackend | None = None,
     ) -> Dataset:
         configuration = service_locator.get_configuration() if configuration is None else configuration
-        storage_client = service_locator.get_storage_client() if storage_client is None else storage_client
+        storage_backend = service_locator.get_storage_backend() if storage_backend is None else storage_backend
 
-        client_opener_coro = storage_client.create_dataset_client(
+        backend_opener_coro = storage_backend.create_dataset_backend(
             id=id, name=name, alias=alias, configuration=configuration
         )
-        storage_client_cache_key = storage_client.get_storage_client_cache_key(configuration=configuration)
+        storage_backend_cache_key = storage_backend.get_storage_backend_cache_key(configuration=configuration)
 
         return await service_locator.storage_instance_manager.open_storage_instance(
             cls,
             id=id,
             name=name,
             alias=alias,
-            client_opener_coro=client_opener_coro,
-            storage_client_cache_key=storage_client_cache_key,
+            backend_opener_coro=backend_opener_coro,
+            storage_backend_cache_key=storage_backend_cache_key,
         )
 
     @override
     async def drop(self) -> None:
         storage_instance_manager = service_locator.storage_instance_manager
         storage_instance_manager.remove_from_cache(self)
-        await self._client.drop()
+        await self._backend.drop()
 
     @override
     async def purge(self) -> None:
-        await self._client.purge()
+        await self._backend.purge()
 
     async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
         """Store an object or an array of objects to the dataset.
 
-        Local storage clients impose no size limit on the pushed data. Some remote storage clients do,
+        Local storage backends impose no size limit on the pushed data. Some remote storage backends do,
         however. For example, when running on the Apify platform, the receiving API only accepts objects
         whose JSON representation is smaller than 9MB, and each item of a passed array is subject to the
         same per-item limit (the array itself may be of any size).
@@ -143,7 +143,7 @@ class Dataset(Storage):
         Args:
             data: A JSON serializable data structure to be stored in the dataset.
         """
-        await self._client.push_data(data=data)
+        await self._backend.push_data(data=data)
 
     async def get_data(
         self,
@@ -182,7 +182,7 @@ class Dataset(Storage):
         Returns:
             An object with filtered, sorted, and paginated dataset items plus pagination details.
         """
-        return await self._client.get_data(
+        return await self._backend.get_data(
             offset=offset,
             limit=limit,
             clean=clean,
@@ -231,7 +231,7 @@ class Dataset(Storage):
             An asynchronous iterator of dictionary objects, each representing a dataset item after applying
             the specified filters and transformations.
         """
-        async for item in self._client.iterate_items(
+        async for item in self._backend.iterate_items(
             offset=offset,
             limit=limit,
             clean=clean,
@@ -317,7 +317,7 @@ class Dataset(Storage):
         content_type: Literal['json'],
         to_kvs_id: str | None = None,
         to_kvs_name: str | None = None,
-        to_kvs_storage_client: StorageClient | None = None,
+        to_kvs_storage_backend: StorageBackend | None = None,
         to_kvs_configuration: Configuration | None = None,
         **kwargs: Unpack[ExportDataJsonKwargs],
     ) -> None: ...
@@ -330,7 +330,7 @@ class Dataset(Storage):
         content_type: Literal['csv'],
         to_kvs_id: str | None = None,
         to_kvs_name: str | None = None,
-        to_kvs_storage_client: StorageClient | None = None,
+        to_kvs_storage_backend: StorageBackend | None = None,
         to_kvs_configuration: Configuration | None = None,
         collect_all_keys: bool = False,
         **kwargs: Unpack[ExportDataCsvKwargs],
@@ -343,7 +343,7 @@ class Dataset(Storage):
         content_type: Literal['json', 'csv'] = 'json',
         to_kvs_id: str | None = None,
         to_kvs_name: str | None = None,
-        to_kvs_storage_client: StorageClient | None = None,
+        to_kvs_storage_backend: StorageBackend | None = None,
         to_kvs_configuration: Configuration | None = None,
         **kwargs: Any,
     ) -> None:
@@ -361,7 +361,7 @@ class Dataset(Storage):
                 Specify only one of ID or name.
             to_kvs_name: Name of the key-value store to save the exported file.
                 Specify only one of ID or name.
-            to_kvs_storage_client: Storage client to use for the key-value store.
+            to_kvs_storage_backend: Storage backend to use for the key-value store.
             to_kvs_configuration: Configuration for the key-value store.
             collect_all_keys: CSV only. When True, the columns are the keys of all items combined, so no value is
                 dropped. When False, the columns are the keys of the first non-empty item, and keys introduced by
@@ -372,7 +372,7 @@ class Dataset(Storage):
             id=to_kvs_id,
             name=to_kvs_name,
             configuration=to_kvs_configuration,
-            storage_client=to_kvs_storage_client,
+            storage_backend=to_kvs_storage_backend,
         )
         dst = StringIO()
 

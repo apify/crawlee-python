@@ -35,9 +35,9 @@ Crawlee offers several storage types for managing and persisting your crawling d
 Crawlee's storage system consists of two main layers:
 
 - **Storages** (<ApiLink to="class/Dataset">`Dataset`</ApiLink>, <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>): High-level interfaces for interacting with different storage types.
-- **Storage clients** (<ApiLink to="class/MemoryStorageClient">`MemoryStorageClient`</ApiLink>, <ApiLink to="class/FileSystemStorageClient">`FileSystemStorageClient`</ApiLink>, etc.): Backend implementations that handle the actual data persistence and management.
+- **Storage backends** (<ApiLink to="class/MemoryStorageBackend">`MemoryStorageBackend`</ApiLink>, <ApiLink to="class/FileSystemStorageBackend">`FileSystemStorageBackend`</ApiLink>, etc.): Backend implementations that handle the actual data persistence and management.
 
-For more information about storage clients and their configuration, see the [Storage clients guide](./storage-clients).
+For more information about storage backends and their configuration, see the [Storage backends guide](./storage-backends).
 
 ```mermaid
 ---
@@ -206,7 +206,7 @@ Crawlee provides the following helper function to simplify interactions with the
 
 ## Cleaning up the storages
 
-By default, Crawlee cleans up all unnamed storages (including the default one) once per process, when each one is first opened, so every process begins with a clean state. This behavior is controlled by <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink> (default: True). In contrast, named storages are never purged automatically and persist across runs. The exact behavior may vary depending on the storage client implementation.
+By default, Crawlee cleans up all unnamed storages (including the default one) once per process, when each one is first opened, so every process begins with a clean state. This behavior is controlled by <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink> (default: True). In contrast, named storages are never purged automatically and persist across runs. The exact behavior may vary depending on the storage backend implementation.
 
 ### When purging happens
 
@@ -232,7 +232,7 @@ Purge on start behavior just triggers the storage's `purge` method, which remove
     {CleaningPurgeExplicitlyExample}
 </RunnableCodeBlock>
 
-Note that purging behavior may vary between storage client implementations. For more details on storage configuration and client implementations, see the [Storage clients guide](./storage-clients).
+Note that purging behavior may vary between storage backend implementations. For more details on storage configuration and backend implementations, see the [Storage backends guide](./storage-backends).
 
 ## Conclusion
 

@@ -101,8 +101,8 @@ if TYPE_CHECKING:
     from crawlee.request_loaders import RequestManager
     from crawlee.sessions import Session
     from crawlee.statistics import FinalStatistics
-    from crawlee.storage_clients import StorageClient
-    from crawlee.storage_clients.models import DatasetItemsListPage
+    from crawlee.storage_backends import StorageBackend
+    from crawlee.storage_backends.models import DatasetItemsListPage
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, default=BasicCrawlingContext)
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
@@ -124,8 +124,8 @@ class _BasicCrawlerOptions(TypedDict):
     event_manager: NotRequired[EventManager]
     """The event manager for managing events for the crawler and all its components."""
 
-    storage_client: NotRequired[StorageClient]
-    """The storage client for managing storages for the crawler and all its components."""
+    storage_backend: NotRequired[StorageBackend]
+    """The storage backend for managing storages for the crawler and all its components."""
 
     request_manager: NotRequired[RequestManager]
     """Manager of requests that should be processed by the crawler."""
@@ -288,7 +288,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         *,
         configuration: Configuration | None = None,
         event_manager: EventManager | None = None,
-        storage_client: StorageClient | None = None,
+        storage_backend: StorageBackend | None = None,
         request_manager: RequestManager | None = None,
         session_pool: SessionPool | None = None,
         proxy_configuration: ProxyConfiguration | None = None,
@@ -324,7 +324,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Args:
             configuration: The `Configuration` instance. Some of its properties are used as defaults for the crawler.
             event_manager: The event manager for managing events for the crawler and all its components.
-            storage_client: The storage client for managing storages for the crawler and all its components.
+            storage_backend: The storage backend for managing storages for the crawler and all its components.
             request_manager: Manager of requests that should be processed by the crawler.
             session_pool: A custom `SessionPool` instance, allowing the use of non-default configuration.
             proxy_configuration: HTTP proxy configuration used when making requests.
@@ -393,14 +393,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         elif not event_manager:
             implicit_event_manager_with_explicit_config = True
 
-        if not storage_client:
-            storage_client = service_locator.get_storage_client()
+        if not storage_backend:
+            storage_backend = service_locator.get_storage_backend()
 
         if not event_manager:
             event_manager = service_locator.get_event_manager()
 
         self._service_locator = ServiceLocator(
-            configuration=configuration, storage_client=storage_client, event_manager=event_manager
+            configuration=configuration, storage_backend=storage_backend, event_manager=event_manager
         )
 
         config = self._service_locator.get_configuration()
@@ -651,7 +651,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if not self._request_manager:
             self._request_manager = await RequestQueue.open(
                 alias=self._default_rq_alias,
-                storage_client=self._service_locator.get_storage_client(),
+                storage_backend=self._service_locator.get_storage_backend(),
                 configuration=self._service_locator.get_configuration(),
             )
 
@@ -669,7 +669,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             id=id,
             name=name,
             alias=alias,
-            storage_client=self._service_locator.get_storage_client(),
+            storage_backend=self._service_locator.get_storage_backend(),
             configuration=self._service_locator.get_configuration(),
         )
 
@@ -685,7 +685,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             id=id,
             name=name,
             alias=alias,
-            storage_client=self._service_locator.get_storage_client(),
+            storage_backend=self._service_locator.get_storage_backend(),
             configuration=self._service_locator.get_configuration(),
         )
 
@@ -989,7 +989,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             id=dataset_id,
             name=dataset_name,
             alias=dataset_alias,
-            storage_client=self._service_locator.get_storage_client(),
+            storage_backend=self._service_locator.get_storage_backend(),
             configuration=self._service_locator.get_configuration(),
         )
         return await dataset.get_data(**kwargs)
@@ -1024,7 +1024,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             id=dataset_id,
             name=dataset_name,
             alias=dataset_alias,
-            storage_client=self._service_locator.get_storage_client(),
+            storage_backend=self._service_locator.get_storage_backend(),
             configuration=self._service_locator.get_configuration(),
         )
 
@@ -1452,7 +1452,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 id=rq_id,
                 name=rq_name,
                 alias=rq_alias,
-                storage_client=self._service_locator.get_storage_client(),
+                storage_backend=self._service_locator.get_storage_backend(),
                 configuration=self._service_locator.get_configuration(),
             )
         else:

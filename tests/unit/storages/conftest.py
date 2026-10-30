@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING
 import pytest
 
 from crawlee import service_locator
-from crawlee.storage_clients import (
-    FileSystemStorageClient,
-    MemoryStorageClient,
-    RedisStorageClient,
-    SqlStorageClient,
-    StorageClient,
+from crawlee.storage_backends import (
+    FileSystemStorageBackend,
+    MemoryStorageBackend,
+    RedisStorageBackend,
+    SqlStorageBackend,
+    StorageBackend,
 )
 
 if TYPE_CHECKING:
@@ -21,35 +21,35 @@ if TYPE_CHECKING:
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    """Skip the Redis request queue cases when `lupa` is missing, since the Redis RQ client runs Lua scripts."""
+    """Skip the Redis request queue cases when `lupa` is missing, since the Redis RQ backend runs Lua scripts."""
     if find_spec('lupa') is not None:
         return
     for item in items:
         callspec = getattr(item, 'callspec', None)
-        if item.path.name == 'test_request_queue.py' and callspec and callspec.params.get('storage_client') == 'redis':
+        if item.path.name == 'test_request_queue.py' and callspec and callspec.params.get('storage_backend') == 'redis':
             item.add_marker(pytest.mark.skip(reason='`lupa` is not installed'))
 
 
 @pytest.fixture(params=['memory', 'file_system', 'sql', 'redis'])
-async def storage_client(
+async def storage_backend(
     request: pytest.FixtureRequest,
     redis_client: FakeAsyncRedis,
-) -> AsyncGenerator[StorageClient, None]:
-    """Parameterized fixture to test with different storage clients."""
-    storage_client: StorageClient
+) -> AsyncGenerator[StorageBackend, None]:
+    """Parameterized fixture to test with different storage backends."""
+    storage_backend: StorageBackend
 
     storage_type = request.param
 
     if storage_type == 'memory':
-        storage_client = MemoryStorageClient()
+        storage_backend = MemoryStorageBackend()
     elif storage_type == 'sql':
-        storage_client = SqlStorageClient()
+        storage_backend = SqlStorageBackend()
     elif storage_type == 'redis':
-        storage_client = RedisStorageClient(redis=redis_client)
+        storage_backend = RedisStorageBackend(redis=redis_client)
     else:
-        storage_client = FileSystemStorageClient()
-    service_locator.set_storage_client(storage_client)
-    yield storage_client
+        storage_backend = FileSystemStorageBackend()
+    service_locator.set_storage_backend(storage_backend)
+    yield storage_backend
 
-    if isinstance(storage_client, SqlStorageClient):
-        await storage_client.close()
+    if isinstance(storage_backend, SqlStorageBackend):
+        await storage_backend.close()

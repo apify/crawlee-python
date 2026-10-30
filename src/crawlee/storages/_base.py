@@ -7,8 +7,8 @@ from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from crawlee.configuration import Configuration
-    from crawlee.storage_clients._base import StorageClient
-    from crawlee.storage_clients.models import DatasetMetadata, KeyValueStoreMetadata, RequestQueueMetadata
+    from crawlee.storage_backends._base import StorageBackend
+    from crawlee.storage_backends.models import DatasetMetadata, KeyValueStoreMetadata, RequestQueueMetadata
 
 
 @docs_group('Storages')
@@ -38,7 +38,7 @@ class Storage(ABC):
         name: str | None = None,
         alias: str | None = None,
         configuration: Configuration | None = None,
-        storage_client: StorageClient | None = None,
+        storage_backend: StorageBackend | None = None,
     ) -> Storage:
         """Open a storage, either restore existing or create a new one.
 
@@ -49,17 +49,17 @@ class Storage(ABC):
                 (e.g. "my-value-1").
             alias: The storage alias (run scope, creates unnamed storage).
             configuration: Configuration object used during the storage creation or restoration process.
-            storage_client: Underlying storage client to use. If not provided, the default global storage client
+            storage_backend: Underlying storage backend to use. If not provided, the default global storage backend
                 from the service locator will be used.
         """
 
     @abstractmethod
     async def drop(self) -> None:
-        """Drop the storage, removing it from the underlying storage client and clearing the cache."""
+        """Drop the storage, removing it from the underlying storage backend and clearing the cache."""
 
     @abstractmethod
     async def purge(self) -> None:
-        """Purge the storage, removing all items from the underlying storage client.
+        """Purge the storage, removing all items from the underlying storage backend.
 
         This method does not remove the storage itself, e.g. don't remove the metadata,
         but clears all items within it.
