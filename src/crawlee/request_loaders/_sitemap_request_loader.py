@@ -210,6 +210,12 @@ class SitemapRequestLoader(RequestLoader):
         return state.handled_count
 
     @override
+    async def get_pending_count(self) -> int:
+        """Return the number of URLs found so far that haven't been handled yet."""
+        state = await self._get_state()
+        return len(state.url_queue) + len(state.in_progress)
+
+    @override
     async def check_readiness(self) -> RequestLoaderStatus:
         state = await self._get_state()
         if state.url_queue:

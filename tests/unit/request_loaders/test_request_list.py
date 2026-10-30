@@ -36,6 +36,19 @@ async def test_async_traversal() -> None:
     assert await request_list.get_handled_count() == 3
 
 
+async def test_pending_count_counts_fetched() -> None:
+    """Test that the pending count covers only the fetched requests not handled yet, since the source is lazy."""
+    request_list = RequestList(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
+
+    first = await request_list.fetch_next_request()
+    second = await request_list.fetch_next_request()
+    assert first is not None
+    assert second is not None
+    await request_list.mark_request_as_handled(first)
+
+    assert await request_list.get_pending_count() == 1
+
+
 async def test_readiness_during_traversal() -> None:
     """Test that the list waits for fetched requests and finishes once they're all handled."""
     request_list = RequestList(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
