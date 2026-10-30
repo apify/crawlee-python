@@ -122,8 +122,7 @@ class Configuration(BaseSettings):
             le=1.0,
         ),
     ] = 0.95
-    """The maximum CPU usage ratio. If the CPU usage exceeds this value, the system is considered overloaded.
-    This option is used by the `Snapshotter`."""
+    """The CPU usage ratio above which a snapshot of the `CpuLoadSignal` counts as overloaded."""
 
     max_used_memory_ratio: Annotated[
         float,
@@ -136,8 +135,7 @@ class Configuration(BaseSettings):
             le=1.0,
         ),
     ] = 0.9
-    """The maximum memory usage ratio. If the memory usage exceeds this ratio, it is considered overloaded.
-    This option is used by the `Snapshotter`."""
+    """The share of the memory budget above which a snapshot of the `MemoryLoadSignal` counts as overloaded."""
 
     max_event_loop_delay: Annotated[
         timedelta_ms,
@@ -148,8 +146,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = timedelta(milliseconds=50)
-    """The maximum event loop delay. If the event loop delay exceeds this value, it is considered overloaded.
-    This option is used by the `Snapshotter`."""
+    """The event loop delay above which a snapshot of the `EventLoopLoadSignal` counts as overloaded."""
 
     max_client_errors: Annotated[
         int,
@@ -159,9 +156,9 @@ class Configuration(BaseSettings):
                 'crawlee_max_client_errors',
             )
         ),
-    ] = 1
-    """The maximum number of client errors (HTTP 429) allowed before the system is considered overloaded.
-    This option is used by the `Snapshotter`."""
+    ] = 3
+    """The number of new rate-limit errors (HTTP 429) between two snapshots of the `StorageClientLoadSignal` above
+    which the later snapshot counts as overloaded."""
 
     memory_mbytes: Annotated[
         int | None,
@@ -173,7 +170,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = None
-    """The maximum used memory in megabytes. This option is utilized by the `Snapshotter`."""
+    """The maximum used memory in megabytes. This option is utilized by the `MemoryLoadSignal`."""
 
     available_memory_ratio: Annotated[
         float,
@@ -188,7 +185,7 @@ class Configuration(BaseSettings):
     ] = 0.25
     """The maximum proportion of the memory available to this process to use, which is the memory limit where one
     applies. If `memory_mbytes` is not provided, this ratio is used to calculate the maximum memory. This option is
-    utilized by the `Snapshotter` and supports the dynamic system memory scaling."""
+    utilized by the `MemoryLoadSignal` and supports the dynamic system memory scaling."""
 
     storage_dir: Annotated[
         str,

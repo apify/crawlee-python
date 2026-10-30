@@ -1,18 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Annotated, Protocol
+from datetime import UTC, datetime
+from typing import Annotated, Protocol
 
 from pydantic import Field
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 from crawlee._utils.docs import docs_group
-
-if TYPE_CHECKING:
-    from crawlee._utils.byte_size import ByteSize
-
-SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD = 0.97
 
 
 @dataclass
@@ -21,11 +16,10 @@ class LoadRatioInfo:
     """Represent the load ratio of a resource."""
 
     limit_ratio: float
-    """The maximum ratio of overloaded and non-overloaded samples. If the actual ratio exceeds this value,
-    the resource is considered as overloaded."""
+    """The share of the sample window the resource may spend overloaded. Above it, the resource counts as overloaded."""
 
     actual_ratio: float
-    """The actual ratio of overloaded and non-overloaded samples."""
+    """The share of the sample window the resource spent overloaded, weighted by the time between snapshots."""
 
     @property
     def is_overloaded(self) -> bool:
@@ -36,7 +30,10 @@ class LoadRatioInfo:
 @dataclass
 @docs_group('Autoscaling')
 class SystemInfo:
-    """Represent the current status of the system."""
+    """Represent the current status of the system.
+
+    A built-in load signal that was switched off is reported with zero ratios, so it never counts as overloaded.
+    """
 
     cpu_info: LoadRatioInfo
     """The CPU load ratio."""
@@ -47,8 +44,12 @@ class SystemInfo:
     event_loop_info: LoadRatioInfo
     """The event loop load ratio."""
 
-    client_info: LoadRatioInfo
-    """The client load ratio."""
+    storage_client_info: LoadRatioInfo
+    """The storage client load ratio."""
+
+    load_signal_info: dict[str, LoadRatioInfo] = field(default_factory=dict)
+    """The load ratios of the custom load signals, keyed by signal name. A custom signal named after a built-in one
+    is reported in that built-in field instead."""
 
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     """The time at which the system load information was measured."""
@@ -60,124 +61,26 @@ class SystemInfo:
             not self.cpu_info.is_overloaded
             and not self.memory_info.is_overloaded
             and not self.event_loop_info.is_overloaded
-            and not self.client_info.is_overloaded
+            and not self.storage_client_info.is_overloaded
+            and not any(info.is_overloaded for info in self.load_signal_info.values())
         )
 
     def __str__(self) -> str:
         """Name the overloaded resources with the share of time each spent over its threshold, against its limit."""
-        resources = {
-            'cpu': self.cpu_info,
-            'memory': self.memory_info,
-            'event loop': self.event_loop_info,
-            'client': self.client_info,
-        }
+        # A list, so that a custom signal named like a built-in resource cannot hide it.
+        resources = [
+            ('cpu', self.cpu_info),
+            ('memory', self.memory_info),
+            ('event loop', self.event_loop_info),
+            ('storage client', self.storage_client_info),
+            *self.load_signal_info.items(),
+        ]
         overloaded = [
             f'{name} {info.actual_ratio:.0%} of the time (limit {info.limit_ratio:.0%})'
-            for name, info in resources.items()
+            for name, info in resources
             if info.is_overloaded
         ]
         return f'overloaded: {", ".join(overloaded)}' if overloaded else 'system idle'
-
-
-@dataclass
-class CpuSnapshot:
-    """A snapshot of CPU usage."""
-
-    used_ratio: float
-    """The ratio of CPU currently in use."""
-
-    max_used_ratio: float
-    """The maximum ratio of CPU that is considered acceptable."""
-
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    """The time at which the system load information was measured."""
-
-    @property
-    def is_overloaded(self) -> bool:
-        """Indicate whether the CPU is considered as overloaded."""
-        return self.used_ratio > self.max_used_ratio
-
-
-@dataclass
-class MemorySnapshot:
-    """A snapshot of memory usage."""
-
-    current_size: ByteSize
-    """Memory usage of the current Python process and its children."""
-
-    system_wide_used_size: ByteSize | None
-    """Memory usage of all processes, within the scope `system_wide_memory_size` covers."""
-
-    max_memory_size: ByteSize
-    """The maximum memory that can be used by the crawlers this snapshot is measured for."""
-
-    system_wide_memory_size: ByteSize | None
-    """Total memory available to this process, which is the memory limit where one applies."""
-
-    max_used_memory_ratio: float
-    """The maximum acceptable ratio of `current_size` to `max_memory_size`."""
-
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    """The time at which the system load information was measured."""
-
-    @property
-    def is_overloaded(self) -> bool:
-        """Indicate whether the memory is considered as overloaded."""
-        if self.system_wide_memory_size is not None and self.system_wide_used_size is not None:
-            system_wide_utilization = self.system_wide_used_size / self.system_wide_memory_size
-            if system_wide_utilization > SYSTEM_WIDE_MEMORY_OVERLOAD_THRESHOLD:
-                return True
-
-        return (self.current_size / self.max_memory_size) > self.max_used_memory_ratio
-
-
-@dataclass
-class EventLoopSnapshot:
-    """Snapshot of the state of the event loop."""
-
-    delay: timedelta
-    """The current delay of the event loop."""
-
-    max_delay: timedelta
-    """The maximum delay that is considered acceptable."""
-
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    """The time at which the system load information was measured."""
-
-    @property
-    def max_delay_exceeded(self) -> timedelta:
-        """The amount of time by which the delay exceeds the maximum delay."""
-        return max(self.delay - self.max_delay, timedelta(seconds=0))
-
-    @property
-    def is_overloaded(self) -> bool:
-        """Indicate whether the event loop is considered as overloaded."""
-        return self.delay > self.max_delay
-
-
-@dataclass
-class ClientSnapshot:
-    """Snapshot of the state of the client."""
-
-    error_count: int
-    """The number of errors (HTTP 429) that occurred."""
-
-    new_error_count: int
-    """The number of new errors (HTTP 429) that occurred since the last snapshot."""
-
-    max_error_count: int
-    """The maximum number of errors that is considered acceptable."""
-
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    """The time at which the system load information was measured."""
-
-    @property
-    def is_overloaded(self) -> bool:
-        """Indicate whether the client is considered as overloaded."""
-        return self.new_error_count > self.max_error_count
-
-
-Snapshot = MemorySnapshot | CpuSnapshot | EventLoopSnapshot | ClientSnapshot
 
 
 @pydantic_dataclass

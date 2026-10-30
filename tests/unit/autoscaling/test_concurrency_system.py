@@ -7,7 +7,7 @@ import logging
 from contextlib import suppress
 from datetime import timedelta
 from typing import TYPE_CHECKING, TypeVar, cast
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, call, patch
 
 import pytest
 
@@ -17,15 +17,17 @@ from crawlee.autoscaling import (
     ConcurrencyConsumer,
     ConcurrencySystem,
     LoadRatioInfo,
+    LoadSignalsOptions,
+    LoadSignalStartContext,
+    LoadSnapshot,
     SystemInfo,
 )
-from crawlee.autoscaling._snapshotter import Snapshotter
+from crawlee.autoscaling._load_signal import LoadSignal
 from crawlee.configuration import Configuration
 from tests.unit.utils import poll_until_condition
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
-    from unittest.mock import Mock
 
 
 T = TypeVar('T')
@@ -46,8 +48,22 @@ def system_info(*, overloaded: bool = False) -> SystemInfo:
         cpu_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
         memory_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=1.0 if overloaded else 0.3),
         event_loop_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
-        client_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
+        storage_client_info=LoadRatioInfo(limit_ratio=0.9, actual_ratio=0.3),
     )
+
+
+def load_signal(name: str) -> Mock:
+    """Build a custom load signal that reports an idle resource."""
+    signal = Mock(spec=LoadSignal)
+    signal.name = name
+    signal.overloaded_ratio = 0.5
+    signal.get_sample.return_value = []
+    return signal
+
+
+def only_custom_signals(*signals: LoadSignal) -> LoadSignalsOptions:
+    """Switch the built-in signals off, leaving only `signals` to watch."""
+    return LoadSignalsOptions(memory=False, event_loop=False, cpu=False, storage_client=False, custom=signals)
 
 
 @pytest.mark.parametrize(
@@ -55,7 +71,8 @@ def system_info(*, overloaded: bool = False) -> SystemInfo:
     [
         pytest.param({'autoscale_interval': timedelta(0)}, 'autoscale_interval must be positive', id='autoscale'),
         pytest.param({'logging_interval': timedelta(0)}, 'logging_interval must be positive', id='logging'),
-        pytest.param({'max_snapshot_age': timedelta(0)}, 'max_snapshot_age must be positive', id='snapshot_age'),
+        pytest.param({'snapshot_history': timedelta(0)}, 'snapshot_history must be positive', id='snapshot_history'),
+        pytest.param({'current_history': timedelta(0)}, 'current_history must be positive', id='current_history'),
         pytest.param({'desired_concurrency_ratio': 0}, 'desired_concurrency_ratio must be between', id='desired'),
         pytest.param({'desired_concurrency_ratio': 1}, 'desired_concurrency_ratio must be between', id='desired_one'),
         pytest.param({'scale_up_step_ratio': 0}, 'scale_up_step_ratio must be between', id='scale_up'),
@@ -70,17 +87,98 @@ def test_rejects_invalid_options(kwargs: dict, error: str) -> None:
 
 
 def test_configures_load_measurement() -> None:
-    """The snapshot window and the configuration reach the components that measure the load."""
+    """The signal options, the windows and the configuration reach the components that measure the load."""
     configuration = Configuration()
+    custom_signal = load_signal('proxy_health')
+    load_signals = LoadSignalsOptions(cpu=False, custom=[custom_signal])
 
     with (
-        patch.object(Snapshotter, 'from_config') as from_config,
+        patch('crawlee.autoscaling._concurrency_system.Snapshotter') as snapshotter_class,
         patch('crawlee.autoscaling._concurrency_system.SystemStatus') as system_status_class,
     ):
-        ConcurrencySystem(max_snapshot_age=timedelta(seconds=2), configuration=configuration)
+        ConcurrencySystem(
+            load_signals=load_signals,
+            current_history=timedelta(seconds=2),
+            snapshot_history=timedelta(seconds=20),
+            configuration=configuration,
+        )
 
-    assert from_config.call_args.args == (configuration,)
-    assert system_status_class.call_args.kwargs['max_snapshot_age'] == timedelta(seconds=2)
+    assert snapshotter_class.call_args == call(
+        load_signals,
+        max_sample_window=timedelta(seconds=20),
+        configuration=configuration,
+    )
+    assert system_status_class.call_args.kwargs == {
+        'current_history': timedelta(seconds=2),
+        'snapshot_history': timedelta(seconds=20),
+    }
+
+
+@pytest.mark.parametrize(
+    ('load_signals', 'error'),
+    [
+        pytest.param(
+            LoadSignalsOptions(custom=[load_signal('cpu_info')]),
+            r"Duplicate load signal name 'cpu_info': .* `LoadSignalsOptions\(cpu=False\)`",
+            id='builtin',
+        ),
+        pytest.param(
+            LoadSignalsOptions(custom=[load_signal('proxy_health'), load_signal('proxy_health')]),
+            "Duplicate load signal name 'proxy_health': two custom signals cannot share a name",
+            id='custom',
+        ),
+    ],
+)
+def test_rejects_duplicate_signal_names(load_signals: LoadSignalsOptions, error: str) -> None:
+    """Signal names key the reported status, so two signals cannot share one."""
+    with pytest.raises(ValueError, match=error):
+        ConcurrencySystem(load_signals=load_signals)
+
+
+async def test_custom_signal_lifecycle() -> None:
+    """Custom signals start with the widest window and the system's configuration, and stop with the system."""
+    signal = load_signal('proxy_health')
+    configuration = Configuration()
+    concurrency_system = ConcurrencySystem(
+        load_signals=only_custom_signals(signal),
+        current_history=timedelta(seconds=40),
+        configuration=configuration,
+    )
+
+    async with concurrency_system:
+        context = LoadSignalStartContext(max_sample_window=timedelta(seconds=40), configuration=configuration)
+        signal.start.assert_awaited_once_with(context)
+        signal.stop.assert_not_awaited()
+
+    signal.stop.assert_awaited_once()
+
+
+async def test_failed_signal_start_rolls_back() -> None:
+    """A signal that fails to start is stopped along with the ones started before it, and the system stays inactive."""
+    started_signal = load_signal('first')
+    failing_signal = load_signal('second')
+    failing_signal.start.side_effect = RuntimeError('Signal failure')
+    concurrency_system = ConcurrencySystem(load_signals=only_custom_signals(started_signal, failing_signal))
+
+    with pytest.raises(RuntimeError, match='Signal failure'):
+        await concurrency_system.__aenter__()
+
+    assert not concurrency_system.active
+    started_signal.stop.assert_awaited_once()
+    failing_signal.stop.assert_awaited_once()
+
+
+async def test_custom_signal_overload_holds_tasks() -> None:
+    """An overloaded custom signal counts as an overloaded system."""
+    signal = load_signal('proxy_health')
+    signal.get_sample.return_value = [LoadSnapshot(is_overloaded=True)]
+    settings = ConcurrencySettings(min_concurrency=1, desired_concurrency=2, max_concurrency=2)
+
+    async with ConcurrencySystem(settings, load_signals=only_custom_signals(signal)) as concurrency_system:
+        # Below the minimum, a task starts regardless of the load.
+        assert concurrency_system.try_register_task_start(CONSUMER, '1')
+        assert not concurrency_system.has_capacity_for_task(CONSUMER)
+        assert concurrency_system.get_current_status().load_signal_info['proxy_health'].is_overloaded
 
 
 async def test_cannot_be_entered_twice(make_concurrency_system: type[ConcurrencySystem]) -> None:
