@@ -14,9 +14,9 @@ async def main() -> None:
     # been read yet.
     crawler = FileDownloadCrawler(
         stream=True,
-        # Bounds establishing the connection and receiving the response headers.
+        # Bounds the whole download: the connection, the response headers and the body.
         navigation_timeout=timedelta(minutes=5),
-        # The body is downloaded inside the handler, so this bounds the transfer itself.
+        # The body is downloaded inside the handler, so this bounds the transfer as well.
         request_handler_timeout=timedelta(minutes=5),
         # Limit the crawl to max requests. Remove or increase it for crawling all links.
         max_requests_per_crawl=10,

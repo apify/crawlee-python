@@ -132,10 +132,10 @@ An HTTP client performs network calls for crawlers. Swapping it changes the tran
 
 The contract is <ApiLink to="class/HttpClient">`HttpClient`</ApiLink>:
 
-- `crawl` performs a request inside the crawler's pipeline and returns the result the crawler consumes.
-- `send_request` covers standalone calls made from a handler.
-- `stream` yields a response you read incrementally.
+- `_fetch` sends a single request and returns the response with its body still unread. It doesn't follow redirects or keep cookies.
 - `cleanup` releases whatever the client holds open.
+
+The base class builds `send_request` on top of `_fetch`. The crawler's pipeline and the handlers both call it. It follows redirects and sends and stores the session cookies, so every client handles them the same way.
 
 Crawlee ships <ApiLink to="class/ImpitHttpClient">`ImpitHttpClient`</ApiLink>, <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink>, and <ApiLink to="class/CurlImpersonateHttpClient">`CurlImpersonateHttpClient`</ApiLink>.
 
