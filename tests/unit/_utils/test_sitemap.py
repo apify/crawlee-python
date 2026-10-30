@@ -1,7 +1,6 @@
 import base64
 import gzip
 import logging
-from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -11,6 +10,7 @@ import pytest
 from yarl import URL
 
 from crawlee._utils.sitemap import (
+    COMMON_SITEMAP_PATHS,
     DEFAULT_MAX_DEPTH,
     ParseSitemapOptions,
     Sitemap,
@@ -31,7 +31,7 @@ from tests.unit.utils import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, AsyncIterator, Callable
+    from collections.abc import AsyncIterator, Callable
 
 
 def _make_mock_client(url_map: dict[str, tuple[int, bytes]]) -> AsyncMock:
@@ -52,11 +52,10 @@ def _make_mock_client(url_map: dict[str, tuple[int, bytes]]) -> AsyncMock:
 
 
 def _make_flaky_stream_client(body: bytes, *, fail_times: int) -> tuple[AsyncMock, list[int]]:
-    """Create a mock client whose `stream` fails with a network error for the first `fail_times` calls."""
+    """Create a mock client whose `send_request` fails with a network error for the first `fail_times` calls."""
     attempts: list[int] = []
 
-    @asynccontextmanager
-    async def stream(_url: str, **_kwargs: Any) -> 'AsyncGenerator[HttpResponse]':
+    async def send_request(_url: str, **_kwargs: Any) -> HttpResponse:
         attempt = len(attempts) + 1
         attempts.append(attempt)
         if attempt <= fail_times:
@@ -69,19 +68,18 @@ def _make_flaky_stream_client(body: bytes, *, fail_times: int) -> tuple[AsyncMoc
         response.status_code = 200
         response.headers = {'content-type': 'application/xml; charset=utf-8'}
         response.read_stream = read_stream
-        yield cast('HttpResponse', response)
+        return cast('HttpResponse', response)
 
     client = AsyncMock(spec=HttpClient)
-    client.stream = stream
+    client.send_request.side_effect = send_request
     return client, attempts
 
 
 def _make_stream_client(body_for_url: 'Callable[[str], bytes]') -> tuple[AsyncMock, list[str]]:
-    """Create a mock client whose `stream` serves `body_for_url(url)` in a single chunk and records fetched URLs."""
+    """Create a mock client whose `send_request` serves `body_for_url(url)` in one chunk and records fetched URLs."""
     fetched: list[str] = []
 
-    @asynccontextmanager
-    async def stream(url: str, **_kwargs: Any) -> 'AsyncGenerator[HttpResponse]':
+    async def send_request(url: str, **_kwargs: Any) -> HttpResponse:
         fetched.append(url)
 
         async def read_stream() -> 'AsyncIterator[bytes]':
@@ -91,10 +89,10 @@ def _make_stream_client(body_for_url: 'Callable[[str], bytes]') -> tuple[AsyncMo
         response.status_code = 200
         response.headers = {'content-type': 'application/xml; charset=utf-8'}
         response.read_stream = read_stream
-        yield cast('HttpResponse', response)
+        return cast('HttpResponse', response)
 
     client = AsyncMock(spec=HttpClient)
-    client.stream = stream
+    client.send_request.side_effect = send_request
     return client, fetched
 
 
@@ -598,8 +596,7 @@ async def test_gzip_sitemap_stops_reading_after_member_end() -> None:
     member = compress_gzip(get_basic_sitemap())
     chunks_read = 0
 
-    @asynccontextmanager
-    async def stream(_url: str, **_kwargs: Any) -> 'AsyncGenerator[HttpResponse]':
+    async def send_request(_url: str, **_kwargs: Any) -> HttpResponse:
         async def read_stream() -> 'AsyncIterator[bytes]':
             nonlocal chunks_read
             chunks_read += 1
@@ -613,10 +610,10 @@ async def test_gzip_sitemap_stops_reading_after_member_end() -> None:
         response.status_code = 200
         response.headers = {'content-type': 'application/gzip'}
         response.read_stream = read_stream
-        yield cast('HttpResponse', response)
+        return cast('HttpResponse', response)
 
     client = AsyncMock(spec=HttpClient)
-    client.stream = stream
+    client.send_request.side_effect = send_request
 
     items = [item async for item in parse_sitemap([{'type': 'url', 'url': f'{DEFAULT_URL}sitemap.xml.gz'}], client)]
 
@@ -630,8 +627,7 @@ async def test_gzip_text_sitemap_parsed_by_extension_when_served_as_gzip() -> No
     urls = {f'{DEFAULT_URL}page-{i}' for i in range(3)}
     body = compress_gzip('\n'.join(urls))
 
-    @asynccontextmanager
-    async def stream(_url: str, **_kwargs: Any) -> 'AsyncGenerator[HttpResponse]':
+    async def send_request(_url: str, **_kwargs: Any) -> HttpResponse:
         async def read_stream() -> 'AsyncIterator[bytes]':
             yield body
 
@@ -639,14 +635,39 @@ async def test_gzip_text_sitemap_parsed_by_extension_when_served_as_gzip() -> No
         response.status_code = 200
         response.headers = {'content-type': 'application/gzip'}
         response.read_stream = read_stream
-        yield cast('HttpResponse', response)
+        return cast('HttpResponse', response)
 
     client = AsyncMock(spec=HttpClient)
-    client.stream = stream
+    client.send_request.side_effect = send_request
 
     items = [item async for item in parse_sitemap([{'type': 'url', 'url': f'{DEFAULT_URL}sitemap.txt.gz'}], client)]
 
     assert {item.loc for item in items} == urls
+
+
+@pytest.mark.parametrize(
+    'status_code',
+    [
+        pytest.param(200, id='parsed'),
+        pytest.param(404, id='skipped'),
+    ],
+)
+async def test_sitemap_response_closed(status_code: int) -> None:
+    """Test that the response of a sitemap is closed, also when its status code skips reading the body."""
+
+    async def read_stream() -> 'AsyncIterator[bytes]':
+        yield get_basic_sitemap().encode()
+
+    response = MagicMock(spec=HttpResponse)
+    response.status_code = status_code
+    response.headers = {'content-type': 'application/xml; charset=utf-8'}
+    response.read_stream = read_stream
+    client = AsyncMock(spec=HttpClient)
+    client.send_request.return_value = response
+
+    [item async for item in parse_sitemap([{'type': 'url', 'url': f'{DEFAULT_URL}sitemap.xml'}], client)]
+
+    response.__aexit__.assert_awaited_once()
 
 
 async def test_nested_sitemaps_followed_only_to_default_max_depth() -> None:
@@ -860,6 +881,20 @@ async def test_discover_sitemap_url_without_host_skipped() -> None:
     urls = [url async for url in discover_valid_sitemaps(['not-a-valid-url'], http_client=http_client)]
 
     assert urls == []
+
+
+async def test_discover_closes_checked_responses() -> None:
+    """Test that sitemap discovery closes the response of every common path it checks."""
+    response = MagicMock(spec=HttpResponse)
+    response.status_code = 404
+    http_client = AsyncMock(spec=HttpClient)
+    http_client.send_request.return_value = response
+
+    urls = [url async for url in discover_valid_sitemaps(['http://example.com/page'], http_client=http_client)]
+
+    assert urls == []
+    # The robots.txt request gets the same response, which it closes with `async with` instead of `aclose`.
+    assert response.aclose.await_count == len(COMMON_SITEMAP_PATHS)
 
 
 async def test_raw_sitemap_index_processes_nested_sitemaps() -> None:

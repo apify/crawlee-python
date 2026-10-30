@@ -123,6 +123,7 @@ class AbstractHttpCrawler(
             .compose(self._make_http_request)
             .compose(self._execute_post_navigation_hooks)
             .compose(self._handle_status_code_response)
+            .compose(self._read_http_response)
             .compose(self._parse_http_response)
             .compose(self._handle_blocked_request_by_content)
         )
@@ -280,16 +281,30 @@ class AbstractHttpCrawler(
             The original crawling context enhanced by HTTP response.
         """
         async with self._shared_navigation_timeouts[id(context.request)] as remaining_timeout:
-            result = await self._http_client.crawl(
-                request=context.request,
+            response = await self._http_client.send_request(
+                context.request.url,
+                method=context.request.method,
+                headers=context.request.headers,
+                payload=context.request.payload,
                 session=context.session,
                 proxy_info=context.proxy_info,
-                statistics=self._statistics,
                 timeout=remaining_timeout,
             )
 
-        context.request.state = RequestState.AFTER_NAV
-        yield HttpCrawlingContext.from_basic_crawling_context(context=context, http_response=result.http_response)
+        try:
+            self._statistics.register_status_code(response.status_code)
+            context.request.loaded_url = response.url
+            context.request.state = RequestState.AFTER_NAV
+            yield HttpCrawlingContext.from_basic_crawling_context(context=context, http_response=response)
+        finally:
+            await response.aclose()
+
+    async def _read_http_response(self, context: HttpCrawlingContext) -> AsyncGenerator[HttpCrawlingContext, None]:
+        """Read the body of the HTTP response within the navigation timeout."""
+        async with self._shared_navigation_timeouts[id(context.request)]:
+            await context.http_response.read()
+
+        yield context
 
     async def _handle_status_code_response(
         self, context: HttpCrawlingContext
