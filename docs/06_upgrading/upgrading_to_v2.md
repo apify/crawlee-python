@@ -15,7 +15,11 @@ We drop support for Python 3.10, which reached its end of life in October 2026. 
 
 ## `StatisticsState.crawler_runtime` is read-only
 
-`StatisticsState.crawler_runtime` is computed from the crawler's start and finish timestamps. In v1, assigning to it only emitted a `DeprecationWarning` and the value was ignored. In v2, the property has no setter, so an assignment raises `AttributeError`. Remove any such assignments.
+`StatisticsState.crawler_runtime` is computed from the runtime accumulated by previous runs and the start timestamp of the run in progress. In v1, assigning to it only emitted a `DeprecationWarning` and the value was ignored. In v2, the property has no setter, so an assignment raises `AttributeError`. Remove any such assignments.
+
+## `StatisticsState.crawler_runtime_for_serialization` is removed
+
+`StatisticsState.crawler_runtime_for_serialization` is removed, and the persisted `crawlerRuntimeMillis` value is a number of milliseconds instead of an ISO 8601 duration string. Read the runtime from the `crawler_runtime` property instead. Statistics persisted by v1 are still restored.
 
 ## `RequestQueueClient.is_finished` is abstract
 
