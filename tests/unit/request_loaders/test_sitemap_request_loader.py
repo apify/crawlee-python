@@ -231,6 +231,23 @@ async def test_fetch_none_while_in_progress(server_url: URL, http_client: HttpCl
     assert (await sitemap_loader.check_readiness()).status == 'waiting'
 
 
+async def test_pending_count_during_traversal(server_url: URL, http_client: HttpClient) -> None:
+    """Test that the pending count covers the queued URLs and the ones in progress."""
+    sitemap_url = (server_url / 'sitemap.xml').with_query(
+        base64=encode_base64(get_basic_sitemap(url=server_url).encode())
+    )
+    sitemap_loader = SitemapRequestLoader([str(sitemap_url)], http_client=http_client, enqueue_strategy='all')
+
+    first = await sitemap_loader.fetch_next_request()
+    second = await sitemap_loader.fetch_next_request()
+    assert first is not None
+    assert second is not None
+    await sitemap_loader.mark_request_as_handled(first)
+
+    assert await poll_until_condition(sitemap_loader.get_total_count, lambda count: count == 5) == 5
+    assert await sitemap_loader.get_pending_count() == 4
+
+
 async def test_abort_sitemap_loading(server_url: URL, http_client: HttpClient) -> None:
     sitemap_url = (server_url / 'sitemap.xml').with_query(
         base64=encode_base64(get_basic_sitemap(url=server_url).encode())

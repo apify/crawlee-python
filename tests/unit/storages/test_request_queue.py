@@ -628,6 +628,17 @@ async def test_add_requests_wait_for_all(
     assert await rq.get_total_count() == 15
 
 
+async def test_get_pending_count(rq: RequestQueue) -> None:
+    """Test that the pending count leaves out the handled requests."""
+    await rq.add_requests(['https://example.com/1', 'https://example.com/2', 'https://example.com/3'])
+
+    request = await rq.fetch_next_request()
+    assert request is not None
+    await rq.mark_request_as_handled(request)
+
+    assert await rq.get_pending_count() == 2
+
+
 async def test_mark_non_existent_request_as_handled(rq: RequestQueue) -> None:
     """Test marking a non-existent request as handled."""
     # Create a request that hasn't been added to the queue

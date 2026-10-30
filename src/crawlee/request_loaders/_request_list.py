@@ -160,6 +160,11 @@ class RequestList(RequestLoader):
         return self._assumed_total_count
 
     @override
+    async def get_pending_count(self) -> int:
+        # The source is read lazily, so like the total count, this leaves out the requests not fetched yet.
+        return self._assumed_total_count - self._handled_count
+
+    @override
     async def check_readiness(self) -> RequestLoaderStatus:
         await self._ensure_next_request()
         if self._next[0] is not None:

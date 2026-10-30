@@ -117,6 +117,11 @@ class RequestQueue(Storage, RequestManager):
         return metadata.total_request_count
 
     @override
+    async def get_pending_count(self) -> int:
+        metadata = await self._client.get_metadata()
+        return metadata.total_request_count - metadata.handled_request_count
+
+    @override
     @classmethod
     async def open(
         cls,
