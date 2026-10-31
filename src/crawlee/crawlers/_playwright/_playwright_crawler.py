@@ -488,8 +488,21 @@ class PlaywrightCrawler(
 
                 requests.append(request)
 
+            skipped_requests = list[Request]()
+
+            for url in skipped:
+                try:
+                    skipped_request = Request.from_url(
+                        url=url, user_data={**base_user_data}, label=label, enqueue_strategy=strategy
+                    )
+                except ValidationError as exc:
+                    context.log.debug(f'Skipping URL "{url}" disallowed by robots.txt due to invalid format: {exc}.')
+                    continue
+
+                skipped_requests.append(skipped_request)
+
             skipped_tasks = [
-                asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped
+                asyncio.create_task(self._handle_skipped_request(request, 'robots_txt')) for request in skipped_requests
             ]
             await asyncio.gather(*skipped_tasks)
 

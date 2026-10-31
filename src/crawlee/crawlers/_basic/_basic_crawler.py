@@ -113,7 +113,7 @@ T = TypeVar('T')
 
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Request | None]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
-SkippedRequestCallback = Callable[[str, SkippedReason], Awaitable[None]]
+SkippedRequestCallback = Callable[[Request, SkippedReason], Awaitable[None]]
 
 
 class _BasicCrawlerOptions(TypedDict):
@@ -713,7 +713,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     def on_skipped_request(self, callback: SkippedRequestCallback) -> SkippedRequestCallback:
         """Register a function to handle skipped requests.
 
-        The skipped request handler is invoked when a request is skipped due to a collision or other reasons.
+        The skipped request handler is invoked when a request is skipped due to a collision or other reasons. It
+        receives the skipped `Request`, including its `user_data` and `label`, and the reason it was skipped.
         """
         self._on_skipped_request = callback
         return callback
@@ -926,14 +927,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added.
         """
         allowed_requests = []
-        skipped = []
+        skipped = list[Request]()
 
         for request in requests:
             check_url = request.url if isinstance(request, Request) else request
             if await self._is_allowed_based_on_robots_txt_file(check_url):
                 allowed_requests.append(request)
-            else:
+            elif isinstance(request, Request):
                 skipped.append(request)
+            else:
+                skipped.append(Request.from_url(request))
 
         if skipped:
             skipped_tasks = [
@@ -1358,17 +1361,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined failed request handler') from e
 
     async def _handle_skipped_request(
-        self, request: Request | str, reason: SkippedReason, *, need_mark: bool = False
+        self, request: Request, reason: SkippedReason, *, need_mark: bool = False
     ) -> None:
-        if need_mark and isinstance(request, Request):
+        if need_mark:
             request.state = RequestState.SKIPPED
             await self._mark_request_as_handled(request)
 
-        url = request.url if isinstance(request, Request) else request
-
         if self._on_skipped_request:
             try:
-                await self._on_skipped_request(url, reason)
+                await self._on_skipped_request(request, reason)
             except Exception as e:
                 raise UserDefinedErrorHandlerError('Exception thrown in user-defined skipped request callback') from e
 

@@ -2360,6 +2360,53 @@ async def test_handles_session_error_in_failed_request_handler() -> None:
     assert set(requests) == handler_requests
 
 
+@pytest.mark.parametrize(
+    'skipped_at',
+    [
+        pytest.param('add_requests', id='skipped when added'),
+        pytest.param('fetch', id='skipped when fetched from RQ'),
+    ],
+)
+async def test_on_skipped_request_receives_request(
+    server_url: URL, skipped_at: Literal['add_requests', 'fetch']
+) -> None:
+    """A request disallowed by robots.txt reaches the skipped request callback with its user data."""
+    queue = await RequestQueue.open()
+    crawler = BasicCrawler(request_manager=queue, respect_robots_txt_file=True, request_handler=AsyncMock())
+    skipped_hook = AsyncMock()
+    crawler.on_skipped_request(skipped_hook)
+    request = Request.from_url(str(server_url / 'page_1'), user_data={'source': 'test'})
+
+    if skipped_at == 'add_requests':
+        await crawler.add_requests([request])
+    else:
+        await queue.add_request(request)
+        await crawler.run()
+
+    skipped_hook.assert_awaited_once()
+    skipped_request, reason = skipped_hook.call_args.args
+    assert isinstance(skipped_request, Request)
+    assert skipped_request.url == request.url
+    assert skipped_request.user_data['source'] == 'test'
+    assert reason == 'robots_txt'
+
+
+async def test_on_skipped_request_receives_request_for_url_string(server_url: URL) -> None:
+    """A URL string passed to `add_requests` and disallowed by robots.txt reaches the callback as a `Request`."""
+    crawler = BasicCrawler(respect_robots_txt_file=True)
+    skipped_hook = AsyncMock()
+    crawler.on_skipped_request(skipped_hook)
+    url = str(server_url / 'page_1')
+
+    await crawler.add_requests([url])
+
+    skipped_hook.assert_awaited_once()
+    skipped_request, reason = skipped_hook.call_args.args
+    assert isinstance(skipped_request, Request)
+    assert skipped_request.url == url
+    assert reason == 'robots_txt'
+
+
 async def test_lock_with_get_robots_txt_file_for_url(server_url: URL) -> None:
     crawler = BasicCrawler(respect_robots_txt_file=True)
 
