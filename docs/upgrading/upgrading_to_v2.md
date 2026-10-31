@@ -135,6 +135,12 @@ The storage backends now write their JSON data with camelCase keys, the same as 
 
 Data written by v1 still loads, so an existing storage directory, Redis instance or database keeps working. Any tooling that reads these files directly needs to handle the camelCase keys.
 
+## `MemoryStorageBackend` stores copies
+
+`MemoryStorageBackend` stores a JSON snapshot of each dataset item and of each key-value store value with a JSON content type, serialized the same way as by `FileSystemStorageBackend`. Changing an object after you push or set it doesn't change the stored data, and pushing the same object twice stores two independent items. Reads return fresh copies too, so changing a returned item or value doesn't change the store.
+
+The memory backend now handles values the same way as the file-system backend. It raises on a value the file-system backend can't serialize, such as one with a circular reference or a tuple as a dict key. Values that JSON doesn't support, such as a `datetime`, are stored as strings, and dict keys that aren't strings become strings.
+
 ## Crawler `id` is a string
 
 The `id` argument of `BasicCrawler` and its subclasses is now a `str`, so pass a string wherever you passed an integer. `StatisticsState.stats_id` and `EventCrawlerStatusData.crawler_id` are strings too, and `crawler_id` holds the crawler's `id`. In v1, it held the Python object ID of the crawler.
