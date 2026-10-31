@@ -1288,6 +1288,30 @@ async def test_enqueue_links_with_limit(server_url: URL) -> None:
     visit.assert_has_calls(expected_visit_calls, any_order=True)
 
 
+async def test_enqueue_links_limit_applied_after_transform(server_url: URL) -> None:
+    """Requests skipped by `transform_request_function` don't count towards the `limit` of `enqueue_links`."""
+    crawler = PlaywrightCrawler()
+    visit = mock.Mock()
+
+    def skip_page_3(request_options: RequestOptions) -> RequestOptions | RequestTransformAction:
+        if request_options['url'].endswith('/page_3'):
+            return 'skip'
+        return 'unchanged'
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        await context.enqueue_links(limit=1, transform_request_function=skip_page_3, label='child')
+
+    @crawler.router.handler('child')
+    async def child_handler(context: PlaywrightCrawlingContext) -> None:
+        visit(context.request.url)
+
+    await crawler.run([str(server_url / 'sub_index')])
+
+    visited = {call.args[0] for call in visit.call_args_list}
+    assert visited == {str(server_url / 'page_2')}
+
+
 async def test_playwright_crawler_pre_navigation_hook_execution(server_url: URL) -> None:
     """Test that pre-navigation hooks are executed."""
     crawler = PlaywrightCrawler(request_handler=AsyncMock())

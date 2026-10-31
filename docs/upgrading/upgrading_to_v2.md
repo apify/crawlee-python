@@ -129,6 +129,22 @@ The default `Request.unique_key` lowercases only the scheme and host of the URL.
 
 As a result, a crawl can visit more pages than in v1. Requests stored in a request queue by v1 keep their lowercased unique keys, so adding the same URL again in v2 can create a duplicate request. To keep case-insensitive deduplication, pass an explicit `unique_key`. With `enqueue_links`, set `unique_key` to the lowercased URL in its `transform_request_function`, and leave `url` as it is, so the crawler still fetches the original casing.
 
+## URL filters match the same way as in Crawlee JS
+
+The `include`, `exclude` and `limit` arguments of `enqueue_links`, `extract_links` and `add_requests` now behave the same as in Crawlee JS. The `include` and `exclude` arguments of `SitemapRequestLoader` follow the same matching rules.
+
+### Globs are case-insensitive
+
+A `Glob` matches URLs regardless of casing, so `Glob('https://example.com/products/**')` also matches `https://example.com/Products/ABC`. In v1, the matching was case-sensitive. For case-sensitive matching, use a regular expression instead.
+
+### Regular expressions match anywhere in the URL
+
+A regular expression in `include` or `exclude` matches if it's found anywhere in the URL, the same as `re.search`. In v1, it had to match at the start of the URL, the same as `re.match`. For example, `re.compile(r'/products/')` now matches `https://example.com/products/1`, where v1 needed `re.compile(r'https://example\.com/products/')`. To match only at the start of the URL again, start the pattern with `^`, for example `re.compile(r'^https://example\.com/products/')`.
+
+### `limit` is applied last
+
+The `limit` argument counts only the requests that pass all the filters. It's applied after the strategy, `include` and `exclude` filters, the `transform_request_function` and the `max_crawl_depth` check. In v1, it was applied before the `transform_request_function`, so the requests that `transform_request_function` skipped still counted towards the limit. For example, with `limit=5` and a `transform_request_function` that skips 2 of the first 5 links, v2 enqueues 5 requests, where v1 enqueued 3.
+
 ## Storage data uses camelCase keys
 
 The storage backends now write their JSON data with camelCase keys, the same as Crawlee JS. This covers the metadata, request and record metadata files of `FileSystemStorageBackend`, the request and record metadata JSON stored by `RedisStorageBackend`, and the request JSON stored by `SqlStorageBackend`. For example, `item_count` in a dataset's `__metadata__.json` becomes `itemCount`. The storage metadata documents of `RedisStorageBackend` keep their snake_case keys.

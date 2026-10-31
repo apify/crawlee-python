@@ -24,7 +24,7 @@ from cachetools import LRUCache
 from typing_extensions import TypeVar
 from yarl import URL
 
-from crawlee import Glob, RequestTransformAction, service_locator
+from crawlee import RequestTransformAction, service_locator
 from crawlee._log_config import configure_logger, string_to_log_level
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._service_locator import ServiceLocator
@@ -44,6 +44,7 @@ from crawlee._types import (
 )
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import atomic_write, export_csv_to_stream, export_json_to_stream
+from crawlee._utils.globs import check_url_patterns
 from crawlee._utils.http import parse_retry_after_header
 from crawlee._utils.log import LoggerOnce
 from crawlee._utils.recurring_task import RecurringTask
@@ -80,7 +81,6 @@ from ._logging_utils import (
 )
 
 if TYPE_CHECKING:
-    import re
     from collections.abc import Iterator, Mapping, MutableMapping
     from contextlib import AbstractAsyncContextManager
 
@@ -1165,7 +1165,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self, request_iterator: Iterator[TRequestIterator], origin_url: str, **kwargs: Unpack[EnqueueLinksKwargs]
     ) -> Iterator[TRequestIterator]:
         """Filter requests based on the enqueue strategy and URL patterns."""
-        limit = kwargs.get('limit')
         parsed_origin_url = URL(origin_url)
         strategy = kwargs.get('strategy', 'all')
 
@@ -1199,43 +1198,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     host_warned = True
                 continue
 
-            if self._check_url_patterns(target_url, kwargs.get('include'), kwargs.get('exclude')):
+            if check_url_patterns(target_url, kwargs.get('include'), kwargs.get('exclude')):
                 yield request
-
-                if limit is not None:
-                    limit -= 1
-                    if limit <= 0:
-                        break
-
-    def _check_url_patterns(
-        self,
-        target_url: str,
-        include: Sequence[re.Pattern[Any] | Glob] | None,
-        exclude: Sequence[re.Pattern[Any] | Glob] | None,
-    ) -> bool:
-        """Check if a URL matches configured include/exclude patterns."""
-        # If the URL matches any `exclude` pattern, reject it
-        for pattern in exclude or ():
-            if isinstance(pattern, Glob):
-                pattern = pattern.regexp  # noqa: PLW2901
-
-            if pattern.match(target_url) is not None:
-                return False
-
-        # If there are no `include` patterns and the URL passed all `exclude` patterns, accept the URL
-        if include is None:
-            return True
-
-        # If the URL matches any `include` pattern, accept it
-        for pattern in include:
-            if isinstance(pattern, Glob):
-                pattern = pattern.regexp  # noqa: PLW2901
-
-            if pattern.match(target_url) is not None:
-                return True
-
-        # The URL does not match any `include` pattern - reject it
-        return False
 
     async def _handle_error_handler_replacement(
         self,
@@ -1463,11 +1427,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         else:
             request_manager = await self.get_request_manager()
 
+        limit = kwargs.get('limit')
         context_aware_requests = list[Request]()
         base_url = kwargs.get('base_url') or context.request.loaded_url or context.request.url
         requests_iterator = self._convert_url_to_request_iterator(requests, base_url)
         filter_requests_iterator = self._enqueue_links_filter_iterator(requests_iterator, context.request.url, **kwargs)
         for dst_request in filter_requests_iterator:
+            if limit is not None and len(context_aware_requests) >= limit:
+                break
+
             # Update the crawl depth of the request.
             dst_request.crawl_depth = context.request.crawl_depth + 1
 

@@ -443,6 +443,7 @@ class PlaywrightCrawler(
 
             kwargs.setdefault('strategy', 'same-hostname')
             strategy = kwargs.get('strategy', 'same-hostname')
+            limit = kwargs.get('limit')
 
             elements = await context.page.query_selector_all(selector)
             # Browsers ignore the whitespace around a URL, as `find_links` of the HTTP parsers does.
@@ -465,6 +466,9 @@ class PlaywrightCrawler(
                 skipped = iter([])
 
             for url in self._enqueue_links_filter_iterator(links_iterator, context.request.url, **kwargs):
+                if limit is not None and len(requests) >= limit:
+                    break
+
                 request_options = RequestOptions(
                     url=url, user_data={**base_user_data}, label=label, enqueue_strategy=strategy
                 )

@@ -213,6 +213,7 @@ class AbstractHttpCrawler(
 
             kwargs.setdefault('strategy', 'same-hostname')
             strategy = kwargs.get('strategy', 'same-hostname')
+            limit = kwargs.get('limit')
 
             links_iterator: Iterator[str] = iter(
                 self._parser.find_links(parsed_content, selector=selector, attribute=attribute)
@@ -239,6 +240,9 @@ class AbstractHttpCrawler(
                 skipped = iter([])
 
             for url in self._enqueue_links_filter_iterator(links_iterator, context.request.url, **kwargs):
+                if limit is not None and len(requests) >= limit:
+                    break
+
                 request_options = RequestOptions(
                     url=url, user_data={**base_user_data}, label=label, enqueue_strategy=strategy
                 )
