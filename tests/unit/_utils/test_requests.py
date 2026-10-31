@@ -9,31 +9,42 @@ from crawlee._utils.requests import compute_unique_key, normalize_url
 @pytest.mark.parametrize(
     ('url', 'expected_output', 'keep_url_fragment'),
     [
-        ('https://example.com/?utm_source=test&utm_medium=test&key=value', 'https://example.com/?key=value', False),
-        (
+        pytest.param(
+            'https://example.com/?utm_source=test&utm_medium=test&key=value',
+            'https://example.com/?key=value',
+            False,
+            id='remove_utm_params',
+        ),
+        pytest.param(
             'http://example.com/?key=value&another_key=another_value',
             'http://example.com/?another_key=another_value&key=value',
             False,
+            id='retain_sort_non_utm_params',
         ),
-        ('HTTPS://EXAMPLE.COM/?KEY=VALUE', 'https://example.com/?key=value', False),
-        ('', '', False),
-        ('http://example.com/#fragment', 'http://example.com/#fragment', True),
-        ('http://example.com/#fragment', 'http://example.com', False),
-        ('  https://example.com/  ', 'https://example.com', False),
-        ('http://example.com/?b=2&a=1', 'http://example.com/?a=1&b=2', False),
-    ],
-    ids=[
-        'remove_utm_params',
-        'retain_sort_non_utm_params',
-        'convert_scheme_netloc_to_lowercase',
-        'handle_empty_url',
-        'retain_fragment',
-        'remove_fragment',
-        'trim_whitespace',
-        'sort_query_params',
+        pytest.param(
+            'HTTPS://EXAMPLE.COM/?KEY=VALUE',
+            'https://example.com/?KEY=VALUE',
+            False,
+            id='lowercase_scheme_and_host_only',
+        ),
+        pytest.param('', '', False, id='handle_empty_url'),
+        pytest.param('http://example.com/#fragment', 'http://example.com/#fragment', True, id='retain_fragment'),
+        pytest.param('http://example.com/#fragment', 'http://example.com', False, id='remove_fragment'),
+        pytest.param('  https://example.com/  ', 'https://example.com', False, id='trim_whitespace'),
+        pytest.param('http://example.com/?b=2&a=1', 'http://example.com/?a=1&b=2', False, id='sort_query_params'),
+        pytest.param(
+            'https://example.com/Product/ABC', 'https://example.com/Product/ABC', False, id='preserve_path_casing'
+        ),
+        pytest.param(
+            'https://example.com/?token=SeCrEt', 'https://example.com/?token=SeCrEt', False, id='preserve_query_casing'
+        ),
+        pytest.param(
+            'https://example.com/#Fragment', 'https://example.com/#Fragment', True, id='preserve_fragment_casing'
+        ),
     ],
 )
 def test_normalize_url(url: str, expected_output: str, *, keep_url_fragment: bool) -> None:
+    """`normalize_url` cleans the URL and lowercases only its scheme and host."""
     output = normalize_url(url, keep_url_fragment=keep_url_fragment)
     assert output == expected_output
 
@@ -43,6 +54,13 @@ def test_compute_unique_key_basic() -> None:
     uk_get = compute_unique_key(url, method='GET')
     uk_post = compute_unique_key(url, method='POST')
     assert url == uk_get == uk_post
+
+
+def test_compute_unique_key_distinguishes_path_casing() -> None:
+    """URLs that differ only in path casing get distinct unique keys."""
+    uk_upper = compute_unique_key('https://example.com/Product/ABC')
+    uk_lower = compute_unique_key('https://example.com/product/abc')
+    assert uk_upper != uk_lower
 
 
 def test_compute_unique_key_handles_fragments() -> None:
