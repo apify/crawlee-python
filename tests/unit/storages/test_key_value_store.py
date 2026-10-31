@@ -1354,3 +1354,24 @@ async def test_clear_cache_with_concurrent_new_autosaved_key(
 
     # Should not raise `RuntimeError: dictionary changed size during iteration`.
     await asyncio.wait_for(asyncio.gather(clear_task, insert_task), timeout=5)
+
+
+async def test_set_value_stores_snapshot(kvs: KeyValueStore) -> None:
+    """Mutating a value after setting it doesn't change the stored value."""
+    value: dict[str, Any] = {'key': 'value', 'nested': {'list': [1, 2]}}
+    await kvs.set_value('test-key', value)
+
+    value['key'] = 'changed'
+    value['nested']['list'].append(3)
+
+    assert await kvs.get_value('test-key') == {'key': 'value', 'nested': {'list': [1, 2]}}
+
+
+async def test_mutating_read_value_does_not_change_stored_value(kvs: KeyValueStore) -> None:
+    """Mutating a value returned by `get_value` doesn't change the stored value."""
+    await kvs.set_value('test-key', {'key': 'value'})
+
+    value = await kvs.get_value('test-key')
+    value['key'] = 'changed'
+
+    assert await kvs.get_value('test-key') == {'key': 'value'}
