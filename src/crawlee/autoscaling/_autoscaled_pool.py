@@ -145,9 +145,29 @@ class AutoscaledPool:
         self._current_run.result.set_exception(AbortError())
         await self._current_run.cleanup_done.wait()
 
-    def pause(self) -> None:
-        """Pause the autoscaled pool so that it does not start new tasks."""
+    async def pause(self, *, timeout: timedelta | None = None) -> None:
+        """Stop starting new tasks and wait until the pool's tasks in progress finish.
+
+        Unlike `abort`, this doesn't end the run, which waits for `resume`.
+
+        Args:
+            timeout: How long to wait for the tasks in progress. The pool stays paused if they don't finish in time.
+
+        Raises:
+            TimeoutError: If the tasks in progress don't finish within `timeout`.
+        """
         self._is_paused = True
+
+        run = self._current_run
+        if run is None or not run.worker_tasks:
+            return
+
+        timeout_seconds = timeout.total_seconds() if timeout is not None else None
+        _, pending = await asyncio.wait(run.worker_tasks, timeout=timeout_seconds)
+        if pending:
+            raise TimeoutError(
+                f"The pool's running tasks did not finish within {timeout_seconds} seconds after `pause()` was called."
+            )
 
     def resume(self) -> None:
         """Resume a paused autoscaled pool so that it continues starting new tasks."""
@@ -203,6 +223,10 @@ class AutoscaledPool:
                     logger.debug('Not scheduling new task - no task is ready')
                     if finished := await self._maybe_finish(run):
                         break
+                elif self._is_paused:
+                    # The pool may have been paused while `is_task_ready_function` was awaited, and `pause` waits only
+                    # for the tasks that were already running.
+                    logger.debug('Not scheduling new tasks - the autoscaled pool is paused')
                 else:
                     task_id = str(self._next_task_id)
                     self._next_task_id += 1
@@ -251,9 +275,14 @@ class AutoscaledPool:
     async def _maybe_finish(self, run: _AutoscaledPoolRun) -> bool:
         """Ask `is_finished_function` whether the run is over, but only while none of this pool's tasks is in flight.
 
-        A running task can still produce new work, and with a shared system only this pool's own tasks count.
+        A running task can still produce new work, and with a shared system only this pool's own tasks count. A paused
+        pool never finishes, even when it was paused while `is_task_ready_function` or `is_finished_function` was
+        awaited.
         """
-        return not run.worker_tasks and await self._is_finished_function()
+        if self._is_paused or run.worker_tasks:
+            return False
+
+        return await self._is_finished_function() and not self._is_paused
 
     def _reap_worker_task(self, task: asyncio.Task, *, run: _AutoscaledPoolRun, task_id: str) -> None:
         """Handle cleanup and tracking of a completed worker task.
