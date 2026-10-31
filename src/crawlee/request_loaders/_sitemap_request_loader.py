@@ -13,7 +13,7 @@ from yarl import URL
 
 from crawlee import Request, RequestOptions
 from crawlee._utils.docs import docs_group
-from crawlee._utils.globs import Glob
+from crawlee._utils.globs import Glob, check_url_patterns
 from crawlee._utils.recoverable_state import RecoverableState
 from crawlee._utils.sitemap import (
     DEFAULT_MAX_DEPTH,
@@ -30,7 +30,7 @@ from ._types import FinishedStatus, ReadyStatus, WaitingStatus
 
 if TYPE_CHECKING:
     import re
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable
     from types import TracebackType
 
     from crawlee import RequestTransformAction
@@ -139,8 +139,9 @@ class SitemapRequestLoader(RequestLoader):
         Args:
             sitemap_urls: List of sitemap URLs to fetch and parse for request URLs.
             proxy_info: Optional proxy to use for fetching sitemaps.
-            include: List of glob or regex patterns to include URLs.
-            exclude: List of glob or regex patterns to exclude URLs.
+            include: List of glob or regex patterns to include URLs. A regex may match anywhere in the URL, like
+                `re.search`. A glob must match the whole URL and is case-insensitive.
+            exclude: List of glob or regex patterns to exclude URLs, matched the same way as `include`.
             enqueue_strategy: Strategy used to decide which sitemap-derived URLs (both nested-sitemap entries and
                 URL entries) are kept relative to the parent sitemap URL. Defaults to `'same-hostname'`, matching
                 the sitemap protocol's same-host expectation and the `enqueue_links` default; pass `'all'` to
@@ -326,36 +327,6 @@ class SitemapRequestLoader(RequestLoader):
             return False
         return True
 
-    def _check_url_patterns(
-        self,
-        target_url: str,
-        include: Sequence[re.Pattern[Any] | Glob] | None,
-        exclude: Sequence[re.Pattern[Any] | Glob] | None,
-    ) -> bool:
-        """Check if a URL matches configured include/exclude patterns."""
-        # If the URL matches any `exclude` pattern, reject it
-        for pattern in exclude or ():
-            if isinstance(pattern, Glob):
-                pattern = pattern.regexp  # noqa: PLW2901
-
-            if pattern.match(target_url) is not None:
-                return False
-
-        # If there are no `include` patterns and the URL passed all `exclude` patterns, accept the URL
-        if include is None:
-            return True
-
-        # If the URL matches any `include` pattern, accept it
-        for pattern in include:
-            if isinstance(pattern, Glob):
-                pattern = pattern.regexp  # noqa: PLW2901
-
-            if pattern.match(target_url) is not None:
-                return True
-
-        # The URL does not match any `include` pattern - reject it
-        return False
-
     async def _load_sitemaps(self) -> None:
         """Load URLs from sitemaps in the background."""
         try:
@@ -420,7 +391,7 @@ class SitemapRequestLoader(RequestLoader):
                                     continue
 
                                 # Check if URL should be included
-                                if not self._check_url_patterns(url, self._include, self._exclude):
+                                if not check_url_patterns(url, self._include, self._exclude):
                                     continue
 
                                 if not self._passes_filters(url, parsed_sitemap_url, 'sitemap URL'):
