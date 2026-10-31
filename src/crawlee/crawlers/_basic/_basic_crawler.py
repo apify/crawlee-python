@@ -352,8 +352,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             additional_http_error_status_codes: Additional HTTP status codes to treat as errors,
                 triggering automatic retries when encountered.
             ignore_http_error_status_codes: HTTP status codes that are typically considered errors but should be treated
-                as successful responses. Doesn't apply to a 429 from a domain throttled by a `ThrottlingRequestManager`,
-                which is retried later.
+                as successful responses. Doesn't apply to a 429 from a domain the crawler's request manager paces, which
+                is retried later.
             concurrency_settings: Settings to fine-tune concurrency levels.
             concurrency_system: A concurrency system to use instead of the default one, e.g. one shared between
                 crawlers to cap their combined concurrency. Keep it open with `async with` until every crawler using it
@@ -1836,10 +1836,22 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # share a clock.
         signal = MinIntervalSignal(url, interval=timedelta(seconds=delay_seconds), scope='hostname')
         request_manager = await self.get_request_manager()
-        if request_manager.record_pacing_signal(signal):
+        domain = URL(url).host or url
+        # An error raised from here would fail `add_requests` or end the crawl.
+        try:
+            accepted = request_manager.record_pacing_signal(signal)
+        except Exception as exc:
+            self._logger_once.log(
+                f'The request manager failed to record the robots.txt crawl-delay for "{domain}" ({exc!r}), so its '
+                'requests will not be paced.',
+                key=f'crawl_delay_failed:{domain}',
+                level=logging.ERROR,
+            )
             return
 
-        domain = URL(url).host or url
+        if accepted:
+            return
+
         self._logger_once.log(
             f'robots.txt for "{domain}" defines a crawl-delay of {delay_seconds}s, but the crawler\'s request manager '
             'does not pace that domain, so its requests will not be paced. Pass a `ThrottlingRequestManager` covering '

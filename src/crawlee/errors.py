@@ -122,12 +122,12 @@ class RequestCollisionError(Exception):
 
 @docs_group('Errors')
 class RequestThrottledError(Exception):
-    """Raised when a domain throttled by a `ThrottlingRequestManager` responds with 429.
+    """Raised when a 429 comes from a domain the crawler's request manager paces, such as a `ThrottlingRequestManager`.
 
     The request is retried later without spending a retry or marking the session as bad. If you raise it yourself, the
-    crawler reports a rate limit to its request manager and defers the request only if the manager paces its domain,
-    and handles it as an ordinary error otherwise. Raise it only when the server has refused the request, since a
-    deferred request never fails.
+    crawler reports a rate limit to its request manager and defers the request only if the manager paces its domain, and
+    handles it as an ordinary error otherwise. Raise it only when the server has refused the request, since a deferred
+    request never fails.
     """
 
     def __init__(self, message: str = 'Request is being retried later because its domain is rate-limiting us') -> None:

@@ -88,13 +88,15 @@ class RequestManager(RequestLoader, ABC):
 
         A manager that doesn't pace its requests, or doesn't handle the signal's `reason`, returns `False`. More signals
         may be added in a minor release. A manager wrapping another forwards every signal to it without inspecting it,
-        so a pacer nested in a composition still receives it. A manager may apply a signal to a wider scope than the
-        one given, but never to a narrower one, and raises for a scope it can't honor.
+        so a pacer nested in a composition still receives it. A manager may apply a signal to a wider scope than the one
+        given, but never to a narrower one, and raises for a scope it can't honor. The crawler may report one refusal
+        more than once, the repeats without a `wait`, so a `RateLimitedSignal` for a URL that is already held back
+        belongs to the same refusal.
 
         Args:
             signal: The signal to record.
 
         Returns:
-            `True` if anything in the composition took responsibility for the signal. For a `RateLimitedSignal`, the
-                URL then isn't dispatched again until a positive delay has passed.
+            `True` if anything in the composition took responsibility for the signal. For a `RateLimitedSignal`, the URL
+                then isn't dispatched again until a positive delay has passed.
         """

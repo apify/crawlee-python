@@ -521,7 +521,7 @@ class PlaywrightCrawler(
             context: The current crawling context containing the response.
 
         Raises:
-            RequestThrottledError: If the response is a 429 from a domain throttled by a `ThrottlingRequestManager`.
+            RequestThrottledError: If the response is a 429 from a domain the crawler's request manager paces.
             SessionError: If the status code indicates the session is blocked.
             HttpStatusCodeError: If the status code represents a server error or is explicitly configured as an error.
             HttpClientStatusCodeError: If the status code represents a client error.

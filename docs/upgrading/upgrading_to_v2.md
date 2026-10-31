@@ -324,7 +324,7 @@ The crawler now reads a stall from the status, so it also sees a `ThrottlingRequ
 
 `RequestManager` has a new abstract method, `record_pacing_signal`. The crawler reports HTTP 429 responses and robots.txt `Crawl-delay` directives through it, so a `ThrottlingRequestManager` now receives them wherever it sits, including inside a `RequestManagerTandem`. In v1, the crawler reached the throttler only when it was passed directly.
 
-`ThrottlingRequestManager.record_domain_delay` and `set_crawl_delay` are replaced by `record_pacing_signal`, which takes a `RateLimitedSignal` or a `MinIntervalSignal`. `is_throttled` and `record_success` are removed without a replacement, since the manager resets the backoff on its own once a domain stops rate-limiting.
+`ThrottlingRequestManager.record_domain_delay` and `set_crawl_delay` are replaced by `record_pacing_signal`, which takes a `RateLimitedSignal` or a `MinIntervalSignal`. `is_throttled` and `record_success` are removed without a replacement. The manager resets the backoff on its own once a domain stops rate-limiting.
 
 ```python
 # v1
@@ -469,7 +469,7 @@ The ERROR message the crawler logs before raising `PersistentRateLimitError` now
 
 The two DEBUG messages that `RequestQueue.is_finished` logged, "Background add requests tasks are still in progress." and "The request queue is finished.", are removed together with the method.
 
-The warnings about an HTTP 429 that the request manager doesn't pace are reworded and logged once per domain. The warning `run()` logged at the start about `respect_robots_txt_file` without a `ThrottlingRequestManager` is replaced by a new one, logged once per domain whose robots.txt `Crawl-delay` the request manager doesn't pace. The warning about a `RequestThrottledError` handled as an ordinary error is reworded, and a new ERROR is logged when the request manager fails to record that rate limit.
+The warnings about an HTTP 429 that the request manager doesn't pace are reworded and logged once per domain. The warning `run()` logged at the start about `respect_robots_txt_file` without a `ThrottlingRequestManager` is replaced by a new one, logged once per domain whose robots.txt `Crawl-delay` the request manager doesn't pace. The warning about a `RequestThrottledError` handled as an ordinary error is reworded, and a new ERROR is logged when the request manager fails to record that rate limit. Another new ERROR is logged once per domain when the request manager fails to record a robots.txt `Crawl-delay`.
 
 The `ThrottlingRequestManager` warning about capping a delay now calls it a "requested wait" delay instead of a "Retry-After header" delay. Its DEBUG messages about a 429 ignored during an active backoff and about resetting a domain's rate limit state are removed, and its DEBUG message about a domain's crawl-delay shows the delay with one decimal place.
 

@@ -3071,6 +3071,27 @@ async def test_unpaced_crawl_delay_warns_once(
     assert len(matching) == 2
 
 
+async def test_crawl_delay_failure_logged_once(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A request manager rejecting a robots.txt crawl-delay is logged once per domain and doesn't fail the check."""
+    request_manager = create_autospec(RequestManager, instance=True, spec_set=True)
+    request_manager.record_pacing_signal.side_effect = ValueError('Unsupported scope')
+    crawler = BasicCrawler(configure_logging=False, request_manager=request_manager, respect_robots_txt_file=True)
+    robots_txt_file = Mock(spec=RobotsTxtFile)
+    robots_txt_file.get_crawl_delay.return_value = 5
+    robots_txt_file.is_allowed.return_value = True
+    monkeypatch.setattr(crawler, '_get_robots_txt_file_for_url', AsyncMock(return_value=robots_txt_file))
+
+    with caplog.at_level(logging.ERROR, logger='crawlee'):
+        for url in ['https://a.example.com/page1', 'https://a.example.com/page2', 'https://b.example.com/page1']:
+            assert await crawler._is_allowed_based_on_robots_txt_file(url)
+
+    matching = [r for r in caplog.records if 'failed to record the robots.txt crawl-delay' in r.getMessage()]
+    assert len(matching) == 2
+
+
 async def test_crawl_waits_out_backoff() -> None:
     """Test that a domain in a cooldown reads as waiting, yet its queued requests are still crawled."""
     storage_backend = MemoryStorageBackend()
@@ -3246,8 +3267,13 @@ async def test_pacing_failure_is_ordinary_error(
         pytest.param(True, id='tandem'),
     ],
 )
-async def test_robots_crawl_delay_reaches_throttler(monkeypatch: pytest.MonkeyPatch, *, wrap_in_tandem: bool) -> None:
-    """A robots.txt crawl-delay reaches the throttler, also when it's wrapped in a `RequestManagerTandem`."""
+async def test_robots_crawl_delay_reaches_throttler(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    *,
+    wrap_in_tandem: bool,
+) -> None:
+    """A robots.txt crawl-delay reaches the throttler, also inside a `RequestManagerTandem`, without a warning."""
     throttler = await open_throttler()
     request_manager = RequestManagerTandem(RequestList(), throttler) if wrap_in_tandem else throttler
     crawler = BasicCrawler(request_manager=request_manager, respect_robots_txt_file=True)
@@ -3258,6 +3284,7 @@ async def test_robots_crawl_delay_reaches_throttler(monkeypatch: pytest.MonkeyPa
 
     assert await crawler._is_allowed_based_on_robots_txt_file(THROTTLED_URL)
     assert throttler._domain_states['throttled.placeholder.com'].crawl_delay == timedelta(seconds=5)
+    assert not any('defines a crawl-delay' in record.message for record in caplog.records)
 
 
 async def test_keep_alive_ignores_stall() -> None:
@@ -3267,7 +3294,7 @@ async def test_keep_alive_ignores_stall() -> None:
     stall_statuses = list[RequestSourceStatus]()
 
     @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
+    async def handler(_context: BasicCrawlingContext) -> None:
         raise RequestThrottledError
 
     async def stop_after_stall() -> None:
@@ -3411,7 +3438,7 @@ async def test_inner_held_429_is_deferred_and_stalls() -> None:
     calls = 0
 
     @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
+    async def handler(_context: BasicCrawlingContext) -> None:
         nonlocal calls
         calls += 1
         if calls > MAX_HANDLER_CALLS:
@@ -3440,7 +3467,7 @@ async def test_deferral_not_counted_as_retry(
     crawler = BasicCrawler(request_manager=throttler, max_request_retries=3)
 
     @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
+    async def handler(_context: BasicCrawlingContext) -> None:
         outcome = outcomes.pop(0)
         if outcome == 'error':
             raise RuntimeError('Handler failed')
