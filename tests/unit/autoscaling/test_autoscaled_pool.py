@@ -240,6 +240,7 @@ async def test_pause_waits_for_running_tasks(make_concurrency_system: type[Concu
 
             assert pool.own_concurrency == 0
         finally:
+            release.set()
             pool_run_task.cancel()
             await asyncio.gather(pool_run_task, return_exceptions=True)
 
@@ -274,6 +275,7 @@ async def test_repeated_pause_waits(make_concurrency_system: type[ConcurrencySys
             release.set()
             await asyncio.wait_for(asyncio.gather(first_pause, second_pause), timeout=5)
         finally:
+            release.set()
             pool_run_task.cancel()
             await asyncio.gather(pool_run_task, return_exceptions=True)
 
@@ -309,6 +311,7 @@ async def test_pause_times_out(make_concurrency_system: type[ConcurrencySystem])
             await asyncio.sleep(0.1)
             run.assert_awaited_once()
         finally:
+            release.set()
             pool_run_task.cancel()
             await asyncio.gather(pool_run_task, return_exceptions=True)
 
@@ -348,6 +351,7 @@ async def test_resume_during_pause(make_concurrency_system: type[ConcurrencySyst
             assert await poll_until_condition(lambda: run.await_count == 2)
             assert pool.own_concurrency == 1
         finally:
+            first_release.set()
             later_release.set()
             pool_run_task.cancel()
             await asyncio.gather(pool_run_task, return_exceptions=True)

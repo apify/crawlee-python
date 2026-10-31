@@ -148,7 +148,8 @@ class AutoscaledPool:
     async def pause(self, *, timeout: timedelta | None = None) -> None:
         """Stop starting new tasks and wait until the pool's tasks in progress finish.
 
-        Unlike `abort`, this doesn't end the run, which waits for `resume`.
+        Unlike `abort`, this doesn't end the run, which waits for `resume`. A call from inside `run_task_function` waits
+        for its own task too, so without a `timeout` it never returns.
 
         Args:
             timeout: How long to wait for the tasks in progress. The pool stays paused if they don't finish in time.
