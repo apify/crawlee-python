@@ -88,7 +88,7 @@ When you run the code, you will see the crawler log the **title** of the first p
 
 ## Skipping duplicate URLs
 
-Skipping of duplicate URLs is critical, because visiting the same page multiple times would lead to duplicate results. This is automatically handled by the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> which deduplicates requests using their `unique_key`. This `unique_key` is automatically generated from the request's URL by lowercasing the URL, lexically ordering query parameters, removing fragments and a few other tweaks that ensure the queue only includes unique URLs.
+Skipping of duplicate URLs is critical, because visiting the same page multiple times would lead to duplicate results. This is automatically handled by the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> which deduplicates requests using their `unique_key`. This `unique_key` is automatically generated from the request's URL by lowercasing its scheme and host, lexically ordering query parameters, removing fragments and a few other tweaks that ensure the queue only includes unique URLs.
 
 ## Advanced filtering arguments
 

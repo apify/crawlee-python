@@ -123,6 +123,12 @@ Unlike tiers, this function doesn't track blocking per domain, so every request 
 
 The `Request.forefront` property is removed. Proxy tiers were the only code that set it. The crawler now reclaims a failed request for a retry at the back of the queue, and a request deferred by a `RequestThrottledError` at the front. To enqueue a request at the front, pass `forefront=True` to `add_requests` or `reclaim_request`.
 
+## Unique keys keep the URL casing
+
+The default `Request.unique_key` lowercases only the scheme and host of the URL. The path, query and fragment keep their casing, since they're case-sensitive. In v1, the whole URL was lowercased, so URLs that differed only in casing, such as `https://example.com/Product/ABC` and `https://example.com/product/abc`, got the same unique key, and the crawler visited only one of them.
+
+As a result, a crawl can visit more pages than in v1. Requests stored in a request queue by v1 keep their lowercased unique keys, so adding the same URL again in v2 can create a duplicate request. To keep case-insensitive deduplication, pass an explicit `unique_key`. With `enqueue_links`, set `unique_key` to the lowercased URL in its `transform_request_function`, and leave `url` as it is, so the crawler still fetches the original casing.
+
 ## Storage data uses camelCase keys
 
 The storage backends now write their JSON data with camelCase keys, the same as Crawlee JS. This covers the metadata, request and record metadata files of `FileSystemStorageBackend`, the request and record metadata JSON stored by `RedisStorageBackend`, and the request JSON stored by `SqlStorageBackend`. For example, `item_count` in a dataset's `__metadata__.json` becomes `itemCount`. The storage metadata documents of `RedisStorageBackend` keep their snake_case keys.
