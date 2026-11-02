@@ -326,7 +326,7 @@ The crawler now reads a stall from the status, so it also sees a `ThrottlingRequ
 
 ### Responses are read lazily
 
-`HttpClient.crawl` and `HttpClient.stream` are removed, and so is `HttpCrawlingResult`, which `crawl` returned. `HttpCrawlingContext` still has `http_response`. `send_request` returns the response as soon as its headers arrive and reads the body only on `read` or `read_stream`. A response whose body you don't read keeps its connection until you call `aclose`. Use the response as an async context manager to close it:
+`HttpClient.crawl` and `HttpClient.stream` are removed, and so is `HttpCrawlingResult`, which `crawl` returned. `HttpCrawlingContext` still has `http_response`. `http_response` now comes after the fields of `BasicCrawlingContext` instead of before them, so if you build a crawling context yourself, pass the fields by keyword. `send_request` returns the response as soon as its headers arrive and reads the body only on `read` or `read_stream`. A response whose body you don't read keeps its connection until you call `aclose`. Use the response as an async context manager to close it:
 
 ```python
 # v1
