@@ -585,7 +585,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     def stop(self, reason: str = 'Stop was called externally.') -> None:
         """Set flag to stop crawler.
 
-        This stops current crawler run regardless of whether all requests were finished.
+        This stops current crawler run regardless of whether all requests were finished. Called with no run in progress,
+        it stops the next run.
 
         Args:
             reason: Reason for stopping that will be used in logs.
