@@ -92,8 +92,35 @@ async def test_delete_temp_folder_when_files_are_locked(monkeypatch: pytest.Monk
     await persist_browser.close()
     assert not current_temp_dir.exists()
     await asyncio.gather(*listener_tasks)
-    # The context's `close` event and `close` itself both ask for the removal, but only one of them retries.
-    assert rmtree.call_count == locked_attempts + 1
+    # The context's `close` event retries the removal until it succeeds, then `close` runs it once more.
+    assert rmtree.call_count == locked_attempts + 2
+
+
+async def test_delete_temp_folder_recreated_after_close_event(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A temp directory the browser writes into after the context's `close` event is removed by `close`."""
+    monkeypatch.setattr(PlaywrightPersistentBrowser, '_TMP_DIR_DELETE_INTERVAL', timedelta(0))
+
+    # Playwright emits the `close` event while the browser process is still shutting down, so the fake context lets the
+    # listener finish its removal and then writes into the directory again before `close` returns.
+    context = Mock()
+
+    async def close_context() -> None:
+        listener = context.on.call_args.args[1]
+        await listener(context)
+        assert not current_temp_dir.exists()
+        current_temp_dir.mkdir()
+        (current_temp_dir / 'Local State').write_text('{}')
+
+    context.close = close_context
+    browser_type = Mock()
+    browser_type.launch_persistent_context = AsyncMock(return_value=context)
+
+    persist_browser = PlaywrightPersistentBrowser(browser_type, user_data_dir=None, browser_launch_options={})
+    await persist_browser.new_context()
+    assert isinstance(persist_browser._temp_dir, Path)
+    current_temp_dir = persist_browser._temp_dir
+    await persist_browser.close()
+    assert not current_temp_dir.exists()
 
 
 async def test_warn_when_temp_folder_cannot_be_deleted(
