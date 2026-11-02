@@ -10,6 +10,7 @@ from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.file import infer_mime_type
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_backends._base import KeyValueStoreBackend
+from crawlee.storage_backends._memory._utils import json_snapshot
 from crawlee.storage_backends.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
 
 if TYPE_CHECKING:
@@ -26,6 +27,9 @@ class MemoryKeyValueStoreBackend(KeyValueStoreBackend):
 
     The memory implementation provides fast access to data but is limited by available memory and
     does not support data sharing across different processes.
+
+    A value with a JSON content type is stored as an independent JSON snapshot, serialized the same way as by the
+    file-system backend, and every read returns a fresh copy of it. Other values are stored as they are.
     """
 
     def __init__(
@@ -105,13 +109,22 @@ class MemoryKeyValueStoreBackend(KeyValueStoreBackend):
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
         await self._update_metadata(update_accessed_at=True)
 
-        # Return None if key doesn't exist
-        return self._records.get(key, None)
+        record = self._records.get(key, None)
+        if record is None:
+            return None
+
+        if 'application/json' in record.content_type:
+            return record.model_copy(update={'value': json_snapshot(record.value)})
+
+        return record
 
     @override
     async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
         content_type = content_type or infer_mime_type(value)
         size = sys.getsizeof(value)
+
+        if 'application/json' in content_type:
+            value = json_snapshot(value)
 
         # Create and store the record
         record = KeyValueStoreRecord(

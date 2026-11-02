@@ -1,16 +1,26 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+import re
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from crawlee.storage_backends import MemoryStorageBackend
+from crawlee.configuration import Configuration
+from crawlee.storage_backends import FileSystemStorageBackend, MemoryStorageBackend
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+    from pathlib import Path
 
     from crawlee.storage_backends._memory import MemoryKeyValueStoreBackend
+
+
+def circular_dict() -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    value['self'] = value
+    return value
 
 
 @pytest.fixture
@@ -92,3 +102,44 @@ async def test_iterate_keys_skips_record_deleted_during_iteration(kvs_backend: M
         collected_keys.append(metadata.key)
 
     assert collected_keys == ['key1']
+
+
+@pytest.mark.parametrize(
+    'value',
+    [
+        pytest.param(circular_dict(), id='circular reference'),
+        pytest.param({'nested': {(1, 2): 'tuple key'}}, id='tuple key'),
+    ],
+)
+async def test_set_value_rejects_what_file_system_rejects(
+    kvs_backend: MemoryKeyValueStoreBackend,
+    tmp_path: Path,
+    value: dict[str, Any],
+) -> None:
+    """A JSON value the file-system backend can't serialize raises the same error and stores nothing."""
+    configuration = Configuration(storage_dir=str(tmp_path))
+    fs_backend = await FileSystemStorageBackend().create_kvs_backend(configuration=configuration)
+
+    with pytest.raises((TypeError, ValueError)) as fs_error:
+        await fs_backend.set_value(key='test-key', value=value)
+
+    with pytest.raises(fs_error.type, match=re.escape(str(fs_error.value))):
+        await kvs_backend.set_value(key='test-key', value=value)
+
+    assert await kvs_backend.get_value(key='test-key') is None
+
+
+async def test_set_value_serializes_like_file_system(kvs_backend: MemoryKeyValueStoreBackend, tmp_path: Path) -> None:
+    """A JSON value with types JSON doesn't support is stored as the file-system backend reads it back."""
+    value = {'created_at': datetime(2026, 1, 1, tzinfo=UTC), 1: 'int key'}
+    configuration = Configuration(storage_dir=str(tmp_path))
+    fs_backend = await FileSystemStorageBackend().create_kvs_backend(configuration=configuration)
+
+    await fs_backend.set_value(key='test-key', value=value)
+    await kvs_backend.set_value(key='test-key', value=value)
+
+    fs_record = await fs_backend.get_value(key='test-key')
+    memory_record = await kvs_backend.get_value(key='test-key')
+    assert fs_record is not None
+    assert memory_record is not None
+    assert memory_record.value == fs_record.value == {'created_at': '2026-01-01 00:00:00+00:00', '1': 'int key'}

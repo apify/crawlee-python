@@ -1,16 +1,26 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+import re
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from crawlee.storage_backends import MemoryStorageBackend
+from crawlee.configuration import Configuration
+from crawlee.storage_backends import FileSystemStorageBackend, MemoryStorageBackend
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+    from pathlib import Path
 
     from crawlee.storage_backends._memory import MemoryDatasetBackend
+
+
+def circular_dict() -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    value['self'] = value
+    return value
 
 
 @pytest.fixture
@@ -76,3 +86,44 @@ async def test_memory_metadata_updates(dataset_backend: MemoryDatasetBackend) ->
     assert metadata.created_at == initial_created
     assert metadata.modified_at > initial_modified
     assert metadata.accessed_at > accessed_after_read
+
+
+@pytest.mark.parametrize(
+    'item',
+    [
+        pytest.param(circular_dict(), id='circular reference'),
+        pytest.param({'nested': {(1, 2): 'tuple key'}}, id='tuple key'),
+    ],
+)
+async def test_push_data_rejects_what_file_system_rejects(
+    dataset_backend: MemoryDatasetBackend,
+    tmp_path: Path,
+    item: dict[str, Any],
+) -> None:
+    """An item the file-system backend can't serialize raises the same error and stores nothing."""
+    configuration = Configuration(storage_dir=str(tmp_path))
+    fs_backend = await FileSystemStorageBackend().create_dataset_backend(configuration=configuration)
+
+    with pytest.raises((TypeError, ValueError)) as fs_error:
+        await fs_backend.push_data(item)
+
+    with pytest.raises(fs_error.type, match=re.escape(str(fs_error.value))):
+        await dataset_backend.push_data([{'valid': True}, item])
+
+    metadata = await dataset_backend.get_metadata()
+    assert metadata.item_count == 0
+    assert (await dataset_backend.get_data()).items == []
+
+
+async def test_push_data_serializes_like_file_system(dataset_backend: MemoryDatasetBackend, tmp_path: Path) -> None:
+    """Values JSON doesn't support are stored as the file-system backend reads them back."""
+    item = {'created_at': datetime(2026, 1, 1, tzinfo=UTC), 'tags': {'single'}, 1: 'int key'}
+    configuration = Configuration(storage_dir=str(tmp_path))
+    fs_backend = await FileSystemStorageBackend().create_dataset_backend(configuration=configuration)
+
+    await fs_backend.push_data(item)  # ty: ignore[invalid-argument-type]
+    await dataset_backend.push_data(item)  # ty: ignore[invalid-argument-type]
+
+    fs_items = (await fs_backend.get_data()).items
+    assert (await dataset_backend.get_data()).items == fs_items
+    assert fs_items == [{'created_at': '2026-01-01 00:00:00+00:00', 'tags': "{'single'}", '1': 'int key'}]
