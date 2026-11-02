@@ -332,7 +332,12 @@ class BrowserPool:
         if browser_controller.total_opened_pages >= self._retire_browser_after_page_count:
             self._retire_browser(browser_controller)
 
-        crawlee_page = CrawleePage(id=page_id, page=page, browser_type=plugin.browser_type)
+        crawlee_page = CrawleePage(
+            id=page_id,
+            page=page,
+            browser_type=plugin.browser_type,
+            context_headers=browser_controller.get_context_headers(page),
+        )
         self._pages[page_id] = crawlee_page
         self._total_pages_count += 1
 

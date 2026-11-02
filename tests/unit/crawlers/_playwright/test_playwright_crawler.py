@@ -629,6 +629,97 @@ async def test_custom_fingerprint_matches_header_user_agent(server_url: URL) -> 
     assert response_headers['User-Agent'] == fingerprints['window.navigator.userAgent']
 
 
+@pytest.mark.parametrize(
+    ('fingerprint_generator', 'use_incognito_pages'),
+    [
+        pytest.param(None, False, id='header generator'),
+        pytest.param('default', False, id='fingerprint generator'),
+        pytest.param('default', True, id='fingerprint generator with incognito pages'),
+    ],
+)
+async def test_context_headers_in_request_headers(
+    fingerprint_generator: Literal['default'] | None, *, use_incognito_pages: bool, server_url: URL
+) -> None:
+    """Headers sent by the browser context are in `context.request.headers`, with the values the server received."""
+    crawler = PlaywrightCrawler(fingerprint_generator=fingerprint_generator, use_incognito_pages=use_incognito_pages)
+    request_headers = dict[str, str]()
+    server_headers = dict[str, str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        request_headers.update(context.request.headers)
+        server_headers.update(json.loads(await context.response.text()))
+
+    await crawler.run([str(server_url / 'headers')])
+
+    assert {'user-agent', 'accept-language'} <= request_headers.keys()
+    assert request_headers == {name: server_headers[name] for name in request_headers}
+
+
+async def test_context_headers_do_not_override_request_headers(server_url: URL) -> None:
+    """Headers set on the request win over the browser context ones, which fill in the rest."""
+    crawler = PlaywrightCrawler(fingerprint_generator='default')
+    request_headers = dict[str, str]()
+    server_headers = dict[str, str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        request_headers.update(context.request.headers)
+        server_headers.update(json.loads(await context.response.text()))
+
+    await crawler.run([Request.from_url(str(server_url / 'headers'), headers={'User-Agent': 'custom-agent'})])
+
+    assert request_headers['user-agent'] == server_headers['user-agent'] == 'custom-agent'
+    assert request_headers['accept-language'] == server_headers['accept-language']
+
+
+async def test_context_header_overridden_in_pre_navigation_hook(server_url: URL) -> None:
+    """A browser context header changed in a pre-navigation hook is sent with the new value."""
+    crawler = PlaywrightCrawler(fingerprint_generator='default')
+    request_headers = dict[str, str]()
+    server_headers = dict[str, str]()
+
+    @crawler.pre_navigation_hook
+    async def override_user_agent(context: PlaywrightPreNavCrawlingContext) -> None:
+        assert 'user-agent' in context.request.headers
+        context.request.headers |= HttpHeaders({'User-Agent': 'custom-agent'})
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        request_headers.update(context.request.headers)
+        server_headers.update(json.loads(await context.response.text()))
+
+    await crawler.run([str(server_url / 'headers')])
+
+    assert request_headers['user-agent'] == server_headers['user-agent'] == 'custom-agent'
+
+
+async def test_context_headers_refreshed_on_retry_and_not_persisted(server_url: URL) -> None:
+    """Each attempt shows the headers of its own browser context, and none of them stay on the handled request."""
+    crawler = PlaywrightCrawler(fingerprint_generator='default', use_incognito_pages=True, max_request_retries=2)
+    attempts = list[tuple[str, str]]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        navigator_user_agent = await context.page.evaluate('() => window.navigator.userAgent')
+        attempts.append((context.request.headers['user-agent'], navigator_user_agent))
+        if len(attempts) < 3:
+            raise RuntimeError('Retry the request.')
+
+    request = Request.from_url(str(server_url / 'headers'))
+    await crawler.run([request])
+
+    assert len(attempts) == 3
+    for request_user_agent, navigator_user_agent in attempts:
+        assert request_user_agent == navigator_user_agent
+
+    request_manager = await crawler.get_request_manager()
+    assert isinstance(request_manager, RequestQueue)
+    handled_request = await request_manager.get_request(request.unique_key)
+    assert handled_request is not None
+    assert handled_request.headers == HttpHeaders()
+
+
 async def test_ignore_http_error_status_codes(server_url: URL) -> None:
     """Test that error codes that would normally trigger session error can be ignored."""
     crawler = PlaywrightCrawler(ignore_http_error_status_codes={403})

@@ -90,6 +90,18 @@ class BrowserController(ABC):
             ValueError: If the browser has reached the maximum number of open pages.
         """
 
+    def get_context_headers(self, page: Page) -> dict[str, str]:  # noqa: ARG002
+        """Return the extra HTTP headers that the browser context of `page` sends with every request.
+
+        These are the headers set on the context itself, for example by a fingerprint or header generator. The
+        `PlaywrightCrawler` exposes them in `context.request.headers`. The default implementation returns an empty
+        dict, meaning the headers are unknown.
+
+        Args:
+            page: A page opened by this controller.
+        """
+        return {}
+
     @abstractmethod
     async def close(self, *, force: bool = False) -> None:
         """Close the browser.

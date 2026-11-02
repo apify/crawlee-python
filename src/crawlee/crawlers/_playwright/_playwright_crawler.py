@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from typing_extensions import NotRequired, TypedDict, TypeVar
 
 from crawlee._request import Request, RequestOptions, RequestState
-from crawlee._types import BasicCrawlingContext, ConcurrencySettings
+from crawlee._types import BasicCrawlingContext, ConcurrencySettings, HttpHeaders
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
 from crawlee._utils.robots import RobotsTxtFile
@@ -158,6 +158,7 @@ class PlaywrightCrawler(
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         self._shared_navigation_timeouts: dict[int, SharedTimeout] = {}
+        self._added_context_headers: dict[int, dict[str, str]] = {}
 
         if browser_pool:
             # Raise an exception if browser_pool is provided together with other browser-related arguments.
@@ -336,15 +337,44 @@ class PlaywrightCrawler(
 
         request_id = id(pre_navigation_context.request)
 
-        # Only use the page context manager here — it sets the current page in a context variable,
-        # making it accessible to PlaywrightHttpClient in subsequent pipeline steps.
-        async with browser_page_context(crawlee_page.page):
-            for hook in self._pre_navigation_hooks:
-                async with self._shared_navigation_timeouts[request_id]:
-                    await hook(pre_navigation_context)
+        # The browser context sends its headers (e.g. from a fingerprint) on its own. They are shown in
+        # `request.headers` only for this attempt, because the request is persisted, retried with a new context,
+        # and shared with the static sub-crawler of `AdaptivePlaywrightCrawler`.
+        self._added_context_headers[request_id] = self._add_context_headers(
+            context.request, crawlee_page.context_headers
+        )
 
-            # Yield should be inside the browser_page_context.
-            yield pre_navigation_context
+        try:
+            # Only use the page context manager here — it sets the current page in a context variable,
+            # making it accessible to PlaywrightHttpClient in subsequent pipeline steps.
+            async with browser_page_context(crawlee_page.page):
+                for hook in self._pre_navigation_hooks:
+                    async with self._shared_navigation_timeouts[request_id]:
+                        await hook(pre_navigation_context)
+
+                # Yield should be inside the browser_page_context.
+                yield pre_navigation_context
+        finally:
+            added_headers = self._added_context_headers.pop(request_id, {})
+            self._remove_context_headers(context.request, added_headers)
+
+    @staticmethod
+    def _add_context_headers(request: Request, context_headers: Mapping[str, str]) -> dict[str, str]:
+        """Add the browser context headers missing from `request.headers` and return the added ones."""
+        added_headers = {
+            name.lower(): value for name, value in context_headers.items() if name.lower() not in request.headers
+        }
+        if added_headers:
+            request.headers = request.headers | HttpHeaders(added_headers)
+        return added_headers
+
+    @staticmethod
+    def _remove_context_headers(request: Request, added_headers: Mapping[str, str]) -> None:
+        """Remove the headers added by `_add_context_headers`, except those the user has set to another value."""
+        if not added_headers:
+            return
+        remaining_headers = {name: value for name, value in request.headers.items() if added_headers.get(name) != value}
+        request.headers = HttpHeaders(remaining_headers)
 
     async def _navigate(
         self,
@@ -385,11 +415,16 @@ class PlaywrightCrawler(
 
         # Apply the custom method, headers, and payload to the navigation request only; the details of doing
         # that correctly live in `NavigationRequestInterceptor`.
-        if context.request.headers or context.request.method != 'GET':
+        # Headers added from the browser context are sent by the browser anyway, unless the user changed their value.
+        added_headers = self._added_context_headers.get(id(context.request), {})
+        custom_headers = {
+            name: value for name, value in context.request.headers.items() if added_headers.get(name) != value
+        }
+        if custom_headers or context.request.method != 'GET':
             interceptor = NavigationRequestInterceptor(
                 context.page,
                 method=context.request.method,
-                headers=context.request.headers,
+                headers=custom_headers,
                 payload=context.request.payload,
             )
             await interceptor.register()
