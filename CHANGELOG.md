@@ -11,6 +11,10 @@ All notable changes to this project will be documented in this file.
 - **deps:** Drop the upper bound on sqlalchemy ([#2356](https://github.com/apify/crawlee-python/pull/2356)) ([cadd810](https://github.com/apify/crawlee-python/commit/cadd810428c735a33f4a0e0a64e7e00236cdf6db)) by [@vdusek](https://github.com/vdusek)
 - **sitemap:** Join element text once and reject entity declarations ([#2369](https://github.com/apify/crawlee-python/pull/2369)) ([242be00](https://github.com/apify/crawlee-python/commit/242be00ce7ba07cf8ce00abf80c1c3c0998d4360)) by [@vdusek](https://github.com/vdusek)
 
+### ⚡ Performance
+
+- Make `html_to_text` linear in the number of nodes ([#2372](https://github.com/apify/crawlee-python/pull/2372)) ([26e7612](https://github.com/apify/crawlee-python/commit/26e7612f4b65e19d2d44f11d952ee18a2ee98a98)) by [@B4nan](https://github.com/B4nan)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [1.11.0](https://github.com/apify/crawlee-python/releases/tag/v1.11.0) (2026-10-15)
