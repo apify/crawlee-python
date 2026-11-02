@@ -440,6 +440,10 @@ class MyHttpClient(HttpClient):
 
 `RequestManagerTandem.get_total_count` no longer counts a request twice once it moves from the loader to the manager. In v1, it added up the totals of both, so the crawler's status message showed too many pages in total.
 
+## `ThrottlingRequestManager.inner` is optional
+
+The `inner` argument of `ThrottlingRequestManager` is now optional, the same as in Crawlee JS. Without it, `request_manager_opener` opens the default store on first use, such as the default request queue for `RequestQueue.open`. Until then, the `inner` property returns `None`, so its type is now `TRequestManager | None`. If you pass `inner`, the property returns it as before.
+
 ## Logs changed
 
 If you configure loggers by name or match log messages, update them for the following changes.
