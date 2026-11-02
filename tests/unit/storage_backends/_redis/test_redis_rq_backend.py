@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from importlib.util import find_spec
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
@@ -25,6 +25,16 @@ if TYPE_CHECKING:
 
 # The Redis RQ backend runs Lua scripts, which `fakeredis` executes only with `lupa` installed.
 pytestmark = pytest.mark.skipif(find_spec('lupa') is None, reason='`lupa` is not installed')
+
+
+MODULE = 'crawlee.storage_backends._redis._request_queue_backend'
+
+
+async def _get_blocked_until(rq_backend: RedisRequestQueueBackend, request: Request) -> int:
+    """Read the lock expiry of an in-progress request, in milliseconds."""
+    in_progress = await await_redis_response(rq_backend.redis.hget(rq_backend._in_progress_key, request.unique_key))
+    assert in_progress is not None
+    return json.loads(in_progress)['blocked_until_timestamp']
 
 
 @pytest.fixture(params=['default', 'bloom'])
@@ -354,3 +364,94 @@ async def test_mark_request_as_handled_restores_in_progress_on_pipeline_failure(
     metadata = await rq_backend.get_metadata()
     assert metadata.pending_request_count == 1
     assert metadata.handled_request_count == 0
+
+
+@pytest.mark.parametrize(
+    ('processing_times', 'expected_block_time'),
+    [
+        pytest.param([], timedelta(minutes=3), id='default'),
+        pytest.param([timedelta(minutes=1)], timedelta(minutes=3), id='shorter keeps default'),
+        pytest.param([timedelta(minutes=10)], timedelta(minutes=10), id='longer raises'),
+        pytest.param([timedelta(minutes=10), timedelta(minutes=5)], timedelta(minutes=10), id='never lowered'),
+    ],
+)
+async def test_block_follows_processing_time(
+    rq_backend: RedisRequestQueueBackend,
+    processing_times: list[timedelta],
+    expected_block_time: timedelta,
+) -> None:
+    """Test that a fetched request is blocked for the longest of the default and the expected processing times."""
+    await rq_backend.add_batch_of_requests([Request.from_url('https://example.com/1')])
+    for processing_time in processing_times:
+        await rq_backend.set_expected_request_processing_time(processing_time)
+
+    fetch_started = datetime.now(UTC)
+    request = await rq_backend.fetch_next_request()
+    fetch_finished = datetime.now(UTC)
+    assert request is not None
+
+    blocked_until = await _get_blocked_until(rq_backend, request)
+    earliest = int((fetch_started + expected_block_time).timestamp() * 1000)
+    latest = int((fetch_finished + expected_block_time).timestamp() * 1000)
+    assert earliest <= blocked_until <= latest
+
+
+async def test_extend_moves_lock_expiry(rq_backend: RedisRequestQueueBackend) -> None:
+    """Test that extending a held lock moves its expiry by the given delta."""
+    await rq_backend.add_batch_of_requests([Request.from_url('https://example.com/1')])
+    request = await rq_backend.fetch_next_request()
+    assert request is not None
+    blocked_until = await _get_blocked_until(rq_backend, request)
+
+    assert await rq_backend.extend_request_processing_time(request, timedelta(minutes=10)) is True
+    assert await _get_blocked_until(rq_backend, request) == blocked_until + 600_000
+
+
+async def test_extend_after_handled(rq_backend: RedisRequestQueueBackend) -> None:
+    """Test that the lock of a handled request isn't extended."""
+    await rq_backend.add_batch_of_requests([Request.from_url('https://example.com/1')])
+    request = await rq_backend.fetch_next_request()
+    assert request is not None
+    await rq_backend.mark_request_as_handled(request)
+
+    assert await rq_backend.extend_request_processing_time(request, timedelta(minutes=10)) is False
+
+
+async def test_extend_lock_of_another_client(
+    rq_backend: RedisRequestQueueBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that a lock held by another client isn't extended."""
+    await rq_backend.add_batch_of_requests([Request.from_url('https://example.com/1')])
+    request = await rq_backend.fetch_next_request()
+    assert request is not None
+    blocked_until = await _get_blocked_until(rq_backend, request)
+
+    monkeypatch.setattr(rq_backend, 'client_key', 'another-client')
+
+    assert await rq_backend.extend_request_processing_time(request, timedelta(minutes=10)) is False
+    assert await _get_blocked_until(rq_backend, request) == blocked_until
+
+
+async def test_extend_expired_lock(rq_backend: RedisRequestQueueBackend, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that a lock that has already expired isn't extended."""
+    await rq_backend.add_batch_of_requests([Request.from_url('https://example.com/1')])
+    request = await rq_backend.fetch_next_request()
+    assert request is not None
+
+    after_expiry = datetime.now(UTC) + timedelta(hours=1)
+    monkeypatch.setattr(f'{MODULE}.datetime', Mock(now=Mock(return_value=after_expiry)))
+
+    assert await rq_backend.extend_request_processing_time(request, timedelta(minutes=10)) is False
+
+
+@pytest.mark.parametrize(
+    'delta',
+    [
+        pytest.param(timedelta(0), id='zero'),
+        pytest.param(timedelta(seconds=-1), id='negative'),
+    ],
+)
+async def test_extend_rejects_non_positive_delta(rq_backend: RedisRequestQueueBackend, delta: timedelta) -> None:
+    """Test that a lock extension must be positive."""
+    with pytest.raises(ValueError, match='must be positive'):
+        await rq_backend.extend_request_processing_time(Request.from_url('https://example.com/1'), delta)

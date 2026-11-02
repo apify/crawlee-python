@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from sqlalchemy import inspect, select
@@ -23,6 +24,8 @@ if TYPE_CHECKING:
     from sqlalchemy import Connection
 
     from crawlee.storage_backends._sql import SqlRequestQueueBackend
+
+MODULE = 'crawlee.storage_backends._sql._request_queue_backend'
 
 
 @pytest.fixture
@@ -45,6 +48,15 @@ async def rq_backend(
         )
         yield backend
         await backend.drop()
+
+
+async def _get_blocked_until(rq_backend: SqlRequestQueueBackend) -> datetime | None:
+    """Read the lock expiry of the only request in the queue."""
+    metadata = await rq_backend.get_metadata()
+    async with rq_backend.get_session() as session:
+        stmt = select(RequestDb.time_blocked_until).where(RequestDb.request_queue_id == metadata.id)
+        result = await session.execute(stmt)
+        return result.scalar_one()
 
 
 # Helper function that allows you to use inspect with an asynchronous engine
@@ -277,3 +289,94 @@ async def test_get_metadata_does_not_retry_on_unexpected_exception(rq_backend: S
 
     # Verify that retry logic was not attempted
     assert mock_sleep.call_count == 0
+
+
+@pytest.mark.parametrize(
+    ('processing_times', 'expected_block_time'),
+    [
+        pytest.param([], timedelta(minutes=3), id='default'),
+        pytest.param([timedelta(minutes=1)], timedelta(minutes=3), id='shorter keeps default'),
+        pytest.param([timedelta(minutes=10)], timedelta(minutes=10), id='longer raises'),
+        pytest.param([timedelta(minutes=10), timedelta(minutes=5)], timedelta(minutes=10), id='never lowered'),
+    ],
+)
+async def test_block_follows_processing_time(
+    rq_backend: SqlRequestQueueBackend,
+    processing_times: list[timedelta],
+    expected_block_time: timedelta,
+) -> None:
+    """Test that a fetched request is blocked for the longest of the default and the expected processing times."""
+    await rq_backend.add_batch_of_requests([Request.from_url('https://example.com/1')])
+    for processing_time in processing_times:
+        await rq_backend.set_expected_request_processing_time(processing_time)
+
+    fetch_started = datetime.now(UTC)
+    request = await rq_backend.fetch_next_request()
+    fetch_finished = datetime.now(UTC)
+    assert request is not None
+
+    blocked_until = await _get_blocked_until(rq_backend)
+    assert blocked_until is not None
+    assert fetch_started + expected_block_time <= blocked_until <= fetch_finished + expected_block_time
+
+
+async def test_extend_moves_lock_expiry(rq_backend: SqlRequestQueueBackend) -> None:
+    """Test that extending a held lock moves its expiry by the given delta."""
+    await rq_backend.add_batch_of_requests([Request.from_url('https://example.com/1')])
+    request = await rq_backend.fetch_next_request()
+    assert request is not None
+    blocked_until = await _get_blocked_until(rq_backend)
+    assert blocked_until is not None
+
+    assert await rq_backend.extend_request_processing_time(request, timedelta(minutes=10)) is True
+    assert await _get_blocked_until(rq_backend) == blocked_until + timedelta(minutes=10)
+
+
+async def test_extend_after_handled(rq_backend: SqlRequestQueueBackend) -> None:
+    """Test that the lock of a handled request isn't extended."""
+    await rq_backend.add_batch_of_requests([Request.from_url('https://example.com/1')])
+    request = await rq_backend.fetch_next_request()
+    assert request is not None
+    await rq_backend.mark_request_as_handled(request)
+
+    assert await rq_backend.extend_request_processing_time(request, timedelta(minutes=10)) is False
+
+
+async def test_extend_lock_of_another_client(
+    rq_backend: SqlRequestQueueBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that a lock held by another client isn't extended."""
+    await rq_backend.add_batch_of_requests([Request.from_url('https://example.com/1')])
+    request = await rq_backend.fetch_next_request()
+    assert request is not None
+    blocked_until = await _get_blocked_until(rq_backend)
+
+    monkeypatch.setattr(rq_backend, 'client_key', 'another-client')
+
+    assert await rq_backend.extend_request_processing_time(request, timedelta(minutes=10)) is False
+    assert await _get_blocked_until(rq_backend) == blocked_until
+
+
+async def test_extend_expired_lock(rq_backend: SqlRequestQueueBackend, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that a lock that has already expired isn't extended."""
+    await rq_backend.add_batch_of_requests([Request.from_url('https://example.com/1')])
+    request = await rq_backend.fetch_next_request()
+    assert request is not None
+
+    after_expiry = datetime.now(UTC) + timedelta(hours=1)
+    monkeypatch.setattr(f'{MODULE}.datetime', Mock(now=Mock(return_value=after_expiry)))
+
+    assert await rq_backend.extend_request_processing_time(request, timedelta(minutes=10)) is False
+
+
+@pytest.mark.parametrize(
+    'delta',
+    [
+        pytest.param(timedelta(0), id='zero'),
+        pytest.param(timedelta(seconds=-1), id='negative'),
+    ],
+)
+async def test_extend_rejects_non_positive_delta(rq_backend: SqlRequestQueueBackend, delta: timedelta) -> None:
+    """Test that a lock extension must be positive."""
+    with pytest.raises(ValueError, match='must be positive'):
+        await rq_backend.extend_request_processing_time(Request.from_url('https://example.com/1'), delta)

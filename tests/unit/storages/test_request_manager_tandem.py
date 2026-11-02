@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import create_autospec
 
 import pytest
@@ -202,3 +202,26 @@ def test_pacing_signal_forwarded_to_manager(*, accepted: bool) -> None:
 
     assert RequestManagerTandem(loader, manager).record_pacing_signal(signal) is accepted
     manager.record_pacing_signal.assert_called_once_with(signal)
+
+
+async def test_processing_time_forwards_to_manager() -> None:
+    """Test that the tandem passes an expected processing time to its manager and leaves the loader alone."""
+    loader = create_autospec(RequestLoader, instance=True, spec_set=True)
+    manager = create_autospec(RequestManager, instance=True, spec_set=True)
+
+    await RequestManagerTandem(loader, manager).set_expected_request_processing_time(timedelta(minutes=10))
+
+    manager.set_expected_request_processing_time.assert_awaited_once_with(timedelta(minutes=10))
+    assert loader.mock_calls == []
+
+
+async def test_extend_forwards_to_manager() -> None:
+    """Test that the tandem passes a lock extension to its manager and returns its result."""
+    loader = create_autospec(RequestLoader, instance=True, spec_set=True)
+    manager = create_autospec(RequestManager, instance=True, spec_set=True)
+    manager.extend_request_processing_time.return_value = True
+    request = Request.from_url('https://example.com/1')
+
+    assert await RequestManagerTandem(loader, manager).extend_request_processing_time(request, timedelta(minutes=1))
+    manager.extend_request_processing_time.assert_awaited_once_with(request, timedelta(minutes=1))
+    assert loader.mock_calls == []

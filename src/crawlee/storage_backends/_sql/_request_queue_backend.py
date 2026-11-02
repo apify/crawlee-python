@@ -95,9 +95,8 @@ class SqlRequestQueueBackend(
     _STORAGE_TYPE = 'Request queue'
     """Human-readable storage type for error messages."""
 
-    _BLOCK_REQUEST_TIME = 300
-    """Number of seconds for which a request is considered blocked in the database after being fetched for processing.
-    """
+    _DEFAULT_BLOCK_REQUEST_TIME = timedelta(minutes=3)
+    """How long a fetched request stays blocked unless a longer expected processing time is set."""
 
     _BUFFER_TABLE = RequestQueueMetadataBufferDb
     """SQLAlchemy model for metadata buffer."""
@@ -122,6 +121,9 @@ class SqlRequestQueueBackend(
 
         self._had_multiple_clients = False
         """Indicates whether the queue has been accessed by multiple clients."""
+
+        self._block_request_time = self._DEFAULT_BLOCK_REQUEST_TIME
+        """How long a request is considered blocked in the database after being fetched for processing."""
 
     @classmethod
     async def open(
@@ -423,7 +425,7 @@ class SqlRequestQueueBackend(
             return self._pending_fetch_cache.popleft()
 
         now = datetime.now(UTC)
-        block_until = now + timedelta(seconds=self._BLOCK_REQUEST_TIME)
+        block_until = now + self._block_request_time
         dialect = self._storage_backend.get_dialect_name()
 
         # Get available requests not blocked by another client
@@ -560,7 +562,7 @@ class SqlRequestQueueBackend(
                 new_sequence = state.forefront_sequence_counter
                 state.forefront_sequence_counter -= 1
                 now = datetime.now(UTC)
-                block_until = now + timedelta(seconds=self._BLOCK_REQUEST_TIME)
+                block_until = now + self._block_request_time
                 # Extend blocking for forefront request, it is considered blocked by the current client.
                 stmt = stmt.values(
                     sequence_number=new_sequence,
@@ -665,6 +667,43 @@ class SqlRequestQueueBackend(
             await self._add_buffer_record(session, update_modified_at=True, recalculate=True)
 
         return False
+
+    @override
+    async def set_expected_request_processing_time(self, processing_time: timedelta) -> None:
+        # Only raised, so a short expected processing time never cuts the default block.
+        self._block_request_time = max(self._block_request_time, processing_time)
+
+    @retry_on_error(SQLAlchemyError)
+    @override
+    async def extend_request_processing_time(self, request: Request, delta: timedelta) -> bool:
+        if delta <= timedelta(0):
+            raise ValueError(f'The lock extension must be positive, got {delta}.')
+
+        request_id = self._get_int_id_from_unique_key(request.unique_key)
+        held_by_this_client = (
+            self._ITEM_TABLE.request_queue_id == self._id,
+            self._ITEM_TABLE.request_id == request_id,
+            self._ITEM_TABLE.client_key == self.client_key,
+            self._ITEM_TABLE.time_blocked_until >= datetime.now(UTC),
+        )
+
+        async with self.get_session(with_simple_commit=True) as session:
+            select_stmt = select(self._ITEM_TABLE.time_blocked_until).where(*held_by_this_client)
+            select_result = await session.execute(select_stmt)
+            blocked_until = select_result.scalar_one_or_none()
+            if blocked_until is None:
+                return False
+
+            # Matching the expiry read above leaves the row untouched if the request was locked anew in between.
+            update_stmt = (
+                update(self._ITEM_TABLE)
+                .where(*held_by_this_client, self._ITEM_TABLE.time_blocked_until == blocked_until)
+                .values(time_blocked_until=blocked_until + delta)
+            )
+            result = await session.execute(update_stmt)
+            result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
+
+        return result.rowcount == 1
 
     async def _get_state(self, session: AsyncSession) -> RequestQueueStateDb:
         """Get the current state of the request queue."""
