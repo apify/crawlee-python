@@ -2,18 +2,47 @@ from __future__ import annotations
 
 import os
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
 class Glob:
-    """Wraps a glob pattern (supports the `*`, `**`, `?` wildcards)."""
+    """Wraps a glob pattern (supports the `*`, `**`, `?` wildcards).
+
+    The pattern must match the whole URL, and the matching is case-insensitive. For case-sensitive matching, use a
+    regular expression.
+    """
 
     def __init__(self, glob: str) -> None:
         self.glob = glob
-        self.regexp = re.compile(_translate(self.glob, recursive=True))
+        self.regexp = re.compile(_translate(self.glob, recursive=True), re.IGNORECASE)
+
+
+def matches_url_pattern(pattern: re.Pattern[Any] | Glob, url: str) -> bool:
+    """Check whether `url` matches an include or exclude pattern.
+
+    A glob must match the whole URL, while a regular expression may match anywhere in it, the same as in Crawlee JS.
+    """
+    if isinstance(pattern, Glob):
+        return pattern.regexp.match(url) is not None
+    return pattern.search(url) is not None
+
+
+def check_url_patterns(
+    url: str,
+    include: Sequence[re.Pattern[Any] | Glob] | None,
+    exclude: Sequence[re.Pattern[Any] | Glob] | None,
+) -> bool:
+    """Check whether `url` matches no `exclude` pattern and, when `include` is given, at least one `include` pattern."""
+    if any(matches_url_pattern(pattern, url) for pattern in exclude or ()):
+        return False
+
+    if include is None:
+        return True
+
+    return any(matches_url_pattern(pattern, url) for pattern in include)
 
 
 def _translate(

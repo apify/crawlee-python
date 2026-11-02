@@ -903,6 +903,36 @@ INCLUDE_TEST_URLS = (
             ),
             id='include_exclude_3',
         ),
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=INCLUDE_TEST_URLS[0],
+                loaded_url=INCLUDE_TEST_URLS[0],
+                requests=INCLUDE_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(include=[re.compile(r'/cats$')], exclude=[re.compile(r'/archive/')]),
+                expected_urls=[INCLUDE_TEST_URLS[1]],
+            ),
+            id='include_exclude_regex_matches_anywhere',
+        ),
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=INCLUDE_TEST_URLS[0],
+                loaded_url=INCLUDE_TEST_URLS[0],
+                requests=INCLUDE_TEST_URLS,
+                kwargs=EnqueueLinksKwargs(include=[Glob('https://SomePlace.com/**/CATS')]),
+                expected_urls=[INCLUDE_TEST_URLS[1], INCLUDE_TEST_URLS[4]],
+            ),
+            id='include_glob_case_insensitive',
+        ),
+        pytest.param(
+            AddRequestsTestInput(
+                start_url=INCLUDE_TEST_URLS[0],
+                loaded_url=INCLUDE_TEST_URLS[0],
+                requests=INCLUDE_TEST_URLS[1:],
+                kwargs=EnqueueLinksKwargs(exclude=[Glob('https://**/category/**')], limit=1),
+                expected_urls=[INCLUDE_TEST_URLS[3]],
+            ),
+            id='limit_counts_requests_passing_filters',
+        ),
     ],
 )
 async def test_enqueue_strategy(test_input: AddRequestsTestInput) -> None:
