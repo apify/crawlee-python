@@ -535,7 +535,9 @@ class PlaywrightCrawler(
             request_url=context.request.url,
             retry_after_header=context.response.headers.get('retry-after'),
         ):
-            raise RequestThrottledError(f'{context.request.url} responded with 429.')
+            error = RequestThrottledError(f'{context.request.url} responded with 429.')
+            error.reported = True
+            raise error
         if self._retry_on_blocked:
             self._raise_for_session_blocked_status_code(context.session, status_code)
         self._raise_for_error_status_code(status_code)

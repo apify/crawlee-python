@@ -1573,7 +1573,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         except RequestHandlerError as primary_error:
             if isinstance(primary_error.wrapped_exception, RequestThrottledError) and await self._report_rate_limit(
-                request
+                request, primary_error.wrapped_exception
             ):
                 await self._defer_throttled_request(request, primary_error.wrapped_exception)
                 return
@@ -1640,7 +1640,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         except ContextPipelineInitializationError as initialization_error:
             wrapped = initialization_error.wrapped_exception
-            if isinstance(wrapped, RequestThrottledError) and await self._report_rate_limit(request):
+            if isinstance(wrapped, RequestThrottledError) and await self._report_rate_limit(request, wrapped):
                 await self._defer_throttled_request(request, wrapped)
                 return
 
@@ -1665,12 +1665,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 except Exception:
                     self._logger.exception('Error in deferred cleanup')
 
-    async def _report_rate_limit(self, request: Request) -> bool:
+    async def _report_rate_limit(self, request: Request, error: RequestThrottledError) -> bool:
         """Report a rate limit for the request's URL and check whether the request manager took responsibility for it.
 
         Only then is a `RequestThrottledError` deferred, since otherwise the request would be dispatched again at once.
         Logs a one-time warning when the manager refuses, since the error is then handled as an ordinary error.
         """
+        # A second report of the same refusal could arrive after its backoff has ended and count as a new refusal.
+        if error.reported:
+            return True
+
         request_manager = await self.get_request_manager()
         # An error raised from here would bypass the request error handling and end the crawl.
         try:
@@ -1683,6 +1687,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return False
 
         if accepted:
+            error.reported = True
             return True
 
         self._logger_once.log(
@@ -1696,6 +1701,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def _defer_throttled_request(self, request: Request, error: RequestThrottledError) -> None:
         """Give a rate-limited request back to the request manager without counting a failure or a retry."""
+        # User code may raise the same instance again for a later refusal, which then has to be reported anew.
+        error.reported = False
         request.state = RequestState.ERROR_HANDLER
         self._logger.debug(
             f'Deferring request because its domain is rate-limiting us. {error}',

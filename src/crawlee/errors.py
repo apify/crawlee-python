@@ -130,6 +130,12 @@ class RequestThrottledError(Exception):
     request never fails.
     """
 
+    reported: bool = False
+    """Whether this rate limit has already been reported to the crawler's request manager.
+
+    The crawler skips its own report while it's `True`, and resets it to `False` once it defers the request.
+    """
+
     def __init__(self, message: str = 'Request is being retried later because its domain is rate-limiting us') -> None:
         super().__init__(message)
 

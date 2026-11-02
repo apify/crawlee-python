@@ -16,6 +16,7 @@ from crawlee.crawlers import HttpCrawler
 from crawlee.errors import PersistentRateLimitError
 from crawlee.http_clients import HttpClient, HttpResponse
 from crawlee.request_loaders import (
+    RateLimitedSignal,
     RequestList,
     RequestManagerTandem,
     ThrottlingRequestManager,
@@ -822,6 +823,22 @@ async def test_tandem_429_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
     assert context.request.retry_count == 0
     assert (context.request.session_rotation_count or 0) == 0
     assert throttler._domain_states['throttled.placeholder.com'].consecutive_429_count == 1
+
+
+async def test_429_reported_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A 429 is reported to the request manager once, not again when the crawler defers the request."""
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
+    record_pacing_signal = Mock(wraps=throttler.record_pacing_signal)
+    monkeypatch.setattr(throttler, 'record_pacing_signal', record_pacing_signal)
+    http_client = AsyncMock(spec=HttpClient)
+    url = 'https://throttled.placeholder.com/page'
+    http_client.send_request.side_effect = [mock_response(429, url), mock_response(200, url)]
+    crawler = HttpCrawler(http_client=http_client, request_manager=throttler)
+    crawler.router.default_handler(AsyncMock())
+
+    await crawler.run([url])
+
+    record_pacing_signal.assert_called_once_with(RateLimitedSignal(url))
 
 
 @pytest.mark.parametrize(

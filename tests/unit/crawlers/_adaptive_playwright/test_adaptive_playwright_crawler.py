@@ -979,6 +979,8 @@ async def test_throttled_static_429_is_deferred(monkeypatch: pytest.MonkeyPatch)
     """A throttled 429 from the static sub crawler defers the request without falling back to the browser."""
     url = 'https://throttled.placeholder.com/page'
     throttler = await open_throttler_held_until_reclaim(monkeypatch)
+    record_pacing_signal = Mock(wraps=throttler.record_pacing_signal)
+    monkeypatch.setattr(throttler, 'record_pacing_signal', record_pacing_signal)
     http_client = AsyncMock(spec=HttpClient)
     http_client.send_request.side_effect = [
         Mock(
@@ -1020,12 +1022,15 @@ async def test_throttled_static_429_is_deferred(monkeypatch: pytest.MonkeyPatch)
     assert len(handled) == 1
     assert handled[0].request.retry_count == 0
     assert throttler._domain_states['throttled.placeholder.com'].consecutive_429_count == 1
+    record_pacing_signal.assert_called_once()
 
 
 async def test_static_handler_raised_throttled_error_is_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
     """A `RequestThrottledError` from the static handler defers the request without falling back to the browser."""
     url = 'https://throttled.placeholder.com/page'
     throttler = await open_throttler_held_until_reclaim(monkeypatch)
+    record_pacing_signal = Mock(wraps=throttler.record_pacing_signal)
+    monkeypatch.setattr(throttler, 'record_pacing_signal', record_pacing_signal)
     http_client = AsyncMock(spec=HttpClient)
     http_client.send_request.return_value = Mock(
         spec=HttpResponse,
@@ -1062,6 +1067,7 @@ async def test_static_handler_raised_throttled_error_is_deferred(monkeypatch: py
     browser_navigations.assert_not_called()
     assert handler_calls.call_count == 2
     assert throttler._domain_states['throttled.placeholder.com'].consecutive_429_count == 1
+    record_pacing_signal.assert_called_once()
 
 
 async def test_static_throttled_error_without_backoff_falls_back_to_browser(test_urls: list[str]) -> None:

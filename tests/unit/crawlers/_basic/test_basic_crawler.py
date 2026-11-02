@@ -3182,6 +3182,22 @@ async def test_handler_raised_throttled_error_is_deferred(monkeypatch: pytest.Mo
     assert throttler._domain_states['throttled.placeholder.com'].consecutive_429_count == 1
 
 
+async def test_reraised_throttled_error_is_reported_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A `RequestThrottledError` instance raised again is reported to the request manager again."""
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
+    record_pacing_signal = Mock(wraps=throttler.record_pacing_signal)
+    monkeypatch.setattr(throttler, 'record_pacing_signal', record_pacing_signal)
+    crawler = BasicCrawler(request_manager=throttler, max_request_retries=0)
+    error = RequestThrottledError()
+    handler = AsyncMock(side_effect=[error, error, None])
+    crawler.router.default_handler(handler)
+
+    await crawler.run([THROTTLED_URL])
+
+    assert handler.await_count == 3
+    assert record_pacing_signal.call_count == 2
+
+
 async def test_deferred_request_is_reclaimed_to_the_front(monkeypatch: pytest.MonkeyPatch) -> None:
     """A request deferred by a `RequestThrottledError` is reclaimed at the front of the queue."""
     throttler = await open_throttler_held_until_reclaim(monkeypatch)

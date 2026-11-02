@@ -170,7 +170,6 @@ To implement `record_pacing_signal` in your own request manager:
 
 - Return `False` when the manager doesn't pace its requests, as <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink> does. The crawler then logs that the signal was dropped. New signals may be added in a minor release, so also return `False` for a signal you don't handle.
 - Return `True` for a `RateLimitedSignal` only if the URL won't be dispatched again until a positive delay has passed. The crawler defers such a request without spending a retry.
-- Treat a `RateLimitedSignal` for a URL that's already held back as part of the same refusal. The crawler may report one refusal more than once, and the repeats carry no `wait`.
 - If the manager wraps another one, forward every signal to it without inspecting it, as <ApiLink to="class/RequestManagerTandem">`RequestManagerTandem`</ApiLink> does. Otherwise a pacer nested inside it never receives the signal.
 
 ## Request manager tandem
