@@ -937,7 +937,7 @@ async def test_pending_count_after_migration(
 ) -> None:
     """Test that a request migrated from inner to its domain's sub-manager counts once as pending."""
     await inner_queue.add_requests([f'https://{THROTTLED_DOMAIN}/page{i}' for i in range(2)])
-    manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/', retry_after=timedelta(seconds=60))
+    manager.record_pacing_signal(RateLimitedSignal(f'https://{THROTTLED_DOMAIN}/', wait=timedelta(seconds=60)))
 
     assert await manager.fetch_next_request() is None
 
