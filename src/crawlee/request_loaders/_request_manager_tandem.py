@@ -42,7 +42,14 @@ class RequestManagerTandem(RequestManager):
 
     @override
     async def get_total_count(self) -> int:
-        return (await self._read_only_loader.get_total_count()) + (await self._read_write_manager.get_total_count())
+        # A request moved into the manager counts as handled in the loader, so only the loader's pending ones are added.
+        loader_pending = await self._read_only_loader.get_pending_count()
+        return loader_pending + (await self._read_write_manager.get_total_count())
+
+    @override
+    async def get_pending_count(self) -> int:
+        loader_pending = await self._read_only_loader.get_pending_count()
+        return loader_pending + (await self._read_write_manager.get_pending_count())
 
     @override
     async def check_readiness(self) -> RequestSourceStatus:
