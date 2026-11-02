@@ -361,12 +361,12 @@ class PlaywrightCrawler(
     @staticmethod
     def _add_context_headers(request: Request, context_headers: Mapping[str, str]) -> dict[str, str]:
         """Add the browser context headers missing from `request.headers` and return the added ones."""
-        added_headers = {
-            name.lower(): value for name, value in context_headers.items() if name.lower() not in request.headers
-        }
+        added_headers = HttpHeaders(
+            {name: value for name, value in context_headers.items() if name not in request.headers}
+        )
         if added_headers:
-            request.headers = request.headers | HttpHeaders(added_headers)
-        return added_headers
+            request.headers = request.headers | added_headers
+        return dict(added_headers)
 
     @staticmethod
     def _remove_context_headers(request: Request, added_headers: Mapping[str, str]) -> None:
