@@ -659,15 +659,22 @@ async def test_cookie_header_rebuilt_per_hop(http_client: HttpClient, server_url
 
 
 async def test_cookie_header_wins_over_session(http_client: HttpClient, server_url: URL) -> None:
-    """Test that a `Cookie` header passed by the caller replaces the cookies of the session."""
-    session = Session(cookies=[CookieParam(name='from_jar', value='1', domain=server_url.host or '')])
+    """Test that the `Cookie` header of the caller is merged with the session cookies and wins on a shared name."""
+    session = Session(
+        cookies=[
+            CookieParam(name='manual', value='from_jar', domain=server_url.host or ''),
+            CookieParam(name='from_jar', value='1', domain=server_url.host or ''),
+        ]
+    )
 
     async with await http_client.send_request(
-        str(server_url / 'cookies'),
+        str(server_url / 'headers'),
         session=session,
         headers={'cookie': 'manual=value'},
     ) as response:
-        assert (await read_json(response))['cookies'] == {'manual': 'value'}
+        cookie_header = (await read_json(response))['cookie']
+
+    assert sorted(cookie_header.split('; ')) == ['from_jar=1', 'manual=value']
 
 
 async def test_cookie_header_not_stored_in_session(http_client: HttpClient, server_url: URL) -> None:
@@ -720,30 +727,30 @@ async def test_session_cookies_take_over_cross_origin(
 
 
 async def test_cookie_header_wins_over_session_on_redirect(http_client: HttpClient, server_url: URL) -> None:
-    """Test that a `Cookie` header of the caller keeps beating the session cookies after a redirect."""
-    session = Session(cookies=[CookieParam(name='from_jar', value='1', domain=server_url.host or '')])
-    redirect_url = (server_url / 'redirect').with_query(url=str(server_url / 'cookies'), status=302)
+    """Test that a cookie in the `Cookie` header of the caller keeps beating the session cookie after a redirect."""
+    session = Session(cookies=[CookieParam(name='manual', value='from_jar', domain=server_url.host or '')])
+    redirect_url = (server_url / 'redirect').with_query(url=str(server_url / 'headers'), status=302)
 
     async with await http_client.send_request(
         str(redirect_url),
         session=session,
         headers={'cookie': 'manual=value'},
     ) as response:
-        assert (await read_json(response))['cookies'] == {'manual': 'value'}
+        assert (await read_json(response))['cookie'] == 'manual=value'
 
 
-async def test_empty_cookie_header_suppresses_session_cookies(http_client: HttpClient, server_url: URL) -> None:
-    """Test that an empty `Cookie` header of the caller keeps the session cookies out of every hop."""
+async def test_empty_cookie_header_keeps_session_cookies(http_client: HttpClient, server_url: URL) -> None:
+    """Test that the session cookies reach every hop despite an empty `Cookie` header of the caller."""
     session = Session(cookies=[CookieParam(name='from_jar', value='1', domain=server_url.host or '')])
     redirect_url = (server_url / 'redirect').with_query(url=str(server_url / 'cookies'), status=302)
 
     async with await http_client.send_request(
         str(server_url / 'cookies'), session=session, headers={'cookie': ''}
     ) as direct:
-        assert (await read_json(direct))['cookies'] == {}
+        assert (await read_json(direct))['cookies'] == {'from_jar': '1'}
 
     async with await http_client.send_request(str(redirect_url), session=session, headers={'cookie': ''}) as redirected:
-        assert (await read_json(redirected))['cookies'] == {}
+        assert (await read_json(redirected))['cookies'] == {'from_jar': '1'}
 
 
 async def test_auth_kept_same_origin(http_client: HttpClient, server_url: URL) -> None:
