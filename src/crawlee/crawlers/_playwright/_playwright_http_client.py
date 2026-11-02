@@ -8,8 +8,7 @@ from typing_extensions import override
 
 from crawlee.crawlers._playwright._types import PlaywrightHttpResponse
 from crawlee.http_clients import HttpClient
-from crawlee.sessions import Session
-from crawlee.sessions._cookies import PlaywrightCookieParam
+from crawlee.sessions._cookies import PlaywrightCookieParam, SessionCookies
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -20,9 +19,13 @@ if TYPE_CHECKING:
     from crawlee._types import HttpHeaders, HttpMethod, HttpPayload
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
+    from crawlee.sessions import Session
 
 
 _browser_page_context_var: contextvars.ContextVar[Page | None] = contextvars.ContextVar('browser_context', default=None)
+
+# Set while `send_request` sends the cookies passed by the caller instead of the cookies of the browser context.
+_caller_cookies_var: contextvars.ContextVar[bool] = contextvars.ContextVar('caller_cookies', default=False)
 
 
 @asynccontextmanager
@@ -55,6 +58,7 @@ class PlaywrightHttpClient(HttpClient):
         headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
         session: Session | None = None,
+        cookies: SessionCookies | None = None,
         proxy_info: ProxyInfo | None = None,
         timeout: timedelta | None = None,
     ) -> HttpResponse:
@@ -62,26 +66,31 @@ class PlaywrightHttpClient(HttpClient):
         # https://github.com/apify/crawlee-python/issues/1055
 
         page = _browser_page_context_var.get()
+        token = _caller_cookies_var.set(cookies is not None)
 
-        # The browser context holds the cookies of the session, added before the navigation, with the changes the page
-        # made since. The browser stores the response cookies there too, and the crawler saves them to the session after
-        # the request handler.
-        if page is not None:
-            context_cookies = await page.context.cookies()
-            session = Session()
-            session.cookies.set_cookies_from_playwright_format(
-                [PlaywrightCookieParam(**cookie) for cookie in context_cookies]
+        try:
+            # The browser context holds the cookies of the session, added before the navigation, with the changes the
+            # page made since. The browser stores the response cookies there too, and the crawler saves them to the
+            # session after the request handler.
+            if page is not None and cookies is None:
+                context_cookies = await page.context.cookies()
+                cookies = SessionCookies()
+                cookies.set_cookies_from_playwright_format(
+                    [PlaywrightCookieParam(**cookie) for cookie in context_cookies]
+                )
+
+            return await super().send_request(
+                url,
+                method=method,
+                headers=headers,
+                payload=payload,
+                session=session,
+                cookies=cookies,
+                proxy_info=proxy_info,
+                timeout=timeout,
             )
-
-        return await super().send_request(
-            url,
-            method=method,
-            headers=headers,
-            payload=payload,
-            session=session,
-            proxy_info=proxy_info,
-            timeout=timeout,
-        )
+        finally:
+            _caller_cookies_var.reset(token)
 
     @override
     async def _fetch(
@@ -100,11 +109,16 @@ class PlaywrightHttpClient(HttpClient):
         if browser_context is None:
             raise RuntimeError('Unable to create an `APIRequestContext` outside the browser context')
 
+        fetch_headers = dict(headers)
+        if _caller_cookies_var.get():
+            # Without a `Cookie` header, Playwright sends the cookies of the browser context.
+            fetch_headers.setdefault('cookie', '')
+
         # Proxies appropriate to the browser context are used
         response = await browser_context.request.fetch(
             url_or_request=url,
             method=method.lower(),
-            headers=dict(headers) or None,
+            headers=fetch_headers or None,
             data=payload,
             timeout=timeout.total_seconds() * 1000 if timeout is not None else None,
             # Redirects are followed hop by hop by `send_request`.

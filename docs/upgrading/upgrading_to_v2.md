@@ -387,13 +387,15 @@ The `headers` argument of a client still applies to every request. Its `Authoriz
 
 A `Cookie` header passed with a request or set on the client is merged with the session cookies while the redirect chain stays on its origin. A cookie in the header wins over a session cookie of the same name and isn't stored in the session. In v1, `ImpitHttpClient`, `HttpxHttpClient` and `context.send_request` of `PlaywrightCrawler` sent the header instead of the session cookies, so an empty `Cookie` header kept them out. `CurlImpersonateHttpClient` sent the session cookies in a second `Cookie` header.
 
+`send_request` and `context.send_request` take a new `cookies` argument, the cookies to send and store instead of the session cookies for a single call. To send no session cookies, pass `cookies=SessionCookies()`. With `PlaywrightCrawler`, the response cookies still reach the session through the browser context.
+
 Without a session, or with `persist_cookies_per_session=False`, the cookies a server sets during a redirect chain are sent with the following requests of that chain. In v1, `ImpitHttpClient` and `HttpxHttpClient` didn't send them.
 
 ### Some client arguments are ignored
 
 The following keyword arguments of the underlying libraries are now ignored with a warning:
 
-- `cookies` of every client and `cookie_jar` of `ImpitHttpClient`, since cookies are kept in sessions.
+- `cookies` of every client and `cookie_jar` of `ImpitHttpClient`, since cookies are kept in sessions. To send other cookies with a single call, pass `cookies` to `send_request`.
 - `auth` and `params` of `HttpxHttpClient` and `CurlImpersonateHttpClient`, which would reach every request of a redirect chain. Pass the credentials in the `Authorization` header and the query in the URL instead.
 - `max_redirects` of every client and `allow_redirects` of `CurlImpersonateHttpClient`, since `send_request` follows the redirects.
 

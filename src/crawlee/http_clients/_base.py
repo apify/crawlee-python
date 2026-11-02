@@ -226,6 +226,7 @@ class HttpClient(ABC):
         headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
         session: Session | None = None,
+        cookies: SessionCookies | None = None,
         proxy_info: ProxyInfo | None = None,
         timeout: timedelta | None = None,
     ) -> HttpResponse:
@@ -246,6 +247,8 @@ class HttpClient(ABC):
             session: The session whose cookies are sent. The response cookies are stored in it when
                 `persist_cookies_per_session` is enabled. Otherwise, and without a session, they are kept only for the
                 redirect chain of this request.
+            cookies: The cookies to send and store instead of the cookies of `session`, even with
+                `persist_cookies_per_session` disabled.
             proxy_info: The information about the proxy to be used.
             timeout: Maximum time allowed to receive the response, including all redirects, and to read its body.
                 Without it, the default timeout of the HTTP client applies.
@@ -263,13 +266,14 @@ class HttpClient(ABC):
         # The headers of the client go through the redirect rules below too, so its credentials never leave the origin.
         headers = self._headers | HttpHeaders(headers or {})
 
-        if session is None:
-            cookies = SessionCookies()
-        elif self._persist_cookies_per_session:
-            cookies = session.cookies
-        else:
-            # The cookies of the session are still sent, but the response cookies go to a copy.
-            cookies = SessionCookies(session.cookies)
+        if cookies is None:
+            if session is None:
+                cookies = SessionCookies()
+            elif self._persist_cookies_per_session:
+                cookies = session.cookies
+            else:
+                # The cookies of the session are still sent, but the response cookies go to a copy.
+                cookies = SessionCookies(session.cookies)
 
         # `encoded=True` keeps the path and the query byte for byte, including a safe `%2F` in query.
         current_url = _with_ascii_host(URL(url, encoded=True))

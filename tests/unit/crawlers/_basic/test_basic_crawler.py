@@ -49,7 +49,7 @@ from crawlee.request_loaders import (
     StalledStatus,
     ThrottlingRequestManager,
 )
-from crawlee.sessions import Session, SessionPool
+from crawlee.sessions import Session, SessionCookies, SessionPool
 from crawlee.statistics import FinalStatistics, Statistics, StatisticsState
 from crawlee.storage_backends import FileSystemStorageBackend, MemoryStorageBackend
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
@@ -652,6 +652,7 @@ async def test_send_request_forwards_timeout_to_http_client() -> None:
     http_client.send_request.return_value = response
     crawler = BasicCrawler(http_client=http_client, use_session_pool=False, max_requests_per_crawl=1)
     timeout = timedelta(seconds=12)
+    cookies = SessionCookies({'name': 'value'})
     result = None
 
     @crawler.router.default_handler
@@ -662,6 +663,7 @@ async def test_send_request_forwards_timeout_to_http_client() -> None:
             method='POST',
             payload=b'Hello, world!',
             headers={'Content-Type': 'text/plain'},
+            cookies=cookies,
             timeout=timeout,
         )
 
@@ -674,6 +676,7 @@ async def test_send_request_forwards_timeout_to_http_client() -> None:
         payload=b'Hello, world!',
         headers={'Content-Type': 'text/plain'},
         session=None,
+        cookies=cookies,
         proxy_info=None,
         timeout=timeout,
     )
