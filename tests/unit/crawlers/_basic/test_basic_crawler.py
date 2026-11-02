@@ -687,6 +687,7 @@ STRATEGY_TEST_URLS = (
     'https://someplace.jp/',
 )
 
+
 INCLUDE_TEST_URLS = (
     'https://someplace.com/',
     'https://someplace.com/blog/category/cats',
@@ -2949,9 +2950,11 @@ async def test_crawl_waits_out_backoff() -> None:
 
 THROTTLED_URL = 'https://throttled.placeholder.com/page'
 
+
 # Well above the autoscaled pool's idle tick of 0.5 s, so a stall is detected even on a slow runner and lasts for
 # more than one tick.
 MAX_DOMAIN_STALL = timedelta(milliseconds=1200)
+
 
 # Guards the tests against an endless crawl if deferral or stall detection breaks.
 MAX_HANDLER_CALLS = 50
