@@ -216,16 +216,20 @@ def test_html_to_text_is_linear_in_node_count(html_to_text: Callable[[str], str]
 
     def convert(repeats: int) -> float:
         source = '<html><body><div>' + '<i> a</i>' * repeats + '</div></body></html>'
-        started = time.perf_counter()
+        # CPU time of this process, so time spent descheduled by other xdist workers is not counted.
+        started = time.process_time()
         text = html_to_text(source)
-        elapsed = time.perf_counter() - started
+        elapsed = time.process_time() - started
         assert text == ' '.join(['a'] * repeats)
         return elapsed
 
     # Warm up the parser so one-off setup costs do not skew the small run.
     convert(1000)
-    # Best of three per size, so a single scheduler or GC pause cannot inflate the ratio.
-    small = min(convert(20_000) for _ in range(3))
-    large = min(convert(80_000) for _ in range(3))
+    # Best of three per size, interleaved so that both sizes run under the same machine load.
+    small_runs = list[float]()
+    large_runs = list[float]()
+    for _ in range(3):
+        small_runs.append(convert(20_000))
+        large_runs.append(convert(80_000))
 
-    assert large / small < 10
+    assert min(large_runs) / min(small_runs) < 10
