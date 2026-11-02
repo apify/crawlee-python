@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Ignore a UTF-8 byte order mark in robots.txt ([#2351](https://github.com/apify/crawlee-python/pull/2351)) ([3e6ee66](https://github.com/apify/crawlee-python/commit/3e6ee66ff2949820a9e7480c0248b6aa36c04beb)) by [@RaphaelFakhri](https://github.com/RaphaelFakhri), closes [#2350](https://github.com/apify/crawlee-python/issues/2350)
 - **deps:** Drop the upper bound on sqlalchemy ([#2356](https://github.com/apify/crawlee-python/pull/2356)) ([cadd810](https://github.com/apify/crawlee-python/commit/cadd810428c735a33f4a0e0a64e7e00236cdf6db)) by [@vdusek](https://github.com/vdusek)
 - **sitemap:** Join element text once and reject entity declarations ([#2369](https://github.com/apify/crawlee-python/pull/2369)) ([242be00](https://github.com/apify/crawlee-python/commit/242be00ce7ba07cf8ce00abf80c1c3c0998d4360)) by [@vdusek](https://github.com/vdusek)
+- **browsers:** Remove the persistent browser&#x27;s temp directory after the browser exits ([#2381](https://github.com/apify/crawlee-python/pull/2381)) ([06d331b](https://github.com/apify/crawlee-python/commit/06d331b6c83d51f0aeb6b9d18dddc0c488f81c88)) by [@vdusek](https://github.com/vdusek)
 
 ### ⚡ Performance
 
