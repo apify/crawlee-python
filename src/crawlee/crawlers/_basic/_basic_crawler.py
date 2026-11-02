@@ -571,7 +571,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     @property
     def _run(self) -> CrawlerRun[TStatisticsState]:
-        """The last run started on this instance, for the code that only a run drives."""
+        """The last run started on this instance. Only code that a run drives may use it."""
         if self._last_run is None:
             raise RuntimeError('No crawl has been started yet, only `run()` starts one.')
 
@@ -595,7 +595,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if self._live_run is not None:
             self._live_run.stop()
         else:
-            # `create_task(crawler.run())` doesn't start the coroutine yet, so the stop waits for the next run.
+            # A caller can stop a run it scheduled with `create_task(crawler.run())` before the task starts.
             self._stop_before_run = True
 
     def _wrap_handler_with_error_context(
