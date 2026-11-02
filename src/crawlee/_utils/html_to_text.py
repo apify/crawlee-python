@@ -31,6 +31,4 @@ BLOCK_TAGS = {
     'option',
 }
 
-_EMPTY_OR_ENDS_WITH_ANY_WHITE_SPACE = re.compile(r'(^|\s)$')
-_EMPTY_OR_ENDS_WITH_NEW_LINE = re.compile(r'(^|\n)$')
 _ANY_CONSECUTIVE_WHITE_SPACES = re.compile(r'\s+')

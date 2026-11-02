@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
 import pytest
@@ -201,3 +202,30 @@ def test_html_to_text_parsel() -> None:
 
 def test_html_to_text_beautifulsoup() -> None:
     assert html_to_text_beautifulsoup(BeautifulSoup(_EXAMPLE_HTML, features='lxml')) == _EXPECTED_TEXT
+
+
+@pytest.mark.parametrize(
+    'html_to_text',
+    [
+        pytest.param(html_to_text_parsel, id='parsel'),
+        pytest.param(html_to_text_beautifulsoup, id='beautifulsoup'),
+    ],
+)
+def test_html_to_text_is_linear_in_node_count(html_to_text: Callable[[str], str]) -> None:
+    """Converting four times as many sibling nodes takes about four times as long, not sixteen times."""
+
+    def convert(repeats: int) -> float:
+        source = '<html><body><div>' + '<i> a</i>' * repeats + '</div></body></html>'
+        started = time.perf_counter()
+        text = html_to_text(source)
+        elapsed = time.perf_counter() - started
+        assert text == ' '.join(['a'] * repeats)
+        return elapsed
+
+    # Warm up the parser so one-off setup costs do not skew the small run.
+    convert(1000)
+    # Best of three per size, so a single scheduler or GC pause cannot inflate the ratio.
+    small = min(convert(20_000) for _ in range(3))
+    large = min(convert(80_000) for _ in range(3))
+
+    assert large / small < 10

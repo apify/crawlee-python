@@ -5,13 +5,7 @@ from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup, NavigableString, PageElement, Tag
 
-from crawlee._utils.html_to_text import (
-    _ANY_CONSECUTIVE_WHITE_SPACES,
-    _EMPTY_OR_ENDS_WITH_ANY_WHITE_SPACE,
-    _EMPTY_OR_ENDS_WITH_NEW_LINE,
-    BLOCK_TAGS,
-    SKIP_TAGS,
-)
+from crawlee._utils.html_to_text import _ANY_CONSECUTIVE_WHITE_SPACES, BLOCK_TAGS, SKIP_TAGS
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -33,7 +27,15 @@ def html_to_text(source: str | Tag) -> str:
     else:
         raise TypeError('Source must be either a string or a `BeautifulSoup` object.')
 
-    text = ''
+    parts: list[str] = []
+    # Last emitted character, so the whitespace checks never have to read the growing output back.
+    last = ''
+
+    def push(part: str) -> None:
+        nonlocal last
+        if part:
+            parts.append(part)
+            last = part[-1]
 
     def _page_element_to_text(page_elements: Iterable[PageElement]) -> None:
         """Extract and process text content from a collection of HTML elements.
@@ -41,7 +43,6 @@ def html_to_text(source: str | Tag) -> str:
         Convert page elements into plain text while preserving structure. Handle whitespace compression,
         skip unwanted elements, and format block elements correctly.
         """
-        nonlocal text
         for page_element in page_elements:
             if isinstance(page_element, (Tag, NavigableString)):
                 if isinstance(page_element, NavigableString):
@@ -52,26 +53,26 @@ def html_to_text(source: str | Tag) -> str:
                         # Compress white spaces outside of pre block
                         compr = re.sub(_ANY_CONSECUTIVE_WHITE_SPACES, ' ', page_element.get_text())
                     # If text is empty or ends with a whitespace, don't add the leading whitespace or new line
-                    if (compr.startswith((' ', '\n'))) and re.search(_EMPTY_OR_ENDS_WITH_ANY_WHITE_SPACE, text):
+                    if (compr.startswith((' ', '\n'))) and (not last or last.isspace()):
                         compr = compr[1:]
-                    text += compr
+                    push(compr)
                 elif page_element.name.lower() in SKIP_TAGS:
                     # Skip comments and special elements
                     pass
                 elif page_element.name.lower() == 'br':
-                    text += '\n'
+                    push('\n')
                 elif page_element.name.lower() == 'td':
                     _page_element_to_text(page_element.children)
-                    text += '\t'
+                    push('\t')
                 else:
                     # Block elements must be surrounded by newlines(unless beginning of text)
                     is_block_tag = page_element.name.lower() in BLOCK_TAGS
-                    if is_block_tag and not re.search(_EMPTY_OR_ENDS_WITH_NEW_LINE, text):
-                        text += '\n'
+                    if is_block_tag and last and last != '\n':
+                        push('\n')
                     _page_element_to_text(page_element.children)
-                    if is_block_tag and not text.endswith('\n'):
-                        text += '\n'
+                    if is_block_tag and last != '\n':
+                        push('\n')
 
     _page_element_to_text(soup.children)
 
-    return text.strip()
+    return ''.join(parts).strip()
