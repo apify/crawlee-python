@@ -148,7 +148,8 @@ class EnqueueLinksKwargs(TypedDict):
     """Keyword arguments for the `enqueue_links` methods."""
 
     limit: NotRequired[int]
-    """Maximum number of requests to be enqueued."""
+    """Maximum number of requests to be enqueued. It's applied last, after the URL filters and the
+    `transform_request_function`, so the requests they skip don't count towards it."""
 
     base_url: NotRequired[str]
     """Base URL to be used for relative URLs."""
@@ -171,10 +172,12 @@ class EnqueueLinksKwargs(TypedDict):
     """
 
     include: NotRequired[Sequence[re.Pattern | Glob]]
-    """List of regular expressions or globs that URLs must match to be enqueued."""
+    """List of regular expressions or globs that URLs must match to be enqueued. A regular expression may match
+    anywhere in the URL, like `re.search`. A glob must match the whole URL and is case-insensitive."""
 
     exclude: NotRequired[Sequence[re.Pattern | Glob]]
-    """List of regular expressions or globs that URLs must not match to be enqueued."""
+    """List of regular expressions or globs that URLs must not match to be enqueued. A regular expression may match
+    anywhere in the URL, like `re.search`. A glob must match the whole URL and is case-insensitive."""
 
 
 class AddRequestsKwargs(EnqueueLinksKwargs):

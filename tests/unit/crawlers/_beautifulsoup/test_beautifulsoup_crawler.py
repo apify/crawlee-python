@@ -10,7 +10,11 @@ from crawlee.crawlers import BeautifulSoupCrawler
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
 
 _CZECH = 'Test dekódování znaků českého jazyka'
+
+
 _UKRAINIAN = 'Тест декодування символів української мови'
+
+
 _CHINESE = '中文字符解码测试'
 
 

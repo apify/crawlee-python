@@ -11,8 +11,14 @@ from crawlee.crawlers import ParselCrawler
 from crawlee.crawlers._parsel._parsel_parser import ParselParser
 
 _CZECH = 'Test dekódování znaků českého jazyka'
+
+
 _UKRAINIAN = 'Тест декодування символів української мови'
+
+
 _CHINESE = '中文字符解码测试'
+
+
 _XHTML = b'<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><body><a href="/next">Next</a></body></html>'
 
 

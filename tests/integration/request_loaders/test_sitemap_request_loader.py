@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import re
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
+from crawlee import Glob
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
 from tests._utils import (
     get_basic_results,
@@ -413,3 +415,28 @@ async def test_sitemap_loader_drops_non_http_scheme_under_strategy_all(
             await loader.mark_request_as_handled(request)
 
     assert fetched == [http_url]
+
+
+async def test_sitemap_loader_include_exclude_matching(server_url: URL, http_client: HttpClient) -> None:
+    """An `include` regex may match anywhere in the URL, and an `exclude` glob matches regardless of casing."""
+    kept_url = str(server_url / 'products' / '1')
+    excluded_url = str(server_url / 'products' / 'Archive' / '2')
+    not_included_url = str(server_url / 'about')
+    sitemap_content = _make_urlset([kept_url, excluded_url, not_included_url])
+    sitemap_url = (server_url / 'sitemap.xml').with_query(base64=encode_base64(sitemap_content.encode()))
+
+    loader = SitemapRequestLoader(
+        [str(sitemap_url)],
+        http_client=http_client,
+        include=[re.compile(r'/products/')],
+        exclude=[Glob(str(server_url / 'products' / 'archive' / '**'))],
+    )
+
+    fetched: list[str] = []
+    while not finished(await loader.check_readiness()):
+        request = await loader.fetch_next_request()
+        if request is not None:
+            fetched.append(request.url)
+            await loader.mark_request_as_handled(request)
+
+    assert fetched == [kept_url]
