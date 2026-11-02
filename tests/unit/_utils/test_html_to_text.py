@@ -204,7 +204,13 @@ def test_html_to_text_beautifulsoup() -> None:
     assert html_to_text_beautifulsoup(BeautifulSoup(_EXAMPLE_HTML, features='lxml')) == _EXPECTED_TEXT
 
 
-@pytest.mark.parametrize('html_to_text', [html_to_text_parsel, html_to_text_beautifulsoup])
+@pytest.mark.parametrize(
+    'html_to_text',
+    [
+        pytest.param(html_to_text_parsel, id='parsel'),
+        pytest.param(html_to_text_beautifulsoup, id='beautifulsoup'),
+    ],
+)
 def test_html_to_text_is_linear_in_node_count(html_to_text: Callable[[str], str]) -> None:
     """Converting four times as many sibling nodes takes about four times as long, not sixteen times."""
 
@@ -218,7 +224,8 @@ def test_html_to_text_is_linear_in_node_count(html_to_text: Callable[[str], str]
 
     # Warm up the parser so one-off setup costs do not skew the small run.
     convert(1000)
-    small = convert(20_000)
-    large = convert(80_000)
+    # Best of three per size, so a single scheduler or GC pause cannot inflate the ratio.
+    small = min(convert(20_000) for _ in range(3))
+    large = min(convert(80_000) for _ in range(3))
 
     assert large / small < 10
