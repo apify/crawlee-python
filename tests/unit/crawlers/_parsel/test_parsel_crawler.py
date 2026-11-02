@@ -340,24 +340,25 @@ async def test_respect_robots_txt_with_problematic_links(
 
 
 async def test_on_skipped_request(server_url: URL, http_client: HttpClient) -> None:
+    """Links disallowed by robots.txt reach the skipped request callback as requests with their label and user data."""
     crawler = ParselCrawler(http_client=http_client, respect_robots_txt_file=True)
     skip = mock.Mock()
 
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
-        await context.enqueue_links()
+        await context.enqueue_links(label='DETAIL', user_data={'source': 'start'})
 
     @crawler.on_skipped_request
-    async def skipped_hook(url: str, _reason: SkippedReason) -> None:
-        skip(url)
+    async def skipped_hook(request: Request, reason: SkippedReason) -> None:
+        skip(request.url, request.label, request.user_data.get('source'), reason)
 
     await crawler.run([str(server_url / 'start_enqueue')])
 
     expected_skip_calls = [
-        mock.call(str(server_url / 'page_1')),
-        mock.call(str(server_url / 'page_2')),
-        mock.call(str(server_url / 'page_3')),
-        mock.call(str(server_url / 'page_4')),
+        mock.call(str(server_url / 'page_1'), 'DETAIL', 'start', 'robots_txt'),
+        mock.call(str(server_url / 'page_2'), 'DETAIL', 'start', 'robots_txt'),
+        mock.call(str(server_url / 'page_3'), 'DETAIL', 'start', 'robots_txt'),
+        mock.call(str(server_url / 'page_4'), 'DETAIL', 'start', 'robots_txt'),
     ]
     skip.assert_has_calls(expected_skip_calls, any_order=True)
 

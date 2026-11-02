@@ -123,6 +123,25 @@ Unlike tiers, this function doesn't track blocking per domain, so every request 
 
 The `Request.forefront` property is removed. Proxy tiers were the only code that set it. The crawler now reclaims a failed request for a retry at the back of the queue, and a request deferred by a `RequestThrottledError` at the front. To enqueue a request at the front, pass `forefront=True` to `add_requests` or `reclaim_request`.
 
+## `on_skipped_request` receives the `Request`
+
+The callback registered with `on_skipped_request` gets the skipped `Request` as its first argument, so it can read the request's `user_data` and `label`. In v1, it got only the URL string. Update the callback's signature and read the URL from `request.url`:
+
+```python
+# v1
+@crawler.on_skipped_request
+async def on_skipped(url: str, reason: SkippedReason) -> None:
+    crawler.log.info(f'Skipped {url}: {reason}')
+
+
+# v2
+@crawler.on_skipped_request
+async def on_skipped(request: Request, reason: SkippedReason) -> None:
+    crawler.log.info(f'Skipped {request.url}: {reason}')
+```
+
+For links that `enqueue_links` skips because of `robots.txt`, the `Request` carries the `label` and `user_data` passed to `enqueue_links`. The `transform_request_function` isn't applied to these links.
+
 ## Unique keys keep the URL casing
 
 The default `Request.unique_key` lowercases only the scheme and host of the URL. The path, query and fragment keep their casing, since they're case-sensitive. In v1, the whole URL was lowercased, so URLs that differed only in casing, such as `https://example.com/Product/ABC` and `https://example.com/product/abc`, got the same unique key, and the crawler visited only one of them.
