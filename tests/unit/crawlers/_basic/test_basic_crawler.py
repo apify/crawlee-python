@@ -1925,6 +1925,36 @@ async def test_stop_before_run_starts() -> None:
     await asyncio.wait_for(run_task, timeout=10)
 
 
+async def test_stop_between_runs() -> None:
+    """A stop called between runs ends the next run and doesn't affect the one after it."""
+    handler = AsyncMock()
+    crawler = BasicCrawler(request_handler=handler)
+    await crawler.run()
+
+    crawler.stop()
+    await crawler.run(['https://a.placeholder.com'])
+    handler.assert_not_called()
+
+    await crawler.run()
+    handler.assert_called_once()
+
+
+async def test_run_while_running() -> None:
+    """A second `run` call raises and leaves the run in progress going."""
+    crawler = BasicCrawler(keep_alive=True, request_handler=AsyncMock())
+
+    run_task = asyncio.create_task(crawler.run())
+    await asyncio.sleep(0)
+
+    with pytest.raises(RuntimeError, match='already running'):
+        await crawler.run()
+
+    assert not run_task.done()
+
+    crawler.stop()
+    await asyncio.wait_for(run_task, timeout=10)
+
+
 async def test_services_no_side_effect_on_crawler_init() -> None:
     custom_configuration = Configuration()
     custom_event_manager = LocalEventManager.from_config(custom_configuration)
@@ -2497,7 +2527,7 @@ async def test_status_message_reports_failed_request_count() -> None:
         return None
 
     crawler = BasicCrawler(status_message_callback=status_callback)
-    crawler._previous_crawler_state = StatisticsState(requests_failed=2)
+    crawler._last_run = Mock(previous_state=StatisticsState(requests_failed=2))
     crawler._statistics = Mock(state=StatisticsState(requests_failed=5))
 
     async with service_locator.get_event_manager():
@@ -2505,6 +2535,28 @@ async def test_status_message_reports_failed_request_count() -> None:
 
     problem_messages = [m for m in captured_messages if m.startswith('Experiencing problems')]
     assert problem_messages == ['Experiencing problems, 3 failed requests since last status update.']
+
+
+async def test_status_callback_previous_state_per_run() -> None:
+    """The first status update of a repeated run has no previous state."""
+    status_updated = asyncio.Event()
+    status_callback = AsyncMock(side_effect=lambda *_: status_updated.set())
+
+    async def handler(context: BasicCrawlingContext) -> None:
+        await status_updated.wait()
+        status_updated.clear()
+
+    crawler = BasicCrawler(
+        request_handler=handler,
+        status_message_callback=status_callback,
+        status_message_logging_interval=timedelta(hours=1),
+    )
+
+    await crawler.run(['https://a.placeholder.com'])
+    await crawler.run(['https://b.placeholder.com'])
+
+    previous_states = [call.args[1] for call in status_callback.call_args_list]
+    assert previous_states == [None, None]
 
 
 @pytest.mark.parametrize(
