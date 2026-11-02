@@ -92,7 +92,7 @@ async def test_delete_temp_folder_when_files_are_locked(monkeypatch: pytest.Monk
     await persist_browser.close()
     assert not current_temp_dir.exists()
     await asyncio.gather(*listener_tasks)
-    # The context's `close` event retries the removal until it succeeds, then `close` checks it once more.
+    # The context's `close` event retries the removal until it succeeds, then `close` runs it once more.
     assert rmtree.call_count == locked_attempts + 2
 
 
