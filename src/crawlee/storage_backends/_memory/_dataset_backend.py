@@ -11,6 +11,7 @@ from crawlee._types import JsonSerializable
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_backends._base import DatasetBackend
+from crawlee.storage_backends._memory._utils import json_snapshot
 from crawlee.storage_backends.models import DatasetItemsListPage, DatasetMetadata
 
 if TYPE_CHECKING:
@@ -31,6 +32,9 @@ class MemoryDatasetBackend(DatasetBackend):
     The memory implementation provides fast access to data but is limited by available memory and
     does not support data sharing across different processes. It supports all dataset operations including
     sorting, filtering, and pagination, but performs them entirely in memory.
+
+    Each pushed item is stored as an independent JSON snapshot, serialized the same way as by the file-system backend,
+    and every read returns fresh copies, so mutating an item outside the dataset never changes the stored data.
     """
 
     def __init__(
@@ -45,7 +49,7 @@ class MemoryDatasetBackend(DatasetBackend):
         self._metadata = metadata
 
         self._records = list[Mapping[str, JsonSerializable]]()
-        """List to hold dataset items. Each item is a dictionary representing a record."""
+        """List to hold dataset items. Each item is a JSON snapshot of a pushed record."""
 
     @override
     async def get_metadata(self) -> DatasetMetadata:
@@ -118,12 +122,12 @@ class MemoryDatasetBackend(DatasetBackend):
     @override
     async def push_data(self, data: Sequence[Mapping[str, JsonSerializable]] | Mapping[str, JsonSerializable]) -> None:
         metadata = await self.get_metadata()
-        new_item_count = metadata.item_count
 
         items = data if isinstance(data, Sequence) else [data]
-        for item in items:
-            new_item_count += 1
-            await self._push_item(item)
+        # Serialize the whole batch before storing any item, so an item that fails to serialize leaves no partial push.
+        snapshots = json_snapshot(list(items))
+        self._records.extend(snapshots)
+        new_item_count = metadata.item_count + len(snapshots)
 
         await self._update_metadata(
             update_accessed_at=True,
@@ -186,7 +190,7 @@ class MemoryDatasetBackend(DatasetBackend):
             limit=limit or (total - offset),
             total=total,
             desc=desc,
-            items=sliced_items,
+            items=json_snapshot(sliced_items),
         )
 
     @override
@@ -231,7 +235,7 @@ class MemoryDatasetBackend(DatasetBackend):
         for item in sliced_items:
             if skip_empty and not item:
                 continue
-            yield item
+            yield json_snapshot(item)
 
         await self._update_metadata(update_accessed_at=True)
 
@@ -257,11 +261,3 @@ class MemoryDatasetBackend(DatasetBackend):
             self._metadata.modified_at = now
         if new_item_count is not None:
             self._metadata.item_count = new_item_count
-
-    async def _push_item(self, item: Mapping[str, JsonSerializable]) -> None:
-        """Push a single item to the dataset.
-
-        Args:
-            item: The data item to add to the dataset.
-        """
-        self._records.append(item)

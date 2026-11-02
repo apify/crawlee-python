@@ -1183,3 +1183,39 @@ async def test_record_with_noascii_chars(dataset: Dataset) -> None:
     value = await dataset.get_data()
     assert value is not None
     assert value.items[0] == init_value
+
+
+async def test_push_data_stores_snapshot(dataset: Dataset) -> None:
+    """Mutating an item after pushing it doesn't change the stored item."""
+    item: dict[str, Any] = {'key': 'value', 'nested': {'list': [1, 2]}}
+    await dataset.push_data(item)
+
+    item['key'] = 'changed'
+    item['nested']['list'].append(3)
+
+    result = await dataset.get_data()
+    assert result.items == [{'key': 'value', 'nested': {'list': [1, 2]}}]
+
+
+async def test_push_same_object_twice_stores_independent_items(dataset: Dataset) -> None:
+    """Pushing one object twice, mutating it in between, stores two independent items."""
+    item = {'count': 1}
+    await dataset.push_data(item)
+    item['count'] = 2
+    await dataset.push_data(item)
+
+    result = await dataset.get_data()
+    assert result.items == [{'count': 1}, {'count': 2}]
+
+
+async def test_mutating_read_item_does_not_change_stored_item(dataset: Dataset) -> None:
+    """Mutating an item returned by `get_data` or `iterate_items` doesn't change the stored item."""
+    await dataset.push_data({'key': 'value'})
+
+    result = await dataset.get_data()
+    result.items[0]['key'] = 'changed by get_data'  # ty: ignore[invalid-assignment]
+    async for item in dataset.iterate_items():
+        item['key'] = 'changed by iterate_items'  # ty: ignore[invalid-assignment]
+
+    result = await dataset.get_data()
+    assert result.items == [{'key': 'value'}]
