@@ -1080,6 +1080,138 @@ async def test_sub_managers_opened_once(
     assert opener.await_count == len(domains)
 
 
+async def test_default_inner_opened_on_first_use(
+    service_locator: ServiceLocator,
+    memory_storage_backend: MemoryStorageBackend,
+) -> None:
+    """Test that a manager without `inner` opens the default store through the opener and routes requests there."""
+    opener = AsyncMock(side_effect=RequestQueue.open)
+    manager = ThrottlingRequestManager(
+        domains=TEST_DOMAINS,
+        request_manager_opener=opener,
+        service_locator=service_locator,
+    )
+    assert manager.inner is None
+
+    await manager.add_request(f'https://{NON_THROTTLED_DOMAIN}/page1')
+
+    opener.assert_any_await(storage_backend=memory_storage_backend, configuration=service_locator.get_configuration())
+    assert manager.inner is not None
+    assert (await manager.inner.check_readiness()).status == 'ready'
+
+
+async def test_default_inner_opened_once(service_locator: ServiceLocator) -> None:
+    """Test that concurrent first calls open the default `inner` exactly once."""
+
+    # Suspends before opening, so the other calls arrive while the default `inner` is still being opened.
+    async def open_after_yield(**kwargs: Any) -> RequestQueue:
+        await asyncio.sleep(0)
+        return await RequestQueue.open(**kwargs)
+
+    opener = AsyncMock(side_effect=open_after_yield)
+    manager = ThrottlingRequestManager(
+        domains=TEST_DOMAINS,
+        request_manager_opener=opener,
+        service_locator=service_locator,
+    )
+
+    await asyncio.gather(manager.get_total_count(), manager.get_handled_count(), manager.get_pending_count())
+
+    assert opener.await_count == len(TEST_DOMAINS) + 1
+
+
+@pytest.mark.parametrize(
+    'method',
+    [
+        pytest.param('purge', id='purge'),
+        pytest.param('drop', id='drop'),
+    ],
+)
+async def test_default_inner_not_opened_to_clear(service_locator: ServiceLocator, method: str) -> None:
+    """Test that purging or dropping doesn't open the default `inner` just to clear it."""
+    manager = ThrottlingRequestManager(
+        domains=TEST_DOMAINS,
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+    await getattr(manager, method)()
+
+    assert manager.inner is None
+
+
+async def test_processing_time_reaches_default_inner(service_locator: ServiceLocator) -> None:
+    """Test that an expected processing time set before the default `inner` opens is applied to it."""
+    manager = ThrottlingRequestManager(
+        domains=TEST_DOMAINS,
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+    with patch.object(RequestQueue, 'set_expected_request_processing_time', autospec=True) as set_processing_time:
+        await manager.set_expected_request_processing_time(timedelta(minutes=10))
+        assert manager.inner is None
+        await manager.add_request(f'https://{NON_THROTTLED_DOMAIN}/page1')
+
+    set_processing_time.assert_any_await(manager.inner, timedelta(minutes=10))
+
+
+async def test_default_inner_gets_longest_time(service_locator: ServiceLocator) -> None:
+    """Test that a default `inner` opened late gets the longest processing time set before, as an open one keeps."""
+    manager = ThrottlingRequestManager(
+        domains=TEST_DOMAINS,
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+    with patch.object(RequestQueue, 'set_expected_request_processing_time', autospec=True) as set_processing_time:
+        await manager.set_expected_request_processing_time(timedelta(minutes=10))
+        await manager.set_expected_request_processing_time(timedelta(minutes=5))
+        await manager.add_request(f'https://{NON_THROTTLED_DOMAIN}/page1')
+
+    awaits = set_processing_time.await_args_list
+    inner_times = [awaited.args[1] for awaited in awaits if awaited.args[0] is manager.inner]
+    assert inner_times == [timedelta(minutes=10)]
+
+
+async def test_check_readiness_opens_default_inner(service_locator: ServiceLocator) -> None:
+    """Test that `check_readiness` opens the default `inner`, so requests already in it aren't missed."""
+    default_queue = await RequestQueue.open(
+        storage_backend=service_locator.get_storage_backend(),
+        configuration=service_locator.get_configuration(),
+    )
+    await default_queue.add_request(f'https://{NON_THROTTLED_DOMAIN}/left-behind')
+    manager = ThrottlingRequestManager(
+        domains=TEST_DOMAINS,
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+    assert (await manager.check_readiness()).status == 'ready'
+    assert manager.inner is default_queue
+
+
+async def test_default_inner_open_retried_after_failure(service_locator: ServiceLocator) -> None:
+    """Test that a failed open of the default `inner` is retried on the next use."""
+    default_queue = await RequestQueue.open(
+        storage_backend=service_locator.get_storage_backend(),
+        configuration=service_locator.get_configuration(),
+    )
+    # Without configured domains, the opener is called only for the default `inner`.
+    manager = ThrottlingRequestManager(
+        domains=[],
+        request_manager_opener=AsyncMock(side_effect=[RuntimeError('storage unavailable'), default_queue]),
+        service_locator=service_locator,
+    )
+
+    with pytest.raises(RuntimeError, match='storage unavailable'):
+        await manager.check_readiness()
+    assert manager.inner is None
+
+    assert (await manager.check_readiness()).status == 'finished'
+    assert manager.inner is default_queue
+
+
 async def test_failed_open_keeps_successful_sub_managers(
     inner_queue: RequestQueue,
     service_locator: ServiceLocator,
@@ -1203,6 +1335,7 @@ async def test_reclaim_routes_to_sub_manager_after_restart(fs_service_locator: S
     await restarted.reclaim_request(request)
 
     assert (await restarted._sub_managers[THROTTLED_DOMAIN].check_readiness()).status == 'ready'
+    assert restarted.inner is not None
     assert (await restarted.inner.check_readiness()).status == 'finished'
 
 

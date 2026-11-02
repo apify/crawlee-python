@@ -473,6 +473,10 @@ Entering `Statistics` or `SessionPool` again keeps their in-memory state. In v1,
 
 `persistence_enabled` of `Statistics` no longer accepts `'explicit_only'`. Pass `True` or `False`.
 
+## `ThrottlingRequestManager.inner` is optional
+
+The `inner` argument of `ThrottlingRequestManager` is now optional, the same as in Crawlee JS. Without it, `request_manager_opener` opens the default store on first use, such as the default request queue for `RequestQueue.open`. Until then, the `inner` property returns `None`, so its type is now `TRequestManager | None`. If you pass `inner`, the property returns it as before.
+
 ## Logs changed
 
 If you configure loggers by name or match log messages, update them for the following changes.
