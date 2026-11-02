@@ -300,7 +300,7 @@ class StagehandBrowserController(BrowserController):
         context = self._browser.contexts[0]
 
         await context.set_extra_http_headers(extra_http_headers)
-        # The browser sets request-dependent headers like `Accept` per request, ignoring the context's values.
+        # Chromium sets request-dependent headers like `Accept` per request, ignoring the context's values.
         self._context_headers = only_injectable_headers(extra_http_headers, self.browser_type)
 
         self._session = session

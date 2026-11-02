@@ -326,6 +326,6 @@ class PlaywrightBrowserController(BrowserController):
         if not filtered_options['extra_http_headers']:
             return context, {}
 
-        # The browser sets request-dependent headers like `Accept` per request, ignoring the context's values.
+        # Chromium sets request-dependent headers like `Accept` per request, ignoring the context's values.
         context_headers = only_injectable_headers(filtered_options['extra_http_headers'], self.browser_type)
         return context, context_headers
