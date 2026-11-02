@@ -384,6 +384,12 @@ class MyHttpClient(HttpClient):
 
 `HttpResponse` is now an abstract base class instead of a protocol, so a custom response subclasses it. It has three new abstract members, `url`, `headers_set_cookie` and `aclose`, and works as an async context manager that closes the response.
 
+## `get_pending_count` on request loaders
+
+`RequestLoader` has a new abstract `get_pending_count` method, which returns the number of requests that haven't been handled yet. If you have a custom request loader or manager, implement it. `RequestList` reads its source lazily, so like `get_total_count`, its `get_pending_count` leaves out the requests it hasn't fetched yet.
+
+`RequestManagerTandem.get_total_count` no longer counts a request twice once it moves from the loader to the manager. In v1, it added up the totals of both, so the crawler's status message showed too many pages in total.
+
 ## Logs changed
 
 If you configure loggers by name or match log messages, update them for the following changes.

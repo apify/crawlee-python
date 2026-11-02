@@ -891,6 +891,32 @@ async def test_get_total_count_aggregates(manager: ThrottlingRequestManager[Requ
     assert await manager.get_total_count() == 2
 
 
+async def test_get_pending_count_aggregates(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """Test that the pending count sums inner and every sub-manager, without the handled requests."""
+    await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+    await manager.add_request(f'https://{NON_THROTTLED_DOMAIN}/page1')
+
+    request = await manager.fetch_next_request()
+    assert request is not None
+    await manager.mark_request_as_handled(request)
+
+    assert await manager.get_pending_count() == 1
+
+
+async def test_pending_count_after_migration(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+) -> None:
+    """Test that a request migrated from inner to its domain's sub-manager counts once as pending."""
+    await inner_queue.add_requests([f'https://{THROTTLED_DOMAIN}/page{i}' for i in range(2)])
+    manager.record_domain_delay(f'https://{THROTTLED_DOMAIN}/', retry_after=timedelta(seconds=60))
+
+    assert await manager.fetch_next_request() is None
+
+    assert await inner_queue.get_handled_count() == 2
+    assert await manager.get_pending_count() == 2
+
+
 async def test_readiness_aggregates(manager: ThrottlingRequestManager[RequestQueue]) -> None:
     """Test that the readiness follows a request through the sub-manager it's routed to."""
     assert (await manager.check_readiness()).status == 'finished'

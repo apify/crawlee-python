@@ -10,6 +10,7 @@ from crawlee import Request
 from crawlee.request_loaders import (
     FinishedStatus,
     ReadyStatus,
+    RequestList,
     RequestLoader,
     RequestManager,
     RequestManagerTandem,
@@ -157,3 +158,28 @@ async def test_transfers_only_when_loader_ready() -> None:
     assert request is not None
     assert request.url == 'https://a.placeholder.com'
     loader.fetch_next_request.assert_not_awaited()
+
+
+async def test_total_count_counts_moved_once() -> None:
+    """Test that a request moved from the loader to the manager counts once in the total."""
+    tandem = RequestManagerTandem(
+        RequestList(['https://a.placeholder.com', 'https://b.placeholder.com']), await RequestQueue.open()
+    )
+
+    while (await tandem.check_readiness()).status != 'finished':
+        request = await tandem.fetch_next_request()
+        assert request is not None
+        await tandem.mark_request_as_handled(request)
+
+    assert await tandem.get_total_count() == 2
+    assert await tandem.get_pending_count() == 0
+
+
+async def test_pending_count_sums_sources() -> None:
+    """Test that the pending count adds up the pending requests of the loader and the manager."""
+    loader = create_autospec(RequestLoader, instance=True, spec_set=True)
+    loader.get_pending_count.return_value = 2
+    manager = create_autospec(RequestManager, instance=True, spec_set=True)
+    manager.get_pending_count.return_value = 3
+
+    assert await RequestManagerTandem(loader, manager).get_pending_count() == 5

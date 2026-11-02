@@ -306,6 +306,15 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         return sum(counts) - self._migrated_from_inner
 
     @override
+    async def get_pending_count(self) -> int:
+        await self._ensure_sub_managers()
+        counts = await asyncio.gather(
+            self._inner.get_pending_count(), *(sm.get_pending_count() for sm in self._sub_managers.values())
+        )
+        # `inner` counts a migrated request as handled, so it is pending only in its sub-manager and needs no fix-up.
+        return sum(counts)
+
+    @override
     async def check_readiness(self) -> RequestSourceStatus:
         """Report whether anything can be dispatched now, and otherwise when it can be or why it never will.
 

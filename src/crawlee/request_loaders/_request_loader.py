@@ -24,7 +24,7 @@ class RequestLoader(ABC):
     Key responsibilities:
         - Fetching the next request to be processed.
         - Marking requests as successfully handled after processing.
-        - Managing state information such as the total and handled request counts.
+        - Managing state information such as the total, pending and handled request counts.
     """
 
     @abstractmethod
@@ -34,6 +34,10 @@ class RequestLoader(ABC):
     @abstractmethod
     async def get_total_count(self) -> int:
         """Get an offline approximation of the total number of requests in the loader (i.e. pending + handled)."""
+
+    @abstractmethod
+    async def get_pending_count(self) -> int:
+        """Get an approximation of the number of requests in the loader that haven't been handled yet."""
 
     @abstractmethod
     async def check_readiness(self) -> RequestSourceStatus:
