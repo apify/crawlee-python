@@ -11,6 +11,7 @@ from crawlee.statistics import StatisticsState
 if TYPE_CHECKING:
     import logging
     from collections.abc import Awaitable, Callable
+    from datetime import timedelta
 
     from crawlee.autoscaling import ConcurrencyConsumer
     from crawlee.autoscaling._types import ConcurrencySystemInterface
@@ -44,6 +45,7 @@ class CrawlerRun(Generic[TStatisticsState]):
         )
         self._logger_once = LoggerOnce(logger)
         self._stop_requested = False
+        self._dispatching = False
         self._finished = False
 
         self.failed = False
@@ -61,13 +63,31 @@ class CrawlerRun(Generic[TStatisticsState]):
         return not self._finished
 
     @property
+    def is_dispatching(self) -> bool:
+        """Whether the task loop is dispatching requests. Pausing a run before then would keep it from ever starting."""
+        return self._dispatching
+
+    @property
     def stop_requested(self) -> bool:
         """Whether a graceful shutdown of this run has been requested."""
         return self._stop_requested
 
     async def dispatch_requests(self) -> None:
         """Run the task loop until the crawl is over. The concurrency system has to be active by now."""
-        await self._autoscaled_pool.run()
+        self._dispatching = True
+
+        try:
+            await self._autoscaled_pool.run()
+        finally:
+            self._dispatching = False
+
+    async def pause(self, *, timeout: timedelta | None = None) -> None:
+        """Stop dispatching new requests and wait until the ones in progress finish."""
+        await self._autoscaled_pool.pause(timeout=timeout)
+
+    def resume(self) -> None:
+        """Resume dispatching after `pause`."""
+        self._autoscaled_pool.resume()
 
     def stop(self) -> None:
         """Ask the run to stop taking new requests."""
