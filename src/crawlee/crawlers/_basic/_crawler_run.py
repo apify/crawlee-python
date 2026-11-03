@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Generic
 
 from typing_extensions import TypeVar
@@ -45,6 +47,8 @@ class CrawlerRun(Generic[TStatisticsState]):
         self._logger_once = LoggerOnce(logger)
         self._stop_requested = False
         self._finished = False
+        self._wake_at: datetime | None = None
+        self._wake_timer: asyncio.TimerHandle | None = None
 
         self.failed = False
         """Whether a request has failed while the crawler aborts on an error."""
@@ -69,6 +73,23 @@ class CrawlerRun(Generic[TStatisticsState]):
         """Run the task loop until the crawl is over. The concurrency system has to be active by now."""
         await self._autoscaled_pool.run()
 
+    def schedule_wake(self, ready_at: datetime) -> None:
+        """Wake the task loop at `ready_at`, unless an earlier wake-up is already scheduled."""
+        if self._finished or (self._wake_at is not None and self._wake_at <= ready_at):
+            return
+
+        if self._wake_timer is not None:
+            self._wake_timer.cancel()
+
+        delay = max(0.0, (ready_at - datetime.now(UTC)).total_seconds())
+        self._wake_at = ready_at
+        self._wake_timer = asyncio.get_running_loop().call_later(delay, self._wake)
+
+    def _wake(self) -> None:
+        self._wake_at = None
+        self._wake_timer = None
+        self._autoscaled_pool.notify()
+
     def stop(self) -> None:
         """Ask the run to stop taking new requests."""
         self._stop_requested = True
@@ -78,5 +99,8 @@ class CrawlerRun(Generic[TStatisticsState]):
         self._logger_once.log(message, key=key)
 
     def finish(self) -> None:
-        """Mark the run as history, so that the crawler can start another one."""
+        """Drop a pending wake-up and mark the run as history, so that the crawler can start another one."""
         self._finished = True
+
+        if self._wake_timer is not None:
+            self._wake_timer.cancel()

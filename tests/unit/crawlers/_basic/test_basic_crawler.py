@@ -14,7 +14,7 @@ from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from itertools import product
+from itertools import chain, product, repeat
 from multiprocessing import get_context
 from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import ANY, AsyncMock, Mock, call, create_autospec, patch
@@ -26,7 +26,7 @@ from crawlee._log_config import CrawleeLogFormatter
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
 from crawlee._utils.robots import RobotsTxtFile
-from crawlee.autoscaling import ConcurrencyConsumer, ConcurrencySystem
+from crawlee.autoscaling import AutoscaledPool, ConcurrencyConsumer, ConcurrencySystem
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import (
@@ -40,6 +40,7 @@ from crawlee.errors import (
 from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
 from crawlee.http_clients import HttpClient, HttpResponse
 from crawlee.request_loaders import (
+    FinishedStatus,
     MinIntervalSignal,
     RateLimitedSignal,
     RequestList,
@@ -48,6 +49,7 @@ from crawlee.request_loaders import (
     RequestSourceStatus,
     StalledStatus,
     ThrottlingRequestManager,
+    WaitingStatus,
 )
 from crawlee.sessions import Session, SessionCookies, SessionPool
 from crawlee.statistics import FinalStatistics, Statistics, StatisticsState
@@ -3047,6 +3049,53 @@ async def test_crawl_waits_out_backoff() -> None:
     assert statuses_during_cooldown[0].ready_at is not None
     assert len(dispatched_at) == 2
     assert dispatched_at[1] - dispatched_at[0] >= 0.5
+
+
+async def test_paced_crawl_wakes_at_ready_at(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each time a domain's cooldown holds a crawl back, it resumes at the request manager's `ready_at`."""
+    # Longer than the test's timeout, so only the wake-up at `ready_at` can resume the crawl in time.
+    monkeypatch.setattr(AutoscaledPool, '_POLL_INTERVAL', timedelta(hours=1))
+    throttler = ThrottlingRequestManager(
+        await RequestQueue.open(),
+        domains=['throttled.placeholder.com'],
+        request_manager_opener=RequestQueue.open,
+    )
+    crawler = BasicCrawler(
+        request_manager=throttler,
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+    )
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        if len(visited) < 2:
+            throttler.record_pacing_signal(RateLimitedSignal(context.request.url, wait=timedelta(milliseconds=200)))
+        visited.append(context.request.url)
+
+    urls = [
+        'https://throttled.placeholder.com/a',
+        'https://throttled.placeholder.com/b',
+        'https://throttled.placeholder.com/c',
+    ]
+    await asyncio.wait_for(crawler.run(urls), timeout=10)
+
+    assert visited == urls
+
+
+async def test_run_cancels_pending_wake() -> None:
+    """A wake-up still pending when the run ends is dropped, so it never fires."""
+    queue = await RequestQueue.open()
+    crawler = BasicCrawler(request_manager=queue)
+    waiting = WaitingStatus(ready_at=datetime.now(UTC) + timedelta(milliseconds=300))
+
+    with patch.object(queue, 'check_readiness', side_effect=chain([waiting], repeat(FinishedStatus()))):
+        await crawler.run()
+
+    # Patched only after the run, so that only a wake-up that outlives the run is caught.
+    with patch.object(AutoscaledPool, 'notify') as notify:
+        await asyncio.sleep(0.6)
+
+    notify.assert_not_called()
 
 
 THROTTLED_URL = 'https://throttled.placeholder.com/page'

@@ -258,8 +258,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         cooldown are skipped, so the call returns `None` when nothing is dispatchable right now.
 
         Note:
-            Since the manager never waits out a cooldown itself, the dispatch cadence is only as precise as the
-            caller's polling interval: a cooldown expiring between two polls is picked up on the next one.
+            Since the manager never waits out a cooldown itself, a caller that only polls picks up a cooldown expiring
+            between two polls on the next one. To resume on time, wake up at the `ready_at` from `check_readiness()`.
         """
         await self._ensure_sub_managers()
 

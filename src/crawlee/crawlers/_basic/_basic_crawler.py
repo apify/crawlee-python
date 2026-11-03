@@ -1522,7 +1522,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return False
 
         request_manager = await self.get_request_manager()
-        return (await request_manager.check_readiness()).status == 'ready'
+        readiness = await request_manager.check_readiness()
+
+        # The pool polls on its own anyway, so the wake-up only resumes a paced crawl on the manager's clock.
+        if readiness.status == 'waiting' and readiness.ready_at is not None:
+            self._run.schedule_wake(readiness.ready_at)
+
+        return readiness.status == 'ready'
 
     async def __run_task_function(self, task_id: str) -> None:  # noqa: ARG002
         request_manager = await self.get_request_manager()
