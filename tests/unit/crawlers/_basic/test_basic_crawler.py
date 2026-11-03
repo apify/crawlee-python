@@ -25,6 +25,7 @@ from crawlee import ConcurrencySettings, Glob, service_locator
 from crawlee._log_config import CrawleeLogFormatter
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
+from crawlee._utils.robots import RobotsTxtFile
 from crawlee.autoscaling import ConcurrencyConsumer, ConcurrencySystem
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
@@ -48,7 +49,7 @@ from crawlee.request_loaders import (
     StalledStatus,
     ThrottlingRequestManager,
 )
-from crawlee.sessions import Session, SessionPool
+from crawlee.sessions import Session, SessionCookies, SessionPool
 from crawlee.statistics import FinalStatistics, Statistics, StatisticsState
 from crawlee.storage_backends import FileSystemStorageBackend, MemoryStorageBackend
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
@@ -611,12 +612,14 @@ async def test_handles_error_in_failed_request_handler() -> None:
         await crawler.run(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
 
 
-async def test_send_request_forwards_timeout_to_http_client() -> None:
+async def test_send_request_forwards_arguments_to_http_client() -> None:
+    """Test that `context.send_request` passes all its arguments to the HTTP client."""
     http_client = AsyncMock(spec=HttpClient)
     response = Mock(spec=HttpResponse)
     http_client.send_request.return_value = response
     crawler = BasicCrawler(http_client=http_client, use_session_pool=False, max_requests_per_crawl=1)
     timeout = timedelta(seconds=12)
+    cookies = SessionCookies({'name': 'value'})
     result = None
 
     @crawler.router.default_handler
@@ -627,6 +630,7 @@ async def test_send_request_forwards_timeout_to_http_client() -> None:
             method='POST',
             payload=b'Hello, world!',
             headers={'Content-Type': 'text/plain'},
+            cookies=cookies,
             timeout=timeout,
         )
 
@@ -639,6 +643,7 @@ async def test_send_request_forwards_timeout_to_http_client() -> None:
         payload=b'Hello, world!',
         headers={'Content-Type': 'text/plain'},
         session=None,
+        cookies=cookies,
         proxy_info=None,
         timeout=timeout,
     )

@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
     from crawlee._types import HttpMethod, HttpPayload
     from crawlee.proxy_configuration import ProxyInfo
-    from crawlee.sessions import Session
+    from crawlee.sessions import Session, SessionCookies
 
 logger = getLogger(__name__)
 
@@ -182,6 +182,7 @@ class HttpxHttpClient(HttpClient):
         headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
         session: Session | None = None,
+        cookies: SessionCookies | None = None,
         proxy_info: ProxyInfo | None = None,
         timeout: timedelta | None = None,
     ) -> HttpResponse:
@@ -196,6 +197,7 @@ class HttpxHttpClient(HttpClient):
             headers=self._combine_headers(headers),
             payload=payload,
             session=session,
+            cookies=cookies,
             proxy_info=proxy_info,
             timeout=timeout,
         )

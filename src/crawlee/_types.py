@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.http_clients import HttpResponse
     from crawlee.proxy_configuration import ProxyInfo
-    from crawlee.sessions import Session
+    from crawlee.sessions import Session, SessionCookies
     from crawlee.storage_backends import StorageBackend
     from crawlee.storages import KeyValueStore
 
@@ -581,6 +581,7 @@ class SendRequestFunction(Protocol):
         method: HttpMethod = 'GET',
         payload: HttpPayload | None = None,
         headers: HttpHeaders | dict[str, str] | None = None,
+        cookies: SessionCookies | None = None,
         timeout: timedelta | None = None,
     ) -> Coroutine[None, None, HttpResponse]:
         """Call send request function.
@@ -590,6 +591,9 @@ class SendRequestFunction(Protocol):
             method: The HTTP method to use.
             headers: The headers to include in the request.
             payload: The payload to include in the request.
+            cookies: The cookies to send and store instead of the cookies of the session. With `PlaywrightCrawler`,
+                the response cookies are stored in the browser context as well, and so in the session after the
+                request handler.
             timeout: Maximum time allowed to receive the response, including all redirects, and to read its body.
                 Without it, the default timeout of the HTTP client applies.
 

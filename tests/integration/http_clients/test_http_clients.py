@@ -13,7 +13,7 @@ from curl_cffi import CurlHttpVersion
 
 from crawlee.errors import ProxyError
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpClient, HttpxHttpClient, ImpitHttpClient
-from crawlee.sessions import CookieParam, Session
+from crawlee.sessions import CookieParam, Session, SessionCookies
 from tests.integration.server import generate_file_content
 from tests.integration.server_endpoints import HELLO_WORLD
 
@@ -497,6 +497,43 @@ async def test_cookies_not_persisted(custom_http_client: HttpClient, server_url:
         pass
 
     assert session.cookies.get_cookies_as_dicts() == []
+
+
+async def test_cookies_argument_replaces_session_cookies(http_client: HttpClient, server_url: URL) -> None:
+    """Test that the cookies passed in `cookies` are sent and stored instead of the cookies of the session."""
+    session = Session(cookies=[CookieParam(name='from_session', value='1', domain=server_url.host or '')])
+    cookies = SessionCookies([CookieParam(name='from_argument', value='1', domain=server_url.host or '')])
+
+    async with await http_client.send_request(
+        str((server_url / 'set_cookies').with_query(a='1')),
+        session=session,
+        cookies=cookies,
+    ) as response:
+        assert (await read_json(response))['cookies'] == {'from_argument': '1', 'a': '1'}
+
+    assert {item['name'] for item in cookies.get_cookies_as_dicts()} == {'from_argument', 'a'}
+    assert {item['name'] for item in session.cookies.get_cookies_as_dicts()} == {'from_session'}
+
+
+@pytest.mark.parametrize(
+    'custom_http_client',
+    [
+        pytest.param(lambda: CurlImpersonateHttpClient(persist_cookies_per_session=False), id='curl'),
+        pytest.param(lambda: HttpxHttpClient(persist_cookies_per_session=False), id='httpx'),
+        pytest.param(lambda: ImpitHttpClient(persist_cookies_per_session=False), id='impit'),
+    ],
+    indirect=['custom_http_client'],
+)
+async def test_cookies_argument_stored_when_not_persisted(custom_http_client: HttpClient, server_url: URL) -> None:
+    """Test that the response cookies are stored in `cookies` even with `persist_cookies_per_session` disabled."""
+    cookies = SessionCookies()
+
+    async with await custom_http_client.send_request(
+        str((server_url / 'set_cookies').with_query(a='1')), cookies=cookies
+    ):
+        pass
+
+    assert {item['name'] for item in cookies.get_cookies_as_dicts()} == {'a'}
 
 
 @pytest.mark.parametrize(

@@ -9,6 +9,7 @@ from playwright.async_api import APIResponse
 from crawlee.crawlers._playwright._playwright_http_client import PlaywrightHttpClient, browser_page_context
 from crawlee.crawlers._playwright._types import PlaywrightHttpResponse
 from crawlee.http_clients import HttpResponse
+from crawlee.sessions import CookieParam, SessionCookies
 
 
 def mock_page() -> Mock:
@@ -69,6 +70,59 @@ async def test_send_request_follows_redirects_hop_by_hop() -> None:
         'https://example.com/final',
     ]
     assert all(call.kwargs['max_redirects'] == 0 for call in page.request.fetch.await_args_list)
+
+
+async def test_send_request_sends_cookies_argument_instead_of_context_cookies() -> None:
+    """Test that the cookies passed in `cookies` are sent instead of the cookies of the browser context."""
+    page = mock_page()
+    cookies = SessionCookies([CookieParam(name='from_argument', value='1', domain='example.com')])
+    client = PlaywrightHttpClient()
+
+    with patch.object(
+        PlaywrightHttpResponse,
+        'from_playwright_response',
+        new=AsyncMock(return_value=mock_response(200, 'https://example.com/')),
+    ):
+        async with browser_page_context(page):
+            await client.send_request('https://example.com/', cookies=cookies)
+
+    page.context.cookies.assert_not_awaited()
+    assert page.request.fetch.call_args.kwargs['headers'] == {'cookie': 'from_argument=1'}
+
+
+async def test_cookies_argument_keeps_context_cookies_out() -> None:
+    """Test that the empty `Cookie` header keeping the browser context cookies out is sent only with `cookies`."""
+    page = mock_page()
+    client = PlaywrightHttpClient()
+
+    with patch.object(
+        PlaywrightHttpResponse,
+        'from_playwright_response',
+        new=AsyncMock(return_value=mock_response(200, 'https://example.com/')),
+    ):
+        async with browser_page_context(page):
+            await client.send_request('https://example.com/', cookies=SessionCookies())
+            await client.send_request('https://example.com/')
+
+    assert [call.kwargs['headers'] for call in page.request.fetch.await_args_list] == [{'cookie': ''}, None]
+
+
+async def test_cookies_argument_keeps_context_cookies_out_cross_origin() -> None:
+    """Test that the browser context adds no cookies of its own after a redirect to another origin."""
+    redirect = mock_response(302, 'https://example.com/start', location='https://other.com/final')
+    final = mock_response(200, 'https://other.com/final')
+    page = mock_page()
+    cookies = SessionCookies([CookieParam(name='from_argument', value='1', domain='example.com')])
+    client = PlaywrightHttpClient()
+
+    with patch.object(PlaywrightHttpResponse, 'from_playwright_response', new=AsyncMock(side_effect=[redirect, final])):
+        async with browser_page_context(page):
+            await client.send_request('https://example.com/start', cookies=cookies)
+
+    assert [call.kwargs['headers'] for call in page.request.fetch.await_args_list] == [
+        {'cookie': 'from_argument=1'},
+        {'cookie': ''},
+    ]
 
 
 async def test_send_request_zero_timeout_expires_immediately() -> None:
