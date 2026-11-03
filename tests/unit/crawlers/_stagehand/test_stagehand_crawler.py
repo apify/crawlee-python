@@ -41,6 +41,13 @@ def test_init_with_valid_browser_pool() -> None:
     StagehandCrawler(browser_pool=pool)
 
 
+def test_forwards_save_response_cookies() -> None:
+    """`save_response_cookies` reaches the `PlaywrightCrawler` that saves the cookies of the page."""
+    crawler = StagehandCrawler(save_response_cookies=False)
+
+    assert crawler._save_response_cookies is False
+
+
 def test_import_error_handled() -> None:
     blocked = {
         mod_name: None for mod_name in sys.modules if mod_name == 'stagehand' or mod_name.startswith('stagehand.')

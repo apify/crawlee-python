@@ -17,7 +17,7 @@ import PersistCookies from '!!raw-loader!roa-loader!./code_examples/cookie_manag
 
 Cookies carry login state, consent flags, CSRF tokens, and other per-user data that a site expects to see on every request.
 
-In Crawlee, cookies are stored on the <ApiLink to="class/Session">`Session`</ApiLink> that handles a request, in a <ApiLink to="class/SessionCookies">`SessionCookies`</ApiLink> jar. When a request runs on a session, the HTTP client sends the session's cookies with the request and writes any `Set-Cookie` from the response back onto the same jar. The next request on that session carries the updated cookies.
+In Crawlee, cookies are stored on the <ApiLink to="class/Session">`Session`</ApiLink> that handles a request, in a <ApiLink to="class/SessionCookies">`SessionCookies`</ApiLink> jar. When a request runs on a session, the HTTP client sends the session's cookies with the request and writes any `Set-Cookie` from the response back onto the same jar. The next request on that session carries the updated cookies. To keep the response cookies out of the session, set <ApiLink to="class/HttpCrawlerOptions#save_response_cookies">`save_response_cookies`</ApiLink> to `False` on the crawler. The session's cookies are still sent.
 
 Cookies follow the session, not the URL. Two requests share cookies when they run on the same session. For how sessions are created and rotated, see the [Session management](./session-management) guide.
 
@@ -49,7 +49,7 @@ To start every session with a known set of cookies, for example a consent flag o
 
 ## Cookies with PlaywrightCrawler
 
-<ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> keeps the session jar and the browser context in sync. Before navigation, the session's cookies are loaded into the browser context. After the handler returns, cookies from the browser context are merged back onto the session. The merge captures whatever the page picked up through `Set-Cookie`, JavaScript, or redirects.
+<ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink> keeps the session jar and the browser context in sync. Before navigation, the session's cookies are loaded into the browser context. After the handler returns, cookies from the browser context are merged back onto the session. The merge captures whatever the page picked up through `Set-Cookie`, JavaScript, or redirects. With <ApiLink to="class/PlaywrightCrawler#__init__">`save_response_cookies`</ApiLink> set to `False`, the crawler skips the merge.
 
 The first request receives a cookie in the browser. Crawlee merges it onto the session, so a later request on the same session sees it.
 

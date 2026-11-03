@@ -389,7 +389,21 @@ A `Cookie` header passed with a request or set on the client is merged with the 
 
 `send_request` and `context.send_request` take a new `cookies` argument, the cookies to send and store instead of the session cookies for a single call. To send no session cookies, pass `cookies=SessionCookies()`. With `PlaywrightCrawler`, the response cookies still reach the session through the browser context.
 
-Without a session, or with `persist_cookies_per_session=False`, the cookies a server sets during a redirect chain are sent with the following requests of that chain. In v1, `ImpitHttpClient` and `HttpxHttpClient` didn't send them.
+Without a session, or with `save_response_cookies=False` on the crawler, the cookies a server sets during a redirect chain are sent with the following requests of that chain. In v1, `ImpitHttpClient` and `HttpxHttpClient` didn't send them.
+
+### `save_response_cookies` replaces `persist_cookies_per_session`
+
+`persist_cookies_per_session` is removed from the HTTP clients. To stop saving the response cookies to the session, pass `save_response_cookies=False` to the crawler. The session cookies are still sent. `PlaywrightCrawler` and `StagehandCrawler` take the same option, which stops saving the cookies of the page to the session after the request handler.
+
+```python
+# v1
+crawler = ParselCrawler(http_client=ImpitHttpClient(persist_cookies_per_session=False))
+
+# v2
+crawler = ParselCrawler(save_response_cookies=False)
+```
+
+With `BasicCrawler` and the HTTP crawlers, `context.send_request` always saves the response cookies to the session, unless you pass other cookies in its `cookies` argument. In v1, `persist_cookies_per_session=False` applied to `context.send_request` too. With `PlaywrightCrawler` and its default HTTP client, `context.send_request` stores the response cookies in the browser context, so `save_response_cookies=False` keeps them out of the session as well.
 
 ### Some client arguments are ignored
 
