@@ -209,8 +209,17 @@ async def test_does_not_finish_while_paused(make_concurrency_system: type[Concur
     is_finished.assert_awaited_once()
 
 
-async def test_pause_waits_for_running_tasks(make_concurrency_system: type[ConcurrencySystem]) -> None:
-    """`pause` returns once the tasks in progress finish."""
+@pytest.mark.parametrize(
+    'timeout',
+    [
+        pytest.param(None, id='no timeout'),
+        pytest.param(timedelta(seconds=5), id='timeout not reached'),
+    ],
+)
+async def test_pause_waits_for_running_tasks(
+    make_concurrency_system: type[ConcurrencySystem], *, timeout: timedelta | None
+) -> None:
+    """`pause` returns once the tasks in progress finish, also when they finish within its `timeout`."""
     release = asyncio.Event()
 
     async def wait_for_release(_task_id: str) -> None:
@@ -231,7 +240,7 @@ async def test_pause_waits_for_running_tasks(make_concurrency_system: type[Concu
         try:
             assert await poll_until_condition(lambda: pool.own_concurrency == 2)
 
-            pause_task = asyncio.create_task(pool.pause(), name='pause task')
+            pause_task = asyncio.create_task(pool.pause(timeout=timeout), name='pause task')
             await asyncio.sleep(0.1)
             assert not pause_task.done()
 
