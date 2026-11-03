@@ -347,7 +347,7 @@ class AbstractHttpCrawler(
             retry_after_header=context.http_response.headers.get('retry-after'),
         ):
             error = RequestThrottledError(f'{context.request.url} responded with 429.')
-            error.reported = True
+            error._reported = True  # noqa: SLF001
             raise error
         if self._retry_on_blocked:
             self._raise_for_session_blocked_status_code(context.session, status_code)

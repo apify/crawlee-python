@@ -130,7 +130,7 @@ class RequestThrottledError(Exception):
     request never fails.
     """
 
-    reported: bool = False
+    _reported: bool = False
     """Whether this rate limit has already been reported to the crawler's request manager.
 
     The crawler skips its own report while it's `True`, and resets it to `False` once it defers the request.

@@ -1672,7 +1672,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Logs a one-time warning when the manager refuses, since the error is then handled as an ordinary error.
         """
         # A second report of the same refusal could arrive after its backoff has ended and count as a new refusal.
-        if error.reported:
+        if error._reported:  # noqa: SLF001
             return True
 
         request_manager = await self.get_request_manager()
@@ -1687,7 +1687,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return False
 
         if accepted:
-            error.reported = True
+            error._reported = True  # noqa: SLF001
             return True
 
         self._logger_once.log(
@@ -1702,7 +1702,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def _defer_throttled_request(self, request: Request, error: RequestThrottledError) -> None:
         """Give a rate-limited request back to the request manager without counting a failure or a retry."""
         # User code may raise the same instance again for a later refusal, which then has to be reported anew.
-        error.reported = False
+        error._reported = False  # noqa: SLF001
         request.state = RequestState.ERROR_HANDLER
         self._logger.debug(
             f'Deferring request because its domain is rate-limiting us. {error}',
