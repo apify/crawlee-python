@@ -383,6 +383,12 @@ The crawlers pass the remaining `navigation_timeout` to the HTTP client, so it b
 
 The `headers` argument of a client still applies to every request. Its `Authorization`, `Proxy-Authorization` and `Cookie` headers are dropped when a redirect leaves the origin, the same as the headers passed with a request. With `HttpxHttpClient`, the headers of the client now win over the generated browser headers. In v1, the generated browser headers replaced them.
 
+### A `Cookie` header is merged with the session cookies
+
+A `Cookie` header passed with a request or set on the client is merged with the session cookies while the redirect chain stays on its origin. A cookie in the header wins over a session cookie of the same name and isn't stored in the session. In v1, `ImpitHttpClient`, `HttpxHttpClient` and `context.send_request` of `PlaywrightCrawler` sent the header instead of the session cookies, so an empty `Cookie` header kept them out. `CurlImpersonateHttpClient` sent the session cookies in a second `Cookie` header.
+
+Without a session, or with `persist_cookies_per_session=False`, the cookies a server sets during a redirect chain are sent with the following requests of that chain. In v1, `ImpitHttpClient` and `HttpxHttpClient` didn't send them.
+
 ### Some client arguments are ignored
 
 The following keyword arguments of the underlying libraries are now ignored with a warning:
