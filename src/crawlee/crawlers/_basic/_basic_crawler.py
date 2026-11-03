@@ -52,7 +52,7 @@ from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import UNSUPPORTED_SCHEME_MESSAGE, convert_to_absolute_url, filter_url, is_url_absolute
 from crawlee._utils.wait import wait_for
 from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
-from crawlee.autoscaling import AutoscaledPool, ConcurrencyConsumer, ConcurrencySystem
+from crawlee.autoscaling import ConcurrencyConsumer, ConcurrencySystem
 from crawlee.errors import (
     ContextPipelineInitializationError,
     ContextPipelineInterruptedError,
@@ -75,6 +75,7 @@ from crawlee.statistics import Statistics, StatisticsState
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
 from ._context_pipeline import ContextPipeline
+from ._crawler_run import CrawlerRun
 from ._logging_utils import (
     get_one_line_error_summary_if_possible,
     reduce_asyncio_timeout_error_to_relevant_traceback_parts,
@@ -524,17 +525,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             func=self._crawler_state_task,
             delay=status_message_logging_interval,
         )
-        self._previous_crawler_state: TStatisticsState | None = None
 
         # State flags
         self._keep_alive = keep_alive
-        self._running = False
         self._has_finished_before = False
-        self._handled_request_this_run = False
-        self._failed = False
-        self._unexpected_stop = False
+        self._stop_before_run = False
         self._logger_once = LoggerOnce(self._logger)
-        self._run_logger_once = LoggerOnce(self._logger)
+
+        # The last run started on this instance, which stays readable after it finishes.
+        self._last_run: CrawlerRun[TStatisticsState] | None = None
 
     @property
     def log(self) -> logging.Logger:
@@ -570,16 +569,35 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """Statistics about the current (or last) crawler run."""
         return self._statistics
 
+    @property
+    def _run(self) -> CrawlerRun[TStatisticsState]:
+        """The last run started on this instance. Only code that a run drives may use it."""
+        if self._last_run is None:
+            raise RuntimeError('No crawl has been started yet, only `run()` starts one.')
+
+        return self._last_run
+
+    @property
+    def _live_run(self) -> CrawlerRun[TStatisticsState] | None:
+        """The run in progress, if any."""
+        return self._last_run if self._last_run is not None and self._last_run.is_live else None
+
     def stop(self, reason: str = 'Stop was called externally.') -> None:
         """Set flag to stop crawler.
 
-        This stops current crawler run regardless of whether all requests were finished.
+        This stops current crawler run regardless of whether all requests were finished. Called with no run in progress,
+        it stops the next run.
 
         Args:
             reason: Reason for stopping that will be used in logs.
         """
         self._logger.info(f'Crawler.stop() was called with following reason: {reason.rstrip(" .")}.')
-        self._unexpected_stop = True
+
+        if self._live_run is not None:
+            self._live_run.stop()
+        else:
+            # A caller can stop a run it scheduled with `create_task(crawler.run())` before the task starts.
+            self._stop_before_run = True
 
     def _wrap_handler_with_error_context(
         self, handler: Callable[[TCrawlingContext | BasicCrawlingContext, Exception], Awaitable[T]]
@@ -601,7 +619,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     def _stop_if_max_requests_count_exceeded(self) -> None:
         """Call `stop` when the maximum number of requests to crawl has been reached."""
-        if self._max_requests_per_crawl is None or self._unexpected_stop:
+        if self._max_requests_per_crawl is None or self._run.stop_requested:
             return
 
         if self._statistics.state.requests_total >= self._max_requests_per_crawl:
@@ -733,13 +751,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             PersistentRateLimitError: If a domain throttled by a `ThrottlingRequestManager` has rate-limited every
                 request for longer than the manager's `max_domain_stall` and no other requests are left.
         """
-        if self._running:
+        if self._live_run is not None:
             raise RuntimeError(
                 'This crawler instance is already running, you can add more requests to it via `crawler.add_requests()`'
             )
 
-        self._running = True
-        self._handled_request_this_run = False
+        self._last_run = self._create_run()
 
         try:
             if self._respect_robots_txt_file and not isinstance(self._request_manager, ThrottlingRequestManager):
@@ -821,7 +838,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             # A crawl that did nothing while the manager holds only handled requests is a mistake, whoever handled them.
             # Starting against handled requests is not, since that is what resuming a crawl looks like. The statistics
             # can't tell, as they don't count skipped requests and may be restored from a previous process.
-            if not self._handled_request_this_run:
+            if not self._run.handled_request:
                 request_manager = await self.get_request_manager()
                 # The diagnostic must never fail the run.
                 try:
@@ -845,11 +862,33 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return final_statistics
         finally:
             # A failed run must leave the instance usable, so that the caller can retry after handling the error.
-            self._running = False
+            self._run.finish()
 
-            self._unexpected_stop = False
-            self._failed = False
-            self._run_logger_once = LoggerOnce(self._logger)
+    def _create_run(self) -> CrawlerRun[TStatisticsState]:
+        if self._borrowed_concurrency_system is not None:
+            concurrency_system: ConcurrencySystemInterface = self._borrowed_concurrency_system
+        else:
+            concurrency_system = ConcurrencySystem(
+                self._concurrency_settings,
+                configuration=self._service_locator.get_configuration(),
+            )
+
+        self._concurrency_system = concurrency_system
+
+        run = CrawlerRun[TStatisticsState](
+            logger=self._logger,
+            concurrency_system=concurrency_system,
+            consumer=self._consumer,
+            is_finished_function=self.__is_finished_function,
+            is_task_ready_function=self.__is_task_ready_function,
+            run_task_function=self.__run_task_function,
+        )
+
+        if self._stop_before_run:
+            run.stop()
+            self._stop_before_run = False
+
+        return run
 
     async def _run_crawler(self) -> None:
         local_event_manager = self._service_locator.get_event_manager()
@@ -864,24 +903,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         # A system supplied by the caller is only borrowed, and its lifecycle belongs to whoever created it. The one
         # the crawler builds for this run is entered and exited below.
-        if self._borrowed_concurrency_system is not None:
-            concurrency_system: ConcurrencySystemInterface = self._borrowed_concurrency_system
-            owned_concurrency_system = None
-        else:
-            owned_concurrency_system = ConcurrencySystem(
-                self._concurrency_settings,
-                configuration=self._service_locator.get_configuration(),
-            )
-            concurrency_system = owned_concurrency_system
-
-        self._concurrency_system = concurrency_system
-        autoscaled_pool = AutoscaledPool(
-            concurrency_system=concurrency_system,
-            consumer=self._consumer,
-            is_finished_function=self.__is_finished_function,
-            is_task_ready_function=self.__is_task_ready_function,
-            run_task_function=self.__run_task_function,
-        )
+        owned_concurrency_system = self._concurrency_system if self._borrowed_concurrency_system is None else None
 
         # Collect the context managers to be entered. Context managers that are already active are excluded,
         # as they were likely entered by the caller, who will also be responsible for exiting them.
@@ -904,7 +926,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             for context in contexts_to_enter:
                 await exit_stack.enter_async_context(context)
 
-            await autoscaled_pool.run()
+            await self._run.dispatch_requests()
 
     async def add_requests(
         self,
@@ -1264,7 +1286,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if self._abort_on_error:
             self._logger.error('Aborting crawler run due to error (abort_on_error=True)', exc_info=error)
-            self._failed = True
+            self._run.failed = True
 
         if self._should_retry_request(context, error):
             request.retry_count += 1
@@ -1469,11 +1491,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def __is_finished_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
-        if self._unexpected_stop:
+        if self._run.stop_requested:
             self._logger.info('The crawler has finished all the remaining ongoing requests and will shut down now.')
             return True
 
-        if self._abort_on_error and self._failed:
+        if self._run.failed:
             return True
 
         if self._keep_alive:
@@ -1493,8 +1515,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def __is_task_ready_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
-        if self._unexpected_stop:
-            self._run_logger_once.log(
+        if self._run.stop_requested:
+            self._run.log_once(
                 'No new requests are allowed because the `stop()` method has been called. '
                 'Ongoing requests will be allowed to complete.',
                 key='shutting_down',
@@ -1502,7 +1524,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return False
 
         # The pool asks whether the run is finished only once nothing is in flight, so stop taking new requests here.
-        if self._abort_on_error and self._failed:
+        if self._run.failed:
             return False
 
         request_manager = await self.get_request_manager()
@@ -1885,7 +1907,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if (
             failed_requests := current_state.requests_failed
-            - (self._previous_crawler_state or current_state).requests_failed
+            - (self._run.previous_state or current_state).requests_failed
         ) > 0:
             message = f'Experiencing problems, {failed_requests} failed requests since last status update.'
         else:
@@ -1906,7 +1928,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             )
 
         if self._status_message_callback:
-            new_message = await self._status_message_callback(current_state, self._previous_crawler_state, message)
+            new_message = await self._status_message_callback(current_state, self._run.previous_state, message)
             if new_message:
                 message = new_message
                 self._log_status_message(message, level='INFO')
@@ -1917,7 +1939,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             event=Event.CRAWLER_STATUS, event_data=EventCrawlerStatusData(message=message, crawler_id=self._id)
         )
 
-        self._previous_crawler_state = current_state
+        self._run.previous_state = current_state
 
     async def _mark_request_as_handled(self, request: Request) -> None:
         request_manager = await self.get_request_manager()
@@ -1929,4 +1951,4 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             logger=self._logger,
             max_retries=3,
         )
-        self._handled_request_this_run = True
+        self._run.handled_request = True
