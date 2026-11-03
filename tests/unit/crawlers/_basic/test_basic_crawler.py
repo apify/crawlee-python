@@ -646,7 +646,8 @@ async def test_send_request_works(server_url: URL, method: HttpMethod, path: str
     assert content_type == 'application/json'
 
 
-async def test_send_request_forwards_timeout_to_http_client() -> None:
+async def test_send_request_forwards_arguments_to_http_client() -> None:
+    """Test that `context.send_request` passes all its arguments to the HTTP client."""
     http_client = AsyncMock(spec=HttpClient)
     response = Mock(spec=HttpResponse)
     http_client.send_request.return_value = response
