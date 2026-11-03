@@ -202,7 +202,8 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
         """Initialize a new instance.
 
         With `per_consumer` set, every consumer gets its own peak search, and `max_concurrency` is shared between them
-        max-min fair. A consumer that has not asked for capacity for ten autoscale intervals, with nothing running,
+        max-min fair. Each consumer keeps at least `min_concurrency`, so with many consumers their total can exceed
+        `max_concurrency`. A consumer that has not asked for capacity for ten autoscale intervals, with nothing running,
         starts its search over when it comes back. Without it, one search covers the tasks of all consumers. The other
         arguments are those of `ConcurrencySystem`.
         """
@@ -290,7 +291,8 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
         if not super().try_register_task_start(consumer, task_id):
             return False
 
-        self._in_flight[consumer.id] += 1
+        if self._per_consumer:
+            self._in_flight[consumer.id] += 1
         controller = self._controller_for(consumer.id)
         self._started[id(consumer), task_id] = (controller, *controller.task_started())
         return True
@@ -303,7 +305,8 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
         if (started := self._started.pop((id(consumer), task_id), None)) is None:
             return
 
-        self._in_flight[consumer.id] -= 1
+        if self._per_consumer:
+            self._in_flight[consumer.id] -= 1
         controller, started_at, cohort, member = started
         controller.task_ended(started_at, cohort, member)
 
