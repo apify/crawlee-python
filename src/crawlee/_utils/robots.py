@@ -120,7 +120,7 @@ class RobotsTxtFile:
             sitemaps.append(sitemap_url)
         return sitemaps
 
-    def get_crawl_delay(self, user_agent: str = '*') -> int | None:
+    def get_crawl_delay(self, user_agent: str = '*') -> float | None:
         """Get the crawl delay for the given user agent.
 
         Args:
@@ -128,7 +128,7 @@ class RobotsTxtFile:
                 user-agent.
         """
         crawl_delay = self._robots.crawl_delay(user_agent)
-        return int(crawl_delay) if crawl_delay is not None else None
+        return float(crawl_delay) if crawl_delay is not None else None
 
     async def parse_sitemaps(self, *, enqueue_strategy: EnqueueStrategy) -> Sitemap:
         """Parse the sitemaps from the robots.txt file and return a `Sitemap` instance.
