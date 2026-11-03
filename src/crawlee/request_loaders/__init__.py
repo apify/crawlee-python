@@ -6,6 +6,10 @@ from ._sitemap_request_loader import SitemapRequestLoader
 from ._throttling_request_manager import ThrottlingRequestManager
 from ._types import (
     FinishedStatus,
+    MinIntervalSignal,
+    PacingScope,
+    PacingSignal,
+    RateLimitedSignal,
     ReadyStatus,
     RequestLoaderStatus,
     RequestSourceStatus,
@@ -15,6 +19,10 @@ from ._types import (
 
 __all__ = [
     'FinishedStatus',
+    'MinIntervalSignal',
+    'PacingScope',
+    'PacingSignal',
+    'RateLimitedSignal',
     'ReadyStatus',
     'RequestList',
     'RequestLoader',
