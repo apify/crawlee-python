@@ -562,6 +562,28 @@ async def test_send_request_sends_page_cookies(server_url: URL) -> None:
     assert sent_cookies == {'a': '1', 'b': '2', 'check': 'test'}
 
 
+async def test_send_request_merges_cookie_header_with_page_cookies(server_url: URL) -> None:
+    """Test that `context.send_request` merges the `Cookie` header with the page cookies and the header wins."""
+    crawler = PlaywrightCrawler()
+    sent_cookies: list[list[str]] = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        await context.page.context.add_cookies(
+            [
+                {'name': 'manual', 'value': 'from_page', 'url': str(server_url)},
+                {'name': 'from_page', 'value': '1', 'url': str(server_url)},
+            ]
+        )
+        response = await context.send_request(str(server_url / 'headers'), headers={'cookie': 'manual=value'})
+        cookie_header = json.loads(await response.read())['cookie']
+        sent_cookies.append(sorted(cookie_header.split('; ')))
+
+    await crawler.run([str(server_url)])
+
+    assert sent_cookies == [['from_page=1', 'manual=value']]
+
+
 async def test_send_request_skips_cookies_deleted_by_page(server_url: URL) -> None:
     """Test that `context.send_request` doesn't send a session cookie that the page deleted in the handler."""
     crawler = PlaywrightCrawler(session_pool=SessionPool(max_pool_size=1))
