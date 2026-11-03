@@ -521,7 +521,7 @@ class PlaywrightCrawler(
             context: The current crawling context containing the response.
 
         Raises:
-            RequestThrottledError: If the response is a 429 from a domain throttled by a `ThrottlingRequestManager`.
+            RequestThrottledError: If the response is a 429 from a domain the crawler's request manager paces.
             SessionError: If the status code indicates the session is blocked.
             HttpStatusCodeError: If the status code represents a server error or is explicitly configured as an error.
             HttpClientStatusCodeError: If the status code represents a client error.
@@ -535,7 +535,9 @@ class PlaywrightCrawler(
             request_url=context.request.url,
             retry_after_header=context.response.headers.get('retry-after'),
         ):
-            raise RequestThrottledError(f'{context.request.url} responded with 429.')
+            error = RequestThrottledError(f'{context.request.url} responded with 429.')
+            error._reported = True  # noqa: SLF001
+            raise error
         if self._retry_on_blocked:
             self._raise_for_session_blocked_status_code(context.session, status_code)
         self._raise_for_error_status_code(status_code)

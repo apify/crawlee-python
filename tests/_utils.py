@@ -67,8 +67,8 @@ async def open_throttler_held_until_reclaim(
 ) -> ThrottlingRequestManager[RequestQueue]:
     """Open a throttler for `throttled.placeholder.com` whose backoff lasts until the crawler gives a request back.
 
-    The throttler runs on a stopped clock, so a backoff can't run out before the crawler checks whether the domain is
-    held back. Each reclaimed request moves the clock past the backoff, so a deferred request is dispatched right away.
+    The throttler runs on a stopped clock, and each reclaimed request moves it past the backoff, so a deferred request
+    is dispatched right away.
     Once the domain has rate-limited for longer than `max_domain_stall`, reclaims stop moving the clock, so a deferred
     request sits out its cooldown in a stalled domain.
     """

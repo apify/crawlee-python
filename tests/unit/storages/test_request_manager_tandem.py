@@ -9,6 +9,7 @@ import pytest
 from crawlee import Request
 from crawlee.request_loaders import (
     FinishedStatus,
+    RateLimitedSignal,
     ReadyStatus,
     RequestList,
     RequestLoader,
@@ -183,3 +184,21 @@ async def test_pending_count_sums_sources() -> None:
     manager.get_pending_count.return_value = 3
 
     assert await RequestManagerTandem(loader, manager).get_pending_count() == 5
+
+
+@pytest.mark.parametrize(
+    'accepted',
+    [
+        pytest.param(True, id='accepted'),
+        pytest.param(False, id='refused'),
+    ],
+)
+def test_pacing_signal_forwarded_to_manager(*, accepted: bool) -> None:
+    """Test that the tandem forwards a pacing signal to its manager and returns the manager's answer."""
+    loader = create_autospec(RequestLoader, instance=True, spec_set=True)
+    manager = create_autospec(RequestManager, instance=True, spec_set=True)
+    manager.record_pacing_signal.return_value = accepted
+    signal = RateLimitedSignal('https://a.placeholder.com')
+
+    assert RequestManagerTandem(loader, manager).record_pacing_signal(signal) is accepted
+    manager.record_pacing_signal.assert_called_once_with(signal)

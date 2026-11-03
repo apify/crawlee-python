@@ -9,6 +9,7 @@ import pytest
 
 from crawlee.crawlers import HttpCrawler
 from crawlee.http_clients import HttpClient, HttpResponse
+from crawlee.request_loaders import RateLimitedSignal, RequestList, RequestManagerTandem
 from crawlee.sessions import SessionPool
 from tests._utils import open_throttler_held_until_reclaim
 
@@ -128,3 +129,46 @@ async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any], monkeyp
     assert session is not None
     assert session.error_score == 0
     assert session.is_usable
+
+
+async def test_tandem_429_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A 429 reaches a throttler wrapped in a `RequestManagerTandem`, so the request is deferred without a retry."""
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
+    http_client = AsyncMock(spec=HttpClient)
+    url = 'https://throttled.placeholder.com/page'
+    http_client.send_request.side_effect = [mock_response(429, url), mock_response(200, url)]
+    failed_request_handler = AsyncMock()
+    crawler = HttpCrawler(
+        http_client=http_client,
+        request_manager=RequestManagerTandem(RequestList([url]), throttler),
+        max_request_retries=0,
+    )
+    crawler.failed_request_handler(failed_request_handler)
+    handler = AsyncMock()
+    crawler.router.default_handler(handler)
+
+    await crawler.run()
+
+    handler.assert_awaited_once()
+    context = handler.call_args.args[0]
+    assert context.http_response.status_code == 200
+    failed_request_handler.assert_not_called()
+    assert context.request.retry_count == 0
+    assert (context.request.session_rotation_count or 0) == 0
+    assert throttler._domain_states['throttled.placeholder.com'].consecutive_429_count == 1
+
+
+async def test_429_reported_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A 429 is reported to the request manager once, not again when the crawler defers the request."""
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
+    record_pacing_signal = Mock(wraps=throttler.record_pacing_signal)
+    monkeypatch.setattr(throttler, 'record_pacing_signal', record_pacing_signal)
+    http_client = AsyncMock(spec=HttpClient)
+    url = 'https://throttled.placeholder.com/page'
+    http_client.send_request.side_effect = [mock_response(429, url), mock_response(200, url)]
+    crawler = HttpCrawler(http_client=http_client, request_manager=throttler)
+    crawler.router.default_handler(AsyncMock())
+
+    await crawler.run([url])
+
+    record_pacing_signal.assert_called_once_with(RateLimitedSignal(url))

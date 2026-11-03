@@ -1414,6 +1414,8 @@ async def test_throttled_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> Non
     """A throttled 429 is retried later without spending a retry, a session rotation or session reputation."""
     url = 'https://throttled.placeholder.com/page'
     throttler = await open_throttler_held_until_reclaim(monkeypatch)
+    record_pacing_signal = Mock(wraps=throttler.record_pacing_signal)
+    monkeypatch.setattr(throttler, 'record_pacing_signal', record_pacing_signal)
     failed_request_handler = AsyncMock()
     crawler = PlaywrightCrawler(
         request_manager=throttler,
@@ -1438,6 +1440,7 @@ async def test_throttled_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert [context.response.status for context in handled] == [200]
     failed_request_handler.assert_not_called()
+    record_pacing_signal.assert_called_once()
     assert handled[0].request.retry_count == 0
     assert (handled[0].request.session_rotation_count or 0) == 0
     session = handled[0].session
