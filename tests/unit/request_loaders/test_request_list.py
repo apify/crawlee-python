@@ -1,10 +1,15 @@
 import asyncio
 import logging
 from collections.abc import AsyncGenerator
+from unittest.mock import AsyncMock
 
 import pytest
 
-from crawlee.request_loaders._request_list import RequestList, RequestListState
+from crawlee import service_locator
+from crawlee.events import EventManager
+from crawlee.events._types import Event, EventPersistStateData
+from crawlee.request_loaders import RequestListState
+from crawlee.request_loaders._request_list import RequestList
 from crawlee.storages import KeyValueStore
 
 URLS = ['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com']
@@ -414,3 +419,84 @@ async def test_concurrent_first_calls_restore_position_once() -> None:
 
     assert request is not None
     assert request.url == 'https://b.placeholder.com'
+
+
+async def test_state_option_sets_start_position() -> None:
+    """The `state` option sets the position to start from when there is no persisted state."""
+    state = RequestListState(next_index=1, next_unique_key='https://b.placeholder.com')
+    request_list = RequestList(URLS, state=state)
+
+    assert await _drain(request_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
+
+
+async def test_get_state_resumes_another_list() -> None:
+    """`get_state` returns a copy that makes another request list resume from the same position."""
+    first_list = RequestList(URLS)
+    first_request = await first_list.fetch_next_request()
+    assert first_request is not None
+    await first_list.fetch_next_request()
+    await first_list.mark_request_as_handled(first_request)
+
+    copied_state = await first_list.get_state()
+    copied_state.in_progress.clear()
+
+    resumed_list = RequestList(URLS, state=await first_list.get_state())
+
+    assert await _drain(resumed_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
+
+
+async def test_persisted_state_wins_over_state_option() -> None:
+    """A persisted state is restored instead of the one passed in the `state` option."""
+    first_list = RequestList(URLS, persist_state_key='state')
+    request = await first_list.fetch_next_request()
+    assert request is not None
+    await first_list.mark_request_as_handled(request)
+    await first_list.persist_state()
+
+    state = RequestListState(next_index=2, next_unique_key='https://c.placeholder.com')
+    restored_list = RequestList(URLS, persist_state_key='state', state=state)
+
+    assert await _drain(restored_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
+
+
+async def test_persist_state_without_key_raises() -> None:
+    """`persist_state` raises when the request list has no `persist_state_key`."""
+    request_list = RequestList(URLS)
+
+    with pytest.raises(RuntimeError, match=r'`persist_state_key` is not set'):
+        await request_list.persist_state()
+
+
+async def test_failed_persist_state_is_logged(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A failed write in `persist_state` is logged instead of raised."""
+    request_list = RequestList(URLS, persist_state_key='state')
+    await request_list.fetch_next_request()
+    kvs = await KeyValueStore.open()
+    monkeypatch.setattr(kvs, 'set_value', AsyncMock(side_effect=RuntimeError('store is on fire')))
+
+    with caplog.at_level(logging.ERROR):
+        await request_list.persist_state()
+
+    assert any(record.message == 'Attempted to persist state, but failed.' for record in caplog.records)
+
+
+async def test_close_persists_state_and_stops_listening() -> None:
+    """Leaving the context persists the state once more, and later PERSIST_STATE events no longer persist it."""
+    async with EventManager() as event_manager:
+        service_locator.set_event_manager(event_manager)
+        kvs = await KeyValueStore.open()
+
+        async with RequestList(URLS, persist_state_key='state') as request_list:
+            request = await request_list.fetch_next_request()
+            assert request is not None
+            await request_list.mark_request_as_handled(request)
+
+        assert (await kvs.get_value('state'))['nextIndex'] == 1
+
+        await request_list.fetch_next_request()
+        event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
+        await event_manager.wait_for_all_listeners_to_complete()
+
+        assert (await kvs.get_value('state'))['nextIndex'] == 1
