@@ -51,6 +51,9 @@ class HttpCrawlerOptions(
     option doesn't apply to `context.send_request`.
     """
 
+    ignore_tls_errors: NotRequired[bool]
+    """Whether to ignore TLS certificate errors. The option doesn't apply to `context.send_request`."""
+
 
 @docs_group('Crawlers')
 class AbstractHttpCrawler(
@@ -78,11 +81,13 @@ class AbstractHttpCrawler(
         parser: AbstractHttpParser[TParseResult, TSelectResult],
         navigation_timeout: timedelta | None = None,
         save_response_cookies: bool = True,
+        ignore_tls_errors: bool = False,
         **kwargs: Unpack[BasicCrawlerOptions[TCrawlingContext, StatisticsState]],
     ) -> None:
         self._parser = parser
         self._navigation_timeout = navigation_timeout or timedelta(minutes=1)
         self._save_response_cookies = save_response_cookies
+        self._ignore_tls_errors = ignore_tls_errors
         self._pre_navigation_hooks: list[Callable[[BasicCrawlingContext], Awaitable[None]]] = []
         self._post_navigation_hooks: list[Callable[[HttpCrawlingContext], Awaitable[None]]] = []
         self._shared_navigation_timeouts: dict[int, SharedTimeout] = {}
@@ -320,6 +325,7 @@ class AbstractHttpCrawler(
                 cookies=cookies,
                 proxy_info=context.proxy_info,
                 timeout=remaining_timeout,
+                ignore_tls_errors=self._ignore_tls_errors,
             )
 
         try:

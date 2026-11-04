@@ -583,6 +583,7 @@ class SendRequestFunction(Protocol):
         headers: HttpHeaders | dict[str, str] | None = None,
         cookies: SessionCookies | None = None,
         timeout: timedelta | None = None,
+        ignore_tls_errors: bool = False,
     ) -> Coroutine[None, None, HttpResponse]:
         """Call send request function.
 
@@ -596,6 +597,8 @@ class SendRequestFunction(Protocol):
                 request handler unless `save_response_cookies` is disabled.
             timeout: Maximum time allowed to receive the response, including all redirects, and to read its body.
                 Without it, the default timeout of the HTTP client applies.
+            ignore_tls_errors: Whether to ignore TLS certificate errors for this request. The `ignore_tls_errors`
+                option of the HTTP crawlers doesn't apply here.
 
         Returns:
             The HTTP response received from the server.

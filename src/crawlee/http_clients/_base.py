@@ -226,6 +226,7 @@ class HttpClient(ABC):
         cookies: SessionCookies | None = None,
         proxy_info: ProxyInfo | None = None,
         timeout: timedelta | None = None,
+        ignore_tls_errors: bool = False,
     ) -> HttpResponse:
         """Send an HTTP request via the client, following up to 10 redirects unless `follow_redirects` is disabled.
 
@@ -247,6 +248,8 @@ class HttpClient(ABC):
             proxy_info: The information about the proxy to be used.
             timeout: Maximum time allowed to receive the response, including all redirects, and to read its body.
                 Without it, the default timeout of the HTTP client applies.
+            ignore_tls_errors: Whether to ignore TLS certificate errors for this request. TLS errors are also ignored
+                when the client or `proxy_info` sets `ignore_tls_errors`.
 
         Raises:
             ProxyError: Raised if a proxy-related error occurs.
@@ -263,6 +266,9 @@ class HttpClient(ABC):
 
         if cookies is None:
             cookies = session.cookies if session is not None else SessionCookies()
+
+        if proxy_info is not None and proxy_info.ignore_tls_errors:
+            ignore_tls_errors = True
 
         # `encoded=True` keeps the path and the query byte for byte, including a safe `%2F` in query.
         current_url = _with_ascii_host(URL(url, encoded=True))
@@ -282,6 +288,7 @@ class HttpClient(ABC):
                     payload=payload,
                     proxy_info=proxy_info,
                     timeout=timedelta(seconds=remaining) if remaining is not None else None,
+                    ignore_tls_errors=ignore_tls_errors,
                 )
 
             try:
@@ -327,6 +334,7 @@ class HttpClient(ABC):
         payload: HttpPayload | None,
         proxy_info: ProxyInfo | None,
         timeout: timedelta | None,
+        ignore_tls_errors: bool,
     ) -> HttpResponse:
         """Send a single HTTP request and return the response without reading its body.
 
@@ -341,6 +349,8 @@ class HttpClient(ABC):
             proxy_info: The information about the proxy to be used.
             timeout: Maximum time allowed to receive the response and read its body. Without it, the default timeout
                 of the client library applies. `send_request` also cancels the call when the time is up.
+            ignore_tls_errors: Whether to ignore TLS certificate errors, as requested by the caller of `send_request`
+                or by `proxy_info`. A client that ignores them on its own does so even when this is `False`.
 
         Raises:
             ProxyError: Raised if a proxy-related error occurs.

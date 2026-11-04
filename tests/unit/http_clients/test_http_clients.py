@@ -15,6 +15,7 @@ from crawlee.http_clients import CurlImpersonateHttpClient, HttpResponse, HttpxH
 from crawlee.http_clients._base import _is_cross_origin, _redirect_method
 from crawlee.http_clients._httpx import _HttpxResponse
 from crawlee.http_clients._impit import _ImpitResponse
+from crawlee.proxy_configuration import ProxyInfo
 from crawlee.sessions import Session
 
 if TYPE_CHECKING:
@@ -63,12 +64,15 @@ async def test_cookies_of_non_ascii_host_sent_back(monkeypatch: pytest.MonkeyPat
     [
         pytest.param(ImpitHttpClient, 'cookies', id='impit_cookies'),
         pytest.param(ImpitHttpClient, 'cookie_jar', id='impit_cookie_jar'),
+        pytest.param(ImpitHttpClient, 'verify', id='impit_verify'),
         pytest.param(HttpxHttpClient, 'cookies', id='httpx_cookies'),
         pytest.param(HttpxHttpClient, 'auth', id='httpx_auth'),
         pytest.param(HttpxHttpClient, 'params', id='httpx_params'),
+        pytest.param(HttpxHttpClient, 'verify', id='httpx_verify'),
         pytest.param(CurlImpersonateHttpClient, 'cookies', id='curl_cookies'),
         pytest.param(CurlImpersonateHttpClient, 'auth', id='curl_auth'),
         pytest.param(CurlImpersonateHttpClient, 'params', id='curl_params'),
+        pytest.param(CurlImpersonateHttpClient, 'verify', id='curl_verify'),
     ],
 )
 def test_ignored_argument_warns(client_class: type[HttpClient], kwarg: str) -> None:
@@ -170,3 +174,66 @@ def test_see_other_keeps_head() -> None:
 def test_is_cross_origin(url: str, other: str, *, expected: bool) -> None:
     """Test that a redirect leaves the origin when the scheme, host or port changes."""
     assert _is_cross_origin(URL(url, encoded=True), URL(other, encoded=True)) is expected
+
+
+@pytest.mark.parametrize(
+    'client_class',
+    [
+        pytest.param(ImpitHttpClient, id='impit'),
+        pytest.param(HttpxHttpClient, id='httpx'),
+    ],
+)
+async def test_clients_cached_per_tls_setting(client_class: type[ImpitHttpClient | HttpxHttpClient]) -> None:
+    """Test that the requests ignoring TLS errors get a client of their own, while the others share one."""
+    client = client_class()
+
+    async with client:
+        verified = client._get_client(None, ignore_tls_errors=False)
+        unverified = client._get_client(None, ignore_tls_errors=True)
+
+        assert verified is not unverified
+        assert client._get_client(None, ignore_tls_errors=False) is verified
+        assert client._get_client(None, ignore_tls_errors=True) is unverified
+
+
+@pytest.mark.parametrize(
+    'client_class',
+    [
+        pytest.param(ImpitHttpClient, id='impit'),
+        pytest.param(HttpxHttpClient, id='httpx'),
+        pytest.param(CurlImpersonateHttpClient, id='curl'),
+    ],
+)
+@pytest.mark.parametrize(
+    ('request_flag', 'proxy_flag', 'expected_flag'),
+    [
+        pytest.param(False, False, False, id='verified'),
+        pytest.param(True, False, True, id='request'),
+        pytest.param(False, True, True, id='proxy'),
+    ],
+)
+async def test_ignore_tls_errors_reaches_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+    client_class: type[HttpClient],
+    *,
+    request_flag: bool,
+    proxy_flag: bool,
+    expected_flag: bool,
+) -> None:
+    """Test that `send_request` asks `_fetch` to ignore TLS errors when the call or its proxy sets the flag."""
+    url = 'https://example.com/'
+    response = Mock(spec=HttpResponse, status_code=200, headers={}, url=url, headers_set_cookie=[])
+    fetch = AsyncMock(return_value=response)
+    client = client_class()
+    monkeypatch.setattr(client, '_fetch', fetch)
+    proxy_info = ProxyInfo(
+        url='http://proxy.com:8000',
+        scheme='http',
+        hostname='proxy.com',
+        port=8000,
+        ignore_tls_errors=proxy_flag,
+    )
+
+    await client.send_request(url, proxy_info=proxy_info, ignore_tls_errors=request_flag)
+
+    assert fetch.call_args.kwargs['ignore_tls_errors'] is expected_flag
