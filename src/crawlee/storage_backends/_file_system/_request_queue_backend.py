@@ -285,7 +285,7 @@ class FileSystemRequestQueueBackend(RequestQueueBackend):
                 await asyncio.to_thread(shutil.rmtree, self.path_to_rq)
 
             # Clear recoverable state
-            await self._state.reset()
+            self._state.reset()
             await self._state.teardown()
             self._request_cache.clear()
             self._request_cache_needs_refresh = True
@@ -302,7 +302,8 @@ class FileSystemRequestQueueBackend(RequestQueueBackend):
                 await asyncio.to_thread(file_path.unlink, missing_ok=True)
 
             # Clear recoverable state
-            await self._state.reset()
+            self._state.reset()
+            await self._state.persist_state()
             self._request_cache.clear()
             self._request_cache_needs_refresh = True
 

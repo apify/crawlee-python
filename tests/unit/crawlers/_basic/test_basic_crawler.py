@@ -1438,6 +1438,17 @@ async def test_abort_on_error_applies_to_one_run() -> None:
     assert handled_urls == ['https://a.placeholder.com', 'https://b.placeholder.com']
 
 
+async def test_repeated_run_starts_with_fresh_statistics() -> None:
+    """A repeated `run()` starts from fresh statistics instead of adding to the previous run's."""
+    crawler = BasicCrawler(request_handler=AsyncMock())
+
+    await crawler.run(['https://a.placeholder.com'])
+    stats = await crawler.run(['https://b.placeholder.com'])
+
+    assert stats.requests_finished == 1
+    assert crawler.statistics.state.requests_finished == 1
+
+
 def test_crawler_log() -> None:
     crawler = BasicCrawler()
     assert isinstance(crawler.log, logging.Logger)

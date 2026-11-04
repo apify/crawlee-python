@@ -76,15 +76,7 @@ class RequestList(RequestLoader):
             logger=logger,
         )
 
-        self._persist_request_data = bool(persist_requests_key)
-
-        self._requests_data = RecoverableState(
-            default_state=RequestListData(requests=[]),
-            # With request data persistence enabled, a snapshot of the requests will be done on initialization
-            persistence_enabled='explicit_only' if self._persist_request_data else False,
-            persist_state_key=persist_requests_key or '',
-            logger=logger,
-        )
+        self._persist_requests_key = persist_requests_key
 
         self._requests: AsyncIterator[str | Request]
         if isinstance(requests, AsyncIterable):
@@ -103,28 +95,36 @@ class RequestList(RequestLoader):
 
         # Initialize recoverable state
         await self._state.initialize()
-        await self._requests_data.initialize()
 
         # Initialize lock if necessary
         if self._requests_lock is None:
             self._requests_lock = asyncio.Lock()
 
         # If the RequestList is configured to persist request data, ensure that a copy of request data is used
-        if self._persist_request_data:
+        if self._persist_requests_key:
+            from crawlee.storages import KeyValueStore  # noqa: PLC0415
+
             async with self._requests_lock:
-                if not await self._requests_data.has_persisted_state():
-                    self._requests_data.current_value.requests = []
+                key_value_store = await KeyValueStore.open()
+                persisted_requests = await key_value_store.get_value(self._persist_requests_key)
+
+                if persisted_requests is None:
+                    requests_data = RequestListData(requests=[])
                     async for processing_request in self._requests:
                         try:
                             request = self._transform_request(processing_request)
                         except ValidationError:
                             logger.warning('Invalid request encountered in the request list: %s', processing_request)
                             continue
-                        self._requests_data.current_value.requests.append(request)
-                    await self._requests_data.persist_state()
+                        requests_data.requests.append(request)
+                    await key_value_store.set_value(
+                        self._persist_requests_key, requests_data.model_dump(mode='json', by_alias=True)
+                    )
+                else:
+                    requests_data = RequestListData.model_validate(persisted_requests)
 
                 self._requests = self._iterate_in_threadpool(
-                    self._requests_data.current_value.requests[self._state.current_value.next_index :]
+                    requests_data.requests[self._state.current_value.next_index :]
                 )
         # If not using persistent request data, advance the request iterator
         else:

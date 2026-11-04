@@ -1,16 +1,20 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Generic, Literal, TypeVar
+import asyncio
+from datetime import timedelta
+from typing import TYPE_CHECKING, Generic, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
+from crawlee._utils.wait import wait_for
 from crawlee.events._types import Event, EventPersistStateData
 
 if TYPE_CHECKING:
     import logging
     from collections.abc import Callable, Coroutine
 
+    from crawlee.events import EventManager
     from crawlee.storages import KeyValueStore
 
 TStateModel = TypeVar('TStateModel', bound=BaseModel)
@@ -36,10 +40,11 @@ class RecoverableState(Generic[TStateModel]):
         *,
         default_state: TStateModel,
         persist_state_key: str,
-        persistence_enabled: Literal[True, False, 'explicit_only'] = False,
+        persistence_enabled: bool = False,
         persist_state_kvs_name: str | None = None,
         persist_state_kvs_id: str | None = None,
         persist_state_kvs_factory: Callable[[], Coroutine[None, None, KeyValueStore]] | None = None,
+        persistence_timeout: timedelta = timedelta(seconds=60),
         logger: logging.Logger,
     ) -> None:
         """Initialize a new recoverable state object.
@@ -48,14 +53,14 @@ class RecoverableState(Generic[TStateModel]):
             default_state: The default state model instance to use when no persisted state is found.
                 A deep copy is made each time the state is used.
             persist_state_key: The key under which the state is stored in the KeyValueStore
-            persistence_enabled: Flag to enable or disable state persistence. Use 'explicit_only' if you want to be able
-                to save the state manually, but without any automatic persistence.
+            persistence_enabled: Flag to enable or disable state persistence.
             persist_state_kvs_name: The name of the KeyValueStore to use for persistence.
                 If neither a name nor and id are supplied, the default store will be used.
             persist_state_kvs_id: The identifier of the KeyValueStore to use for persistence.
                 If neither a name nor and id are supplied, the default store will be used.
             persist_state_kvs_factory: Factory that can be awaited to create KeyValueStore to use for persistence. If
                 not provided, a system-wide KeyValueStore will be used, based on service locator configuration.
+            persistence_timeout: Time limit for a single load, save or clear of the persisted state.
             logger: A logger instance for logging operations related to state persistence
         """
         raise_if_too_many_kwargs(
@@ -74,8 +79,13 @@ class RecoverableState(Generic[TStateModel]):
         self._default_state = default_state
         self._state_type: type[TStateModel] = self._default_state.__class__
         self._state: TStateModel | None = None
+        self._initialized = False
+        self._record_loaded = False
+        self._listening = False
+        self._lock = asyncio.Lock()
         self._persistence_enabled = persistence_enabled
         self._persist_state_key = persist_state_key
+        self._persistence_timeout = persistence_timeout
         if persist_state_kvs_factory is None:
 
             async def kvs_factory() -> KeyValueStore:
@@ -93,116 +103,176 @@ class RecoverableState(Generic[TStateModel]):
     async def initialize(self) -> TStateModel:
         """Initialize the recoverable state.
 
-        This method must be called before using the recoverable state. It loads the saved state
-        if persistence is enabled and registers the object to listen for PERSIST_STATE events.
+        If persistence is enabled, this method loads the saved state and registers the object to listen for
+        PERSIST_STATE events. A state established beforehand by `reset` survives if there is no record to restore.
+
+        Calling this again after `teardown` registers the listener again, but doesn't reload the record.
 
         Returns:
             The loaded state model
+
+        Raises:
+            ValidationError: If the persisted record is invalid. The record is kept, and every call raises again until
+                it's fixed or cleared by `reset_store`.
         """
-        if self._persistence_enabled is False:
-            self._state = self._default_state.model_copy(deep=True)
+        async with self._lock:
+            if self._initialized:
+                return self.current_value
+
+            if not self._record_loaded:
+                await self._load_saved_state()
+
+            # Registered only after a successful load, so that a failed one leaves no listener behind.
+            if self._persistence_enabled:
+                self._event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state_quietly)
+                self._listening = True
+
+            self._initialized = True
             return self.current_value
-
-        # Import here to avoid circular imports.
-
-        self._key_value_store = await self._persist_state_kvs_factory()
-
-        await self._load_saved_state()
-
-        if self._persistence_enabled is True:
-            # Import here to avoid circular imports.
-            from crawlee import service_locator  # noqa: PLC0415
-
-            event_manager = service_locator.get_event_manager()
-            event_manager.on(event=Event.PERSIST_STATE, listener=self.persist_state)
-
-        return self.current_value
 
     async def teardown(self) -> None:
         """Clean up resources used by the recoverable state.
 
-        If persistence is enabled, this method deregisters the object from PERSIST_STATE events
-        and persists the current state one last time.
+        If persistence is enabled, this method deregisters the object from PERSIST_STATE events and persists the
+        current state one last time, logging a warning if that fails. The in-memory state is kept, and `initialize`
+        can be called again.
         """
-        if not self._persistence_enabled:
-            return
+        async with self._lock:
+            self._initialized = False
 
-        if self._persistence_enabled is True:
-            # Import here to avoid circular imports.
-            from crawlee import service_locator  # noqa: PLC0415
+            if not self._persistence_enabled:
+                return
 
-            event_manager = service_locator.get_event_manager()
-            event_manager.off(event=Event.PERSIST_STATE, listener=self.persist_state)
-            await self.persist_state()
+            self._event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state_quietly)
+            self._listening = False
+            await self._persist_state_quietly()
 
     @property
     def current_value(self) -> TStateModel:
         """Get the current state."""
         if self._state is None:
-            raise RuntimeError('Recoverable state has not yet been loaded')
+            raise RuntimeError('Recoverable state has not yet been loaded - call initialize() or reset() first')
 
         return self._state
 
     @property
     def is_initialized(self) -> bool:
-        """Check if the state has already been initialized."""
-        return self._state is not None
+        """Check if `initialize` has finished loading the state and `teardown` wasn't called since."""
+        return self._initialized
 
-    async def has_persisted_state(self) -> bool:
-        """Check if there is any persisted state in the key-value store."""
-        if not self._persistence_enabled:
-            return False
+    def reset(self) -> None:
+        """Reset the in-memory state to the default values, leaving any persisted record alone.
 
-        if self._key_value_store is None:
-            raise RuntimeError('Recoverable state has not yet been initialized')
-
-        return await self._key_value_store.record_exists(self._persist_state_key)
-
-    async def reset(self) -> None:
-        """Reset the state to the default values and clear any persisted state.
-
-        Resets the current state to the default state and, if persistence is enabled,
-        clears the persisted state from the KeyValueStore.
+        Use `reset_store` to clear the persisted record as well.
         """
         self._state = self._default_state.model_copy(deep=True)
 
-        if self._persistence_enabled:
-            if self._key_value_store is None:
-                raise RuntimeError('Recoverable state has not yet been initialized')
+    async def reset_store(self) -> None:
+        """Clear the persisted state record, leaving the in-memory state alone.
 
-            await self._key_value_store.set_value(self._persist_state_key, None)
+        Does nothing if persistence is disabled.
+
+        Raises:
+            RuntimeError: If the state is still being persisted on PERSIST_STATE events, which would write the record
+                straight back. Call `teardown` first.
+        """
+        # The lock makes a call during a load wait for the listener that the load registers.
+        async with self._lock:
+            if self._listening:
+                raise RuntimeError(
+                    f"Cannot clear the state persisted under key '{self._persist_state_key}' while it is still being "
+                    'persisted periodically - the next PERSIST_STATE event would write it straight back. Use reset() '
+                    'to reset the state itself, or teardown() before clearing the record.'
+                )
+
+            if not self._persistence_enabled:
+                return
+
+            key_value_store = await self._open_key_value_store()
+
+            await wait_for(
+                lambda: key_value_store.set_value(self._persist_state_key, None),
+                timeout=self._persistence_timeout,
+                timeout_message=f"Clearing the persisted state under key '{self._persist_state_key}' timed out after "
+                f'{self._persistence_timeout.total_seconds():g} seconds.',
+                logger=self._log,
+            )
 
     async def persist_state(self, event_data: EventPersistStateData | None = None) -> None:
         """Persist the current state to the KeyValueStore.
 
-        This method is typically called in response to a PERSIST_STATE event, but can also be called
-        directly when needed.
+        This method is typically called in response to a PERSIST_STATE event, but can also be called directly when
+        needed. It does nothing if persistence is disabled, or before `initialize` has read the persisted record. A
+        failed write raises from a direct call, while the persists on PERSIST_STATE events and in `teardown` log a
+        warning instead.
 
         Args:
             event_data: Optional data associated with a PERSIST_STATE event
         """
+        if not self._persistence_enabled or not self._record_loaded:
+            return
+
         self._log.debug(
             'Persisting RecoverableState (model=%s, event_data=%s).', self._default_state.__class__.__name__, event_data
         )
 
-        if self._key_value_store is None or self._state is None:
-            raise RuntimeError('Recoverable state has not yet been initialized')
+        key_value_store = await self._open_key_value_store()
 
-        if self._persistence_enabled is True or self._persistence_enabled == 'explicit_only':
-            await self._key_value_store.set_value(
+        await wait_for(
+            lambda: key_value_store.set_value(
                 self._persist_state_key,
-                self._state.model_dump(mode='json', by_alias=True),
+                self.current_value.model_dump(mode='json', by_alias=True),
                 content_type='application/json',
-            )
-        else:
-            self._log.debug('Persistence is not enabled - not doing anything')
+            ),
+            timeout=self._persistence_timeout,
+            timeout_message=f"Persisting the state under key '{self._persist_state_key}' timed out after "
+            f'{self._persistence_timeout.total_seconds():g} seconds.',
+            logger=self._log,
+        )
+
+    @property
+    def _event_manager(self) -> EventManager:
+        # Import here to avoid circular imports.
+        from crawlee import service_locator  # noqa: PLC0415
+
+        return service_locator.get_event_manager()
+
+    async def _persist_state_quietly(self, event_data: EventPersistStateData | None = None) -> None:
+        try:
+            await self.persist_state(event_data)
+        except Exception:
+            self._log.warning(f"Failed to persist the state under key '{self._persist_state_key}'.", exc_info=True)
+
+    async def _open_key_value_store(self) -> KeyValueStore:
+        if self._key_value_store is None:
+            self._key_value_store = await self._persist_state_kvs_factory()
+
+        return self._key_value_store
 
     async def _load_saved_state(self) -> None:
-        if self._key_value_store is None:
-            raise RuntimeError('Recoverable state has not yet been initialized')
+        stored_state = None
+        if self._persistence_enabled:
+            key_value_store = await self._open_key_value_store()
+            stored_state = await wait_for(
+                lambda: key_value_store.get_value(self._persist_state_key),
+                timeout=self._persistence_timeout,
+                timeout_message=f"Loading the persisted state under key '{self._persist_state_key}' timed out after "
+                f'{self._persistence_timeout.total_seconds():g} seconds.',
+                logger=self._log,
+            )
 
-        stored_state = await self._key_value_store.get_value(self._persist_state_key)
-        if stored_state is None:
+        if stored_state is not None:
+            try:
+                self._state = self._state_type.model_validate(stored_state)
+            except ValidationError as exc:
+                exc.add_note(
+                    f"The state persisted under key '{self._persist_state_key}' is invalid. Fix or delete the record "
+                    'to start from the default state.'
+                )
+                raise
+        elif self._state is None:
             self._state = self._default_state.model_copy(deep=True)
-        else:
-            self._state = self._state_type.model_validate(stored_state)
+
+        # Set only once the load succeeds. A load that fails, is cancelled or finds an invalid record leaves the object
+        # unwired, so that nothing is persisted over the record, and the next call loads it again.
+        self._record_loaded = True

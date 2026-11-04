@@ -222,9 +222,21 @@ class SessionPool:
 
         return session
 
+    def reset(self) -> None:
+        """Discard all sessions in the pool, leaving the persisted record alone.
+
+        Use `reset_store` to clear the persisted record as well.
+        """
+        self._state.reset()
+
     async def reset_store(self) -> None:
-        """Reset the KVS where the pool state is persisted."""
-        await self._state.reset()
+        """Clear the persisted pool record, leaving the in-memory sessions alone.
+
+        Raises:
+            RuntimeError: If the pool is active with persistence enabled, since the next persist would write the record
+                straight back.
+        """
+        await self._state.reset_store()
 
     async def _create_new_session(self) -> Session:
         """Create a new session, add it to the pool and return it."""

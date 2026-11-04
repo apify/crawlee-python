@@ -448,6 +448,25 @@ class MyHttpClient(HttpClient):
 
 `RequestManagerTandem.get_total_count` no longer counts a request twice once it moves from the loader to the manager. In v1, it added up the totals of both, so the crawler's status message showed too many pages in total.
 
+## Resetting statistics and the session pool
+
+`Statistics.reset()` is now synchronous and resets only the in-memory statistics, the same as Crawlee JS. In v1, it also cleared the persisted record. To clear the record too, call the new `reset_store()` once the statistics are exited:
+
+```python
+# v1
+await statistics.reset()
+
+# v2
+statistics.reset()
+await statistics.reset_store()
+```
+
+`SessionPool.reset_store()` now clears only the persisted record, and the new `SessionPool.reset()` discards the sessions in memory. While the statistics or the pool are active with persistence enabled, `reset_store()` raises a `RuntimeError`, since the next persist would write the record straight back.
+
+Entering `Statistics` or `SessionPool` again keeps their in-memory state. In v1, with persistence disabled, every entry started from the defaults. To start from the defaults, call `reset()` before entering.
+
+`persistence_enabled` of `Statistics` no longer accepts `'explicit_only'`. Pass `True` or `False`.
+
 ## Logs changed
 
 If you configure loggers by name or match log messages, update them for the following changes.
@@ -501,6 +520,8 @@ The crawler has finished all the remaining ongoing requests and will shut down n
 ```
 
 The crawler logs the first message once per run, the next time it looks for a new request after the stop. It logs the second one once the ongoing requests have finished, where v1 logged it right after the stop. In `Crawler.stop() was called with following reason: ...`, a trailing period or space in the reason is dropped, so the default reason and the `max_requests_per_crawl` one no longer end with a double period.
+
+When the statistics, the session pool or another component fails to persist its state on a `PERSIST_STATE` event, it now logs a WARNING `Failed to persist the state under key '<key>'.` with the traceback. The WARNING comes from the component's own logger, such as `crawlee.statistics._statistics`. In v1, the `crawlee.events._event_manager` logger logged the ERROR `Exception in the event listener`. A failed persist when the component is exited logs the same WARNING, where v1 raised the error.
 
 When a crawl processes no requests because its request manager holds only handled ones, the crawler logs a new warning. It starts with `This crawl processed no requests` and explains how to crawl the requests again.
 
