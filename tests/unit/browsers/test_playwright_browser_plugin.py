@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from crawlee.browsers import PlaywrightBrowserPlugin
 
 
@@ -21,11 +19,13 @@ async def test_initial_state() -> None:
     assert plugin.max_open_pages_per_browser == 10
 
 
-async def raise_error_if_chrome_and_executable_path() -> None:
-    with pytest.raises(
-        ValueError, match=r'Cannot use `use_chrome` with `Configuration.default_browser_path` or `executable_path` set.'
-    ):
-        PlaywrightBrowserPlugin(
-            browser_type='chrome',
-            browser_launch_options={'executable_path': '/path/to/chrome'},
-        )
+async def test_executable_path_with_chrome_browser_type() -> None:
+    """An `executable_path` combined with `browser_type='chrome'` is kept and launches through Chromium."""
+    plugin = PlaywrightBrowserPlugin(
+        browser_type='chrome',
+        browser_launch_options={'executable_path': '/path/to/chrome'},
+    )
+
+    assert plugin.browser_type == 'chromium'
+    assert plugin.browser_launch_options['executable_path'] == '/path/to/chrome'
+    assert plugin.browser_launch_options['channel'] == 'chrome'
