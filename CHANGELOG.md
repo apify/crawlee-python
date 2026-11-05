@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.11.1 - **not yet released**
+## [1.11.1](https://github.com/apify/crawlee-python/releases/tag/v1.11.1) (2026-11-05)
 
 ### 🐛 Bug Fixes
 
@@ -17,7 +16,6 @@ All notable changes to this project will be documented in this file.
 - Make `html_to_text` linear in the number of nodes ([#2372](https://github.com/apify/crawlee-python/pull/2372)) ([26e7612](https://github.com/apify/crawlee-python/commit/26e7612f4b65e19d2d44f11d952ee18a2ee98a98)) by [@B4nan](https://github.com/B4nan)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.11.0](https://github.com/apify/crawlee-python/releases/tag/v1.11.0) (2026-10-15)
 
 ### 🚀 Features
