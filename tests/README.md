@@ -1,4 +1,4 @@
-# Unit tests
+# Flaky tests
 
 Some tests may exhibit flaky behavior in CI. The reason for flaky behavior should be understood as it can indicate bug in the code or design flaw in the test. There are other reasons related to test execution, such as some tests that are not (or can not be) properly isolated, or limited resource constraints of the test executor.
 

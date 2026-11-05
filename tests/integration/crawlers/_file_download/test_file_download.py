@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock, call
 import pytest
 
 from crawlee.crawlers import FileDownloadCrawler, FileDownloadCrawlingContext
-from tests.unit.server import generate_file_content
+from tests.integration.server import generate_file_content
 
 if TYPE_CHECKING:
     from yarl import URL

@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       run_tests:
-        description: Whether to run the unit test suite.
+        description: Whether to run the unit and integration test suites.
         required: false
         type: boolean
         default: true

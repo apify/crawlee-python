@@ -331,12 +331,12 @@ impit = false
 
 # Run tasks with: uv run poe <task>
 [tool.poe.tasks]
-clean = { cmd = "rm -rf .coverage .pytest_cache .ruff_cache .ty_cache .uv-cache build coverage-unit.xml dist htmlcov website/.docusaurus website/module_shortcuts.json website/node_modules ", help = "Remove build artifacts and clean caches" }
+clean = { cmd = "rm -rf .coverage .pytest_cache .ruff_cache .ty_cache .uv-cache build coverage-unit.xml coverage-integration.xml dist htmlcov website/.docusaurus website/module_shortcuts.json website/node_modules ", help = "Remove build artifacts and clean caches" }
 install-sync = { cmd = "uv sync --all-extras", help = "Sync dependencies with all extras" }
 build = { cmd = "uv build --verbose", help = "Build the package" }
 publish-to-pypi = { cmd = "uv publish --verbose --token ${APIFY_PYPI_TOKEN_CRAWLEE}", help = "Publish the package to PyPI" }
 type-check = { cmd = "uv run ty check", help = "Run the type checker" }
-check-code = { sequence = ["lint", "type-check", "unit-tests"], help = "Run lint, type check, and unit tests" }
+check-code = { sequence = ["lint", "type-check", "unit-tests", "integration-tests"], help = "Run lint, type check, unit tests, and integration tests" }
 
 [tool.poe.tasks.install-dev]
 shell = "uv sync --all-extras && uv run pre-commit install && uv run playwright install"
@@ -380,6 +380,37 @@ uv run pytest \
     tests/unit
 """
 help = "Run unit tests with an XML coverage report"
+
+[tool.poe.tasks.integration-tests]
+shell = """
+uv run pytest \
+    -m "run_alone" \
+    tests/integration && \
+uv run pytest \
+    --numprocesses=${TESTS_CONCURRENCY:-auto} \
+    -m "not run_alone" \
+    tests/integration
+"""
+help = "Run integration tests (`run_alone` tests first, then the rest in parallel)"
+
+[tool.poe.tasks.integration-tests-cov]
+# Falls back to the default core with a warning on Python < 3.12.
+env = { COVERAGE_CORE = "sysmon" }
+shell = """
+uv run pytest \
+    -m "run_alone" \
+    --cov=src/crawlee \
+    --cov-report=xml:coverage-integration.xml \
+    tests/integration && \
+uv run pytest \
+    --numprocesses=${TESTS_CONCURRENCY:-auto} \
+    -m "not run_alone" \
+    --cov=src/crawlee \
+    --cov-report=xml:coverage-integration.xml \
+    --cov-append \
+    tests/integration
+"""
+help = "Run integration tests with an XML coverage report"
 
 [tool.poe.tasks.e2e-templates-tests]
 cmd = """

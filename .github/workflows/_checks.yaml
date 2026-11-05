@@ -7,7 +7,7 @@ on:
   workflow_call:
     inputs:
       run_tests:
-        description: Whether to run the unit test suite.
+        description: Whether to run the unit and integration test suites.
         required: false
         type: boolean
         default: true
@@ -139,6 +139,19 @@ jobs:
       operating_systems: '["ubuntu-latest", "windows-latest", "macos-latest"]'
       python_version_for_codecov: "3.15"
       operating_system_for_codecov: ubuntu-latest
+      tests_concurrency: "8"
+
+  integration_tests:
+    name: Integration tests
+    if: inputs.run_tests
+    # Integration tests need no Apify platform, only a local test server and browsers, so they reuse the
+    # unit test workflow with a different command.
+    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
+    secrets: inherit
+    with:
+      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]'
+      operating_systems: '["ubuntu-latest", "windows-latest", "macos-latest"]'
+      run_tests_command: uv run poe integration-tests-cov
       tests_concurrency: "8"
 
   package_check:
