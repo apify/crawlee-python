@@ -10,7 +10,7 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 import ListenToEventsExample from '!!raw-loader!roa-loader!./code_examples/events/listen_to_events.py';
 import UseStateExample from '!!raw-loader!roa-loader!./code_examples/events/use_state.py';
 
-Crawlee components talk to each other through events. An event manager emits events such as "save your state now" or "here's the current CPU and memory usage", and any component can register a listener for them. The crawler doesn't need to know which components care about an event. The <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> listens to system info events to drive autoscaling, and statistics, storages, and your own code listen to persist state events to save their progress.
+Crawlee components talk to each other through events. An event manager emits events such as "save your state now" or "here's the current CPU and memory usage", and any component can register a listener for them. The crawler doesn't need to know which components care about an event. The <ApiLink to="class/CpuLoadSignal">`CpuLoadSignal`</ApiLink> and <ApiLink to="class/MemoryLoadSignal">`MemoryLoadSignal`</ApiLink> listen to system info events to drive autoscaling, and statistics, storages, and your own code listen to persist state events to save their progress.
 
 ## Event manager
 
@@ -27,7 +27,7 @@ The event manager is an async context manager. The crawler enters it when `run()
 
 ## Events
 
-The <ApiLink to="enum/Event">`Event`</ApiLink> enum lists the event names. Each event comes with a payload model:
+The <ApiLink to="class/Event">`Event`</ApiLink> enum lists the event names. Each event comes with a payload model:
 
 - `PERSIST_STATE` carries <ApiLink to="class/EventPersistStateData">`EventPersistStateData`</ApiLink>. It's emitted when the event manager starts, then at every `persist_state_interval`, and one last time when it closes. Its `is_migrating` flag tells whether the process is about to be migrated.
 - `SYSTEM_INFO` carries <ApiLink to="class/EventSystemInfoData">`EventSystemInfoData`</ApiLink> with the CPU usage ratio and the memory used by the current process and its children. The `LocalEventManager` emits it at every `system_info_interval`.

@@ -72,7 +72,7 @@ module.exports = {
                     'Storage',
                     'storage',
                     'Where crawlers keep data and requests: datasets, key-value stores, request queues, storage backends, and request loaders.',
-                    ['storages', 'storage-clients', 'request-loaders'],
+                    ['storages', 'storage-backends', 'request-loaders'],
                 ),
                 conceptCategory(
                     'HTTP and networking',

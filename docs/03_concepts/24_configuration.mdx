@@ -70,7 +70,7 @@ If nothing is registered, the first call to `service_locator.get_configuration()
 
 ## Applying a configuration to one crawler
 
-Pass a `Configuration` to the crawler's `configuration` argument to use it for that crawler only. The crawler keeps it in a service locator of its own and uses the configuration for the storages it opens, such as its default request queue and dataset, for the <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> that drives autoscaling, and for `internal_timeout`.
+Pass a `Configuration` to the crawler's `configuration` argument to use it for that crawler only. The crawler keeps it in a service locator of its own and uses the configuration for the storages it opens, such as its default request queue and dataset, for the default <ApiLink to="class/ConcurrencySystem">`ConcurrencySystem`</ApiLink> that drives autoscaling, and for `internal_timeout`.
 
 <RunnableCodeBlock className="language-python" language="python">
     {CrawlerConfigurationExample}

@@ -117,7 +117,7 @@ def pick_proxy_url(session_id=None, request=None):
 proxy_configuration = ProxyConfiguration(new_url_function=pick_proxy_url)
 ```
 
-Unlike tiers, this function doesn't track blocking per domain, so every request starts again from the first proxy. For details, see [Switching proxies on retries](../guides/proxy-management#switching-proxies-on-retries).
+Unlike tiers, this function doesn't track blocking per domain, so every request starts again from the first proxy. For details, see [Switching proxies on retries](../concepts/proxy-management#switching-proxies-on-retries).
 
 ## `Request.forefront` is removed
 
@@ -196,7 +196,7 @@ The autoscaling classes now live in the public `crawlee.autoscaling` package, wh
 - `run_task_function` receives the id the task is booked under.
 - `current_concurrency` comes from the concurrency system, so a shared system may count the tasks of other pools too. The pool's own tasks are counted by the new `own_concurrency`.
 - `is_finished_function` is called only when no new task can start and none of the pool's own tasks are in flight, and never while the pool is paused. In v1, it was called on every loop iteration, so a paused pool could finish. A pool whose `is_task_ready_function` keeps resolving to `True` doesn't finish, so make it resolve to `False` once the work runs out.
-- The `cpu_overload_threshold`, `memory_overload_threshold`, `event_loop_overload_threshold` and `client_overload_threshold` options of `SystemStatus` are now the `overloaded_ratio` of the matching signal options in `load_signals`, such as `CpuLoadSignalOptions`. Its `max_snapshot_age` is now the `current_history` of the `ConcurrencySystem`. For details, see [Load signals](../guides/scaling-crawlers#load-signals).
+- The `cpu_overload_threshold`, `memory_overload_threshold`, `event_loop_overload_threshold` and `client_overload_threshold` options of `SystemStatus` are now the `overloaded_ratio` of the matching signal options in `load_signals`, such as `CpuLoadSignalOptions`. Its `max_snapshot_age` is now the `current_history` of the `ConcurrencySystem`. For details, see [Load signals](../concepts/scaling-crawlers#load-signals).
 - `pause()` is a coroutine that returns once the pool's tasks in progress finish. With the new `timeout` option, it raises `TimeoutError` if they take longer, and the pool stays paused. Await it, since a call without `await` doesn't pause the pool.
 
 For example:
@@ -233,13 +233,13 @@ async with ConcurrencySystem(settings) as concurrency_system:
 
 ## `max_tasks_per_minute` counts the last minute
 
-`ConcurrencySettings.max_tasks_per_minute` now caps the tasks started over the last 60 seconds, the same as Crawlee JS. In v1, the pool spaced task starts evenly, `60 / max_tasks_per_minute` seconds apart. In v2, tasks start as fast as the concurrency allows until the cap is reached. The next ones wait until the oldest starts age out of the window. The rate over a minute stays the same, but tasks start in bursts. For details, see [Max tasks per minute](../guides/scaling-crawlers#max-tasks-per-minute).
+`ConcurrencySettings.max_tasks_per_minute` now caps the tasks started over the last 60 seconds, the same as Crawlee JS. In v1, the pool spaced task starts evenly, `60 / max_tasks_per_minute` seconds apart. In v2, tasks start as fast as the concurrency allows until the cap is reached. The next ones wait until the oldest starts age out of the window. The rate over a minute stays the same, but tasks start in bursts. For details, see [Max tasks per minute](../concepts/scaling-crawlers#max-tasks-per-minute).
 
 The value has to be a whole number of at least 1, or infinity, which is the default. A fractional value, such as `0.5` or `7.5`, now raises `ValueError`.
 
 ## `SystemInfo.client_info` is renamed
 
-`SystemInfo.client_info` is renamed to `storage_backend_info`, after the `StorageBackendLoadSignal` that reports it. The new `load_signal_info` holds the verdicts of custom load signals by name. For how to configure the signals or add your own, see [Load signals](../guides/scaling-crawlers#load-signals).
+`SystemInfo.client_info` is renamed to `storage_backend_info`, after the `StorageBackendLoadSignal` that reports it. The new `load_signal_info` holds the verdicts of custom load signals by name. For how to configure the signals or add your own, see [Load signals](../concepts/scaling-crawlers#load-signals).
 
 ## `max_client_errors` defaults to 3
 
@@ -341,7 +341,7 @@ throttler.record_pacing_signal(
 )
 ```
 
-If you have a custom request manager, implement `record_pacing_signal`. Return `False` if the manager doesn't pace requests or doesn't handle the signal's `reason`, and forward every signal if it wraps another manager. For details, see [Pacing signals](../guides/request-loaders#pacing-signals).
+If you have a custom request manager, implement `record_pacing_signal`. Return `False` if the manager doesn't pace requests or doesn't handle the signal's `reason`, and forward every signal if it wraps another manager. For details, see [Pacing signals](../concepts/request-loaders#pacing-signals).
 
 `ThrottlingRequestManager` now rejects a `base_delay` or `max_delay` that isn't positive, so a zero `base_delay` no longer works as a way to honor only `Retry-After`.
 
