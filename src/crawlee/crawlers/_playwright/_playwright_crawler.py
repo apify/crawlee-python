@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import warnings
 from datetime import timedelta
 from functools import partial
@@ -214,7 +213,6 @@ class PlaywrightCrawler(
             .compose(self._create_crawling_context)
         )
         kwargs['_additional_context_managers'] = [self._browser_pool]
-        kwargs.setdefault('_logger', logging.getLogger(__name__))
         self._pre_navigation_hooks: list[Callable[[TPreNavContext], Awaitable[None]]] = []
         self._post_navigation_hooks: list[Callable[[TPostNavContext], Awaitable[None]]] = []
 

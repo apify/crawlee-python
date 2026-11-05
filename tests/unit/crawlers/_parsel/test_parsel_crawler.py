@@ -34,7 +34,8 @@ def test_import_error_handled() -> None:
 
 
 def test_default_logger() -> None:
-    assert ParselCrawler().log.name == 'ParselCrawler'
+    """The default crawler logger is named after the crawler class, under `crawlee.crawlers`."""
+    assert ParselCrawler().log.name == 'crawlee.crawlers.ParselCrawler'
 
 
 @pytest.mark.parametrize(

@@ -4,7 +4,6 @@ import logging
 from collections.abc import Awaitable, Callable, Coroutine
 from copy import deepcopy
 from dataclasses import dataclass
-from logging import getLogger
 from random import random
 from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar, get_args
 
@@ -153,21 +152,26 @@ class AdaptivePlaywrightCrawler(
         if kwargs.get('concurrency_settings') is None and kwargs.get('concurrency_system') is None:
             kwargs['concurrency_settings'] = ConcurrencySettings(desired_concurrency=1)
 
-        adaptive_statistics = statistics or Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)
+        adaptive_statistics = statistics or Statistics(
+            state_model=AdaptivePlaywrightCrawlerStatisticState,
+            periodic_message_logger=kwargs.get('logger')
+            or logging.getLogger(f'crawlee.crawlers.{type(self).__name__}'),
+        )
 
         super().__init__(statistics=adaptive_statistics, **kwargs)
 
         # Sub crawlers related.
         playwright_crawler_specific_kwargs = playwright_crawler_specific_kwargs or _PlaywrightCrawlerAdditionalOptions()
 
-        # Each sub crawler will use custom logger .
-        static_logger = getLogger('Subcrawler_static')
+        # The sub crawlers log under the adaptive crawler's logger, and only errors, since the adaptive crawler reports
+        # the outcome of each request itself.
+        static_logger = self._logger.getChild('static')
         static_logger.setLevel(logging.ERROR)
-        basic_crawler_kwargs_for_static_crawler: _BasicCrawlerOptions = {'_logger': static_logger, **kwargs}
+        basic_crawler_kwargs_for_static_crawler: _BasicCrawlerOptions = {**kwargs, 'logger': static_logger}
 
-        pw_logger = getLogger('Subcrawler_playwright')
+        pw_logger = self._logger.getChild('playwright')
         pw_logger.setLevel(logging.ERROR)
-        basic_crawler_kwargs_for_pw_crawler: _BasicCrawlerOptions = {'_logger': pw_logger, **kwargs}
+        basic_crawler_kwargs_for_pw_crawler: _BasicCrawlerOptions = {**kwargs, 'logger': pw_logger}
 
         # Initialize sub crawlers to create their pipelines.
         static_crawler_class = AbstractHttpCrawler.create_parsed_http_crawler_class(static_parser=static_parser)
@@ -245,10 +249,9 @@ class AdaptivePlaywrightCrawler(
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag]:
         """Create `AdaptivePlaywrightCrawler` that uses `BeautifulSoup` for parsing static content."""
-        if statistics is not None:
-            adaptive_statistics = statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState)
-        else:
-            adaptive_statistics = Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)
+        adaptive_statistics = (
+            statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState) if statistics is not None else None
+        )
         return AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag](
             rendering_type_predictor=rendering_type_predictor,
             result_checker=result_checker,
@@ -271,10 +274,9 @@ class AdaptivePlaywrightCrawler(
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector, Selector]:
         """Create `AdaptivePlaywrightCrawler` that uses `Parcel` for parsing static content."""
-        if statistics is not None:
-            adaptive_statistics = statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState)
-        else:
-            adaptive_statistics = Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)
+        adaptive_statistics = (
+            statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState) if statistics is not None else None
+        )
         return AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector, Selector](
             rendering_type_predictor=rendering_type_predictor,
             result_checker=result_checker,

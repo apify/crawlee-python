@@ -4,7 +4,7 @@ import asyncio
 from contextlib import suppress
 from datetime import timedelta
 from functools import partial
-from logging import getLogger
+from logging import Logger, getLogger
 from typing import TYPE_CHECKING
 
 from crawlee._utils.docs import docs_group
@@ -13,8 +13,6 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from ._types import ConcurrencyConsumer, ConcurrencySystemInterface
-
-logger = getLogger(__name__)
 
 
 class AbortError(Exception):
@@ -57,6 +55,7 @@ class AutoscaledPool:
         run_task_function: Callable[[str], Awaitable],
         is_task_ready_function: Callable[[], Awaitable[bool]],
         is_finished_function: Callable[[], Awaitable[bool]],
+        logger: Logger | None = None,
     ) -> None:
         """Initialize a new instance.
 
@@ -75,12 +74,14 @@ class AutoscaledPool:
                 pool is not paused. If it resolves to `True` then the pool's run finishes. Being called only when there
                 are no tasks being processed means that as long as `is_task_ready_function` keeps resolving to `True`,
                 `is_finished_function` will never be called. To abort a run, use the `abort` method.
+            logger: The logger the pool logs to. Defaults to the logger of this module.
         """
         self._concurrency_system = concurrency_system
         self._consumer = consumer
         self._run_task_function = run_task_function
         self._is_task_ready_function = is_task_ready_function
         self._is_finished_function = is_finished_function
+        self._logger = logger or getLogger(__name__)
 
         self._is_paused = False
         self._current_run: _AutoscaledPoolRun | None = None
@@ -107,7 +108,7 @@ class AutoscaledPool:
         run = _AutoscaledPoolRun()
         self._current_run = run
 
-        logger.debug('Starting the pool')
+        self._logger.debug('Starting the pool')
 
         orchestrator = asyncio.create_task(
             self._worker_task_orchestrator(run), name='autoscaled pool worker task orchestrator'
@@ -124,9 +125,9 @@ class AutoscaledPool:
             if not orchestrator.done():
                 orchestrator.cancel()
             elif not orchestrator.cancelled() and orchestrator.exception() is not None:
-                logger.error('Exception in worker task orchestrator', exc_info=orchestrator.exception())
+                self._logger.error('Exception in worker task orchestrator', exc_info=orchestrator.exception())
 
-            logger.debug('Waiting for remaining tasks to finish')
+            self._logger.debug('Waiting for remaining tasks to finish')
 
             # A copy, as the done callback of every task that finishes meanwhile removes it from the list.
             for task in list(run.worker_tasks):
@@ -140,7 +141,7 @@ class AutoscaledPool:
             run.cleanup_done.set()
             self._current_run = None
 
-            logger.debug('Pool cleanup finished')
+            self._logger.debug('Pool cleanup finished')
 
     async def abort(self) -> None:
         """Interrupt the autoscaled pool and all the tasks in progress."""
@@ -224,21 +225,21 @@ class AutoscaledPool:
                 run.wake.clear()
 
                 if self._is_paused:
-                    logger.debug('Not scheduling new tasks - the autoscaled pool is paused')
+                    self._logger.debug('Not scheduling new tasks - the autoscaled pool is paused')
                 elif not self._concurrency_system.has_capacity_for_task(self._consumer):
-                    logger.debug('Not scheduling new tasks - no free capacity')
+                    self._logger.debug('Not scheduling new tasks - no free capacity')
                     # Another pool can keep a shared system saturated indefinitely, so this pool still has to notice
                     # that it has run out of work.
                     if finished := await self._maybe_finish(run):
                         break
                 elif not await self._is_task_ready_function():
-                    logger.debug('Not scheduling new task - no task is ready')
+                    self._logger.debug('Not scheduling new task - no task is ready')
                     if finished := await self._maybe_finish(run):
                         break
                 elif self._is_paused:
                     # The pool may have been paused while `is_task_ready_function` was awaited, and `pause` waits only
                     # for the tasks that were already running.
-                    logger.debug('Not scheduling new tasks - the autoscaled pool is paused')
+                    self._logger.debug('Not scheduling new tasks - the autoscaled pool is paused')
                 else:
                     task_id = str(self._next_task_id)
                     self._next_task_id += 1
@@ -246,7 +247,7 @@ class AutoscaledPool:
                     # Booking is a separate step, because the capacity checked above may be gone by now - awaiting
                     # `is_task_ready_function` gave another pool sharing the system a chance to take the last slot.
                     if self._concurrency_system.try_register_task_start(self._consumer, task_id):
-                        logger.debug('Scheduling a new task')
+                        self._logger.debug('Scheduling a new task')
                         worker_task = asyncio.create_task(
                             self._worker_task(task_id), name='autoscaled pool worker task'
                         )
@@ -254,7 +255,7 @@ class AutoscaledPool:
                         run.worker_tasks.append(worker_task)
                         continue
 
-                    logger.debug('Not scheduling new task - the task was not accepted by the concurrency system')
+                    self._logger.debug('Not scheduling new task - the task was not accepted by the concurrency system')
 
                 with suppress(TimeoutError):
                     await asyncio.wait_for(run.wake.wait(), timeout=self._POLL_INTERVAL.total_seconds())
@@ -264,16 +265,16 @@ class AutoscaledPool:
             orchestrator_error = exc
         finally:
             if finished:
-                logger.debug('`is_finished_function` reports that we are finished')
+                self._logger.debug('`is_finished_function` reports that we are finished')
             elif run.result.done() and not run.result.cancelled() and run.result.exception() is not None:
-                logger.debug('Unhandled exception in `run_task_function`')
+                self._logger.debug('Unhandled exception in `run_task_function`')
 
             if run.worker_tasks:
-                logger.debug('Terminating - waiting for tasks to complete')
+                self._logger.debug('Terminating - waiting for tasks to complete')
                 await asyncio.wait(run.worker_tasks, return_when=asyncio.ALL_COMPLETED)
-                logger.debug('Worker tasks finished')
+                self._logger.debug('Worker tasks finished')
             else:
-                logger.debug('Terminating - no running tasks to wait for')
+                self._logger.debug('Terminating - no running tasks to wait for')
 
             if not run.result.done():
                 if orchestrator_error is not None:
@@ -282,7 +283,7 @@ class AutoscaledPool:
                     run.result.set_result(object())
             elif orchestrator_error is not None:
                 # A worker failure or an abort already decided the run, so this error has no way out.
-                logger.error('Unpropagated exception in worker task orchestrator', exc_info=orchestrator_error)
+                self._logger.error('Unpropagated exception in worker task orchestrator', exc_info=orchestrator_error)
 
     async def _maybe_finish(self, run: _AutoscaledPoolRun) -> bool:
         """Ask `is_finished_function` whether the run is over, but only while none of this pool's tasks is in flight.
@@ -322,6 +323,6 @@ class AutoscaledPool:
             if self._TASK_TIMEOUT is None:
                 # Without a timeout, `wait_for` cannot time out - the error comes from the task function itself.
                 raise
-            logger.warning(f'Task timed out after {self._TASK_TIMEOUT.total_seconds()} seconds')
+            self._logger.warning(f'Task timed out after {self._TASK_TIMEOUT.total_seconds()} seconds')
         finally:
-            logger.debug('Worker task finished')
+            self._logger.debug('Worker task finished')

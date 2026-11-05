@@ -56,3 +56,9 @@ def test_formatter_without_name() -> None:
     record = get_log_record(logging.INFO, 'Info message without name')
     formatted_message = formatter.format(record)
     assert formatted_message == '\x1b[32mINFO \x1b[0m Info message without name'
+
+
+def test_crawlee_logger_has_null_handler() -> None:
+    """The `crawlee` logger carries a `NullHandler`, so Python never prints its records through `logging.lastResort`."""
+    handlers = logging.getLogger('crawlee').handlers
+    assert any(isinstance(handler, logging.NullHandler) for handler in handlers)

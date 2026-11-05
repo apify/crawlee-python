@@ -9,7 +9,7 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
 import JsonLoggingExample from '!!raw-loader!roa-loader!./code_examples/logging/configure_json_logging.py';
 
-Crawlee builds on the standard Python [`logging`](https://docs.python.org/3/library/logging.html) module. Each crawler comes with a logger. Most HTTP crawlers name it after the crawler class (for example `HttpCrawler`), and the other crawlers after their module (for example `crawlee.crawlers._playwright._playwright_crawler`). Inside a request handler the same logger is available as `context.log`, so you can log from your handlers without any setup.
+Crawlee builds on the standard Python [`logging`](https://docs.python.org/3/library/logging.html) module. Each crawler logs to a logger named after its class under `crawlee.crawlers`, for example `crawlee.crawlers.HttpCrawler`. To use your own logger, pass it as the `logger` argument of the crawler. Inside a request handler the same logger is available as `context.log`, so you can log from your handlers without any setup.
 
 ## Default configuration
 
@@ -33,7 +33,7 @@ Here's an example of what a crawler statistics log entry looks like in JSONL for
 
 ```json
 {
-    "text": "[HttpCrawler] |   INFO   | - Final request statistics: {'requests_finished': 1, 'requests_failed': 0, 'retry_histogram': [1], 'request_avg_failed_duration': None, 'request_avg_finished_duration': 3.57098, 'requests_finished_per_minute': 17, 'requests_failed_per_minute': 0, 'request_total_duration': 3.57098, 'requests_total': 1, 'crawler_runtime': 3.59165}\n",
+    "text": "[crawlee.crawlers.HttpCrawler] |   INFO   | - Final request statistics: {'requests_finished': 1, 'requests_failed': 0, 'retry_histogram': [1], 'request_avg_failed_duration': None, 'request_avg_finished_duration': 3.57098, 'requests_finished_per_minute': 17, 'requests_failed_per_minute': 0, 'request_total_duration': 3.57098, 'requests_total': 1, 'crawler_runtime': 3.59165}\n",
     "record": {
         "elapsed": { "repr": "0:00:05.604568", "seconds": 5.604568 },
         "exception": null,
@@ -58,7 +58,7 @@ Here's an example of what a crawler statistics log entry looks like in JSONL for
         "line": 583,
         "message": "Final request statistics:",
         "module": "_basic_crawler",
-        "name": "HttpCrawler",
+        "name": "crawlee.crawlers.HttpCrawler",
         "process": { "id": 198383, "name": "MainProcess" },
         "thread": { "id": 135312814966592, "name": "MainThread" },
         "time": {
