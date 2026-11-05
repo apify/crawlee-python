@@ -113,9 +113,8 @@ class ImpitHttpClient(HttpClient):
     def __init__(
         self,
         *,
-        persist_cookies_per_session: bool = True,
         http3: bool = False,
-        verify: bool = True,
+        ignore_tls_errors: bool = False,
         browser: Browser | None = 'firefox',
         follow_redirects: bool = True,
         **async_client_kwargs: Any,
@@ -123,25 +122,23 @@ class ImpitHttpClient(HttpClient):
         """Initialize a new instance.
 
         Args:
-            persist_cookies_per_session: Whether to persist cookies per HTTP session.
             http3: Whether to enable HTTP/3 support.
-            verify: SSL certificates used to verify the identity of requested hosts.
+            ignore_tls_errors: Whether to ignore TLS certificate errors for every request.
             browser: Browser to impersonate.
             follow_redirects: Whether to follow HTTP redirects.
             async_client_kwargs: Additional keyword arguments for `impit.AsyncClient`. Some of them are ignored with a
                 warning. Cookies are kept in sessions, so `cookies` and `cookie_jar` are ignored. Redirects are followed
-                by `send_request`, so `max_redirects` is ignored.
+                by `send_request`, so `max_redirects` is ignored. Use `ignore_tls_errors` instead of `verify`.
         """
         super().__init__(
-            persist_cookies_per_session=persist_cookies_per_session,
             follow_redirects=follow_redirects,
             headers=async_client_kwargs.pop('headers', None),
         )
         self._http3 = http3
-        self._verify = verify
+        self._ignore_tls_errors = ignore_tls_errors
         self._browser = browser
 
-        for ignored_kwarg in ('cookies', 'cookie_jar', 'max_redirects'):
+        for ignored_kwarg in ('cookies', 'cookie_jar', 'max_redirects', 'verify'):
             if async_client_kwargs.pop(ignored_kwarg, None) is not None:
                 warnings.warn(
                     f'The `{ignored_kwarg}` argument of `ImpitHttpClient` is ignored.',
@@ -151,7 +148,8 @@ class ImpitHttpClient(HttpClient):
 
         self._async_client_kwargs = async_client_kwargs
 
-        self._client_by_proxy_url = dict[str | None, AsyncClient]()
+        # `impit` verifies the certificates per client, so the clients are kept per proxy URL and TLS setting.
+        self._clients = dict[tuple[str | None, bool], AsyncClient]()
 
     @override
     async def _fetch(
@@ -163,8 +161,12 @@ class ImpitHttpClient(HttpClient):
         payload: HttpPayload | None,
         proxy_info: ProxyInfo | None,
         timeout: timedelta | None,
+        ignore_tls_errors: bool,
     ) -> _ImpitResponse:
-        client = self._get_client(proxy_info.url if proxy_info else None)
+        client = self._get_client(
+            proxy_info.url if proxy_info else None,
+            ignore_tls_errors=ignore_tls_errors or self._ignore_tls_errors,
+        )
         deadline = asyncio.get_running_loop().time() + timeout.total_seconds() if timeout is not None else None
 
         try:
@@ -186,19 +188,20 @@ class ImpitHttpClient(HttpClient):
 
         return _ImpitResponse(response, deadline=deadline)
 
-    def _get_client(self, proxy_url: str | None) -> AsyncClient:
-        """Retrieve or create an HTTP client for the given proxy URL.
+    def _get_client(self, proxy_url: str | None, *, ignore_tls_errors: bool) -> AsyncClient:
+        """Retrieve or create an HTTP client for the given proxy URL and TLS setting.
 
-        If a client for the specified proxy URL does not exist, create and store a new one.
+        If such a client does not exist, create and store a new one.
         """
-        if client := self._client_by_proxy_url.get(proxy_url):
+        key = (proxy_url, ignore_tls_errors)
+        if client := self._clients.get(key):
             return client
 
         # Prepare a default kwargs for the new client.
         kwargs: dict[str, Any] = {
             'proxy': proxy_url,
             'http3': self._http3,
-            'verify': self._verify,
+            'verify': not ignore_tls_errors,
             'browser': self._browser,
         }
 
@@ -210,7 +213,7 @@ class ImpitHttpClient(HttpClient):
 
         client = AsyncClient(**kwargs)
 
-        self._client_by_proxy_url[proxy_url] = client
+        self._clients[key] = client
 
         return client
 
@@ -231,4 +234,4 @@ class ImpitHttpClient(HttpClient):
     @override
     async def cleanup(self) -> None:
         """Clean up resources used by the HTTP client."""
-        self._client_by_proxy_url.clear()
+        self._clients.clear()

@@ -61,6 +61,7 @@ class PlaywrightHttpClient(HttpClient):
         cookies: SessionCookies | None = None,
         proxy_info: ProxyInfo | None = None,
         timeout: timedelta | None = None,
+        ignore_tls_errors: bool = False,
     ) -> HttpResponse:
         # TODO: Use `session` to restore all the fingerprint headers according to the `BrowserContext`, after resolved
         # https://github.com/apify/crawlee-python/issues/1055
@@ -71,7 +72,7 @@ class PlaywrightHttpClient(HttpClient):
         try:
             # The browser context holds the cookies of the session, added before the navigation, with the changes the
             # page made since. The browser stores the response cookies there too, and the crawler saves them to the
-            # session after the request handler.
+            # session after the request handler unless `save_response_cookies` is disabled.
             if page is not None and cookies is None:
                 context_cookies = await page.context.cookies()
                 cookies = SessionCookies()
@@ -88,6 +89,7 @@ class PlaywrightHttpClient(HttpClient):
                 cookies=cookies,
                 proxy_info=proxy_info,
                 timeout=timeout,
+                ignore_tls_errors=ignore_tls_errors,
             )
         finally:
             _caller_cookies_var.reset(token)
@@ -102,6 +104,7 @@ class PlaywrightHttpClient(HttpClient):
         payload: HttpPayload | None,
         proxy_info: ProxyInfo | None,
         timeout: timedelta | None,
+        ignore_tls_errors: bool,
     ) -> HttpResponse:
         # `proxy_info` are not used because `APIRequestContext` inherits the proxy from `BrowserContext`
         browser_context = _browser_page_context_var.get()
@@ -121,6 +124,8 @@ class PlaywrightHttpClient(HttpClient):
             headers=fetch_headers or None,
             data=payload,
             timeout=timeout.total_seconds() * 1000 if timeout is not None else None,
+            # Without the flag, the TLS setting of the browser context applies.
+            ignore_https_errors=True if ignore_tls_errors else None,
             # Redirects are followed hop by hop by `send_request`.
             max_redirects=0,
         )

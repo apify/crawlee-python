@@ -389,7 +389,35 @@ A `Cookie` header passed with a request or set on the client is merged with the 
 
 `send_request` and `context.send_request` take a new `cookies` argument, the cookies to send and store instead of the session cookies for a single call. To send no session cookies, pass `cookies=SessionCookies()`. With `PlaywrightCrawler`, the response cookies still reach the session through the browser context.
 
-Without a session, or with `persist_cookies_per_session=False`, the cookies a server sets during a redirect chain are sent with the following requests of that chain. In v1, `ImpitHttpClient` and `HttpxHttpClient` didn't send them.
+Without a session, or with `save_response_cookies=False` on the crawler, the cookies a server sets during a redirect chain are sent with the following requests of that chain. In v1, `ImpitHttpClient` and `HttpxHttpClient` didn't send them.
+
+### `save_response_cookies` replaces `persist_cookies_per_session`
+
+`persist_cookies_per_session` is removed from the HTTP clients. To stop saving the response cookies to the session, pass `save_response_cookies=False` to the crawler. The session cookies are still sent. `PlaywrightCrawler` and `StagehandCrawler` take the same option, which stops saving the cookies of the page to the session after the request handler. In `AdaptivePlaywrightCrawler`, the option applies to both the HTTP and the browser crawling.
+
+```python
+# v1
+crawler = ParselCrawler(http_client=ImpitHttpClient(persist_cookies_per_session=False))
+
+# v2
+crawler = ParselCrawler(save_response_cookies=False)
+```
+
+With `BasicCrawler` and the HTTP crawlers, `context.send_request` always saves the response cookies to the session, unless you pass other cookies in its `cookies` argument. In v1, `persist_cookies_per_session=False` applied to `context.send_request` too. With `PlaywrightCrawler` and its default HTTP client, `context.send_request` stores the response cookies in the browser context, so `save_response_cookies=False` keeps them out of the session as well.
+
+### `ignore_tls_errors` replaces `verify`
+
+`ImpitHttpClient` and `HttpxHttpClient` take `ignore_tls_errors` instead of `verify`, and `CurlImpersonateHttpClient` takes it too. TLS certificates are still verified by default. `HttpxHttpClient` no longer takes a CA bundle or an `SSLContext`.
+
+```python
+# v1
+http_client = ImpitHttpClient(verify=False)
+
+# v2
+http_client = ImpitHttpClient(ignore_tls_errors=True)
+```
+
+To ignore TLS errors only for the navigation requests of an HTTP crawler, pass `ignore_tls_errors=True` to the crawler instead. The crawler option doesn't apply to `context.send_request`, which takes its own `ignore_tls_errors` argument for a single call, the same as `send_request` of the clients.
 
 ### Some client arguments are ignored
 
@@ -398,6 +426,7 @@ The following keyword arguments of the underlying libraries are now ignored with
 - `cookies` of every client and `cookie_jar` of `ImpitHttpClient`, since cookies are kept in sessions. To send other cookies with a single call, pass `cookies` to `send_request`.
 - `auth` and `params` of `HttpxHttpClient` and `CurlImpersonateHttpClient`, which would reach every request of a redirect chain. Pass the credentials in the `Authorization` header and the query in the URL instead.
 - `max_redirects` of every client and `allow_redirects` of `CurlImpersonateHttpClient`, since `send_request` follows the redirects.
+- `verify` of every client. For what replaces it, see [`ignore_tls_errors` replaces `verify`](#ignore_tls_errors-replaces-verify).
 
 ### Custom clients implement `_fetch`
 
@@ -419,7 +448,9 @@ class MyHttpClient(HttpClient):
 
 # v2
 class MyHttpClient(HttpClient):
-    async def _fetch(self, url, *, method, headers, payload, proxy_info, timeout): ...
+    async def _fetch(
+        self, url, *, method, headers, payload, proxy_info, timeout, ignore_tls_errors
+    ): ...
 
     async def cleanup(self): ...
 ```

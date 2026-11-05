@@ -22,7 +22,6 @@ from crawlee.http_clients import HttpClient, HttpResponse
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
     from datetime import timedelta
-    from ssl import SSLContext
 
     from crawlee._types import HttpMethod, HttpPayload
     from crawlee.proxy_configuration import ProxyInfo
@@ -115,10 +114,9 @@ class HttpxHttpClient(HttpClient):
     def __init__(
         self,
         *,
-        persist_cookies_per_session: bool = True,
         http1: bool = True,
         http2: bool = True,
-        verify: str | bool | SSLContext = True,
+        ignore_tls_errors: bool = False,
         header_generator: HeaderGenerator | None = _DEFAULT_HEADER_GENERATOR,
         follow_redirects: bool = True,
         **async_client_kwargs: Any,
@@ -126,22 +124,21 @@ class HttpxHttpClient(HttpClient):
         """Initialize a new instance.
 
         Args:
-            persist_cookies_per_session: Whether to persist cookies per HTTP session.
             http1: Whether to enable HTTP/1.1 support.
             http2: Whether to enable HTTP/2 support.
-            verify: SSL certificates used to verify the identity of requested hosts.
+            ignore_tls_errors: Whether to ignore TLS certificate errors for every request.
             header_generator: Header generator instance to use for generating browser-like headers.
             follow_redirects: Whether to follow HTTP redirects.
             async_client_kwargs: Additional keyword arguments for `httpx2.AsyncClient`. Some of them are ignored with a
                 warning. The `mounts` and `transport` arguments would bypass the proxy of a `ProxyInfo`. Cookies are
                 kept in sessions, so `cookies` is ignored. The `auth` and `params` arguments would reach every request
                 of a redirect chain, so pass credentials in the `Authorization` header and the query in the URL instead.
-                Redirects are followed by `send_request`, so `max_redirects` is ignored. The `proxy` argument covers
-                only the requests made without a `ProxyInfo`, a `ProxyConfiguration` takes precedence over it. The
-                `limits` argument applies per proxy, because every proxy gets a connection pool of its own.
+                Redirects are followed by `send_request`, so `max_redirects` is ignored. Use `ignore_tls_errors`
+                instead of `verify`. The `proxy` argument covers only the requests made without a `ProxyInfo`, a
+                `ProxyConfiguration` takes precedence over it. The `limits` argument applies per proxy and TLS setting,
+                because each combination gets a connection pool of its own.
         """
         super().__init__(
-            persist_cookies_per_session=persist_cookies_per_session,
             follow_redirects=follow_redirects,
             headers=async_client_kwargs.pop('headers', None),
         )
@@ -158,7 +155,7 @@ class HttpxHttpClient(HttpClient):
         # covers the requests that carry no `ProxyInfo` of their own.
         self._proxy = async_client_kwargs.pop('proxy', None)
 
-        for ignored_kwarg in ('mounts', 'transport', 'cookies', 'auth', 'params', 'max_redirects'):
+        for ignored_kwarg in ('mounts', 'transport', 'cookies', 'auth', 'params', 'max_redirects', 'verify'):
             if async_client_kwargs.pop(ignored_kwarg, None) is not None:
                 warnings.warn(
                     f'The `{ignored_kwarg}` argument of `HttpxHttpClient` is ignored.',
@@ -168,10 +165,13 @@ class HttpxHttpClient(HttpClient):
 
         self._async_client_kwargs = async_client_kwargs
         self._header_generator = header_generator
+        self._ignore_tls_errors = ignore_tls_errors
 
-        self._ssl_context = httpx2.create_ssl_context(verify=verify)
+        self._ssl_context = httpx2.create_ssl_context()
+        self._unverified_ssl_context = httpx2.create_ssl_context(verify=False)
 
-        self._client_by_proxy_url = dict[str | None, httpx2.AsyncClient]()
+        # The certificates are verified per transport, so the clients are kept per proxy URL and TLS setting.
+        self._clients = dict[tuple[str | None, bool], httpx2.AsyncClient]()
 
     @override
     async def send_request(
@@ -185,6 +185,7 @@ class HttpxHttpClient(HttpClient):
         cookies: SessionCookies | None = None,
         proxy_info: ProxyInfo | None = None,
         timeout: timedelta | None = None,
+        ignore_tls_errors: bool = False,
     ) -> HttpResponse:
         # The headers are generated once per call, so that every request of a redirect chain carries the same browser
         # profile.
@@ -200,6 +201,7 @@ class HttpxHttpClient(HttpClient):
             cookies=cookies,
             proxy_info=proxy_info,
             timeout=timeout,
+            ignore_tls_errors=ignore_tls_errors,
         )
 
     @override
@@ -212,8 +214,12 @@ class HttpxHttpClient(HttpClient):
         payload: HttpPayload | None,
         proxy_info: ProxyInfo | None,
         timeout: timedelta | None,
+        ignore_tls_errors: bool,
     ) -> _HttpxResponse:
-        client = self._get_client(proxy_info.url if proxy_info else None)
+        client = self._get_client(
+            proxy_info.url if proxy_info else None,
+            ignore_tls_errors=ignore_tls_errors or self._ignore_tls_errors,
+        )
         deadline = asyncio.get_running_loop().time() + timeout.total_seconds() if timeout is not None else None
 
         http_request = client.build_request(
@@ -235,18 +241,21 @@ class HttpxHttpClient(HttpClient):
 
         return _HttpxResponse(response, deadline=deadline)
 
-    def _get_client(self, proxy_url: str | None) -> httpx2.AsyncClient:
-        """Retrieve or create an HTTP client for the given proxy URL.
+    def _get_client(self, proxy_url: str | None, *, ignore_tls_errors: bool) -> httpx2.AsyncClient:
+        """Retrieve or create an HTTP client for the given proxy URL and TLS setting.
 
-        If a client for the specified proxy URL does not exist, create and store a new one.
+        If such a client does not exist, create and store a new one.
         """
-        if proxy_url not in self._client_by_proxy_url:
+        key = (proxy_url, ignore_tls_errors)
+        if key not in self._clients:
+            ssl_context = self._unverified_ssl_context if ignore_tls_errors else self._ssl_context
+
             # A client built with `proxy=` mounts its own transport and never calls the one given to `transport=`,
             # so the proxy goes on the transport.
             transport = httpx2.AsyncHTTPTransport(
                 http1=self._http1,
                 http2=self._http2,
-                verify=self._ssl_context,
+                verify=ssl_context,
                 proxy=proxy_url or self._proxy,
                 # Above the `httpx2` default of 20 kept-alive connections every request pays a TCP and TLS handshake.
                 limits=self._async_client_kwargs.get(
@@ -267,7 +276,7 @@ class HttpxHttpClient(HttpClient):
             kwargs.update(
                 {
                     'transport': transport,
-                    'verify': self._ssl_context,
+                    'verify': ssl_context,
                     # Redirects are followed hop by hop by `send_request`, which also handles the cookies.
                     'follow_redirects': False,
                     # With both cookie protocols off, the jar of the client never stores a cookie.
@@ -276,9 +285,9 @@ class HttpxHttpClient(HttpClient):
             )
 
             client = httpx2.AsyncClient(**kwargs)
-            self._client_by_proxy_url[proxy_url] = client
+            self._clients[key] = client
 
-        return self._client_by_proxy_url[proxy_url]
+        return self._clients[key]
 
     def _combine_headers(self, explicit_headers: HttpHeaders) -> HttpHeaders:
         """Merge generated headers with the headers of the client and explicit headers for an HTTP request.
@@ -311,6 +320,6 @@ class HttpxHttpClient(HttpClient):
         return False
 
     async def cleanup(self) -> None:
-        for client in self._client_by_proxy_url.values():
+        for client in self._clients.values():
             await client.aclose()
-        self._client_by_proxy_url.clear()
+        self._clients.clear()

@@ -88,6 +88,23 @@ async def test_body_read_bound_by_navigation_timeout() -> None:
     assert isinstance(failed_request_handler.call_args.args[1], TimeoutError)
 
 
+async def test_ignore_tls_errors_applies_to_navigation_only() -> None:
+    """Test that the `ignore_tls_errors` option reaches the navigation request, but not `context.send_request`."""
+    url = 'https://a.placeholder.com'
+    http_client = AsyncMock(spec=HttpClient)
+    http_client.send_request.return_value = mock_response(200, url)
+    crawler = HttpCrawler(http_client=http_client, ignore_tls_errors=True)
+
+    @crawler.router.default_handler
+    async def handler(context: HttpCrawlingContext) -> None:
+        await context.send_request(url)
+
+    await crawler.run([url])
+
+    sent_flags = [send_call.kwargs['ignore_tls_errors'] for send_call in http_client.send_request.await_args_list]
+    assert sent_flags == [True, False]
+
+
 @pytest.mark.parametrize(
     'crawler_kwargs',
     [
