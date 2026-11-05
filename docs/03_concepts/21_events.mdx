@@ -10,7 +10,7 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 import ListenToEventsExample from '!!raw-loader!roa-loader!./code_examples/events/listen_to_events.py';
 import UseStateExample from '!!raw-loader!roa-loader!./code_examples/events/use_state.py';
 
-Crawlee components talk to each other through events. An event manager emits events such as "save your state now" or "here's the current CPU and memory usage", and any component can register a listener for them. The crawler doesn't need to know which components care about an event. The <ApiLink to="class/Snapshotter">`Snapshotter`</ApiLink> listens to system info events to drive autoscaling, and statistics, storages, and your own code listen to persist state events to save their progress.
+Crawlee components talk to each other through events. An event manager emits events such as "save your state now" or "here's the current CPU and memory usage", and any component can register a listener for them. The crawler doesn't need to know which components care about an event. The <ApiLink to="class/CpuLoadSignal">`CpuLoadSignal`</ApiLink> and <ApiLink to="class/MemoryLoadSignal">`MemoryLoadSignal`</ApiLink> listen to system info events to drive autoscaling, and statistics, storages, and your own code listen to persist state events to save their progress.
 
 ## Event manager
 
