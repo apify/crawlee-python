@@ -5,7 +5,7 @@
 - `unit/` holds tests that run without a network or a browser. Run them with `uv run poe unit-tests`.
 - `integration/` holds tests that send real HTTP requests, mostly to the local test server in `integration/server.py`, or launch a Playwright browser. Run them with `uv run poe integration-tests`.
 - `e2e/` holds tests that build the project templates and run them as Actors on the Apify platform. Run them with `uv run poe e2e-templates-tests`.
-- `_fixtures.py` has the fixtures that isolate each test's environment, imported by the unit and integration conftests.
+- `_fixtures.py` has the fixtures shared by the unit and integration tests, including the ones that isolate each test's environment. Both conftests import them.
 - `_utils.py` has helpers shared by the unit and integration tests.
 
 A test goes to `integration/` when it uses the `server_url` fixture (or another local server or proxy fixture), opens a real HTTP connection, or launches a browser. Everything else goes to `unit/`.
