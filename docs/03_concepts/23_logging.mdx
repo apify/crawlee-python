@@ -16,7 +16,7 @@ Crawlee builds on the standard Python [`logging`](https://docs.python.org/3/libr
 
 ## Default configuration
 
-By default, a crawler sets up the logging infrastructure automatically when it's created. It attaches a handler with a human-readable, colored formatter to the root logger, unless the root logger already has handlers configured, the same way [`logging.basicConfig`](https://docs.python.org/3/library/logging.html#logging.basicConfig) does. You can opt out by passing `configure_logging=False` to the crawler's constructor (see <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>) and configure logging yourself.
+By default, a crawler sets up the logging infrastructure automatically when it's created. It attaches a handler with a human-readable, colored formatter to the root logger, unless the root logger already has handlers configured, the same way [`logging.basicConfig`](https://docs.python.org/3/library/logging.html#logging.basicConfig) does. You can opt out by passing `configure_logging=False` to the crawler's constructor and configure logging yourself. For the other constructor options, see <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>.
 
 The level of the root logger that the crawler configures comes from the <ApiLink to="class/Configuration#log_level">`Configuration.log_level`</ApiLink> option of the global configuration. It defaults to INFO and can also be set through the `CRAWLEE_LOG_LEVEL` environment variable, for example:
 
@@ -30,7 +30,7 @@ The `crawlee` logger has a [`NullHandler`](https://docs.python.org/3/library/log
 
 ## Logger names
 
-A crawler's autoscaled pool logs to the `autoscaled_pool` child of the crawler's logger, such as `crawlee.crawlers.ParselCrawler.autoscaled_pool`. The sub crawlers of <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> log to its `static` and `playwright` children.
+A crawler's autoscaled pool logs to the `autoscaled_pool` child of the crawler's logger, such as `crawlee.crawlers.ParselCrawler.autoscaled_pool`. The sub crawlers of <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> log to the `static` and `playwright` children of its logger. The crawler sets these two loggers to ERROR when it's created, since it reports the outcome of each request itself. To see more from the sub crawlers, set the level of these loggers after you create the crawler.
 
 The rest of Crawlee logs to loggers named after their modules, all under `crawlee`. Because the names form a hierarchy, you can set the level of a whole subtree:
 
@@ -52,7 +52,7 @@ To format the logs yourself, configure logging before you create the crawler. Th
     {OwnLoggingConfigExample}
 </RunnableCodeBlock>
 
-The format string of `logging.basicConfig` doesn't include the request fields, so the DEBUG messages don't say which request they're about. For how to add the fields, see [Request context in log records](#request-context-in-log-records).
+The format string in this example doesn't include the request fields, so the DEBUG messages don't say which request they're about. For how to add the fields, see [Request context in log records](#request-context-in-log-records).
 
 ## Use a custom logger
 
@@ -74,7 +74,7 @@ Crawlee picks the level of a message by who needs to act on it:
 At DEBUG, the crawler logs these messages for every request:
 
 - `Processing request` when it starts on the request.
-- `Received a response` when the HTTP or Playwright crawler gets a response, with its `status_code`.
+- `Received a response` when an HTTP-based or Playwright crawler gets a response, with its `status_code`.
 - `Committed the request handler result` when it stores the data and adds the requests from your handler, with the number of `push_data_calls` and `add_requests_calls`.
 - `Request handled` when the request is done.
 
