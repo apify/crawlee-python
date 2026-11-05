@@ -225,21 +225,19 @@ class AutoscaledPool:
                 run.wake.clear()
 
                 if self._is_paused:
-                    self._logger.debug('Not scheduling new tasks - the autoscaled pool is paused')
+                    pass
                 elif not self._concurrency_system.has_capacity_for_task(self._consumer):
-                    self._logger.debug('Not scheduling new tasks - no free capacity')
                     # Another pool can keep a shared system saturated indefinitely, so this pool still has to notice
                     # that it has run out of work.
                     if finished := await self._maybe_finish(run):
                         break
                 elif not await self._is_task_ready_function():
-                    self._logger.debug('Not scheduling new task - no task is ready')
                     if finished := await self._maybe_finish(run):
                         break
                 elif self._is_paused:
                     # The pool may have been paused while `is_task_ready_function` was awaited, and `pause` waits only
                     # for the tasks that were already running.
-                    self._logger.debug('Not scheduling new tasks - the autoscaled pool is paused')
+                    pass
                 else:
                     task_id = str(self._next_task_id)
                     self._next_task_id += 1
@@ -247,15 +245,12 @@ class AutoscaledPool:
                     # Booking is a separate step, because the capacity checked above may be gone by now - awaiting
                     # `is_task_ready_function` gave another pool sharing the system a chance to take the last slot.
                     if self._concurrency_system.try_register_task_start(self._consumer, task_id):
-                        self._logger.debug('Scheduling a new task')
                         worker_task = asyncio.create_task(
                             self._worker_task(task_id), name='autoscaled pool worker task'
                         )
                         worker_task.add_done_callback(partial(self._reap_worker_task, run=run, task_id=task_id))
                         run.worker_tasks.append(worker_task)
                         continue
-
-                    self._logger.debug('Not scheduling new task - the task was not accepted by the concurrency system')
 
                 with suppress(TimeoutError):
                     await asyncio.wait_for(run.wake.wait(), timeout=self._POLL_INTERVAL.total_seconds())
@@ -324,5 +319,3 @@ class AutoscaledPool:
                 # Without a timeout, `wait_for` cannot time out - the error comes from the task function itself.
                 raise
             self._logger.warning(f'Task timed out after {self._TASK_TIMEOUT.total_seconds()} seconds')
-        finally:
-            self._logger.debug('Worker task finished')

@@ -502,6 +502,10 @@ The warnings about an HTTP 429 that the request manager doesn't pace are reworde
 
 The `ThrottlingRequestManager` warning about capping a delay now calls it a "requested wait" delay instead of a "Retry-After header" delay. Its DEBUG messages about a 429 ignored during an active backoff and about resetting a domain's rate limit state are removed, and its DEBUG message about a domain's crawl-delay shows the delay with one decimal place.
 
+At DEBUG, the crawler logs the steps of each request: `Processing request`, `Received a response` (HTTP and Playwright crawlers), `Committed the request handler result`, and `Request handled`. The request context is in the record's `extra` fields `url`, `unique_key` and `retry_count`, plus `status_code` on the response message and `add_requests_calls` and `push_data_calls` on the commit message. The `Deferring request because its domain is rate-limiting us.` message carries the same fields.
+
+The autoscaled pool doesn't log the DEBUG messages that repeated on every scheduling attempt anymore: `Not scheduling new tasks - the autoscaled pool is paused`, `Not scheduling new tasks - no free capacity`, `Not scheduling new task - no task is ready`, `Not scheduling new task - the task was not accepted by the concurrency system`, `Scheduling a new task` and `Worker task finished`.
+
 ## Session retirement is permanent
 
 In v1, `Session.retire()` only added `max_error_score` to the error score, so a later `mark_good()` could lower it again and make the retired session usable. In v2, a separate `retired` flag tracks retirement, exposed as the `Session.retired` property, and a retired session is never usable again. Create a new session to replace it.

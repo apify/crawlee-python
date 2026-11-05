@@ -46,7 +46,7 @@ from crawlee._utils.docs import docs_group
 from crawlee._utils.file import atomic_write, export_csv_to_stream, export_json_to_stream
 from crawlee._utils.globs import check_url_patterns
 from crawlee._utils.http import parse_retry_after_header
-from crawlee._utils.log import LoggerOnce
+from crawlee._utils.log import LoggerOnce, request_log_extra
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.urls import UNSUPPORTED_SCHEME_MESSAGE, convert_to_absolute_url, filter_url, is_url_absolute
@@ -1472,6 +1472,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         await self._commit_key_value_store_changes(result, get_kvs=self.get_key_value_store)
 
+        self._logger.debug(
+            'Committed the request handler result',
+            extra={
+                **request_log_extra(context.request),
+                'add_requests_calls': len(result.add_requests_calls),
+                'push_data_calls': len(result.push_data_calls),
+            },
+        )
+
     @staticmethod
     async def _commit_key_value_store_changes(
         result: RequestHandlerRunResult, get_kvs: GetKeyValueStoreFromRequestHandlerFunction
@@ -1545,6 +1554,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             await self._handle_skipped_request(request, 'robots_txt', need_mark=True)
             return
 
+        self._logger.debug('Processing request', extra=request_log_extra(request))
+
         if request.session_id:
             session = await self._get_session_by_id(request.session_id)
         else:
@@ -1589,6 +1600,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 session.mark_good()
 
             self._statistics.record_request_processing_finish(request.unique_key)
+            self._logger.debug('Request handled', extra=request_log_extra(request))
 
         except RequestCollisionError as request_error:
             request.no_retry = True
@@ -1729,7 +1741,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         request.state = RequestState.ERROR_HANDLER
         self._logger.debug(
             f'Deferring request because its domain is rate-limiting us. {error}',
-            extra={'url': request.url, 'unique_key': request.unique_key},
+            extra=request_log_extra(request),
         )
         request_manager = await self.get_request_manager()
         await request_manager.reclaim_request(request, forefront=True)
