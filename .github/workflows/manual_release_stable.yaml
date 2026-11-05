@@ -88,47 +88,24 @@ jobs:
           target_commitish: ${{ needs.changelog_update.outputs.changelog_commitish }}
           body: ${{ needs.release_prepare.outputs.release_notes }}
 
+  # Publishing runs as a separate workflow run of `publish_to_pypi.yaml` (see the comment there).
   pypi_publish:
     name: PyPI publish
     needs: [release_prepare, changelog_update]
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      id-token: write # Required for OIDC authentication.
-    environment:
-      name: pypi
-      url: https://pypi.org/project/crawlee
+      actions: write # Required by execute-workflow.
     steps:
-      - name: Prepare distribution
-        uses: apify/actions/prepare-pypi-distribution@v1.6.2
+      - name: Dispatch PyPI publish workflow
+        uses: apify/actions/execute-workflow@v1.6.2
         with:
-          package_name: crawlee
-          is_prerelease: ""
-          version_number: ${{ needs.release_prepare.outputs.version_number }}
-          ref: ${{ needs.changelog_update.outputs.changelog_commitish }}
-
-      - name: Verify built package
-        uses: apify/actions/python-package-check@v1.6.2
-        with:
-          package_name: crawlee
-          dist_dir: dist
-          python_version: "3.14"
-          extras: all
-          smoke_code: |
-            from crawlee.crawlers import (
-                HttpCrawler, BeautifulSoupCrawler, ParselCrawler,
-                PlaywrightCrawler, AdaptivePlaywrightCrawler,
-            )
-            from crawlee.storages import Dataset, KeyValueStore, RequestQueue
-            from crawlee.http_clients import HttpxHttpClient, ImpitHttpClient
-            from crawlee import Request
-            HttpCrawler()
-            BeautifulSoupCrawler()
-            ParselCrawler()
-
-      # Publish the package to PyPI using PyPA official GitHub action with OIDC authentication.
-      - name: Publish package to PyPI
-        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
+          workflow: publish_to_pypi.yaml
+          inputs: >
+            {
+              "version_number": "${{ needs.release_prepare.outputs.version_number }}",
+              "ref": "${{ needs.changelog_update.outputs.changelog_commitish }}",
+              "is_prerelease": "false"
+            }
 
       # TODO: add job for publish package to Conda
       # https://github.com/apify/crawlee-python/issues/104

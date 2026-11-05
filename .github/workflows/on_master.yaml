@@ -43,9 +43,6 @@ jobs:
     uses: ./.github/workflows/manual_release_docs.yaml
     secrets: inherit
 
-  # The beta release is dispatched as a separate workflow run (instead of calling `manual_release_beta.yaml` via `uses:`)
-  # because PyPI's Trusted Publishing does not currently support reusable workflows.
-  # See: https://docs.pypi.org/trusted-publishers/troubleshooting/#reusable-workflows-on-github
   beta_release:
     # Only on push, and only for "feat", "fix", "perf", "refactor" and "style" commits.
     if: >-
