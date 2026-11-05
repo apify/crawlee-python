@@ -106,6 +106,13 @@ async def test_parse_from_content() -> None:
     assert not robots.is_allowed('http://not-exists.com/deny_all/page.html')
 
 
+async def test_get_fractional_crawl_delay() -> None:
+    """A fractional `Crawl-delay` value is returned without truncation."""
+    content = 'User-agent: *\nCrawl-delay: 0.5\nDisallow: /private/'
+    robots = await RobotsTxtFile.from_content('http://example.com/robots.txt', content)
+    assert robots.get_crawl_delay() == 0.5
+
+
 async def test_bind_robots_txt_url() -> None:
     content = 'User-agent: *\nDisallow: /'
     robots = await RobotsTxtFile.from_content('http://check.com/robots.txt', content)
