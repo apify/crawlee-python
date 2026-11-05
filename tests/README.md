@@ -17,6 +17,6 @@ A test that fails only sometimes usually points to a bug in the code or a flaw i
 Handle a flaky test with the first of these that works:
 
 1. Find the root cause and fix the code or the test.
-2. Run the test alone. `@pytest.mark.run_alone` runs it before the parallel tests, with no other test alongside. Use it for resource-sensitive tests, or for the rare test that cannot run in parallel by design. `@run_alone_on_mac` from `tests/_utils.py` does the same on macOS only.
+2. Run the test alone. `@pytest.mark.run_alone` runs it before the parallel tests, with no other test alongside. Use it for resource-sensitive tests, or for the rare test that cannot run in parallel by design.
 3. Retry it with `@pytest.mark.flaky(reruns=..., reason=...)`. Use this when the cause is not understood or cannot be removed, and say why in `reason`.
 4. Skip it with `@pytest.mark.skip`, as a last resort. A skipped test can hide a real bug, so track it in a GitHub issue.
