@@ -326,17 +326,12 @@ class ConcurrencySystem:
         self._raise_if_inactive()
 
         if self._current_concurrency >= self._desired_concurrency:
-            logger.debug('Not scheduling new tasks - already running at desired concurrency')
             return False
 
         is_system_idle = self._get_current_load().is_system_idle
 
         # Below the minimum the pool keeps going regardless, so that an overloaded machine cannot stall a crawl.
-        if not is_system_idle and self._current_concurrency >= self._min_concurrency:
-            logger.debug('Not scheduling new tasks - system is overloaded')
-            return False
-
-        return True
+        return is_system_idle or self._current_concurrency < self._min_concurrency
 
     def get_current_status(self) -> SystemInfo:
         """Report what the system currently makes of the machine, on the window that gates task dispatch.
@@ -369,7 +364,6 @@ class ConcurrencySystem:
             return False
 
         if self._is_over_max_tasks_per_minute:
-            logger.debug('Not scheduling new tasks - maximum tasks per minute reached')
             return False
 
         self._current_concurrency += 1

@@ -234,11 +234,9 @@ class AutoscaledPool:
                 elif not await self._is_task_ready_function():
                     if finished := await self._maybe_finish(run):
                         break
-                elif self._is_paused:
+                elif not self._is_paused:
                     # The pool may have been paused while `is_task_ready_function` was awaited, and `pause` waits only
                     # for the tasks that were already running.
-                    pass
-                else:
                     task_id = str(self._next_task_id)
                     self._next_task_id += 1
 
