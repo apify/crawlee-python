@@ -450,6 +450,51 @@ async def test_pause_during_finish_check(make_concurrency_system: type[Concurren
     assert is_finished.await_count == 2
 
 
+async def test_notify_wakes_pool(
+    make_concurrency_system: type[ConcurrencySystem], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`notify` makes the pool look for a ready task at once, not at its next periodic check."""
+    # Longer than the test's timeout, so only `notify` can wake the pool in time.
+    monkeypatch.setattr(AutoscaledPool, '_POLL_INTERVAL', timedelta(hours=1))
+    run = AsyncMock()
+    is_task_ready = AsyncMock(return_value=False)
+
+    async with make_concurrency_system() as concurrency_system:
+        pool = AutoscaledPool(
+            concurrency_system=concurrency_system,
+            consumer=CONSUMER,
+            run_task_function=run,
+            is_task_ready_function=is_task_ready,
+            is_finished_function=lambda: future(run.await_count == 1),
+        )
+
+        pool_run_task = asyncio.create_task(pool.run(), name='pool run task')
+        try:
+            assert await poll_until_condition(lambda: is_task_ready.await_count == 1)
+
+            is_task_ready.side_effect = chain([True], repeat(False))
+            pool.notify()
+            await asyncio.wait_for(pool_run_task, timeout=5)
+        finally:
+            pool_run_task.cancel()
+            await asyncio.gather(pool_run_task, return_exceptions=True)
+
+    run.assert_awaited_once()
+
+
+async def test_notify_without_run() -> None:
+    """`notify` on a pool that isn't running has nothing to wake, so it does nothing."""
+    pool = AutoscaledPool(
+        concurrency_system=Mock(spec=ConcurrencySystemInterface),
+        consumer=CONSUMER,
+        run_task_function=AsyncMock(),
+        is_task_ready_function=AsyncMock(),
+        is_finished_function=AsyncMock(),
+    )
+
+    pool.notify()
+
+
 @pytest.mark.run_alone
 async def test_runs_concurrently(make_concurrency_system: type[ConcurrencySystem]) -> None:
     """The pool fills the whole budget the system allows, rather than running the tasks one after another."""

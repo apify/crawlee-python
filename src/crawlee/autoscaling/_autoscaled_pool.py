@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
+from datetime import timedelta
 from functools import partial
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -10,7 +11,6 @@ from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
-    from datetime import timedelta
 
     from ._types import ConcurrencyConsumer, ConcurrencySystemInterface
 
@@ -26,7 +26,9 @@ class _AutoscaledPoolRun:
         self.worker_tasks = list[asyncio.Task]()
         """A list of worker tasks currently in progress"""
 
-        self.worker_tasks_updated = asyncio.Event()
+        self.wake = asyncio.Event()
+        """Set when a worker task finishes or `notify` is called, so that the orchestrator looks for work at once."""
+
         self.cleanup_done = asyncio.Event()
         self.result: asyncio.Future = asyncio.Future()
 
@@ -43,6 +45,9 @@ class AutoscaledPool:
 
     _TASK_TIMEOUT: timedelta | None = None
     """Timeout within which the `run_task_function` must complete."""
+
+    _POLL_INTERVAL = timedelta(seconds=0.5)
+    """How often the pool looks for a ready task when nothing wakes it up earlier."""
 
     def __init__(
         self,
@@ -173,6 +178,12 @@ class AutoscaledPool:
     def resume(self) -> None:
         """Resume a paused autoscaled pool so that it continues starting new tasks."""
         self._is_paused = False
+        self.notify()
+
+    def notify(self) -> None:
+        """Look for a ready task at once, instead of waiting for the next periodic check."""
+        if self._current_run is not None:
+            self._current_run.wake.set()
 
     @property
     def concurrency_system(self) -> ConcurrencySystemInterface:
@@ -210,7 +221,7 @@ class AutoscaledPool:
 
         try:
             while not run.result.done():
-                run.worker_tasks_updated.clear()
+                run.wake.clear()
 
                 if self._is_paused:
                     logger.debug('Not scheduling new tasks - the autoscaled pool is paused')
@@ -246,7 +257,7 @@ class AutoscaledPool:
                     logger.debug('Not scheduling new task - the task was not accepted by the concurrency system')
 
                 with suppress(TimeoutError):
-                    await asyncio.wait_for(run.worker_tasks_updated.wait(), timeout=0.5)
+                    await asyncio.wait_for(run.wake.wait(), timeout=self._POLL_INTERVAL.total_seconds())
         except Exception as exc:
             # Surface the error through `run.result` only once the cleanup below has awaited the worker tasks,
             # so that the caller does not observe the failure while tasks are still in flight.
@@ -293,7 +304,7 @@ class AutoscaledPool:
         - Notify the orchestrator about the task completion.
         - Return the task's slot to the concurrency system.
         """
-        run.worker_tasks_updated.set()
+        run.wake.set()
         run.worker_tasks.remove(task)
 
         if not task.cancelled() and (exception := task.exception()) and not run.result.done():
