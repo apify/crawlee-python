@@ -240,6 +240,20 @@ async def test_persistence_by_id(second_id: str, expected_requests_failed: int) 
     assert statistics.state.requests_failed == expected_requests_failed
 
 
+async def test_persist_state_writes_state_in_progress() -> None:
+    """`persist_state()` writes the current state while the statistics are still active."""
+    key = 'statistics_persist_state'
+    kvs = await KeyValueStore.open()
+
+    async with Statistics.with_default_state(persistence_enabled=True, persist_state_key=key) as statistics:
+        statistics.state.requests_failed = 42
+        await statistics.persist_state()
+        persisted = await kvs.get_value(key)
+
+    assert persisted is not None
+    assert persisted['requestsFailed'] == 42
+
+
 async def test_persistence_loads_numeric_id() -> None:
     """A persisted state whose `statsId` is a number loads with a string ID."""
     key = 'statistics_foo'

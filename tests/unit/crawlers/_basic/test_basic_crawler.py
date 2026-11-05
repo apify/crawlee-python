@@ -37,7 +37,13 @@ from crawlee.errors import (
     SessionError,
     UserDefinedErrorHandlerError,
 )
-from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
+from crawlee.events import (
+    Event,
+    EventAbortingData,
+    EventCrawlerStatusData,
+    EventMigratingData,
+    LocalEventManager,
+)
 from crawlee.http_clients import HttpClient, HttpResponse
 from crawlee.request_loaders import (
     MinIntervalSignal,
@@ -1913,6 +1919,151 @@ async def test_run_while_running() -> None:
 
     crawler.stop()
     await asyncio.wait_for(run_task, timeout=10)
+
+
+async def test_pause_holds_requests_until_resume() -> None:
+    """`pause()` waits for the request in progress, and the paused run starts nothing new until `resume()`."""
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1))
+    release = asyncio.Event()
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+        await release.wait()
+
+    urls = ['https://a.placeholder.com', 'https://b.placeholder.com']
+    run_task = asyncio.create_task(crawler.run(urls))
+    assert await poll_until_condition(lambda: len(visited) == 1)
+
+    pause_task = asyncio.create_task(crawler.pause())
+    await asyncio.sleep(0)
+    assert not pause_task.done()
+
+    release.set()
+    await asyncio.wait_for(pause_task, timeout=10)
+
+    # Give a pause that doesn't hold the task loop the chance to start the next request.
+    await asyncio.sleep(0.1)
+    assert visited == urls[:1]
+    assert not run_task.done()
+
+    crawler.resume()
+    await asyncio.wait_for(run_task, timeout=10)
+
+    assert visited == urls
+
+
+async def test_pause_and_resume_before_run_warn(caplog: pytest.LogCaptureFixture) -> None:
+    """`pause()` and `resume()` before a run only log a warning."""
+    crawler = BasicCrawler()
+
+    with caplog.at_level(logging.WARNING, logger='crawlee'):
+        await crawler.pause()
+        crawler.resume()
+
+    assert 'Cannot pause a crawler that is not running.' in caplog.text
+    assert 'Cannot resume a crawler that is not running.' in caplog.text
+
+
+async def test_pause_and_resume_after_run_warn(caplog: pytest.LogCaptureFixture) -> None:
+    """`pause()` and `resume()` on a crawler whose run has finished only log a warning."""
+    crawler = BasicCrawler(request_handler=AsyncMock())
+    await crawler.run(['https://a.placeholder.com'])
+
+    with caplog.at_level(logging.WARNING, logger='crawlee'):
+        await crawler.pause()
+        crawler.resume()
+
+    assert 'Cannot pause a crawler that is not running.' in caplog.text
+    assert 'Cannot resume a crawler that is not running.' in caplog.text
+
+
+@pytest.mark.parametrize(
+    ('event', 'event_data'),
+    [
+        pytest.param(Event.MIGRATING, EventMigratingData(), id='migrating'),
+        pytest.param(Event.ABORTING, EventAbortingData(), id='aborting'),
+    ],
+)
+async def test_migration_pauses_crawl_and_persists_statistics(
+    event: Event, event_data: EventMigratingData | EventAbortingData
+) -> None:
+    """A migration or an abort pauses the crawl and persists the statistics once the request in progress finishes."""
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1))
+    release = asyncio.Event()
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+        await release.wait()
+
+    urls = ['https://a.placeholder.com', 'https://b.placeholder.com']
+    run_task = asyncio.create_task(crawler.run(urls))
+    assert await poll_until_condition(lambda: len(visited) == 1)
+
+    finished_when_persisted = list[int]()
+    persist_state = AsyncMock(
+        side_effect=lambda: finished_when_persisted.append(crawler.statistics.state.requests_finished)
+    )
+    event_manager = service_locator.get_event_manager()
+
+    with patch.object(crawler.statistics, 'persist_state', persist_state):
+        event_manager.emit(event=event, event_data=event_data)
+        await asyncio.sleep(0)
+        persist_state.assert_not_called()
+
+        release.set()
+        await event_manager.wait_for_all_listeners_to_complete()
+
+    assert finished_when_persisted == [1]
+    assert visited == urls[:1]
+
+    crawler.resume()
+    await asyncio.wait_for(run_task, timeout=10)
+
+
+async def test_migration_timeout_logs_error(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    """A migration that the request in progress outlasts logs an error."""
+    monkeypatch.setattr(BasicCrawler, '_SAFE_MIGRATION_WAIT', timedelta(milliseconds=50))
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1))
+    release = asyncio.Event()
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+        await release.wait()
+
+    run_task = asyncio.create_task(crawler.run(['https://a.placeholder.com']))
+    assert await poll_until_condition(lambda: len(visited) == 1)
+
+    event_manager = service_locator.get_event_manager()
+    with caplog.at_level(logging.ERROR, logger='crawlee'):
+        event_manager.emit(event=Event.MIGRATING, event_data=EventMigratingData())
+        await event_manager.wait_for_all_listeners_to_complete()
+
+    assert 'some requests did not finish in time' in caplog.text
+
+    release.set()
+    crawler.resume()
+    await asyncio.wait_for(run_task, timeout=10)
+
+
+async def test_run_stops_listening_for_migration() -> None:
+    """Once `run()` returns, a migration no longer reaches the crawler."""
+    event_manager = LocalEventManager()
+    crawler = BasicCrawler(event_manager=event_manager, request_handler=AsyncMock())
+
+    async with event_manager:
+        await crawler.run(['https://a.placeholder.com'])
+
+        with patch.object(crawler.statistics, 'persist_state') as persist_state:
+            event_manager.emit(event=Event.MIGRATING, event_data=EventMigratingData())
+            await event_manager.wait_for_all_listeners_to_complete()
+
+    persist_state.assert_not_called()
 
 
 async def test_services_no_side_effect_on_crawler_init() -> None:

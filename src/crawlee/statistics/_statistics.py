@@ -291,6 +291,10 @@ class Statistics(Generic[TStatisticsState]):
             retry_histogram=serialized_state['request_retry_histogram'],
         )
 
+    async def persist_state(self) -> None:
+        """Persist the current statistics, if persistence is enabled."""
+        await self._state.persist_state()
+
     async def reset(self) -> None:
         """Reset the statistics to their defaults and remove any persistent state."""
         await self._state.reset()
