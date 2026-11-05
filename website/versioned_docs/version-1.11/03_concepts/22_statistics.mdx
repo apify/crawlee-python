@@ -1,0 +1,79 @@
+---
+id: statistics
+title: Statistics
+description: How Crawlee tracks request counts, retries, durations, and errors during a crawl, and how to read, log, and persist them.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import ReadFinalStatisticsExample from '!!raw-loader!roa-loader!./code_examples/statistics/read_final_statistics.py';
+import CustomStatisticsExample from '!!raw-loader!roa-loader!./code_examples/statistics/custom_statistics.py';
+
+Every crawler collects runtime statistics about the requests it processes. It counts finished and failed requests, measures how long they take, records how many retries each one needed, and groups the errors it hits. The <ApiLink to="class/Statistics">`Statistics`</ApiLink> class does the bookkeeping. The crawler calls it whenever a request starts, finishes, fails, or gets retried, so you don't have to record anything yourself.
+
+## What gets tracked
+
+The raw data lives in a <ApiLink to="class/StatisticsState">`StatisticsState`</ApiLink> model. Its main fields are:
+
+- `requests_finished` and `requests_failed` count requests that succeeded or failed after exhausting their retries.
+- `requests_retries` counts requests that needed at least one retry, and `request_retry_histogram` shows how many requests finished or failed after 0, 1, 2, and more retries.
+- `request_total_finished_duration`, `request_total_failed_duration`, `request_min_duration`, and `request_max_duration` measure request processing time.
+- `requests_with_status_code` maps HTTP status codes to the number of responses that returned them.
+- `crawler_started_at`, `crawler_finished_at`, and the computed `crawler_runtime` describe the run itself.
+
+From the state, <ApiLink to="class/Statistics#calculate">`Statistics.calculate`</ApiLink> derives a <ApiLink to="class/FinalStatistics">`FinalStatistics`</ApiLink> object. It's a frozen summary with the request counts, the retry histogram as a list, average finished and failed durations, total duration, per-minute rates for finished and failed requests, and the crawler runtime. The same summary appears in the periodic and final statistics logs.
+
+## Reading statistics
+
+There are two ways to get the statistics of a crawl:
+
+- <ApiLink to="class/BasicCrawler#run">`crawler.run()`</ApiLink> returns the `FinalStatistics` of the run once it ends.
+- <ApiLink to="class/BasicCrawler#statistics">`crawler.statistics`</ApiLink> gives you the `Statistics` instance, so you can read the full `state` or call `calculate()` at any time, including from a request handler while the crawl is running.
+
+The following example reads the summary returned by `run()`, then looks at state fields that `FinalStatistics` doesn't include, and the errors collected during the run.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {ReadFinalStatisticsExample}
+</RunnableCodeBlock>
+
+A crawler that you run again with `run()` after a completed run resets its statistics at the start of the new run. To keep the numbers from a previous run, store the returned `FinalStatistics` before calling `run()` again.
+
+## Periodic logging
+
+While the crawler runs, `Statistics` logs the current `FinalStatistics` at a fixed interval, and the crawler logs a final summary when the run ends. Two options control the periodic messages, and both belong to `Statistics`:
+
+- `log_interval` sets how often the statistics are logged. The default is one minute.
+- `statistics_log_format` picks between `table`, a formatted table, and `inline`, a single message with the values attached as extra log fields.
+
+The crawler's constructor also accepts `statistics_log_format`. When the crawler creates its own `Statistics`, it passes the value through, so the option controls both the periodic and the final logs. When you pass a custom `Statistics`, the crawler's option applies only to the final summary. For more about log output, including structured JSON logs, see [Logging](./logging).
+
+## Persistence
+
+`Statistics` can save its state to a key-value store, so a crawl that gets migrated, aborted, or restarted continues counting from where it left off. When persistence is on, the state is loaded from the store when the crawl starts, saved on every `PERSIST_STATE` event, and saved once more when the crawl ends. For details about the event, see [Events](./events).
+
+The following options control persistence:
+
+- `persistence_enabled` turns persistence on. With `'explicit_only'`, a saved state is loaded at the start, but nothing is saved automatically, neither on `PERSIST_STATE` events nor at the end of the crawl.
+- `persist_state_key` is the key the state is stored under. It defaults to `__CRAWLER_STATISTICS_<n>`, where `<n>` is a per-process counter of `Statistics` instances.
+- `persist_state_kvs_name` selects a named key-value store. Without it, the default key-value store is used.
+
+The statistics a crawler creates for itself have persistence enabled and use the crawler's key-value store. The exception is <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink>, whose default statistics don't persist. A `Statistics` instance you create yourself has `persistence_enabled=False` by default. For how to resume an interrupted crawl, see [Stopping and resuming crawlers](../guides/stopping-and-resuming-crawlers).
+
+## Custom statistics
+
+To change any of these options, create a `Statistics` instance and pass it to the crawler through the `statistics` argument. Use <ApiLink to="class/Statistics#with_default_state">`Statistics.with_default_state`</ApiLink> to get an instance with the standard `StatisticsState` model.
+
+The following example logs the statistics every second in the `inline` format, persists them under a custom key, and reads the persisted record back after the run.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {CustomStatisticsExample}
+</RunnableCodeBlock>
+
+A custom `Statistics` logs its periodic messages through the `crawlee.statistics._statistics` logger. To log through the crawler's logger instead, pass it as `periodic_message_logger`.
+
+## Error tracking
+
+Each `Statistics` instance holds an `error_tracker`, which groups errors from failed request attempts by their type, the place in the code where they were raised, and a similar message. Its `total` and `unique_error_count` properties count all errors and the distinct groups, and `get_most_common_errors()` returns the most frequent groups with their counts. At the end of a run that had errors, the crawler logs both counts. A second tracker, `error_tracker_retry`, collects session errors that caused a retry with a new session.
+
+With `save_error_snapshots=True`, the error tracker also saves a snapshot of the page on the first occurrence of each unique error. For details and examples, see [Capturing page snapshots on errors](./error-handling#capturing-page-snapshots-on-errors).
