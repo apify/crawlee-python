@@ -163,8 +163,6 @@ class RequestQueue(Storage, RequestManager):
     @override
     async def purge(self) -> None:
         await self._backend.purge()
-        # A purged queue gets reused by a later run, which may expect a shorter processing time.
-        self._expected_request_processing_time = timedelta(0)
 
     @override
     async def add_request(

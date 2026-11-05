@@ -50,7 +50,7 @@ async def rq_backend(
         await backend.drop()
 
 
-async def _get_blocked_until(rq_backend: SqlRequestQueueBackend) -> datetime | None:
+async def get_blocked_until(rq_backend: SqlRequestQueueBackend) -> datetime | None:
     """Read the lock expiry of the only request in the queue."""
     metadata = await rq_backend.get_metadata()
     async with rq_backend.get_session() as session:
@@ -315,7 +315,7 @@ async def test_block_follows_processing_time(
     fetch_finished = datetime.now(UTC)
     assert request is not None
 
-    blocked_until = await _get_blocked_until(rq_backend)
+    blocked_until = await get_blocked_until(rq_backend)
     assert blocked_until is not None
     assert fetch_started + expected_block_time <= blocked_until <= fetch_finished + expected_block_time
 
@@ -325,11 +325,11 @@ async def test_extend_moves_lock_expiry(rq_backend: SqlRequestQueueBackend) -> N
     await rq_backend.add_batch_of_requests([Request.from_url('https://example.com/1')])
     request = await rq_backend.fetch_next_request()
     assert request is not None
-    blocked_until = await _get_blocked_until(rq_backend)
+    blocked_until = await get_blocked_until(rq_backend)
     assert blocked_until is not None
 
     assert await rq_backend.extend_request_processing_time(request, timedelta(minutes=10)) is True
-    assert await _get_blocked_until(rq_backend) == blocked_until + timedelta(minutes=10)
+    assert await get_blocked_until(rq_backend) == blocked_until + timedelta(minutes=10)
 
 
 async def test_extend_after_handled(rq_backend: SqlRequestQueueBackend) -> None:
@@ -349,12 +349,12 @@ async def test_extend_lock_of_another_client(
     await rq_backend.add_batch_of_requests([Request.from_url('https://example.com/1')])
     request = await rq_backend.fetch_next_request()
     assert request is not None
-    blocked_until = await _get_blocked_until(rq_backend)
+    blocked_until = await get_blocked_until(rq_backend)
 
     monkeypatch.setattr(rq_backend, 'client_key', 'another-client')
 
     assert await rq_backend.extend_request_processing_time(request, timedelta(minutes=10)) is False
-    assert await _get_blocked_until(rq_backend) == blocked_until
+    assert await get_blocked_until(rq_backend) == blocked_until
 
 
 async def test_extend_expired_lock(rq_backend: SqlRequestQueueBackend, monkeypatch: pytest.MonkeyPatch) -> None:

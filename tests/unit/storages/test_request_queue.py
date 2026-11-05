@@ -1599,8 +1599,8 @@ async def test_processing_time_only_raises() -> None:
     ]
 
 
-async def test_purge_resets_processing_time() -> None:
-    """Test that a purged queue passes a shorter expected processing time to the backend again."""
+async def test_purge_keeps_processing_time() -> None:
+    """Test that a purged queue doesn't pass a shorter expected processing time to the backend."""
     backend = create_autospec(RequestQueueBackend, instance=True, spec_set=True)
     rq = RequestQueue(backend, id='test', name=None)
 
@@ -1608,10 +1608,7 @@ async def test_purge_resets_processing_time() -> None:
     await rq.purge()
     await rq.set_expected_request_processing_time(timedelta(minutes=1))
 
-    assert backend.set_expected_request_processing_time.await_args_list == [
-        call(timedelta(minutes=2)),
-        call(timedelta(minutes=1)),
-    ]
+    assert backend.set_expected_request_processing_time.await_args_list == [call(timedelta(minutes=2))]
 
 
 async def test_extend_forwards_to_backend() -> None:

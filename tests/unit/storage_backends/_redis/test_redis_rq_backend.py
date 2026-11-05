@@ -30,7 +30,7 @@ pytestmark = pytest.mark.skipif(find_spec('lupa') is None, reason='`lupa` is not
 MODULE = 'crawlee.storage_backends._redis._request_queue_backend'
 
 
-async def _get_blocked_until(rq_backend: RedisRequestQueueBackend, request: Request) -> int:
+async def get_blocked_until(rq_backend: RedisRequestQueueBackend, request: Request) -> int:
     """Read the lock expiry of an in-progress request, in milliseconds."""
     in_progress = await await_redis_response(rq_backend.redis.hget(rq_backend._in_progress_key, request.unique_key))
     assert in_progress is not None
@@ -390,7 +390,7 @@ async def test_block_follows_processing_time(
     fetch_finished = datetime.now(UTC)
     assert request is not None
 
-    blocked_until = await _get_blocked_until(rq_backend, request)
+    blocked_until = await get_blocked_until(rq_backend, request)
     earliest = int((fetch_started + expected_block_time).timestamp() * 1000)
     latest = int((fetch_finished + expected_block_time).timestamp() * 1000)
     assert earliest <= blocked_until <= latest
@@ -401,10 +401,10 @@ async def test_extend_moves_lock_expiry(rq_backend: RedisRequestQueueBackend) ->
     await rq_backend.add_batch_of_requests([Request.from_url('https://example.com/1')])
     request = await rq_backend.fetch_next_request()
     assert request is not None
-    blocked_until = await _get_blocked_until(rq_backend, request)
+    blocked_until = await get_blocked_until(rq_backend, request)
 
     assert await rq_backend.extend_request_processing_time(request, timedelta(minutes=10)) is True
-    assert await _get_blocked_until(rq_backend, request) == blocked_until + 600_000
+    assert await get_blocked_until(rq_backend, request) == blocked_until + 600_000
 
 
 async def test_extend_after_handled(rq_backend: RedisRequestQueueBackend) -> None:
@@ -424,12 +424,12 @@ async def test_extend_lock_of_another_client(
     await rq_backend.add_batch_of_requests([Request.from_url('https://example.com/1')])
     request = await rq_backend.fetch_next_request()
     assert request is not None
-    blocked_until = await _get_blocked_until(rq_backend, request)
+    blocked_until = await get_blocked_until(rq_backend, request)
 
     monkeypatch.setattr(rq_backend, 'client_key', 'another-client')
 
     assert await rq_backend.extend_request_processing_time(request, timedelta(minutes=10)) is False
-    assert await _get_blocked_until(rq_backend, request) == blocked_until
+    assert await get_blocked_until(rq_backend, request) == blocked_until
 
 
 async def test_extend_expired_lock(rq_backend: RedisRequestQueueBackend, monkeypatch: pytest.MonkeyPatch) -> None:
