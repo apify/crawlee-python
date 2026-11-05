@@ -250,9 +250,9 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
         )
 
         self._per_consumer = per_consumer
-        self._start_level = self._desired_concurrency
+        self._start_concurrency = self._desired_concurrency
         self._controllers = dict[str, _ThroughputController]()
-        self._in_flight = Counter[str]()
+        self._consumer_concurrency = Counter[str]()
         # Consumers that asked for capacity recently, so that the ones that went away can be dropped.
         self._seen = TTLCache[str, bool](
             maxsize=math.inf, ttl=_CONSUMER_TTL_TICKS * autoscale_interval.total_seconds(), timer=time.monotonic
@@ -267,14 +267,14 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
         self._sync_desired_concurrency()
 
     @property
-    def _bounded_start_level(self) -> int:
+    def _bounded_start_concurrency(self) -> int:
         """The level a new controller starts at: the settings' level, inside bounds that may have moved since."""
-        return min(self._max_concurrency, max(self._min_concurrency, self._start_level))
+        return min(self._max_concurrency, max(self._min_concurrency, self._start_concurrency))
 
     def _new_controller(self, current_concurrency: Callable[[], int]) -> _ThroughputController:
         return _ThroughputController(
             self,
-            level=self._bounded_start_level,
+            desired_concurrency=self._bounded_start_concurrency,
             current_concurrency=current_concurrency,
             status=self._system_status,
             tick=self._autoscale_interval.total_seconds(),
@@ -299,13 +299,13 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
 
         self._raise_if_inactive()
         self._seen[consumer.id] = True
-        in_flight = self._in_flight[consumer.id]
-        if in_flight >= self._controller_for(consumer.id).level:
+        concurrency = self._consumer_concurrency[consumer.id]
+        if concurrency >= self._controller_for(consumer.id).desired_concurrency:
             return False
 
         # Below its own minimum a consumer keeps going even on an overloaded machine, as a lone crawler would. Above
         # it, the tasks a share cut left running may still fill the budget, so the system total is checked too.
-        if in_flight < self._min_concurrency:
+        if concurrency < self._min_concurrency:
             return True
         return self._current_concurrency < self._max_concurrency and self._get_current_load().is_system_idle
 
@@ -316,7 +316,7 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
             return False
 
         if self._per_consumer:
-            self._in_flight[consumer.id] += 1
+            self._consumer_concurrency[consumer.id] += 1
         controller = self._controller_for(consumer.id)
         self._started[id(consumer), task_id] = (controller, controller.task_started())
         return True
@@ -330,7 +330,7 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
             return
 
         if self._per_consumer:
-            self._in_flight[consumer.id] -= 1
+            self._consumer_concurrency[consumer.id] -= 1
         controller, member = started
         controller.task_ended(member)
 
@@ -339,7 +339,9 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
         if self._per_consumer:
             self._share_budget()
         for controller in self._controllers.values():
-            controller.level = min(max(controller.level, self._min_concurrency), controller.bound)
+            controller.desired_concurrency = min(
+                max(controller.desired_concurrency, self._min_concurrency), controller.bound
+            )
         self._sync_desired_concurrency()
 
     @override
@@ -360,16 +362,17 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
             return self._controllers[_SHARED]
 
         if (controller := self._controllers.get(consumer_id)) is None:
-            controller = self._new_controller(lambda: self._in_flight[consumer_id])
+            controller = self._new_controller(lambda: self._consumer_concurrency[consumer_id])
             self._controllers[consumer_id] = controller
             self._share_budget()
             self._sync_desired_concurrency()
         return controller
 
     def _drop_gone_consumers(self) -> None:
-        for consumer_id in [key for key in self._controllers if key not in self._seen and not self._in_flight[key]]:
+        gone = [key for key in self._controllers if key not in self._seen and not self._consumer_concurrency[key]]
+        for consumer_id in gone:
             del self._controllers[consumer_id]
-            self._in_flight.pop(consumer_id, None)
+            self._consumer_concurrency.pop(consumer_id, None)
 
     def _share_budget(self) -> None:
         """Cap every consumer at an equal share of `max_concurrency`, giving the others what one does not want.
@@ -390,7 +393,9 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
 
     def _sync_desired_concurrency(self) -> None:
         # With no consumer yet, the level a newcomer would start at, since the contract needs it at least 1.
-        self._desired_concurrency = sum(c.level for c in self._controllers.values()) or self._bounded_start_level
+        self._desired_concurrency = (
+            sum(c.desired_concurrency for c in self._controllers.values()) or self._bounded_start_concurrency
+        )
 
 
 class _ThroughputController:
@@ -400,7 +405,7 @@ class _ThroughputController:
         self,
         system: ThroughputConcurrencySystem,
         *,
-        level: int,
+        desired_concurrency: int,
         current_concurrency: Callable[[], int],
         status: SystemStatus,
         tick: float,
@@ -415,7 +420,7 @@ class _ThroughputController:
         self._desired_ratio = desired_ratio
         self._scale_up_step_ratio = scale_up_step_ratio
         self._scale_down_step_ratio = scale_down_step_ratio
-        self.level = level
+        self.desired_concurrency = desired_concurrency
         """The concurrency this controller currently asks for."""
 
         self._share: int | None = None
@@ -424,7 +429,7 @@ class _ThroughputController:
         self._enrolling: _Cohort | None = None
         self._window: _Cohort | None = None
 
-        self._centre = float(self.level)
+        self._centre = float(self.desired_concurrency)
         self._dither = self._system.dither_max
         self._phase: _Phase = 'centre'
         self._stage: _Stage = 'settle'
@@ -433,7 +438,7 @@ class _ThroughputController:
         self._reference_duration = 0.0
         self._soft_ceiling = self.bound
         # The level before the last raise, kept until a window at the raised level has been read.
-        self._level_before_raise: int | None = None
+        self._concurrency_before_raise: int | None = None
         self._filled = True
         self._rates = dict[str, float]()
         self._last_direction = 0
@@ -452,7 +457,7 @@ class _ThroughputController:
         self._hold_reference: float | None = None
         self._hold_streak = 0
 
-        self._set_level()
+        self._set_desired_concurrency()
 
     @property
     def bound(self) -> int:
@@ -462,15 +467,15 @@ class _ThroughputController:
     @property
     def wanted(self) -> int:
         """The level this controller asks for in its current phase, with the whole budget to itself."""
-        return self._level(self._phase, bound=self._system.max_concurrency)
+        return self._concurrency_for(self._phase, bound=self._system.max_concurrency)
 
     def limit_to(self, share: int) -> None:
         """Bound this controller by its share of the budget, cutting its level at once if it is above."""
         self._share = share
-        if self.level > share:
-            self.level = share
-            # A drop leaves no raise to undo, as in `_set_level`.
-            self._level_before_raise = None
+        if self.desired_concurrency > share:
+            self.desired_concurrency = share
+            # A drop leaves no raise to undo, as in `_set_desired_concurrency`.
+            self._concurrency_before_raise = None
 
     def restart(self) -> None:
         """Settle the level from now, dropping any window left open."""
@@ -512,7 +517,7 @@ class _ThroughputController:
         bound = self.bound if bound is None else bound
         return min(bound, max(self._system.min_concurrency, self._soft_ceiling))
 
-    def _level(self, phase: _Phase, *, bound: int | None = None) -> int:
+    def _concurrency_for(self, phase: _Phase, *, bound: int | None = None) -> int:
         ceiling = self._ceiling(bound)
         if self._hold_cycles > 0:
             return (
@@ -528,22 +533,22 @@ class _ThroughputController:
         else:
             factor = 1 / (1 + self._dither)
 
-        level = round(self._centre * factor)
+        concurrency = round(self._centre * factor)
         # Near the floor both levels can round to the centre, and two windows at one level can only ever tie.
         if phase == 'high':
-            level = max(level, round(self._centre) + 1)
+            concurrency = max(concurrency, round(self._centre) + 1)
         elif phase == 'low':
-            level = min(level, round(self._centre) - 1)
+            concurrency = min(concurrency, round(self._centre) - 1)
 
-        return min(ceiling, max(self._system.min_concurrency, level))
+        return min(ceiling, max(self._system.min_concurrency, concurrency))
 
-    def _set_level(self) -> None:
-        level = self._level(self._phase)
-        if level > self.level:
-            self._level_before_raise = self.level
-        elif level < self.level:
-            self._level_before_raise = None
-        self.level = level
+    def _set_desired_concurrency(self) -> None:
+        new_concurrency = self._concurrency_for(self._phase)
+        if new_concurrency > self.desired_concurrency:
+            self._concurrency_before_raise = self.desired_concurrency
+        elif new_concurrency < self.desired_concurrency:
+            self._concurrency_before_raise = None
+        self.desired_concurrency = new_concurrency
         # Past the knee recent durations are the congested ones, so patience comes from the last level that finished.
         fallback = self._dead_time if self._dead_time is not None else float('inf')
         self._dead_time_at_move = max(self._reference_duration or fallback, self._tick)
@@ -596,8 +601,8 @@ class _ThroughputController:
         now = time.monotonic()
 
         # A raise the machine objects to at once failed as a step, before the slower historical signal can tell.
-        if self._level_before_raise is not None and not self._status.get_current_system_info().is_system_idle:
-            self._on_overload(now, cut_to=self._level_before_raise)
+        if self._concurrency_before_raise is not None and not self._status.get_current_system_info().is_system_idle:
+            self._on_overload(now, cut_to=self._concurrency_before_raise)
             return
 
         if not self._status.get_historical_system_info().is_system_idle:
@@ -617,21 +622,21 @@ class _ThroughputController:
         """Cut to `cut_to` or by the parent's step, cap this controller at the cut, and restart the cycle there."""
         self._enrolling = None
         self._window = None
-        self._level_before_raise = None
+        self._concurrency_before_raise = None
         if cut_to is not None:
             # A raise recorded before `min_concurrency` was raised may sit below the new minimum.
-            self.level = max(self._system.min_concurrency, cut_to)
-        elif self.level > self._system.min_concurrency:
-            step = math.ceil(self._scale_down_step_ratio * self.level)
-            self.level = max(self._system.min_concurrency, self.level - step)
+            self.desired_concurrency = max(self._system.min_concurrency, cut_to)
+        elif self.desired_concurrency > self._system.min_concurrency:
+            step = math.ceil(self._scale_down_step_ratio * self.desired_concurrency)
+            self.desired_concurrency = max(self._system.min_concurrency, self.desired_concurrency - step)
 
         reason = 'right after a raise, undoing it' if cut_to is not None else 'cutting by the parent step'
-        logger.debug(f'Machine overloaded {reason}; concurrency is now {self.level}')
+        logger.debug(f'Machine overloaded {reason}; concurrency is now {self.desired_concurrency}')
 
         # The cut level becomes the lower level of the next cycle, so a burst is cut at the parent's pace. Near the
         # floor the centre sits a task above it, since the lower level is always at least a task below the centre.
-        self._soft_ceiling = self.level
-        self._centre = max(self.level * (1 + self._system.dither_min), self.level + 1.0)
+        self._soft_ceiling = self.desired_concurrency
+        self._centre = max(self.desired_concurrency * (1 + self._system.dither_min), self.desired_concurrency + 1.0)
         self._dither = self._system.dither_min
         self._end_hold()
         self._rates.clear()
@@ -639,12 +644,12 @@ class _ThroughputController:
         self._last_direction = 0
         self._startup = False
         self._phase, self._stage, self._stage_since = 'low', 'settle', now
-        self._set_level()
+        self._set_desired_concurrency()
 
     def _settle(self, now: float) -> None:
         """Wait for the target to meet the level, then open a window on it."""
         # The climb only waits for the level to fill: a window enrolled during the fill reads its mean.
-        filled = not self._startup or (self._current_concurrency() >= self._desired_ratio * self.level)
+        filled = not self._startup or (self._current_concurrency() >= self._desired_ratio * self.desired_concurrency)
         settle = 0.0 if self._startup and filled else min(self._dead_time_at_move, _MAX_SETTLE_TICKS * self._tick)
 
         if now - self._stage_since < settle:
@@ -654,7 +659,7 @@ class _ThroughputController:
             # The request loader hands out less than this level takes, so nothing above it can be measured either.
             self._end_climb(0.0, measured=False)
             self._stage_since = now
-            self._set_level()
+            self._set_desired_concurrency()
             return
 
         self._open_window()
@@ -698,17 +703,17 @@ class _ThroughputController:
         self._stage, self._stage_since = 'settle', now
 
         # A level counts as filled only if it was filled while the window enrolled and still is now.
-        wanted = self._desired_ratio * self.level
+        wanted = self._desired_ratio * self.desired_concurrency
         self._filled = window.concurrency >= wanted and self._current_concurrency() >= wanted
 
         self._read(rate, median if median is not None else window.median_ceiling())
         # The level this window measured has run without the machine objecting, so it no longer needs undoing.
-        self._level_before_raise = None
-        self._set_level()
+        self._concurrency_before_raise = None
+        self._set_desired_concurrency()
 
     def _end_climb(self, rate: float, *, measured: bool) -> None:
         cause = 'a step stopped paying off' if measured else 'the level could not be filled'
-        logger.debug(f'Climb ended at concurrency {self.level}: {cause}')
+        logger.debug(f'Climb ended at concurrency {self.desired_concurrency}: {cause}')
         self._startup = False
         self._phase = 'low'
         self._climb_gain = self._system.startup_gain
@@ -743,7 +748,7 @@ class _ThroughputController:
             self._reference = rate
             self._reference_median = median
             if self._phase == 'climb':
-                self._centre = float(self.level)
+                self._centre = float(self.desired_concurrency)
             self._phase = 'climb'
             self._climb_retried = False
             return
@@ -840,8 +845,8 @@ class _ThroughputController:
     def _on_win(self, direction: int, high: float, low: float, median: float | None) -> None:
         """Move the centre toward the winning level, or resume the climb from it."""
         # The upper level was read last, so it is still the one set.
-        clamped = direction > 0 and self.level >= self._ceiling()
-        self._centre = float(self.level if direction > 0 else self._level('low'))
+        clamped = direction > 0 and self.desired_concurrency >= self._ceiling()
+        self._centre = float(self.desired_concurrency if direction > 0 else self._concurrency_for('low'))
 
         if direction > 0 and not clamped and high > low * (1 + self._system.climb_margin) and self._last_direction > 0:
             # Twice running the upper level delivered what a doubling would, so the climb ended early on noise.
@@ -857,7 +862,7 @@ class _ThroughputController:
             return
 
         if clamped:
-            logger.debug(f'Upper level won at the concurrency limit; holding at {self.level}')
+            logger.debug(f'Upper level won at the concurrency limit; holding at {self.desired_concurrency}')
             self._dither = self._system.dither_min
             self._hold_cycles = self._system.hold_cycles_at_ceiling
             self._holding_peak = False

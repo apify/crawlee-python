@@ -180,11 +180,11 @@ def run_window(system: ThroughputConcurrencySystem, clock: FakeClock, durations:
 
 def run_windows(system: ThroughputConcurrencySystem, clock: FakeClock, *rates: float) -> list[int]:
     """Run one window per rate, its members taking the duration that delivers the rate, and return each next level."""
-    levels = []
+    concurrencies = []
     for rate in rates:
         duration = system.desired_concurrency / rate
-        levels.append(run_window(system, clock, [duration] * system.min_members))
-    return levels
+        concurrencies.append(run_window(system, clock, [duration] * system.min_members))
+    return concurrencies
 
 
 def run_stalled_window(system: ThroughputConcurrencySystem, clock: FakeClock) -> int:
@@ -218,8 +218,8 @@ def run_batches(
 ) -> list[tuple[int, float]]:
     """Run tasks against the system in batches of its desired concurrency. Return each batch's level and duration.
 
-    A batch of `level` tasks that each take one duration delivers `level` tasks per duration, which is Little's law
-    with no scatter, so the run is exact and takes milliseconds.
+    A batch of `concurrency` tasks that each take one duration delivers `concurrency` tasks per duration, which is
+    Little's law with no scatter, so the run is exact and takes milliseconds.
     """
     batches = list[tuple[int, float]]()
     last_tick = clock.now
@@ -229,18 +229,18 @@ def run_batches(
         patch.object(ThroughputConcurrencySystem, 'current_concurrency', new_callable=PropertyMock) as live,
     ):
         while clock.now < minutes * 60:
-            level = system.desired_concurrency
-            duration = task_duration(level, capacity)
-            live.return_value = level
+            concurrency = system.desired_concurrency
+            duration = task_duration(concurrency, capacity)
+            live.return_value = concurrency
 
             started_at = clock.now
-            for _ in range(level):
+            for _ in range(concurrency):
                 clock.now = started_at
                 task_id = str(next(TASK_IDS))
                 system.try_register_task_start(CONSUMER, task_id)
                 clock.advance(duration)
                 system.register_task_end(CONSUMER, task_id)
-            batches.append((level, duration))
+            batches.append((concurrency, duration))
 
             if clock.now - last_tick >= TICK:
                 system._autoscale()
@@ -252,10 +252,10 @@ def run_batches(
 def trailing_batches(batches: list[tuple[int, float]], minutes: int) -> list[tuple[int, float]]:
     """Get the trailing batches of a run that together span `minutes`."""
     tail = list[tuple[int, float]]()
-    for level, duration in reversed(batches):
+    for concurrency, duration in reversed(batches):
         if sum(d for _, d in tail) >= minutes * 60:
             break
-        tail.append((level, duration))
+        tail.append((concurrency, duration))
     return tail
 
 
@@ -272,24 +272,24 @@ def test_levels_sit_around_centre() -> None:
     system = make_system(desired=40)
 
     assert (
-        system._controllers[_SHARED]._level('centre'),
-        system._controllers[_SHARED]._level('climb'),
-        system._controllers[_SHARED]._level('high'),
-        system._controllers[_SHARED]._level('low'),
+        system._controllers[_SHARED]._concurrency_for('centre'),
+        system._controllers[_SHARED]._concurrency_for('climb'),
+        system._controllers[_SHARED]._concurrency_for('high'),
+        system._controllers[_SHARED]._concurrency_for('low'),
     ) == (40, 80, 60, 27)
 
 
 def test_levels_stay_inside_settings() -> None:
     """No level leaves the configured bounds."""
-    assert make_system(desired=90, max_concurrency=100)._controllers[_SHARED]._level('high') == 100
-    assert make_system(desired=6, min_concurrency=5)._controllers[_SHARED]._level('low') == 5
+    assert make_system(desired=90, max_concurrency=100)._controllers[_SHARED]._concurrency_for('high') == 100
+    assert make_system(desired=6, min_concurrency=5)._controllers[_SHARED]._concurrency_for('low') == 5
 
 
 def test_levels_collapse_at_equal_bounds() -> None:
     """With one allowed concurrency every level is that concurrency."""
     system = make_system(desired=5, min_concurrency=5, max_concurrency=5)
 
-    assert {system._controllers[_SHARED]._level(phase) for phase in ('centre', 'climb', 'high', 'low')} == {5}
+    assert {system._controllers[_SHARED]._concurrency_for(phase) for phase in ('centre', 'climb', 'high', 'low')} == {5}
 
 
 @pytest.mark.parametrize(
@@ -307,10 +307,13 @@ def test_levels_step_at_least_one_task(desired: int, expected: tuple[int, int]) 
 
     system = make_system(cls=Narrow, desired=desired)
 
-    assert (system._controllers[_SHARED]._level('high'), system._controllers[_SHARED]._level('low')) == expected
+    assert (
+        system._controllers[_SHARED]._concurrency_for('high'),
+        system._controllers[_SHARED]._concurrency_for('low'),
+    ) == expected
 
 
-def test_paying_climb_doubles_level(clock: FakeClock) -> None:
+def test_paying_climb_doubles_concurrency(clock: FakeClock) -> None:
     """Each window that delivers a quarter more than the last doubles the desired concurrency."""
     system = make_system(desired=10)
 
@@ -453,9 +456,9 @@ def test_tie_at_narrowest_spread_holds(clock: FakeClock) -> None:
     """A tie at the narrowest spread holds the level for six windows, then measures below it again."""
     system = make_system(desired=40)
 
-    levels = run_windows(system, clock, *TO_HOLD, *[5.0] * system.hold_cycles_at_peak)
+    concurrencies = run_windows(system, clock, *TO_HOLD, *[5.0] * system.hold_cycles_at_peak)
 
-    assert levels[len(TO_HOLD) - 1 :] == [28] * system.hold_cycles_at_peak + [25]
+    assert concurrencies[len(TO_HOLD) - 1 :] == [28] * system.hold_cycles_at_peak + [25]
 
 
 def test_zero_hold_cycles_never_hold(clock: FakeClock) -> None:
@@ -466,9 +469,9 @@ def test_zero_hold_cycles_never_hold(clock: FakeClock) -> None:
 
     system = make_system(cls=NeverHolds, desired=40)
 
-    levels = run_windows(system, clock, *TO_HOLD, 5.0, 5.0, 5.0)
+    concurrencies = run_windows(system, clock, *TO_HOLD, 5.0, 5.0, 5.0)
 
-    assert all(level != following for level, following in pairwise(levels))
+    assert all(concurrency != following for concurrency, following in pairwise(concurrencies))
 
 
 @pytest.mark.parametrize(
@@ -709,8 +712,8 @@ def test_overload_cuts_and_restarts(clock: FakeClock) -> None:
     assert system.desired_concurrency == 76
 
     status.get_historical_system_info.return_value = MagicMock(is_system_idle=True)
-    [level] = run_windows(system, clock, 100.0)
-    assert 76 <= level < 152
+    [concurrency] = run_windows(system, clock, 100.0)
+    assert 76 <= concurrency < 152
 
 
 def test_overload_ends_peak_hold(clock: FakeClock) -> None:
@@ -783,7 +786,7 @@ def test_read_window_confirms_raise(clock: FakeClock) -> None:
     assert system.desired_concurrency == 100
 
 
-def test_current_overload_keeps_level() -> None:
+def test_current_overload_keeps_concurrency() -> None:
     """A current overload with no raise to undo is left to the historical signal."""
     status = idle_status()
     status.get_current_system_info.return_value = MagicMock(is_system_idle=False)
@@ -903,13 +906,13 @@ def test_settles_near_peak(clock: FakeClock) -> None:
     """Against a target that slows past its capacity, the system settles near the peak and short of its limit."""
     capacity = 40
     system = make_system(desired=10, max_concurrency=100)
-    peak = max(range(1, 101), key=lambda level: level / task_duration(level, capacity))
+    peak = max(range(1, 101), key=lambda concurrency: concurrency / task_duration(concurrency, capacity))
 
     tail = trailing_batches(run_batches(system, clock, capacity=capacity, minutes=30), minutes=5)
 
     assert system.desired_concurrency < 100
-    assert all(abs(level - peak) <= 0.25 * peak for level, _ in tail)
-    delivered = sum(level for level, _ in tail) / sum(duration for _, duration in tail)
+    assert all(abs(concurrency - peak) <= 0.25 * peak for concurrency, _ in tail)
+    delivered = sum(concurrency for concurrency, _ in tail) / sum(duration for _, duration in tail)
     assert delivered >= 0.9 * peak / task_duration(peak, capacity)
 
 
@@ -919,8 +922,8 @@ def test_holds_at_limit_below_knee(clock: FakeClock) -> None:
 
     tail = trailing_batches(run_batches(system, clock, capacity=1000, minutes=30), minutes=5)
 
-    levels = [level for level, _ in tail]
-    assert levels.count(100) >= 0.75 * len(levels)
+    concurrencies = [concurrency for concurrency, _ in tail]
+    assert concurrencies.count(100) >= 0.75 * len(concurrencies)
 
 
 def test_emits_experimental_warning() -> None:
@@ -950,7 +953,7 @@ def test_shared_mode_keeps_no_counts() -> None:
         system.register_task_end(FIRST, '1')
         system.register_task_end(SECOND, '1')
 
-    assert not system._in_flight
+    assert not system._consumer_concurrency
 
 
 def test_consumer_gets_own_controller() -> None:
@@ -961,11 +964,12 @@ def test_consumer_gets_own_controller() -> None:
         system.has_capacity_for_task(FIRST)
         system.has_capacity_for_task(SECOND)
 
-    assert {key: controller.level for key, controller in system._controllers.items()} == {'first': 20, 'second': 20}
+    desired = {key: controller.desired_concurrency for key, controller in system._controllers.items()}
+    assert desired == {'first': 20, 'second': 20}
     assert system.desired_concurrency == 40
 
 
-def test_capacity_follows_own_level() -> None:
+def test_capacity_follows_own_concurrency() -> None:
     """A consumer at its own level is refused while another one still gets capacity."""
     system = make_system(desired=2, per_consumer=True)
 
@@ -1028,7 +1032,7 @@ def test_equal_consumers_kept_apart() -> None:
         system.register_task_end(second, '0')
 
     assert list(system._controllers) == ['shared']
-    assert system._in_flight['shared'] == 0
+    assert system._consumer_concurrency['shared'] == 0
 
 
 def test_overload_keeps_own_minimum() -> None:
@@ -1085,7 +1089,7 @@ def test_newcomer_cuts_shares_at_once() -> None:
         system.has_capacity_for_task(FIRST)
         system.has_capacity_for_task(SECOND)
 
-    assert [controller.level for controller in system._controllers.values()] == [15, 15]
+    assert [controller.desired_concurrency for controller in system._controllers.values()] == [15, 15]
 
 
 @pytest.mark.parametrize(
@@ -1095,7 +1099,7 @@ def test_newcomer_cuts_shares_at_once() -> None:
         pytest.param(True, id='per consumer'),
     ],
 )
-def test_lower_max_cuts_level_at_once(per_consumer: bool) -> None:  # noqa: FBT001
+def test_lower_max_cuts_concurrency_at_once(per_consumer: bool) -> None:  # noqa: FBT001
     """Lowering `max_concurrency` while the system runs cuts the level right away."""
     system = make_system(desired=20, max_concurrency=30, per_consumer=per_consumer)
 
@@ -1114,7 +1118,7 @@ def test_lower_max_cuts_level_at_once(per_consumer: bool) -> None:  # noqa: FBT0
         pytest.param(True, id='per consumer'),
     ],
 )
-def test_higher_min_lifts_level_at_once(per_consumer: bool) -> None:  # noqa: FBT001
+def test_higher_min_lifts_concurrency_at_once(per_consumer: bool) -> None:  # noqa: FBT001
     """Raising `min_concurrency` while the system runs lifts the level right away."""
     system = make_system(desired=20, max_concurrency=30, per_consumer=per_consumer)
 
@@ -1196,13 +1200,13 @@ def test_share_cut_drops_raise() -> None:
         system.has_capacity_for_task(FIRST)
     controller = system._controllers[FIRST.id]
 
-    with patch.object(controller, '_level_before_raise', 15):
+    with patch.object(controller, '_concurrency_before_raise', 15):
         controller.limit_to(10)
 
-        assert (controller.level, controller._level_before_raise) == (10, None)
+        assert (controller.desired_concurrency, controller._concurrency_before_raise) == (10, None)
 
 
-def test_levels_in_budget_after_tick() -> None:
+def test_concurrency_in_budget_after_tick() -> None:
     """Controllers that move up within a tick are cut back to the shared budget before anyone books."""
     system = make_system(desired=30, max_concurrency=60, per_consumer=True)
 
@@ -1211,7 +1215,7 @@ def test_levels_in_budget_after_tick() -> None:
         system.has_capacity_for_task(SECOND)
 
     def climb(controller: _ThroughputController) -> None:
-        controller.level *= 2
+        controller.desired_concurrency *= 2
 
     with (
         patch.object(_ThroughputController, 'tick', autospec=True, side_effect=climb),
@@ -1259,7 +1263,7 @@ def test_undo_stays_above_raised_min(clock: FakeClock) -> None:
     system._autoscale()
 
     assert system.desired_concurrency == 15
-    assert system._controllers[_SHARED]._level_before_raise is None
+    assert system._controllers[_SHARED]._concurrency_before_raise is None
 
 
 def test_newcomer_starts_inside_bounds() -> None:
@@ -1271,4 +1275,4 @@ def test_newcomer_starts_inside_bounds() -> None:
         system.has_capacity_for_task(FIRST)
     controller = system._controllers[FIRST.id]
 
-    assert (controller.level, controller._level_before_raise) == (10, None)
+    assert (controller.desired_concurrency, controller._concurrency_before_raise) == (10, None)
