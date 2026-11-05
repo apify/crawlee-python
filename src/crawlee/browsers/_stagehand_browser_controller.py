@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
+from browserforge.injectors.utils import only_injectable_headers
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
@@ -16,7 +17,7 @@ from crawlee.fingerprint_suite._header_generator import fingerprint_browser_type
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from playwright.async_api import Browser, BrowserContext, Playwright
+    from playwright.async_api import Browser, BrowserContext, Page, Playwright
     from stagehand import AsyncSession, AsyncStagehand
 
     from crawlee.browsers._stagehand_types import StagehandOptions
@@ -68,6 +69,7 @@ class StagehandBrowserController(BrowserController):
         self._session: AsyncSession | None = None
         self._browser: Browser | None = None
         self._browser_context: BrowserContext | None = None
+        self._context_headers: dict[str, str] = {}
         self._context_creation_lock = Lock()
 
         self._pages = list[StagehandPage]()
@@ -171,6 +173,11 @@ class StagehandBrowserController(BrowserController):
             self._opening_pages_count -= 1
 
         return page
+
+    @override
+    def get_context_headers(self, page: Page) -> dict[str, str]:
+        # All pages share the single context of the Stagehand session.
+        return dict(self._context_headers)
 
     @override
     async def close(self, *, force: bool = False) -> None:
@@ -293,6 +300,8 @@ class StagehandBrowserController(BrowserController):
         context = self._browser.contexts[0]
 
         await context.set_extra_http_headers(extra_http_headers)
+        # Chromium sets request-dependent headers like `Accept` per request, ignoring the context's values.
+        self._context_headers = only_injectable_headers(extra_http_headers, self.browser_type)
 
         self._session = session
 

@@ -288,6 +288,28 @@ async def test_adaptive_crawling_pre_nav_change_to_context(test_urls: list[str])
     assert user_data_in_handler == ['pw', 'bs']
 
 
+async def test_adaptive_crawling_browser_headers_not_used_by_static_crawl(test_urls: list[str]) -> None:
+    """Headers of the browser context are shown to the browser sub-crawl only, not to the static one."""
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(),
+    )
+    headers_by_sub_crawler = dict[str, dict[str, str]]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        try:
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            sub_crawler = 'pw'
+        except AdaptiveContextError:
+            sub_crawler = 'static'
+        headers_by_sub_crawler[sub_crawler] = dict(context.request.headers)
+
+    await crawler.run(test_urls[:1])
+
+    assert 'user-agent' in headers_by_sub_crawler['pw']
+    assert headers_by_sub_crawler['static'] == {}
+
+
 async def test_playwright_only_pre_navigation_hook(test_urls: list[str]) -> None:
     """Test that hook can be registered for playwright only sub crawler.
 

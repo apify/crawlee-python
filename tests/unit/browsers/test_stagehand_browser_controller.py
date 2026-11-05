@@ -355,3 +355,17 @@ async def test_fingerprint_headers_set_on_new_page(controller: StagehandBrowserC
     response_json = await response.json()
 
     assert 'Headless' not in response_json['user-agent']
+
+
+async def test_context_headers_match_sent_headers(controller: StagehandBrowserController, server_url: URL) -> None:
+    """`get_context_headers` returns the generated headers that the browser sends."""
+    page = await controller.new_page()
+    response = await page.goto(str(server_url / 'headers'))
+    assert response is not None
+    server_headers = await response.json()
+
+    context_headers = controller.get_context_headers(page)
+
+    assert 'user-agent' in {name.lower() for name in context_headers}
+    for name, value in context_headers.items():
+        assert server_headers[name.lower()] == value
