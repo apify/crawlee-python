@@ -1,0 +1,72 @@
+name: Publish to PyPI
+
+on:
+  # Dispatched from `manual_release_beta.yaml` and `manual_release_stable.yaml` via the `apify/actions/execute-workflow`
+  # action. All releases are published from this single workflow, which is the one registered as the PyPI Trusted
+  # Publisher, so PyPI attests the same provenance for beta and stable releases. It is a standalone workflow, not
+  # a reusable one, because PyPI's Trusted Publishing does not currently support reusable workflows.
+  # See: https://docs.pypi.org/trusted-publishers/troubleshooting/#reusable-workflows-on-github
+  workflow_dispatch:
+    inputs:
+      version_number:
+        description: Version to publish (for a prerelease, the base version the beta number is appended to)
+        required: true
+        type: string
+      ref:
+        description: Git ref to build the package from (branch, tag, or commit SHA)
+        required: true
+        type: string
+      is_prerelease:
+        description: Whether to publish a beta prerelease
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: publish-to-pypi
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  pypi_publish:
+    name: PyPI publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # Required for OIDC authentication.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/crawlee
+    steps:
+      - name: Prepare distribution
+        uses: apify/actions/prepare-pypi-distribution@v1.6.2
+        with:
+          package_name: crawlee
+          is_prerelease: ${{ inputs.is_prerelease && 'yes' || '' }}
+          version_number: ${{ inputs.version_number }}
+          ref: ${{ inputs.ref }}
+
+      - name: Verify built package
+        uses: apify/actions/python-package-check@v1.6.2
+        with:
+          package_name: crawlee
+          dist_dir: dist
+          python_version: "3.14"
+          extras: all
+          smoke_code: |
+            from crawlee.crawlers import (
+                HttpCrawler, BeautifulSoupCrawler, ParselCrawler,
+                PlaywrightCrawler, AdaptivePlaywrightCrawler,
+            )
+            from crawlee.storages import Dataset, KeyValueStore, RequestQueue
+            from crawlee.http_clients import HttpxHttpClient, ImpitHttpClient
+            from crawlee import Request
+            HttpCrawler()
+            BeautifulSoupCrawler()
+            ParselCrawler()
+
+      # Publish the package to PyPI using PyPA official GitHub action with OIDC authentication.
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
