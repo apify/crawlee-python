@@ -4,7 +4,7 @@ import asyncio
 import warnings
 from functools import cached_property
 from http.cookiejar import CookieJar, DefaultCookiePolicy
-from logging import DEBUG, WARNING, getLogger
+from logging import DEBUG, NOTSET, WARNING, getLogger
 from typing import TYPE_CHECKING, Any
 
 import httpx2
@@ -147,9 +147,10 @@ class HttpxHttpClient(HttpClient):
         )
 
         # `httpx2` logs one INFO line per request, which is too noisy for the default log level. Silence it down to
-        # WARNING unless the user has explicitly opted into DEBUG.
+        # WARNING unless the user has explicitly opted into DEBUG, or has set a level on the `httpx2` logger already.
         httpx_logger = getLogger('httpx2')
-        httpx_logger.setLevel(DEBUG if get_configured_log_level() <= DEBUG else WARNING)
+        if httpx_logger.level == NOTSET:
+            httpx_logger.setLevel(DEBUG if get_configured_log_level() <= DEBUG else WARNING)
 
         self._http1 = http1
         self._http2 = http2

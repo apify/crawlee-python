@@ -29,8 +29,24 @@ async def test_transport_kwargs_do_not_reach_the_client(client_kwargs: dict[str,
 def test_silences_httpx_request_logging() -> None:
     """Instantiating the client lowers the noisy per-request `httpx2` INFO logs to WARNING by default."""
     httpx_logger = logging.getLogger('httpx2')
+    original_level = httpx_logger.level
     httpx_logger.setLevel(logging.NOTSET)
 
-    HttpxHttpClient()
+    try:
+        HttpxHttpClient()
+        assert httpx_logger.level == logging.WARNING
+    finally:
+        httpx_logger.setLevel(original_level)
 
-    assert httpx_logger.level == logging.WARNING
+
+def test_keeps_user_set_httpx_log_level() -> None:
+    """Instantiating the client leaves the `httpx2` logger level alone when the application has set one."""
+    httpx_logger = logging.getLogger('httpx2')
+    original_level = httpx_logger.level
+    httpx_logger.setLevel(logging.INFO)
+
+    try:
+        HttpxHttpClient()
+        assert httpx_logger.level == logging.INFO
+    finally:
+        httpx_logger.setLevel(original_level)
