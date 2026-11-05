@@ -27,7 +27,7 @@ The event manager is an async context manager. The crawler enters it when `run()
 
 ## Events
 
-The <ApiLink to="enum/Event">`Event`</ApiLink> enum lists the event names. Each event comes with a payload model:
+The <ApiLink to="class/Event">`Event`</ApiLink> enum lists the event names. Each event comes with a payload model:
 
 - `PERSIST_STATE` carries <ApiLink to="class/EventPersistStateData">`EventPersistStateData`</ApiLink>. It's emitted when the event manager starts, then at every `persist_state_interval`, and one last time when it closes. Its `is_migrating` flag tells whether the process is about to be migrated.
 - `SYSTEM_INFO` carries <ApiLink to="class/EventSystemInfoData">`EventSystemInfoData`</ApiLink> with the CPU usage ratio and the memory used by the current process and its children. The `LocalEventManager` emits it at every `system_info_interval`.
