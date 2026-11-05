@@ -471,7 +471,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """
         return self._is_domain_throttled(self._extract_domain(url))
 
-    def set_crawl_delay(self, url: str, delay_seconds: int) -> None:
+    def set_crawl_delay(self, url: str, delay_seconds: float) -> None:
         """Set the robots.txt crawl-delay for a domain.
 
         The delay is locked once set so robots.txt re-fetches (e.g. after LRU eviction) can't change the in-flight

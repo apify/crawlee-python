@@ -23,11 +23,152 @@
     },
     {
       "type": "category",
+      "label": "Concepts",
+      "collapsed": true,
+      "link": {
+        "type": "generated-index",
+        "title": "Concepts",
+        "description": "Learn how the core components of Crawlee work: crawlers, request routing, storages, sessions, and more.",
+        "slug": "/concepts",
+        "keywords": [
+          "concepts"
+        ]
+      },
+      "items": [
+        {
+          "type": "category",
+          "label": "Fundamentals",
+          "description": "How a crawler processes requests: the architecture, the request object, the crawling context, routing, and error handling.",
+          "collapsed": true,
+          "link": {
+            "type": "generated-index",
+            "title": "Fundamentals",
+            "description": "How a crawler processes requests: the architecture, the request object, the crawling context, routing, and error handling.",
+            "slug": "/concepts/fundamentals"
+          },
+          "items": [
+            "concepts/architecture-overview",
+            "concepts/requests",
+            "concepts/crawling-context",
+            "concepts/request-router",
+            "concepts/error-handling"
+          ]
+        },
+        {
+          "type": "category",
+          "label": "Crawlers",
+          "description": "The crawler classes for HTTP, browser, adaptive, and LLM-based crawling, and when to use each one.",
+          "collapsed": true,
+          "link": {
+            "type": "generated-index",
+            "title": "Crawlers",
+            "description": "The crawler classes for HTTP, browser, adaptive, and LLM-based crawling, and when to use each one.",
+            "slug": "/concepts/crawlers"
+          },
+          "items": [
+            "concepts/http-crawlers",
+            "concepts/playwright-crawler",
+            "concepts/adaptive-playwright-crawler",
+            "concepts/pydantic-ai-crawler",
+            "concepts/stagehand-crawler"
+          ]
+        },
+        {
+          "type": "category",
+          "label": "Storage",
+          "description": "Where crawlers keep data and requests: datasets, key-value stores, request queues, storage backends, and request loaders.",
+          "collapsed": true,
+          "link": {
+            "type": "generated-index",
+            "title": "Storage",
+            "description": "Where crawlers keep data and requests: datasets, key-value stores, request queues, storage backends, and request loaders.",
+            "slug": "/concepts/storage"
+          },
+          "items": [
+            "concepts/storages",
+            "concepts/storage-clients",
+            "concepts/request-loaders"
+          ]
+        },
+        {
+          "type": "category",
+          "label": "HTTP and networking",
+          "description": "How crawlers send requests over the network: HTTP clients, headers, sessions, cookies, and proxies.",
+          "collapsed": true,
+          "link": {
+            "type": "generated-index",
+            "title": "HTTP and networking",
+            "description": "How crawlers send requests over the network: HTTP clients, headers, sessions, cookies, and proxies.",
+            "slug": "/concepts/http-and-networking"
+          },
+          "items": [
+            "concepts/http-clients",
+            "concepts/http-headers",
+            "concepts/session-management",
+            "concepts/cookie-management",
+            "concepts/proxy-management"
+          ]
+        },
+        {
+          "type": "category",
+          "label": "Scaling",
+          "description": "How crawlers adjust concurrency to available resources and limit the request rate per domain.",
+          "collapsed": true,
+          "link": {
+            "type": "generated-index",
+            "title": "Scaling",
+            "description": "How crawlers adjust concurrency to available resources and limit the request rate per domain.",
+            "slug": "/concepts/scaling"
+          },
+          "items": [
+            "concepts/scaling-crawlers",
+            "concepts/request-throttling"
+          ]
+        },
+        {
+          "type": "category",
+          "label": "Runtime",
+          "description": "How to configure a crawler run and observe it through events, statistics, and logs.",
+          "collapsed": true,
+          "link": {
+            "type": "generated-index",
+            "title": "Runtime",
+            "description": "How to configure a crawler run and observe it through events, statistics, and logs.",
+            "slug": "/concepts/runtime"
+          },
+          "items": [
+            "concepts/configuration",
+            "concepts/events",
+            "concepts/statistics",
+            "concepts/logging"
+          ]
+        },
+        {
+          "type": "category",
+          "label": "Advanced",
+          "description": "The service locator and the extension points for plugging your own components into Crawlee.",
+          "collapsed": true,
+          "link": {
+            "type": "generated-index",
+            "title": "Advanced",
+            "description": "The service locator and the extension points for plugging your own components into Crawlee.",
+            "slug": "/concepts/advanced"
+          },
+          "items": [
+            "concepts/service-locator",
+            "concepts/extending-crawlee"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "category",
       "label": "Guides",
       "collapsed": true,
       "link": {
         "type": "generated-index",
         "title": "Guides",
+        "description": "Task-oriented guides for common crawling and scraping scenarios, integrations, and migrations.",
         "slug": "/guides",
         "keywords": [
           "guides"
@@ -36,7 +177,7 @@
       "items": [
         {
           "type": "autogenerated",
-          "dirName": "guides"
+          "dirName": "04_guides"
         }
       ]
     },
@@ -73,25 +214,6 @@
     },
     {
       "type": "category",
-      "label": "Examples",
-      "collapsed": true,
-      "link": {
-        "type": "generated-index",
-        "title": "Examples",
-        "slug": "/examples",
-        "keywords": [
-          "examples"
-        ]
-      },
-      "items": [
-        {
-          "type": "autogenerated",
-          "dirName": "examples"
-        }
-      ]
-    },
-    {
-      "type": "category",
       "label": "Upgrading",
       "collapsed": true,
       "link": {
@@ -105,7 +227,7 @@
       "items": [
         {
           "type": "autogenerated",
-          "dirName": "upgrading"
+          "dirName": "06_upgrading"
         }
       ]
     },

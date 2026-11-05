@@ -1,0 +1,89 @@
+---
+id: requests
+title: Requests
+description: How Crawlee represents a single request, how it carries data between handlers, how it's deduplicated, retried, and tracked through its lifecycle.
+---
+
+import ApiLink from '@site/src/components/ApiLink';
+import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
+
+import LabelAndUserDataExample from '!!raw-loader!roa-loader!./code_examples/requests/label_and_user_data.py';
+import UniqueKeyDeduplicationExample from '!!raw-loader!roa-loader!./code_examples/requests/unique_key_deduplication.py';
+
+A <ApiLink to="class/Request">`Request`</ApiLink> describes one unit of work for a crawler: the URL to fetch, how to fetch it, and any data your code wants to keep with it. Crawlers read requests from a request manager such as a <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, pass each one to a request handler, and record the result back in the queue. The request object travels with the work the whole time, including its retries, so it's the natural place to store anything a later step needs.
+
+## Creating requests
+
+The recommended constructor is <ApiLink to="class/Request#from_url">`Request.from_url`</ApiLink>. It validates the URL (only HTTP and HTTPS are accepted) and computes the unique key used for deduplication. Most methods that accept requests also accept plain URL strings. That includes `crawler.run`, `crawler.add_requests`, and `context.add_requests`. Crawlee turns each string into a request with `Request.from_url(url)` and default options.
+
+The main fields of a request are:
+
+- `url`: the URL to crawl. After the request is processed, `loaded_url` holds the final URL if the server redirected.
+- `method`: the HTTP method, `GET` by default.
+- `headers`: HTTP headers sent with the request, as <ApiLink to="class/HttpHeaders">`HttpHeaders`</ApiLink>. You can pass a plain `dict` to `from_url`.
+- `payload`: the request body as `bytes`. A `str` passed to `from_url` is encoded to bytes.
+- `user_data`: a mutable mapping with your own JSON-serializable data.
+- `label`: a string stored in `user_data` that the router uses to pick a handler.
+
+The `url`, `method`, `payload`, and `unique_key` fields are frozen. To change them, create a new request.
+
+## Labels and user data
+
+The `label` decides which handler processes a request. The <ApiLink to="class/Router">`Router`</ApiLink> looks up a handler registered for the request's label and falls back to the default handler when there's no label or no matching handler. For details, see [Request router](./request-router).
+
+The `user_data` mapping carries data from the handler that created a request to the handler that processes it. It's stored with the request in the queue, so it survives retries and crawler restarts with a persistent storage. Values must be JSON-serializable. Crawlee also keeps its own metadata under the reserved `__crawlee` key of `user_data`, so don't write to that key.
+
+Both `label` and `user_data` can be set on a single request with `from_url`, or on every link enqueued from a page with `context.enqueue_links` and `context.add_requests`. In the following example, the start request carries a `source` value, and the default handler enqueues the links it finds with the `DETAIL` label and extra user data that the detail handler reads.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {LabelAndUserDataExample}
+</RunnableCodeBlock>
+
+## Unique key and deduplication
+
+Every request has a `unique_key`. A request queue stores at most one request per unique key, so adding a request with a key that's already in the queue does nothing. The <ApiLink to="class/ProcessedRequest">`ProcessedRequest`</ApiLink> returned by `add_request` tells you whether that happened through its `was_already_present` field. Deduplication covers handled requests too, so a page that was already crawled isn't crawled again when another page links to it.
+
+By default, `from_url` computes the unique key by normalizing the URL. The normalization lowercases the URL, removes `utm_*` query parameters, sorts the remaining query parameters, removes a trailing slash from the path, and drops the URL fragment. The following options of `from_url` change the computation:
+
+- `keep_url_fragment=True` keeps the fragment, so `/page#a` and `/page#b` become two requests. It's useful for single-page apps that route with fragments.
+- `use_extended_unique_key=True` adds the HTTP method, a hash of the payload, a hash of selected headers (`Accept`, `Accept-Language`, `Authorization`, and `Content-Type`), and the session ID to the key. Use it when requests to the same URL differ only by their body, as with POST APIs.
+- `always_enqueue=True` prepends a random ID to the key, so the request is added even if the same URL is already in the queue. You can't combine it with a custom `unique_key`.
+- `unique_key='...'` sets the key directly and skips the computation.
+
+The next example adds several requests to a queue and prints whether each one was a duplicate, followed by its unique key.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {UniqueKeyDeduplicationExample}
+</RunnableCodeBlock>
+
+The second request is a duplicate of the first one, so the queue ends up with five requests.
+
+## Retries
+
+When a request handler raises an exception, the crawler retries the request. It increments `retry_count` and returns the request to the queue. A request is retried until `retry_count` reaches the crawler's `max_request_retries` option, which defaults to 3. To set a different limit for a single request, pass `max_retries` to `from_url`. A request created with `no_retry=True` isn't retried at all, and neither are requests that failed with an HTTP client error status (4xx), except the status codes that mark a session as blocked (401, 403, and 429 by default), which rotate the session and retry. Session rotations caused by blocking are counted separately and are limited by `max_session_rotations`.
+
+When the retries run out, the crawler calls the failed request handler and marks the request as handled. For error handlers, failed request handlers, and the related options, see [Error handling](./error-handling).
+
+## Crawl depth
+
+The `crawl_depth` property tells how many links away from a start request a request is. Requests you pass to `run` or `add_requests` on the crawler have depth 0. Each request created by `context.enqueue_links` or `context.add_requests` gets the depth of the current request plus one.
+
+The crawler's `max_crawl_depth` option limits how deep the crawl goes. Requests at the maximum depth are still processed, but links found on their pages aren't enqueued. By default, the depth isn't limited.
+
+## Binding to a session
+
+Pass `session_id` to `from_url` to bind a request to one session from the crawler's <ApiLink to="class/SessionPool">`SessionPool`</ApiLink>. The crawler then processes the request with that session only. If the session isn't available anymore, the request fails with a <ApiLink to="class/RequestCollisionError">`RequestCollisionError`</ApiLink> and isn't retried. For details on sessions, see [Session management](./session-management).
+
+## Request lifecycle
+
+Crawlee tracks the progress of a request in its `state` property, a `RequestState` value. A request that's processed without errors moves through the following states:
+
+1. `UNPROCESSED`: the request was created and waits in the queue.
+2. `BEFORE_NAV`: the crawler took the request and runs pre-navigation hooks.
+3. `AFTER_NAV`: the HTTP response or browser page is ready. Crawlers that don't navigate, such as <ApiLink to="class/BasicCrawler">`BasicCrawler`</ApiLink>, skip this state.
+4. `REQUEST_HANDLER`: the router runs your request handler.
+5. `DONE`: the handler finished, and the request is marked as handled.
+
+When an error occurs, the request switches to `ERROR_HANDLER` while the crawler runs the error handler and decides whether to retry. A retried request goes back to the queue and starts again from `BEFORE_NAV`. A request that runs out of retries ends in the `ERROR` state. Requests skipped because robots.txt disallows them end in the `SKIPPED` state. For details, see [Respecting robots.txt](../guides/respect-robots-txt-file).
+
+Failed and skipped requests are marked as handled too, so the queue doesn't hand them out again. The `handled_at` field holds the time a request was marked as handled, and `was_already_handled` tells whether it's set.
