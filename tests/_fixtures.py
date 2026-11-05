@@ -5,21 +5,25 @@ from __future__ import annotations
 import logging
 import os
 import warnings
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import Mock
 
 import pytest
+from curl_cffi import CurlHttpVersion
 
 from crawlee import service_locator
 from crawlee._utils.public_suffix import PUBLIC_SUFFIX_LIST_SNAPSHOT
 from crawlee.crawlers import BasicCrawler
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_network
+from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient, ImpitHttpClient
 from crawlee.statistics import Statistics
 from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable, Iterator
     from pathlib import Path
+
+    from crawlee.http_clients._base import HttpClient
 
 
 @pytest.fixture(autouse=True)
@@ -114,3 +118,26 @@ async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
     kvs = await KeyValueStore.open()
     yield kvs
     await kvs.drop()
+
+
+@pytest.fixture(
+    params=[
+        pytest.param('httpx', id='httpx'),
+        pytest.param('impit', id='impit'),
+        pytest.param('curl', id='curl'),
+    ]
+)
+async def http_client(request: pytest.FixtureRequest) -> AsyncGenerator[HttpClient, None]:
+    class_client: type[HttpClient]
+    kwargs: dict[str, Any]
+    if request.param == 'curl':
+        class_client = CurlImpersonateHttpClient
+        kwargs = {'http_version': CurlHttpVersion.V1_1}
+    elif request.param == 'impit':
+        class_client = ImpitHttpClient
+        kwargs = {'http3': False}
+    else:
+        class_client = HttpxHttpClient
+        kwargs = {'http2': True}
+    async with class_client(**kwargs) as client:
+        yield client

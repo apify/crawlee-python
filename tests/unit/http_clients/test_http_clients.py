@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import importlib
 import sys
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
+
+if TYPE_CHECKING:
+    from crawlee.http_clients import HttpClient
 
 
 @pytest.mark.parametrize(
@@ -26,3 +31,14 @@ def test_import_error_handled(optional_module_name: str, import_path: str) -> No
                 sys.modules.pop(mod_name, None)
         with pytest.raises(ImportError):
             importlib.import_module(import_path)
+
+
+async def test_send_request_rejects_non_http_scheme(http_client: HttpClient) -> None:
+    with pytest.raises(ValidationError):
+        await http_client.send_request('gopher://127.0.0.1:6379/_PING')
+
+
+async def test_stream_rejects_non_http_scheme(http_client: HttpClient) -> None:
+    with pytest.raises(ValidationError):
+        async with http_client.stream('gopher://127.0.0.1:6379/_PING'):
+            pass

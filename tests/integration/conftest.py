@@ -1,20 +1,19 @@
 from __future__ import annotations
 
 import socket
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pytest
-from curl_cffi import CurlHttpVersion
 from proxy import Proxy
 from uvicorn.config import Config
 
-from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient, ImpitHttpClient
 from crawlee.proxy_configuration import ProxyInfo
 from tests._fixtures import (  # noqa: F401
     _isolate_test_environment,
     _offline_public_suffix_list,
     _set_crawler_log_level,
     header_network,
+    http_client,
     key_value_store,
     prepare_test_env,
     suppress_user_warning,
@@ -22,11 +21,9 @@ from tests._fixtures import (  # noqa: F401
 from tests.integration.server import TestServer, app, no_robots_app, serve_in_thread
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Callable, Iterator
+    from collections.abc import Callable, Iterator
 
     from yarl import URL
-
-    from crawlee.http_clients._base import HttpClient
 
 
 def _proxy_info(port: int) -> ProxyInfo:
@@ -162,26 +159,3 @@ def redirect_http_server(unused_tcp_port_factory: Callable[[], int]) -> Iterator
 def redirect_server_url(redirect_http_server: TestServer) -> URL:
     """Provide the base URL of the test server."""
     return redirect_http_server.url
-
-
-@pytest.fixture(
-    params=[
-        pytest.param('httpx', id='httpx'),
-        pytest.param('impit', id='impit'),
-        pytest.param('curl', id='curl'),
-    ]
-)
-async def http_client(request: pytest.FixtureRequest) -> AsyncGenerator[HttpClient, None]:
-    class_client: type[HttpClient]
-    kwargs: dict[str, Any]
-    if request.param == 'curl':
-        class_client = CurlImpersonateHttpClient
-        kwargs = {'http_version': CurlHttpVersion.V1_1}
-    elif request.param == 'impit':
-        class_client = ImpitHttpClient
-        kwargs = {'http3': False}
-    else:
-        class_client = HttpxHttpClient
-        kwargs = {'http2': True}
-    async with class_client(**kwargs) as client:
-        yield client
