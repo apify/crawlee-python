@@ -300,13 +300,13 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
 
         self._raise_if_inactive()
         self._seen[consumer.id] = True
-        concurrency = self._consumer_concurrency[consumer.id]
-        if concurrency >= self._controller_for(consumer.id).desired_concurrency:
+        consumer_concurrency = self._consumer_concurrency[consumer.id]
+        if consumer_concurrency >= self._controller_for(consumer.id).desired_concurrency:
             return False
 
         # Below its own minimum a consumer keeps going even on an overloaded machine, as a lone crawler would. Above
         # it, the tasks a share cut left running may still fill the budget, so the system total is checked too.
-        if concurrency < self._min_concurrency:
+        if consumer_concurrency < self._min_concurrency:
             return True
         return self._current_concurrency < self._max_concurrency and self._get_current_load().is_system_idle
 
