@@ -1524,7 +1524,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         request_manager = await self.get_request_manager()
         readiness = await request_manager.check_readiness()
 
-        # The pool polls on its own anyway, so the wake-up only resumes a paced crawl on the manager's clock.
+        # Without a wake-up, a paced crawl would resume only at the pool's next poll.
         if readiness.status == 'waiting' and readiness.ready_at is not None:
             self._run.schedule_wake(readiness.ready_at)
 

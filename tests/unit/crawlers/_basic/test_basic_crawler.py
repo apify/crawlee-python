@@ -3086,16 +3086,14 @@ async def test_run_cancels_pending_wake() -> None:
     """A wake-up still pending when the run ends is dropped, so it never fires."""
     queue = await RequestQueue.open()
     crawler = BasicCrawler(request_manager=queue)
-    waiting = WaitingStatus(ready_at=datetime.now(UTC) + timedelta(milliseconds=300))
+    waiting = WaitingStatus(ready_at=datetime.now(UTC) + timedelta(hours=1))
 
     with patch.object(queue, 'check_readiness', side_effect=chain([waiting], repeat(FinishedStatus()))):
         await crawler.run()
 
-    # Patched only after the run, so that only a wake-up that outlives the run is caught.
-    with patch.object(AutoscaledPool, 'notify') as notify:
-        await asyncio.sleep(0.6)
-
-    notify.assert_not_called()
+    wake_timer = crawler._run._wake_timer
+    assert wake_timer is not None
+    assert wake_timer.cancelled()
 
 
 THROTTLED_URL = 'https://throttled.placeholder.com/page'

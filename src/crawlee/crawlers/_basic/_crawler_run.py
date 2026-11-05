@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Generic
 
 from typing_extensions import TypeVar
@@ -25,6 +25,11 @@ class CrawlerRun(Generic[TStatisticsState]):
 
     The crawler builds a fresh instance for every run, so nothing has to be reset between runs. A finished run stays
     readable as the history of the last crawl, so liveness is asked about explicitly with `is_live`.
+    """
+
+    _MIN_WAKE_DELAY = timedelta(milliseconds=10)
+    """The shortest delay of a wake-up. A source that keeps reporting waiting past its `ready_at` would otherwise be
+    re-checked in a busy loop.
     """
 
     def __init__(
@@ -74,14 +79,17 @@ class CrawlerRun(Generic[TStatisticsState]):
         await self._autoscaled_pool.run()
 
     def schedule_wake(self, ready_at: datetime) -> None:
-        """Wake the task loop at `ready_at`, unless an earlier wake-up is already scheduled."""
+        """Wake the task loop at `ready_at`, unless an earlier wake-up is already scheduled.
+
+        The wake-up comes no sooner than `_MIN_WAKE_DELAY` from now.
+        """
         if self._finished or (self._wake_at is not None and self._wake_at <= ready_at):
             return
 
         if self._wake_timer is not None:
             self._wake_timer.cancel()
 
-        delay = max(0.0, (ready_at - datetime.now(UTC)).total_seconds())
+        delay = max(self._MIN_WAKE_DELAY, ready_at - datetime.now(UTC)).total_seconds()
         self._wake_at = ready_at
         self._wake_timer = asyncio.get_running_loop().call_later(delay, self._wake)
 
