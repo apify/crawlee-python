@@ -17,6 +17,7 @@ from crawlee.autoscaling._throughput_concurrency_system import (
     _MAX_SETTLE_TICKS,
     _SHARED,
     _Cohort,
+    _Member,
     _ThroughputController,
 )
 
@@ -106,9 +107,9 @@ def make_cohort(finished: Iterable[float] = (), *, running: Iterable[float] = ()
     """Build a closed window with `finished` durations and members that have run for `running` seconds at time zero."""
     cohort = _Cohort()
     for duration in finished:
-        cohort.leave(cohort.join(0.0, concurrency), duration)
+        cohort.join(_Member(started_at=0.0, duration=duration), concurrency)
     for age in running:
-        cohort.join(-age, concurrency)
+        cohort.join(_Member(started_at=-age), concurrency)
     return cohort
 
 

@@ -5,6 +5,7 @@ import statistics
 import time
 import warnings
 from collections import Counter, deque
+from dataclasses import dataclass
 from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING, Literal
@@ -57,28 +58,51 @@ _Phase = Literal['centre', 'climb', 'high', 'low']
 _Stage = Literal['settle', 'enrol', 'wait']
 
 
+@dataclass(slots=True)
+class _Member:
+    """One task: when it started and, once it has finished, how long it ran."""
+
+    started_at: float
+    duration: float | None = None
+    """Seconds the task ran, at least `_MIN_DURATION`, or `None` while it is still running."""
+
+    def finish(self, now: float) -> float:
+        """Record the task as finished at `now` and return its duration."""
+        self.duration = max(now - self.started_at, _MIN_DURATION)
+        return self.duration
+
+
 class _Cohort:
     """The tasks that started while one window was enrolling, and what has become of them."""
 
     def __init__(self) -> None:
-        self.size = 0
+        self.members = list[_Member]()
         self.concurrency_sum = 0
-        self.running = dict[int, float]()
-        self.finished = list[float]()
-        self.finished_total = 0.0
 
-    def join(self, started_at: float, concurrency: int) -> int:
-        """Enrol a task that started at `started_at` among `concurrency` running tasks, and return its member number."""
-        self.size += 1
-        self.running[self.size] = started_at
+    def join(self, member: _Member, concurrency: int) -> None:
+        """Enrol a task that started among `concurrency` running tasks."""
+        self.members.append(member)
         self.concurrency_sum += concurrency
-        return self.size
 
-    def leave(self, member: int, elapsed: float) -> None:
-        """Record that a member finished after `elapsed` seconds."""
-        del self.running[member]
-        self.finished.append(elapsed)
-        self.finished_total += elapsed
+    @property
+    def size(self) -> int:
+        """Members enrolled, finished or not."""
+        return len(self.members)
+
+    @property
+    def running(self) -> list[float]:
+        """Start times of the members still running."""
+        return [member.started_at for member in self.members if member.duration is None]
+
+    @property
+    def finished(self) -> list[float]:
+        """Durations of the members that have finished."""
+        return [member.duration for member in self.members if member.duration is not None]
+
+    @property
+    def finished_total(self) -> float:
+        """Seconds the finished members ran, together."""
+        return sum(self.finished)
 
     @property
     def concurrency(self) -> float:
@@ -95,7 +119,7 @@ class _Cohort:
         if (upper := self.median_ceiling()) is None:
             return None
 
-        if self.running and now - max(self.running.values()) < upper:
+        if self.running and now - max(self.running) < upper:
             return None
 
         return upper if self.size % 2 else math.sqrt(sorted(self.finished)[self.size // 2 - 1] * upper)
@@ -233,9 +257,9 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
         self._seen = TTLCache[str, bool](
             maxsize=math.inf, ttl=_CONSUMER_TTL_TICKS * autoscale_interval.total_seconds(), timer=time.monotonic
         )
-        # When each booked task started, and the controller, window and member number it joined. Keyed by the consumer
-        # object rather than its id, since crawlers sharing an id number their tasks alike.
-        self._started = dict[tuple[int, str], tuple[_ThroughputController, float, _Cohort | None, int | None]]()
+        # The controller each booked task counts toward, and the task's record. Keyed by the consumer object rather
+        # than its id, since crawlers sharing an id number their tasks alike.
+        self._started = dict[tuple[int, str], tuple[_ThroughputController, _Member]]()
 
         if not per_consumer:
             self._controllers[_SHARED] = self._new_controller(lambda: self.current_concurrency)
@@ -294,7 +318,7 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
         if self._per_consumer:
             self._in_flight[consumer.id] += 1
         controller = self._controller_for(consumer.id)
-        self._started[id(consumer), task_id] = (controller, *controller.task_started())
+        self._started[id(consumer), task_id] = (controller, controller.task_started())
         return True
 
     @override
@@ -307,8 +331,8 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
 
         if self._per_consumer:
             self._in_flight[consumer.id] -= 1
-        controller, started_at, cohort, member = started
-        controller.task_ended(started_at, cohort, member)
+        controller, member = started
+        controller.task_ended(member)
 
     @override
     def _clamp_desired_concurrency(self) -> None:
@@ -454,19 +478,16 @@ class _ThroughputController:
         self._window = None
         self._stage, self._stage_since = 'settle', time.monotonic()
 
-    def task_started(self) -> tuple[float, _Cohort | None, int | None]:
-        """Enrol a task that starts now, and return when it started and the window and member number it joined."""
-        started_at = time.monotonic()
-        cohort = self._enrolling
-        member = cohort.join(started_at, self._current_concurrency()) if cohort is not None else None
-        return started_at, cohort, member
+    def task_started(self) -> _Member:
+        """Record a task that starts now, enrolling it in the window if one is enrolling, and return its record."""
+        member = _Member(started_at=time.monotonic())
+        if self._enrolling is not None:
+            self._enrolling.join(member, self._current_concurrency())
+        return member
 
-    def task_ended(self, started_at: float, cohort: _Cohort | None, member: int | None) -> None:
-        """Record a task that started at `started_at` as finished now."""
-        elapsed = max(time.monotonic() - started_at, _MIN_DURATION)
-        if cohort is not None and member is not None:
-            cohort.leave(member, elapsed)
-        self._durations.append(elapsed)
+    def task_ended(self, member: _Member) -> None:
+        """Record a task as finished now."""
+        self._durations.append(member.finish(time.monotonic()))
 
     @property
     def _dead_time(self) -> float | None:
@@ -560,7 +581,7 @@ class _ThroughputController:
         required = self._required(cohort)
         count, occupied = len(cohort.finished), cohort.finished_total
         bound = 0.0
-        for age in sorted(now - started for started in cohort.running.values()):
+        for age in sorted(now - started for started in cohort.running):
             count += 1
             occupied += age
             if count >= required:
