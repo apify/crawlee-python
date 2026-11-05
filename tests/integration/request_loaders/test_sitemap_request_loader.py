@@ -1,13 +1,10 @@
+from __future__ import annotations
+
 import base64
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-from yarl import URL
-
-from crawlee import RequestOptions, RequestTransformAction
-from crawlee.http_clients._base import HttpClient
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
-from crawlee.storages import KeyValueStore
 from tests._utils import (
     get_basic_results,
     get_basic_sitemap,
@@ -15,7 +12,12 @@ from tests._utils import (
 )
 
 if TYPE_CHECKING:
+    from yarl import URL
+
+    from crawlee import RequestOptions, RequestTransformAction
     from crawlee._types import JsonSerializable
+    from crawlee.http_clients._base import HttpClient
+    from crawlee.storages import KeyValueStore
 
 
 def encode_base64(data: bytes) -> str:

@@ -1,19 +1,24 @@
+from __future__ import annotations
+
 import base64
 import gzip
 from datetime import datetime
-
-from yarl import URL
+from typing import TYPE_CHECKING
 
 from crawlee._utils.sitemap import (
     Sitemap,
     SitemapUrl,
     parse_sitemap,
 )
-from crawlee.http_clients._base import HttpClient
 from tests._utils import (
     get_basic_results,
     get_basic_sitemap,
 )
+
+if TYPE_CHECKING:
+    from yarl import URL
+
+    from crawlee.http_clients._base import HttpClient
 
 
 def compress_gzip(data: str) -> bytes:

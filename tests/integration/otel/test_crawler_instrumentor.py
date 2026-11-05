@@ -1,18 +1,23 @@
+from __future__ import annotations
+
 import io
 import json
 import re
+from typing import TYPE_CHECKING
 from unittest import mock
 
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
 from opentelemetry.trace import set_tracer_provider
-from yarl import URL
 
 from crawlee import ConcurrencySettings
 from crawlee.crawlers import ParselCrawler
 from crawlee.otel.crawler_instrumentor import CrawlerInstrumentor
 from crawlee.storages import Dataset
+
+if TYPE_CHECKING:
+    from yarl import URL
 
 
 async def test_crawler_instrumentor_capability(server_url: URL) -> None:
