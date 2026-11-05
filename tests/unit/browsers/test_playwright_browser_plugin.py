@@ -20,7 +20,7 @@ async def test_initial_state() -> None:
 
 
 async def test_executable_path_with_chrome_browser_type() -> None:
-    """An `executable_path` combined with `browser_type='chrome'` is kept and launches through Chromium."""
+    """An `executable_path` with `browser_type='chrome'` is kept, and the plugin runs Chromium on the Chrome channel."""
     plugin = PlaywrightBrowserPlugin(
         browser_type='chrome',
         browser_launch_options={'executable_path': '/path/to/chrome'},
