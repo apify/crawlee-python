@@ -474,7 +474,7 @@ class _ThroughputController:
 
     def restart(self) -> None:
         """Settle the level from now, dropping any window left open."""
-        self._stop_enrolling()
+        self._enrolling = None
         self._window = None
         self._stage, self._stage_since = 'settle', time.monotonic()
 
@@ -507,9 +507,6 @@ class _ThroughputController:
 
     def _open_window(self) -> None:
         self._window = self._enrolling = _Cohort()
-
-    def _stop_enrolling(self) -> None:
-        self._enrolling = None
 
     def _ceiling(self, bound: int | None = None) -> int:
         bound = self.bound if bound is None else bound
@@ -618,7 +615,7 @@ class _ThroughputController:
 
     def _on_overload(self, now: float, *, cut_to: int | None = None) -> None:
         """Cut to `cut_to` or by the parent's step, cap this controller at the cut, and restart the cycle there."""
-        self._stop_enrolling()
+        self._enrolling = None
         self._window = None
         self._level_before_raise = None
         if cut_to is not None:
@@ -676,7 +673,7 @@ class _ThroughputController:
             return
 
         if elapsed >= span and (size >= self._system.min_members or elapsed >= _MAX_ENROL_SPANS * span):
-            self._stop_enrolling()
+            self._enrolling = None
             self._stage, self._stage_since = 'wait', now
 
     def _wait(self, now: float) -> None:
