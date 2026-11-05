@@ -127,8 +127,7 @@ class RobotsTxtFile:
             user_agent: The user-agent string to check the crawl delay for. Defaults to '*' which matches any
                 user-agent.
         """
-        crawl_delay = self._robots.crawl_delay(user_agent)
-        return float(crawl_delay) if crawl_delay is not None else None
+        return self._robots.crawl_delay(user_agent)
 
     async def parse_sitemaps(self, *, enqueue_strategy: EnqueueStrategy) -> Sitemap:
         """Parse the sitemaps from the robots.txt file and return a `Sitemap` instance.
