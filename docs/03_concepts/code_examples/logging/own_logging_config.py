@@ -12,7 +12,7 @@ async def main() -> None:
         format='%(asctime)s %(levelname)s %(name)s: %(message)s',
     )
 
-    # Show the request lifecycle of the crawlers only.
+    # DEBUG for the crawlers only. The rest of Crawlee stays at INFO.
     logging.getLogger('crawlee.crawlers').setLevel(logging.DEBUG)
 
     crawler = ParselCrawler(max_requests_per_crawl=5)

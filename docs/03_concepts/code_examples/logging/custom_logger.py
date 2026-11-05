@@ -13,7 +13,7 @@ async def main() -> None:
 
     @products_crawler.router.default_handler
     async def products_handler(context: ParselCrawlingContext) -> None:
-        # The `context.log` is the crawler's logger, `shop.products`.
+        # `context.log` is the crawler's logger, `shop.products`.
         context.log.info('Product page %s', context.request.url)
 
     @reviews_crawler.router.default_handler
