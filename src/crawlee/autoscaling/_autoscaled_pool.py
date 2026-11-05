@@ -178,6 +178,7 @@ class AutoscaledPool:
     def resume(self) -> None:
         """Resume a paused autoscaled pool so that it continues starting new tasks."""
         self._is_paused = False
+        self.notify()
 
     def notify(self) -> None:
         """Look for a ready task at once, instead of waiting for the next periodic check."""
