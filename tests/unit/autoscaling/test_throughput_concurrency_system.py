@@ -878,7 +878,7 @@ def test_task_end_records_duration(clock: FakeClock) -> None:
         members.finish(1)
 
     assert window is not None
-    assert (window.size, len(window.finished), window.finished_total) == (1, 1, 3.0)
+    assert (window.size, len(window.finished_durations), window.finished_total) == (1, 1, 3.0)
     assert list(system._controllers[_SHARED]._durations) == [3.0]
 
 

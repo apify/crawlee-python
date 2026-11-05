@@ -90,19 +90,19 @@ class _Cohort:
         return len(self.members)
 
     @property
-    def running(self) -> list[float]:
+    def running_start_times(self) -> list[float]:
         """Start times of the members still running."""
         return [member.started_at for member in self.members if member.duration is None]
 
     @property
-    def finished(self) -> list[float]:
+    def finished_durations(self) -> list[float]:
         """Durations of the members that have finished."""
         return [member.duration for member in self.members if member.duration is not None]
 
     @property
     def finished_total(self) -> float:
         """Seconds the finished members ran, together."""
-        return sum(self.finished)
+        return sum(self.finished_durations)
 
     @property
     def concurrency(self) -> float:
@@ -112,17 +112,17 @@ class _Cohort:
     def median_ceiling(self) -> float | None:
         """Get the finished members' duration at the median's rank, which the median can only fall below."""
         rank = self.size // 2 + 1
-        return sorted(self.finished)[rank - 1] if len(self.finished) >= rank else None
+        return sorted(self.finished_durations)[rank - 1] if len(self.finished_durations) >= rank else None
 
     def median(self, now: float) -> float | None:
         """Get the median duration once no member still running can change it, else `None`."""
         if (upper := self.median_ceiling()) is None:
             return None
 
-        if self.running and now - max(self.running) < upper:
+        if self.running_start_times and now - max(self.running_start_times) < upper:
             return None
 
-        return upper if self.size % 2 else math.sqrt(sorted(self.finished)[self.size // 2 - 1] * upper)
+        return upper if self.size % 2 else math.sqrt(sorted(self.finished_durations)[self.size // 2 - 1] * upper)
 
 
 @docs_group('Autoscaling')
@@ -554,13 +554,13 @@ class _ThroughputController:
     @staticmethod
     def _rate(cohort: _Cohort) -> float:
         """Get tasks per second by Little's law, over the members that have finished."""
-        return cohort.concurrency * len(cohort.finished) / cohort.finished_total
+        return cohort.concurrency * len(cohort.finished_durations) / cohort.finished_total
 
     def _required(self, cohort: _Cohort) -> int:
         return max(1, math.floor(self._system.finished_fraction * cohort.size))
 
     def _finished(self, cohort: _Cohort) -> bool:
-        return len(cohort.finished) >= self._required(cohort)
+        return len(cohort.finished_durations) >= self._required(cohort)
 
     def _losing_bound(self, cohort: _Cohort, now: float) -> float | None:
         """Get the best rate the window can still be read at, if even that already loses its comparison."""
@@ -579,9 +579,9 @@ class _ThroughputController:
         # The members still needed for a reading, and any more that would raise the rate, finish now at their ages,
         # youngest first. The rate is read over finished members only, so a slow tail left running cannot lower it.
         required = self._required(cohort)
-        count, occupied = len(cohort.finished), cohort.finished_total
+        count, occupied = len(cohort.finished_durations), cohort.finished_total
         bound = 0.0
-        for age in sorted(now - started for started in cohort.running):
+        for age in sorted(now - started for started in cohort.running_start_times):
             count += 1
             occupied += age
             if count >= required:
