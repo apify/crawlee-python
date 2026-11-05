@@ -448,6 +448,8 @@ async def test_persist_state_without_persistence_does_nothing() -> None:
 async def test_persist_state_times_out(monkeypatch: pytest.MonkeyPatch) -> None:
     """A persist that takes longer than `persistence_timeout` raises `TimeoutError`."""
     kvs = await KeyValueStore.open()
+    # The short timeout covers the load in `initialize` too, so the real read must not run under it.
+    monkeypatch.setattr(kvs, 'get_value', AsyncMock(return_value=None))
     recoverable_state = _build_state(persistence_timeout=timedelta(milliseconds=50))
     await recoverable_state.initialize()
 
