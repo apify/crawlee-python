@@ -20,19 +20,27 @@ uv run poe install-dev
 
 ## Code checking
 
-To run all code checks (lint, type check, and unit tests), run:
+To run all code checks (lint, type check, unit tests, and integration tests), run:
 
 ```sh
 uv run poe check-code
 ```
 
-We use [ruff](https://docs.astral.sh/ruff/) for linting and formatting, [ty](https://docs.astral.sh/ty/) for type checking, and [pytest](https://docs.pytest.org/) for tests. All of them are configured in `pyproject.toml`, and each has its own task (`lint`, `format`, `type-check`, `unit-tests`).
+We use [ruff](https://docs.astral.sh/ruff/) for linting and formatting, [ty](https://docs.astral.sh/ty/) for type checking, and [pytest](https://docs.pytest.org/) for tests. All of them are configured in `pyproject.toml`, and each has its own task (`lint`, `format`, `type-check`, `unit-tests`, `integration-tests`).
 
 ## Tests
 
+See [`tests/README.md`](tests/README.md) for how to handle flaky tests.
+
 ### Unit tests
 
-Unit tests live in `tests/unit`. Run them with `uv run poe unit-tests`, or a single test with `uv run pytest tests/unit/<path>.py::<test_name>`. See [`tests/unit/README.md`](tests/unit/README.md) for how to handle flaky tests.
+Unit tests live in `tests/unit` and run without a network or a browser. Run them with `uv run poe unit-tests`, or a single test with `uv run pytest tests/unit/<path>.py::<test_name>`.
+
+### Integration tests
+
+Integration tests live in `tests/integration`. They send real HTTP requests, mostly to a local test server, or launch a Playwright browser. They need no Apify account. Run them with `uv run poe integration-tests`, or a single test with `uv run pytest tests/integration/<path>.py::<test_name>`.
+
+A test belongs here when it uses the `server_url` fixture (or another local server or proxy fixture), opens a real HTTP connection, or launches a browser. Everything else goes to `tests/unit`.
 
 ### End-to-end tests
 

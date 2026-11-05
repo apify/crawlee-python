@@ -12,7 +12,7 @@ from crawlee.storage_clients import MemoryStorageClient, StorageClient
 from crawlee.storage_clients.models import AddRequestsResponse, ProcessedRequest, UnprocessedRequest
 from crawlee.storages import RequestQueue
 from crawlee.storages._storage_instance_manager import StorageInstanceManager
-from tests.unit.utils import poll_until_condition
+from tests._utils import poll_until_condition
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Sequence

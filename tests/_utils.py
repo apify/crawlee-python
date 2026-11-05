@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import sys
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 from unittest.mock import AsyncMock, MagicMock, Mock
-
-import pytest
 
 from crawlee.http_clients._base import HttpClient, HttpResponse
 from crawlee.request_loaders import ThrottlingRequestManager, _throttling_request_manager
@@ -18,14 +15,13 @@ from crawlee.storages import RequestQueue
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 
+    import pytest
     from yarl import URL
 
     from crawlee import Request
     from crawlee.storage_clients.models import ProcessedRequest
 
 T = TypeVar('T')
-
-run_alone_on_mac = pytest.mark.run_alone if sys.platform == 'darwin' else lambda x: x
 
 
 def make_status_stream_client(

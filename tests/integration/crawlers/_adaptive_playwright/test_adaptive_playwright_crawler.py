@@ -1,0 +1,1074 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+from contextlib import suppress
+from dataclasses import dataclass
+from datetime import timedelta
+from itertools import cycle
+from typing import TYPE_CHECKING, cast
+from unittest.mock import AsyncMock, Mock, call, patch
+
+import pytest
+from bs4 import Tag
+from parsel import Selector
+from typing_extensions import override
+
+from crawlee import Request
+from crawlee.crawlers import (
+    AdaptivePlaywrightCrawler,
+    AdaptivePlaywrightCrawlingContext,
+    AdaptivePlaywrightPostNavCrawlingContext,
+    AdaptivePlaywrightPreNavCrawlingContext,
+    BasicCrawler,
+    RenderingType,
+    RenderingTypePrediction,
+    RenderingTypePredictor,
+)
+from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
+    AdaptivePlaywrightCrawlerStatisticState,
+)
+from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import AdaptiveContextError
+from crawlee.errors import RequestThrottledError
+from crawlee.http_clients import HttpClient, HttpCrawlingResult
+from crawlee.sessions import SessionPool
+from crawlee.statistics import Statistics
+from crawlee.storage_clients import SqlStorageClient
+from crawlee.storages import KeyValueStore, RequestQueue
+from tests._utils import open_throttler_held_until_reclaim
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Iterator
+    from pathlib import Path
+
+    from yarl import URL
+
+
+_H1_TEXT = 'Static'
+_H2_TEXT = 'Only in browser'
+_H3_CHANGED_TEXT = 'Changed by JS'
+_INJECTED_JS_DELAY_MS = 100
+# Generous wait for the JS-injected element. Resolves as soon as it appears, so it stays robust on
+# slow CI without slowing the happy path.
+_ELEMENT_WAIT_TIMEOUT = timedelta(milliseconds=50 * _INJECTED_JS_DELAY_MS)
+_PAGE_CONTENT_STATIC = f"""
+<h1>{_H1_TEXT}</h1>
+<h3>Initial text</h3>
+<script>
+    setTimeout(function() {{
+    let h2 = document.createElement("h2");
+    h2.innerText = "{_H2_TEXT}";
+    document.getElementsByTagName("body")[0].append(h2);
+    document.getElementsByTagName("h3")[0].textContent="{_H3_CHANGED_TEXT}";
+    }}, {_INJECTED_JS_DELAY_MS});
+
+</script>
+"""
+
+
+@pytest.fixture
+def test_urls(server_url: URL) -> list[str]:
+    """Example pages used in the test are mocked for static requests."""
+    return [
+        str(server_url.with_path('echo_content').with_query(content=_PAGE_CONTENT_STATIC)),
+        str(server_url.with_path('echo_content').with_query(id='test2', content=_PAGE_CONTENT_STATIC)),
+    ]
+
+
+@pytest.fixture
+async def key_value_store() -> AsyncGenerator[KeyValueStore, None]:
+    kvs = await KeyValueStore.open()
+    yield kvs
+    await kvs.drop()
+
+
+class _SimpleRenderingTypePredictor(RenderingTypePredictor):
+    """Simplified predictor for tests.
+
+    Predictions are memoized per URL, so a request that gets retried keeps the rendering type it was first assigned
+    instead of consuming the next value from the iterators.
+    """
+
+    def __init__(
+        self,
+        rendering_types: Iterator[RenderingType] | None = None,
+        detection_probability_recommendation: Iterator[float] | None = None,
+    ) -> None:
+        super().__init__()
+
+        default_rendering_types: list[RenderingType] = ['static']
+        self._rendering_types = rendering_types or cycle(default_rendering_types)
+        self._detection_probability_recommendation = detection_probability_recommendation or cycle([1])
+        self._predictions = dict[str, RenderingTypePrediction]()
+
+    @override
+    def predict(self, request: Request) -> RenderingTypePrediction:
+        if request.url not in self._predictions:
+            self._predictions[request.url] = RenderingTypePrediction(
+                next(self._rendering_types), next(self._detection_probability_recommendation)
+            )
+        return self._predictions[request.url]
+
+    @override
+    def store_result(self, request: Request, rendering_type: RenderingType) -> None:
+        pass
+
+
+@dataclass(frozen=True)
+class TestInput:
+    __test__ = False
+
+    expected_pw_count: int
+    expected_static_count: int
+    rendering_types: Iterator[RenderingType]
+    detection_probability_recommendation: Iterator[float]
+
+
+@pytest.mark.parametrize(
+    'test_input',
+    [
+        pytest.param(
+            TestInput(
+                expected_pw_count=0,
+                expected_static_count=2,
+                # Lack of ty support, see https://github.com/astral-sh/ty/issues/2348.
+                rendering_types=cycle(['static']),
+                detection_probability_recommendation=cycle([0]),
+            ),
+            id='Static only',
+        ),
+        pytest.param(
+            TestInput(
+                expected_pw_count=2,
+                expected_static_count=0,
+                rendering_types=cycle(['client only']),
+                detection_probability_recommendation=cycle([0]),
+            ),
+            id='Client only',
+        ),
+        pytest.param(
+            TestInput(
+                expected_pw_count=1,
+                expected_static_count=1,
+                rendering_types=cycle(['static', 'client only']),
+                detection_probability_recommendation=cycle([0]),
+            ),
+            id='Mixed',
+        ),
+        pytest.param(
+            TestInput(
+                expected_pw_count=2,
+                expected_static_count=2,
+                rendering_types=cycle(['static', 'client only']),
+                detection_probability_recommendation=cycle([1]),
+            ),
+            id='Enforced rendering type detection',
+        ),
+    ],
+)
+async def test_adaptive_crawling(
+    test_input: TestInput,
+    test_urls: list[str],
+) -> None:
+    """Tests correct routing to pre-nav hooks and correct handling through proper handler."""
+
+    predictor = _SimpleRenderingTypePredictor(
+        rendering_types=test_input.rendering_types,
+        detection_probability_recommendation=test_input.detection_probability_recommendation,
+    )
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=predictor,
+    )
+
+    # `BasicCrawler` retries the whole request when a sub crawler fails, so hooks and handlers can run more than once
+    # per URL. Only the routing is under test, so sets keep the assertions insensitive to that.
+    pw_handler_urls = set[str]()
+    static_handler_urls = set[str]()
+
+    pw_hook_urls = set[str]()
+    static_hook_urls = set[str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            pw_handler_urls.add(context.request.url)
+        except AdaptiveContextError:
+            static_handler_urls.add(context.request.url)
+
+    @crawler.pre_navigation_hook
+    async def pre_nav_hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            pw_hook_urls.add(context.request.url)
+        except AdaptiveContextError:
+            static_hook_urls.add(context.request.url)
+
+    await crawler.run(test_urls)
+
+    # Each URL must reach the hook and the handler of the same sub crawler.
+    assert pw_hook_urls == pw_handler_urls
+    assert static_hook_urls == static_handler_urls
+
+    assert len(pw_handler_urls) == test_input.expected_pw_count
+    assert len(static_handler_urls) == test_input.expected_static_count
+
+    # The sizes alone would also be satisfied by one URL taking both routes and the other never being crawled.
+    assert pw_handler_urls | static_handler_urls == set(test_urls)
+
+
+async def test_adaptive_crawling_parsel(test_urls: list[str]) -> None:
+    """Top level test for parsel. Only one argument combination. (The rest of code is tested with bs variant.)"""
+    predictor = _SimpleRenderingTypePredictor(
+        rendering_types=cycle(['static', 'client only']),
+        detection_probability_recommendation=cycle([0]),
+    )
+
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+        rendering_type_predictor=predictor,
+    )
+
+    pw_handler_urls = set[str]()
+    static_handler_urls = set[str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            pw_handler_urls.add(context.request.url)
+        except AdaptiveContextError:
+            static_handler_urls.add(context.request.url)
+
+    await crawler.run(test_urls)
+
+    assert len(pw_handler_urls) == 1
+    assert len(static_handler_urls) == 1
+    assert pw_handler_urls | static_handler_urls == set(test_urls)
+
+
+@pytest.mark.flaky(
+    reruns=3,
+    reason='Test is flaky on Windows when Playwright hits net::ERR_NO_BUFFER_SPACE and retries, '
+    'causing the pre-nav hook to fire one extra time.',
+)
+async def test_adaptive_crawling_pre_nav_change_to_context(test_urls: list[str]) -> None:
+    """Tests that context can be modified in pre-navigation hooks."""
+    static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_predictor_enforce_detection,
+    )
+    user_data_in_pre_nav_hook = []
+    user_data_in_handler = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        user_data_in_handler.append(context.request.user_data.get('data', None))
+
+    @crawler.pre_navigation_hook
+    async def pre_nav_hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+        user_data_in_pre_nav_hook.append(context.request.user_data.get('data', None))
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            context.request.user_data['data'] = 'pw'
+        except AdaptiveContextError:
+            context.request.user_data['data'] = 'bs'
+
+    await crawler.run(test_urls[:1])
+    # First probe starts from the original user data. The second probe runs on the same request, so it
+    # sees the mutation from the first one.
+    assert user_data_in_pre_nav_hook == [None, 'pw']
+    # Check that the request handler sees changes to user data done by pre nav hooks
+    assert user_data_in_handler == ['pw', 'bs']
+
+
+async def test_playwright_only_pre_navigation_hook(test_urls: list[str]) -> None:
+    """Test that hook can be registered for playwright only sub crawler.
+
+    Create a situation where one page is crawled by both sub crawlers. One common pre navigation hook is registered and
+    one playwright only pre navigation hook is registered."""
+    static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_predictor_enforce_detection,
+    )
+    pre_nav_hook_common = Mock()
+    pre_nav_hook_playwright = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        pass
+
+    @crawler.pre_navigation_hook
+    async def pre_nav_hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+        pre_nav_hook_common(context.request.url)
+
+    @crawler.pre_navigation_hook(playwright_only=True)
+    async def pre_nav_hook_pw_only(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+        pre_nav_hook_playwright(context.page.url)
+
+    await crawler.run(test_urls[:1])
+
+    # Default behavior. Hook is called every time, both static sub crawler and playwright sub crawler.
+    pre_nav_hook_common.assert_has_calls([call(test_urls[0]), call(test_urls[0])])
+    # Hook is called only by playwright sub crawler.
+    pre_nav_hook_playwright.assert_called_once_with('about:blank')
+
+
+async def test_adaptive_crawling_post_nav_change_to_context(test_urls: list[str]) -> None:
+    """Tests that context can be modified in post-navigation hooks."""
+    static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_predictor_enforce_detection,
+    )
+    user_data_in_post_nav_hook = []
+    user_data_in_handler = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        user_data_in_handler.append(context.request.user_data.get('data', None))
+
+    @crawler.post_navigation_hook
+    async def post_nav_hook(context: AdaptivePlaywrightPostNavCrawlingContext) -> None:
+        user_data_in_post_nav_hook.append(context.request.user_data.get('data', None))
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            context.request.user_data['data'] = 'pw'
+        except AdaptiveContextError:
+            context.request.user_data['data'] = 'bs'
+
+    await crawler.run(test_urls[:1])
+    # First probe starts from the original user data. The second probe runs on the same request, so it
+    # sees the mutation from the first one.
+    assert user_data_in_post_nav_hook == [None, 'pw']
+    # Check that the request handler sees changes to user data done by post nav hooks
+    assert user_data_in_handler == ['pw', 'bs']
+
+
+async def test_playwright_only_post_navigation_hook(test_urls: list[str]) -> None:
+    """Test that hook can be registered for playwright only sub crawler.
+
+    Create a situation where one page is crawled by both sub crawlers. One common post navigation hook is registered and
+    one playwright only post navigation hook is registered."""
+    static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_predictor_enforce_detection,
+    )
+    post_nav_hook_common = Mock()
+    post_nav_hook_playwright = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        pass
+
+    @crawler.post_navigation_hook
+    async def post_nav_hook(context: AdaptivePlaywrightPostNavCrawlingContext) -> None:
+        post_nav_hook_common(context.request.url)
+
+    @crawler.post_navigation_hook(playwright_only=True)
+    async def post_nav_hook_pw_only(context: AdaptivePlaywrightPostNavCrawlingContext) -> None:
+        post_nav_hook_playwright(context.page.url)
+
+    await crawler.run(test_urls[:1])
+
+    # Default behavior. Hook is called every time, both static sub crawler and playwright sub crawler.
+    post_nav_hook_common.assert_has_calls([call(test_urls[0]), call(test_urls[0])])
+    # Hook is called only by playwright sub crawler.
+    post_nav_hook_playwright.assert_called_once_with(test_urls[0])
+
+
+async def test_adaptive_crawling_result(test_urls: list[str]) -> None:
+    """Tests that result only from one sub crawler is saved.
+
+    Enforced rendering type detection to run both sub crawlers."""
+    static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_predictor_enforce_detection,
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            await context.push_data({'handler': 'pw'})
+        except AdaptiveContextError:
+            await context.push_data({'handler': 'bs'})
+
+    await crawler.run(test_urls[:1])
+
+    # Enforced rendering type detection will trigger both sub crawlers, but only pw crawler result is saved.
+    assert (await crawler.get_data()).items == [{'handler': 'pw'}]
+
+
+@pytest.mark.parametrize(
+    ('pw_saved_data', 'static_saved_data', 'expected_result_rendering_type'),
+    [
+        pytest.param({'some': 'data'}, {'some': 'data'}, 'static', id='Same results from sub crawlers'),
+        pytest.param({'some': 'data'}, {'different': 'data'}, 'client only', id='Different results from sub crawlers'),
+    ],
+)
+async def test_adaptive_crawling_predictor_calls(
+    pw_saved_data: dict[str, str],
+    static_saved_data: dict[str, str],
+    expected_result_rendering_type: RenderingType,
+    test_urls: list[str],
+) -> None:
+    """Tests expected predictor calls. Same results."""
+    some_label = 'bla'
+    some_url = test_urls[0]
+    static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
+    requests = [Request.from_url(url=some_url, label=some_label)]
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_predictor_enforce_detection,
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            await context.push_data(pw_saved_data)
+        except AdaptiveContextError:
+            await context.push_data(static_saved_data)
+
+    with (
+        patch.object(static_only_predictor_enforce_detection, 'store_result', Mock()) as mocked_store_result,
+        patch.object(
+            static_only_predictor_enforce_detection, 'predict', Mock(return_value=RenderingTypePrediction('static', 1))
+        ) as mocked_predict,
+    ):
+        await crawler.run(requests)
+
+    assert mocked_predict.call_count == 1
+    assert mocked_predict.call_args[0][0].url == requests[0].url
+
+    # If `static` and `client only` results are same, `store_result` should be called with `static`.
+    mocked_store_result.assert_called_once_with(mocked_predict.call_args[0][0], expected_result_rendering_type)
+
+
+async def test_adaptive_crawling_result_use_state_isolation(
+    key_value_store: KeyValueStore, test_urls: list[str]
+) -> None:
+    """Tests that global state accessed through `use_state` is changed only by one sub crawler.
+
+    Enforced rendering type detection to run both sub crawlers."""
+    static_only_predictor_enforce_detection = _SimpleRenderingTypePredictor()
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_predictor_enforce_detection,
+    )
+    await key_value_store.set_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0', {'counter': 0})
+    request_handler_calls = 0
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        nonlocal request_handler_calls
+        state = cast('dict[str, int]', await context.use_state())
+        request_handler_calls += 1
+        state['counter'] += 1
+
+    await crawler.run(test_urls[:1])
+
+    await key_value_store.persist_autosaved_values()
+
+    # Request handler was called twice
+    assert request_handler_calls == 2
+    # Increment of global state happened only once
+    assert (await key_value_store.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0'))['counter'] == 1
+
+
+async def test_adaptive_crawling_statistics(test_urls: list[str]) -> None:
+    """Test adaptive crawler statistics.
+
+    Crawler set to static crawling, but due to result_checker returning False on static crawling result it
+    will do browser crawling instead as well. This increments all three adaptive crawling related stats."""
+    static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_predictor_no_detection,
+        result_checker=lambda result: False,  #  noqa: ARG005  # Intentionally unused argument.
+        # Navigation has its own budget. Exceeding either one retries the request and re-increments every counter.
+        request_handler_timeout=timedelta(minutes=5),
+        playwright_crawler_specific_kwargs={'navigation_timeout': timedelta(minutes=5)},
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        pass
+
+    await crawler.run(test_urls[:1])
+
+    assert crawler.statistics.state.http_only_request_handler_runs == 1
+    assert crawler.statistics.state.browser_request_handler_runs == 1
+    assert crawler.statistics.state.rendering_type_mispredictions == 1
+
+    # Despite running both sub crawlers the top crawler statistics should count this as one request finished.
+    assert crawler.statistics.state.requests_finished == 1
+    assert crawler.statistics.state.requests_failed == 0
+
+
+@pytest.mark.parametrize(
+    'error_in_pw_crawler',
+    [
+        pytest.param(False, id='Error only in static sub crawler'),
+        pytest.param(True, id='Error in both sub crawlers'),
+    ],
+)
+async def test_adaptive_crawler_exceptions_in_sub_crawlers(*, error_in_pw_crawler: bool, test_urls: list[str]) -> None:
+    """Test that correct results are committed when exceptions are raised in sub crawlers.
+
+    Exception in bs sub crawler will be logged and pw sub crawler used instead.
+    Any result from bs sub crawler will be discarded, result form pw crawler will be saved instead.
+    (But global state modifications through `use_state` will not be reverted!!!)
+
+    Exception in pw sub crawler will prevent any result from being committed. Even if `push_data` was called before
+    the exception
+    """
+    static_only_no_detection_predictor = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=static_only_no_detection_predictor,
+    )
+    saved_data = {'some': 'data'}
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            await context.push_data(saved_data)
+            if error_in_pw_crawler:
+                raise RuntimeError('Some pw sub crawler related error')
+
+        except AdaptiveContextError:
+            await context.push_data({'this': 'data should not be saved'})
+            raise RuntimeError('Some bs sub crawler related error') from None
+
+    await crawler.run(test_urls[:1])
+
+    dataset = await crawler.get_dataset()
+    stored_results = [item async for item in dataset.iterate_items()]
+
+    if error_in_pw_crawler:
+        assert stored_results == []
+    else:
+        assert stored_results == [saved_data]
+
+
+async def test_adaptive_playwright_crawler_statistics_in_init() -> None:
+    """Tests that adaptive crawler uses created AdaptivePlaywrightCrawlerStatistics from inputted Statistics."""
+    persistence_enabled = True
+    persist_state_kvs_name = 'some-name'
+    persist_state_key = 'come key'
+    log_message = 'some message'
+    periodic_message_logger = logging.getLogger('some logger')
+    log_interval = timedelta(minutes=2)
+    statistics = Statistics.with_default_state(
+        persistence_enabled=persistence_enabled,
+        persist_state_kvs_name=persist_state_kvs_name,
+        persist_state_key=persist_state_key,
+        log_message=log_message,
+        periodic_message_logger=periodic_message_logger,
+        log_interval=log_interval,
+    )
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(statistics=statistics)
+    await crawler.run([])  # ensure that statistics get initialized
+
+    assert type(crawler._statistics.state) is AdaptivePlaywrightCrawlerStatisticState
+
+    assert crawler._statistics._state._persistence_enabled == persistence_enabled
+    assert crawler._statistics._state._persist_state_key == persist_state_key
+
+    assert crawler._statistics._log_message == log_message
+    assert crawler._statistics._periodic_message_logger == periodic_message_logger
+
+
+async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: list[str]) -> None:
+    """Tests that timeout in static sub crawler forces fall back to browser sub crawler.
+
+    Create situation where static sub crawler blocks(should time out), such error should start browser sub
+    crawler.
+    """
+    static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+    # Use a generous timeout so the static pipeline has enough time to reach the handler even on slow CI.
+    # The handler will block indefinitely, so the timeout will always fire during the handler's wait.
+    request_handler_timeout = timedelta(seconds=10)
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        max_request_retries=0,
+        rendering_type_predictor=static_only_predictor_no_detection,
+        request_handler_timeout=request_handler_timeout,
+        # Navigation has its own budget, separate from the handler timeout, and no retry is left to absorb it.
+        playwright_crawler_specific_kwargs={'navigation_timeout': timedelta(seconds=120)},
+    )
+    mocked_static_handler = Mock(name='static_handler')
+    mocked_browser_handler = Mock(name='browser_handler')
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            mocked_browser_handler()
+        except AdaptiveContextError:
+            mocked_static_handler()
+            # Relax timeout for the fallback browser request to allow for slow browser startup on CI
+            crawler._request_handler_timeout = timedelta(seconds=120)
+            # Block indefinitely - will be cancelled when the request_handler_timeout fires.
+            await asyncio.Event().wait()
+
+    await crawler.run(test_urls[:1])
+
+    mocked_static_handler.assert_called_once_with()
+    # Browser handler was capable of running despite static handler blocking longer than the handler timeout.
+    mocked_browser_handler.assert_called_once_with()
+
+
+async def test_adaptive_playwright_crawler_default_predictor(test_urls: list[str]) -> None:
+    """Test default rendering type predictor integration into crawler."""
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser()
+    mocked_static_handler = Mock()
+    mocked_browser_handler = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        try:
+            # page is available only if it was crawled by PlaywrightCrawler.
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            mocked_browser_handler()
+        except AdaptiveContextError:
+            mocked_static_handler()
+
+    await crawler.run(test_urls[:1])
+
+    # First prediction should trigger rendering type detection as the predictor does not have any data for prediction.
+    mocked_static_handler.assert_called_once_with()
+    mocked_browser_handler.assert_called_once_with()
+
+
+async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[str]) -> None:
+    """Test that `context.query_selector_one` works regardless of the crawl type for BeautifulSoup variant.
+
+    Handler tries to locate two elements h1 and h2.
+    h1 exists immediately, h2 is created dynamically by inline JS snippet embedded in the html.
+    Create situation where page is crawled with static sub crawler first.
+    Static sub crawler should be able to locate only h1. It will try to wait for h2, trying to wait for h2 will trigger
+    `AdaptiveContextError` which will force the adaptive crawler to try playwright sub crawler instead. Playwright sub
+    crawler is able to wait for the h2 element."""
+
+    # Get page with injected JS code that will add some element after timeout
+    static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        max_request_retries=1,
+        rendering_type_predictor=static_only_predictor_no_detection,
+    )
+
+    mocked_h1_handler = Mock()
+    mocked_h2_handler = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        h1 = await context.query_selector_one('h1', _ELEMENT_WAIT_TIMEOUT)
+        mocked_h1_handler(h1)
+        h2 = await context.query_selector_one('h2', _ELEMENT_WAIT_TIMEOUT)
+        mocked_h2_handler(h2)
+
+    await crawler.run(test_urls[:1])
+
+    expected_h1_tag = Tag(name='h1')
+    expected_h1_tag.append(_H1_TEXT)
+
+    expected_h2_tag = Tag(name='h2')
+    expected_h2_tag.append(_H2_TEXT)
+
+    # Called by both sub crawlers
+    mocked_h1_handler.assert_has_calls([call(expected_h1_tag), call(expected_h1_tag)])
+    # Called only by pw sub crawler
+    mocked_h2_handler.assert_has_calls([call(expected_h2_tag)])
+
+
+async def test_adaptive_context_query_selector_parsel(test_urls: list[str]) -> None:
+    """Test that `context.query_selector_one` works regardless of the crawl type for Parsel variant.
+
+    Handler tries to locate two elements h1 and h2.
+    h1 exists immediately, h2 is created dynamically by inline JS snippet embedded in the html.
+    Create situation where page is crawled with static sub crawler first.
+    Static sub crawler should be able to locate only h1. It will try to wait for h2, trying to wait for h2 will trigger
+    `AdaptiveContextError` which will force the adaptive crawler to try playwright sub crawler instead. Playwright sub
+    crawler is able to wait for the h2 element."""
+
+    # Get page with injected JS code that will add some element after timeout
+    static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+    expected_h1_tag = f'<h1>{_H1_TEXT}</h1>'
+    expected_h2_tag = f'<h2>{_H2_TEXT}</h2>'
+
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+        max_request_retries=1,
+        rendering_type_predictor=static_only_predictor_no_detection,
+    )
+
+    mocked_h1_handler = Mock()
+    mocked_h2_handler = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        if h1 := await context.query_selector_one('h1', _ELEMENT_WAIT_TIMEOUT):
+            mocked_h1_handler(type(h1), h1.get())
+        if h2 := await context.query_selector_one('h2', _ELEMENT_WAIT_TIMEOUT):
+            mocked_h2_handler(type(h2), h2.get())
+
+    await crawler.run(test_urls[:1])
+
+    # Called by both sub crawlers
+    mocked_h1_handler.assert_has_calls([call(Selector, expected_h1_tag), call(Selector, expected_h1_tag)])
+    # Called only by pw sub crawler
+    mocked_h2_handler.assert_has_calls([call(Selector, expected_h2_tag)])
+
+
+async def test_adaptive_context_parse_with_static_parser_parsel(test_urls: list[str]) -> None:
+    """Test `context.parse_with_static_parser` works regardless of the crawl type for Parsel variant.
+
+    (Test covers also  `context.wait_for_selector`, which is called by `context.parse_with_static_parser`)
+    """
+    static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+    expected_h2_tag = f'<h2>{_H2_TEXT}</h2>'
+
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+        max_request_retries=1,
+        rendering_type_predictor=static_only_predictor_no_detection,
+    )
+
+    mocked_h2_handler = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        h2_static = context.parsed_content.css('h2')  # Should not find anything
+        mocked_h2_handler(h2_static)
+
+        # Reparse whole page after h2 appears
+        parsed_content_after_h2_appeared = await context.parse_with_static_parser(
+            selector='h2', timeout=_ELEMENT_WAIT_TIMEOUT
+        )
+        mocked_h2_handler(parsed_content_after_h2_appeared.css('h2')[0].get())
+
+    await crawler.run(test_urls[:1])
+
+    mocked_h2_handler.assert_has_calls(
+        [
+            call([]),  # Static sub crawler tried and did not find h2.
+            call([]),  # Playwright sub crawler tried and did not find h2 without waiting.
+            call(expected_h2_tag),  # Playwright waited for h2 to appear.
+        ]
+    )
+
+
+async def test_adaptive_context_helpers_on_changed_selector(test_urls: list[str]) -> None:
+    """Test that context helpers work on latest version of the page.
+
+    Scenario where page is changed after a while. H2 element is added and text of H3 element is modified.
+    Test that context helpers automatically work on latest version of the page by reading H3 element and expecting it's
+    dynamically changed text instead of the original static text.
+    """
+    browser_only_predictor_no_detection = _SimpleRenderingTypePredictor(
+        rendering_types=cycle(['client only']),
+        detection_probability_recommendation=cycle([0]),
+    )
+    expected_h3_tag = f'<h3>{_H3_CHANGED_TEXT}</h3>'
+
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+        max_request_retries=1,
+        rendering_type_predictor=browser_only_predictor_no_detection,
+    )
+
+    mocked_h3_handler = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        await context.query_selector_one('h2')  # Wait for change that is indicated by appearance of h2 element.
+        if h3 := await context.query_selector_one('h3'):
+            mocked_h3_handler(h3.get())  # Get updated h3 element.
+
+    await crawler.run(test_urls[:1])
+
+    mocked_h3_handler.assert_called_once_with(expected_h3_tag)
+
+
+async def test_adaptive_context_query_non_existing_element(test_urls: list[str]) -> None:
+    """Test that querying non-existing selector returns `None`"""
+    browser_only_predictor_no_detection = _SimpleRenderingTypePredictor(
+        rendering_types=cycle(['client only']),
+        detection_probability_recommendation=cycle([0]),
+    )
+
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+        max_request_retries=1,
+        rendering_type_predictor=browser_only_predictor_no_detection,
+    )
+
+    mocked_h3_handler = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        mocked_h3_handler(await context.query_selector_one('non sense selector', timeout=timedelta(milliseconds=1)))
+
+    await crawler.run(test_urls[:1])
+
+    mocked_h3_handler.assert_called_once_with(None)
+
+
+@pytest.mark.parametrize(
+    ('test_input', 'expected_request_state'),
+    [
+        pytest.param(
+            TestInput(
+                expected_pw_count=0,
+                expected_static_count=2,
+                rendering_types=cycle(['static']),
+                detection_probability_recommendation=cycle([0]),
+            ),
+            ['initial', 'static'],
+            id='Static only',
+        ),
+        pytest.param(
+            TestInput(
+                expected_pw_count=2,
+                expected_static_count=0,
+                rendering_types=cycle(['client only']),
+                detection_probability_recommendation=cycle([0]),
+            ),
+            ['initial', 'browser'],
+            id='Client only',
+        ),
+        pytest.param(
+            TestInput(
+                expected_pw_count=2,
+                expected_static_count=2,
+                rendering_types=cycle(['static', 'client only']),
+                detection_probability_recommendation=cycle([1]),
+            ),
+            # Both sub crawlers run on the same request: browser first, then the static detection probe.
+            # Mutations from both handlers persist.
+            ['initial', 'browser', 'static'],
+            id='Enforced rendering type detection',
+        ),
+    ],
+)
+async def test_change_context_state_after_handling(
+    test_input: TestInput, expected_request_state: list[str], server_url: URL
+) -> None:
+    """Test that context state is saved after handling the request."""
+    predictor = _SimpleRenderingTypePredictor(
+        rendering_types=test_input.rendering_types,
+        detection_probability_recommendation=test_input.detection_probability_recommendation,
+    )
+
+    request_queue = await RequestQueue.open(name='state-test')
+    used_session_id = None
+
+    async with SessionPool() as session_pool:
+        crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+            rendering_type_predictor=predictor,
+            session_pool=session_pool,
+            request_manager=request_queue,
+        )
+
+        @crawler.router.default_handler
+        async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+            nonlocal used_session_id
+
+            if context.session is not None:
+                used_session_id = context.session.id
+                context.session.user_data['session_state'] = True
+
+            try:
+                # `page` is only available in the browser sub crawler, static crawling raises here.
+                _ = context.page
+                handler_type = 'browser'
+            except AdaptiveContextError:
+                handler_type = 'static'
+
+            if isinstance(context.request.user_data['request_state'], list):
+                context.request.user_data['request_state'].append(handler_type)
+
+        request = Request.from_url(str(server_url), user_data={'request_state': ['initial']})
+
+        await crawler.run([request])
+
+        assert used_session_id is not None
+
+        session = await session_pool.get_session_by_id(used_session_id)
+        check_request = await request_queue.get_request(request.unique_key)
+
+        assert session is not None
+        assert check_request is not None
+
+        assert session.user_data.get('session_state') is True
+
+        assert check_request.user_data.get('request_state') == expected_request_state
+
+        await request_queue.drop()
+
+
+async def test_adaptive_playwright_crawler_with_sql_storage(test_urls: list[str], tmp_path: Path) -> None:
+    """Tests that AdaptivePlaywrightCrawler can be initialized with SqlStorageClient."""
+    storage_dir = tmp_path / 'test_table.db'
+
+    async with SqlStorageClient(connection_string=f'sqlite+aiosqlite:///{storage_dir}') as storage_client:
+        crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+            storage_client=storage_client,
+        )
+
+        mocked_handler = Mock()
+
+        @crawler.router.default_handler
+        async def request_handler(_context: AdaptivePlaywrightCrawlingContext) -> None:
+            mocked_handler()
+
+        await crawler.run(test_urls[:1])
+
+        mocked_handler.assert_called()
+
+
+async def test_throttled_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A throttled 429 from the browser sub crawler is retried later without spending a retry."""
+    url = 'https://throttled.placeholder.com/page'
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
+    failed_request_handler = AsyncMock()
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(
+            rendering_types=cycle(['client only']), detection_probability_recommendation=cycle([0])
+        ),
+        request_manager=throttler,
+        max_request_retries=0,
+        max_session_rotations=0,
+    )
+    crawler.failed_request_handler(failed_request_handler)
+    statuses = [429, 200]
+    handled: list[AdaptivePlaywrightCrawlingContext] = []
+
+    @crawler.pre_navigation_hook
+    async def fulfill_with_next_status(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+        status = statuses.pop(0)
+        await context.page.route(url, lambda route: route.fulfill(status=status, body='<html></html>'))
+
+    @crawler.router.default_handler
+    async def handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        handled.append(context)
+
+    await crawler.run([url])
+
+    assert [context.response.status for context in handled] == [200]
+    failed_request_handler.assert_not_called()
+    assert handled[0].request.retry_count == 0
+
+
+async def test_throttled_static_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A throttled 429 from the static sub crawler defers the request without falling back to the browser."""
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
+    http_client = AsyncMock(spec=HttpClient)
+    http_client.crawl.side_effect = [
+        HttpCrawlingResult(http_response=Mock(status_code=status, headers={}, read=AsyncMock(return_value=b'')))
+        for status in (429, 200)
+    ]
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(
+            rendering_types=cycle(['static']), detection_probability_recommendation=cycle([0])
+        ),
+        request_manager=throttler,
+        http_client=http_client,
+        max_request_retries=0,
+        max_session_rotations=0,
+    )
+    browser_navigations = Mock()
+
+    @crawler.pre_navigation_hook
+    async def track_browser_navigation(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+        with suppress(AdaptiveContextError):
+            context.page  # noqa:B018 Intentionally "useless expression". Raises outside the browser sub crawler.
+            browser_navigations()
+
+    handled: list[AdaptivePlaywrightCrawlingContext] = []
+
+    @crawler.router.default_handler
+    async def handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        handled.append(context)
+
+    await crawler.run(['https://throttled.placeholder.com/page'])
+
+    browser_navigations.assert_not_called()
+    assert http_client.crawl.await_count == 2
+    assert len(handled) == 1
+    assert handled[0].request.retry_count == 0
+
+
+async def test_static_handler_raised_throttled_error_is_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A `RequestThrottledError` from the static handler defers the request without falling back to the browser."""
+    url = 'https://throttled.placeholder.com/page'
+    throttler = await open_throttler_held_until_reclaim(monkeypatch)
+    http_client = AsyncMock(spec=HttpClient)
+    http_client.crawl.return_value = HttpCrawlingResult(
+        http_response=Mock(status_code=200, headers={}, read=AsyncMock(return_value=b''))
+    )
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(
+            rendering_types=cycle(['static']), detection_probability_recommendation=cycle([0])
+        ),
+        request_manager=throttler,
+        http_client=http_client,
+        max_request_retries=0,
+    )
+    browser_navigations = Mock()
+    handler_calls = Mock()
+
+    @crawler.pre_navigation_hook
+    async def track_browser_navigation(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+        with suppress(AdaptiveContextError):
+            context.page  # noqa:B018 Intentionally "useless expression". Raises outside the browser sub crawler.
+            browser_navigations()
+
+    @crawler.router.default_handler
+    async def handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        handler_calls()
+        if handler_calls.call_count == 1:
+            throttler.record_domain_delay(context.request.url)
+            raise RequestThrottledError
+
+    await crawler.run([url])
+
+    browser_navigations.assert_not_called()
+    assert handler_calls.call_count == 2
+
+
+async def test_static_throttled_error_without_backoff_falls_back_to_browser(test_urls: list[str]) -> None:
+    """A `RequestThrottledError` from the static handler whose domain nothing holds back falls back to the browser."""
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(
+            rendering_types=cycle(['static']), detection_probability_recommendation=cycle([0])
+        ),
+        max_request_retries=0,
+    )
+    rendering_types = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        try:
+            context.page  # noqa:B018 Intentionally "useless expression". Raises outside the browser sub crawler.
+        except AdaptiveContextError:
+            rendering_types('static')
+            raise RequestThrottledError from None
+        rendering_types('client only')
+
+    await crawler.run(test_urls[:1])
+
+    assert [c.args[0] for c in rendering_types.call_args_list] == ['static', 'client only']

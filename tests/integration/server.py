@@ -15,7 +15,7 @@ from urllib.parse import parse_qs
 from uvicorn.server import Server
 from yarl import URL
 
-from tests.unit.server_endpoints import (
+from tests.integration.server_endpoints import (
     BASE_INDEX,
     GENERIC_RESPONSE,
     HELLO_WORLD,

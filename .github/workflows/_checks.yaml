@@ -7,7 +7,7 @@ on:
   workflow_call:
     inputs:
       run_tests:
-        description: Whether to run the unit test suite.
+        description: Whether to run the unit and integration test suites.
         required: false
         type: boolean
         default: true
@@ -140,6 +140,70 @@ jobs:
       python_version_for_codecov: "3.15"
       operating_system_for_codecov: ubuntu-latest
       tests_concurrency: "8"
+
+  integration_tests:
+    name: Integration tests (${{ matrix.python-version }}, ${{ matrix.os }})
+    if: inputs.run_tests
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        # The oldest and newest supported Python; the unit tests cover every version in between.
+        python-version: ["3.10", "3.15"]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      TESTS_CONCURRENCY: "8"
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+    steps:
+      - name: macOS cleanup
+        if: runner.os == 'macOS'
+        # Disable Spotlight indexing and stop background processes that drain CPU during the tests.
+        run: |
+          sudo mdutil -i off /
+          sudo killall Finder spindump ecosystemanalyticsd SystemUIServer NotificationCenter mds mds_stores mds_worker mdworker mdworker_shared || true
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The default Windows temp dir is a network disk, about 5x slower at small files than RUNNER_TEMP.
+      - name: Use the runner's local disk for temp files
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          echo "TMP=$RUNNER_TEMP" >> "$GITHUB_ENV"
+          echo "TEMP=$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv package manager
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Python dependencies
+        run: uv run poe install-dev
+
+      - name: Run integration tests
+        run: uv run poe integration-tests-cov
+
+      # Codecov merges this upload with the unit test one, so the reported coverage covers both suites.
+      - name: Upload integration test coverage
+        if: >-
+          ${{
+            matrix.os == 'ubuntu-latest' &&
+            matrix.python-version == '3.15' &&
+            env.CODECOV_TOKEN != ''
+          }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ env.CODECOV_TOKEN }}
+          files: coverage-integration.xml
+          flags: integration
 
   package_check:
     name: Package check

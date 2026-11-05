@@ -1,0 +1,542 @@
+from __future__ import annotations
+
+import json
+from typing import TYPE_CHECKING, Any
+from unittest import mock
+
+import pytest
+
+from crawlee import ConcurrencySettings, Glob, HttpHeaders, Request, RequestTransformAction, SkippedReason
+from crawlee.crawlers import ParselCrawler
+from crawlee.storages import RequestQueue
+
+if TYPE_CHECKING:
+    from yarl import URL
+
+    from crawlee._request import RequestOptions
+    from crawlee.crawlers import BasicCrawlingContext, ParselCrawlingContext
+    from crawlee.http_clients._base import HttpClient
+
+
+async def test_basic(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client)
+    handler = mock.AsyncMock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        links = context.selector.css('a::attr(href)').getall()
+        await handler(links)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    assert handler.called
+
+    # The handler should find three links
+    assert len(handler.call_args[0][0]) == 3
+
+
+async def test_enqueue_links(redirect_server_url: URL, server_url: URL, http_client: HttpClient) -> None:
+    redirect_target = str(server_url / 'start_enqueue')
+    redirect_url = str(redirect_server_url.with_path('redirect').with_query(url=redirect_target))
+    requests = [redirect_url]
+
+    crawler = ParselCrawler(http_client=http_client)
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        url = str(context.request.url)
+        visit(url)
+        await context.enqueue_links()
+
+    await crawler.run(requests)
+
+    expected_visit_calls = [
+        mock.call(redirect_url),
+        mock.call(str(server_url / 'sub_index')),
+        mock.call(str(server_url / 'page_1')),
+        mock.call(str(server_url / 'page_2')),
+        mock.call(str(server_url / 'page_3')),
+        mock.call(str(server_url / 'page_4')),
+        mock.call(str(server_url / 'base_page')),
+        mock.call(str(server_url / 'base_subpath/page_5')),
+    ]
+    assert visit.mock_calls[0] == expected_visit_calls[0]
+    visit.assert_has_calls(expected_visit_calls, any_order=True)
+
+
+async def test_enqueue_non_href_links(redirect_server_url: URL, server_url: URL, http_client: HttpClient) -> None:
+    redirect_target = str(server_url / 'start_enqueue_non_href')
+    redirect_url = str(redirect_server_url.with_path('redirect').with_query(url=redirect_target))
+    requests = [redirect_url]
+
+    crawler = ParselCrawler(http_client=http_client)
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links(selector='img', attribute='src')
+
+    await crawler.run(requests)
+
+    expected_visit_calls = [
+        mock.call(redirect_url),
+        mock.call(str(server_url / 'base_subpath/image_1')),
+        mock.call(str(server_url / 'image_2')),
+    ]
+    visit.assert_has_calls(expected_visit_calls, any_order=True)
+
+
+async def test_enqueue_links_with_incompatible_kwargs_raises_error(server_url: URL) -> None:
+    """Call `enqueue_links` with arguments that can't be used together."""
+    crawler = ParselCrawler(max_request_retries=1)
+    exceptions = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        # The overloads reject this combination statically, so build the call dynamically to reach the runtime guard.
+        kwargs: dict[str, Any] = {'requests': [Request.from_url(str(server_url / 'start_enqueue'))], 'selector': 'a'}
+        try:
+            await context.enqueue_links(**kwargs)
+        except Exception as e:
+            exceptions.append(e)
+
+    await crawler.run([str(server_url)])
+
+    assert len(exceptions) == 1
+    assert type(exceptions[0]) is ValueError
+
+
+async def test_enqueue_links_selector(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client)
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links(selector='a.foo')
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    expected_visit_calls = [
+        mock.call(str(server_url / 'start_enqueue')),
+        mock.call(str(server_url / 'sub_index')),
+    ]
+    visit.assert_has_calls(expected_visit_calls, any_order=True)
+
+
+async def test_enqueue_links_with_max_crawl(server_url: URL, http_client: HttpClient) -> None:
+    start_urls = [str(server_url / 'start_enqueue')]
+    processed_urls = []
+
+    # Set max_concurrency to 1 to ensure testing max_requests_per_crawl accurately
+    crawler = ParselCrawler(
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+        max_requests_per_crawl=3,
+        http_client=http_client,
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        await context.enqueue_links()
+        processed_urls.append(context.request.url)
+
+    stats = await crawler.run(start_urls)
+
+    # Verify that only 3 out of the possible 5 requests were made
+    assert len(processed_urls) == 3
+    assert stats.requests_total == 3
+    assert stats.requests_finished == 3
+
+
+async def test_enqueue_links_with_transform_request_function(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client)
+    visit = mock.Mock()
+    headers = []
+
+    def test_transform_request_function(
+        request_options: RequestOptions,
+    ) -> RequestOptions | RequestTransformAction:
+        if 'page_3' in request_options['url']:
+            return 'skip'
+
+        request_options['headers'] = HttpHeaders({'transform-header': 'my-header'})
+        return request_options
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        visit(context.request.url)
+        headers.append(context.request.headers)
+        await context.enqueue_links(transform_request_function=test_transform_request_function, label='test')
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    # url /page_3 should not be visited
+    expected_visit_calls = [
+        mock.call(str(server_url / 'start_enqueue')),
+        mock.call(str(server_url / 'sub_index')),
+        mock.call(str(server_url / 'page_1')),
+        mock.call(str(server_url / 'page_2')),
+        mock.call(str(server_url / 'page_4')),
+        mock.call(str(server_url / 'base_page')),
+        mock.call(str(server_url / 'base_subpath/page_5')),
+    ]
+    visit.assert_has_calls(expected_visit_calls, any_order=True)
+
+    # all urls added to `enqueue_links` must have a custom header
+    assert headers[1]['transform-header'] == 'my-header'
+    assert headers[2]['transform-header'] == 'my-header'
+    assert headers[3]['transform-header'] == 'my-header'
+
+
+async def test_handle_blocked_request(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(max_session_rotations=1, http_client=http_client)
+
+    stats = await crawler.run([str(server_url / 'incapsula')])
+    assert stats.requests_failed == 1
+
+
+async def test_handle_blocked_status_code(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(max_session_rotations=1, http_client=http_client)
+
+    # Patch internal calls and run crawler
+    with (
+        mock.patch.object(
+            crawler._statistics,
+            'record_request_processing_failure',
+            wraps=crawler._statistics.record_request_processing_failure,
+        ) as record_request_processing_failure,
+        mock.patch.object(
+            crawler._statistics.error_tracker, 'add', wraps=crawler._statistics.error_tracker.add
+        ) as error_tracker_add,
+    ):
+        stats = await crawler.run([str(server_url / 'status/403')])
+
+    assert stats.requests_failed == 1
+    assert record_request_processing_failure.called
+    assert error_tracker_add.called
+    assert crawler._statistics.error_tracker.total == 1
+
+
+async def test_json(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client)
+    handler = mock.AsyncMock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        result = context.selector.jmespath('hello').getall()
+        await handler(result)
+
+    await crawler.run([str(server_url / 'json')])
+
+    assert handler.called
+
+    assert handler.call_args[0][0] == ['world']
+
+
+async def test_xml(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client)
+    handler = mock.AsyncMock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        result = context.selector.css('hello').getall()
+        await handler(result)
+
+    await crawler.run([str(server_url / 'xml')])
+
+    assert handler.called
+
+    assert handler.call_args[0][0] == ['<hello>world</hello>']
+
+
+async def test_respect_robots_txt(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client, respect_robots_txt_file=True)
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links()
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    expected_visit_calls = [
+        mock.call(str(server_url / 'start_enqueue')),
+        mock.call(str(server_url / 'sub_index')),
+        mock.call(str(server_url / 'base_page')),
+        mock.call(str(server_url / 'base_subpath/page_5')),
+    ]
+    visit.assert_has_calls(expected_visit_calls, any_order=True)
+
+
+async def test_respect_robots_txt_with_problematic_links(
+    server_url: URL,
+    no_robots_server_url: URL,
+    unreachable_url: str,
+    http_client: HttpClient,
+) -> None:
+    """Test checks the crawler behavior with links that may cause problems when attempting to retrieve robots.txt."""
+    no_robots_url = str(no_robots_server_url / 'page')
+    start_url = str(
+        (server_url / 'problematic_links').with_query(unreachable_url=unreachable_url, no_robots_url=no_robots_url)
+    )
+    visit = mock.Mock()
+    fail = mock.Mock()
+    crawler = ParselCrawler(
+        http_client=http_client,
+        respect_robots_txt_file=True,
+        max_request_retries=0,
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links(strategy='all')
+
+    @crawler.failed_request_handler
+    async def error_handler(context: BasicCrawlingContext, _error: Exception) -> None:
+        fail(context.request.url)
+
+    await crawler.run([start_url])
+
+    # Email must be skipped.
+    # An origin without robots.txt is still crawled, an unavailable file means unrestricted crawling.
+    expected_visit_calls = [
+        mock.call(start_url),
+        mock.call(no_robots_url),
+    ]
+    visit.assert_has_calls(expected_visit_calls, any_order=True)
+
+    # The unreachable URL cannot be connected to.
+    expected_fail_calls = [
+        mock.call(unreachable_url),
+    ]
+    fail.assert_has_calls(expected_fail_calls, any_order=True)
+
+
+async def test_on_skipped_request(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client, respect_robots_txt_file=True)
+    skip = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        await context.enqueue_links()
+
+    @crawler.on_skipped_request
+    async def skipped_hook(url: str, _reason: SkippedReason) -> None:
+        skip(url)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    expected_skip_calls = [
+        mock.call(str(server_url / 'page_1')),
+        mock.call(str(server_url / 'page_2')),
+        mock.call(str(server_url / 'page_3')),
+        mock.call(str(server_url / 'page_4')),
+    ]
+    skip.assert_has_calls(expected_skip_calls, any_order=True)
+
+
+async def test_extract_links(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client)
+    extracted_links: list[str] = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        links = await context.extract_links(exclude=[Glob(f'{server_url}sub_index')])
+        extracted_links.extend(request.url for request in links)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    assert len(extracted_links) == 1
+    assert extracted_links[0] == str(server_url / 'page_1')
+
+
+@pytest.mark.parametrize(
+    ('base', 'expected_path'),
+    [
+        pytest.param('{origin}/abs/', '/abs/page', id='absolute-base'),
+        pytest.param('/sub/', '/sub/page', id='relative-base'),
+        pytest.param('http://[bad', '/page', id='invalid-base'),
+        pytest.param('mailto:a@b.c', '/page', id='non-hierarchical-base'),
+    ],
+)
+async def test_extract_links_base_href(server_url: URL, http_client: HttpClient, base: str, expected_path: str) -> None:
+    """Links are resolved against `<base href>`, a relative one against the page URL, and an invalid one is ignored."""
+    crawler = ParselCrawler(http_client=http_client)
+    handler = mock.AsyncMock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        links = await context.extract_links()
+        await handler([request.url for request in links])
+
+    page = f'<head><base href="{base.format(origin=server_url.origin())}"></head><body><a href="page">Page</a></body>'
+    await crawler.run([str((server_url / 'echo_content').with_query(content=page))])
+
+    handler.assert_awaited_once_with([str(server_url.with_path(expected_path))])
+
+
+async def test_extract_form_requests(server_url: URL, http_client: HttpClient) -> None:
+    """A form request built in the handler submits the form fields with the `Referer` of the page."""
+    crawler = ParselCrawler(http_client=http_client)
+    responses: list[dict[str, Any]] = []
+    page = '<form method="post" action="/post"><input type="hidden" name="token" value="t"><input name="q"></form>'
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        requests = await context.extract_form_requests(fields={'q': 'x'}, label='result')
+        await context.add_requests(requests)
+
+    @crawler.router.handler('result')
+    async def result_handler(context: ParselCrawlingContext) -> None:
+        responses.append(json.loads(await context.http_response.read()))
+
+    await crawler.run([str((server_url / 'echo_content').with_query(content=page))])
+
+    [response] = responses
+    assert response['form'] == {'token': 't', 'q': 'x'}
+    assert response['headers']['referer'].startswith(str(server_url / 'echo_content'))
+
+
+async def test_extract_non_href_links(server_url: URL, http_client: HttpClient) -> None:
+    crawler = ParselCrawler(http_client=http_client)
+    extracted_links: list[str] = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        links = await context.extract_links(selector='li', attribute='data-href')
+        extracted_links.extend(request.url for request in links)
+
+    await crawler.run([str(server_url / 'non_href_links')])
+
+    assert len(extracted_links) == 1
+    assert extracted_links[0] == str(server_url / 'page_2')
+
+
+@pytest.mark.parametrize(
+    ('queue_name', 'queue_alias', 'by_id'),
+    [
+        pytest.param('named-queue', None, False, id='with rq_name'),
+        pytest.param(None, 'alias-queue', False, id='with rq_alias'),
+        pytest.param('id-queue', None, True, id='with rq_id'),
+    ],
+)
+async def test_enqueue_links_with_rq_param(
+    server_url: URL, http_client: HttpClient, queue_name: str | None, queue_alias: str | None, *, by_id: bool
+) -> None:
+    crawler = ParselCrawler(http_client=http_client)
+    rq = await RequestQueue.open(name=queue_name, alias=queue_alias)
+    if by_id:
+        queue_name = None
+        queue_id = rq.id
+    else:
+        queue_id = None
+    visit_urls: set[str] = set()
+
+    @crawler.router.default_handler
+    async def handler(context: ParselCrawlingContext) -> None:
+        visit_urls.add(context.request.url)
+        await context.enqueue_links(rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    requests_from_queue: list[str] = []
+    while request := await rq.fetch_next_request():
+        requests_from_queue.append(request.url)
+
+    assert set(requests_from_queue) == {str(server_url / 'page_1'), str(server_url / 'sub_index')}
+    assert visit_urls == {str(server_url / 'start_enqueue')}
+
+    await rq.drop()
+
+
+@pytest.mark.parametrize(
+    ('queue_name', 'queue_alias', 'by_id'),
+    [
+        pytest.param('named-queue', None, False, id='with rq_name'),
+        pytest.param(None, 'alias-queue', False, id='with rq_alias'),
+        pytest.param('id-queue', None, True, id='with rq_id'),
+    ],
+)
+async def test_enqueue_links_requests_with_rq_param(
+    server_url: URL, http_client: HttpClient, queue_name: str | None, queue_alias: str | None, *, by_id: bool
+) -> None:
+    crawler = ParselCrawler(http_client=http_client)
+    rq = await RequestQueue.open(name=queue_name, alias=queue_alias)
+    if by_id:
+        queue_name = None
+        queue_id = rq.id
+    else:
+        queue_id = None
+    visit_urls: set[str] = set()
+
+    check_requests: list[str] = [
+        'https://a.placeholder.com',
+        'https://b.placeholder.com',
+        'https://c.placeholder.com',
+    ]
+
+    @crawler.router.default_handler
+    async def handler(context: ParselCrawlingContext) -> None:
+        visit_urls.add(context.request.url)
+        await context.enqueue_links(
+            requests=check_requests, rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias, strategy='all'
+        )
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    requests_from_queue: list[str] = []
+    while request := await rq.fetch_next_request():
+        requests_from_queue.append(request.url)
+
+    assert set(requests_from_queue) == set(check_requests)
+    assert visit_urls == {str(server_url / 'start_enqueue')}
+
+    await rq.drop()
+
+
+@pytest.mark.parametrize(
+    ('queue_id', 'queue_name', 'queue_alias'),
+    [
+        pytest.param('named-queue', 'alias-queue', None, id='rq_name and rq_alias'),
+        pytest.param('named-queue', None, 'id-queue', id='rq_name and rq_id'),
+        pytest.param(None, 'alias-queue', 'id-queue', id='rq_alias and rq_id'),
+        pytest.param('named-queue', 'alias-queue', 'id-queue', id='rq_name and rq_alias and rq_id'),
+    ],
+)
+async def test_enqueue_links_error_with_multi_params(
+    server_url: URL, http_client: HttpClient, queue_id: str | None, queue_name: str | None, queue_alias: str | None
+) -> None:
+    crawler = ParselCrawler(http_client=http_client)
+
+    @crawler.router.default_handler
+    async def handler(context: ParselCrawlingContext) -> None:
+        with pytest.raises(ValueError, match='Cannot use both `rq_name` and `rq_alias`'):
+            await context.enqueue_links(rq_id=queue_id, rq_name=queue_name, rq_alias=queue_alias)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+
+async def test_enqueue_links_with_limit(server_url: URL, http_client: HttpClient) -> None:
+    start_url = str(server_url / 'sub_index')
+    requests = [start_url]
+
+    crawler = ParselCrawler(http_client=http_client)
+    visit = mock.Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: ParselCrawlingContext) -> None:
+        visit(context.request.url)
+        await context.enqueue_links(limit=1)
+
+    await crawler.run(requests)
+
+    # Only one link should be enqueued from sub_index due to the limit
+    expected_visit_calls = [
+        mock.call(start_url),
+        mock.call(str(server_url / 'page_3')),
+    ]
+    visit.assert_has_calls(expected_visit_calls, any_order=True)
