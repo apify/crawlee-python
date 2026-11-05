@@ -130,9 +130,10 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
     """A `ConcurrencySystem` that settles near the concurrency at which its targets deliver the most.
 
     `ConcurrencySystem` climbs until a machine resource runs out, so against a target that stops answering faster under
-    load it keeps adding concurrency, which costs throughput and strains the target. This system measures how many
-    tasks per second two levels around a centre deliver and moves the centre toward the better one. It climbs by
-    doublings at the start and holds for a while once the two levels tie. Every load signal of the parent still applies.
+    load it keeps adding concurrency, which costs throughput and strains the target. This system searches for the
+    throughput peak instead. It measures how many tasks per second two concurrency levels around a centre deliver and
+    moves the centre toward the better one. It climbs by doublings at the start and holds for a while once the two
+    levels tie. Every load signal of the parent still applies.
 
     Crawlers sharing the system get one search over all their tasks, which suits crawlers against the same site. With
     `per_consumer` set, each crawler gets a search of its own and a fair share of `max_concurrency` instead.
@@ -263,12 +264,12 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
 
         if not per_consumer:
             self._controllers[_SHARED] = self._new_controller(lambda: self.current_concurrency)
-        # The task gating of the parent reads `_desired_concurrency`, so it mirrors the controllers' levels.
+        # The task gating of the parent reads `_desired_concurrency`, so it holds the controllers' total.
         self._sync_desired_concurrency()
 
     @property
     def _bounded_start_concurrency(self) -> int:
-        """The level a new controller starts at: the settings' level, inside bounds that may have moved since."""
+        """The concurrency a new controller starts at: the settings' value, inside bounds that may have moved since."""
         return min(self._max_concurrency, max(self._min_concurrency, self._start_concurrency))
 
     def _new_controller(self, current_concurrency: Callable[[], int]) -> _ThroughputController:
@@ -285,7 +286,7 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
 
     @override
     async def __aenter__(self) -> Self:
-        """Start the system, settling its level from now and dropping any window a previous session left open."""
+        """Start the system, settling its concurrency from now and dropping any window a previous session left open."""
         entered = await super().__aenter__()
         for controller in self._controllers.values():
             controller.restart()
@@ -392,14 +393,14 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
             controller.limit_to(min(self._max_concurrency, max(self._min_concurrency, cap)))
 
     def _sync_desired_concurrency(self) -> None:
-        # With no consumer yet, the level a newcomer would start at, since the contract needs it at least 1.
+        # With no consumer yet, the concurrency a newcomer would start at, since the contract needs it at least 1.
         self._desired_concurrency = (
             sum(c.desired_concurrency for c in self._controllers.values()) or self._bounded_start_concurrency
         )
 
 
 class _ThroughputController:
-    """The search for the throughput peak of one set of tasks: those of the whole system, or of one consumer."""
+    """Runs the peak search for one set of tasks: those of the whole system, or of one consumer."""
 
     def __init__(
         self,
@@ -437,7 +438,7 @@ class _ThroughputController:
         self._dead_time_at_move = 0.0
         self._reference_duration = 0.0
         self._soft_ceiling = self.bound
-        # The level before the last raise, kept until a window at the raised level has been read.
+        # The desired concurrency before the last raise, kept until a window at the raised level has been read.
         self._concurrency_before_raise: int | None = None
         self._filled = True
         self._rates = dict[str, float]()
@@ -466,11 +467,11 @@ class _ThroughputController:
 
     @property
     def wanted(self) -> int:
-        """The level this controller asks for in its current phase, with the whole budget to itself."""
+        """The concurrency this controller asks for in its current phase, with the whole budget to itself."""
         return self._concurrency_for(self._phase, bound=self._system.max_concurrency)
 
     def limit_to(self, share: int) -> None:
-        """Bound this controller by its share of the budget, cutting its level at once if it is above."""
+        """Bound this controller by its share of the budget, cutting its desired concurrency at once if it is above."""
         self._share = share
         if self.desired_concurrency > share:
             self.desired_concurrency = share
@@ -478,7 +479,7 @@ class _ThroughputController:
             self._concurrency_before_raise = None
 
     def restart(self) -> None:
-        """Settle the level from now, dropping any window left open."""
+        """Settle the desired concurrency from now, dropping any window left open."""
         self._enrolling = None
         self._window = None
         self._stage, self._stage_since = 'settle', time.monotonic()

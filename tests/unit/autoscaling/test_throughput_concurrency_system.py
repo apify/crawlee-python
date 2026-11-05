@@ -159,7 +159,7 @@ def booked_members(system: ThroughputConcurrencySystem, size: int) -> Generator[
 
 
 def run_window(system: ThroughputConcurrencySystem, clock: FakeClock, durations: list[float]) -> int:
-    """Run one window at the system's level, one member per duration, and return the level the system sets after it."""
+    """Run one window, one member per duration, and return the desired concurrency the system sets after it."""
     with live_tasks(system.desired_concurrency):
         clock.advance(_MAX_SETTLE_TICKS * TICK)
         system._autoscale()
@@ -179,7 +179,7 @@ def run_window(system: ThroughputConcurrencySystem, clock: FakeClock, durations:
 
 
 def run_windows(system: ThroughputConcurrencySystem, clock: FakeClock, *rates: float) -> list[int]:
-    """Run one window per rate, its members taking the duration that delivers the rate, and return each next level."""
+    """Run one window per rate, its members taking the duration that delivers it, and return each next concurrency."""
     concurrencies = []
     for rate in rates:
         duration = system.desired_concurrency / rate
@@ -188,7 +188,7 @@ def run_windows(system: ThroughputConcurrencySystem, clock: FakeClock, *rates: f
 
 
 def run_stalled_window(system: ThroughputConcurrencySystem, clock: FakeClock) -> int:
-    """Run one window whose members never finish, until patience reads it, and return the level set after it."""
+    """Run a window that never finishes until patience reads it, and return the desired concurrency set after it."""
     with live_tasks(system.desired_concurrency):
         clock.advance(_MAX_SETTLE_TICKS * TICK)
         system._autoscale()
@@ -216,7 +216,7 @@ def task_duration(concurrency: int, capacity: int) -> float:
 def run_batches(
     system: ThroughputConcurrencySystem, clock: FakeClock, *, capacity: int, minutes: int
 ) -> list[tuple[int, float]]:
-    """Run tasks against the system in batches of its desired concurrency. Return each batch's level and duration.
+    """Run tasks against the system in batches of its desired concurrency. Return each batch's concurrency and duration.
 
     A batch of `concurrency` tasks that each take one duration delivers `concurrency` tasks per duration, which is
     Little's law with no scatter, so the run is exact and takes milliseconds.
@@ -453,7 +453,7 @@ def test_ties_stop_at_minimum(clock: FakeClock) -> None:
 
 
 def test_tie_at_narrowest_spread_holds(clock: FakeClock) -> None:
-    """A tie at the narrowest spread holds the level for six windows, then measures below it again."""
+    """A tie at the narrowest spread holds the concurrency for six windows, then measures below it again."""
     system = make_system(desired=40)
 
     concurrencies = run_windows(system, clock, *TO_HOLD, *[5.0] * system.hold_cycles_at_peak)
@@ -462,7 +462,7 @@ def test_tie_at_narrowest_spread_holds(clock: FakeClock) -> None:
 
 
 def test_zero_hold_cycles_never_hold(clock: FakeClock) -> None:
-    """A subclass can switch the hold off, and ties then keep moving the level."""
+    """A subclass can switch the hold off, and ties then keep moving the concurrency."""
 
     class NeverHolds(ThroughputConcurrencySystem):
         hold_cycles_at_peak = 0
@@ -763,7 +763,7 @@ def test_overload_near_floor(desired: int, expected: int) -> None:
 
 
 def test_overload_undoes_raise(clock: FakeClock) -> None:
-    """An overload before the raised level was read returns the system to the level before the raise."""
+    """An overload before the raised level was read returns the system to the concurrency before the raise."""
     status = idle_status()
     system = make_system(desired=40, status=status)
     assert run_windows(system, clock, 10.0) == [80]
@@ -957,7 +957,7 @@ def test_shared_mode_keeps_no_counts() -> None:
 
 
 def test_consumer_gets_own_controller() -> None:
-    """Each consumer gets its own controller at the settings' level, and the system reports their sum."""
+    """Each consumer gets its own controller at the settings' desired concurrency, and the system reports their sum."""
     system = make_system(desired=20, per_consumer=True)
 
     with pretend_active():
@@ -970,7 +970,7 @@ def test_consumer_gets_own_controller() -> None:
 
 
 def test_capacity_follows_own_concurrency() -> None:
-    """A consumer at its own level is refused while another one still gets capacity."""
+    """A consumer at its own desired concurrency is refused while another one still gets capacity."""
     system = make_system(desired=2, per_consumer=True)
 
     with pretend_active():
@@ -1049,7 +1049,7 @@ def test_overload_keeps_own_minimum() -> None:
 
 
 def test_no_consumer_checks_total() -> None:
-    """Asking without a consumer is gated by the system's total, while a consumer is gated by its own level."""
+    """Asking without a consumer is gated by the system total, and a consumer by its own desired concurrency."""
     system = make_system(desired=1, per_consumer=True)
 
     with pretend_active():
@@ -1082,7 +1082,7 @@ def test_budget_split(wants: tuple[int, ...], min_concurrency: int, maximum: int
 
 
 def test_newcomer_cuts_shares_at_once() -> None:
-    """A consumer joining a full budget cuts the level of the one already there to its share right away."""
+    """A consumer joining a full budget cuts the one already there to its share right away."""
     system = make_system(desired=20, max_concurrency=30, per_consumer=True)
 
     with pretend_active():
@@ -1100,7 +1100,7 @@ def test_newcomer_cuts_shares_at_once() -> None:
     ],
 )
 def test_lower_max_cuts_concurrency_at_once(per_consumer: bool) -> None:  # noqa: FBT001
-    """Lowering `max_concurrency` while the system runs cuts the level right away."""
+    """Lowering `max_concurrency` while the system runs cuts the desired concurrency right away."""
     system = make_system(desired=20, max_concurrency=30, per_consumer=per_consumer)
 
     with pretend_active():
@@ -1119,7 +1119,7 @@ def test_lower_max_cuts_concurrency_at_once(per_consumer: bool) -> None:  # noqa
     ],
 )
 def test_higher_min_lifts_concurrency_at_once(per_consumer: bool) -> None:  # noqa: FBT001
-    """Raising `min_concurrency` while the system runs lifts the level right away."""
+    """Raising `min_concurrency` while the system runs lifts the desired concurrency right away."""
     system = make_system(desired=20, max_concurrency=30, per_consumer=per_consumer)
 
     with pretend_active():
@@ -1131,7 +1131,7 @@ def test_higher_min_lifts_concurrency_at_once(per_consumer: bool) -> None:  # no
 
 
 def test_no_consumer_desired_in_bounds() -> None:
-    """With no consumer yet, lowering `max_concurrency` below the start level still bounds the desired concurrency."""
+    """With no consumer yet, the desired concurrency follows a `max_concurrency` lowered below its starting value."""
     system = make_system(desired=20, max_concurrency=30, per_consumer=True)
 
     system.max_concurrency = 10
@@ -1240,7 +1240,7 @@ def test_full_budget_refuses_above_min() -> None:
 
 
 def test_max_wins_over_raised_min() -> None:
-    """With `min_concurrency` raised above `max_concurrency` at runtime, the level stays at the maximum."""
+    """With `min_concurrency` raised above `max_concurrency` at runtime, `max_concurrency` wins."""
     status = idle_status()
     system = make_system(desired=40, status=status)
     system.max_concurrency = 5
