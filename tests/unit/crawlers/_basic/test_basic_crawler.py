@@ -1780,7 +1780,7 @@ async def test_logs_final_statistics(
             '└───────────────────────────────┴────────────┘',
         ]
     else:
-        assert final_statistics.msg == 'Final request statistics:'
+        assert final_statistics.getMessage() == 'Final request statistics:'
 
         # `extra` parameters are not defined on `LogRecord`, so we cast to `Any` to access them.
         record = cast('Any', final_statistics)
