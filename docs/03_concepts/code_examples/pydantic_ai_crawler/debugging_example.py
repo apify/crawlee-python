@@ -58,12 +58,12 @@ async def main() -> None:
             try:
                 article = await context.extract(Article)
             except UnexpectedModelBehavior:
-                context.log.exception(f'Extraction failed for {context.request.url}.')
+                context.log.exception('Extraction failed for %s.', context.request.url)
                 raise
             finally:
                 # Log each exchanged message on its own line for readability.
                 for message in messages:
-                    context.log.info(f'{message}')
+                    context.log.info('%s', message)
 
         await context.push_data(article.model_dump())
 

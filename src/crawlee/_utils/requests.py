@@ -81,7 +81,7 @@ def compute_unique_key(
     try:
         normalized_url = normalize_url(url, keep_url_fragment=keep_url_fragment)
     except Exception as exc:
-        logger.warning(f'Failed to normalize URL: {exc}')
+        logger.warning('Failed to normalize URL: %s', exc)
         normalized_url = url
 
     # Normalize the method.
@@ -102,9 +102,13 @@ def compute_unique_key(
     # Log information if there is a non-GET request with a payload.
     if normalized_method != 'GET' and payload:
         logger.info(
-            f'{normalized_method} request with a payload detected. By default, requests to the same URL with '
-            'different methods or payloads will be deduplicated. Use "use_extended_unique_key" to include payload '
-            'and headers in the unique key and avoid deduplication in these cases.'
+            (
+                '%s request with a payload detected. By default, requests to the same URL with '
+                'different methods or payloads will be deduplicated. Use '
+                '"use_extended_unique_key" to include payload and headers in the unique key and '
+                'avoid deduplication in these cases.'
+            ),
+            normalized_method,
         )
 
     # Return the normalized URL as the unique key.

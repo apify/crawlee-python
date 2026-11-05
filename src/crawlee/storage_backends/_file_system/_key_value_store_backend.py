@@ -233,7 +233,7 @@ class FileSystemKeyValueStoreBackend(KeyValueStoreBackend):
         # Found a file for this key, now look for its metadata
         record_metadata_filepath = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
         if not record_metadata_filepath.exists():
-            logger.warning(f'Found value file for key "{key}" but no metadata file.')
+            logger.warning('Found value file for key "%s" but no metadata file.', key)
             return None
 
         # Read the metadata file
@@ -243,13 +243,13 @@ class FileSystemKeyValueStoreBackend(KeyValueStoreBackend):
                     functools.partial(record_metadata_filepath.open, mode='r', encoding='utf-8'),
                 )
             except FileNotFoundError:
-                logger.warning(f'Metadata file disappeared for key "{key}", aborting get_value')
+                logger.warning('Metadata file disappeared for key "%s", aborting get_value', key)
                 return None
 
             try:
                 metadata_content = json.load(file)
             except json.JSONDecodeError:
-                logger.warning(f'Invalid metadata file for key "{key}"')
+                logger.warning('Invalid metadata file for key "%s"', key)
                 return None
             finally:
                 await asyncio.to_thread(file.close)
@@ -257,14 +257,14 @@ class FileSystemKeyValueStoreBackend(KeyValueStoreBackend):
         try:
             metadata = KeyValueStoreRecordMetadata(**metadata_content)
         except ValidationError:
-            logger.warning(f'Invalid metadata schema for key "{key}"')
+            logger.warning('Invalid metadata schema for key "%s"', key)
             return None
 
         # Read the actual value
         try:
             value_bytes = await asyncio.to_thread(record_path.read_bytes)
         except FileNotFoundError:
-            logger.warning(f'Value file disappeared for key "{key}"')
+            logger.warning('Value file disappeared for key "%s"', key)
             return None
 
         # Handle None values
@@ -275,14 +275,14 @@ class FileSystemKeyValueStoreBackend(KeyValueStoreBackend):
             try:
                 value = json.loads(value_bytes.decode('utf-8'))
             except (json.JSONDecodeError, UnicodeDecodeError):
-                logger.warning(f'Failed to decode JSON value for key "{key}"')
+                logger.warning('Failed to decode JSON value for key "%s"', key)
                 return None
         # Handle text values
         elif metadata.content_type.startswith('text/'):
             try:
                 value = value_bytes.decode('utf-8')
             except UnicodeDecodeError:
-                logger.warning(f'Failed to decode text value for key "{key}"')
+                logger.warning('Failed to decode text value for key "%s"', key)
                 return None
         # Handle binary values
         else:
@@ -354,7 +354,7 @@ class FileSystemKeyValueStoreBackend(KeyValueStoreBackend):
                 if metadata_path.exists():
                     await asyncio.to_thread(metadata_path.unlink, missing_ok=True)
                 else:
-                    logger.warning(f'Found value file for key "{key}" but no metadata file when trying to delete it.')
+                    logger.warning('Found value file for key "%s" but no metadata file when trying to delete it.', key)
 
                 deleted = True
 
@@ -399,19 +399,19 @@ class FileSystemKeyValueStoreBackend(KeyValueStoreBackend):
             try:
                 metadata_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
             except FileNotFoundError:
-                logger.warning(f'Metadata file disappeared for key "{key_name}", skipping it.')
+                logger.warning('Metadata file disappeared for key "%s", skipping it.', key_name)
                 continue
 
             try:
                 metadata_dict = json.loads(metadata_content)
             except json.JSONDecodeError:
-                logger.warning(f'Failed to decode metadata file for key "{key_name}", skipping it.')
+                logger.warning('Failed to decode metadata file for key "%s", skipping it.', key_name)
                 continue
 
             try:
                 record_metadata = KeyValueStoreRecordMetadata(**metadata_dict)
             except ValidationError:
-                logger.warning(f'Invalid metadata schema for key "{key_name}", skipping it.')
+                logger.warning('Invalid metadata schema for key "%s", skipping it.', key_name)
 
             yield record_metadata
 

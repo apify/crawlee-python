@@ -23,7 +23,7 @@ async def main() -> None:
             state['cookies'] = context.session.cookies.get_cookies_as_dicts()
             raise RuntimeError('retry with cookies')
 
-        context.log.info(f'Cookies: {context.session.cookies.get_cookies_as_dicts()}')
+        context.log.info('Cookies: %s', context.session.cookies.get_cookies_as_dicts())
 
     @crawler.pre_navigation_hook
     async def apply_cookies(context: BasicCrawlingContext) -> None:

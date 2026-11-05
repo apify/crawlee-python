@@ -238,7 +238,7 @@ class _XmlSitemapParser:
             self._handler.items.clear()
 
         except Exception as e:
-            logger.warning(f'Failed to parse XML data chunk: {e}', exc_info=True)
+            logger.warning('Failed to parse XML data chunk: %s', e, exc_info=True)
 
     async def flush(self) -> AsyncGenerator[_SitemapItem, None]:
         """Process any remaining data in the buffer, yielding items one by one."""
@@ -249,7 +249,7 @@ class _XmlSitemapParser:
                 flush()
 
         except Exception as e:
-            logger.warning(f'Failed to parse remaining XML data: {e}')
+            logger.warning('Failed to parse remaining XML data: %s', e)
 
         finally:
             for item in self._handler.items:
@@ -309,7 +309,7 @@ async def _process_sitemap_item(
             if parent_url := source.get('url'):
                 ok, reason = filter_url(target=sitemap_url, strategy=enqueue_strategy, origin=parent_url)
                 if not ok:
-                    logger.warning(f'Skipping nested sitemap {sitemap_url!r} (parent {parent_url!r}): {reason}.')
+                    logger.warning('Skipping nested sitemap %r (parent %r): %s.', sitemap_url, parent_url, reason)
                     return
 
             # Add to processing queue
@@ -329,7 +329,7 @@ async def _process_sitemap_item(
         if parent_url and loc:
             ok, reason = filter_url(target=loc, strategy=enqueue_strategy, origin=parent_url)
             if not ok:
-                logger.warning(f'Skipping sitemap URL {loc!r} (parent {parent_url!r}): {reason}.')
+                logger.warning('Skipping sitemap URL %r (parent %r): %s.', loc, parent_url, reason)
                 return
 
         # Create and yield the sitemap URL object
@@ -353,7 +353,7 @@ async def _process_raw_source(
 ) -> AsyncGenerator[SitemapUrl | NestedSitemap, None]:
     """Process a raw content sitemap source."""
     if 'content' not in source:
-        logger.warning(f'Raw source missing content: {source}')
+        logger.warning('Raw source missing content: %s', source)
         return
 
     content = source['content']
@@ -388,7 +388,7 @@ async def _process_raw_source(
                 if result:
                     yield result
     except Exception as e:
-        logger.warning(f'Failed to parse raw sitemap content: {e}')
+        logger.warning('Failed to parse raw sitemap content: %s', e)
     finally:
         parser.close()
 
@@ -424,7 +424,7 @@ async def _fetch_and_process_sitemap(
                 if not _is_successful_sitemap_status(status_code):
                     # Retryable statuses raise and route to the retry handler below; the rest skip this source.
                     _raise_for_retryable_sitemap_status(status_code)
-                    logger.warning(f'Skipping sitemap {sitemap_url} due to HTTP status code {status_code}.')
+                    logger.warning('Skipping sitemap %s due to HTTP status code %s.', sitemap_url, status_code)
                     return
 
                 # Determine content type and compression
@@ -488,8 +488,12 @@ async def _fetch_and_process_sitemap(
 
                     if truncated:
                         logger.warning(
-                            f'Sitemap {sitemap_url} exceeded the maximum size of {MAX_SITEMAP_SIZE} bytes, '
-                            f'processing only the truncated content.'
+                            (
+                                'Sitemap %s exceeded the maximum size of %s bytes, processing only the truncated '
+                                'content.'
+                            ),
+                            sitemap_url,
+                            MAX_SITEMAP_SIZE,
                         )
 
                     # Process any remaining content
@@ -512,17 +516,22 @@ async def _fetch_and_process_sitemap(
         except _RetryableSitemapStatusError as e:
             if retries_left > 0:
                 logger.warning(
-                    f'Error fetching sitemap {sitemap_url}: HTTP status {e.status_code}. Retries left: {retries_left}'
+                    'Error fetching sitemap %s: HTTP status %s. Retries left: %s',
+                    sitemap_url,
+                    e.status_code,
+                    retries_left,
                 )
                 await asyncio.sleep(SITEMAP_RETRY_DELAY)
             else:
-                logger.warning(f'Failed to fetch sitemap {sitemap_url}, no retries left: HTTP status {e.status_code}.')
+                logger.warning(
+                    'Failed to fetch sitemap %s, no retries left: HTTP status %s.', sitemap_url, e.status_code
+                )
         except Exception as e:
             if retries_left > 0:
-                logger.warning(f'Error fetching sitemap {sitemap_url}: {e}. Retries left: {retries_left}')
+                logger.warning('Error fetching sitemap %s: %s. Retries left: %s', sitemap_url, e, retries_left)
                 await asyncio.sleep(SITEMAP_RETRY_DELAY)
             else:
-                logger.exception(f'Failed to fetch sitemap {sitemap_url}, no retries left.')
+                logger.exception('Failed to fetch sitemap %s, no retries left.', sitemap_url)
                 raise
         else:
             return
@@ -630,7 +639,7 @@ async def parse_sitemap(
 
         # Skip if we've reached max depth
         if depth > max_depth:
-            logger.debug(f'Skipping sitemap {source.get("url", "")} - exceeded max depth {max_depth}')
+            logger.debug('Skipping sitemap %s - exceeded max depth %s', source.get('url', ''), max_depth)
             continue
 
         # Process based on source type
@@ -676,7 +685,7 @@ async def parse_sitemap(
                 # Already logged by `_fetch_and_process_sitemap`; raised below only if no source succeeds.
                 source_errors.append(e)
         else:
-            logger.warning(f'Invalid source configuration: {source}')
+            logger.warning('Invalid source configuration: %s', source)
 
     if source_errors and successful_sources == 0:
         raise source_errors[0]
@@ -692,7 +701,7 @@ async def _merge_async_generators(*generators: AsyncGenerator) -> AsyncGenerator
             async for item in gen:
                 await queue.put(item)
         except Exception:
-            logger.warning(f'Error in generator: {gen}', exc_info=True)
+            logger.warning('Error in generator: %s', gen, exc_info=True)
         finally:
             await queue.put(end_feed)
 
@@ -762,11 +771,13 @@ async def _discover_for_hostname(
                 if is_status_code_successful(response.status_code) and _check_and_add(candidate):
                     yield candidate
             except ProxyError:
-                logger.warning(f'Proxy error when checking {candidate} with sitemap discovery for {hostname}')
+                logger.warning('Proxy error when checking %s with sitemap discovery for %s', candidate, hostname)
             except TimeoutError:
-                logger.warning(f'Timeout when checking {candidate} with sitemap discovery for {hostname}')
+                logger.warning('Timeout when checking %s with sitemap discovery for %s', candidate, hostname)
             except Exception:
-                logger.warning(f'Error when checking {candidate} with sitemap discovery for {hostname}', exc_info=True)
+                logger.warning(
+                    'Error when checking %s with sitemap discovery for %s', candidate, hostname, exc_info=True
+                )
 
 
 async def discover_valid_sitemaps(
@@ -794,11 +805,11 @@ async def discover_valid_sitemaps(
         try:
             hostname = URL(url).host
         except ValueError:
-            logger.warning(f'Invalid URL {url} skipped')
+            logger.warning('Invalid URL %s skipped', url)
             continue
 
         if not hostname:
-            logger.warning(f'URL {url} without host skipped')
+            logger.warning('URL %s without host skipped', url)
             continue
 
         grouped_urls[hostname].append(url)

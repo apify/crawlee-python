@@ -89,7 +89,7 @@ class PlaywrightCrawler(
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
         # Extract data from the page.
         data = {
@@ -483,9 +483,12 @@ class PlaywrightCrawler(
                     request = Request.from_url(**request_options)
                 except ValidationError as exc:
                     context.log.debug(
-                        f'Skipping URL "{url}" due to invalid format: {exc}. '
-                        'This may be caused by a malformed URL or unsupported URL scheme. '
-                        'Please ensure the URL is correct and retry.'
+                        (
+                            'Skipping URL "%s" due to invalid format: %s. This may be caused by a malformed '
+                            'URL or unsupported URL scheme. Please ensure the URL is correct and retry.'
+                        ),
+                        url,
+                        exc,
                     )
                     continue
 
@@ -499,7 +502,7 @@ class PlaywrightCrawler(
                         url=url, user_data={**base_user_data}, label=label, enqueue_strategy=strategy
                     )
                 except ValidationError as exc:
-                    context.log.debug(f'Skipping URL "{url}" disallowed by robots.txt due to invalid format: {exc}.')
+                    context.log.debug('Skipping URL "%s" disallowed by robots.txt due to invalid format: %s.', url, exc)
                     continue
 
                 skipped_requests.append(skipped_request)

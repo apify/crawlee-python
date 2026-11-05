@@ -16,14 +16,14 @@ async def main() -> None:
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
         await context.enqueue_links()
 
     # Define the hook, which will be called before every request.
     @crawler.pre_navigation_hook
     async def navigation_hook(context: PlaywrightPreNavCrawlingContext) -> None:
-        context.log.info(f'Navigating to {context.request.url} ...')
+        context.log.info('Navigating to %s ...', context.request.url)
 
         # Block all requests to URLs that include `adsbygoogle.js` and also all defaults.
         await context.block_requests(extra_url_patterns=['adsbygoogle.js'])

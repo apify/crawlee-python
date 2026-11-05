@@ -17,7 +17,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def handle_request(context: AdaptivePlaywrightCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
         data = {
             'url': context.request.url,
             'title': await context.query_selector_one('title'),

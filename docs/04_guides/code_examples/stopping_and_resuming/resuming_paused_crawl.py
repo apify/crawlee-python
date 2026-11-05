@@ -23,7 +23,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
     # List of links for crawl
     requests = [

@@ -242,13 +242,19 @@ class PlaywrightBrowserController(BrowserController):
         for key, value in options.items():
             if self._use_incognito_pages and key in params_cache['persistent_unique']:
                 logger.warning(
-                    f'Option "{key}" is only supported in persistent context mode '
-                    '(use_incognito_pages=False) and will be ignored.'
+                    (
+                        'Option "%s" is only supported in persistent context mode '
+                        '(use_incognito_pages=False) and will be ignored.'
+                    ),
+                    key,
                 )
             elif not self._use_incognito_pages and key in params_cache['incognito_unique']:
                 logger.warning(
-                    f'Option "{key}" is only supported in incognito context mode '
-                    '(use_incognito_pages=True) and will be ignored.'
+                    (
+                        'Option "%s" is only supported in incognito context mode '
+                        '(use_incognito_pages=True) and will be ignored.'
+                    ),
+                    key,
                 )
             else:
                 filtered[key] = value

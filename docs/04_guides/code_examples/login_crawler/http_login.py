@@ -34,12 +34,12 @@ async def main() -> None:
     # Default request handler for normal page processing
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
     # Specialized handler for the login API request
     @crawler.router.handler('login')
     async def login_handler(context: HttpCrawlingContext) -> None:
-        context.log.info(f'Processing login at {context.request.url} ...')
+        context.log.info('Processing login at %s ...', context.request.url)
 
         # Verify that a session is available before proceeding
         if not context.session:

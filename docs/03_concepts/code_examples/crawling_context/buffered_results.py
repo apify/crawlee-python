@@ -9,7 +9,7 @@ async def main() -> None:
     @crawler.router.default_handler
     async def request_handler(context: BasicCrawlingContext) -> None:
         attempt = context.request.retry_count + 1
-        context.log.info(f'Attempt {attempt} for {context.request.url}')
+        context.log.info('Attempt %s for %s', attempt, context.request.url)
 
         # Buffered until the handler finishes without an exception.
         await context.push_data({'url': context.request.url, 'attempt': attempt})

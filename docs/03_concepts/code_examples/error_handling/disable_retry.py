@@ -10,13 +10,13 @@ async def main() -> None:
     # Create a parsing error for demonstration
     @crawler.router.default_handler
     async def default_handler(context: HttpCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
         raise ValueError('Simulated parsing error')
 
     # This handler runs before any retry attempts
     @crawler.error_handler
     async def retry_handler(context: BasicCrawlingContext, error: Exception) -> None:
-        context.log.error(f'Failed request {context.request.url}')
+        context.log.error('Failed request %s', context.request.url)
         # Only allow retries for network-related errors
         if not isinstance(error, (SessionError, HttpStatusCodeError)):
             context.log.error('Non-network error detected')

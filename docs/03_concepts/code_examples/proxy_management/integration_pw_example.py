@@ -22,7 +22,7 @@ async def main() -> None:
             'url': context.request.url,
             'title': await context.page.title(),
         }
-        context.log.info(f'Extracted data: {data}')
+        context.log.info('Extracted data: %s', data)
 
     # Run the crawler with the initial list of requests.
     await crawler.run(['https://crawlee.dev/'])

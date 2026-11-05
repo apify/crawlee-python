@@ -142,7 +142,10 @@ class PydanticAiDirectExtractor(BasePydanticAiHtmlExtractor):
             self._ai_usage.add(run_usage)
 
         logger.debug(
-            f'Direct extraction of {schema.__name__} used {run_usage.requests} request(s), '
-            f'{run_usage.input_tokens} input + {run_usage.output_tokens} output tokens.'
+            'Direct extraction of %s used %s request(s), %s input + %s output tokens.',
+            schema.__name__,
+            run_usage.requests,
+            run_usage.input_tokens,
+            run_usage.output_tokens,
         )
         return result.output

@@ -8,7 +8,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url}')
+        context.log.info('Processing %s', context.request.url)
 
         # Wait for the category cards to render on the page. This ensures that
         # the elements we want to interact with are present in the DOM.

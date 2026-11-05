@@ -19,12 +19,12 @@ async def main() -> None:
     # Runs between retries. It can inspect or adjust the request before the next try.
     @crawler.error_handler
     async def on_error(context: BasicCrawlingContext, error: Exception) -> None:
-        context.log.warning(f'Retrying {context.request.url}: {error}')
+        context.log.warning('Retrying %s: %s', context.request.url, error)
 
     # Runs once a request has exhausted all retries, like Scrapy's `errback`.
     @crawler.failed_request_handler
     async def on_failed(context: BasicCrawlingContext, error: Exception) -> None:
-        context.log.error(f'Giving up on {context.request.url}: {error}')
+        context.log.error('Giving up on %s: %s', context.request.url, error)
         # highlight-end
 
     await crawler.run(['https://quotes.toscrape.com/'])

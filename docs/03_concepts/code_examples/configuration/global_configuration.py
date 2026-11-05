@@ -24,7 +24,7 @@ async def main() -> None:
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
         # Logged at INFO level, so the WARNING threshold filters it out.
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
         await context.push_data({'title': context.selector.css('title::text').get()})
 
     await crawler.run(['https://crawlee.dev'])

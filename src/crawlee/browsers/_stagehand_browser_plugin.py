@@ -169,7 +169,7 @@ class StagehandBrowserPlugin(BrowserPlugin):
             if 'executable_path' not in self._browser_launch_options:
                 chrome_path = self._playwright.chromium.executable_path
                 self._browser_launch_options['executable_path'] = chrome_path
-                logger.debug(f'Resolved Chromium path from Playwright: {chrome_path}')
+                logger.debug('Resolved Chromium path from Playwright: %s', chrome_path)
 
             self._stagehand_init_params['local_chrome_path'] = self._browser_launch_options['executable_path']
 

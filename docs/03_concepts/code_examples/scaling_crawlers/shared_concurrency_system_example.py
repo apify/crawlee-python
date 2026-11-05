@@ -32,11 +32,11 @@ async def main() -> None:
 
         @first_crawler.router.default_handler
         async def first_handler(context: BeautifulSoupCrawlingContext) -> None:
-            context.log.info(f'Processing {context.request.url}...')
+            context.log.info('Processing %s...', context.request.url)
 
         @second_crawler.router.default_handler
         async def second_handler(context: ParselCrawlingContext) -> None:
-            context.log.info(f'Processing {context.request.url}...')
+            context.log.info('Processing %s...', context.request.url)
 
         await asyncio.gather(
             first_crawler.run(['https://crawlee.dev/']),

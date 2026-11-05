@@ -21,14 +21,14 @@ async def archive_response(
     """Helper function for archiving response in WARC format."""
     response = await request.response()
     if not response:
-        logger.warning(f'Could not get response {request.url}')
+        logger.warning('Could not get response %s', request.url)
         return
     try:
         response_body = await response.body()
     except Exception as e:
-        logger.warning(f'Could not get response body for {response.url}: {e}')
+        logger.warning('Could not get response body for %s: %s', response.url, e)
         return
-    logger.info(f'Archiving resource {response.url}')
+    logger.info('Archiving resource %s', response.url)
     response_payload_stream = io.BytesIO(response_body)
     response_headers = StatusAndHeaders(
         str(response.status), response.headers, protocol='HTTP/1.1'

@@ -318,4 +318,4 @@ class AutoscaledPool:
             if self._TASK_TIMEOUT is None:
                 # Without a timeout, `wait_for` cannot time out - the error comes from the task function itself.
                 raise
-            self._logger.warning(f'Task timed out after {self._TASK_TIMEOUT.total_seconds()} seconds')
+            self._logger.warning('Task timed out after %s seconds', self._TASK_TIMEOUT.total_seconds())

@@ -14,7 +14,7 @@ async def main() -> None:
     @router.use
     async def logging_middleware(context: ParselCrawlingContext) -> None:
         context.log.info(
-            f'Processing request: {context.request.url} label={context.request.label}'
+            'Processing request: %s label=%s', context.request.url, context.request.label
         )
 
     # Register a middleware that adds a timestamp to the request's user data
@@ -24,11 +24,11 @@ async def main() -> None:
 
     @router.default_handler
     async def default_handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} with default handler')
+        context.log.info('Processing %s with default handler', context.request.url)
 
     @router.handler('CATEGORY')
     async def category_handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} with category handler')
+        context.log.info('Processing %s with category handler', context.request.url)
 
     crawler = ParselCrawler(
         request_handler=router,

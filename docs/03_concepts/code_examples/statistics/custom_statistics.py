@@ -24,7 +24,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
         await context.enqueue_links()
 
     await crawler.run(['https://crawlee.dev'])

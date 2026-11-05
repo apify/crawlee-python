@@ -12,7 +12,7 @@ async def main() -> None:
     # and attach it to the crawler using a decorator.
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
         # Extract relevant data from the page context.
         data = {
             'url': context.request.url,

@@ -181,7 +181,7 @@ class RedisKeyValueStoreBackend(KeyValueStoreBackend, RedisBackendMixin):
             await self._update_metadata(pipe, **MetadataUpdateParams(update_accessed_at=True))
 
         if not isinstance(serialized_metadata_item, (str, bytes, bytearray)):
-            logger.warning(f'Metadata for key "{key}" is missing or invalid.')
+            logger.warning('Metadata for key "%s" is missing or invalid.', key)
             return None
 
         metadata_item = KeyValueStoreRecordMetadata.model_validate_json(serialized_metadata_item)
@@ -207,7 +207,7 @@ class RedisKeyValueStoreBackend(KeyValueStoreBackend, RedisBackendMixin):
         key = metadata_item.key
 
         if value_bytes is None:
-            logger.warning(f'Value for key "{key}" is missing.')
+            logger.warning('Value for key "%s" is missing.', key)
             return None
 
         # Handle None values
@@ -218,14 +218,14 @@ class RedisKeyValueStoreBackend(KeyValueStoreBackend, RedisBackendMixin):
             try:
                 value = json.loads(value_bytes.decode('utf-8'))
             except (json.JSONDecodeError, UnicodeDecodeError):
-                logger.warning(f'Failed to decode JSON value for key "{key}"')
+                logger.warning('Failed to decode JSON value for key "%s"', key)
                 return None
         # Handle text values
         elif metadata_item.content_type.startswith('text/'):
             try:
                 value = value_bytes.decode('utf-8')
             except UnicodeDecodeError:
-                logger.warning(f'Failed to decode text value for key "{key}"')
+                logger.warning('Failed to decode text value for key "%s"', key)
                 return None
         # Handle binary values
         else:

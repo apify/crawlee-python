@@ -25,7 +25,7 @@ async def main() -> None:
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
     async def request_handler(context: FileDownloadCrawlingContext) -> None:
-        context.log.info(f'Downloading {context.request.url} ...')
+        context.log.info('Downloading %s ...', context.request.url)
 
         file_name = URL(context.request.url).name
 
@@ -34,7 +34,7 @@ async def main() -> None:
             async for chunk in context.http_response.read_stream():
                 file.write(chunk)
 
-        context.log.info(f'Saved {file_name}')
+        context.log.info('Saved %s', file_name)
 
     # Run the crawler with the list of files to download.
     await crawler.run(

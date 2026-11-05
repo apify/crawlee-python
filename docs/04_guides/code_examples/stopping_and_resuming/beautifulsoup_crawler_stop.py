@@ -16,7 +16,7 @@ async def main() -> None:
     # - soup: the BeautifulSoup object containing the parsed HTML of the response.
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
         # Create custom condition to stop crawler once it finds what it is looking for.
         if 'crawlee' in context.request.url:

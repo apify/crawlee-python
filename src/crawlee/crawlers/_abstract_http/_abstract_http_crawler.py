@@ -230,7 +230,7 @@ class AbstractHttpCrawler(
                 if is_url_absolute(resolved_base_url):
                     base_url = resolved_base_url
                 else:
-                    context.log.debug(f'Ignoring invalid base URL "{extracted_base_urls[0]}", using the page URL.')
+                    context.log.debug('Ignoring invalid base URL "%s", using the page URL.', extracted_base_urls[0])
             links_iterator = to_absolute_url_iterator(base_url, links_iterator, logger=context.log)
 
             if robots_txt_file:
@@ -257,9 +257,12 @@ class AbstractHttpCrawler(
                     request = Request.from_url(**request_options)
                 except ValidationError as exc:
                     context.log.debug(
-                        f'Skipping URL "{url}" due to invalid format: {exc}. '
-                        'This may be caused by a malformed URL or unsupported URL scheme. '
-                        'Please ensure the URL is correct and retry.'
+                        (
+                            'Skipping URL "%s" due to invalid format: %s. This may be caused by a malformed '
+                            'URL or unsupported URL scheme. Please ensure the URL is correct and retry.'
+                        ),
+                        url,
+                        exc,
                     )
                     continue
 
@@ -273,7 +276,7 @@ class AbstractHttpCrawler(
                         url=url, user_data={**base_user_data}, label=label, enqueue_strategy=strategy
                     )
                 except ValidationError as exc:
-                    context.log.debug(f'Skipping URL "{url}" disallowed by robots.txt due to invalid format: {exc}.')
+                    context.log.debug('Skipping URL "%s" disallowed by robots.txt due to invalid format: %s.', url, exc)
                     continue
 
                 skipped_requests.append(skipped_request)

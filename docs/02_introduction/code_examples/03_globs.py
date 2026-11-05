@@ -9,7 +9,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url}.')
+        context.log.info('Processing %s.', context.request.url)
 
         # Enqueue links that match the 'include' glob pattern and
         # do not match the 'exclude' glob pattern.

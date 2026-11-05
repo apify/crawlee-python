@@ -389,10 +389,10 @@ class AdaptivePlaywrightCrawler(
 
         if not should_detect_rendering_type:
             self.log.debug(
-                f'Predicted rendering type {rendering_type_prediction.rendering_type} for {context.request.url}'
+                'Predicted rendering type %s for %s', rendering_type_prediction.rendering_type, context.request.url
             )
             if rendering_type_prediction.rendering_type == 'static':
-                context.log.debug(f'Running static request for {context.request.url}')
+                context.log.debug('Running static request for %s', context.request.url)
                 self.track_http_only_request_handler_runs()
 
                 static_run = await self._crawl_one(rendering_type='static', context=context)
@@ -408,13 +408,13 @@ class AdaptivePlaywrightCrawler(
                     raise static_run.exception
                 if static_run.exception:
                     context.log.error(
-                        msg=f'Static crawler: failed for {context.request.url}', exc_info=static_run.exception
+                        'Static crawler: failed for %s', context.request.url, exc_info=static_run.exception
                     )
                 else:
-                    context.log.warning(f'Static crawler: returned a suspicious result for {context.request.url}')
+                    context.log.warning('Static crawler: returned a suspicious result for %s', context.request.url)
                     self.track_rendering_type_mispredictions()
 
-        context.log.debug(f'Running browser request handler for {context.request.url}')
+        context.log.debug('Running browser request handler for %s', context.request.url)
 
         old_state_copy = None
 
@@ -445,7 +445,7 @@ class AdaptivePlaywrightCrawler(
                 else:
                     detection_result = 'client only'
 
-                context.log.debug(f'Detected rendering type {detection_result} for {context.request.url}')
+                context.log.debug('Detected rendering type %s for %s', detection_result, context.request.url)
                 self.rendering_type_predictor.store_result(context.request, detection_result)
 
             self._context_result_map[context] = pw_run.result

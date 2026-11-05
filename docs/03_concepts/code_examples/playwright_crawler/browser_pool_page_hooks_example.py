@@ -27,7 +27,7 @@ async def main() -> None:
             _proxy_info: ProxyInfo | None,
         ) -> None:
             """Log when a new page is about to be created."""
-            logger.info(f'Creating page {page_id}...')
+            logger.info('Creating page %s...', page_id)
 
         @browser_pool.post_page_create_hook
         async def set_viewport(
@@ -49,14 +49,14 @@ async def main() -> None:
                 value=screenshot,
                 content_type='image/png',
             )
-            logger.info(f'Saved screenshot for page {crawlee_page.id}.')
+            logger.info('Saved screenshot for page %s.', crawlee_page.id)
 
         @browser_pool.post_page_close_hook
         async def log_page_closed(
             page_id: str, _browser_controller: BrowserController
         ) -> None:
             """Log after each page is closed."""
-            logger.info(f'Page {page_id} closed successfully.')
+            logger.info('Page %s closed successfully.', page_id)
 
         crawler = PlaywrightCrawler(
             browser_pool=browser_pool,
@@ -65,7 +65,7 @@ async def main() -> None:
 
         @crawler.router.default_handler
         async def request_handler(context: PlaywrightCrawlingContext) -> None:
-            context.log.info(f'Processing {context.request.url} ...')
+            context.log.info('Processing %s ...', context.request.url)
 
             await context.enqueue_links()
 

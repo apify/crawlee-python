@@ -1758,13 +1758,13 @@ async def test_logs_final_statistics(
     assert result is fake_statistics
 
     final_statistics = next(
-        (record for record in caplog.records if record.msg.startswith('Final')),
+        (record for record in caplog.records if record.getMessage().startswith('Final')),
         None,
     )
 
     assert final_statistics is not None
     if statistics_log_format == 'table':
-        assert final_statistics.msg.splitlines() == [
+        assert final_statistics.getMessage().splitlines() == [
             'Final request statistics:',
             '┌───────────────────────────────┬────────────┐',
             '│ requests_finished             │ 4          │',
@@ -2600,13 +2600,13 @@ async def _run_crawler(crawler_id: str | None, requests: list[str], storage_dir:
     Must be defined like this to be pickable for ProcessPoolExecutor."""
 
     async def request_handler(context: BasicCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
         # Add visited url to crawler state and use it to verify state persistence.
         state = await context.use_state({'urls': []})
         state['urls'] = state.get('urls')
         assert isinstance(state['urls'], list)
         state['urls'].append(context.request.url)
-        context.log.info(f'State {state}')
+        context.log.info('State %s', state)
 
     crawler = BasicCrawler(
         id=crawler_id,

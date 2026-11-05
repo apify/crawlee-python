@@ -61,7 +61,7 @@ class ConcurrencySystem:
 
 
     async def handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
 
     async def main() -> None:
@@ -443,15 +443,18 @@ class ConcurrencySystem:
         if should_scale_up:
             step = math.ceil(self._scale_up_step_ratio * self._desired_concurrency)
             self._desired_concurrency = min(self._max_concurrency, self._desired_concurrency + step)
-            logger.debug(f'Scaled up the desired concurrency to {self._desired_concurrency}, {status}')
+            logger.debug('Scaled up the desired concurrency to %s, %s', self._desired_concurrency, status)
         elif should_scale_down:
             step = math.ceil(self._scale_down_step_ratio * self._desired_concurrency)
             self._desired_concurrency = max(self._min_concurrency, self._desired_concurrency - step)
-            logger.debug(f'Scaled down the desired concurrency to {self._desired_concurrency}, {status}')
+            logger.debug('Scaled down the desired concurrency to %s, %s', self._desired_concurrency, status)
 
     def _log_system_status(self) -> None:
         system_status = self._system_status.get_historical_system_info()
 
         logger.debug(
-            f'current concurrency {self._current_concurrency}, desired {self._desired_concurrency}, {system_status}'
+            'current concurrency %s, desired %s, %s',
+            self._current_concurrency,
+            self._desired_concurrency,
+            system_status,
         )

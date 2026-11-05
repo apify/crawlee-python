@@ -45,7 +45,7 @@ async def main() -> None:
 
         @crawler.router.default_handler
         async def default_handler(context: PlaywrightCrawlingContext) -> None:
-            context.log.info(f'Visiting {context.request.url}')
+            context.log.info('Visiting %s', context.request.url)
 
         await crawler.run(['https://crawlee.dev/'])
 

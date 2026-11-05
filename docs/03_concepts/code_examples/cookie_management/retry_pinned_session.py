@@ -14,7 +14,9 @@ async def main() -> None:
 
         if context.request.user_data.get('prepared'):
             # Cookies from the setup step are on this pinned session.
-            context.log.info(f'Cookies: {context.session.cookies.get_cookies_as_dicts()}')
+            context.log.info(
+                'Cookies: %s', context.session.cookies.get_cookies_as_dicts()
+            )
             return
 
         # First pass: establish cookies on the current session.

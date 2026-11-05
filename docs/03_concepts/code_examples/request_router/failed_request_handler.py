@@ -12,7 +12,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def default_handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url}')
+        context.log.info('Processing %s', context.request.url)
 
         # Extract product information
         product_name = context.selector.css('h1[data-testid="product-title"]::text').get()
@@ -34,7 +34,7 @@ async def main() -> None:
     @crawler.failed_request_handler
     async def failed_handler(context: BasicCrawlingContext, error: Exception) -> None:
         context.log.error(
-            f'Failed to process {context.request.url} after all retries: {error}'
+            'Failed to process %s after all retries: %s', context.request.url, error
         )
 
         # Save failed request information for analysis

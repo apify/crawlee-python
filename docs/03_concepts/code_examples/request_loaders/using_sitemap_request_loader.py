@@ -75,7 +75,7 @@ async def main() -> None:
         async def handler(context: BeautifulSoupCrawlingContext) -> None:
             source = context.request.user_data.get('source', 'unknown')
             context.log.info(
-                f'Processing request: {context.request.url} from source: {source}'
+                'Processing request: %s from source: %s', context.request.url, source
             )
 
         # Create handler for requests labeled 'apify'
@@ -83,7 +83,9 @@ async def main() -> None:
         async def apify_handler(context: BeautifulSoupCrawlingContext) -> None:
             source = context.request.user_data.get('source', 'unknown')
             context.log.info(
-                f'Apify handler processing: {context.request.url} from source: {source}'
+                'Apify handler processing: %s from source: %s',
+                context.request.url,
+                source,
             )
 
         # Create handler for requests labeled 'crawlee'
@@ -91,7 +93,9 @@ async def main() -> None:
         async def crawlee_handler(context: BeautifulSoupCrawlingContext) -> None:
             source = context.request.user_data.get('source', 'unknown')
             context.log.info(
-                f'Crawlee handler processing: {context.request.url} from source: {source}'
+                'Crawlee handler processing: %s from source: %s',
+                context.request.url,
+                source,
             )
 
         await crawler.run()

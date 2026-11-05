@@ -31,7 +31,7 @@ async def main() -> None:
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
     async def request_handler(context: BasicCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
         # Stop crawler if some guard condition has been met.
         stop_crawler_if_url_visited(context)

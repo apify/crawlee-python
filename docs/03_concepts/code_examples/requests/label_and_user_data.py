@@ -13,7 +13,7 @@ async def main() -> None:
     @crawler.router.default_handler
     async def default_handler(context: ParselCrawlingContext) -> None:
         source = context.request.user_data['source']
-        context.log.info(f'Start page {context.request.url} (source: {source})')
+        context.log.info('Start page %s (source: %s)', context.request.url, source)
 
         # Links enqueued here get the `DETAIL` label and carry the same user data.
         await context.enqueue_links(
@@ -25,8 +25,10 @@ async def main() -> None:
     async def detail_handler(context: ParselCrawlingContext) -> None:
         request = context.request
         context.log.info(
-            f'Detail page {request.url} '
-            f'(depth: {request.crawl_depth}, parent: {request.user_data["parent_url"]})'
+            'Detail page %s (depth: %s, parent: %s)',
+            request.url,
+            request.crawl_depth,
+            request.user_data['parent_url'],
         )
         await context.push_data(
             {

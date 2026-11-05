@@ -102,7 +102,7 @@ class ErrorTracker:
                     error_message=error_message, file_and_line=file_and_line, context=context
                 )
             except Exception:
-                logger.exception(f'Error when trying to collect error snapshot for exception: {error_message}')
+                logger.exception('Error when trying to collect error snapshot for exception: %s', error_message)
 
     def _get_file_and_line(self, error: Exception) -> str:
         if self.show_file_and_line_number:

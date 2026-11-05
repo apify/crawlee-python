@@ -219,7 +219,7 @@ class BrowserPool:
             for plugin in self._plugins:
                 await asyncio.wait_for(plugin.__aenter__(), timeout)
         except TimeoutError:
-            logger.warning(f'Initializing of the browser plugin {plugin} timed out, will be skipped.')
+            logger.warning('Initializing of the browser plugin %s timed out, will be skipped.', plugin)
 
         return self
 

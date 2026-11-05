@@ -33,14 +33,14 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url}.')
+        context.log.info('Processing %s.', context.request.url)
 
         # Transform request before enqueueing
         await context.enqueue_links(transform_request_function=transform_request)
 
     @crawler.router.handler('BLOG')
     async def blog_handler(context: BeautifulSoupCrawlingContext) -> None:
-        context.log.info(f'Blog Processing {context.request.url}.')
+        context.log.info('Blog Processing %s.', context.request.url)
 
     await crawler.run(['https://crawlee.dev/'])
 

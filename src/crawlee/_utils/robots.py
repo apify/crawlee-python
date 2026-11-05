@@ -73,7 +73,7 @@ class RobotsTxtFile:
             robots = Protego.parse(body.decode('utf-8-sig'))
 
         except Exception as e:
-            logger.warning(f'Failed to fetch from robots.txt from "{url}" with error: "{e}"')
+            logger.warning('Failed to fetch from robots.txt from "%s" with error: "%s"', url, e)
 
             robots = Protego.parse('User-agent: *\nAllow: /')
 
@@ -117,7 +117,7 @@ class RobotsTxtFile:
             ok, reason = filter_url(target=sitemap_url, strategy=enqueue_strategy, origin=self._original_url)
             if not ok:
                 logger.warning(
-                    f'Skipping sitemap {sitemap_url!r} listed in robots.txt at {str(self._original_url)!r}: {reason}.'
+                    'Skipping sitemap %r listed in robots.txt at %r: %s.', sitemap_url, str(self._original_url), reason
                 )
                 continue
             sitemaps.append(sitemap_url)

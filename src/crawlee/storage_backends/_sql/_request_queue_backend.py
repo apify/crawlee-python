@@ -371,7 +371,7 @@ class SqlRequestQueueBackend(
                 processed_requests.extend(transaction_processed_requests)
             except SQLAlchemyError as e:
                 await session.rollback()
-                logger.debug(f'Failed add requests to DB with error: {e}')
+                logger.debug('Failed add requests to DB with error: %s', e)
                 await self._add_buffer_record(
                     session,
                     update_modified_at=True,
@@ -409,7 +409,7 @@ class SqlRequestQueueBackend(
             request_db = result.scalar_one_or_none()
 
             if request_db is None:
-                logger.warning(f'Request with ID "{unique_key}" not found in the queue.')
+                logger.warning('Request with ID "%s" not found in the queue.', unique_key)
                 return None
 
             await self._add_buffer_record(session)
@@ -526,7 +526,7 @@ class SqlRequestQueueBackend(
             result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
 
             if result.rowcount == 0:
-                logger.warning(f'Request {request.unique_key} not found in database.')
+                logger.warning('Request %s not found in database.', request.unique_key)
                 return None
 
             await self._add_buffer_record(
@@ -582,7 +582,7 @@ class SqlRequestQueueBackend(
             result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
 
             if result.rowcount == 0:
-                logger.warning(f'Request {request.unique_key} not found in database.')
+                logger.warning('Request %s not found in database.', request.unique_key)
                 return None
             await self._add_buffer_record(session, update_modified_at=True)
 

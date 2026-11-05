@@ -7,7 +7,7 @@ router = Router[PlaywrightCrawlingContext]()
 @router.default_handler
 async def default_handler(context: PlaywrightCrawlingContext) -> None:
     # This is a fallback route which will handle the start URL.
-    context.log.info(f'default_handler is processing {context.request.url}')
+    context.log.info('default_handler is processing %s', context.request.url)
 
     await context.page.wait_for_selector('.collection-block-item')
 
@@ -20,7 +20,7 @@ async def default_handler(context: PlaywrightCrawlingContext) -> None:
 @router.handler('CATEGORY')
 async def category_handler(context: PlaywrightCrawlingContext) -> None:
     # This replaces the context.request.label == CATEGORY branch of the if clause.
-    context.log.info(f'category_handler is processing {context.request.url}')
+    context.log.info('category_handler is processing %s', context.request.url)
 
     await context.page.wait_for_selector('.product-item > a')
 
@@ -41,7 +41,7 @@ async def category_handler(context: PlaywrightCrawlingContext) -> None:
 @router.handler('DETAIL')
 async def detail_handler(context: PlaywrightCrawlingContext) -> None:
     # This replaces the context.request.label == DETAIL branch of the if clause.
-    context.log.info(f'detail_handler is processing {context.request.url}')
+    context.log.info('detail_handler is processing %s', context.request.url)
 
     url_part = context.request.url.split('/').pop()
     manufacturer = url_part.split('-')[0]

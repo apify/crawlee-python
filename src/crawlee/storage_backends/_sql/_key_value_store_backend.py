@@ -237,14 +237,14 @@ class SqlKeyValueStoreBackend(
             try:
                 value = json.loads(value_bytes.decode('utf-8'))
             except (json.JSONDecodeError, UnicodeDecodeError):
-                logger.warning(f'Failed to decode JSON value for key "{key}"')
+                logger.warning('Failed to decode JSON value for key "%s"', key)
                 return None
         # Handle text values
         elif content_type.startswith('text/'):
             try:
                 value = value_bytes.decode('utf-8')
             except UnicodeDecodeError:
-                logger.warning(f'Failed to decode text value for key "{key}"')
+                logger.warning('Failed to decode text value for key "%s"', key)
                 return None
         # Handle binary values
         else:

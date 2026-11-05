@@ -590,7 +590,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Args:
             reason: Reason for stopping that will be used in logs.
         """
-        self._logger.info(f'Crawler.stop() was called with following reason: {reason.rstrip(" .")}.')
+        self._logger.info('Crawler.stop() was called with following reason: %s.', reason.rstrip(' .'))
 
         if self._live_run is not None:
             self._live_run.stop()
@@ -806,14 +806,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             if self._statistics.error_tracker.total > 0:
                 self._logger.info(
-                    'Error analysis:'
-                    f' total_errors={self._statistics.error_tracker.total}'
-                    f' unique_errors={self._statistics.error_tracker.unique_error_count}'
+                    'Error analysis: total_errors=%s unique_errors=%s',
+                    self._statistics.error_tracker.total,
+                    self._statistics.error_tracker.unique_error_count,
                 )
 
             if interrupted:
                 self._logger.info(
-                    f'The crawl was interrupted. To resume, do: CRAWLEE_PURGE_ON_START=0 python {sys.argv[0]}'
+                    'The crawl was interrupted. To resume, do: CRAWLEE_PURGE_ON_START=0 python %s', sys.argv[0]
                 )
 
             self._has_finished_before = True
@@ -822,7 +822,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             final_statistics = self._statistics.calculate()
             if self._statistics_log_format == 'table':
-                self._logger.info(f'Final request statistics:\n{final_statistics.to_table()}')
+                self._logger.info('Final request statistics:\n%s', final_statistics.to_table())
             else:
                 self._logger.info('Final request statistics:', extra=final_statistics.to_dict())
 
@@ -842,13 +842,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 # Pending requests mean the crawl ended early, such as after an abort, not that everything was handled.
                 if is_finished and handled_count > 0:
                     noun = 'request' if handled_count == 1 else 'requests'
-                    message = (
-                        f'This crawl processed no requests - the request manager holds {handled_count} {noun}, all of '
-                        'them already handled, and a failed request counts as handled too. Nothing empties a queue '
-                        'between runs, so to crawl them again, purge it (`await queue.purge()`) or use a fresh one '
-                        "(e.g. `RequestQueue.open(alias='second-run')`) with a freshly created crawler instance."
+                    self._logger_once.log(
+                        'This crawl processed no requests - the request manager holds %s %s, all of them already '
+                        'handled, and a failed request counts as handled too. Nothing empties a queue between runs, '
+                        'so to crawl them again, purge it (`await queue.purge()`) or use a fresh one '
+                        "(e.g. `RequestQueue.open(alias='second-run')`) with a freshly created crawler instance.",
+                        handled_count,
+                        noun,
+                        key=f'no_requests_processed:{handled_count}',
+                        level=logging.WARNING,
                     )
-                    self._logger_once.log(message, key=message, level=logging.WARNING)
 
             return final_statistics
         finally:
@@ -1185,7 +1188,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         strategy = kwargs.get('strategy', 'all')
 
         if strategy == 'all' and not parsed_origin_url.host:
-            self.log.warning(f'Skipping enqueue: Missing hostname in origin_url = {origin_url}.')
+            self.log.warning('Skipping enqueue: Missing hostname in origin_url = %s.', origin_url)
             return
 
         # Each warning is emitted at most once per call.
@@ -1207,10 +1210,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 # Scheme rejections and missing hostnames signal a misconfiguration upstream, so warn.
                 if reason == UNSUPPORTED_SCHEME_MESSAGE:
                     if not scheme_warned:
-                        self.log.warning(f'Skipping enqueue url {target_url!r}: {reason}')
+                        self.log.warning('Skipping enqueue url %r: %s', target_url, reason)
                         scheme_warned = True
                 elif not parsed_target_url.host and not host_warned:
-                    self.log.warning(f'Skipping enqueue url: Missing hostname in target_url = {target_url}.')
+                    self.log.warning('Skipping enqueue url: Missing hostname in target_url = %s.', target_url)
                     host_warned = True
                 continue
 
@@ -1283,8 +1286,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request.retry_count += 1
             reduced_error = str(error).split('\n')[0]
             self.log.warning(
-                f'Retrying request to {context.request.url} due to: {reduced_error}. '
-                f'{get_one_line_error_summary_if_possible(error)}'
+                'Retrying request to %s due to: %s. %s',
+                context.request.url,
+                reduced_error,
+                get_one_line_error_summary_if_possible(error),
             )
             await self._statistics.error_tracker.add(error=error, context=context)
 
@@ -1326,8 +1331,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     async def _handle_failed_request(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
         self._logger.error(
-            f'Request to {context.request.url} failed and reached maximum retries\n '
-            f'{self._get_message_from_error(error)}'
+            'Request to %s failed and reached maximum retries\n %s',
+            context.request.url,
+            self._get_message_from_error(error),
         )
         await self._statistics.error_tracker.add(error=error, context=context)
 
@@ -1548,7 +1554,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if not (await self._is_allowed_based_on_robots_txt_file(request.url)):
             self._logger.warning(
-                f'Skipping request {request.url} ({request.unique_key}) because it is disallowed based on robots.txt'
+                'Skipping request %s (%s) because it is disallowed based on robots.txt', request.url, request.unique_key
             )
 
             await self._handle_skipped_request(request, 'robots_txt', need_mark=True)
@@ -1716,8 +1722,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             accepted = request_manager.record_pacing_signal(RateLimitedSignal(request.url))
         except Exception:
             self._logger.exception(
-                f'The request manager failed to record a rate limit for {request.url}, so the '
-                '`RequestThrottledError` is handled as an ordinary error.'
+                (
+                    'The request manager failed to record a rate limit for %s, so the '
+                    '`RequestThrottledError` is handled as an ordinary error.'
+                ),
+                request.url,
             )
             return False
 
@@ -1726,9 +1735,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return True
 
         self._logger_once.log(
-            f"`RequestThrottledError` was raised for {request.url}, but the crawler's request manager does not pace "
-            "its domain, so it's handled as an ordinary error. Pass a `ThrottlingRequestManager` covering the domain "
-            'as `request_manager` to retry such requests once the domain stops rate-limiting.',
+            "`RequestThrottledError` was raised for %s, but the crawler's request manager does not pace its domain, "
+            "so it's handled as an ordinary error. Pass a `ThrottlingRequestManager` covering the domain as "
+            '`request_manager` to retry such requests once the domain stops rate-limiting.',
+            request.url,
             key='throttled_error_without_backoff',
             level=logging.WARNING,
         )
@@ -1740,8 +1750,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         error._reported = False  # noqa: SLF001
         request.state = RequestState.ERROR_HANDLER
         self._logger.debug(
-            f'Deferring request because its domain is rate-limiting us. {error}',
-            extra=request_log_extra(request),
+            'Deferring request because its domain is rate-limiting us. %s', error, extra=request_log_extra(request)
         )
         request_manager = await self.get_request_manager()
         await request_manager.reclaim_request(request, forefront=True)
@@ -1814,10 +1823,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         domain = URL(request_url).host or request_url
         self._logger_once.log(
-            f'"{domain}" responded with HTTP 429 (Too Many Requests), but the crawler\'s request manager does not pace '
-            'that domain, so the response is handled like any other, with no per-domain delay. Pass a '
-            f'`ThrottlingRequestManager` covering "{domain}" as `request_manager` to honor `Retry-After` and apply '
+            '"%s" responded with HTTP 429 (Too Many Requests), but the crawler\'s request manager does not pace that '
+            'domain, so the response is handled like any other, with no per-domain delay. Pass a '
+            '`ThrottlingRequestManager` covering "%s" as `request_manager` to honor `Retry-After` and apply '
             'exponential backoff instead.',
+            domain,
+            domain,
             key=f'rate_limit_not_paced:{domain}',
             level=logging.WARNING,
         )
@@ -1884,8 +1895,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             accepted = request_manager.record_pacing_signal(signal)
         except Exception as exc:
             self._logger_once.log(
-                f'The request manager failed to record the robots.txt crawl-delay for "{domain}" ({exc!r}), so its '
-                'requests will not be paced.',
+                'The request manager failed to record the robots.txt crawl-delay for "%s" (%r), so its requests will '
+                'not be paced.',
+                domain,
+                exc,
                 key=f'crawl_delay_failed:{domain}',
                 level=logging.ERROR,
             )
@@ -1895,9 +1908,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             return
 
         self._logger_once.log(
-            f'robots.txt for "{domain}" defines a crawl-delay of {delay_seconds}s, but the crawler\'s request manager '
-            'does not pace that domain, so its requests will not be paced. Pass a `ThrottlingRequestManager` covering '
-            f'"{domain}" as `request_manager`.',
+            'robots.txt for "%s" defines a crawl-delay of %ss, but the crawler\'s request manager does not pace that '
+            'domain, so its requests will not be paced. Pass a `ThrottlingRequestManager` covering "%s" as '
+            '`request_manager`.',
+            domain,
+            delay_seconds,
+            domain,
             key=f'crawl_delay_not_paced:{domain}',
             level=logging.WARNING,
         )

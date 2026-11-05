@@ -45,7 +45,7 @@ async def main() -> None:
 
         @playwright_crawler.router.default_handler
         async def handle_playwright(context: PlaywrightCrawlingContext) -> None:
-            context.log.info(f'Playwright Processing {context.request.url}...')
+            context.log.info('Playwright Processing %s...', context.request.url)
 
             title = await context.page.title()
             # Push the extracted data to the dataset for Playwright crawler
@@ -56,7 +56,7 @@ async def main() -> None:
 
         @parsel_crawler.router.default_handler
         async def handle_parsel(context: ParselCrawlingContext) -> None:
-            context.log.info(f'Parsel Processing {context.request.url}...')
+            context.log.info('Parsel Processing %s...', context.request.url)
 
             title = context.parsed_content.css('title::text').get()
             # Push the extracted data to the dataset for Parsel crawler

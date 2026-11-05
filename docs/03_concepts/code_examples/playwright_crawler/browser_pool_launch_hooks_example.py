@@ -20,14 +20,18 @@ async def main() -> None:
         @browser_pool.pre_launch_hook
         async def log_browser_launch(page_id: str, plugin: BrowserPlugin) -> None:
             """Log before a new browser instance is launched."""
-            logger.info(f'Launching {plugin.browser_type} browser for page {page_id}...')
+            logger.info(
+                'Launching %s browser for page %s...', plugin.browser_type, page_id
+            )
 
         @browser_pool.post_launch_hook
         async def log_browser_launched(
             page_id: str, controller: BrowserController
         ) -> None:
             """Log after a new browser instance has been launched."""
-            logger.info(f'Browser launched for page {page_id}, controller: {controller}')
+            logger.info(
+                'Browser launched for page %s, controller: %s', page_id, controller
+            )
 
         crawler = PlaywrightCrawler(
             browser_pool=browser_pool,
@@ -36,7 +40,7 @@ async def main() -> None:
 
         @crawler.router.default_handler
         async def request_handler(context: PlaywrightCrawlingContext) -> None:
-            context.log.info(f'Processing {context.request.url} ...')
+            context.log.info('Processing %s ...', context.request.url)
 
             await context.enqueue_links()
 
