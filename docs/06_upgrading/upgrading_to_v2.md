@@ -460,7 +460,7 @@ crawler = ParselCrawler(logger=logging.getLogger('my_crawler'))
 
 ### `NullHandler` on the `crawlee` logger
 
-The `crawlee` logger has a `logging.NullHandler`. If you create a crawler with `configure_logging=False` and don't configure logging yourself, Python doesn't print crawlee's warnings and errors to stderr through `logging.lastResort` anymore. Configure logging in your application, for example with `logging.basicConfig()`, to see them.
+The `crawlee` logger has a `logging.NullHandler`. If you create a crawler with `configure_logging=False` and don't configure logging yourself, Python doesn't print Crawlee's warnings and errors to stderr through `logging.lastResort` anymore. Configure logging in your application, for example with `logging.basicConfig()`, to see them.
 
 ### Log levels
 
