@@ -8,7 +8,7 @@ import pytest
 
 from crawlee.autoscaling import AutoscaledPool
 from crawlee.crawlers._basic._crawler_run import CrawlerRun
-from tests.unit.utils import poll_until_condition
+from tests._utils import poll_until_condition
 
 
 @pytest.fixture
