@@ -34,7 +34,7 @@ jobs:
     name: PyPI publish
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       id-token: write # Required for OIDC authentication.
     environment:
       name: pypi
