@@ -6,13 +6,9 @@ from crawlee.storages import RequestQueue
 
 
 async def main() -> None:
-    # Open the default request queue.
-    queue = await RequestQueue.open()
-
-    # Wrap it with ThrottlingRequestManager for specific domains. The throttler uses the
-    # same storage backend as the underlying queue.
+    # Throttle specific domains. Without a queue to wrap, the throttler opens the default
+    # request queue on first use.
     throttler = ThrottlingRequestManager(
-        queue,
         domains=['api.example.com', 'slow-site.org'],
         request_manager_opener=RequestQueue.open,
     )

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, call, create_autospec, patch
 
 import pytest
 
@@ -11,6 +11,7 @@ from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
 from crawlee.request_loaders import RateLimitedSignal
 from crawlee.storage_backends import MemoryStorageBackend, StorageBackend
+from crawlee.storage_backends._base import RequestQueueBackend
 from crawlee.storage_backends.models import AddRequestsResponse, ProcessedRequest, UnprocessedRequest
 from crawlee.storages import RequestQueue
 from crawlee.storages._storage_instance_manager import StorageInstanceManager
@@ -1582,3 +1583,40 @@ async def test_request_with_noascii_chars(rq: RequestQueue) -> None:
     assert request is not None
     assert request.url == 'https://crawlee.dev'
     assert request.user_data == init_request.user_data
+
+
+async def test_processing_time_only_raises() -> None:
+    """Test that the queue passes an expected processing time to the backend only when it grows."""
+    backend = create_autospec(RequestQueueBackend, instance=True, spec_set=True)
+    rq = RequestQueue(backend, id='test', name=None)
+
+    for minutes in [1, 2, 0.5, 2]:
+        await rq.set_expected_request_processing_time(timedelta(minutes=minutes))
+
+    assert backend.set_expected_request_processing_time.await_args_list == [
+        call(timedelta(minutes=1)),
+        call(timedelta(minutes=2)),
+    ]
+
+
+async def test_purge_keeps_processing_time() -> None:
+    """Test that a purged queue doesn't pass a shorter expected processing time to the backend."""
+    backend = create_autospec(RequestQueueBackend, instance=True, spec_set=True)
+    rq = RequestQueue(backend, id='test', name=None)
+
+    await rq.set_expected_request_processing_time(timedelta(minutes=2))
+    await rq.purge()
+    await rq.set_expected_request_processing_time(timedelta(minutes=1))
+
+    assert backend.set_expected_request_processing_time.await_args_list == [call(timedelta(minutes=2))]
+
+
+async def test_extend_forwards_to_backend() -> None:
+    """Test that the queue passes a lock extension to the backend and returns its result."""
+    backend = create_autospec(RequestQueueBackend, instance=True, spec_set=True)
+    backend.extend_request_processing_time.return_value = True
+    rq = RequestQueue(backend, id='test', name=None)
+    request = Request.from_url('https://example.com/1')
+
+    assert await rq.extend_request_processing_time(request, timedelta(minutes=1)) is True
+    backend.extend_request_processing_time.assert_awaited_once_with(request, timedelta(minutes=1))

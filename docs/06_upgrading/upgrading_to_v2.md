@@ -176,6 +176,12 @@ Data written by v1 still loads, so an existing storage directory, Redis instance
 
 The memory backend now handles values the same way as the file-system backend. It raises on a value the file-system backend can't serialize, such as one with a circular reference or a tuple as a dict key. Values that JSON doesn't support, such as a `datetime`, are stored as strings, and dict keys that aren't strings become strings.
 
+## SQL and Redis lock fetched requests for 3 minutes
+
+`SqlStorageBackend` and `RedisStorageBackend` now lock a fetched request for 3 minutes by default, the same as Crawlee JS. In v1, the lock lasted 5 minutes. When a lock expires before the request is handled or reclaimed, another client sharing the queue can fetch the request and process it again.
+
+If processing a request can take longer than 3 minutes, call `RequestQueue.set_expected_request_processing_time()` with the longest time you expect. Every request fetched after that call stays locked at least that long. To give a single request that's still being processed more time, call `RequestQueue.extend_request_processing_time()`.
+
 ## Crawler `id` is a string
 
 The `id` argument of `BasicCrawler` and its subclasses is now a `str`, so pass a string wherever you passed an integer. `StatisticsState.stats_id` and `EventCrawlerStatusData.crawler_id` are strings too, and `crawler_id` holds the crawler's `id`. In v1, it held the Python object ID of the crawler.
@@ -433,6 +439,10 @@ class MyHttpClient(HttpClient):
 `RequestLoader` has a new abstract `get_pending_count` method, which returns the number of requests that haven't been handled yet. If you have a custom request loader or manager, implement it. `RequestList` reads its source lazily, so like `get_total_count`, its `get_pending_count` leaves out the requests it hasn't fetched yet.
 
 `RequestManagerTandem.get_total_count` no longer counts a request twice once it moves from the loader to the manager. In v1, it added up the totals of both, so the crawler's status message showed too many pages in total.
+
+## `ThrottlingRequestManager.inner` is optional
+
+The `inner` argument of `ThrottlingRequestManager` is now optional, the same as in Crawlee JS. Without it, `request_manager_opener` opens the default store on first use, such as the default request queue for `RequestQueue.open`. Until then, the `inner` property returns `None`, so its type is now `TRequestManager | None`. If you pass `inner`, the property returns it as before.
 
 ## Logs changed
 
