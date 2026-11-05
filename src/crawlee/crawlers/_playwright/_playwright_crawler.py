@@ -673,6 +673,6 @@ class PlaywrightCrawlerOptions(
     """
 
     # Kept out of `_PlaywrightCrawlerAdditionalOptions`, since `AdaptivePlaywrightCrawler` passes those to its browser
-    # sub-crawler only, while its static sub-crawler would keep saving the response cookies.
+    # sub-crawler only. It takes `save_response_cookies` as its own argument and passes it to both sub-crawlers.
     save_response_cookies: NotRequired[bool]
     """Whether to save the cookies of the page to the session after the request handler."""

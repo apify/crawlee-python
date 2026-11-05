@@ -125,6 +125,7 @@ class AdaptivePlaywrightCrawler(
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
         playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
+        save_response_cookies: bool = True,
         statistics: Statistics[AdaptivePlaywrightCrawlerStatisticState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> None:
@@ -140,6 +141,8 @@ class AdaptivePlaywrightCrawler(
             static_parser: Implementation of `AbstractHttpParser`. Parser that will be used for static crawling.
             static_crawler_specific_kwargs: `AbstractHttpCrawler` only kwargs that are passed to the sub crawler.
             playwright_crawler_specific_kwargs: `PlaywrightCrawler` only kwargs that are passed to the sub crawler.
+            save_response_cookies: Whether to save the response cookies to the session, in both the static and the
+                browser sub crawler.
             statistics: A custom `Statistics[AdaptivePlaywrightCrawlerStatisticState]` instance, allowing the use of
                 non-default configuration.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
@@ -174,10 +177,12 @@ class AdaptivePlaywrightCrawler(
 
         static_crawler = static_crawler_class(
             parser=static_parser,
+            save_response_cookies=save_response_cookies,
             statistics=_NonPersistentStatistics(),
             **basic_crawler_kwargs_for_static_crawler,
         )
         playwright_crawler = PlaywrightCrawler(
+            save_response_cookies=save_response_cookies,
             statistics=_NonPersistentStatistics(),
             **playwright_crawler_specific_kwargs,
             **basic_crawler_kwargs_for_pw_crawler,
@@ -241,6 +246,7 @@ class AdaptivePlaywrightCrawler(
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
         parser_type: BeautifulSoupParserType = 'lxml',
         playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
+        save_response_cookies: bool = True,
         statistics: Statistics[StatisticsState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag]:
@@ -255,6 +261,7 @@ class AdaptivePlaywrightCrawler(
             result_comparator=result_comparator,
             static_parser=BeautifulSoupParser(parser=parser_type),
             playwright_crawler_specific_kwargs=playwright_crawler_specific_kwargs,
+            save_response_cookies=save_response_cookies,
             statistics=adaptive_statistics,
             **kwargs,
         )
@@ -267,6 +274,7 @@ class AdaptivePlaywrightCrawler(
         result_checker: Callable[[RequestHandlerRunResult], bool] | None = None,
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
         playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
+        save_response_cookies: bool = True,
         statistics: Statistics[StatisticsState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector, Selector]:
@@ -281,6 +289,7 @@ class AdaptivePlaywrightCrawler(
             result_comparator=result_comparator,
             static_parser=ParselParser(),
             playwright_crawler_specific_kwargs=playwright_crawler_specific_kwargs,
+            save_response_cookies=save_response_cookies,
             statistics=adaptive_statistics,
             **kwargs,
         )

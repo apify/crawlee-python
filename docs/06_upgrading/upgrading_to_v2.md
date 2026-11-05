@@ -393,7 +393,7 @@ Without a session, or with `save_response_cookies=False` on the crawler, the coo
 
 ### `save_response_cookies` replaces `persist_cookies_per_session`
 
-`persist_cookies_per_session` is removed from the HTTP clients. To stop saving the response cookies to the session, pass `save_response_cookies=False` to the crawler. The session cookies are still sent. `PlaywrightCrawler` and `StagehandCrawler` take the same option, which stops saving the cookies of the page to the session after the request handler.
+`persist_cookies_per_session` is removed from the HTTP clients. To stop saving the response cookies to the session, pass `save_response_cookies=False` to the crawler. The session cookies are still sent. `PlaywrightCrawler` and `StagehandCrawler` take the same option, which stops saving the cookies of the page to the session after the request handler. In `AdaptivePlaywrightCrawler`, the option applies to both the HTTP and the browser crawling.
 
 ```python
 # v1
