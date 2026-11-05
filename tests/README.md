@@ -1,12 +1,22 @@
-# Flaky tests
+# Tests
 
-Some tests may exhibit flaky behavior in CI. The reason for flaky behavior should be understood as it can indicate bug in the code or design flaw in the test. There are other reasons related to test execution, such as some tests that are not (or can not be) properly isolated, or limited resource constraints of the test executor.
+## Structure
 
-Here are some suggested approaches to mitigate flakiness, sorted in the order of preference:
+- `unit/` holds tests that run without a network or a browser. Run them with `uv run poe unit-tests`.
+- `integration/` holds tests that send real HTTP requests, mostly to the local test server in `integration/server.py`, or launch a Playwright browser. Run them with `uv run poe integration-tests`.
+- `e2e/` holds tests that build the project templates and run them as Actors on the Apify platform. Run them with `uv run poe e2e-templates-tests`.
+- `_fixtures.py` has the fixtures that isolate each test's environment, imported by the unit and integration conftests.
+- `_utils.py` has helpers shared by the unit and integration tests.
 
-- Investigate the root cause and fix the code or test.
-- Apply one of the pytest marks to mitigate the flakiness:
-  - `@run_alone_on_mac` - Test with such mark will run alone on macOS exeutor in CI (normally several tests run in parallel, which can cause resource-sensitive tests to fail.) Use for resource sensitive tests that are known to be flaky only on macOS.
-  - `@run_alone` - Test with such mark will run alone on any executor. Use for resource sensitive tests that are known to be flaky on all platforms or for tests that can not be run in parallel with other test due to their design (This should be extremely rare).
-  - `@pytest.mark.flaky` - Test with such mark will be retried several times if it fails. Use for tests that are known to be flaky, but the reason for flakiness is not understood or can not be easily mitigated.
-  - `@pytest.mark.skip` - Test with such mark will be skipped. Use when none of the above approaches mitigate the test flakiness. Marking test as skipped should be a last resort, as it can hide potential bugs and give false sense of security. Skipped tests should be tracked in GitHub issue.
+A test goes to `integration/` when it uses the `server_url` fixture (or another local server or proxy fixture), opens a real HTTP connection, or launches a browser. Everything else goes to `unit/`.
+
+## Flaky tests
+
+A test that fails only sometimes usually points to a bug in the code or a flaw in the test, so find the cause first. Some flakiness comes from how the tests run instead: tests that cannot be fully isolated, or a CI runner short on CPU or memory.
+
+Handle a flaky test with the first of these that works:
+
+1. Find the root cause and fix the code or the test.
+2. Run the test alone. `@pytest.mark.run_alone` runs it before the parallel tests, with no other test alongside. Use it for resource-sensitive tests, or for the rare test that cannot run in parallel by design. `@run_alone_on_mac` from `tests/_utils.py` does the same on macOS only.
+3. Retry it with `@pytest.mark.flaky(reruns=..., reason=...)`. Use this when the cause is not understood or cannot be removed, and say why in `reason`.
+4. Skip it with `@pytest.mark.skip`, as a last resort. A skipped test can hide a real bug, so track it in a GitHub issue.
