@@ -74,7 +74,7 @@ class AutoscaledPool:
                 pool is not paused. If it resolves to `True` then the pool's run finishes. Being called only when there
                 are no tasks being processed means that as long as `is_task_ready_function` keeps resolving to `True`,
                 `is_finished_function` will never be called. To abort a run, use the `abort` method.
-            logger: The logger the pool logs to. Defaults to the logger of this module.
+            logger: The logger the pool logs to. Defaults to `crawlee.autoscaling._autoscaled_pool`.
         """
         self._concurrency_system = concurrency_system
         self._consumer = consumer

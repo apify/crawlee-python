@@ -8,7 +8,7 @@ from ._utils.globs import Glob
 
 __version__ = metadata.version('crawlee')
 
-# Keeps Python from printing crawlee's warnings through `logging.lastResort` when the application has not configured
+# Keeps Python from printing Crawlee's warnings through `logging.lastResort` when the application has not configured
 # logging.
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
