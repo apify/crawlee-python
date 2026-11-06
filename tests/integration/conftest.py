@@ -4,6 +4,7 @@ import socket
 from typing import TYPE_CHECKING
 
 import pytest
+from filelock import FileLock
 from proxy import Proxy
 from stagehand._custom.sea_binary import resolve_binary_path
 from uvicorn.config import Config
@@ -27,11 +28,12 @@ if TYPE_CHECKING:
     from yarl import URL
 
 
-def pytest_configure(config: pytest.Config) -> None:
-    # Stagehand copies its server binary into a per-user cache on first use, without a lock, so xdist workers starting
-    # on a cold cache race on that copy (`WinError 32` on Windows, `FileNotFoundError` elsewhere). Populate the cache
-    # once in the controller, before any worker starts.
-    if not hasattr(config, 'workerinput'):
+@pytest.fixture(scope='session')
+def stagehand_binary(tmp_path_factory: pytest.TempPathFactory) -> None:
+    """Populate Stagehand's per-user binary cache once, serialized across xdist workers."""
+    # Stagehand copies its server binary into the cache on first use without a lock, so concurrent first uses race on
+    # the copy (`WinError 32` on Windows, `FileNotFoundError` elsewhere).
+    with FileLock(tmp_path_factory.getbasetemp().parent / 'stagehand_binary.lock'):
         resolve_binary_path()
 
 
