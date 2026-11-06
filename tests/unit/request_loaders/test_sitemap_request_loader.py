@@ -1,15 +1,19 @@
 import gzip
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
+from crawlee import RequestOptions, service_locator
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.sitemap import DEFAULT_MAX_DEPTH
 from crawlee.crawlers import BasicCrawler
+from crawlee.events import EventManager
+from crawlee.events._types import Event, EventPersistStateData
 from crawlee.http_clients._base import HttpClient, HttpResponse
 from crawlee.request_loaders import RequestSourceStatus
 from crawlee.request_loaders._sitemap_request_loader import SitemapRequestLoader
+from crawlee.storages import KeyValueStore
 from tests._utils import (
     DEFAULT_URL,
     get_basic_results,
@@ -160,3 +164,73 @@ async def test_crawler_tandem_continues_when_sitemap_is_dead(monkeypatch: pytest
     assert set(visited) == {f'{DEFAULT_URL}seeded-a', f'{DEFAULT_URL}seeded-b'}
     assert stats.requests_finished == 2
     assert stats.requests_failed == 0
+
+
+async def test_call_after_close_skips_setup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A call after `close()` doesn't register the persistence listener or serve an in-progress request again."""
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    client, _ = make_status_stream_client({sitemap_url: [(200, get_basic_sitemap().encode())]})
+    loader = SitemapRequestLoader([sitemap_url], http_client=client, persist_state_key='sitemap-state')
+
+    first_request = await loader.fetch_next_request()
+    assert first_request is not None
+    await loader.close()
+
+    event_manager = service_locator.get_event_manager()
+    on = Mock(wraps=event_manager.on)
+    monkeypatch.setattr(event_manager, 'on', on)
+
+    second_request = await loader.fetch_next_request()
+
+    on.assert_not_called()
+    assert second_request is not None
+    assert second_request.url != first_request.url
+
+
+async def test_restored_request_not_transformed_again() -> None:
+    """A request in progress on `close()` is served again after a restore as it was, without another transform."""
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    client, _ = make_status_stream_client({sitemap_url: [(200, get_basic_sitemap().encode())]})
+
+    def to_api_url(request_options: RequestOptions) -> RequestOptions:
+        request_options['url'] = request_options['url'].replace(DEFAULT_URL, f'{DEFAULT_URL}api/')
+        return request_options
+
+    loader = SitemapRequestLoader(
+        [sitemap_url], http_client=client, persist_state_key='sitemap-state', transform_request_function=to_api_url
+    )
+    request = await loader.fetch_next_request()
+    assert request is not None
+    request.user_data['page'] = 2
+    await loader.close()
+
+    transform = Mock(side_effect=to_api_url)
+    restored_loader = SitemapRequestLoader(
+        [sitemap_url], http_client=client, persist_state_key='sitemap-state', transform_request_function=transform
+    )
+    restored_request = await restored_loader.fetch_next_request()
+    await restored_loader.close()
+
+    transform.assert_not_called()
+    assert restored_request is not None
+    assert restored_request.url == request.url
+    assert restored_request.user_data['page'] == 2
+
+
+async def test_close_before_first_use_stops_listening(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A loader closed before its first use doesn't persist on PERSIST_STATE events once it's used."""
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    client, _ = make_status_stream_client({sitemap_url: [(200, get_basic_sitemap().encode())]})
+    async with EventManager() as event_manager:
+        service_locator.set_event_manager(event_manager)
+        kvs = await KeyValueStore.open()
+        loader = SitemapRequestLoader([sitemap_url], http_client=client, persist_state_key='sitemap-state')
+        await loader.close()
+
+        await loader.check_readiness()
+        set_value = AsyncMock()
+        monkeypatch.setattr(kvs, 'set_value', set_value)
+        event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
+        await event_manager.wait_for_all_listeners_to_complete()
+
+        set_value.assert_not_called()

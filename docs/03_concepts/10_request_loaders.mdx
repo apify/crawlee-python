@@ -146,7 +146,7 @@ The loader supports filtering URLs using glob patterns and regular expressions, 
 
 ### Sitemap request loader with persistence
 
-Similarly, the <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> supports state persistence to resume processing from where it left off. This is especially valuable when processing large sitemaps that may take considerable time to complete.
+Similarly, the <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> supports state persistence to resume processing from where it left off. This is especially valuable when processing large sitemaps that may take considerable time to complete. Requests that were in progress when the state was saved are served again after a restart.
 
 <RunnableCodeBlock className="language-python" language="python">
     {SitemapPersistExample}
