@@ -30,6 +30,31 @@ class RequestManager(RequestLoader, ABC):
         Default implementation is a no-op. Subclasses with persistent state should override to clear it.
         """
 
+    async def set_expected_request_processing_time(self, processing_time: timedelta) -> None:
+        """Set how long a consumer expects to hold a fetched request before marking it handled or reclaiming it.
+
+        A manager backed by a storage that locks fetched requests uses it so a request isn't handed out again while
+        it's still being processed. Default implementation is a no-op.
+
+        Args:
+            processing_time: The expected time between fetching a request and marking it handled or reclaiming it.
+        """
+
+    async def extend_request_processing_time(self, request: Request, delta: timedelta) -> bool:  # noqa: ARG002
+        """Give a fetched request that's still being processed `delta` more time before its lock expires.
+
+        Default implementation is a no-op that returns `False`.
+
+        Args:
+            request: The request returned by `fetch_next_request` and not yet marked handled or reclaimed.
+            delta: How much longer the request stays locked.
+
+        Returns:
+            `True` if the lock was extended. `False` if the manager doesn't lock requests or no longer holds this one,
+            so the request may be processed twice.
+        """
+        return False
+
     @abstractmethod
     async def add_request(
         self,
