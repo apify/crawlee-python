@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 1.11.2 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Stop truncating fractional robots.txt crawl-delay to an integer ([#2392](https://github.com/apify/crawlee-python/pull/2392)) ([fa386bb](https://github.com/apify/crawlee-python/commit/fa386bb5a54d641cefbe40b72a61c6ced97a3e87)) by [@RaphaelFakhri](https://github.com/RaphaelFakhri), closes [#2391](https://github.com/apify/crawlee-python/issues/2391)
+- Fit the default `desired_concurrency` within `min_concurrency` and `max_concurrency` ([#2397](https://github.com/apify/crawlee-python/pull/2397)) ([b71d5af](https://github.com/apify/crawlee-python/commit/b71d5afb8ee888b5d12d0a47519038d3040a10e5)) by [@PrashanthLande](https://github.com/PrashanthLande)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [1.11.1](https://github.com/apify/crawlee-python/releases/tag/v1.11.1) (2026-11-05)
 
 ### 🐛 Bug Fixes
