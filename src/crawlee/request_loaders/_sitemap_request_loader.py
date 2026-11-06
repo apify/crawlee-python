@@ -281,12 +281,18 @@ class SitemapRequestLoader(RequestLoader):
 
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
-        """Mark a request as successfully handled."""
+        """Mark a request as successfully handled.
+
+        Raises:
+            ValueError: If the request isn't being processed.
+        """
         state = await self._get_state()
-        if request.url in state.in_progress:
-            state.in_progress.remove(request.url)
-            del state.request_data[request.url]
-            state.handled_count += 1
+        if request.url not in state.in_progress:
+            raise ValueError(f'The request is not being processed (url: {request.url}).')
+
+        state.in_progress.remove(request.url)
+        del state.request_data[request.url]
+        state.handled_count += 1
         return None
 
     async def start(self) -> None:
@@ -301,6 +307,11 @@ class SitemapRequestLoader(RequestLoader):
             self._loading_task.cancel()
             with suppress(asyncio.CancelledError):
                 await self._loading_task
+
+    async def persist_state(self) -> None:
+        """Persist the loader's state to the key-value store. Does nothing without a `persist_state_key`."""
+        await self._get_state()
+        await self._state.persist_state()
 
     async def close(self) -> None:
         """Close the request loader."""
