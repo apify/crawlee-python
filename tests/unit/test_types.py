@@ -8,12 +8,12 @@ from crawlee import ConcurrencySettings
 @pytest.mark.parametrize(
     ('kwargs', 'expected_desired_concurrency'),
     [
-        pytest.param({}, 10, id='no-args-keeps-default'),
-        pytest.param({'max_concurrency': 5}, 5, id='clamped-down-to-max'),
-        pytest.param({'min_concurrency': 20}, 20, id='clamped-up-to-min'),
-        pytest.param({'max_concurrency': 50}, 10, id='default-fits-unchanged'),
-        pytest.param({'max_concurrency': 10}, 10, id='max-equals-default'),
-        pytest.param({'min_concurrency': 3, 'max_concurrency': 3}, 3, id='min-equals-max'),
+        pytest.param({}, 10, id='no args keeps default'),
+        pytest.param({'max_concurrency': 5}, 5, id='clamped down to max'),
+        pytest.param({'min_concurrency': 20}, 20, id='clamped up to min'),
+        pytest.param({'max_concurrency': 50}, 10, id='default fits unchanged'),
+        pytest.param({'max_concurrency': 10}, 10, id='max equals default'),
+        pytest.param({'min_concurrency': 3, 'max_concurrency': 3}, 3, id='min equals max'),
     ],
 )
 def test_concurrency_settings_default_desired_concurrency(
@@ -30,12 +30,12 @@ def test_concurrency_settings_default_desired_concurrency(
         pytest.param(
             {'max_concurrency': 5, 'desired_concurrency': 8},
             'desired_concurrency cannot be greater than max_concurrency',
-            id='explicit-above-max',
+            id='explicit above max',
         ),
         pytest.param(
             {'min_concurrency': 5, 'desired_concurrency': 2},
             'desired_concurrency cannot be less than min_concurrency',
-            id='explicit-below-min',
+            id='explicit below min',
         ),
     ],
 )
