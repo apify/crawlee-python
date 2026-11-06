@@ -99,6 +99,9 @@ class HttpHeaders(RootModel, Mapping[str, str]):
         return len(self.root)
 
 
+_DEFAULT_DESIRED_CONCURRENCY = 10
+
+
 @docs_group('Configuration')
 class ConcurrencySettings:
     """Concurrency settings for AutoscaledPool."""
@@ -129,7 +132,7 @@ class ConcurrencySettings:
             raise ValueError('max_concurrency cannot be less than min_concurrency')
 
         if desired_concurrency is None:
-            desired_concurrency = min(max(10, min_concurrency), max_concurrency)
+            desired_concurrency = min(max(_DEFAULT_DESIRED_CONCURRENCY, min_concurrency), max_concurrency)
 
         if desired_concurrency < min_concurrency:
             raise ValueError('desired_concurrency cannot be less than min_concurrency')
