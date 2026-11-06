@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from datetime import timedelta
 
     from crawlee import Request
     from crawlee.storage_backends.models import AddRequestsResponse, ProcessedRequest, RequestQueueMetadata
@@ -133,3 +134,31 @@ class RequestQueueBackend(ABC):
         Returns:
             True if the request queue is finished, False otherwise.
         """
+
+    async def set_expected_request_processing_time(self, processing_time: timedelta) -> None:  # noqa: B027
+        """Set how long a consumer expects to hold a fetched request before marking it handled or reclaiming it.
+
+        A backend that locks fetched requests keeps each lock at least this long, so a request isn't handed out again
+        while it's still being processed. Backends that don't lock ignore it.
+
+        The backend method for the `RequestQueue.set_expected_request_processing_time` call.
+
+        Args:
+            processing_time: The expected time between fetching a request and marking it handled or reclaiming it.
+        """
+
+    async def extend_request_processing_time(self, request: Request, delta: timedelta) -> bool:  # noqa: ARG002
+        """Extend the lock this backend holds on a fetched request by `delta`.
+
+        The backend method for the `RequestQueue.extend_request_processing_time` call. Backends that don't lock
+        return `False`.
+
+        Args:
+            request: The request returned by `fetch_next_request` and not yet marked handled or reclaimed.
+            delta: How much longer the request stays locked.
+
+        Returns:
+            `True` if the lock was extended. `False` if this backend doesn't lock requests or no longer holds the lock
+            on this one, so the request may be processed twice.
+        """
+        return False

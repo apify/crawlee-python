@@ -124,7 +124,7 @@ Here is a basic example of working with the <ApiLink to="class/RequestList">`Req
 
 The <ApiLink to="class/RequestList">`RequestList`</ApiLink> supports state persistence, allowing it to resume from where it left off after interruption. This is particularly useful for long-running crawls or when you need to pause and resume crawling later.
 
-To enable persistence, provide `persist_state_key` and optionally `persist_requests_key` parameters, and disable automatic cleanup by setting `purge_on_start = False` in the configuration. The `persist_state_key` saves the loader's progress, while `persist_requests_key` ensures that the request data doesn't change between runs. For more details on resuming interrupted crawls, see the [Stopping and resuming crawlers](../guides/stopping-and-resuming-crawlers) guide.
+To enable persistence, provide `persist_state_key` and optionally `persist_requests_key` parameters, and disable automatic cleanup by setting `purge_on_start = False` in the configuration. The `persist_state_key` saves the loader's progress, while `persist_requests_key` ensures that the request data doesn't change between runs. Requests that were in progress when the state was saved are served again after a restart. For more details on resuming interrupted crawls, see the [Stopping and resuming crawlers](../guides/stopping-and-resuming-crawlers) guide.
 
 <RunnableCodeBlock className="language-python" language="python">
     {RlBasicPersistExample}
