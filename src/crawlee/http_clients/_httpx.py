@@ -5,7 +5,7 @@ import warnings
 from functools import cached_property
 from http.cookiejar import CookieJar, DefaultCookiePolicy
 from logging import DEBUG, NOTSET, WARNING, getLogger
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import httpx2
 from typing_extensions import override
@@ -110,6 +110,9 @@ class HttpxHttpClient(HttpClient):
     ```
     """
 
+    _httpx2_log_level: ClassVar[int | None] = None
+    """The `httpx2` logger level the last client set, so a later client can tell it apart from a level the user set."""
+
     _DEFAULT_HEADER_GENERATOR = HeaderGenerator()
 
     def __init__(
@@ -149,8 +152,10 @@ class HttpxHttpClient(HttpClient):
         # `httpx2` logs one INFO line per request, which is too noisy for the default log level. Silence it down to
         # WARNING unless the user has explicitly opted into DEBUG, or has set a level on the `httpx2` logger already.
         httpx_logger = getLogger('httpx2')
-        if httpx_logger.level == NOTSET:
-            httpx_logger.setLevel(DEBUG if get_configured_log_level() <= DEBUG else WARNING)
+        if httpx_logger.level in (NOTSET, HttpxHttpClient._httpx2_log_level):
+            level = DEBUG if get_configured_log_level() <= DEBUG else WARNING
+            httpx_logger.setLevel(level)
+            HttpxHttpClient._httpx2_log_level = level
 
         self._http1 = http1
         self._http2 = http2
