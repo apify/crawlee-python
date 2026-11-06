@@ -273,6 +273,9 @@ class RequestList(RequestLoader):
         if not self._persist_state_key:
             raise RuntimeError('Cannot persist state. `persist_state_key` is not set.')
 
+        # Loads the persisted record first, so that a call before the first use writes the restored position.
+        await self._get_state()
+
         try:
             await self._state.persist_state()
         except Exception:

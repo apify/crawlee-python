@@ -6,10 +6,8 @@ from unittest.mock import AsyncMock
 import pytest
 
 from crawlee import service_locator
-from crawlee.events import EventManager
-from crawlee.events._types import Event, EventPersistStateData
-from crawlee.request_loaders import RequestListState
-from crawlee.request_loaders._request_list import RequestList
+from crawlee.events import Event, EventManager, EventPersistStateData
+from crawlee.request_loaders import RequestList, RequestListState
 from crawlee.storages import KeyValueStore
 
 URLS = ['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com']
@@ -465,6 +463,17 @@ async def test_persist_state_without_key_raises() -> None:
 
     with pytest.raises(RuntimeError, match=r'`persist_state_key` is not set'):
         await request_list.persist_state()
+
+
+async def test_persist_state_before_first_use() -> None:
+    """`persist_state` called before the list is used writes the position it starts from."""
+    state = RequestListState(next_index=1, next_unique_key='https://b.placeholder.com')
+    request_list = RequestList(URLS, persist_state_key='state', state=state)
+
+    await request_list.persist_state()
+
+    kvs = await KeyValueStore.open()
+    assert (await kvs.get_value('state'))['nextIndex'] == 1
 
 
 async def test_failed_persist_state_is_logged(

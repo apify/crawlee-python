@@ -67,7 +67,7 @@ Secondary arguments of the public API are now keyword-only. The main argument of
 - `KeyValueStore.iterate_keys`, `iterate_values`, `iterate_entries` and `list_keys`, which take `exclusive_start_key` and `limit` by keyword only.
 - `Dataset.export_to(key, *, content_type, to_kvs_id, ...)`.
 - `ConcurrencySettings(*, min_concurrency, max_concurrency, max_tasks_per_minute, desired_concurrency)`.
-- `RequestList(requests, *, name, persist_state_key, persist_requests_key)`.
+- `RequestList(requests, *, name, persist_state_key, persist_requests_key, state)`.
 - `ProxyConfiguration.new_url(*, session_id, request)` and `ProxyConfiguration.new_proxy_info(*, session_id, request)`. Both arguments of `new_proxy_info` now default to `None`.
 - `AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(*, ...)` and `with_parsel_static_parser(*, ...)`.
 - `AdaptivePlaywrightCrawlingContext.wait_for_selector`, `query_selector_one`, `query_selector_all` and `parse_with_static_parser`, which take `timeout` by keyword only.
