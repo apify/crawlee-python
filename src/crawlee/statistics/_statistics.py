@@ -75,7 +75,7 @@ class Statistics(Generic[TStatisticsState]):
     def __init__(
         self,
         *,
-        persistence_enabled: bool | Literal['explicit_only'] = False,
+        persistence_enabled: bool = False,
         persist_state_kvs_name: str | None = None,
         persist_state_key: str | None = None,
         persist_state_kvs_factory: Callable[[], Coroutine[None, None, KeyValueStore]] | None = None,
@@ -174,9 +174,11 @@ class Statistics(Generic[TStatisticsState]):
 
         await self._state.initialize()
 
-        # The restored timestamps belong to the previous run. Clear them, so that the downtime since then (e.g. a
-        # migration or resurrection) doesn't count towards the runtime, and a clock that is behind the previous
-        # host's doesn't make `crawler_runtime` treat the new run as already checkpointed.
+        # The timestamps belong to the previous run, restored or kept in memory. Fold that run into the accumulated
+        # runtime and clear them, so that the downtime since then (e.g. a migration or resurrection) doesn't count
+        # towards the runtime, and a clock that is behind the previous host's doesn't make `crawler_runtime` treat the
+        # new run as already checkpointed.
+        self.state.accumulated_runtime = self.state.crawler_runtime
         self.state.crawler_last_started_at = None
         self.state.crawler_finished_at = None
         self.state.stats_persisted_at = None
@@ -291,12 +293,24 @@ class Statistics(Generic[TStatisticsState]):
             retry_histogram=serialized_state['request_retry_histogram'],
         )
 
-    async def reset(self) -> None:
-        """Reset the statistics to their defaults and remove any persistent state."""
-        await self._state.reset()
+    def reset(self) -> None:
+        """Reset the statistics to their defaults, leaving the persisted record alone.
+
+        Use `reset_store` to clear the persisted record as well.
+        """
+        self._state.reset()
         self.error_tracker = ErrorTracker()
         self.error_tracker_retry = ErrorTracker()
         self._requests_in_progress.clear()
+
+    async def reset_store(self) -> None:
+        """Clear the persisted statistics record, leaving the in-memory state alone.
+
+        Raises:
+            RuntimeError: If the statistics are active with persistence enabled, since the next persist would write the
+                record straight back.
+        """
+        await self._state.reset_store()
 
     def _log(self) -> None:
         stats = self.calculate()

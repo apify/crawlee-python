@@ -759,9 +759,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         try:
             if self._has_finished_before:
-                await self._statistics.reset()
+                self._statistics.reset()
+                await self._statistics.reset_store()
 
                 if self._use_session_pool:
+                    self._session_pool.reset()
                     await self._session_pool.reset_store()
 
             if requests is not None:

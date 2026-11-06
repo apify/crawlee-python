@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock
 
 import pytest
+from pydantic import ValidationError
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
@@ -1354,6 +1356,42 @@ async def test_clear_cache_with_concurrent_new_autosaved_key(
 
     # Should not raise `RuntimeError: dictionary changed size during iteration`.
     await asyncio.wait_for(asyncio.gather(clear_task, insert_task), timeout=5)
+
+
+async def test_get_auto_saved_value_retries_cancelled_load(kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch) -> None:
+    """After a call cancelled during the load, the next `get_auto_saved_value` returns the stored record."""
+    await kvs.set_value('state', {'counter': 42})
+    get_value = kvs.get_value
+    load_started = asyncio.Event()
+
+    async def hanging_get_value(*_args: Any, **_kwargs: Any) -> None:
+        load_started.set()
+        await asyncio.sleep(3600)
+
+    monkeypatch.setattr(kvs, 'get_value', AsyncMock(side_effect=hanging_get_value))
+    load_task = asyncio.create_task(kvs.get_auto_saved_value('state'))
+    await load_started.wait()
+    load_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await load_task
+
+    monkeypatch.setattr(kvs, 'get_value', get_value)
+
+    assert await kvs.get_auto_saved_value('state') == {'counter': 42}
+
+
+async def test_get_auto_saved_value_keeps_invalid_record(kvs: KeyValueStore) -> None:
+    """A stored value that isn't a mapping makes `get_auto_saved_value` raise and isn't overwritten."""
+    await kvs.set_value('state', [1, 2, 3])
+
+    with pytest.raises(ValidationError):
+        await kvs.get_auto_saved_value('state')
+
+    await kvs.persist_autosaved_values()
+
+    assert await kvs.get_value('state') == [1, 2, 3]
+    with pytest.raises(ValidationError):
+        await kvs.get_auto_saved_value('state')
 
 
 async def test_set_value_stores_snapshot(kvs: KeyValueStore) -> None:

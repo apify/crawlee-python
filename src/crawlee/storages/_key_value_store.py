@@ -343,7 +343,9 @@ class KeyValueStore(Storage):
             cache = self._autosaved_values.setdefault(self.id, {})
 
             if key in cache:
-                return cache[key].current_value.root
+                # Retries the load if an earlier call failed or was cancelled during it.
+                cached_state = await cache[key].initialize()
+                return cached_state.root
 
             async def kvs_factory() -> KeyValueStore:
                 return self

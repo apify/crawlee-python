@@ -265,3 +265,20 @@ def test_replace_state_model_keeps_id() -> None:
     statistics = Statistics.with_default_state(id='custom')
 
     assert statistics.replace_state_model(StatisticsState)._id == 'custom'
+
+
+async def test_reentering_keeps_counters_and_runtime() -> None:
+    """Entering the statistics again keeps the counters and the runtime of the previous run."""
+    statistics = Statistics.with_default_state()
+
+    async with statistics:
+        statistics.state.requests_failed = 42
+        assert statistics.state.crawler_last_started_at is not None
+        statistics.state.crawler_last_started_at -= timedelta(seconds=5)
+
+    previous_runtime = statistics.state.crawler_runtime
+
+    async with statistics:
+        assert statistics.state.requests_failed == 42
+        assert statistics.state.accumulated_runtime == previous_runtime
+        assert previous_runtime >= timedelta(seconds=5)

@@ -177,10 +177,42 @@ async def test_session_pool_persist_and_restore(event_manager: EventManager, kvs
         persist_state_kvs_name=KVS_NAME,
         persist_state_key=PERSIST_STATE_KEY,
     ) as sp:
-        # Not just reset the store and check it's empty
-        await sp.reset_store()
-        previous_state = await kvs.get_value(key=PERSIST_STATE_KEY)
-        assert previous_state is None
+        with pytest.raises(RuntimeError, match=r'Use reset\(\) to reset the state itself'):
+            await sp.reset_store()
+
+    # The record can be cleared only once the pool is exited, since its final persist would write it back.
+    await sp.reset_store()
+    previous_state = await kvs.get_value(key=PERSIST_STATE_KEY)
+    assert previous_state is None
+
+
+async def test_reset_discards_sessions_and_keeps_record(kvs: KeyValueStore) -> None:
+    """`reset` discards the sessions in memory and leaves the persisted record alone."""
+    session_pool = SessionPool(
+        max_pool_size=MAX_POOL_SIZE,
+        persistence_enabled=True,
+        persist_state_kvs_name=KVS_NAME,
+        persist_state_key=PERSIST_STATE_KEY,
+    )
+    async with session_pool:
+        pass
+
+    session_pool.reset()
+
+    assert session_pool.session_count == 0
+    saved_pool = SessionPoolModel.model_validate(await kvs.get_value(PERSIST_STATE_KEY))
+    assert len(saved_pool.sessions) == MAX_POOL_SIZE
+
+
+async def test_reentering_keeps_sessions() -> None:
+    """Entering the pool again keeps the sessions of the previous entry."""
+    session_pool = SessionPool(max_pool_size=MAX_POOL_SIZE)
+
+    async with session_pool:
+        session_ids = set(session_pool.get_state(as_dict=False).sessions)
+
+    async with session_pool:
+        assert set(session_pool.get_state(as_dict=False).sessions) == session_ids
 
 
 async def test_retired_session_is_not_restored(event_manager: EventManager, kvs: KeyValueStore) -> None:

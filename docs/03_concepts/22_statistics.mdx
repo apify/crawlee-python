@@ -54,7 +54,7 @@ The crawler's constructor also accepts `statistics_log_format`. When the crawler
 
 The following options control persistence:
 
-- `persistence_enabled` turns persistence on. With `'explicit_only'`, a saved state is loaded at the start, but nothing is saved automatically, neither on `PERSIST_STATE` events nor at the end of the crawl.
+- `persistence_enabled` turns persistence on.
 - `persist_state_key` is the key the state is stored under. It defaults to `__CRAWLER_STATISTICS_<n>`, where `<n>` is a per-process counter of `Statistics` instances.
 - `persist_state_kvs_name` selects a named key-value store. Without it, the default key-value store is used.
 
