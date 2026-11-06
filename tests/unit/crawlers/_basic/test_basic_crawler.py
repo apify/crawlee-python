@@ -1442,6 +1442,25 @@ def test_crawler_log() -> None:
     crawler.log.info('Test log message')
 
 
+def test_default_logger_named_after_crawler_class() -> None:
+    """The default crawler logger is `crawlee.crawlers.<class name>`, so it sits under the `crawlee` logger."""
+    assert BasicCrawler().log.name == 'crawlee.crawlers.BasicCrawler'
+
+
+async def test_crawler_logs_to_given_logger(caplog: pytest.LogCaptureFixture) -> None:
+    """A crawler given a `logger` logs its own records and the autoscaled pool's records under that logger."""
+    logger = logging.getLogger('tests.crawler_logs_to_given_logger')
+    crawler = BasicCrawler(logger=logger)
+    assert crawler.log is logger
+
+    with caplog.at_level(logging.DEBUG, logger=logger.name):
+        await crawler.run([])
+
+    logger_names = {record.name for record in caplog.records}
+    assert logger.name in logger_names
+    assert f'{logger.name}.autoscaled_pool' in logger_names
+
+
 def test_configure_logging_preserves_host_app_root_handlers() -> None:
     """Constructing a crawler must not remove handlers installed on the root logger by the host application."""
     root_logger = logging.getLogger()

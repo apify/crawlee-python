@@ -41,6 +41,7 @@ class CrawlerRun(Generic[TStatisticsState]):
             run_task_function=run_task_function,
             is_task_ready_function=is_task_ready_function,
             is_finished_function=is_finished_function,
+            logger=logger.getChild('autoscaled_pool'),
         )
         self._logger_once = LoggerOnce(logger)
         self._stop_requested = False

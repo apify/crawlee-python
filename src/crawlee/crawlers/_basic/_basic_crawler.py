@@ -190,6 +190,9 @@ class _BasicCrawlerOptions(TypedDict):
     """If True, the crawler will set up logging infrastructure automatically, unless the root logger already has
     handlers configured by the host application."""
 
+    logger: NotRequired[logging.Logger]
+    """The logger the crawler and its components log to. Defaults to `crawlee.crawlers.<crawler class name>`."""
+
     statistics_log_format: NotRequired[Literal['table', 'inline']]
     """If 'table', displays crawler statistics as formatted tables in logs. If 'inline', outputs statistics as plain
     text log messages.
@@ -206,10 +209,6 @@ class _BasicCrawlerOptions(TypedDict):
 
     _additional_context_managers: NotRequired[Sequence[AbstractAsyncContextManager]]
     """Additional context managers used throughout the crawler lifecycle. Intended for use by
-    subclasses rather than direct instantiation of `BasicCrawler`."""
-
-    _logger: NotRequired[logging.Logger]
-    """A logger instance, typically provided by a subclass, for consistent logging labels. Intended for use by
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
     respect_robots_txt_file: NotRequired[bool]
@@ -311,6 +310,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         abort_on_error: bool = False,
         keep_alive: bool = False,
         configure_logging: bool = True,
+        logger: logging.Logger | None = None,
         statistics_log_format: Literal['table', 'inline'] = 'table',
         respect_robots_txt_file: bool = False,
         status_message_logging_interval: timedelta = timedelta(seconds=10),
@@ -319,7 +319,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         id: str | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
         _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
-        _logger: logging.Logger | None = None,
     ) -> None:
         """Initialize a new instance.
 
@@ -366,6 +365,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 Use `crawler.stop()` to exit the crawler.
             configure_logging: If True, the crawler will set up logging infrastructure automatically, unless the root
                 logger already has handlers configured by the host application.
+            logger: The logger the crawler and its components log to. Defaults to a logger named
+                `crawlee.crawlers.<crawler class name>`.
             statistics_log_format: If 'table', displays crawler statistics as formatted tables in logs. If 'inline',
                 outputs statistics as plain text log messages.
             respect_robots_txt_file: If set to `True`, the crawler will automatically try to fetch the robots.txt file
@@ -380,8 +381,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
             _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
-                Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
-            _logger: A logger instance, typically provided by a subclass, for consistent logging labels.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
         self._id = str(BasicCrawler.__next_id) if id is None else id
@@ -473,7 +472,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             # mirroring `logging.basicConfig` semantics.
             if not root_logger.handlers:
                 configure_logger(root_logger)
-        self._logger = _logger or logging.getLogger(__name__)
+        self._logger = logger or logging.getLogger(f'crawlee.crawlers.{type(self).__name__}')
         if implicit_event_manager_with_explicit_config:
             self._logger.warning(
                 'No event manager set, implicitly using event manager from global service_locator.'

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any
 
 from crawlee._utils.docs import docs_group
@@ -157,8 +156,6 @@ class StagehandCrawler(
                     )
                 ]
             )
-
-        kwargs.setdefault('_logger', logging.getLogger(__name__))
 
         super().__init__(
             browser_pool=browser_pool,

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from abc import ABC
 from datetime import timedelta
 from typing import TYPE_CHECKING, Generic, NotRequired
@@ -86,7 +85,6 @@ class AbstractHttpCrawler(
                 'AbstractHttpCrawler._create_static_content_crawler_pipeline() method to initialize it.'
             )
 
-        kwargs.setdefault('_logger', logging.getLogger(self.__class__.__name__))
         super().__init__(**kwargs)
 
     @classmethod

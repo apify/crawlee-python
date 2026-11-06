@@ -73,7 +73,7 @@ uv run poe e2e-templates-tests
 
 ### Logging
 
-- Modules log to `getLogger(__name__)`. Crawlers and their components log to the crawler's logger (`crawler.log`) or its children.
+- Modules log to `getLogger(__name__)`. Crawlers and their components log to the crawler's logger, `crawlee.crawlers.<class name>` by default, or its children.
 - In a DEBUG line about a request, keep the message short and pass the request context as `extra=request_log_extra(request)` from `crawlee._utils.log`.
 - Pick the level by who needs to act:
   - `ERROR`: a request failed for good, or the crawler can't go on.

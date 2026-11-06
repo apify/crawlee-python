@@ -863,3 +863,21 @@ async def test_fails_when_system_closes(
 
     with pytest.raises(RuntimeError, match='not active'):
         await asyncio.wait_for(pool_run_task, timeout=5)
+
+
+async def test_logs_to_given_logger(make_concurrency_system: type[ConcurrencySystem]) -> None:
+    """A pool given a `logger` logs to it."""
+    logger = Mock(spec=logging.Logger)
+
+    async with make_concurrency_system() as concurrency_system:
+        pool = AutoscaledPool(
+            concurrency_system=concurrency_system,
+            consumer=CONSUMER,
+            run_task_function=lambda _: future(None),
+            is_task_ready_function=lambda: future(False),
+            is_finished_function=lambda: future(True),
+            logger=logger,
+        )
+        await pool.run()
+
+    logger.debug.assert_any_call('Starting the pool')

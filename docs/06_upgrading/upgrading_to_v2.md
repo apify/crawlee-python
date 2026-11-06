@@ -442,6 +442,26 @@ If you configure loggers by name or match log messages, update them for the foll
 
 The autoscaling loggers moved together with the package. `crawlee._autoscaling.autoscaled_pool` and `crawlee._autoscaling.system_status` are now `crawlee.autoscaling._autoscaled_pool` and `crawlee.autoscaling._system_status`. The memory warnings of `crawlee._autoscaling.snapshotter` now come from `crawlee.autoscaling._memory_load_signal`. The state log, along with the messages about scaling and free capacity, now comes from the new `crawlee.autoscaling._concurrency_system` logger. To configure all of them at once, use the `crawlee.autoscaling` logger.
 
+Every crawler logs to a logger named after its class under `crawlee.crawlers`, such as `crawlee.crawlers.BasicCrawler`, `crawlee.crawlers.ParselCrawler` or `crawlee.crawlers.PlaywrightCrawler`. In v1, `HttpCrawler`, `BeautifulSoupCrawler` and `ParselCrawler` logged to a logger named only after the class (`ParselCrawler`), outside the `crawlee` hierarchy, and the other crawlers logged to the name of their module (`crawlee.crawlers._basic._basic_crawler`). The sub crawlers of `AdaptivePlaywrightCrawler` log to its `static` and `playwright` children, `crawlee.crawlers.AdaptivePlaywrightCrawler.static` and `crawlee.crawlers.AdaptivePlaywrightCrawler.playwright`, instead of `Subcrawler_static` and `Subcrawler_playwright`.
+
+The autoscaled pool of a crawler logs to the `autoscaled_pool` child of the crawler's logger, for example `crawlee.crawlers.ParselCrawler.autoscaled_pool`. A standalone `AutoscaledPool` logs to `crawlee.autoscaling._autoscaled_pool` unless you pass it a `logger`.
+
+### Custom crawler logger
+
+The private `_logger` argument of the crawlers is replaced by a public `logger` argument. The crawler, its autoscaled pool, and the periodic statistics log to it.
+
+```python
+# v1
+crawler = ParselCrawler(_logger=logging.getLogger('my_crawler'))
+
+# v2
+crawler = ParselCrawler(logger=logging.getLogger('my_crawler'))
+```
+
+### `NullHandler` on the `crawlee` logger
+
+The `crawlee` logger has a `logging.NullHandler`. If you create a crawler with `configure_logging=False` and don't configure logging yourself, Python doesn't print Crawlee's warnings and errors to stderr through `logging.lastResort` anymore. Configure logging in your application, for example with `logging.basicConfig()`, to see them.
+
 ### Log levels
 
 The periodic log of the autoscaling state and the `Waiting for remaining tasks to finish` message are now logged at DEBUG instead of INFO. The crawler's status message at INFO still reports the desired concurrency. To read the concurrency values in code, use `crawler.concurrency_system`.
