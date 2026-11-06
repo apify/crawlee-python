@@ -132,7 +132,7 @@ class _BasicCrawlerOptions(TypedDict):
     session_pool: NotRequired[SessionPool]
     """A custom `SessionPool` instance, allowing the use of non-default configuration."""
 
-    proxy_configuration: NotRequired[ProxyConfiguration]
+    proxy_configuration: NotRequired[ProxyConfiguration | None]
     """HTTP proxy configuration used when making requests."""
 
     http_client: NotRequired[HttpClient]
