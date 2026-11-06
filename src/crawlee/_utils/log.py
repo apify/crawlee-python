@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import logging
 import threading
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from crawlee._request import Request
 
 
 class LoggerOnce:
@@ -34,3 +38,8 @@ class LoggerOnce:
             self._seen.add(key)
 
         self._logger.log(level, message)
+
+
+def request_log_extra(request: Request) -> dict[str, Any]:
+    """Return the fields that identify `request` in a log record, to pass as `extra`."""
+    return {'url': request.url, 'unique_key': request.unique_key, 'retry_count': request.retry_count}

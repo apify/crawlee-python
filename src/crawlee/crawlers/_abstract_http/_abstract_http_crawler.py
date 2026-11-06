@@ -12,6 +12,7 @@ from typing_extensions import TypeVar
 
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._utils.docs import docs_group
+from crawlee._utils.log import request_log_extra
 from crawlee._utils.time import SharedTimeout
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute, to_absolute_url_iterator
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
@@ -341,6 +342,9 @@ class AbstractHttpCrawler(
             The original crawling context if no errors are detected.
         """
         status_code = context.http_response.status_code
+        context.log.debug(
+            'Received a response', extra={**request_log_extra(context.request), 'status_code': status_code}
+        )
         if self._record_rate_limit_status_code(
             status_code,
             request_url=context.request.url,
