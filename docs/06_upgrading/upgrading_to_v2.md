@@ -504,10 +504,6 @@ The `ThrottlingRequestManager` warning about capping a delay now calls it a "req
 
 Log records hold the message template and its arguments separately. `record.msg` is the template, such as `Retrying request to %s due to: %s. %s`, and `record.args` holds the values. To read the final text, use `record.getMessage()`, which formatters and handlers already do.
 
-At DEBUG, the crawler logs the steps of each request: `Processing request`, `Received a response` (HTTP and Playwright crawlers), `Committed the request handler result`, and `Request handled`. The request context is in the record's `extra` fields `url`, `unique_key` and `retry_count`, plus `status_code` on the response message and `add_requests_calls` and `push_data_calls` on the commit message. The `Deferring request because its domain is rate-limiting us.` message carries the same fields.
-
-The autoscaled pool doesn't log the DEBUG messages that repeated on every scheduling attempt anymore: `Not scheduling new tasks - the autoscaled pool is paused`, `Not scheduling new tasks - no free capacity`, `Not scheduling new task - no task is ready`, `Not scheduling new task - the task was not accepted by the concurrency system`, `Scheduling a new task` and `Worker task finished`. The concurrency system drops its matching messages too: `Not scheduling new tasks - already running at desired concurrency`, `Not scheduling new tasks - system is overloaded` and `Not scheduling new tasks - maximum tasks per minute reached`.
-
 ## Session retirement is permanent
 
 In v1, `Session.retire()` only added `max_error_score` to the error score, so a later `mark_good()` could lower it again and make the retired session usable. In v2, a separate `retired` flag tracks retirement, exposed as the `Session.retired` property, and a retired session is never usable again. Create a new session to replace it.

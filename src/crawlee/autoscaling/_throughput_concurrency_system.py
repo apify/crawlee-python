@@ -157,7 +157,7 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
 
 
     async def handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
 
     async def main() -> None:
