@@ -81,6 +81,10 @@ uv run poe e2e-templates-tests
 - On Windows with Python 3.12 or older, `datetime.now()` ticks in 1-15 ms steps, so two timestamps taken a few milliseconds apart can be equal. A test that asserts one timestamp is later than another injects a `Mock` clock instead of sleeping.
 - For a TCP endpoint that must refuse connections, bind a socket to `('127.0.0.1', 0)` and hold it open without calling `listen()`. A hard-coded port can be taken by a server in a parallel xdist worker. Test servers use `127.0.0.1`, since on Windows `localhost` resolves to both IPv4 and IPv6.
 
+### YAML
+
+Leave YAML values unquoted unless quotes are needed: a plain value that would change type (`"3.14"`, `"true"`, `""`), start with an indicator character (`"*"`, `"@apify/*"`), contain a colon followed by a space or a `#` preceded by one (`"a: b"`, `"a #b"`), or need an escape sequence (`"\n"`). Use double quotes then. Keep single quotes when the value itself contains double quotes, and for string literals inside GitHub Actions expressions (`${{ ... }}`, `if:` conditions), where double quotes are invalid.
+
 ## Documentation
 
 We follow the [Google docstring format](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html) for code documentation. All user-facing classes and functions must be documented. Documentation standards are enforced using [Ruff](https://docs.astral.sh/ruff/).
@@ -97,11 +101,7 @@ uv run poe run-docs
 
 ### Linting the docs and website
 
-Markdown content (this guide, `README.md`, and the `docs/` folder) is checked with
-[markdownlint](https://github.com/DavidAnson/markdownlint). The Docusaurus website code is linted
-with [oxlint](https://oxc.rs/) in type-aware mode (types come from `website/tsconfig.json`) and
-formatted with [oxfmt](https://oxc.rs/). All of them run in CI.
-To run them locally (requires Node.js 22.12 or newer and pnpm), from the `website/` directory:
+Markdown content (this guide, `README.md`, and the `docs/` folder) is checked with [markdownlint](https://github.com/DavidAnson/markdownlint). The Docusaurus website code is linted with [oxlint](https://oxc.rs/) in type-aware mode (types come from `website/tsconfig.json`) and formatted with [oxfmt](https://oxc.rs/). All of them run in CI. To run them locally (requires Node.js 22.12 or newer and pnpm), from the `website/` directory:
 
 ```sh
 pnpm lint          # lint Markdown and website code
@@ -109,8 +109,7 @@ pnpm lint:fix      # auto-fix both
 pnpm format        # format the website code
 ```
 
-Doc images are committed as optimized `.webp`. To convert a new image, run
-`pnpm opt:images <path-to-image>` from the `website/` directory.
+Doc images are committed as optimized `.webp`. To convert a new image, run `pnpm opt:images <path-to-image>` from the `website/` directory.
 
 ## Commits
 
