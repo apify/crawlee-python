@@ -83,7 +83,7 @@ uv run poe e2e-templates-tests
 
 ### YAML
 
-Leave YAML values unquoted unless quotes are needed: a plain value that would change type (`"3.14"`, `"true"`) or start with an indicator character (`"*"`, `"@apify/*"`). Use double quotes then. Keep single quotes when the value itself contains double quotes, and for string literals inside GitHub Actions expressions (`${{ ... }}`, `if:` conditions), where double quotes are invalid.
+Leave YAML values unquoted unless quotes are needed: a plain value that would change type (`"3.14"`, `"true"`, `""`), start with an indicator character (`"*"`, `"@apify/*"`), contain a colon followed by a space or a `#` preceded by one (`"a: b"`, `"a #b"`), or need an escape sequence (`"\n"`). Use double quotes then. Keep single quotes when the value itself contains double quotes, and for string literals inside GitHub Actions expressions (`${{ ... }}`, `if:` conditions), where double quotes are invalid.
 
 ## Documentation
 
