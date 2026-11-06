@@ -593,7 +593,7 @@ class SendRequestFunction(Protocol):
             payload: The payload to include in the request.
             cookies: The cookies to send and store instead of the cookies of the session. With `PlaywrightCrawler`,
                 the response cookies are stored in the browser context as well, and so in the session after the
-                request handler.
+                request handler unless `save_response_cookies` is disabled.
             timeout: Maximum time allowed to receive the response, including all redirects, and to read its body.
                 Without it, the default timeout of the HTTP client applies.
 

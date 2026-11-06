@@ -170,14 +170,12 @@ class CurlImpersonateHttpClient(HttpClient):
     def __init__(
         self,
         *,
-        persist_cookies_per_session: bool = True,
         follow_redirects: bool = True,
         **async_session_kwargs: Any,
     ) -> None:
         """Initialize a new instance.
 
         Args:
-            persist_cookies_per_session: Whether to persist cookies per HTTP session.
             follow_redirects: Whether to follow HTTP redirects.
             async_session_kwargs: Additional keyword arguments for `curl_cffi.requests.AsyncSession`. Some of them are
                 ignored with a warning. Cookies are kept in sessions, so `cookies` is ignored. The `auth` and `params`
@@ -186,7 +184,6 @@ class CurlImpersonateHttpClient(HttpClient):
                 and `max_redirects` are ignored.
         """
         super().__init__(
-            persist_cookies_per_session=persist_cookies_per_session,
             follow_redirects=follow_redirects,
             headers=async_session_kwargs.pop('headers', None),
         )

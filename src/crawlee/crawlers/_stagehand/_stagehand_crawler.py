@@ -100,6 +100,7 @@ class StagehandCrawler(
         browser_new_context_options: dict[str, Any] | None = None,
         goto_options: GotoOptions | None = None,
         navigation_timeout: timedelta | None = None,
+        save_response_cookies: bool = True,
         **kwargs: Unpack[BasicCrawlerOptions[StagehandCrawlingContext, StatisticsState]],
     ) -> None:
         """Initialize a new instance.
@@ -123,6 +124,7 @@ class StagehandCrawler(
                 supported - use `navigation_timeout` instead.
             navigation_timeout: Timeout for the navigation phase (from opening the page to calling the request handler).
             Defaults to one minute.
+            save_response_cookies: Whether to save the cookies of the page to the session after the request handler.
             kwargs: Additional keyword arguments forwarded to `BasicCrawler`.
         """
         if browser_pool is not None:
@@ -161,6 +163,7 @@ class StagehandCrawler(
             browser_pool=browser_pool,
             goto_options=goto_options,
             navigation_timeout=navigation_timeout,
+            save_response_cookies=save_response_cookies,
             **kwargs,
         )
 
