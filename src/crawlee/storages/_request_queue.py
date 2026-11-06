@@ -92,6 +92,9 @@ class RequestQueue(Storage, RequestManager):
         self._add_requests_tasks = list[asyncio.Task]()
         """A list of tasks for adding requests to the queue."""
 
+        self._expected_request_processing_time = timedelta(0)
+        """The longest expected processing time passed to the backend so far."""
+
     @property
     @override
     def id(self) -> str:
@@ -327,6 +330,39 @@ class RequestQueue(Storage, RequestManager):
             return FinishedStatus()
 
         return WaitingStatus()
+
+    @override
+    async def set_expected_request_processing_time(self, processing_time: timedelta) -> None:
+        """Set how long a consumer expects to hold a fetched request before marking it handled or reclaiming it.
+
+        Several consumers may share one queue, so the value only grows. A shorter one would cut short the locks of a
+        consumer that holds its requests longer.
+
+        Args:
+            processing_time: The expected time between fetching a request and marking it handled or reclaiming it.
+        """
+        if processing_time <= self._expected_request_processing_time:
+            return
+
+        self._expected_request_processing_time = processing_time
+        await self._backend.set_expected_request_processing_time(processing_time)
+
+    @override
+    async def extend_request_processing_time(self, request: Request, delta: timedelta) -> bool:
+        """Give a fetched request that's still being processed `delta` more time before its lock expires.
+
+        Unlike `set_expected_request_processing_time`, which sizes every future lock, this only touches the given
+        request.
+
+        Args:
+            request: The request returned by `fetch_next_request` and not yet marked handled or reclaimed.
+            delta: How much longer the request stays locked.
+
+        Returns:
+            `True` if the lock was extended. `False` if the backend doesn't lock requests or no longer holds this one,
+            so the request may be processed twice.
+        """
+        return await self._backend.extend_request_processing_time(request, delta)
 
     async def _process_batch(
         self,

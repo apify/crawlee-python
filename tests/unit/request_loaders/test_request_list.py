@@ -292,7 +292,7 @@ async def test_handle_invalid_url_with_persistence() -> None:
     assert [request['url'] for request in persisted_data['requests']] == ['https://valid.placeholder.com']
 
 
-async def _drain(request_list: RequestList) -> list[str]:
+async def drain(request_list: RequestList) -> list[str]:
     served = []
     while (request := await request_list.fetch_next_request()) is not None:
         served.append(request.url)
@@ -300,7 +300,7 @@ async def _drain(request_list: RequestList) -> list[str]:
     return served
 
 
-async def _persist_position(position: RequestListState) -> None:
+async def persist_position(position: RequestListState) -> None:
     kvs = await KeyValueStore.open()
     await kvs.set_value('state', position.model_dump(mode='json', by_alias=True))
 
@@ -326,7 +326,7 @@ async def test_restore_serves_in_progress_requests_again(persist_requests_key: s
     assert await restored_list.get_handled_count() == 1
     assert await restored_list.get_pending_count() == 1
     assert await restored_list.get_total_count() == 2
-    assert await _drain(restored_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
+    assert await drain(restored_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
     assert (await restored_list.check_readiness()).status == 'finished'
     assert await restored_list.get_handled_count() == 3
     assert await restored_list.get_total_count() == 3
@@ -334,11 +334,11 @@ async def test_restore_serves_in_progress_requests_again(persist_requests_key: s
 
 async def test_restore_reports_ready_while_only_in_progress_requests_remain() -> None:
     """A restored list with an exhausted source reports ready while in-progress requests are left to serve again."""
-    await _persist_position(RequestListState(next_index=3, in_progress={'https://c.placeholder.com'}))
+    await persist_position(RequestListState(next_index=3, in_progress={'https://c.placeholder.com'}))
     request_list = RequestList(URLS, persist_state_key='state')
 
     assert (await request_list.check_readiness()).status == 'ready'
-    assert await _drain(request_list) == ['https://c.placeholder.com']
+    assert await drain(request_list) == ['https://c.placeholder.com']
     assert (await request_list.check_readiness()).status == 'finished'
 
 
@@ -349,11 +349,11 @@ async def test_restore_drops_in_progress_keys_not_fetched(caplog: pytest.LogCapt
         next_unique_key='https://b.placeholder.com',
         in_progress={'https://a.placeholder.com', 'https://unknown.placeholder.com'},
     )
-    await _persist_position(position)
+    await persist_position(position)
     request_list = RequestList(URLS, persist_state_key='state')
 
     with caplog.at_level(logging.WARNING):
-        assert await _drain(request_list) == URLS
+        assert await drain(request_list) == URLS
 
     assert (await request_list.check_readiness()).status == 'finished'
     assert any(
@@ -373,7 +373,7 @@ async def test_restore_skips_invalid_requests_before_position() -> None:
 
     restored_list = RequestList(source, persist_state_key='state')
 
-    assert await _drain(restored_list) == ['https://c.placeholder.com']
+    assert await drain(restored_list) == ['https://c.placeholder.com']
 
 
 async def test_mismatch_keeps_persisted_in_progress_keys() -> None:
@@ -401,18 +401,18 @@ async def test_mismatch_leaves_no_persisted_requests() -> None:
     reordered_urls = ['https://b.placeholder.com', 'https://a.placeholder.com', 'https://c.placeholder.com']
     mismatched_list = RequestList(reordered_urls, persist_state_key='state', persist_requests_key='requests')
 
-    with pytest.raises(RuntimeError, match=r'Mismatch at index 1'):
+    with pytest.raises(RuntimeError, match='Mismatch at index 1'):
         await mismatched_list.fetch_next_request()
 
     kvs = await KeyValueStore.open()
     assert await kvs.get_value('requests') is None
     restored_list = RequestList(URLS, persist_state_key='state', persist_requests_key='requests')
-    assert await _drain(restored_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
+    assert await drain(restored_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
 
 
 async def test_concurrent_first_calls_restore_position_once() -> None:
     """Concurrent first calls restore the position once instead of advancing the source twice."""
-    await _persist_position(RequestListState(next_index=1, next_unique_key='https://b.placeholder.com'))
+    await persist_position(RequestListState(next_index=1, next_unique_key='https://b.placeholder.com'))
     request_list = RequestList(URLS, persist_state_key='state')
 
     _, request = await asyncio.gather(request_list.check_readiness(), request_list.fetch_next_request())
@@ -426,7 +426,7 @@ async def test_state_option_sets_start_position() -> None:
     state = RequestListState(next_index=1, next_unique_key='https://b.placeholder.com')
     request_list = RequestList(URLS, state=state)
 
-    assert await _drain(request_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
+    assert await drain(request_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
 
 
 async def test_get_state_resumes_another_list() -> None:
@@ -442,7 +442,7 @@ async def test_get_state_resumes_another_list() -> None:
 
     resumed_list = RequestList(URLS, state=await first_list.get_state())
 
-    assert await _drain(resumed_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
+    assert await drain(resumed_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
 
 
 async def test_persisted_state_wins_over_state_option() -> None:
@@ -456,7 +456,7 @@ async def test_persisted_state_wins_over_state_option() -> None:
     state = RequestListState(next_index=2, next_unique_key='https://c.placeholder.com')
     restored_list = RequestList(URLS, persist_state_key='state', state=state)
 
-    assert await _drain(restored_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
+    assert await drain(restored_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
 
 
 async def test_persist_state_without_key_raises() -> None:

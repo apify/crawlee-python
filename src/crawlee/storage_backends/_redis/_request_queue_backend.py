@@ -80,8 +80,8 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
     _MAX_BATCH_FETCH_SIZE = 10
     """Maximum number of requests to fetch in a single batch operation."""
 
-    _BLOCK_REQUEST_TIME = 300_000  # milliseconds
-    """Time in milliseconds to block a fetched request for other clients before it can be autoreclaimed."""
+    _DEFAULT_BLOCK_REQUEST_TIME = timedelta(minutes=3)
+    """How long a fetched request stays blocked unless a longer expected processing time is set."""
 
     _RECLAIM_INTERVAL = timedelta(seconds=30)
     """Interval to check for stale requests to reclaim."""
@@ -112,10 +112,14 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
         self.client_key = crypto_random_object_id(length=32)[:32]
         """Unique identifier for this client instance."""
 
+        self._block_request_time = self._DEFAULT_BLOCK_REQUEST_TIME
+        """How long a fetched request stays blocked for other clients before it can be autoreclaimed."""
+
         # Lua scripts for atomic operations
         self._fetch_script: AsyncScript | None = None
         self._reclaim_stale_script: AsyncScript | None = None
         self._add_requests_script: AsyncScript | None = None
+        self._extend_lock_script: AsyncScript | None = None
 
         self._next_reclaim_stale: datetime | None = None
 
@@ -363,7 +367,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
         if self._fetch_script is None:
             raise RuntimeError('Scripts not loaded. Call _ensure_scripts_loaded() before using the backend.')
 
-        blocked_until_timestamp = int(datetime.now(tz=UTC).timestamp() * 1000) + self._BLOCK_REQUEST_TIME
+        blocked_until_timestamp = int((datetime.now(tz=UTC) + self._block_request_time).timestamp() * 1000)
 
         # The script retrieves requests from the queue and places them in the in_progress hash.
         requests_json = await self._fetch_script(
@@ -437,7 +441,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
                 was_already_handled=True,
             )
         except Exception:
-            blocked_until = int(datetime.now(tz=UTC).timestamp() * 1000) + self._BLOCK_REQUEST_TIME
+            blocked_until = int((datetime.now(tz=UTC) + self._block_request_time).timestamp() * 1000)
             # If we fail to mark the request as handled after removing it from in_progress, we restore request in
             # `in_progress` hash.
             await await_redis_response(
@@ -464,7 +468,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
 
         async with self._get_pipeline() as pipe:
             if forefront:
-                blocked_until_timestamp = int(datetime.now(tz=UTC).timestamp() * 1000) + self._BLOCK_REQUEST_TIME
+                blocked_until_timestamp = int((datetime.now(tz=UTC) + self._block_request_time).timestamp() * 1000)
 
                 await await_redis_response(
                     pipe.hset(
@@ -522,10 +526,33 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
         metadata = await self.get_metadata()
         return metadata.pending_request_count == 0
 
+    @override
+    async def set_expected_request_processing_time(self, processing_time: timedelta) -> None:
+        # Only raised, so a short expected processing time never cuts the default block.
+        self._block_request_time = max(self._block_request_time, processing_time)
+
+    @retry_on_error(RedisError)
+    @override
+    async def extend_request_processing_time(self, request: Request, delta: timedelta) -> bool:
+        if delta <= timedelta(0):
+            raise ValueError(f'The lock extension must be positive, got {delta}.')
+
+        if self._extend_lock_script is None:
+            raise RuntimeError('Scripts not loaded. Call _ensure_scripts_loaded() before using the backend.')
+
+        current_time = int(datetime.now(tz=UTC).timestamp() * 1000)
+        delta_ms = int(delta.total_seconds() * 1000)
+        extended = await self._extend_lock_script(
+            keys=[self._in_progress_key],
+            args=[request.unique_key, self.client_key, current_time, delta_ms],
+        )
+        return extended == 1
+
     async def _load_scripts(self) -> None:
         """Ensure Lua scripts are loaded in Redis."""
         self._fetch_script = await self._create_script('atomic_fetch_request.lua')
         self._reclaim_stale_script = await self._create_script('reclaim_stale_requests.lua')
+        self._extend_lock_script = await self._create_script('extend_request_lock.lua')
         if self._dedup_strategy == 'bloom':
             self._add_requests_script = await self._create_script('atomic_bloom_add_requests.lua')
         elif self._dedup_strategy == 'default':

@@ -188,6 +188,19 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             state.reset_throttling()
 
     @override
+    async def set_expected_request_processing_time(self, processing_time: timedelta) -> None:
+        await self._ensure_sub_managers()
+        await asyncio.gather(
+            self._inner.set_expected_request_processing_time(processing_time),
+            *(sm.set_expected_request_processing_time(processing_time) for sm in self._sub_managers.values()),
+        )
+
+    @override
+    async def extend_request_processing_time(self, request: Request, delta: timedelta) -> bool:
+        await self._ensure_sub_managers()
+        return await self._fetch_owner(request).extend_request_processing_time(request, delta)
+
+    @override
     async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest | None:
         """Add a request, routing it to the appropriate manager.
 

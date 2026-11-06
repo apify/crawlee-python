@@ -137,3 +137,12 @@ class RequestManagerTandem(RequestManager):
         holds are fetched as usual.
         """
         await self._read_write_manager.purge()
+
+    @override
+    async def set_expected_request_processing_time(self, processing_time: timedelta) -> None:
+        # Every request is fetched from the manager, even one that came from the loader.
+        await self._read_write_manager.set_expected_request_processing_time(processing_time)
+
+    @override
+    async def extend_request_processing_time(self, request: Request, delta: timedelta) -> bool:
+        return await self._read_write_manager.extend_request_processing_time(request, delta)
