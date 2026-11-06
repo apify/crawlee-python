@@ -157,7 +157,7 @@ class ThroughputConcurrencySystem(ConcurrencySystem):
 
 
     async def handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
 
     async def main() -> None:
@@ -632,7 +632,7 @@ class _ThroughputController:
             self.desired_concurrency = max(self._system.min_concurrency, self.desired_concurrency - step)
 
         reason = 'right after a raise, undoing it' if cut_to is not None else 'cutting by the parent step'
-        logger.debug(f'Machine overloaded {reason}; concurrency is now {self.desired_concurrency}')
+        logger.debug('Machine overloaded %s; concurrency is now %s', reason, self.desired_concurrency)
 
         # The cut level becomes the lower level of the next cycle, so a burst is cut at the parent's pace. Near the
         # floor the centre sits a task above it, since the lower level is always at least a task below the centre.
@@ -715,7 +715,7 @@ class _ThroughputController:
 
     def _end_climb(self, rate: float, *, measured: bool) -> None:
         cause = 'a step stopped paying off' if measured else 'the level could not be filled'
-        logger.debug(f'Climb ended at concurrency {self.desired_concurrency}: {cause}')
+        logger.debug('Climb ended at concurrency %s: %s', self.desired_concurrency, cause)
         self._startup = False
         self._phase = 'low'
         self._climb_gain = self._system.startup_gain
@@ -796,7 +796,7 @@ class _ThroughputController:
             self._end_hold()
 
     def _end_hold(self) -> None:
-        logger.debug(f'Hold ended; measuring around concurrency {round(self._centre)} again')
+        logger.debug('Hold ended; measuring around concurrency %s again', round(self._centre))
         self._hold_cycles = 0
         self._holding_peak = False
         self._hold_reference = None
@@ -831,7 +831,7 @@ class _ThroughputController:
     def _on_tie(self) -> None:
         if self._dither <= self._system.dither_min and self._system.hold_cycles_at_peak > 0:
             # A step-down before the hold would have no way back up, so the hold sits between the two tied levels.
-            logger.debug(f'Levels tied at the narrowest spread; holding concurrency {round(self._centre)}')
+            logger.debug('Levels tied at the narrowest spread; holding concurrency %s', round(self._centre))
             self._hold_cycles = self._system.hold_cycles_at_peak
             self._holding_peak = True
             return
@@ -854,13 +854,11 @@ class _ThroughputController:
             self._reference = high
             self._reference_median = median
             self._phase = 'climb'
-            logger.debug(
-                f'Upper level kept winning by a climb step; climbing again from concurrency {self._centre:.0f}'
-            )
+            logger.debug('Upper level kept winning by a climb step; climbing again from concurrency %.0f', self._centre)
             return
 
         if clamped:
-            logger.debug(f'Upper level won at the concurrency limit; holding at {self.desired_concurrency}')
+            logger.debug('Upper level won at the concurrency limit; holding at %s', self.desired_concurrency)
             self._dither = self._system.dither_min
             self._hold_cycles = self._system.hold_cycles_at_ceiling
             self._holding_peak = False

@@ -32,7 +32,7 @@ async def main() -> None:
             raise RuntimeError('retry with cookies')
 
         # The retry runs on the same session, so the cookies are still here.
-        context.log.info(f'Cookies: {context.session.cookies.get_cookies_as_dicts()}')
+        context.log.info('Cookies: %s', context.session.cookies.get_cookies_as_dicts())
 
     await crawler.run(['https://httpbingo.org/cookies'])
 

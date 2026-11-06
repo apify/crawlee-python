@@ -48,7 +48,9 @@ def to_absolute_url_iterator(base_url: str, urls: Iterator[str], logger: Logger 
             # Skip the URL if conversion fails, probably due to an incorrect format, such as 'mailto:'.
             if not is_url_absolute(converted_url):
                 if logger:
-                    logger.debug(f'Could not convert URL "{url}" to absolute using base URL "{base_url}". Skipping it.')
+                    logger.debug(
+                        'Could not convert URL "%s" to absolute using base URL "%s". Skipping it.', url, base_url
+                    )
                 continue
             yield converted_url
 

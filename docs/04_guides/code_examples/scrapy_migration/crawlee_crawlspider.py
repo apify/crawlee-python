@@ -11,7 +11,7 @@ async def main() -> None:
     # pagination and enqueues each book detail page, routed by label.
     @crawler.router.default_handler
     async def listing_handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Listing {context.request.url}')
+        context.log.info('Listing %s', context.request.url)
 
         # highlight-start
         # `selector` is the `restrict_css` analog. `include` is the `allow` analog:
@@ -29,7 +29,7 @@ async def main() -> None:
     # Routed by the 'book' label, like a `Rule` with `callback='parse_book'`.
     @crawler.router.handler('book')
     async def book_handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Book {context.request.url}')
+        context.log.info('Book %s', context.request.url)
         await context.push_data(
             {
                 'title': context.selector.css('h1::text').get(),

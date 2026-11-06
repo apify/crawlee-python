@@ -23,11 +23,12 @@ class LoggerOnce:
         self._seen: set[str] = set()
         self._lock = threading.Lock()
 
-    def log(self, message: str, *, key: str, level: int = logging.INFO) -> None:
+    def log(self, message: str, *args: object, key: str, level: int = logging.INFO) -> None:
         """Log `message` at `level` the first time `key` is seen on this instance; later calls are no-ops.
 
         Args:
-            message: The message to log.
+            message: The message to log, with `%s` placeholders for `args`.
+            args: The values for the placeholders in `message`.
             key: Deduplication key. Two calls with the same key emit at most once.
             level: Standard `logging` level (e.g. `logging.WARNING`). Defaults to `logging.INFO`.
         """
@@ -37,7 +38,7 @@ class LoggerOnce:
                 return
             self._seen.add(key)
 
-        self._logger.log(level, message)
+        self._logger.log(level, message, *args)
 
 
 def request_log_extra(request: Request) -> dict[str, Any]:

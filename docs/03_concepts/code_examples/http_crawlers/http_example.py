@@ -14,7 +14,7 @@ async def main() -> None:
     # Define the default request handler
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url}')
+        context.log.info('Processing %s', context.request.url)
 
         # Get the raw response content
         response_body = await context.http_response.read()

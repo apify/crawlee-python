@@ -14,13 +14,13 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
         await context.enqueue_links()
 
     @crawler.pre_navigation_hook
     async def configure_page(context: PlaywrightPreNavCrawlingContext) -> None:
-        context.log.info(f'Navigating to {context.request.url} ...')
+        context.log.info('Navigating to %s ...', context.request.url)
 
         # block stylesheets, images, fonts and other static assets
         # to speed up page loading

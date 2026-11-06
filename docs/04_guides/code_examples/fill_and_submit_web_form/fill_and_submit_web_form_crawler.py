@@ -11,9 +11,9 @@ async def main() -> None:
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
         response = (await context.http_response.read()).decode('utf-8')
-        context.log.info(f'Response: {response}')  # To see the response in the logs.
+        context.log.info('Response: %s', response)  # To see the response in the logs.
 
     # Prepare a POST request to the form endpoint.
     request = Request.from_url(

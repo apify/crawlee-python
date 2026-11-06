@@ -131,13 +131,13 @@ The callback registered with `on_skipped_request` gets the skipped `Request` as 
 # v1
 @crawler.on_skipped_request
 async def on_skipped(url: str, reason: SkippedReason) -> None:
-    crawler.log.info(f'Skipped {url}: {reason}')
+    crawler.log.info('Skipped %s: %s', url, reason)
 
 
 # v2
 @crawler.on_skipped_request
 async def on_skipped(request: Request, reason: SkippedReason) -> None:
-    crawler.log.info(f'Skipped {request.url}: {reason}')
+    crawler.log.info('Skipped %s: %s', request.url, reason)
 ```
 
 For links that `enqueue_links` skips because of `robots.txt`, the `Request` carries the `label` and `user_data` passed to `enqueue_links`. The `transform_request_function` isn't applied to these links.
@@ -501,6 +501,8 @@ The two DEBUG messages that `RequestQueue.is_finished` logged, "Background add r
 The warnings about an HTTP 429 that the request manager doesn't pace are reworded and logged once per domain. The warning `run()` logged at the start about `respect_robots_txt_file` without a `ThrottlingRequestManager` is replaced by a new one, logged once per domain whose robots.txt `Crawl-delay` the request manager doesn't pace. The warning about a `RequestThrottledError` handled as an ordinary error is reworded, and a new ERROR is logged when the request manager fails to record that rate limit. Another new ERROR is logged once per domain when the request manager fails to record a robots.txt `Crawl-delay`.
 
 The `ThrottlingRequestManager` warning about capping a delay now calls it a "requested wait" delay instead of a "Retry-After header" delay. Its DEBUG messages about a 429 ignored during an active backoff and about resetting a domain's rate limit state are removed, and its DEBUG message about a domain's crawl-delay shows the delay with one decimal place.
+
+Log records hold the message template and its arguments separately. `record.msg` is the template, such as `Retrying request to %s due to: %s. %s`, and `record.args` holds the values. To read the final text, use `record.getMessage()`, which formatters and handlers already do.
 
 ## Session retirement is permanent
 

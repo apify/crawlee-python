@@ -9,7 +9,7 @@ async def main() -> None:
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
         # The request being processed and the crawler's logger.
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
         # Store a result in the default dataset.
         await context.push_data(

@@ -108,7 +108,7 @@ class PlaywrightPersistentBrowser(Browser):
                 if not temp_dir.exists():
                     return
 
-            logger.warning(f'Could not remove the temporary user data directory "{temp_dir}".')
+            logger.warning('Could not remove the temporary user data directory "%s".', temp_dir)
 
     @override
     async def close(self, **kwargs: Any) -> None:

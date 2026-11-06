@@ -118,7 +118,7 @@ class RequestList(RequestLoader):
                         try:
                             request = self._transform_request(processing_request)
                         except ValidationError:
-                            logger.warning(f'Invalid request encountered in the request list: {processing_request}')
+                            logger.warning('Invalid request encountered in the request list: %s', processing_request)
                             continue
                         self._requests_data.current_value.requests.append(request)
                     await self._requests_data.persist_state()
@@ -223,7 +223,7 @@ class RequestList(RequestLoader):
                 try:
                     request = self._transform_request(processing_request)
                 except ValidationError:
-                    logger.warning(f'Invalid request encountered in the request list: {processing_request}')
+                    logger.warning('Invalid request encountered in the request list: %s', processing_request)
                     continue
                 yield request
             except StopAsyncIteration:

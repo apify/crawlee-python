@@ -50,7 +50,7 @@ async def main() -> None:
         # Define the default request handler, which will be called for every request.
         @crawler.router.default_handler
         async def request_handler(context: ParselCrawlingContext) -> None:
-            context.log.info(f'Archiving {context.request.url} ...')
+            context.log.info('Archiving %s ...', context.request.url)
             await archive_response(context=context, writer=writer)
             await context.enqueue_links(strategy='same-domain')
 

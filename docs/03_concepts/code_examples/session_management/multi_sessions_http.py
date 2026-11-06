@@ -40,14 +40,14 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def basic_handler(context: HttpCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url}')
+        context.log.info('Processing %s', context.request.url)
 
     # Initialize the session and bind the next request to this session if needed
     @crawler.router.handler(label='session_init')
     async def session_init(context: HttpCrawlingContext) -> None:
         next_requests = []
         if context.session:
-            context.log.info(f'Init session {context.session.id}')
+            context.log.info('Init session %s', context.session.id)
             next_request = Request.from_url(
                 'https://a.placeholder.com', session_id=context.session.id
             )
@@ -61,8 +61,8 @@ async def main() -> None:
     async def error_processing(context: BasicCrawlingContext, error: Exception) -> None:
         if isinstance(error, RequestCollisionError) and context.session:
             context.log.error(
-                f'Request {context.request.url} failed, because the bound '
-                'session is unavailable'
+                'Request %s failed, because the bound session is unavailable',
+                context.request.url,
             )
 
     # Create a pool of requests bound to their respective sessions

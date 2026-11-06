@@ -16,7 +16,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        context.log.info(f'Archiving {context.request.url} ...')
+        context.log.info('Archiving %s ...', context.request.url)
         # For some sites, where the content loads dynamically,
         # it is needed to scroll the page to load all content.
         # It slows down the crawling, but ensures that all content is loaded.

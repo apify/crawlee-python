@@ -179,8 +179,9 @@ class RequestQueue(Storage, RequestManager):
         # (neither processed nor unprocessed) is unexpected here.
         if not response.unprocessed_requests:
             logger.warning(
-                f'Request {request.url} was not processed by storage backend '
-                f'"{self._backend.__class__.__name__}" (received an empty response).'
+                'Request %s was not processed by storage backend "%s" (received an empty response).',
+                request.url,
+                self._backend.__class__.__name__,
             )
         return None
 
@@ -347,17 +348,18 @@ class RequestQueue(Storage, RequestManager):
         request_count = len(batch) - len(response.unprocessed_requests)
         if request_count:
             logger.debug(
-                f'Added {request_count} requests to the queue. Processed requests: {response.processed_requests}'
+                'Added %s requests to the queue. Processed requests: %s', request_count, response.processed_requests
             )
 
         if not response.unprocessed_requests:
             return response
 
-        logger.debug(f'Following requests were not processed: {response.unprocessed_requests}.')
+        logger.debug('Following requests were not processed: %s.', response.unprocessed_requests)
         if attempt > max_attempts:
             logger.warning(
-                f'Following requests were not processed even after {max_attempts} attempts:\n'
-                f'{response.unprocessed_requests}'
+                'Following requests were not processed even after %s attempts:\n%s',
+                max_attempts,
+                response.unprocessed_requests,
             )
             return response
 

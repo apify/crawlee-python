@@ -26,7 +26,7 @@ async def main() -> None:
     #   (see https://playwright.dev/python/docs/api/class-page for more details).
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
         # Extract data from the page using Playwright's API.
         posts = await context.page.query_selector_all('.athing')
@@ -57,7 +57,7 @@ async def main() -> None:
     # navigated to.
     @crawler.pre_navigation_hook
     async def log_navigation_url(context: PlaywrightPreNavCrawlingContext) -> None:
-        context.log.info(f'Navigating to {context.request.url} ...')
+        context.log.info('Navigating to %s ...', context.request.url)
 
     # Run the crawler with the initial list of URLs.
     await crawler.run(['https://news.ycombinator.com/'])

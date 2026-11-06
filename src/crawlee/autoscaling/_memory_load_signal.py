@@ -109,10 +109,12 @@ class MemoryLoadSignal:
             if budget is not None:
                 limit = ByteSize(budget.limit)
                 logger_once.log(
-                    f'Setting max memory of this run to {limit * config.available_memory_ratio}, '
-                    f'{config.available_memory_ratio:.0%} of the {limit} memory limit applying to this process. '
+                    'Setting max memory of this run to %s, %.0f%% of the %s memory limit applying to this process. '
                     'Use the CRAWLEE_MEMORY_MBYTES or CRAWLEE_AVAILABLE_MEMORY_RATIO environment variable to '
                     'override it.',
+                    limit * config.available_memory_ratio,
+                    config.available_memory_ratio * 100,
+                    limit,
                     key='default_memory_ratio_under_limit',
                     level=WARNING,
                 )
@@ -206,8 +208,9 @@ class MemoryLoadSignal:
         if current_memory_usage_size > overload_memory_threshold_size:
             memory_usage_percentage = round((current_memory_usage_size.bytes / max_memory_size.bytes) * 100)
             logger.warning(
-                f'Memory is critically overloaded. Using {current_memory_usage_size} of '
-                f'{max_memory_size} ({memory_usage_percentage}%). '
-                'Consider increasing available memory.'
+                'Memory is critically overloaded. Using %s of %s (%s%%). Consider increasing available memory.',
+                current_memory_usage_size,
+                max_memory_size,
+                memory_usage_percentage,
             )
             self._timestamp_of_last_memory_warning = snapshot_timestamp

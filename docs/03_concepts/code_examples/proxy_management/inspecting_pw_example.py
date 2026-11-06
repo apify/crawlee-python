@@ -18,7 +18,7 @@ async def main() -> None:
     @crawler.router.default_handler
     async def default_handler(context: PlaywrightCrawlingContext) -> None:
         # Log the proxy used for the current request.
-        context.log.info(f'Proxy for the current request: {context.proxy_info}')
+        context.log.info('Proxy for the current request: %s', context.proxy_info)
 
     # Run the crawler with the initial list of requests.
     await crawler.run(['https://crawlee.dev/'])

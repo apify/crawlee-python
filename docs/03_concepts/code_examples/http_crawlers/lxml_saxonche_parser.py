@@ -20,7 +20,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: HttpCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
         # Parse HTML with lxml.
         parsed_html = html.fromstring(await context.http_response.read())
@@ -63,7 +63,7 @@ async def main() -> None:
             try:
                 request = Request.from_url(url)
             except ValidationError as exc:
-                context.log.warning(f'Skipping invalid URL "{url}": {exc}')
+                context.log.warning('Skipping invalid URL "%s": %s', url, exc)
                 continue
             extracted_requests.append(request)
 

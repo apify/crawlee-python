@@ -301,7 +301,7 @@ class Statistics(Generic[TStatisticsState]):
     def _log(self) -> None:
         stats = self.calculate()
         if self._statistics_log_format == 'table':
-            self._periodic_message_logger.info(f'{self._log_message}\n{stats.to_table()}')
+            self._periodic_message_logger.info('%s\n%s', self._log_message, stats.to_table())
         else:
             self._periodic_message_logger.info(self._log_message, extra=stats.to_dict())
 

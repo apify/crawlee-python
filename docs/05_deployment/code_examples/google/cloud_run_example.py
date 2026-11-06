@@ -26,7 +26,7 @@ async def main() -> str:
     @crawler.router.default_handler
     async def default_handler(context: PlaywrightCrawlingContext) -> None:
         """Default request handler that processes each page during crawling."""
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
         title = await context.page.query_selector('title')
         await context.push_data(
             {

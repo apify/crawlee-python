@@ -419,8 +419,9 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
         if reason is not None:
             if self._fallback is not None:
                 logger.info(
-                    f'Schema {schema.__name__} is not supported by cached selectors ({reason}). '
-                    f'Delegating to the fallback extractor.'
+                    'Schema %s is not supported by cached selectors (%s). Delegating to the fallback extractor.',
+                    schema.__name__,
+                    reason,
                 )
                 return await self._delegate_to_fallback(selector, schema, cache_tag, additional_instructions)
             raise ValueError(
@@ -439,24 +440,25 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
 
         extracted = self._try_cached_variants(variants, selector, schema)
         if extracted is not None:
-            logger.debug(f'Cache hit for {schema.__name__} (tag={cache_tag!r}); extracted with no model call.')
+            logger.debug('Cache hit for %s (tag=%r); extracted with no model call.', schema.__name__, cache_tag)
             return extracted
 
         async with self._locks[cache_digest]:
             # A concurrent miss may have generated selectors while we waited for the lock, so check the cache again.
             extracted = self._try_cached_variants(variants, selector, schema)
             if extracted is not None:
-                logger.debug(f'Cache hit for {schema.__name__} (tag={cache_tag!r}) after waiting on the lock.')
+                logger.debug('Cache hit for %s (tag=%r) after waiting on the lock.', schema.__name__, cache_tag)
                 return extracted
 
-            logger.debug(f'Cache miss for {schema.__name__} (tag={cache_tag!r}); generating selectors.')
+            logger.debug('Cache miss for %s (tag=%r); generating selectors.', schema.__name__, cache_tag)
             try:
                 selector_map = await self._generate_selectors(selector, schema, additional_instructions)
             except UnexpectedModelBehavior:
                 if self._fallback is not None:
                     logger.info(
-                        f'Selector generation failed for {schema.__name__} (tag={cache_tag!r}). '
-                        'Delegating to the fallback extractor.'
+                        'Selector generation failed for %s (tag=%r). Delegating to the fallback extractor.',
+                        schema.__name__,
+                        cache_tag,
                     )
                     return await self._delegate_to_fallback(selector, schema, cache_tag, additional_instructions)
                 raise
@@ -467,7 +469,10 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
             del variants[self._max_variants :]
 
             logger.debug(
-                f'Cached new selectors for {schema.__name__} (tag={cache_tag!r}); {len(variants)} variant(s) in bucket.'
+                'Cached new selectors for %s (tag=%r); %s variant(s) in bucket.',
+                schema.__name__,
+                cache_tag,
+                len(variants),
             )
             return self._apply_selectors(selector_map, selector, schema)
 
@@ -542,8 +547,11 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
             self._ai_usage.add(run_usage)
 
         logger.debug(
-            f'Selector generation for {schema.__name__} used {run_usage.requests} request(s), '
-            f'{run_usage.input_tokens} input + {run_usage.output_tokens} output tokens.'
+            'Selector generation for %s used %s request(s), %s input + %s output tokens.',
+            schema.__name__,
+            run_usage.requests,
+            run_usage.input_tokens,
+            run_usage.output_tokens,
         )
         return result.output
 

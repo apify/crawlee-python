@@ -22,7 +22,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url}')
+        context.log.info('Processing %s', context.request.url)
 
     # Add requests. Listed domains are routed directly to their throttled sub-managers.
     # Others go to the inner manager.

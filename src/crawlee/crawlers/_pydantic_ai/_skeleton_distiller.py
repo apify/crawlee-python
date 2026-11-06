@@ -214,9 +214,12 @@ class PydanticAiSkeletonDistiller(PydanticAiCleanHtmlDistiller):
         # Still too big, cut mid-stream and warn.
         if len(tighter_distilled_html) > self._max_size:
             logger.warning(
-                f'Skeleton exceeds max_size even after tightening ({len(tighter_distilled_html)} > {self._max_size}). '
-                'The tail of the page is cut off and invisible to the LLM. '
-                'Raise `max_size` or set `max_json_len`.'
+                (
+                    'Skeleton exceeds max_size even after tightening (%s > %s). The tail of the page '
+                    'is cut off and invisible to the LLM. Raise `max_size` or set `max_json_len`.'
+                ),
+                len(tighter_distilled_html),
+                self._max_size,
             )
             return tighter_distilled_html[: self._max_size] + _TRUNCATION_MARKER
 

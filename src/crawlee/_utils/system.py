@@ -219,7 +219,7 @@ def _log_resource_limits() -> None:
 
     memory = str(ByteSize(limits.memory_budget.limit)) if limits.memory_budget else 'unrestricted'
     cpu = f'{cores:g} core{"" if cores == 1 else "s"}' if cores is not None else 'unrestricted'
-    logger.info(f'Resource limits applying to this process: memory {memory}, CPU {cpu}.')
+    logger.info('Resource limits applying to this process: memory %s, CPU %s.', memory, cpu)
 
 
 def get_cpu_info(cpu_load: proclimits.CpuLoad | None = None) -> CpuInfo:

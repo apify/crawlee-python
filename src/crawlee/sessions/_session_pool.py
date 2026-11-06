@@ -172,7 +172,7 @@ class SessionPool:
         state = self._state.current_value
 
         if session.id in state.sessions:
-            logger.warning(f'Session with ID {session.id} already exists in the pool.')
+            logger.warning('Session with ID %s already exists in the pool.', session.id)
             return
         state.sessions[session.id] = session
 
@@ -213,11 +213,11 @@ class SessionPool:
         session = self._state.current_value.sessions.get(session_id)
 
         if not session:
-            logger.warning(f'Session with ID {session_id} not found.')
+            logger.warning('Session with ID %s not found.', session_id)
             return None
 
         if not session.is_usable:
-            logger.warning(f'Session with ID {session_id} is not usable.')
+            logger.warning('Session with ID %s is not usable.', session_id)
             return None
 
         return session

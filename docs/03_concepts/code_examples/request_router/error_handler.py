@@ -15,7 +15,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def default_handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url}')
+        context.log.info('Processing %s', context.request.url)
 
         # Extract product information (might fail for some pages)
         product_name = context.selector.css('h1[data-testid="product-title"]::text').get()
@@ -35,7 +35,7 @@ async def main() -> None:
     @crawler.error_handler
     async def error_handler(context: BasicCrawlingContext, error: Exception) -> None:
         error_name = type(error).__name__
-        context.log.warning(f'Error occurred for {context.request.url}: {error_name}')
+        context.log.warning('Error occurred for %s: %s', context.request.url, error_name)
 
         # You can modify the request or context here before retry
         if (

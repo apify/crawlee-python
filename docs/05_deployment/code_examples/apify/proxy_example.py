@@ -17,7 +17,7 @@ async def main() -> None:
             return
 
         proxy_url = await proxy_configuration.new_url()
-        Actor.log.info(f'Proxy URL: {proxy_url}')
+        Actor.log.info('Proxy URL: %s', proxy_url)
 
 
 if __name__ == '__main__':
