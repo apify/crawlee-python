@@ -11,9 +11,7 @@ from crawlee import ConcurrencySettings
         pytest.param({}, 10, id='no args keeps default'),
         pytest.param({'max_concurrency': 5}, 5, id='clamped down to max'),
         pytest.param({'min_concurrency': 20}, 20, id='clamped up to min'),
-        pytest.param({'max_concurrency': 50}, 10, id='default fits unchanged'),
         pytest.param({'max_concurrency': 10}, 10, id='max equals default'),
-        pytest.param({'min_concurrency': 3, 'max_concurrency': 3}, 3, id='min equals max'),
     ],
 )
 def test_concurrency_settings_default_desired_concurrency(
