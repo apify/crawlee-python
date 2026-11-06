@@ -387,7 +387,7 @@ The `headers` argument of a client still applies to every request. Its `Authoriz
 
 A `Cookie` header passed with a request or set on the client is merged with the session cookies while the redirect chain stays on its origin. A cookie in the header wins over a session cookie of the same name and isn't stored in the session. In v1, `ImpitHttpClient`, `HttpxHttpClient` and `context.send_request` of `PlaywrightCrawler` sent the header instead of the session cookies, so an empty `Cookie` header kept them out. `CurlImpersonateHttpClient` sent the session cookies in a second `Cookie` header.
 
-`send_request` and `context.send_request` take a new `cookies` argument, the cookies to send and store instead of the session cookies for a single call. To send no session cookies, pass `cookies=SessionCookies()`. With `PlaywrightCrawler`, the response cookies still reach the session through the browser context.
+`send_request` and `context.send_request` take a new `cookies` argument, the cookies to send and store instead of the session cookies for a single call. To send no session cookies, pass `cookies=SessionCookies()`. With `PlaywrightCrawler`, the response cookies still reach the session through the browser context, unless `save_response_cookies` is disabled.
 
 Without a session, or with `save_response_cookies=False` on the crawler, the cookies a server sets during a redirect chain are sent with the following requests of that chain. In v1, `ImpitHttpClient` and `HttpxHttpClient` didn't send them.
 
