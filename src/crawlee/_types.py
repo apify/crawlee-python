@@ -100,6 +100,7 @@ class HttpHeaders(RootModel, Mapping[str, str]):
 
 
 _DEFAULT_DESIRED_CONCURRENCY = 10
+"""Default `ConcurrencySettings.desired_concurrency`, clamped to the `min_concurrency`/`max_concurrency` range."""
 
 
 @docs_group('Configuration')
