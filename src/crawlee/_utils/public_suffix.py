@@ -65,7 +65,7 @@ class PublicSuffixList:
         try:
             return self._parse_rules(self._download_list())
         except Exception as exc:
-            logger.warning(f'Failed to download the Public Suffix List, using the bundled snapshot: {exc!r}')
+            logger.warning('Failed to download the Public Suffix List, using the bundled snapshot: %r', exc)
             return self._parse_rules(PUBLIC_SUFFIX_LIST_SNAPSHOT.read_text(encoding='utf-8'))
 
     @staticmethod

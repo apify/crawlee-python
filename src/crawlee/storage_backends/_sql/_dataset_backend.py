@@ -269,7 +269,9 @@ class SqlDatasetBackend(DatasetBackend, SqlBackendMixin[DatasetMetadataDb, Datas
 
         if unsupported:
             logger.warning(
-                f'The arguments {list(unsupported.keys())} of get_data are not supported by {self.__class__.__name__}.'
+                'The arguments %s of get_data are not supported by %s.',
+                list(unsupported.keys()),
+                self.__class__.__name__,
             )
 
         stmt = select(self._ITEM_TABLE).where(self._ITEM_TABLE.dataset_id == self._id)

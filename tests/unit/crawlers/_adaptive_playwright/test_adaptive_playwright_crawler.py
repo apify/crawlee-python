@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sys
 from unittest.mock import patch
 
@@ -41,3 +42,27 @@ def test_import_error_handled(optional_module_name: str) -> None:
 
         with pytest.raises(ImportError):
             from crawlee.crawlers import AdaptivePlaywrightCrawler  # noqa: F401 PLC0415
+
+
+def test_sub_crawlers_log_errors_under_crawler_logger() -> None:
+    """The static and Playwright sub crawlers log errors only, under children of the adaptive crawler's logger."""
+    logger = logging.getLogger('tests.adaptive_sub_crawler_loggers')
+    AdaptivePlaywrightCrawler.with_parsel_static_parser(logger=logger)
+
+    assert logging.getLogger(f'{logger.name}.static').level == logging.ERROR
+    assert logging.getLogger(f'{logger.name}.playwright').level == logging.ERROR
+
+
+def test_default_statistics_log_to_given_logger() -> None:
+    """The default statistics of a crawler given a `logger` log their periodic message to it."""
+    logger = logging.getLogger('tests.adaptive_statistics_logger')
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(logger=logger)
+
+    assert crawler.statistics._periodic_message_logger is logger
+
+
+def test_default_statistics_log_to_default_crawler_logger() -> None:
+    """The default statistics of a crawler without a `logger` log their periodic message to the crawler's logger."""
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser()
+
+    assert crawler.statistics._periodic_message_logger is crawler.log

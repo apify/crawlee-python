@@ -37,12 +37,12 @@ async def main() -> None:
     # The main handler for processing requests
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
     # A handler for the login page
     @crawler.router.handler('login')
     async def login_handler(context: PlaywrightCrawlingContext) -> None:
-        context.log.info(f'Processing login {context.request.url} ...')
+        context.log.info('Processing login %s ...', context.request.url)
 
         # Check if the session is available
         if not context.session:

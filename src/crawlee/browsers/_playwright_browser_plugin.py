@@ -94,7 +94,7 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
                 'executable_path', default_launch_browser_options.get('executable_path')
             ):
                 logger.debug(
-                    f"Using browser executable from {executable_path}, which takes precedence over 'chrome' channel."
+                    "Using browser executable from %s, which takes precedence over 'chrome' channel.", executable_path
                 )
 
         self._browser_type: BrowserType = browser_type

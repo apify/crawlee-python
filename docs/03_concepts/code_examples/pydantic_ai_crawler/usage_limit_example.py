@@ -49,7 +49,7 @@ async def main() -> None:
             article = await context.extract(Article)
         except UsageLimitExceeded:
             # The page needs more tokens than the per-extraction limit allows.
-            context.log.warning(f'Content at {context.request.url} is too large.')
+            context.log.warning('Content at %s is too large.', context.request.url)
             return
 
         await context.push_data(article.model_dump())

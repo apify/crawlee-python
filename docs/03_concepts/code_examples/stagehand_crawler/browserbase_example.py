@@ -20,7 +20,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def handler(context: StagehandCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
         extracted = await context.page.extract(
             instruction='Get the main content of the page',

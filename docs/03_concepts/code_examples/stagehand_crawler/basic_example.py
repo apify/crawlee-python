@@ -16,7 +16,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def handler(context: StagehandCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
         # Dismiss overlays or interact with the page using natural language.
         await context.page.act(input='Click the accept cookies button if present')

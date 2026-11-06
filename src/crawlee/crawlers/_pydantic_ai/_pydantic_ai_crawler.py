@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import warnings
 from contextlib import AbstractAsyncContextManager
-from logging import getLogger
 from typing import TYPE_CHECKING
 
 from parsel import Selector
@@ -120,7 +119,6 @@ class PydanticAiCrawler(AbstractHttpCrawler[PydanticAiCrawlingContext, Selector,
                 ai_usage=self._extractor.ai_usage,
             )
 
-        kwargs.setdefault('_logger', getLogger(__name__))
         kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline().compose(final_step)
 
         # If the extractor is an async context manager, add it to the crawler's additional context managers so it's

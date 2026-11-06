@@ -18,7 +18,7 @@ async def main() -> None:
         Trying to access `context.page` in this hook would raise `AdaptiveContextError`
         for pages crawled without playwright.
         """
-        context.log.info(f'pre navigation hook for: {context.request.url}')
+        context.log.info('pre navigation hook for: %s', context.request.url)
 
     @crawler.pre_navigation_hook(playwright_only=True)
     async def hook_playwright(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
@@ -29,7 +29,7 @@ async def main() -> None:
 
         await context.page.route('*/**', some_routing_function)
         context.log.info(
-            f'Playwright only pre navigation hook for: {context.request.url}'
+            'Playwright only pre navigation hook for: %s', context.request.url
         )
 
     await crawler.run(['https://crawlee.dev/'])

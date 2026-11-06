@@ -111,7 +111,7 @@ class BasePydanticAiHtmlExtractor(ABC):
             raise ValueError(f'Extraction scope {scope!r} matched nothing on the page.')
         if len(scoped) > 1:
             logger.warning(
-                f'Extraction scope {scope!r} matched {len(scoped)} elements on the page, using the first one.'
+                'Extraction scope %r matched %s elements on the page, using the first one.', scope, len(scoped)
             )
         return scoped[0]
 

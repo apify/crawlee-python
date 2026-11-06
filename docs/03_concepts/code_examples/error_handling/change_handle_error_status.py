@@ -22,7 +22,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def default_handler(context: HttpCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
         # Now we can handle 401 responses ourselves
         if context.http_response.status_code == UNAUTHORIZED_CODE:
             # Get a fresh access token

@@ -34,19 +34,19 @@ async def main() -> None:
     # Basic request handling logic
     @crawler.router.default_handler
     async def basic_handler(context: HttpCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url}')
+        context.log.info('Processing %s', context.request.url)
 
     # Handler for session initialization (authentication, initial cookies, etc.)
     @crawler.router.handler(label='session_init')
     async def session_init(context: HttpCrawlingContext) -> None:
         if context.session:
-            context.log.info(f'Init session {context.session.id}')
+            context.log.info('Init session %s', context.session.id)
 
     # Monitor if our session gets blocked and explicitly stop the crawler
     @crawler.error_handler
     async def error_processing(context: BasicCrawlingContext, error: Exception) -> None:
         if isinstance(error, SessionError) and context.session:
-            context.log.info(f'Session {context.session.id} blocked')
+            context.log.info('Session %s blocked', context.session.id)
             crawler.stop()
 
     await crawler.run([Request.from_url('https://example.org/', label='session_init')])

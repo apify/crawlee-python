@@ -26,7 +26,7 @@ async def main() -> None:
             if context.page.context.browser
             else 'undefined'
         )
-        context.log.info(f'Processing {context.request.url} with {browser_name} ...')
+        context.log.info('Processing %s with %s ...', context.request.url, browser_name)
 
         await context.enqueue_links()
 

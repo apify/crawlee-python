@@ -23,7 +23,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url}')
+        context.log.info('Processing %s', context.request.url)
         await context.enqueue_links(selector='li.next a')
 
     await crawler.run(['https://quotes.toscrape.com/'])

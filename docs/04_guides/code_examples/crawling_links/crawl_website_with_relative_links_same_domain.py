@@ -12,7 +12,7 @@ async def main() -> None:
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
         # Setting the strategy to same domain will enqueue all links found that
         # are on the same hostname as request.loaded_url or request.url.

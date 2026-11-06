@@ -14,7 +14,7 @@ from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from itertools import product
+from itertools import chain, product, repeat
 from multiprocessing import get_context
 from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import ANY, AsyncMock, Mock, call, create_autospec, patch
@@ -26,7 +26,7 @@ from crawlee._log_config import CrawleeLogFormatter
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
 from crawlee._utils.robots import RobotsTxtFile
-from crawlee.autoscaling import ConcurrencyConsumer, ConcurrencySystem
+from crawlee.autoscaling import AutoscaledPool, ConcurrencyConsumer, ConcurrencySystem
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import (
@@ -40,6 +40,7 @@ from crawlee.errors import (
 from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
 from crawlee.http_clients import HttpClient, HttpResponse
 from crawlee.request_loaders import (
+    FinishedStatus,
     MinIntervalSignal,
     RateLimitedSignal,
     RequestList,
@@ -48,6 +49,7 @@ from crawlee.request_loaders import (
     RequestSourceStatus,
     StalledStatus,
     ThrottlingRequestManager,
+    WaitingStatus,
 )
 from crawlee.sessions import Session, SessionCookies, SessionPool
 from crawlee.statistics import FinalStatistics, Statistics, StatisticsState
@@ -1442,6 +1444,25 @@ def test_crawler_log() -> None:
     crawler.log.info('Test log message')
 
 
+def test_default_logger_named_after_crawler_class() -> None:
+    """The default crawler logger is `crawlee.crawlers.<class name>`, so it sits under the `crawlee` logger."""
+    assert BasicCrawler().log.name == 'crawlee.crawlers.BasicCrawler'
+
+
+async def test_crawler_logs_to_given_logger(caplog: pytest.LogCaptureFixture) -> None:
+    """A crawler given a `logger` logs its own records and the autoscaled pool's records under that logger."""
+    logger = logging.getLogger('tests.crawler_logs_to_given_logger')
+    crawler = BasicCrawler(logger=logger)
+    assert crawler.log is logger
+
+    with caplog.at_level(logging.DEBUG, logger=logger.name):
+        await crawler.run([])
+
+    logger_names = {record.name for record in caplog.records}
+    assert logger.name in logger_names
+    assert f'{logger.name}.autoscaled_pool' in logger_names
+
+
 def test_configure_logging_preserves_host_app_root_handlers() -> None:
     """Constructing a crawler must not remove handlers installed on the root logger by the host application."""
     root_logger = logging.getLogger()
@@ -1739,13 +1760,13 @@ async def test_logs_final_statistics(
     assert result is fake_statistics
 
     final_statistics = next(
-        (record for record in caplog.records if record.msg.startswith('Final')),
+        (record for record in caplog.records if record.getMessage().startswith('Final')),
         None,
     )
 
     assert final_statistics is not None
     if statistics_log_format == 'table':
-        assert final_statistics.msg.splitlines() == [
+        assert final_statistics.getMessage().splitlines() == [
             'Final request statistics:',
             '┌───────────────────────────────┬────────────┐',
             '│ requests_finished             │ 4          │',
@@ -1761,7 +1782,7 @@ async def test_logs_final_statistics(
             '└───────────────────────────────┴────────────┘',
         ]
     else:
-        assert final_statistics.msg == 'Final request statistics:'
+        assert final_statistics.getMessage() == 'Final request statistics:'
 
         # `extra` parameters are not defined on `LogRecord`, so we cast to `Any` to access them.
         record = cast('Any', final_statistics)
@@ -2581,13 +2602,13 @@ async def _run_crawler(crawler_id: str | None, requests: list[str], storage_dir:
     Must be defined like this to be pickable for ProcessPoolExecutor."""
 
     async def request_handler(context: BasicCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
         # Add visited url to crawler state and use it to verify state persistence.
         state = await context.use_state({'urls': []})
         state['urls'] = state.get('urls')
         assert isinstance(state['urls'], list)
         state['urls'].append(context.request.url)
-        context.log.info(f'State {state}')
+        context.log.info('State %s', state)
 
     crawler = BasicCrawler(
         id=crawler_id,
@@ -3047,6 +3068,51 @@ async def test_crawl_waits_out_backoff() -> None:
     assert statuses_during_cooldown[0].ready_at is not None
     assert len(dispatched_at) == 2
     assert dispatched_at[1] - dispatched_at[0] >= 0.5
+
+
+async def test_paced_crawl_wakes_at_ready_at(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each time a domain's cooldown holds a crawl back, it resumes at the request manager's `ready_at`."""
+    # Longer than the test's timeout, so only the wake-up at `ready_at` can resume the crawl in time.
+    monkeypatch.setattr(AutoscaledPool, '_POLL_INTERVAL', timedelta(hours=1))
+    throttler = ThrottlingRequestManager(
+        await RequestQueue.open(),
+        domains=['throttled.placeholder.com'],
+        request_manager_opener=RequestQueue.open,
+    )
+    crawler = BasicCrawler(
+        request_manager=throttler,
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+    )
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        if len(visited) < 2:
+            throttler.record_pacing_signal(RateLimitedSignal(context.request.url, wait=timedelta(milliseconds=200)))
+        visited.append(context.request.url)
+
+    urls = [
+        'https://throttled.placeholder.com/a',
+        'https://throttled.placeholder.com/b',
+        'https://throttled.placeholder.com/c',
+    ]
+    await asyncio.wait_for(crawler.run(urls), timeout=10)
+
+    assert visited == urls
+
+
+async def test_run_cancels_pending_wake() -> None:
+    """A wake-up still pending when the run ends is dropped, so it never fires."""
+    queue = await RequestQueue.open()
+    crawler = BasicCrawler(request_manager=queue)
+    waiting = WaitingStatus(ready_at=datetime.now(UTC) + timedelta(hours=1))
+
+    with patch.object(queue, 'check_readiness', side_effect=chain([waiting], repeat(FinishedStatus()))):
+        await crawler.run()
+
+    wake_timer = crawler._run._wake_timer
+    assert wake_timer is not None
+    assert wake_timer.cancelled()
 
 
 THROTTLED_URL = 'https://throttled.placeholder.com/page'

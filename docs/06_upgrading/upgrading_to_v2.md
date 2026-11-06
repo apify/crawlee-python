@@ -131,13 +131,13 @@ The callback registered with `on_skipped_request` gets the skipped `Request` as 
 # v1
 @crawler.on_skipped_request
 async def on_skipped(url: str, reason: SkippedReason) -> None:
-    crawler.log.info(f'Skipped {url}: {reason}')
+    crawler.log.info('Skipped %s: %s', url, reason)
 
 
 # v2
 @crawler.on_skipped_request
 async def on_skipped(request: Request, reason: SkippedReason) -> None:
-    crawler.log.info(f'Skipped {request.url}: {reason}')
+    crawler.log.info('Skipped %s: %s', request.url, reason)
 ```
 
 For links that `enqueue_links` skips because of `robots.txt`, the `Request` carries the `label` and `user_data` passed to `enqueue_links`. The `transform_request_function` isn't applied to these links.
@@ -456,6 +456,26 @@ If you configure loggers by name or match log messages, update them for the foll
 
 The autoscaling loggers moved together with the package. `crawlee._autoscaling.autoscaled_pool` and `crawlee._autoscaling.system_status` are now `crawlee.autoscaling._autoscaled_pool` and `crawlee.autoscaling._system_status`. The memory warnings of `crawlee._autoscaling.snapshotter` now come from `crawlee.autoscaling._memory_load_signal`. The state log, along with the messages about scaling and free capacity, now comes from the new `crawlee.autoscaling._concurrency_system` logger. To configure all of them at once, use the `crawlee.autoscaling` logger.
 
+Every crawler logs to a logger named after its class under `crawlee.crawlers`, such as `crawlee.crawlers.BasicCrawler`, `crawlee.crawlers.ParselCrawler` or `crawlee.crawlers.PlaywrightCrawler`. In v1, `HttpCrawler`, `BeautifulSoupCrawler` and `ParselCrawler` logged to a logger named only after the class (`ParselCrawler`), outside the `crawlee` hierarchy, and the other crawlers logged to the name of their module (`crawlee.crawlers._basic._basic_crawler`). The sub crawlers of `AdaptivePlaywrightCrawler` log to its `static` and `playwright` children, `crawlee.crawlers.AdaptivePlaywrightCrawler.static` and `crawlee.crawlers.AdaptivePlaywrightCrawler.playwright`, instead of `Subcrawler_static` and `Subcrawler_playwright`.
+
+The autoscaled pool of a crawler logs to the `autoscaled_pool` child of the crawler's logger, for example `crawlee.crawlers.ParselCrawler.autoscaled_pool`. A standalone `AutoscaledPool` logs to `crawlee.autoscaling._autoscaled_pool` unless you pass it a `logger`.
+
+### Custom crawler logger
+
+The private `_logger` argument of the crawlers is replaced by a public `logger` argument. The crawler, its autoscaled pool, and the periodic statistics log to it.
+
+```python
+# v1
+crawler = ParselCrawler(_logger=logging.getLogger('my_crawler'))
+
+# v2
+crawler = ParselCrawler(logger=logging.getLogger('my_crawler'))
+```
+
+### `NullHandler` on the `crawlee` logger
+
+The `crawlee` logger has a `logging.NullHandler`. If you create a crawler with `configure_logging=False` and don't configure logging yourself, Python doesn't print Crawlee's warnings and errors to stderr through `logging.lastResort` anymore. Configure logging in your application, for example with `logging.basicConfig()`, to see them.
+
 ### Log levels
 
 The periodic log of the autoscaling state and the `Waiting for remaining tasks to finish` message are now logged at DEBUG instead of INFO. The crawler's status message at INFO still reports the desired concurrency. To read the concurrency values in code, use `crawler.concurrency_system`.
@@ -495,6 +515,8 @@ The two DEBUG messages that `RequestQueue.is_finished` logged, "Background add r
 The warnings about an HTTP 429 that the request manager doesn't pace are reworded and logged once per domain. The warning `run()` logged at the start about `respect_robots_txt_file` without a `ThrottlingRequestManager` is replaced by a new one, logged once per domain whose robots.txt `Crawl-delay` the request manager doesn't pace. The warning about a `RequestThrottledError` handled as an ordinary error is reworded, and a new ERROR is logged when the request manager fails to record that rate limit. Another new ERROR is logged once per domain when the request manager fails to record a robots.txt `Crawl-delay`.
 
 The `ThrottlingRequestManager` warning about capping a delay now calls it a "requested wait" delay instead of a "Retry-After header" delay. Its DEBUG messages about a 429 ignored during an active backoff and about resetting a domain's rate limit state are removed, and its DEBUG message about a domain's crawl-delay shows the delay with one decimal place.
+
+Log records hold the message template and its arguments separately. `record.msg` is the template, such as `Retrying request to %s due to: %s. %s`, and `record.args` holds the values. To read the final text, use `record.getMessage()`, which formatters and handlers already do.
 
 ## Session retirement is permanent
 

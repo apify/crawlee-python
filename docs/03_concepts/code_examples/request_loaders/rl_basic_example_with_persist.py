@@ -35,7 +35,7 @@ async def main() -> None:
     # Each time you run it, it will be a new request until you exhaust the `RequestList`.
     request = await request_list.fetch_next_request()
     if request:
-        logger.info(f'Processing request: {request.url}')
+        logger.info('Processing request: %s', request.url)
         # Do something with it...
 
         # And mark it as handled.

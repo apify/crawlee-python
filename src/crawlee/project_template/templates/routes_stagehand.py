@@ -7,7 +7,7 @@ router = Router[StagehandCrawlingContext]()
 @router.default_handler
 async def default_handler(context: StagehandCrawlingContext) -> None:
     """Default request handler."""
-    context.log.info(f'Processing {context.request.url} ...')
+    context.log.info('Processing %s ...', context.request.url)
 
     data = await context.page.extract(instruction='Get the page title and main heading.')
 

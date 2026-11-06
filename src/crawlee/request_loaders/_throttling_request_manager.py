@@ -258,8 +258,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         cooldown are skipped, so the call returns `None` when nothing is dispatchable right now.
 
         Note:
-            Since the manager never waits out a cooldown itself, the dispatch cadence is only as precise as the
-            caller's polling interval: a cooldown expiring between two polls is picked up on the next one.
+            Since the manager never waits out a cooldown itself, a caller that only polls picks up a cooldown expiring
+            between two polls on the next one. To resume on time, wake up at the `ready_at` from `check_readiness()`.
         """
         await self._ensure_sub_managers()
 
@@ -473,17 +473,24 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         if delay > self._max_delay:
             logger.warning(
-                f'Capping {source} delay of {delay.total_seconds():.1f}s for domain "{state.domain}" '
-                f'to max_delay ({self._max_delay.total_seconds():.1f}s); the domain may continue to rate-limit. '
-                f'Consider increasing max_delay if this recurs.'
+                (
+                    'Capping %s delay of %.1fs for domain "%s" to max_delay (%.1fs); the domain may '
+                    'continue to rate-limit. Consider increasing max_delay if this recurs.'
+                ),
+                source,
+                delay.total_seconds(),
+                state.domain,
+                self._max_delay.total_seconds(),
             )
             delay = self._max_delay
 
         state.apply_backoff(now, delay)
 
         logger.info(
-            f'Rate limit (429) detected for domain "{state.domain}" '
-            f'(consecutive: {state.consecutive_429_count}, delay: {delay.total_seconds():.1f}s)'
+            'Rate limit (429) detected for domain "%s" (consecutive: %s, delay: %.1fs)',
+            state.domain,
+            state.consecutive_429_count,
+            delay.total_seconds(),
         )
         return True
 
@@ -495,7 +502,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         if state.crawl_delay is None:
             state.crawl_delay = interval
-            logger.debug(f'Set crawl-delay for domain "{state.domain}" to {interval.total_seconds():.1f}s')
+            logger.debug('Set crawl-delay for domain "%s" to %.1fs', state.domain, interval.total_seconds())
 
         return True
 

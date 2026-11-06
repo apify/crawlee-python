@@ -58,7 +58,7 @@ def parse_retry_after_header(value: str | None) -> timedelta | None:
         if seconds <= 0:
             # A negative delay is malformed and a zero one carries no backoff, so reject both and let the caller
             # apply its own backoff instead.
-            logger.debug(f'Retry-After delay-seconds {value!r} is not positive; ignoring.')
+            logger.debug('Retry-After delay-seconds %r is not positive; ignoring.', value)
             return None
         return timedelta(seconds=seconds)
 
@@ -73,7 +73,7 @@ def parse_retry_after_header(value: str | None) -> timedelta | None:
         delay = retry_date - datetime.now(UTC)
         if delay.total_seconds() > 0:
             return delay
-        logger.debug(f'Retry-After HTTP-date {value!r} is in the past; ignoring.')
+        logger.debug('Retry-After HTTP-date %r is in the past; ignoring.', value)
     except (ValueError, TypeError):
         pass
 

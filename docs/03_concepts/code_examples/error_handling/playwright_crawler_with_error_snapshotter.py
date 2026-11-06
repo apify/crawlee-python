@@ -12,7 +12,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
         # Simulate various errors to demonstrate `ErrorSnapshotter`
         # saving only the first occurrence of unique error.
         await context.enqueue_links()

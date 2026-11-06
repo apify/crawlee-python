@@ -15,7 +15,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def handler(context: PlaywrightCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url}')
+        context.log.info('Processing %s', context.request.url)
 
         # highlight-start
         # `context.page` is a Playwright `Page`. Query the rendered DOM directly.

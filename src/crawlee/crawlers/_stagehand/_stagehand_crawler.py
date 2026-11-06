@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any
 
 from crawlee._utils.docs import docs_group
@@ -73,7 +72,7 @@ class StagehandCrawler(
 
     @crawler.router.default_handler
     async def handler(context: StagehandCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
         # Use standard Playwright methods alongside AI methods.
         await context.page.act(input='Click the accept cookies button if present')
@@ -159,8 +158,6 @@ class StagehandCrawler(
                     )
                 ]
             )
-
-        kwargs.setdefault('_logger', logging.getLogger(__name__))
 
         super().__init__(
             browser_pool=browser_pool,

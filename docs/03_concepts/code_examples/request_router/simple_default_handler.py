@@ -12,7 +12,7 @@ async def main() -> None:
     # Use the crawler's built-in router to define a default handler
     @crawler.router.default_handler
     async def default_handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url}')
+        context.log.info('Processing %s', context.request.url)
 
         # Extract page title
         title = context.selector.css('title::text').get() or 'No title found'

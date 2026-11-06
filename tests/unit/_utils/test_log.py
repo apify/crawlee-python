@@ -63,3 +63,15 @@ def test_log_emits_at_specified_level(caplog: pytest.LogCaptureFixture) -> None:
     levels = {r.getMessage(): r.levelno for r in caplog.records}
     assert levels['warn-msg'] == logging.WARNING
     assert levels['error-msg'] == logging.ERROR
+
+
+def test_log_formats_args_into_message(caplog: pytest.LogCaptureFixture) -> None:
+    """Positional arguments are passed to the logger and formatted into the message lazily."""
+    logger = logging.getLogger('crawlee.tests.log_dedup_args')
+    logger_once = LoggerOnce(logger)
+    with caplog.at_level(logging.INFO, logger=logger.name):
+        logger_once.log('%s of %s', 'a', 'b', key='k')
+    record = caplog.records[-1]
+    assert record.msg == '%s of %s'
+    assert record.args == ('a', 'b')
+    assert record.getMessage() == 'a of b'

@@ -13,7 +13,7 @@ async def main() -> None:
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
         # Extract data from the page using Playwright API.
         data = {
@@ -35,7 +35,7 @@ async def main() -> None:
 
     # Or access the data directly.
     data = await crawler.get_data()
-    crawler.log.info(f'Extracted data: {data.items}')
+    crawler.log.info('Extracted data: %s', data.items)
 
 
 if __name__ == '__main__':

@@ -625,6 +625,30 @@ async def test_context_send_request_saves_cookies(server_url: URL) -> None:
     handler_call.assert_called_once_with(session_cookies={'b'})
 
 
+async def test_debug_logs_follow_request_lifecycle(server_url: URL, caplog: pytest.LogCaptureFixture) -> None:
+    """At DEBUG, the crawler logs each step of a request with the request context and the response status code."""
+    crawler = HttpCrawler()
+    url = str(server_url)
+
+    @crawler.router.default_handler
+    async def handler(context: HttpCrawlingContext) -> None:
+        await context.push_data({'url': context.request.url})
+
+    with caplog.at_level(logging.DEBUG, logger=crawler.log.name):
+        await crawler.run([url])
+
+    lifecycle = [record for record in caplog.records if getattr(record, 'url', None) == url]
+    assert [record.getMessage() for record in lifecycle] == [
+        'Processing request',
+        'Received a response',
+        'Committed the request handler result',
+        'Request handled',
+    ]
+    assert cast('Any', lifecycle[1]).status_code == 200
+    assert cast('Any', lifecycle[2]).push_data_calls == 1
+    assert all(cast('Any', record).retry_count == 0 for record in lifecycle)
+
+
 async def test_get_snapshot(server_url: URL) -> None:
     crawler = HttpCrawler()
 

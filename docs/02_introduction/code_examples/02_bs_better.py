@@ -11,7 +11,7 @@ async def main() -> None:
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
         url = context.request.url
         title = context.soup.title.string if context.soup.title else ''
-        context.log.info(f'The title of {url} is: {title}.')
+        context.log.info('The title of %s is: %s.', url, title)
 
     # Start the crawler with the provided URLs.
     await crawler.run(['https://crawlee.dev/'])

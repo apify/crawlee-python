@@ -266,12 +266,14 @@ class FileSystemDatasetBackend(DatasetBackend):
 
         if unsupported:
             logger.warning(
-                f'The arguments {list(unsupported.keys())} of get_data are not supported by {self.__class__.__name__}.'
+                'The arguments %s of get_data are not supported by %s.',
+                list(unsupported.keys()),
+                self.__class__.__name__,
             )
 
         # If the dataset directory does not exist, log a warning and return an empty page.
         if not self.path_to_dataset.exists():
-            logger.warning(f'Dataset directory not found: {self.path_to_dataset}')
+            logger.warning('Dataset directory not found: %s', self.path_to_dataset)
             return DatasetItemsListPage(
                 count=0,
                 offset=offset,
@@ -306,13 +308,13 @@ class FileSystemDatasetBackend(DatasetBackend):
             try:
                 file_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
             except FileNotFoundError:
-                logger.warning(f'File disappeared during iterate_items(): {file_path}, skipping')
+                logger.warning('File disappeared during iterate_items(): %s, skipping', file_path)
                 continue
 
             try:
                 item = json.loads(file_content)
             except json.JSONDecodeError:
-                logger.exception(f'Corrupt JSON in {file_path}, skipping')
+                logger.exception('Corrupt JSON in %s, skipping', file_path)
                 continue
 
             # Skip empty items if requested.
@@ -360,12 +362,14 @@ class FileSystemDatasetBackend(DatasetBackend):
 
         if unsupported:
             logger.warning(
-                f'The arguments {list(unsupported.keys())} of iterate are not supported by {self.__class__.__name__}.'
+                'The arguments %s of iterate are not supported by %s.',
+                list(unsupported.keys()),
+                self.__class__.__name__,
             )
 
         # If the dataset directory does not exist, log a warning and return immediately.
         if not self.path_to_dataset.exists():
-            logger.warning(f'Dataset directory not found: {self.path_to_dataset}')
+            logger.warning('Dataset directory not found: %s', self.path_to_dataset)
             return
 
         # Get the list of sorted data files.
@@ -389,13 +393,13 @@ class FileSystemDatasetBackend(DatasetBackend):
             try:
                 file_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
             except FileNotFoundError:
-                logger.warning(f'File disappeared during iterate_items(): {file_path}, skipping')
+                logger.warning('File disappeared during iterate_items(): %s, skipping', file_path)
                 continue
 
             try:
                 item = json.loads(file_content)
             except json.JSONDecodeError:
-                logger.exception(f'Corrupt JSON in {file_path}, skipping')
+                logger.exception('Corrupt JSON in %s, skipping', file_path)
                 continue
 
             # Skip empty items if requested.

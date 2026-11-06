@@ -15,7 +15,7 @@ async def main() -> None:
     async def request_handler(context: HttpCrawlingContext) -> None:
         # `httpbin.org/headers` echoes the received request headers back.
         response = (await context.http_response.read()).decode()
-        context.log.info(f'{context.request.unique_key}: {response}')
+        context.log.info('%s: %s', context.request.unique_key, response)
 
     # Add a header for this request only. It merges with the client defaults.
     request = Request.from_url(

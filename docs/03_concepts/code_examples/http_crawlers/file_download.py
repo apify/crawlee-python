@@ -16,7 +16,7 @@ async def main() -> None:
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
     async def request_handler(context: FileDownloadCrawlingContext) -> None:
-        context.log.info(f'Downloading {context.request.url} ...')
+        context.log.info('Downloading %s ...', context.request.url)
 
         # Read the whole file into memory.
         content = await context.http_response.read()

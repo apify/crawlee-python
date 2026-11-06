@@ -429,7 +429,7 @@ class FileSystemRequestQueueBackend(RequestQueueBackend):
                     )
 
                 else:
-                    logger.warning(f'Request with unique key "{request.unique_key}" could not be processed.')
+                    logger.warning('Request with unique key "%s" could not be processed.', request.unique_key)
                     unprocessed_requests.append(
                         UnprocessedRequest(
                             unique_key=request.unique_key,
@@ -460,7 +460,7 @@ class FileSystemRequestQueueBackend(RequestQueueBackend):
             request = await self._parse_request_file(request_path)
 
             if request is None:
-                logger.warning(f'Request with unique key "{unique_key}" not found in the queue.')
+                logger.warning('Request with unique key "%s" not found in the queue.', unique_key)
                 return None
 
             await self._update_metadata(update_accessed_at=True)
@@ -503,7 +503,7 @@ class FileSystemRequestQueueBackend(RequestQueueBackend):
 
             # Check if the request is in progress.
             if request.unique_key not in state.in_progress_requests:
-                logger.warning(f'Marking request {request.unique_key} as handled that is not in progress.')
+                logger.warning('Marking request %s as handled that is not in progress.', request.unique_key)
                 return None
 
             # Update the request's handled_at timestamp.
@@ -514,7 +514,7 @@ class FileSystemRequestQueueBackend(RequestQueueBackend):
             request_path = self._get_request_path(request.unique_key)
 
             if not await asyncio.to_thread(request_path.exists):
-                logger.warning(f'Request file for {request.unique_key} does not exist, cannot mark as handled.')
+                logger.warning('Request file for %s does not exist, cannot mark as handled.', request.unique_key)
                 return None
 
             request_data = await json_dumps(request.model_dump(by_alias=True))
@@ -555,13 +555,13 @@ class FileSystemRequestQueueBackend(RequestQueueBackend):
 
             # Check if the request is in progress.
             if request.unique_key not in state.in_progress_requests:
-                logger.info(f'Reclaiming request {request.unique_key} that is not in progress.')
+                logger.info('Reclaiming request %s that is not in progress.', request.unique_key)
                 return None
 
             request_path = self._get_request_path(request.unique_key)
 
             if not await asyncio.to_thread(request_path.exists):
-                logger.warning(f'Request file for {request.unique_key} does not exist, cannot reclaim.')
+                logger.warning('Request file for %s does not exist, cannot reclaim.', request.unique_key)
                 return None
 
             # Update sequence number and state to ensure proper ordering.
@@ -743,7 +743,7 @@ class FileSystemRequestQueueBackend(RequestQueueBackend):
 
             request = await self._parse_request_file(self._get_request_path(unique_key))
             if request is None:
-                logger.warning(f'Request file for "{unique_key}" is missing or invalid, skipping.')
+                logger.warning('Request file for "%s" is missing or invalid, skipping.', unique_key)
                 continue
 
             self._request_cache.append(request)
@@ -785,21 +785,21 @@ class FileSystemRequestQueueBackend(RequestQueueBackend):
         try:
             file_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
         except FileNotFoundError:
-            logger.warning(f'Request file "{file_path}" not found.')
+            logger.warning('Request file "%s" not found.', file_path)
             return None
 
         # Parse the file content as JSON.
         try:
             parsed = json.loads(file_content)
         except json.JSONDecodeError as exc:
-            logger.warning(f'Failed to parse request file {file_path}: {exc!s}')
+            logger.warning('Failed to parse request file %s: %s', file_path, exc)
             return None
 
         # Validate the content against the Request model.
         try:
             return Request.model_validate(parsed)
         except ValidationError as exc:
-            logger.warning(f'Failed to validate request file {file_path}: {exc!s}')
+            logger.warning('Failed to validate request file %s: %s', file_path, exc)
             return None
 
     async def _discover_existing_requests(self) -> None:
@@ -813,7 +813,8 @@ class FileSystemRequestQueueBackend(RequestQueueBackend):
 
         if state.in_progress_requests:
             logger.info(
-                f'Reclaiming {len(state.in_progress_requests)} in-progress request(s) from previous run.',
+                'Reclaiming %s in-progress request(s) from previous run.',
+                len(state.in_progress_requests),
             )
             state.in_progress_requests.clear()
 

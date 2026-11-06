@@ -182,7 +182,7 @@ class RecoverableState(Generic[TStateModel]):
             event_data: Optional data associated with a PERSIST_STATE event
         """
         self._log.debug(
-            f'Persisting RecoverableState (model={self._default_state.__class__.__name__}, event_data={event_data}).'
+            'Persisting RecoverableState (model=%s, event_data=%s).', self._default_state.__class__.__name__, event_data
         )
 
         if self._key_value_store is None or self._state is None:

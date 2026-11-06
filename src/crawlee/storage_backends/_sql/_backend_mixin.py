@@ -202,7 +202,7 @@ class SqlBackendMixin(ABC, Generic[TMetadataTable, TBufferTable, TItemTable]):
                     yield session
                     await session.commit()
                 except SQLAlchemyError as e:
-                    logger.warning(f'Error occurred during session transaction: {e}')
+                    logger.warning('Error occurred during session transaction: %s', e)
                     await session.rollback()
                     raise
             else:

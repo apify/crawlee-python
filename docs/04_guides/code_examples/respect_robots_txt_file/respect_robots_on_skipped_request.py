@@ -13,7 +13,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def request_handler(context: BeautifulSoupCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
     # highlight-start
     # This handler is called when a request is skipped
@@ -21,7 +21,7 @@ async def main() -> None:
     async def skipped_request_handler(request: Request, reason: SkippedReason) -> None:
         # Check if the request was skipped due to robots.txt rules
         if reason == 'robots_txt':
-            crawler.log.info(f'Skipped {request.url} due to robots.txt rules.')
+            crawler.log.info('Skipped %s due to robots.txt rules.', request.url)
 
     # highlight-end
 

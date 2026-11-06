@@ -402,7 +402,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
 
         # If not deleted, the request was not in progress.
         if not deleted:
-            logger.warning(f'Marking request {request.unique_key} as handled that is not in progress.')
+            logger.warning('Marking request %s as handled that is not in progress.', request.unique_key)
             return None
 
         # Update the request's handled_at timestamp.
@@ -459,7 +459,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
     ) -> ProcessedRequest | None:
         check_in_progress = await await_redis_response(self._redis.hexists(self._in_progress_key, request.unique_key))
         if not check_in_progress:
-            logger.info(f'Reclaiming request {request.unique_key} that is not in progress.')
+            logger.info('Reclaiming request %s that is not in progress.', request.unique_key)
             return None
 
         async with self._get_pipeline() as pipe:

@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[State]:
     # Define the default request handler, which will be called for every request.
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
         title = context.selector.xpath('//title/text()').get() or ''
 
         # Extract data from the page and save it to the result dictionary.
@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[State]:
         )
 
     # Start the crawler without awaiting it to finish
-    crawler.log.info(f'Starting crawler for the {app.title}')
+    crawler.log.info('Starting crawler for the %s', app.title)
     run_task = asyncio.create_task(crawler.run([]))
 
     # Make the crawler and the result dictionary available in the app state

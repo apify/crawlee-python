@@ -175,7 +175,9 @@ class RedisDatasetBackend(DatasetBackend, RedisBackendMixin):
 
         if unsupported:
             logger.warning(
-                f'The arguments {list(unsupported.keys())} of get_data are not supported by {self.__class__.__name__}.'
+                'The arguments %s of get_data are not supported by %s.',
+                list(unsupported.keys()),
+                self.__class__.__name__,
             )
 
         metadata = await self.get_metadata()
@@ -261,8 +263,9 @@ class RedisDatasetBackend(DatasetBackend, RedisBackendMixin):
 
         if unsupported:
             logger.warning(
-                f'The arguments {list(unsupported.keys())} of iterate_items are not supported '
-                f'by {self.__class__.__name__}.'
+                'The arguments %s of iterate_items are not supported by %s.',
+                list(unsupported.keys()),
+                self.__class__.__name__,
             )
 
         metadata = await self.get_metadata()

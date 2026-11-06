@@ -19,7 +19,8 @@ _CHINESE = '中文字符解码测试'
 
 
 def test_default_logger() -> None:
-    assert BeautifulSoupCrawler().log.name == 'BeautifulSoupCrawler'
+    """The default crawler logger is named after the crawler class, under `crawlee.crawlers`."""
+    assert BeautifulSoupCrawler().log.name == 'crawlee.crawlers.BeautifulSoupCrawler'
 
 
 def test_import_error_handled() -> None:

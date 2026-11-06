@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest import mock
 from unittest.mock import AsyncMock, Mock
 
@@ -1074,6 +1074,21 @@ async def test_extract_non_href_links(server_url: URL) -> None:
 
     assert len(extracted_links) == 1
     assert extracted_links[0] == str(server_url / 'page_2')
+
+
+async def test_debug_log_on_response_carries_status_code(server_url: URL, caplog: pytest.LogCaptureFixture) -> None:
+    """At DEBUG, the crawler logs the received response with the request context and its status code."""
+    crawler = PlaywrightCrawler(request_handler=mock.AsyncMock())
+    url = str(server_url)
+
+    with caplog.at_level(logging.DEBUG, logger=crawler.log.name):
+        await crawler.run([url])
+
+    responses = [record for record in caplog.records if record.getMessage() == 'Received a response']
+    assert len(responses) == 1
+    response = cast('Any', responses[0])
+    assert response.url == url
+    assert response.status_code == 200
 
 
 async def test_reduced_logs_from_playwright_navigation_timeout(caplog: pytest.LogCaptureFixture) -> None:

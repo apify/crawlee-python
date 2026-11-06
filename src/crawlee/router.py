@@ -34,24 +34,24 @@ class Router(Generic[TCrawlingContext]):
     # Middleware executed for every request before the handlers
     @router.use
     async def logging_middleware(context: HttpCrawlingContext) -> None:
-        context.log.info(f'Processing request: {context.request.url} label={context.request.label}')
+        context.log.info('Processing request: %s label=%s', context.request.url, context.request.label)
 
     # Handler for requests without a matching label handler
     @router.default_handler
     async def default_handler(context: HttpCrawlingContext) -> None:
-        context.log.info(f'Request without label {context.request.url} ...')
+        context.log.info('Request without label %s ...', context.request.url)
 
 
     # Handler for category requests
     @router.handler(label='category')
     async def category_handler(context: HttpCrawlingContext) -> None:
-        context.log.info(f'Category request {context.request.url} ...')
+        context.log.info('Category request %s ...', context.request.url)
 
 
     # Handler for product requests
     @router.handler(label='product')
     async def product_handler(context: HttpCrawlingContext) -> None:
-        context.log.info(f'Product {context.request.url} ...')
+        context.log.info('Product %s ...', context.request.url)
 
 
     async def main() -> None:

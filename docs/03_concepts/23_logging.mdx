@@ -1,21 +1,92 @@
 ---
 id: logging
 title: Logging
-description: How Crawlee logs its activity and how to configure the log level, statistics logs, and structured JSON output.
+description: How Crawlee logs its activity, how its loggers are named, and how to configure levels, custom loggers, request context, statistics logs and JSON output.
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
 import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
+import OwnLoggingConfigExample from '!!raw-loader!roa-loader!./code_examples/logging/own_logging_config.py';
+import CustomLoggerExample from '!!raw-loader!roa-loader!./code_examples/logging/custom_logger.py';
+import RequestContextExtraExample from '!!raw-loader!roa-loader!./code_examples/logging/request_context_extra.py';
 import JsonLoggingExample from '!!raw-loader!roa-loader!./code_examples/logging/configure_json_logging.py';
 
-Crawlee builds on the standard Python [`logging`](https://docs.python.org/3/library/logging.html) module. Each crawler comes with a logger. Most HTTP crawlers name it after the crawler class (for example `HttpCrawler`), and the other crawlers after their module (for example `crawlee.crawlers._playwright._playwright_crawler`). Inside a request handler the same logger is available as `context.log`, so you can log from your handlers without any setup.
+Crawlee builds on the standard Python [`logging`](https://docs.python.org/3/library/logging.html) module. Each crawler logs to a logger named after its class under `crawlee.crawlers`, for example `crawlee.crawlers.HttpCrawler`. To use your own logger, pass it as the `logger` argument of the crawler. Inside a request handler the same logger is available as `context.log`, so you can log from your handlers without any setup.
 
 ## Default configuration
 
-By default, a crawler sets up the logging infrastructure automatically when it's created. It attaches a handler with a human-readable, colored formatter to the root logger, unless the root logger already has handlers configured. You can opt out by passing `configure_logging=False` to the crawler's constructor (see <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>) and configure logging yourself.
+By default, a crawler sets up the logging infrastructure automatically when it's created. It attaches a handler with a human-readable, colored formatter to the root logger, unless the root logger already has handlers configured, the same way [`logging.basicConfig`](https://docs.python.org/3/library/logging.html#logging.basicConfig) does. You can opt out by passing `configure_logging=False` to the crawler's constructor and configure logging yourself. For the other constructor options, see <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>.
 
-The level of the root logger that the crawler configures comes from the <ApiLink to="class/Configuration#log_level">`Configuration.log_level`</ApiLink> option of the global configuration, which can also be set through the `CRAWLEE_LOG_LEVEL` environment variable. It has no effect when the crawler doesn't configure logging. For the other settings and the environment variables behind them, see [Configuration](./configuration).
+The level of the root logger that the crawler configures comes from the <ApiLink to="class/Configuration#log_level">`Configuration.log_level`</ApiLink> option of the global configuration. It defaults to INFO, or DEBUG in Python's [development mode](https://docs.python.org/3/library/devmode.html), and can also be set through the `CRAWLEE_LOG_LEVEL` environment variable, for example:
+
+```sh
+CRAWLEE_LOG_LEVEL=DEBUG python main.py
+```
+
+The level has no effect when the crawler doesn't configure logging, except on the `httpx2` logger (see [Third-party loggers](#third-party-loggers)). For the other settings and the environment variables behind them, see [Configuration](./configuration).
+
+The `crawlee` logger has a [`NullHandler`](https://docs.python.org/3/library/logging.handlers.html#logging.NullHandler). If neither Crawlee nor your application configures logging, Crawlee's logs go nowhere.
+
+## Logger names
+
+A crawler's autoscaled pool logs to the `autoscaled_pool` child of the crawler's logger, such as `crawlee.crawlers.ParselCrawler.autoscaled_pool`. The sub crawlers of <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> log to the `static` and `playwright` children of its logger. The crawler sets these two loggers to ERROR when it's created, since it reports the outcome of each request itself. To see more from the sub crawlers, set the level of these loggers after you create the crawler.
+
+The rest of Crawlee logs to loggers named after their modules, all under `crawlee`. Because the names form a hierarchy, you can set the level of a whole subtree:
+
+```python
+import logging
+
+# Only warnings and errors from Crawlee.
+logging.getLogger('crawlee').setLevel(logging.WARNING)
+
+# The concurrency decisions of the autoscaling.
+logging.getLogger('crawlee.autoscaling').setLevel(logging.DEBUG)
+```
+
+## Use your own logging configuration
+
+To format the logs yourself, configure logging before you create the crawler. The following example uses `logging.basicConfig` and turns on DEBUG for the crawlers only:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {OwnLoggingConfigExample}
+</RunnableCodeBlock>
+
+The format string in this example doesn't include the request fields, so the DEBUG messages don't say which request they're about. For how to add the fields, see [Request context in log records](#request-context-in-log-records).
+
+## Use a custom logger
+
+To make a crawler log to a logger of your choice, pass it as the `logger` argument. A logger per crawler helps when you run several crawlers in one process and want to tell their logs apart:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {CustomLoggerExample}
+</RunnableCodeBlock>
+
+## Log levels
+
+Crawlee picks the level of a message by who needs to act on it:
+
+- ERROR: a request failed after all its retries, or the crawler can't go on.
+- WARNING: a request is retried, a session is rotated, or something looks misconfigured.
+- INFO: the crawler starts or finishes, and the periodic status and statistics.
+- DEBUG: the steps of every request and the internal decisions, such as the autoscaling.
+
+At DEBUG, the crawler logs these messages for every request:
+
+- `Processing request` when it starts on the request.
+- `Received a response` when an HTTP-based or Playwright crawler gets a response, with its `status_code`.
+- `Committed the request handler result` when it stores the data and adds the requests from your handler, with the number of `push_data_calls` and `add_requests_calls`.
+- `Request handled` when the request is done.
+
+## Request context in log records
+
+The request messages carry the request context as [`extra`](https://docs.python.org/3/library/logging.html#logging.Logger.debug) fields: `url`, `unique_key` and `retry_count`. Crawlee's formatter prints them after the message, and your own formatter can read them as attributes of the log record. The `Received a response` message adds `status_code` to them. The following example prints every record as a JSON line with these fields:
+
+<RunnableCodeBlock className="language-python" language="python">
+    {RequestContextExtraExample}
+</RunnableCodeBlock>
+
+For a complete JSON logging setup based on `loguru`, see [JSON logging with loguru](#json-logging-with-loguru).
 
 ## Statistics logs
 
@@ -33,7 +104,7 @@ Here's an example of what a crawler statistics log entry looks like in JSONL for
 
 ```json
 {
-    "text": "[HttpCrawler] |   INFO   | - Final request statistics: {'requests_finished': 1, 'requests_failed': 0, 'retry_histogram': [1], 'request_avg_failed_duration': None, 'request_avg_finished_duration': 3.57098, 'requests_finished_per_minute': 17, 'requests_failed_per_minute': 0, 'request_total_duration': 3.57098, 'requests_total': 1, 'crawler_runtime': 3.59165}\n",
+    "text": "[crawlee.crawlers.HttpCrawler] |   INFO   | - Final request statistics: {'requests_finished': 1, 'requests_failed': 0, 'retry_histogram': [1], 'request_avg_failed_duration': None, 'request_avg_finished_duration': 3.57098, 'requests_finished_per_minute': 17, 'requests_failed_per_minute': 0, 'request_total_duration': 3.57098, 'requests_total': 1, 'crawler_runtime': 3.59165}\n",
     "record": {
         "elapsed": { "repr": "0:00:05.604568", "seconds": 5.604568 },
         "exception": null,
@@ -58,7 +129,7 @@ Here's an example of what a crawler statistics log entry looks like in JSONL for
         "line": 583,
         "message": "Final request statistics:",
         "module": "_basic_crawler",
-        "name": "HttpCrawler",
+        "name": "crawlee.crawlers.HttpCrawler",
         "process": { "id": 198383, "name": "MainProcess" },
         "thread": { "id": 135312814966592, "name": "MainThread" },
         "time": {
@@ -68,3 +139,7 @@ Here's an example of what a crawler statistics log entry looks like in JSONL for
     }
 }
 ```
+
+## Third-party loggers
+
+The <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink> sets the `httpx2` logger to WARNING, because `httpx2` logs every request at INFO. When the configured log level is DEBUG, for example with `CRAWLEE_LOG_LEVEL=DEBUG`, it sets the logger to DEBUG. If you set a level on the `httpx2` logger before you create the client, the client keeps it.

@@ -118,7 +118,7 @@ class PydanticAiCleanHtmlDistiller(BasePydanticAiHtmlDistiller):
 
         result = self._enforce_max_size(distilled_html, html)
 
-        logger.debug(f'{type(self).__name__} distilled {len(html)} chars to {len(result)} chars.')
+        logger.debug('%s distilled %s chars to %s chars.', type(self).__name__, len(html), len(result))
 
         return result
 
@@ -254,9 +254,13 @@ class PydanticAiCleanHtmlDistiller(BasePydanticAiHtmlDistiller):
         if self._max_size is not None and len(distilled_html) > self._max_size:
             # No safe way to cut HTML mid-stream without breaking the structure.
             logger.warning(
-                f'{type(self).__name__} output exceeds max_size ({len(distilled_html)} > {self._max_size}). '
-                'The tail of the page is cut off and invisible to the LLM. '
-                'Raise `max_size` or set `max_json_len`.'
+                (
+                    '%s output exceeds max_size (%s > %s). The tail of the page is cut off and '
+                    'invisible to the LLM. Raise `max_size` or set `max_json_len`.'
+                ),
+                type(self).__name__,
+                len(distilled_html),
+                self._max_size,
             )
             return distilled_html[: self._max_size] + _TRUNCATION_MARKER
 

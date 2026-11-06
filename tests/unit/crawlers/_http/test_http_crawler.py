@@ -31,7 +31,8 @@ async def crawler_without_retries(
 
 
 def test_default_logger() -> None:
-    assert HttpCrawler().log.name == 'HttpCrawler'
+    """The default crawler logger is named after the crawler class, under `crawlee.crawlers`."""
+    assert HttpCrawler().log.name == 'crawlee.crawlers.HttpCrawler'
 
 
 def mock_response(status_code: int, url: str) -> Mock:

@@ -23,7 +23,7 @@ async def main() -> None:
 
         # Log the extracted texts.
         for i, text in enumerate(category_texts):
-            context.log.info(f'CATEGORY_{i + 1}: {text}')
+            context.log.info('CATEGORY_%s: %s', i + 1, text)
 
     await crawler.run(['https://warehouse-theme-metal.myshopify.com/collections'])
 

@@ -64,8 +64,8 @@ Finally, run your crawler. Your logs should show something like this:
 
 ```plaintext
 ...
-[HttpCrawler] INFO  Processing https://httpbin.org/post ...
-[HttpCrawler] INFO  Response: {
+[crawlee.crawlers.HttpCrawler] INFO  Processing https://httpbin.org/post ...
+[crawlee.crawlers.HttpCrawler] INFO  Response: {
   "args": {},
   "data": "",
   "files": {},
@@ -103,7 +103,7 @@ Finally, run your crawler. Your logs should show something like this:
   "url": "https://httpbin.org/post"
 }
 
-[HttpCrawler] INFO  Final request statistics:
+[crawlee.crawlers.HttpCrawler] INFO  Final request statistics:
 ┌───────────────────────────────┬─────────┐
 │ requests_finished             │ 1       │
 │ requests_failed               │ 0       │

@@ -12,7 +12,7 @@ async def main() -> None:
     # Define the default handler (fallback for requests without specific labels)
     @router.default_handler
     async def default_handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Processing homepage: {context.request.url}')
+        context.log.info('Processing homepage: %s', context.request.url)
 
         # Extract page title
         title = context.selector.css('title::text').get() or 'No title found'
@@ -31,7 +31,7 @@ async def main() -> None:
     # Define a handler for category pages
     @router.handler('CATEGORY')
     async def category_handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Processing category page: {context.request.url}')
+        context.log.info('Processing category page: %s', context.request.url)
 
         # Extract category information
         category_title = context.selector.css('h1::text').get() or 'Unknown Category'
@@ -53,7 +53,7 @@ async def main() -> None:
     # Define a handler for product detail pages
     @router.handler('PRODUCT')
     async def product_handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Processing product page: {context.request.url}')
+        context.log.info('Processing product page: %s', context.request.url)
 
         # Extract detailed product information
         product_data = {

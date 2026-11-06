@@ -9,7 +9,7 @@ async def main() -> None:
     # Fill in the form on the page and enqueue its submission.
     @crawler.router.default_handler
     async def request_handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Filling in the form on {context.request.url} ...')
+        context.log.info('Filling in the form on %s ...', context.request.url)
         requests = await context.extract_form_requests(
             fields={
                 'custname': 'John Doe',
@@ -27,9 +27,9 @@ async def main() -> None:
     # Process the response to the form submission.
     @crawler.router.handler('form-result')
     async def form_result_handler(context: ParselCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
         response = (await context.http_response.read()).decode('utf-8')
-        context.log.info(f'Response: {response}')  # To see the response in the logs.
+        context.log.info('Response: %s', response)  # To see the response in the logs.
 
     # Run the crawler with the page containing the form.
     await crawler.run(['https://httpbin.org/forms/post'])

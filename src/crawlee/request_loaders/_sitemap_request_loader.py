@@ -329,7 +329,7 @@ class SitemapRequestLoader(RequestLoader):
         """Filter `target` by URL scheme and enqueue strategy, logging the reason if rejected."""
         ok, reason = filter_url(target=target, strategy=self._enqueue_strategy, origin=parent)
         if not ok:
-            logger.warning(f'Skipping {kind} {target!r} (parent {str(parent)!r}): {reason}.')
+            logger.warning('Skipping %s %r (parent %r): %s.', kind, target, str(parent), reason)
             return False
         return True
 
@@ -377,8 +377,9 @@ class SitemapRequestLoader(RequestLoader):
                                 ):
                                     if current_depth >= DEFAULT_MAX_DEPTH:
                                         logger.warning(
-                                            f'Skipping nested sitemap {item.loc!r}: '
-                                            f'max depth {DEFAULT_MAX_DEPTH} reached.'
+                                            'Skipping nested sitemap %r: max depth %s reached.',
+                                            item.loc,
+                                            DEFAULT_MAX_DEPTH,
                                         )
                                         continue
                                     if not self._passes_filters(item.loc, parsed_sitemap_url, 'nested sitemap'):
@@ -416,7 +417,7 @@ class SitemapRequestLoader(RequestLoader):
                 except Exception:
                     # A sitemap that fails to load is marked processed and skipped, so one dead sitemap
                     # does not abandon the remaining pending sitemaps.
-                    logger.warning(f'Failed to load sitemap {sitemap_url}, skipping it.')
+                    logger.warning('Failed to load sitemap %s, skipping it.', sitemap_url)
 
                 # Clear current sitemap after processing
                 state = await self._get_state()

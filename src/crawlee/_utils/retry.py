@@ -52,8 +52,11 @@ def retry_on_error(
 
                     delay = base_delay_seconds * (2**attempt)
                     logger.debug(
-                        f'{func_qualname}: attempt {attempt + 1}/{max_attempts} failed. '
-                        f'Retrying in {delay:.2f} seconds.',
+                        '%s: attempt %s/%s failed. Retrying in %.2f seconds.',
+                        func_qualname,
+                        attempt + 1,
+                        max_attempts,
+                        delay,
                         exc_info=exc,
                     )
                     await _retry_sleep(delay)

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from abc import ABC
 from datetime import timedelta
 from typing import TYPE_CHECKING, Generic, NotRequired
@@ -12,6 +11,7 @@ from typing_extensions import TypeVar
 
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._utils.docs import docs_group
+from crawlee._utils.log import request_log_extra
 from crawlee._utils.time import SharedTimeout
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute, to_absolute_url_iterator
 from crawlee.crawlers._basic import BasicCrawler, BasicCrawlerOptions, ContextPipeline
@@ -93,7 +93,6 @@ class AbstractHttpCrawler(
                 'AbstractHttpCrawler._create_static_content_crawler_pipeline() method to initialize it.'
             )
 
-        kwargs.setdefault('_logger', logging.getLogger(self.__class__.__name__))
         super().__init__(**kwargs)
 
     @classmethod
@@ -239,7 +238,7 @@ class AbstractHttpCrawler(
                 if is_url_absolute(resolved_base_url):
                     base_url = resolved_base_url
                 else:
-                    context.log.debug(f'Ignoring invalid base URL "{extracted_base_urls[0]}", using the page URL.')
+                    context.log.debug('Ignoring invalid base URL "%s", using the page URL.', extracted_base_urls[0])
             links_iterator = to_absolute_url_iterator(base_url, links_iterator, logger=context.log)
 
             if robots_txt_file:
@@ -266,9 +265,12 @@ class AbstractHttpCrawler(
                     request = Request.from_url(**request_options)
                 except ValidationError as exc:
                     context.log.debug(
-                        f'Skipping URL "{url}" due to invalid format: {exc}. '
-                        'This may be caused by a malformed URL or unsupported URL scheme. '
-                        'Please ensure the URL is correct and retry.'
+                        (
+                            'Skipping URL "%s" due to invalid format: %s. This may be caused by a malformed '
+                            'URL or unsupported URL scheme. Please ensure the URL is correct and retry.'
+                        ),
+                        url,
+                        exc,
                     )
                     continue
 
@@ -282,7 +284,7 @@ class AbstractHttpCrawler(
                         url=url, user_data={**base_user_data}, label=label, enqueue_strategy=strategy
                     )
                 except ValidationError as exc:
-                    context.log.debug(f'Skipping URL "{url}" disallowed by robots.txt due to invalid format: {exc}.')
+                    context.log.debug('Skipping URL "%s" disallowed by robots.txt due to invalid format: %s.', url, exc)
                     continue
 
                 skipped_requests.append(skipped_request)
@@ -355,6 +357,9 @@ class AbstractHttpCrawler(
             The original crawling context if no errors are detected.
         """
         status_code = context.http_response.status_code
+        context.log.debug(
+            'Received a response', extra={**request_log_extra(context.request), 'status_code': status_code}
+        )
         if self._record_rate_limit_status_code(
             status_code,
             request_url=context.request.url,

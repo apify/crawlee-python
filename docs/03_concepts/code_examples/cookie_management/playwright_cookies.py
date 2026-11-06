@@ -20,7 +20,7 @@ async def main() -> None:
         # It's synced back onto the session after the handler returns, so on the
         # second request it's already on `context.session`.
         names = [cookie['name'] for cookie in context.session.cookies]
-        context.log.info(f'Session cookies on {context.request.url}: {names}')
+        context.log.info('Session cookies on %s: %s', context.request.url, names)
 
         if not context.request.user_data.get('followup'):
             await context.add_requests(

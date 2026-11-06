@@ -27,7 +27,7 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def handler(context: PydanticAiCrawlingContext) -> None:
-        context.log.info(f'Processing {context.request.url} ...')
+        context.log.info('Processing %s ...', context.request.url)
 
         # Pass a Pydantic model and get a validated instance back.
         article = await context.extract(Article)

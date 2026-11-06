@@ -41,7 +41,7 @@ async def wait_for(
             if iteration == max_retries:
                 raise
 
-            logger.warning(f'{e!s}: retrying ({iteration}/{max_retries})')
+            logger.warning('%s: retrying (%s/%s)', e, iteration, max_retries)
 
     raise RuntimeError('Unreachable code')
 
@@ -83,4 +83,4 @@ async def wait_for_all_tasks_to_finish(
                 except asyncio.CancelledError:
                     pass
                 except Exception as e:
-                    logger.warning(f'Task raised an exception: {e}')
+                    logger.warning('Task raised an exception: %s', e)
