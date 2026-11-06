@@ -1,7 +1,13 @@
+import asyncio
+import logging
 from collections.abc import AsyncGenerator
 
-from crawlee.request_loaders._request_list import RequestList
+import pytest
+
+from crawlee.request_loaders._request_list import RequestList, RequestListState
 from crawlee.storages import KeyValueStore
+
+URLS = ['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com']
 
 
 async def test_sync_traversal() -> None:
@@ -279,3 +285,132 @@ async def test_handle_invalid_url_with_persistence() -> None:
     persisted_data = await kvs.get_value(persist_key)
     assert persisted_data is not None
     assert [request['url'] for request in persisted_data['requests']] == ['https://valid.placeholder.com']
+
+
+async def _drain(request_list: RequestList) -> list[str]:
+    served = []
+    while (request := await request_list.fetch_next_request()) is not None:
+        served.append(request.url)
+        await request_list.mark_request_as_handled(request)
+    return served
+
+
+async def _persist_position(position: RequestListState) -> None:
+    kvs = await KeyValueStore.open()
+    await kvs.set_value('state', position.model_dump(mode='json', by_alias=True))
+
+
+@pytest.mark.parametrize(
+    'persist_requests_key',
+    [
+        pytest.param(None, id='source'),
+        pytest.param('requests', id='persisted-requests'),
+    ],
+)
+async def test_restore_serves_in_progress_requests_again(persist_requests_key: str | None) -> None:
+    """Requests in progress when the state was persisted are served again first, and the list then finishes."""
+    first_list = RequestList(URLS, persist_state_key='state', persist_requests_key=persist_requests_key)
+    first_request = await first_list.fetch_next_request()
+    assert first_request is not None
+    await first_list.fetch_next_request()
+    await first_list.mark_request_as_handled(first_request)
+    await first_list._state.persist_state()
+
+    restored_list = RequestList(URLS, persist_state_key='state', persist_requests_key=persist_requests_key)
+
+    assert await restored_list.get_handled_count() == 1
+    assert await restored_list.get_pending_count() == 1
+    assert await restored_list.get_total_count() == 2
+    assert await _drain(restored_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
+    assert (await restored_list.check_readiness()).status == 'finished'
+    assert await restored_list.get_handled_count() == 3
+    assert await restored_list.get_total_count() == 3
+
+
+async def test_restore_reports_ready_while_only_in_progress_requests_remain() -> None:
+    """A restored list with an exhausted source reports ready while in-progress requests are left to serve again."""
+    await _persist_position(RequestListState(next_index=3, in_progress={'https://c.placeholder.com'}))
+    request_list = RequestList(URLS, persist_state_key='state')
+
+    assert (await request_list.check_readiness()).status == 'ready'
+    assert await _drain(request_list) == ['https://c.placeholder.com']
+    assert (await request_list.check_readiness()).status == 'finished'
+
+
+async def test_restore_drops_in_progress_keys_not_fetched(caplog: pytest.LogCaptureFixture) -> None:
+    """An in-progress key that isn't among the fetched requests is dropped with a warning instead of blocking."""
+    position = RequestListState(
+        next_index=1,
+        next_unique_key='https://b.placeholder.com',
+        in_progress={'https://a.placeholder.com', 'https://unknown.placeholder.com'},
+    )
+    await _persist_position(position)
+    request_list = RequestList(URLS, persist_state_key='state')
+
+    with caplog.at_level(logging.WARNING):
+        assert await _drain(request_list) == URLS
+
+    assert (await request_list.check_readiness()).status == 'finished'
+    assert any(
+        record.message.startswith("RequestList's in-progress field is not consistent") for record in caplog.records
+    )
+
+
+async def test_restore_skips_invalid_requests_before_position() -> None:
+    """Restoring the position skips the fetched requests, not the invalid entries among them."""
+    source = ['https://a.placeholder.com', 'invalid-url.com', 'https://b.placeholder.com', 'https://c.placeholder.com']
+    first_list = RequestList(source, persist_state_key='state')
+    for _ in range(2):
+        request = await first_list.fetch_next_request()
+        assert request is not None
+        await first_list.mark_request_as_handled(request)
+    await first_list._state.persist_state()
+
+    restored_list = RequestList(source, persist_state_key='state')
+
+    assert await _drain(restored_list) == ['https://c.placeholder.com']
+
+
+async def test_mismatch_keeps_persisted_in_progress_keys() -> None:
+    """A list that doesn't match the persisted position raises and leaves the persisted in-progress keys intact."""
+    first_list = RequestList(URLS, persist_state_key='state')
+    await first_list.fetch_next_request()
+    await first_list._state.persist_state()
+
+    changed_list = RequestList([URLS[1], URLS[0], URLS[2]], persist_state_key='state')
+    with pytest.raises(RuntimeError, match='Mismatch at index 1'):
+        await changed_list.check_readiness()
+    await changed_list._state.persist_state()
+
+    kvs = await KeyValueStore.open()
+    assert (await kvs.get_value('state'))['inProgress'] == [URLS[0]]
+
+
+async def test_mismatch_leaves_no_persisted_requests() -> None:
+    """A position mismatch doesn't persist the requests, so the list restores once the source is right again."""
+    first_list = RequestList(URLS, persist_state_key='state')
+    request = await first_list.fetch_next_request()
+    assert request is not None
+    await first_list.mark_request_as_handled(request)
+    await first_list._state.persist_state()
+    reordered_urls = ['https://b.placeholder.com', 'https://a.placeholder.com', 'https://c.placeholder.com']
+    mismatched_list = RequestList(reordered_urls, persist_state_key='state', persist_requests_key='requests')
+
+    with pytest.raises(RuntimeError, match=r'Mismatch at index 1'):
+        await mismatched_list.fetch_next_request()
+
+    kvs = await KeyValueStore.open()
+    assert await kvs.get_value('requests') is None
+    restored_list = RequestList(URLS, persist_state_key='state', persist_requests_key='requests')
+    assert await _drain(restored_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
+
+
+async def test_concurrent_first_calls_restore_position_once() -> None:
+    """Concurrent first calls restore the position once instead of advancing the source twice."""
+    await _persist_position(RequestListState(next_index=1, next_unique_key='https://b.placeholder.com'))
+    request_list = RequestList(URLS, persist_state_key='state')
+
+    _, request = await asyncio.gather(request_list.check_readiness(), request_list.fetch_next_request())
+
+    assert request is not None
+    assert request.url == 'https://b.placeholder.com'
