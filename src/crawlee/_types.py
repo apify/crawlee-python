@@ -123,7 +123,7 @@ class ConcurrencySettings:
             max_tasks_per_minute: The maximum number of tasks per minute the pool can run. By default, this is set
                 to infinity, but you can pass any positive, non-zero number.
             desired_concurrency: The desired number of tasks that should be running parallel on the start of the pool,
-                if there is a large enough supply of them. Defaults to 10, adjusted to fit between `min_concurrency` and
+                if there is a large enough supply of them. The default is adjusted to fit between `min_concurrency` and
                 `max_concurrency`. An explicitly passed value outside that range raises a `ValueError`.
         """
         if min_concurrency < 1:
