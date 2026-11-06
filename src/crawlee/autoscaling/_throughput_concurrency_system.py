@@ -639,7 +639,8 @@ class _ThroughputController:
         self._soft_ceiling = self.desired_concurrency
         self._centre = max(self.desired_concurrency * (1 + self._system.dither_min), self.desired_concurrency + 1.0)
         self._dither = self._system.dither_min
-        self._end_hold()
+        if self._hold_cycles > 0:
+            self._end_hold()
         self._rates.clear()
         self._reused = False
         self._last_direction = 0
@@ -772,12 +773,9 @@ class _ThroughputController:
         self._phase = 'low'
 
         if not self._holding_peak:
-            self._hold_cycles -= 1
             # The soft ceiling may lift during the hold, and the centre follows it so the next cycle starts from there.
             self._centre = float(self._ceiling())
-            return
-
-        if self._hold_reference is None:
+        elif self._hold_reference is None:
             if rate <= 0:
                 # The target could not serve the held level at all, so there is nothing to hold.
                 self._end_hold()
@@ -798,8 +796,7 @@ class _ThroughputController:
             self._end_hold()
 
     def _end_hold(self) -> None:
-        if self._holding_peak or self._hold_cycles > 0:
-            logger.debug(f'Hold ended; measuring around concurrency {round(self._centre)} again')
+        logger.debug(f'Hold ended; measuring around concurrency {round(self._centre)} again')
         self._hold_cycles = 0
         self._holding_peak = False
         self._hold_reference = None
