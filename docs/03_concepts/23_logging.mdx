@@ -18,13 +18,13 @@ Crawlee builds on the standard Python [`logging`](https://docs.python.org/3/libr
 
 By default, a crawler sets up the logging infrastructure automatically when it's created. It attaches a handler with a human-readable, colored formatter to the root logger, unless the root logger already has handlers configured, the same way [`logging.basicConfig`](https://docs.python.org/3/library/logging.html#logging.basicConfig) does. You can opt out by passing `configure_logging=False` to the crawler's constructor and configure logging yourself. For the other constructor options, see <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>.
 
-The level of the root logger that the crawler configures comes from the <ApiLink to="class/Configuration#log_level">`Configuration.log_level`</ApiLink> option of the global configuration. It defaults to INFO and can also be set through the `CRAWLEE_LOG_LEVEL` environment variable, for example:
+The level of the root logger that the crawler configures comes from the <ApiLink to="class/Configuration#log_level">`Configuration.log_level`</ApiLink> option of the global configuration. It defaults to INFO, or DEBUG in Python's [development mode](https://docs.python.org/3/library/devmode.html), and can also be set through the `CRAWLEE_LOG_LEVEL` environment variable, for example:
 
 ```sh
 CRAWLEE_LOG_LEVEL=DEBUG python main.py
 ```
 
-The level has no effect when the crawler doesn't configure logging. For the other settings and the environment variables behind them, see [Configuration](./configuration).
+The level has no effect when the crawler doesn't configure logging, except on the `httpx2` logger (see [Third-party loggers](#third-party-loggers)). For the other settings and the environment variables behind them, see [Configuration](./configuration).
 
 The `crawlee` logger has a [`NullHandler`](https://docs.python.org/3/library/logging.handlers.html#logging.NullHandler). If neither Crawlee nor your application configures logging, Crawlee's logs go nowhere.
 
@@ -142,4 +142,4 @@ Here's an example of what a crawler statistics log entry looks like in JSONL for
 
 ## Third-party loggers
 
-The <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink> sets the `httpx2` logger to WARNING, because `httpx2` logs every request at INFO. With `CRAWLEE_LOG_LEVEL=DEBUG`, it sets the logger to DEBUG. If you set a level on the `httpx2` logger before you create the client, the client keeps it.
+The <ApiLink to="class/HttpxHttpClient">`HttpxHttpClient`</ApiLink> sets the `httpx2` logger to WARNING, because `httpx2` logs every request at INFO. When the configured log level is DEBUG, for example with `CRAWLEE_LOG_LEVEL=DEBUG`, it sets the logger to DEBUG. If you set a level on the `httpx2` logger before you create the client, the client keeps it.
