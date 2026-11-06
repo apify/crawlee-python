@@ -48,6 +48,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
+    from crawlee._types import UseStateFunction
     from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
 
 
@@ -288,26 +289,15 @@ class AdaptivePlaywrightCrawler(
         self,
         rendering_type: RenderingType,
         context: BasicCrawlingContext,
-        state: MutableMapping[str, JsonSerializable] | None = None,
+        use_state: UseStateFunction | None = None,
     ) -> SubCrawlerRun:
         """Perform a one request crawl with specific context pipeline and return `SubCrawlerRun`.
 
         `SubCrawlerRun` contains either result of the crawl or the exception that was thrown during the crawl.
         Sub crawler pipeline call is dynamically created based on the `rendering_type`.
-        A new context is created from passed `context` and `state` and is passed to sub crawler pipeline. The original
-        `request` is shared, so its mutations persist. Only `result` and `use_state` are isolated per sub crawler.
+        A new context is created from passed `context` and `use_state` and is passed to sub crawler pipeline. The
+        original `request` is shared, so its mutations persist. Only `result` is isolated per sub crawler.
         """
-        if state is not None:
-
-            async def get_input_state(
-                default_value: MutableMapping[str, JsonSerializable] | None = None,  # noqa:ARG001  # Intentionally unused arguments. Closure, that generates same output regardless of inputs.
-            ) -> MutableMapping[str, JsonSerializable]:
-                return state
-
-            use_state_function = get_input_state
-        else:
-            use_state_function = context.use_state
-
         # A fresh result is injected into the new context to isolate `add_requests`/`push_data`/`kvs` calls between
         # sub crawlers. The `request` itself is shared, so mutations to it persist.
         result = RequestHandlerRunResult(
@@ -321,7 +311,7 @@ class AdaptivePlaywrightCrawler(
             add_requests=result.add_requests,
             push_data=result.push_data,
             get_key_value_store=result.get_key_value_store,
-            use_state=use_state_function,
+            use_state=use_state or context.use_state,
             log=context.log,
             register_deferred_cleanup=context.register_deferred_cleanup,
         )
@@ -413,21 +403,31 @@ class AdaptivePlaywrightCrawler(
 
         context.log.debug(f'Running browser request handler for {context.request.url}')
 
-        old_state_copy = None
+        # The static crawl performed only to evaluate rendering type detection gets a copy of the state from the first
+        # `use_state` call of the browser crawl. Both crawls run with the same conditions and the static crawl can't
+        # modify the state.
+        initial_state_copy: MutableMapping[str, JsonSerializable] | None = None
 
-        if should_detect_rendering_type:
-            # Save copy of global state from `use_state` before it can be mutated by browser crawl.
-            # This copy will be used in the static crawl to make sure they both run with same conditions and to
-            # avoid static crawl to modify the state.
-            # (This static crawl is performed only to evaluate rendering type detection.)
-            kvs = await context.get_key_value_store()
-            default_value: MutableMapping[str, JsonSerializable] = {}
-            old_state: MutableMapping[str, JsonSerializable] = await kvs.get_value(
-                self._CRAWLEE_STATE_KEY, default_value
-            )
-            old_state_copy = deepcopy(old_state)
+        async def use_state_and_copy(
+            default_value: MutableMapping[str, JsonSerializable] | None = None,
+        ) -> MutableMapping[str, JsonSerializable]:
+            nonlocal initial_state_copy
+            state = await context.use_state(default_value)
+            if initial_state_copy is None:
+                initial_state_copy = deepcopy(state)
+            return state
 
-        pw_run = await self._crawl_one('client only', context=context)
+        async def use_initial_state_copy(
+            default_value: MutableMapping[str, JsonSerializable] | None = None,
+        ) -> MutableMapping[str, JsonSerializable]:
+            nonlocal initial_state_copy
+            if initial_state_copy is None:
+                initial_state_copy = deepcopy(await context.use_state(default_value))
+            return initial_state_copy
+
+        pw_run = await self._crawl_one(
+            'client only', context=context, use_state=use_state_and_copy if should_detect_rendering_type else None
+        )
         self.track_browser_request_handler_runs()
 
         if pw_run.exception is not None:
@@ -436,7 +436,7 @@ class AdaptivePlaywrightCrawler(
         if pw_run.result:
             if should_detect_rendering_type:
                 detection_result: RenderingType
-                static_run = await self._crawl_one('static', context=context, state=old_state_copy)
+                static_run = await self._crawl_one('static', context=context, use_state=use_initial_state_copy)
                 if static_run.result and self.result_comparator(static_run.result, pw_run.result):
                     detection_result = 'static'
                 else:
