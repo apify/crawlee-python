@@ -61,15 +61,16 @@ class SitemapRequestLoaderState(BaseModel):
     cleared. The next sitemap is retrieved from `pending_sitemap_urls`, skipping any URLs that already exist in
     `processed_sitemap_urls`. If `pending_sitemap_urls` is empty, `completed` is set to `True`.
 
-    When `fetch_next_request` is called, a URL is extracted from `url_queue` and placed in `in_progress`.
-    When `mark_request_as_handled` is called for the extracted URL, it is removed from `in_progress` and
-    `handled_count` is incremented by 1.
+    When `fetch_next_request` is called, a URL is extracted from `url_queue`, and the request built from it is added
+    to `request_data` and its URL to `in_progress`. When `mark_request_as_handled` is called for the request, it is
+    removed from both and `handled_count` is incremented by 1.
 
     During initial startup or restart after persistence, state validation occurs in `_get_state`. If both
     `pending_sitemap_urls` and `in_progress_sitemap_url` are empty and `completed` is False, this indicates a
     fresh start. In this case, `self._sitemap_urls` are moved to `pending_sitemap_urls`. Otherwise, the system is
     restarting from a persisted state. If `in_progress` contains any URLs, they are moved back to `url_queue` and
-    `in_progress` is cleared.
+    `in_progress` is cleared. Their requests stay in `request_data`, so `fetch_next_request` serves them again as
+    they were, without `transform_request_function`.
     """
 
     model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)
@@ -79,6 +80,9 @@ class SitemapRequestLoaderState(BaseModel):
 
     in_progress: set[str] = set()
     """Set of request URLs currently being processed."""
+
+    request_data: dict[str, Request] = {}
+    """Requests returned by `fetch_next_request` and not handled yet, by URL."""
 
     pending_sitemap_urls: deque[str]
     """Queue of sitemap URLs that need to be fetched and processed."""
@@ -181,6 +185,11 @@ class SitemapRequestLoader(RequestLoader):
             logger=logger,
         )
 
+        # Kept apart from `self._state.is_initialized`, which `close` resets, so that a call after `close` doesn't
+        # set the state up again.
+        self._initialized = False
+        self._closed = False
+
         # Start background loading
         self._loading_task = asyncio.create_task(self._load_sitemaps())
 
@@ -251,6 +260,11 @@ class SitemapRequestLoader(RequestLoader):
                 if len(state.url_queue) < self._max_buffer_size:
                     self._queue_has_capacity.set()
 
+                # A request restored as in progress is served again as it was.
+                if (restored_request := state.request_data.get(url)) is not None:
+                    state.in_progress.add(url)
+                    return restored_request
+
                 if self._transform_request_function:
                     transform_request_option = self._transform_request_function(request_option)
                     if transform_request_option == 'skip':
@@ -261,6 +275,7 @@ class SitemapRequestLoader(RequestLoader):
 
                 request = Request.from_url(**request_option)
                 state.in_progress.add(request.url)
+                state.request_data[request.url] = request
 
             return request
 
@@ -270,6 +285,7 @@ class SitemapRequestLoader(RequestLoader):
         state = await self._get_state()
         if request.url in state.in_progress:
             state.in_progress.remove(request.url)
+            del state.request_data[request.url]
             state.handled_count += 1
         return None
 
@@ -288,17 +304,18 @@ class SitemapRequestLoader(RequestLoader):
 
     async def close(self) -> None:
         """Close the request loader."""
+        self._closed = True
         await self.abort_loading()
         await self._state.teardown()
 
     async def _get_state(self) -> SitemapRequestLoaderState:
         """Initialize and return the current state."""
-        if self._state.is_initialized:
+        if self._initialized:
             return self._state.current_value
 
         async with self._queue_lock:
             # Re-check if state got initialized while waiting for the lock
-            if self._state.is_initialized:
+            if self._initialized:
                 return self._state.current_value
 
             await self._state.initialize()
@@ -322,6 +339,12 @@ class SitemapRequestLoader(RequestLoader):
             ):
                 # Notify that the queue is full
                 self._queue_has_capacity.clear()
+
+            self._initialized = True
+
+            # A loader closed before its first use had no listener to remove then, so it's removed right away.
+            if self._closed:
+                await self._state.teardown()
 
             return self._state.current_value
 
