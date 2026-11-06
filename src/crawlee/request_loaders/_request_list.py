@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
+from collections import deque
 from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Iterable
 from logging import getLogger
 from typing import TYPE_CHECKING, Annotated
@@ -25,7 +25,7 @@ logger = getLogger(__name__)
 class RequestListState(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)
 
-    next_index: int = 0
+    next_index: Annotated[int, Field(ge=0)] = 0
     next_unique_key: str | None = None
     in_progress: set[str] = set()
 
@@ -61,10 +61,9 @@ class RequestList(RequestLoader):
         from crawlee._utils.recoverable_state import RecoverableState  # noqa: PLC0415
 
         self._name = name
-        self._handled_count = 0
-        self._assumed_total_count = 0
 
         self._next: tuple[Request | None, Request | None] = (None, None)
+        self._requests_to_retry = deque[Request]()
 
         if persist_state_key is None and name is not None:
             persist_state_key = f'SDK_REQUEST_LIST_STATE-{name}'
@@ -87,67 +86,88 @@ class RequestList(RequestLoader):
             self._requests = self._iterate_in_threadpool(requests)
 
         self._requests_lock: asyncio.Lock | None = None
+        self._initialized = False
+        self._initialize_lock = asyncio.Lock()
 
     async def _get_state(self) -> RequestListState:
-        # If state is already initialized, we are done
-        if self._state.is_initialized:
-            return self._state.current_value
+        if not self._initialized:
+            async with self._initialize_lock:
+                if not self._initialized:
+                    await self._initialize()
+                    self._initialized = True
 
-        # Initialize recoverable state
-        await self._state.initialize()
+        return self._state.current_value
 
-        # Initialize lock if necessary
-        if self._requests_lock is None:
-            self._requests_lock = asyncio.Lock()
+    async def _initialize(self) -> None:
+        from crawlee.storages import KeyValueStore  # noqa: PLC0415
+
+        state = await self._state.initialize()
+        requests_to_persist: RequestListData | None = None
 
         # If the RequestList is configured to persist request data, ensure that a copy of request data is used
         if self._persist_requests_key:
-            from crawlee.storages import KeyValueStore  # noqa: PLC0415
+            key_value_store = await KeyValueStore.open()
+            persisted_requests = await key_value_store.get_value(self._persist_requests_key)
 
-            async with self._requests_lock:
-                key_value_store = await KeyValueStore.open()
-                persisted_requests = await key_value_store.get_value(self._persist_requests_key)
+            if persisted_requests is None:
+                requests_data = RequestListData(requests=[])
+                async for processing_request in self._requests:
+                    try:
+                        request = self._transform_request(processing_request)
+                    except ValidationError:
+                        logger.warning('Invalid request encountered in the request list: %s', processing_request)
+                        continue
+                    requests_data.requests.append(request)
+                requests_to_persist = requests_data
+            else:
+                requests_data = RequestListData.model_validate(persisted_requests)
 
-                if persisted_requests is None:
-                    requests_data = RequestListData(requests=[])
-                    async for processing_request in self._requests:
-                        try:
-                            request = self._transform_request(processing_request)
-                        except ValidationError:
-                            logger.warning('Invalid request encountered in the request list: %s', processing_request)
-                            continue
-                        requests_data.requests.append(request)
-                    await key_value_store.set_value(
-                        self._persist_requests_key,
-                        requests_data.model_dump(mode='json', by_alias=True),
-                        content_type='application/json',
-                    )
-                else:
-                    requests_data = RequestListData.model_validate(persisted_requests)
-
-                self._requests = self._iterate_in_threadpool(
-                    requests_data.requests[self._state.current_value.next_index :]
-                )
+            fetched_requests = requests_data.requests[: state.next_index]
+            self._requests = self._iterate_in_threadpool(requests_data.requests[state.next_index :])
         # If not using persistent request data, advance the request iterator
         else:
-            async with self._requests_lock:
-                for _ in range(self._state.current_value.next_index):
-                    with contextlib.suppress(StopAsyncIteration):
-                        await self._requests.__anext__()
+            # Only the in-progress requests are kept, so that skipping a large source doesn't hold all of it in memory.
+            fetched_requests = [
+                request
+                async for request in self._dequeue_requests(state.next_index)
+                if request is not None and request.unique_key in state.in_progress
+            ]
 
         # Check consistency of the stored state and the request iterator
-        if (unique_key_to_check := self._state.current_value.next_unique_key) is not None:
+        if (unique_key_to_check := state.next_unique_key) is not None:
             await self._ensure_next_request()
 
             next_unique_key = self._next[0].unique_key if self._next[0] is not None else None
             if next_unique_key != unique_key_to_check:
                 raise RuntimeError(
-                    f"""Mismatch at index {
-                        self._state.current_value.next_index
-                    } in persisted requests - Expected unique key `{unique_key_to_check}`, got `{next_unique_key}`"""
+                    f"""Mismatch at index {state.next_index} in persisted requests - Expected unique key `{
+                        unique_key_to_check
+                    }`, got `{next_unique_key}`"""
                 )
 
-        return self._state.current_value
+        # Persisted only after the check above, so that a mismatch doesn't persist requests that the saved position
+        # doesn't fit.
+        if self._persist_requests_key and requests_to_persist is not None:
+            key_value_store = await KeyValueStore.open()
+            await key_value_store.set_value(
+                self._persist_requests_key,
+                requests_to_persist.model_dump(mode='json', by_alias=True),
+                content_type='application/json',
+            )
+
+        # The requests that were in progress when the state was persisted are served again first. An in-progress key
+        # missing among the fetched requests can't be served again, so it's dropped: it's either ahead of `next_index`,
+        # to be fetched anyway, or unknown. Dropping waits for the check above, so a mismatch leaves the record intact.
+        requests_to_retry = {
+            request.unique_key: request for request in fetched_requests if request.unique_key in state.in_progress
+        }
+        if dropped_keys := state.in_progress.difference(requests_to_retry):
+            logger.warning(
+                "RequestList's in-progress field is not consistent, skipping invalid in-progress entries",
+                extra={'delete_from_in_progress': sorted(dropped_keys)},
+            )
+        self._requests_to_retry.extend(requests_to_retry.values())
+        state.in_progress.intersection_update(requests_to_retry)
 
     @property
     def name(self) -> str | None:
@@ -155,37 +175,41 @@ class RequestList(RequestLoader):
 
     @override
     async def get_handled_count(self) -> int:
-        return self._handled_count
+        state = await self._get_state()
+        return state.next_index - len(state.in_progress)
 
     @override
     async def get_total_count(self) -> int:
-        return self._assumed_total_count
+        state = await self._get_state()
+        return state.next_index
 
     @override
     async def get_pending_count(self) -> int:
         # The source is read lazily, so like the total count, this leaves out the requests not fetched yet.
-        return self._assumed_total_count - self._handled_count
+        state = await self._get_state()
+        return len(state.in_progress)
 
     @override
     async def check_readiness(self) -> RequestLoaderStatus:
+        state = await self._get_state()
         await self._ensure_next_request()
-        if self._next[0] is not None:
+        if self._requests_to_retry or self._next[0] is not None:
             return ReadyStatus()
 
-        state = await self._get_state()
         return WaitingStatus() if state.in_progress else FinishedStatus()
 
     @override
     async def fetch_next_request(self) -> Request | None:
-        await self._get_state()
+        state = await self._get_state()
+        if self._requests_to_retry:
+            return self._requests_to_retry.popleft()
+
         await self._ensure_next_request()
 
         if self._next[0] is None:
             return None
 
-        state = await self._get_state()
         state.in_progress.add(self._next[0].unique_key)
-        self._assumed_total_count += 1
 
         next_request = self._next[0]
         if next_request is not None:
@@ -199,13 +223,10 @@ class RequestList(RequestLoader):
 
     @override
     async def mark_request_as_handled(self, request: Request) -> None:
-        self._handled_count += 1
         state = await self._get_state()
         state.in_progress.remove(request.unique_key)
 
     async def _ensure_next_request(self) -> None:
-        await self._get_state()
-
         if self._requests_lock is None:
             self._requests_lock = asyncio.Lock()
 

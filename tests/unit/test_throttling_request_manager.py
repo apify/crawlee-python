@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
 
 import pytest
 
@@ -994,6 +994,51 @@ async def test_purge_clears_requests_and_resets_throttle_state(
     # Transient backoff state is reset.
     assert state.consecutive_429_count == 0
     assert state.throttled_until <= datetime.now(UTC)
+
+
+async def test_processing_time_reaches_every_queue(
+    two_domain_manager: ThrottlingRequestManager[RequestQueue],
+) -> None:
+    """Test that an expected processing time reaches `inner` and every sub-manager, opening them first."""
+    processing_time = timedelta(minutes=10)
+
+    with patch.object(RequestQueue, 'set_expected_request_processing_time', autospec=True) as set_processing_time:
+        await two_domain_manager.set_expected_request_processing_time(processing_time)
+
+    queues = [two_domain_manager.inner, *two_domain_manager._sub_managers.values()]
+    assert len(queues) == 3
+    assert set_processing_time.await_count == len(queues)
+    set_processing_time.assert_has_awaits([call(queue, processing_time) for queue in queues], any_order=True)
+
+
+async def test_extend_routes_to_sub_manager(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """Test that a lock extension goes to the sub-manager the request was fetched from."""
+    await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+    request = await manager.fetch_next_request()
+    assert request is not None
+
+    with patch.object(RequestQueue, 'extend_request_processing_time', autospec=True, return_value=True) as extend:
+        assert await manager.extend_request_processing_time(request, timedelta(minutes=1))
+
+    extend.assert_awaited_once_with(manager._sub_managers[THROTTLED_DOMAIN], request, timedelta(minutes=1))
+
+
+async def test_extend_keeps_inner_routing(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+) -> None:
+    """Test that a lock extension goes to `inner` for a request fetched from it and keeps its completion there."""
+    await inner_queue.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+    request = await manager.fetch_next_request()
+    assert request is not None
+
+    with patch.object(RequestQueue, 'extend_request_processing_time', autospec=True, return_value=True) as extend:
+        assert await manager.extend_request_processing_time(request, timedelta(minutes=1))
+
+    extend.assert_awaited_once_with(inner_queue, request, timedelta(minutes=1))
+
+    await manager.mark_request_as_handled(request)
+    assert (await inner_queue.check_readiness()).status == 'finished'
 
 
 async def test_sub_managers_opened_for_every_configured_domain(
