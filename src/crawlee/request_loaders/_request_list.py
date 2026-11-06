@@ -4,7 +4,7 @@ import asyncio
 from collections import deque
 from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Iterable
 from logging import getLogger
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from pydantic.alias_generators import to_camel
@@ -17,17 +17,27 @@ from crawlee.request_loaders._request_loader import RequestLoader
 from ._types import FinishedStatus, ReadyStatus, WaitingStatus
 
 if TYPE_CHECKING:
+    from types import TracebackType
+
     from ._types import RequestLoaderStatus
 
 logger = getLogger(__name__)
 
 
+@docs_group('Request loaders')
 class RequestListState(BaseModel):
+    """The crawling position of a `RequestList`, as returned by `RequestList.get_state`."""
+
     model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, validate_by_alias=True)
 
     next_index: Annotated[int, Field(ge=0)] = 0
+    """The number of requests fetched from the list."""
+
     next_unique_key: str | None = None
+    """The unique key of the request at `next_index`, used to check that the list hasn't changed."""
+
     in_progress: set[str] = set()
+    """The unique keys of the fetched requests that haven't been handled yet."""
 
 
 class RequestListData(BaseModel):
@@ -45,6 +55,7 @@ class RequestList(RequestLoader):
         name: str | None = None,
         persist_state_key: str | None = None,
         persist_requests_key: str | None = None,
+        state: RequestListState | None = None,
     ) -> None:
         """Initialize a new instance.
 
@@ -57,6 +68,8 @@ class RequestList(RequestLoader):
             persist_requests_key: A key for persisting the request data loaded from the `requests` iterator.
                 If specified, the request data will be stored in the KeyValueStore to make sure that they don't change
                 over time. This is useful if the `requests` iterator pulls the data dynamically.
+            state: The crawling position to start from when there is no persisted state to restore, such as one
+                returned by `get_state`.
         """
         from crawlee._utils.recoverable_state import RecoverableState  # noqa: PLC0415
 
@@ -68,8 +81,9 @@ class RequestList(RequestLoader):
         if persist_state_key is None and name is not None:
             persist_state_key = f'SDK_REQUEST_LIST_STATE-{name}'
 
+        self._persist_state_key = persist_state_key
         self._state = RecoverableState(
-            default_state=RequestListState(),
+            default_state=state if state is not None else RequestListState(),
             persistence_enabled=bool(persist_state_key),
             persist_state_key=persist_state_key or '',
             logger=logger,
@@ -87,14 +101,33 @@ class RequestList(RequestLoader):
 
         self._requests_lock: asyncio.Lock | None = None
         self._initialized = False
+        self._closed = False
         self._initialize_lock = asyncio.Lock()
+
+    async def __aenter__(self) -> Self:
+        """Enter the context manager."""
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
+        """Exit the context manager and close the request list."""
+        await self.close()
 
     async def _get_state(self) -> RequestListState:
         if not self._initialized:
             async with self._initialize_lock:
                 if not self._initialized:
-                    await self._initialize()
-                    self._initialized = True
+                    try:
+                        await self._initialize()
+                        self._initialized = True
+                    finally:
+                        # A list closed before its first use had no listener to remove then, so it's removed right away.
+                        if self._closed:
+                            await self._state.teardown()
 
         return self._state.current_value
 
@@ -225,6 +258,37 @@ class RequestList(RequestLoader):
     async def mark_request_as_handled(self, request: Request) -> None:
         state = await self._get_state()
         state.in_progress.remove(request.unique_key)
+
+    async def get_state(self) -> RequestListState:
+        """Return a copy of the crawling position, which the `state` option of another request list accepts."""
+        state = await self._get_state()
+        return state.model_copy(deep=True)
+
+    async def persist_state(self) -> None:
+        """Persist the crawling position to the key-value store, logging a failed write.
+
+        Raises:
+            RuntimeError: If the request list has no `persist_state_key`.
+        """
+        if not self._persist_state_key:
+            raise RuntimeError('Cannot persist state. `persist_state_key` is not set.')
+
+        # Loads the persisted record first, so that a call before the first use writes the restored position.
+        await self._get_state()
+
+        try:
+            await self._state.persist_state()
+        except Exception:
+            logger.exception('Attempted to persist state, but failed.')
+
+    async def close(self) -> None:
+        """Stop persisting the crawling position on PERSIST_STATE events and persist it one last time.
+
+        Call this, or use the request list as an async context manager, once you're done with it, so that it doesn't
+        stay registered on the event manager.
+        """
+        self._closed = True
+        await self._state.teardown()
 
     async def _ensure_next_request(self) -> None:
         if self._requests_lock is None:

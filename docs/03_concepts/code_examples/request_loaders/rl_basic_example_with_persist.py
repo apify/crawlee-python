@@ -19,7 +19,8 @@ configuration.purge_on_start = False
 async def main() -> None:
     # Open the request list, if it does not exist, it will be created.
     # Leave name empty to use the default request list.
-    request_list = RequestList(
+    # Leaving the context persists the state of the request list.
+    async with RequestList(
         name='my-request-list',
         requests=[
             'https://apify.com/',
@@ -29,17 +30,17 @@ async def main() -> None:
         # Enable persistence
         persist_state_key='my-persist-state',
         persist_requests_key='my-persist-requests',
-    )
+    ) as request_list:
+        # We receive only one request.
+        # Each time you run it, it will be a new request
+        # until you exhaust the `RequestList`.
+        request = await request_list.fetch_next_request()
+        if request:
+            logger.info('Processing request: %s', request.url)
+            # Do something with it...
 
-    # We receive only one request.
-    # Each time you run it, it will be a new request until you exhaust the `RequestList`.
-    request = await request_list.fetch_next_request()
-    if request:
-        logger.info('Processing request: %s', request.url)
-        # Do something with it...
-
-        # And mark it as handled.
-        await request_list.mark_request_as_handled(request)
+            # And mark it as handled.
+            await request_list.mark_request_as_handled(request)
 
 
 if __name__ == '__main__':
