@@ -118,7 +118,9 @@ class RequestList(RequestLoader):
                             continue
                         requests_data.requests.append(request)
                     await key_value_store.set_value(
-                        self._persist_requests_key, requests_data.model_dump(mode='json', by_alias=True)
+                        self._persist_requests_key,
+                        requests_data.model_dump(mode='json', by_alias=True),
+                        content_type='application/json',
                     )
                 else:
                     requests_data = RequestListData.model_validate(persisted_requests)

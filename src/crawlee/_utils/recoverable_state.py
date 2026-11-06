@@ -12,12 +12,13 @@ from crawlee.events._types import Event, EventPersistStateData
 
 if TYPE_CHECKING:
     import logging
-    from collections.abc import Callable, Coroutine
+    from collections.abc import Awaitable, Callable, Coroutine
 
     from crawlee.events import EventManager
     from crawlee.storages import KeyValueStore
 
 TStateModel = TypeVar('TStateModel', bound=BaseModel)
+T = TypeVar('T')
 
 
 class RecoverableState(Generic[TStateModel]):
@@ -81,7 +82,6 @@ class RecoverableState(Generic[TStateModel]):
         self._state: TStateModel | None = None
         self._initialized = False
         self._record_loaded = False
-        self._listening = False
         self._lock = asyncio.Lock()
         self._persistence_enabled = persistence_enabled
         self._persist_state_key = persist_state_key
@@ -125,7 +125,6 @@ class RecoverableState(Generic[TStateModel]):
             # Registered only after a successful load, so that a failed one leaves no listener behind.
             if self._persistence_enabled:
                 self._event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state_quietly)
-                self._listening = True
 
             self._initialized = True
             return self.current_value
@@ -144,7 +143,6 @@ class RecoverableState(Generic[TStateModel]):
                 return
 
             self._event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state_quietly)
-            self._listening = False
             await self._persist_state_quietly()
 
     @property
@@ -178,24 +176,20 @@ class RecoverableState(Generic[TStateModel]):
         """
         # The lock makes a call during a load wait for the listener that the load registers.
         async with self._lock:
-            if self._listening:
+            if not self._persistence_enabled:
+                return
+
+            if self._initialized:
                 raise RuntimeError(
                     f"Cannot clear the state persisted under key '{self._persist_state_key}' while it is still being "
                     'persisted periodically - the next PERSIST_STATE event would write it straight back. Use reset() '
                     'to reset the state itself, or teardown() before clearing the record.'
                 )
 
-            if not self._persistence_enabled:
-                return
-
             key_value_store = await self._open_key_value_store()
 
-            await wait_for(
-                lambda: key_value_store.set_value(self._persist_state_key, None),
-                timeout=self._persistence_timeout,
-                timeout_message=f"Clearing the persisted state under key '{self._persist_state_key}' timed out after "
-                f'{self._persistence_timeout.total_seconds():g} seconds.',
-                logger=self._log,
+            await self._with_timeout(
+                lambda: key_value_store.set_value(self._persist_state_key, None), 'Clearing the persisted state'
             )
 
     async def persist_state(self, event_data: EventPersistStateData | None = None) -> None:
@@ -218,16 +212,13 @@ class RecoverableState(Generic[TStateModel]):
 
         key_value_store = await self._open_key_value_store()
 
-        await wait_for(
+        await self._with_timeout(
             lambda: key_value_store.set_value(
                 self._persist_state_key,
                 self.current_value.model_dump(mode='json', by_alias=True),
                 content_type='application/json',
             ),
-            timeout=self._persistence_timeout,
-            timeout_message=f"Persisting the state under key '{self._persist_state_key}' timed out after "
-            f'{self._persistence_timeout.total_seconds():g} seconds.',
-            logger=self._log,
+            'Persisting the state',
         )
 
     @property
@@ -253,12 +244,8 @@ class RecoverableState(Generic[TStateModel]):
         stored_state = None
         if self._persistence_enabled:
             key_value_store = await self._open_key_value_store()
-            stored_state = await wait_for(
-                lambda: key_value_store.get_value(self._persist_state_key),
-                timeout=self._persistence_timeout,
-                timeout_message=f"Loading the persisted state under key '{self._persist_state_key}' timed out after "
-                f'{self._persistence_timeout.total_seconds():g} seconds.',
-                logger=self._log,
+            stored_state = await self._with_timeout(
+                lambda: key_value_store.get_value(self._persist_state_key), 'Loading the persisted state'
             )
 
         if stored_state is not None:
@@ -276,3 +263,12 @@ class RecoverableState(Generic[TStateModel]):
         # Set only once the load succeeds. A load that fails, is cancelled or finds an invalid record leaves the object
         # unwired, so that nothing is persisted over the record, and the next call loads it again.
         self._record_loaded = True
+
+    async def _with_timeout(self, operation: Callable[[], Awaitable[T]], description: str) -> T:
+        return await wait_for(
+            operation,
+            timeout=self._persistence_timeout,
+            timeout_message=f"{description} under key '{self._persist_state_key}' timed out after "
+            f'{self._persistence_timeout.total_seconds():g} seconds.',
+            logger=self._log,
+        )

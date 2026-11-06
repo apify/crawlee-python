@@ -423,6 +423,18 @@ async def test_reset_store_before_initialize_clears_record() -> None:
     await recoverable_state.teardown()
 
 
+async def test_reset_store_without_persistence_does_nothing() -> None:
+    """`reset_store` without persistence neither raises between `initialize` and `teardown` nor clears the record."""
+    kvs = await KeyValueStore.open()
+    await kvs.set_value(KEY, {'counter': 42, 'message': 'hello'})
+    recoverable_state = _build_state(persistence_enabled=False)
+    await recoverable_state.initialize()
+
+    await recoverable_state.reset_store()
+
+    assert await kvs.get_value(KEY) == {'counter': 42, 'message': 'hello'}
+
+
 async def test_persist_state_before_initialize_does_nothing() -> None:
     """`persist_state` before `initialize` writes nothing."""
     kvs = await KeyValueStore.open()
