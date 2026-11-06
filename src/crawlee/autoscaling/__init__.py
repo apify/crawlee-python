@@ -6,6 +6,7 @@ from ._load_signal import LoadSignalStartContext, LoadSnapshot, SnapshotStore
 from ._memory_load_signal import MemoryLoadSignal, MemoryLoadSignalOptions
 from ._snapshotter import LoadSignalsOptions
 from ._storage_backend_load_signal import StorageBackendLoadSignal, StorageBackendLoadSignalOptions
+from ._throughput_concurrency_system import ThroughputConcurrencySystem
 from ._types import ConcurrencyConsumer, LoadRatioInfo, SystemInfo
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     'StorageBackendLoadSignal',
     'StorageBackendLoadSignalOptions',
     'SystemInfo',
+    'ThroughputConcurrencySystem',
 ]

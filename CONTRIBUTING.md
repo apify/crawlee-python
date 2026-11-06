@@ -71,6 +71,17 @@ uv run poe e2e-templates-tests
 - Write only ASCII in source files: `->` instead of an arrow, `-` instead of a dash, straight quotes.
 - Write `RQ` for the request queue. Log messages and public `.mdx` docs spell out the full term.
 
+### Logging
+
+- Modules log to `getLogger(__name__)`. Crawlers and their components log to the crawler's logger (`crawler.log`) or its children.
+- In a DEBUG line about a request, keep the message short and pass the request context as `extra=request_log_extra(request)` from `crawlee._utils.log`.
+- Pick the level by who needs to act:
+  - `ERROR`: a request failed for good, or the crawler can't go on.
+  - `WARNING`: a retry, a recoverable problem, or a likely misconfiguration. Warn once with `LoggerOnce` when the condition repeats for every request.
+  - `INFO`: the crawler's lifecycle: start, finish, final statistics, and the periodic status. Never one line per request.
+  - `DEBUG`: the life of a single request and internal decisions. Nothing that repeats on a timer while the crawler is idle.
+- Log an exception once, where it's handled. Use `logger.exception()` inside an `except` block, and don't log an error you re-raise unless the message adds what the traceback can't.
+
 ### Tests
 
 - Write flat `def test_*()` functions, never `class Test*`, and no section-header comments between tests.
