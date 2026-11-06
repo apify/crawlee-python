@@ -500,3 +500,38 @@ async def test_close_persists_state_and_stops_listening() -> None:
         await event_manager.wait_for_all_listeners_to_complete()
 
         assert (await kvs.get_value('state'))['nextIndex'] == 1
+
+
+async def test_close_before_first_use_stops_listening() -> None:
+    """A list closed before its first use doesn't persist on PERSIST_STATE events once it's used."""
+    async with EventManager() as event_manager:
+        service_locator.set_event_manager(event_manager)
+        kvs = await KeyValueStore.open()
+        request_list = RequestList(URLS, persist_state_key='state')
+        await request_list.close()
+
+        await request_list.fetch_next_request()
+        event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
+        await event_manager.wait_for_all_listeners_to_complete()
+
+        assert (await kvs.get_value('state'))['nextIndex'] == 0
+
+
+async def test_close_before_failed_first_use_stops_listening(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A list closed before a first use that fails doesn't persist on PERSIST_STATE events."""
+    async with EventManager() as event_manager:
+        service_locator.set_event_manager(event_manager)
+        kvs = await KeyValueStore.open()
+        state = RequestListState(next_index=1, next_unique_key='https://unknown.placeholder.com')
+        request_list = RequestList(URLS, persist_state_key='state', state=state)
+        await request_list.close()
+
+        with pytest.raises(RuntimeError, match='Mismatch at index 1'):
+            await request_list.fetch_next_request()
+
+        set_value = AsyncMock()
+        monkeypatch.setattr(kvs, 'set_value', set_value)
+        event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
+        await event_manager.wait_for_all_listeners_to_complete()
+
+        set_value.assert_not_called()

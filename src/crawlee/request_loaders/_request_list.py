@@ -101,6 +101,7 @@ class RequestList(RequestLoader):
 
         self._requests_lock: asyncio.Lock | None = None
         self._initialized = False
+        self._closed = False
         self._initialize_lock = asyncio.Lock()
 
     async def __aenter__(self) -> Self:
@@ -120,8 +121,13 @@ class RequestList(RequestLoader):
         if not self._initialized:
             async with self._initialize_lock:
                 if not self._initialized:
-                    await self._initialize()
-                    self._initialized = True
+                    try:
+                        await self._initialize()
+                        self._initialized = True
+                    finally:
+                        # A list closed before its first use had no listener to remove then, so it's removed right away.
+                        if self._closed:
+                            await self._state.teardown()
 
         return self._state.current_value
 
@@ -278,6 +284,7 @@ class RequestList(RequestLoader):
         Call this, or use the request list as an async context manager, once you're done with it, so that it doesn't
         stay registered on the event manager.
         """
+        self._closed = True
         await self._state.teardown()
 
     async def _ensure_next_request(self) -> None:
