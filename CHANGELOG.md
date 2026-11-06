@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Stop truncating fractional robots.txt crawl-delay to an integer ([#2392](https://github.com/apify/crawlee-python/pull/2392)) ([fa386bb](https://github.com/apify/crawlee-python/commit/fa386bb5a54d641cefbe40b72a61c6ced97a3e87)) by [@RaphaelFakhri](https://github.com/RaphaelFakhri), closes [#2391](https://github.com/apify/crawlee-python/issues/2391)
 - Fit the default `desired_concurrency` within `min_concurrency` and `max_concurrency` ([#2397](https://github.com/apify/crawlee-python/pull/2397)) ([b71d5af](https://github.com/apify/crawlee-python/commit/b71d5afb8ee888b5d12d0a47519038d3040a10e5)) by [@PrashanthLande](https://github.com/PrashanthLande)
+- Pass the crawler state to the rendering type detection run of `AdaptivePlaywrightCrawler` ([#2417](https://github.com/apify/crawlee-python/pull/2417)) ([4d3f989](https://github.com/apify/crawlee-python/commit/4d3f989ed0c435a391a876b7fea1120dc9474646)) by [@Mantisus](https://github.com/Mantisus)
 
 
 <!-- git-cliff-unreleased-end -->
