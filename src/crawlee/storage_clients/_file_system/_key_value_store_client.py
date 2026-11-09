@@ -373,11 +373,11 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         if not self.path_to_kvs.exists():
             return
 
-        # List and sort all files *inside* a brief lock, then release it immediately:
+        # List all files *inside* a brief lock, then release it immediately:
         async with self._lock:
-            files = sorted(await asyncio.to_thread(lambda: list(self.path_to_kvs.glob('*'))))
+            files = await asyncio.to_thread(lambda: list(self.path_to_kvs.glob('*')))
 
-        count = 0
+        records: list[KeyValueStoreRecordMetadata] = []
 
         for file_path in files:
             # Skip the main metadata file
@@ -390,10 +390,6 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
 
             # Extract the base key name from the metadata filename
             key_name = self._decode_key(file_path.name[: -len(f'.{METADATA_FILENAME}')])
-
-            # Apply exclusive_start_key filter if provided
-            if exclusive_start_key is not None and key_name <= exclusive_start_key:
-                continue
 
             # Try to read and parse the metadata file
             try:
@@ -412,10 +408,16 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
                 record_metadata = KeyValueStoreRecordMetadata(**metadata_dict)
             except ValidationError:
                 logger.warning(f'Invalid metadata schema for key "{key_name}", skipping it.')
+                continue
 
+            if exclusive_start_key is not None and record_metadata.key <= exclusive_start_key:
+                continue
+
+            records.append(record_metadata)
+
+        for count, record_metadata in enumerate(sorted(records, key=lambda record: record.key), start=1):
             yield record_metadata
 
-            count += 1
             if limit and count >= limit:
                 break
 
