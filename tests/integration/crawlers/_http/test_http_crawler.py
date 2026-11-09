@@ -13,7 +13,7 @@ from crawlee import ConcurrencySettings, Request, RequestState
 from crawlee.crawlers import HttpCrawler
 from crawlee.errors import PersistentRateLimitError
 from crawlee.request_loaders import ThrottlingRequestManager, _throttling_request_manager
-from crawlee.sessions import SessionPool
+from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storages import RequestQueue
 from tests.integration.server_endpoints import HELLO_WORLD
@@ -211,14 +211,14 @@ async def test_stores_cookies(http_client: HttpClient, server_url: URL) -> None:
 async def test_session_reuse_strategy(
     http_client: HttpClient, server_url: URL, session_reuse_strategy: SessionReuseStrategy
 ) -> None:
-    """Apply session selection and usage limits while processing real local HTTP requests."""
+    """Continue session rotation across exhausted pools while processing real local HTTP requests."""
     used_session_ids: list[str] = []
+    sessions = [Session(max_usage_count=2) for _ in range(9)]
     async with SessionPool(
         max_pool_size=3,
         session_reuse_strategy=session_reuse_strategy,
-        create_session_settings={'max_usage_count': 3},
+        create_session_function=Mock(side_effect=sessions),
     ) as pool:
-        session_ids = list(pool.get_state(as_dict=False).sessions)
         crawler = HttpCrawler(
             session_pool=pool,
             http_client=http_client,
@@ -231,12 +231,13 @@ async def test_session_reuse_strategy(
             assert context.http_response.status_code == 200
             used_session_ids.append(context.session.id)
 
-        statistics = await crawler.run([str(server_url.with_query(request=index)) for index in range(7)])
-        assert statistics.requests_finished == 7
+        statistics = await crawler.run([str(server_url.with_query(request=index)) for index in range(14)])
+        assert statistics.requests_finished == 14
         if session_reuse_strategy == 'round-robin':
-            assert used_session_ids == [session_ids[index % 3] for index in range(7)]
+            expected_sessions = sessions[:3] * 2 + sessions[3:6] * 2 + sessions[6:8]
         else:
-            assert used_session_ids == [session_ids[index // 3] for index in range(7)]
+            expected_sessions = [session for session in sessions[:7] for _ in range(2)]
+        assert used_session_ids == [session.id for session in expected_sessions]
 
 
 async def test_do_not_retry_on_client_errors(crawler: HttpCrawler, server_url: URL) -> None:

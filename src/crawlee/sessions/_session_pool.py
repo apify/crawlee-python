@@ -207,7 +207,10 @@ class SessionPool:
 
         # If the selected session is not usable, clean up and create a new session
         self._remove_retired_sessions()
-        return await self._create_new_session()
+        session = await self._create_new_session()
+        if self._session_reuse_strategy == 'round-robin' and self.session_count == 1:
+            self._round_robin_index = 1
+        return session
 
     @ensure_context
     async def get_session_by_id(self, session_id: str) -> Session | None:

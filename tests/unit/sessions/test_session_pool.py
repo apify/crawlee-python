@@ -236,8 +236,18 @@ async def test_session_reuse_all_unusable(session_reuse_strategy: SessionReuseSt
         assert replacement.is_usable
         assert replacement.id not in session_ids
         assert pool.session_count == 1
-        assert (await pool.get_session()).is_usable
+        next_session = await pool.get_session()
+        assert next_session.is_usable
         assert pool.session_count == MAX_POOL_SIZE
+        if session_reuse_strategy == 'round-robin':
+            refilled_session_ids = list(pool.get_state(as_dict=False).sessions)
+            assert next_session.id == refilled_session_ids[1]
+            assert [(await pool.get_session()).id for _ in range(MAX_POOL_SIZE - 1)] == [
+                *refilled_session_ids[2:],
+                replacement.id,
+            ]
+        elif session_reuse_strategy == 'use-until-failure':
+            assert next_session is replacement
 
 
 async def test_session_reuse_reset_and_reopen(session_reuse_strategy: SessionReuseStrategy) -> None:
