@@ -52,6 +52,7 @@ class CrawlerRun(Generic[TStatisticsState]):
         )
         self._logger_once = LoggerOnce(logger)
         self._stop_requested = False
+        self._dispatching = False
         self._finished = False
         self._wake_at: datetime | None = None
         self._wake_timer: asyncio.TimerHandle | None = None
@@ -71,13 +72,31 @@ class CrawlerRun(Generic[TStatisticsState]):
         return not self._finished
 
     @property
+    def is_dispatching(self) -> bool:
+        """Whether the task loop is dispatching requests. Pausing a run before then would keep it from ever starting."""
+        return self._dispatching
+
+    @property
     def stop_requested(self) -> bool:
         """Whether a graceful shutdown of this run has been requested."""
         return self._stop_requested
 
     async def dispatch_requests(self) -> None:
         """Run the task loop until the crawl is over. The concurrency system has to be active by now."""
-        await self._autoscaled_pool.run()
+        self._dispatching = True
+
+        try:
+            await self._autoscaled_pool.run()
+        finally:
+            self._dispatching = False
+
+    async def pause(self, *, timeout: timedelta | None = None) -> None:
+        """Stop dispatching new requests and wait until the ones in progress finish."""
+        await self._autoscaled_pool.pause(timeout=timeout)
+
+    def resume(self) -> None:
+        """Resume dispatching after `pause`."""
+        self._autoscaled_pool.resume()
 
     def schedule_wake(self, ready_at: datetime) -> None:
         """Wake the task loop at `ready_at`, unless an earlier wake-up is already scheduled.
