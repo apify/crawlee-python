@@ -9,7 +9,6 @@ async def main() -> None:
         # Optional additional keyword arguments for `impit.AsyncClient`.
         http3=True,
         browser='firefox',
-        verify=True,
     )
 
     crawler = ParselCrawler(

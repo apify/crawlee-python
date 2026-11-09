@@ -408,7 +408,7 @@ async def test_sessions_share_one_client(http_client: HttpClient, server_url: UR
         async with await http_client.send_request(str(server_url / 'cookies'), session=Session()):
             pass
 
-    assert len(http_client._client_by_proxy_url) == 1  # ty: ignore[unresolved-attribute]
+    assert len(http_client._clients) == 1  # ty: ignore[unresolved-attribute]
 
 
 async def test_cookies_isolated_per_session(http_client: HttpClient, server_url: URL) -> None:

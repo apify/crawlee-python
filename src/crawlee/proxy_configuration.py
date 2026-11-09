@@ -44,6 +44,10 @@ class ProxyInfo:
     """The identifier of the used proxy session, if used.
     Using the same session ID guarantees getting the same proxy URL."""
 
+    ignore_tls_errors: bool = False
+    """Whether the proxy intercepts HTTPS traffic, so that `HttpClient.send_request` and the browser contexts of
+    `PlaywrightBrowserController` ignore TLS certificate errors for the requests sent through it."""
+
 
 @docs_group('Configuration')
 class ProxyConfiguration:

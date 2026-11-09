@@ -156,7 +156,7 @@ async def test_own_cookie_jar_stays_empty(server_url: URL) -> None:
         async with await client.send_request(str((server_url / 'set_cookies').with_query(a='1')), session=session):
             pass
 
-        assert list(client._get_client(None).cookies.jar) == []
+        assert list(client._get_client(None, ignore_tls_errors=False).cookies.jar) == []
 
     assert {item['name'] for item in session.cookies.get_cookies_as_dicts()} == {'a'}
 
