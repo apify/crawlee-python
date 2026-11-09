@@ -234,3 +234,19 @@ async def test_close_before_first_use_stops_listening(monkeypatch: pytest.Monkey
         await event_manager.wait_for_all_listeners_to_complete()
 
         set_value.assert_not_called()
+
+
+async def test_persist_state_writes_record(key_value_store: KeyValueStore) -> None:
+    """`persist_state()` writes the state with the in-progress request to the key-value store."""
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    client, _ = make_status_stream_client({sitemap_url: [(200, get_basic_sitemap().encode())]})
+    loader = SitemapRequestLoader([sitemap_url], http_client=client, persist_state_key='sitemap-state')
+    request = await loader.fetch_next_request()
+    assert request is not None
+
+    await loader.persist_state()
+    record = await key_value_store.get_value('sitemap-state')
+    await loader.close()
+
+    assert record['inProgress'] == [request.url]
+    assert list(record['requestData']) == [request.url]
