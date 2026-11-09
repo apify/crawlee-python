@@ -45,6 +45,9 @@ RequestTransformAction = Literal['skip', 'unchanged']
 EnqueueStrategy = Literal['all', 'same-domain', 'same-hostname', 'same-origin']
 """Enqueue strategy to be used for determining which links to extract and enqueue."""
 
+SessionReuseStrategy = Literal['random', 'round-robin', 'use-until-failure']
+"""Strategy for selecting sessions to reuse from a session pool."""
+
 SkippedReason = Literal['robots_txt']
 
 LogLevel = Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']

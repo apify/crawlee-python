@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
     from yarl import URL
 
+    from crawlee import SessionReuseStrategy
     from crawlee._types import BasicCrawlingContext
     from crawlee.crawlers import HttpCrawlingContext
     from crawlee.http_clients import HttpClient
@@ -201,6 +202,41 @@ async def test_stores_cookies(http_client: HttpClient, server_url: URL) -> None:
             'b': '2',
             'c': '3',
         }
+
+
+@pytest.mark.parametrize(
+    'session_reuse_strategy',
+    [pytest.param('round-robin', id='round-robin'), pytest.param('use-until-failure', id='use-until-failure')],
+)
+async def test_session_reuse_strategy(
+    http_client: HttpClient, server_url: URL, session_reuse_strategy: SessionReuseStrategy
+) -> None:
+    """Apply session selection and usage limits while processing real local HTTP requests."""
+    used_session_ids: list[str] = []
+    async with SessionPool(
+        max_pool_size=3,
+        session_reuse_strategy=session_reuse_strategy,
+        create_session_settings={'max_usage_count': 3},
+    ) as pool:
+        session_ids = list(pool.get_state(as_dict=False).sessions)
+        crawler = HttpCrawler(
+            session_pool=pool,
+            http_client=http_client,
+            concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+        )
+
+        @crawler.router.default_handler
+        async def handler(context: HttpCrawlingContext) -> None:
+            assert context.session is not None
+            assert context.http_response.status_code == 200
+            used_session_ids.append(context.session.id)
+
+        statistics = await crawler.run([str(server_url.with_query(request=index)) for index in range(7)])
+        assert statistics.requests_finished == 7
+        if session_reuse_strategy == 'round-robin':
+            assert used_session_ids == [session_ids[index % 3] for index in range(7)]
+        else:
+            assert used_session_ids == [session_ids[index // 3] for index in range(7)]
 
 
 async def test_do_not_retry_on_client_errors(crawler: HttpCrawler, server_url: URL) -> None:

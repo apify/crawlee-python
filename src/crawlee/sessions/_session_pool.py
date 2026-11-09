@@ -17,6 +17,7 @@ from crawlee.sessions._models import SessionPoolModel
 if TYPE_CHECKING:
     from types import TracebackType
 
+    from crawlee import SessionReuseStrategy
     from crawlee.events import EventManager
 
 logger = getLogger(__name__)
@@ -37,6 +38,7 @@ class SessionPool:
         self,
         *,
         max_pool_size: int = 1000,
+        session_reuse_strategy: SessionReuseStrategy = 'random',
         create_session_settings: dict | None = None,
         create_session_function: CreateSessionFunctionType | None = None,
         event_manager: EventManager | None = None,
@@ -49,6 +51,10 @@ class SessionPool:
         Args:
             max_pool_size: Maximum number of sessions to maintain in the pool. You can add more sessions to the pool
                 by using the `add_session` method.
+            session_reuse_strategy: How to select sessions for reuse. 'random' selects a random session (default),
+                'round-robin' cycles through sessions in insertion order, and 'use-until-failure' reuses the first
+                usable session until it is retired, expires, or reaches its usage or error limit. Selection restarts
+                when the pool is reopened or reset; the selection position is not persisted.
             create_session_settings: Settings for creating new session instances. If None, default settings will
                 be used. Do not set it if you are providing a `create_session_function`.
             create_session_function: A callable to create new session instances. If None, a default session settings
@@ -58,6 +64,9 @@ class SessionPool:
             persist_state_kvs_name: The name of the `KeyValueStore` used for state persistence.
             persist_state_key: The key under which the session pool's state is stored in the `KeyValueStore`.
         """
+        if session_reuse_strategy not in ('random', 'round-robin', 'use-until-failure'):
+            raise ValueError(f'Invalid session reuse strategy: {session_reuse_strategy!r}.')
+
         if event_manager:
             service_locator.set_event_manager(event_manager)
 
@@ -73,6 +82,8 @@ class SessionPool:
         )
 
         self._max_pool_size = max_pool_size
+        self._session_reuse_strategy = session_reuse_strategy
+        self._round_robin_index = 0
         self._session_settings = create_session_settings or {}
         self._create_session_function = create_session_function
         self._persistence_enabled = persistence_enabled
@@ -120,6 +131,7 @@ class SessionPool:
 
         state = await self._state.initialize()
         state.max_pool_size = self._max_pool_size
+        self._round_robin_index = 0
         self._remove_retired_sessions()
 
         if not state.sessions:
@@ -178,21 +190,22 @@ class SessionPool:
 
     @ensure_context
     async def get_session(self) -> Session:
-        """Retrieve a random session from the pool.
+        """Retrieve a session according to the configured reuse strategy.
 
-        This method first ensures the session pool is at its maximum capacity. If the random session is not usable,
-        retired sessions are removed and a new session is created and returned.
+        This method first ensures the session pool is at its maximum capacity. If the selected session is not usable,
+        retired sessions are removed and a new session is created and returned. With 'use-until-failure', existing
+        usable sessions are preferred before creating a replacement.
 
         Returns:
             The session object.
         """
         await self._fill_sessions_to_max()
-        session = self._get_random_session()
+        session = self._pick_session()
 
-        if session.is_usable:
+        if session is not None and session.is_usable:
             return session
 
-        # If the random session is not usable, clean up and create a new session
+        # If the selected session is not usable, clean up and create a new session
         self._remove_retired_sessions()
         return await self._create_new_session()
 
@@ -225,6 +238,7 @@ class SessionPool:
     async def reset_store(self) -> None:
         """Reset the KVS where the pool state is persisted."""
         await self._state.reset()
+        self._round_robin_index = 0
 
     async def _create_new_session(self) -> Session:
         """Create a new session, add it to the pool and return it."""
@@ -247,7 +261,27 @@ class SessionPool:
             raise ValueError('No sessions available in the pool.')
         return random.choice(list(state.sessions.values()))
 
+    def _pick_session(self) -> Session | None:
+        """Select a session using the configured reuse strategy."""
+        if self._session_reuse_strategy == 'random':
+            return self._get_random_session()
+
+        sessions = list(self._state.current_value.sessions.values())
+        if self._session_reuse_strategy == 'use-until-failure':
+            return next((session for session in sessions if session.is_usable), None)
+
+        if not sessions:
+            return None
+        index = self._round_robin_index % len(sessions)
+        self._round_robin_index = index + 1
+        return sessions[index]
+
     def _remove_retired_sessions(self) -> None:
         """Remove all sessions from the pool that are no longer usable."""
         state = self._state.current_value
+        if self._session_reuse_strategy == 'round-robin':
+            sessions = list(state.sessions.values())
+            self._round_robin_index = sum(session.is_usable for session in sessions[: self._round_robin_index])
         state.sessions = {session.id: session for session in state.sessions.values() if session.is_usable}
+        if self._session_reuse_strategy == 'round-robin':
+            self._round_robin_index %= max(1, len(state.sessions))
