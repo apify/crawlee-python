@@ -454,7 +454,7 @@ class MyHttpClient(HttpClient):
 
 `RequestManagerTandem.get_total_count` no longer counts a request twice once it moves from the loader to the manager. In v1, it added up the totals of both, so the crawler's status message showed too many pages in total.
 
-## `SitemapRequestLoader.mark_request_as_handled` raises for an unknown request
+## `SitemapRequestLoader.mark_request_as_handled` raises for a request it isn't processing
 
 `SitemapRequestLoader.mark_request_as_handled` now raises a `ValueError` for a request that the loader isn't processing, such as one it never returned or one that's already handled. Crawlee JS raises in the same case. In v1, such a call did nothing.
 

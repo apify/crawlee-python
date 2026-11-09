@@ -248,6 +248,47 @@ async def test_mark_handled_twice_raises() -> None:
     assert await loader.get_handled_count() == 1
 
 
+async def test_duplicate_url_skipped_while_in_progress() -> None:
+    """A URL listed again by another sitemap isn't served while its request is still in progress."""
+    sitemap_body = f'<urlset><url><loc>{DEFAULT_URL}page</loc></url></urlset>'.encode()
+    sitemap_urls = [f'{DEFAULT_URL}sitemap-1.xml', f'{DEFAULT_URL}sitemap-2.xml']
+    client, _ = make_status_stream_client({url: [(200, sitemap_body)] for url in sitemap_urls})
+    loader = SitemapRequestLoader(sitemap_urls, http_client=client)
+
+    request = await loader.fetch_next_request()
+    assert request is not None
+    duplicate = await loader.fetch_next_request()
+    await loader.mark_request_as_handled(request)
+
+    assert duplicate is None
+    assert await loader.get_total_count() == 1
+    assert await loader.get_handled_count() == 1
+
+
+async def test_restored_request_served_once_for_duplicate_url() -> None:
+    """A request restored as in progress isn't served again for the same URL listed by another sitemap."""
+    sitemap_body = f'<urlset><url><loc>{DEFAULT_URL}page</loc></url></urlset>'.encode()
+    sitemap_urls = [f'{DEFAULT_URL}sitemap-1.xml', f'{DEFAULT_URL}sitemap-2.xml']
+    client, _ = make_status_stream_client({url: [(200, sitemap_body)] for url in sitemap_urls})
+    loader = SitemapRequestLoader(sitemap_urls, http_client=client, persist_state_key='sitemap-state')
+    request = await loader.fetch_next_request()
+    assert request is not None
+    # The second sitemap queues the URL again while its request is in progress.
+    assert await poll_until_condition(loader.get_pending_count, lambda count: count == 2) == 2
+    await loader.close()
+
+    restored_loader = SitemapRequestLoader(sitemap_urls, http_client=client, persist_state_key='sitemap-state')
+    restored_request = await restored_loader.fetch_next_request()
+    duplicate = await restored_loader.fetch_next_request()
+    total_count = await restored_loader.get_total_count()
+    await restored_loader.close()
+
+    assert restored_request is not None
+    assert restored_request.url == request.url
+    assert duplicate is None
+    assert total_count == 1
+
+
 async def test_close_before_first_use_stops_listening(monkeypatch: pytest.MonkeyPatch) -> None:
     """A loader closed before its first use doesn't persist on PERSIST_STATE events once it's used."""
     sitemap_url = f'{DEFAULT_URL}sitemap.xml'

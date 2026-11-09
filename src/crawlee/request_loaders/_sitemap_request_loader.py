@@ -62,8 +62,9 @@ class SitemapRequestLoaderState(BaseModel):
     `processed_sitemap_urls`. If `pending_sitemap_urls` is empty, `completed` is set to `True`.
 
     When `fetch_next_request` is called, a URL is extracted from `url_queue`, and the request built from it is added
-    to `request_data` and its URL to `in_progress`. When `mark_request_as_handled` is called for the request, it is
-    removed from both and `handled_count` is incremented by 1.
+    to `request_data` and its URL to `in_progress`. A URL that's already in `in_progress`, because another sitemap
+    lists it too, is skipped and `total_count` is decremented by 1. When `mark_request_as_handled` is called for the
+    request, it is removed from both and `handled_count` is incremented by 1.
 
     During initial startup or restart after persistence, state validation occurs in `_get_state`. If both
     `pending_sitemap_urls` and `in_progress_sitemap_url` are empty and `completed` is False, this indicates a
@@ -261,7 +262,8 @@ class SitemapRequestLoader(RequestLoader):
                     self._queue_has_capacity.set()
 
                 # A request restored as in progress is served again as it was.
-                if (restored_request := state.request_data.get(url)) is not None:
+                restored_request = state.request_data.get(url)
+                if restored_request is not None and url not in state.in_progress:
                     state.in_progress.add(url)
                     return restored_request
 
@@ -274,6 +276,10 @@ class SitemapRequestLoader(RequestLoader):
                         request_option = transform_request_option
 
                 request = Request.from_url(**request_option)
+                # The URL was listed again while its request is still being processed.
+                if request.url in state.in_progress:
+                    state.total_count -= 1
+                    continue
                 state.in_progress.add(request.url)
                 state.request_data[request.url] = request
 
@@ -310,6 +316,7 @@ class SitemapRequestLoader(RequestLoader):
 
     async def persist_state(self) -> None:
         """Persist the loader's state to the key-value store. Does nothing without a `persist_state_key`."""
+        # Loads the persisted record first, so that a call before the first use writes the restored state.
         await self._get_state()
         await self._state.persist_state()
 
