@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -24,6 +25,7 @@ class MockContext(BasicCrawlingContext):
             get_key_value_store=AsyncMock(),
             log=logging.getLogger(),
             register_deferred_cleanup=lambda _: None,
+            extend_timeout=AsyncMock(),
         )
 
 
@@ -227,3 +229,74 @@ async def test_router_middleware_exception_interrupts_chain() -> None:
 
     assert mock_execution_order.call_count == 1
     assert mock_execution_order.call_args_list[0][1] == {'call': 'middleware_1'}
+
+
+async def test_default_handler_with_timeout() -> None:
+    """Test that the default handler registered with a timeout is returned and invoked."""
+    router = Router[MockContext]()
+    mock_default_handler = Mock()
+
+    async def default_handler(_context: MockContext) -> None:
+        mock_default_handler()
+
+    registered_handler = router.default_handler(request_handler_timeout=timedelta(seconds=30))(default_handler)
+
+    assert registered_handler is default_handler
+
+    await router(MockContext(label=None))
+
+    mock_default_handler.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    ('label', 'expected_timeout'),
+    [
+        pytest.param('SLOW', timedelta(seconds=10), id='handler-with-timeout'),
+        pytest.param('PLAIN', None, id='handler-without-timeout'),
+        pytest.param('UNKNOWN', timedelta(seconds=30), id='unknown-label-falls-back-to-default-handler'),
+        pytest.param(None, timedelta(seconds=30), id='no-label-falls-back-to-default-handler'),
+    ],
+)
+def test_router_timeout_by_label(label: str | None, expected_timeout: timedelta | None) -> None:
+    """Test that the timeout is taken from the handler that the router would invoke for the label."""
+    router = Router[MockContext]()
+
+    @router.handler('SLOW', request_handler_timeout=timedelta(seconds=10))
+    async def slow_handler(_context: MockContext) -> None:
+        pass
+
+    @router.handler('PLAIN')
+    async def plain_handler(_context: MockContext) -> None:
+        pass
+
+    @router.default_handler(request_handler_timeout=timedelta(seconds=30))
+    async def default_handler(_context: MockContext) -> None:
+        pass
+
+    assert router.get_request_handler_timeout(label) == expected_timeout
+
+
+@pytest.mark.parametrize(
+    ('handler_timeout', 'default_handler_timeout', 'expected_timeout'),
+    [
+        pytest.param(None, None, None, id='no-overrides'),
+        pytest.param(timedelta(seconds=10), None, timedelta(seconds=10), id='handler-only'),
+        pytest.param(timedelta(seconds=10), timedelta(seconds=30), timedelta(seconds=30), id='default-is-longest'),
+        pytest.param(timedelta(seconds=60), timedelta(seconds=30), timedelta(seconds=60), id='handler-is-longest'),
+    ],
+)
+def test_router_max_handler_timeout(
+    handler_timeout: timedelta | None, default_handler_timeout: timedelta | None, expected_timeout: timedelta | None
+) -> None:
+    """Test that the longest timeout of all handlers is returned, including the default handler."""
+    router = Router[MockContext]()
+
+    @router.handler('LABEL', request_handler_timeout=handler_timeout)
+    async def handler(_context: MockContext) -> None:
+        pass
+
+    @router.default_handler(request_handler_timeout=default_handler_timeout)
+    async def default_handler(_context: MockContext) -> None:
+        pass
+
+    assert router.get_max_request_handler_timeout() == expected_timeout

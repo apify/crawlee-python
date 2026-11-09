@@ -29,8 +29,9 @@ class FileDownloadCrawler(AbstractHttpCrawler[FileDownloadCrawlingContext, bytes
     `await context.http_response.read()`. For large files, construct the crawler with `stream=True`. The request
     handler then receives a response whose body has not been read yet and can consume it in chunks via
     `context.http_response.read_stream()`. The connection stays open while the handler runs and is closed
-    afterwards. A handler that returns without consuming the body just skips the download. In both modes, reading
-    the body counts towards `navigation_timeout`, so raise it for long downloads.
+    afterwards. A handler that returns without consuming the body just skips the download. Reading the body counts
+    towards `navigation_timeout` by default and towards `request_handler_timeout` in stream mode, so raise the one that
+    applies for long downloads.
 
     ### Usage
 

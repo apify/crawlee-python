@@ -312,7 +312,7 @@ class AbstractHttpCrawler(
         if context.session is not None and not self._save_response_cookies:
             cookies = SessionCookies(context.session.cookies)
 
-        async with self._shared_navigation_timeouts[id(context.request)] as remaining_timeout:
+        async with self._shared_navigation_timeouts[id(context.request)]:
             response = await self._http_client.send_request(
                 context.request.url,
                 method=context.request.method,
@@ -321,7 +321,8 @@ class AbstractHttpCrawler(
                 session=context.session,
                 cookies=cookies,
                 proxy_info=context.proxy_info,
-                timeout=remaining_timeout,
+                # The crawler's timeouts, which `extend_timeout` can extend, bound the request and reading its body.
+                timeout=None,
             )
 
         try:

@@ -42,6 +42,7 @@ async def test_calls_consumer_without_middleware() -> None:
         get_key_value_store=AsyncMock(),
         log=logging.getLogger(),
         register_deferred_cleanup=lambda _: None,
+        extend_timeout=AsyncMock(),
     )
 
     await pipeline(context, consumer)
@@ -70,6 +71,7 @@ async def test_calls_consumers_and_middlewares() -> None:
             get_key_value_store=AsyncMock(),
             log=logging.getLogger(),
             register_deferred_cleanup=context.register_deferred_cleanup,
+            extend_timeout=context.extend_timeout,
         )
         events.append('middleware_a_out')
 
@@ -88,6 +90,7 @@ async def test_calls_consumers_and_middlewares() -> None:
             get_key_value_store=AsyncMock(),
             log=logging.getLogger(),
             register_deferred_cleanup=context.register_deferred_cleanup,
+            extend_timeout=context.extend_timeout,
         )
         events.append('middleware_b_out')
 
@@ -104,6 +107,7 @@ async def test_calls_consumers_and_middlewares() -> None:
         get_key_value_store=AsyncMock(),
         log=logging.getLogger(),
         register_deferred_cleanup=lambda _: None,
+        extend_timeout=AsyncMock(),
     )
     await pipeline(context, consumer)
 
@@ -131,6 +135,7 @@ async def test_wraps_consumer_errors() -> None:
         get_key_value_store=AsyncMock(),
         log=logging.getLogger(),
         register_deferred_cleanup=lambda _: None,
+        extend_timeout=AsyncMock(),
     )
 
     with pytest.raises(RequestHandlerError):
@@ -161,6 +166,7 @@ async def test_handles_exceptions_in_middleware_initialization() -> None:
         get_key_value_store=AsyncMock(),
         log=logging.getLogger(),
         register_deferred_cleanup=lambda _: None,
+        extend_timeout=AsyncMock(),
     )
 
     with pytest.raises(ContextPipelineInitializationError):
@@ -194,6 +200,7 @@ async def test_handles_exceptions_in_middleware_finalization() -> None:
         get_key_value_store=AsyncMock(),
         log=logging.getLogger(),
         register_deferred_cleanup=lambda _: None,
+        extend_timeout=AsyncMock(),
     )
 
     with pytest.raises(ContextPipelineFinalizationError):

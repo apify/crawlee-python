@@ -4,6 +4,8 @@ import asyncio
 from contextlib import suppress
 from typing import TYPE_CHECKING, TypeVar
 
+from crawlee._utils.time import SharedTimeout
+
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Sequence
     from datetime import timedelta
@@ -44,6 +46,20 @@ async def wait_for(
             logger.warning('%s: retrying (%s/%s)', e, iteration, max_retries)
 
     raise RuntimeError('Unreachable code')
+
+
+async def wait_for_extendable(
+    operation: Callable[[], Awaitable[T]],
+    *,
+    timeout: timedelta,
+    timeout_message: str,
+) -> T:
+    """Wait for an async operation like `wait_for`, but under a timeout that `extend_active_timeouts` can extend."""
+    try:
+        async with SharedTimeout(timeout):
+            return await operation()
+    except TimeoutError as ex:
+        raise TimeoutError(timeout_message) from ex
 
 
 async def wait_for_all_tasks_to_finish(
