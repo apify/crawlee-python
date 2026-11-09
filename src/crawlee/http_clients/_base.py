@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from datetime import timedelta
 from http import HTTPStatus
 from time import monotonic
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Literal, Self
 
 from yarl import URL
 
@@ -225,7 +225,7 @@ class HttpClient(ABC):
         session: Session | None = None,
         cookies: SessionCookies | None = None,
         proxy_info: ProxyInfo | None = None,
-        timeout: timedelta | None = None,
+        timeout: timedelta | Literal['default'] | None = 'default',
     ) -> HttpResponse:
         """Send an HTTP request via the client, following up to 10 redirects unless `follow_redirects` is disabled.
 
@@ -246,7 +246,8 @@ class HttpClient(ABC):
             cookies: The cookies to send and store instead of the cookies of `session`.
             proxy_info: The information about the proxy to be used.
             timeout: Maximum time allowed to receive the response, including all redirects, and to read its body.
-                Without it, the default timeout of the HTTP client applies.
+                With `'default'`, the default timeout of the HTTP client applies. `None` disables the timeout, so the
+                request runs until it's cancelled.
 
         Raises:
             ProxyError: Raised if a proxy-related error occurs.
@@ -266,7 +267,7 @@ class HttpClient(ABC):
 
         # `encoded=True` keeps the path and the query byte for byte, including a safe `%2F` in query.
         current_url = _with_ascii_host(URL(url, encoded=True))
-        deadline = monotonic() + timeout.total_seconds() if timeout is not None else None
+        deadline = monotonic() + timeout.total_seconds() if timeout not in (None, 'default') else None
 
         for _ in range(_MAX_REDIRECTS + 1):
             remaining = deadline - monotonic() if deadline is not None else None
@@ -281,7 +282,7 @@ class HttpClient(ABC):
                     headers=_add_cookie_header(headers, cookies, str(current_url)),
                     payload=payload,
                     proxy_info=proxy_info,
-                    timeout=timedelta(seconds=remaining) if remaining is not None else None,
+                    timeout=timedelta(seconds=remaining) if remaining is not None else timeout,
                 )
 
             try:
@@ -326,12 +327,13 @@ class HttpClient(ABC):
         headers: HttpHeaders,
         payload: HttpPayload | None,
         proxy_info: ProxyInfo | None,
-        timeout: timedelta | None,
+        timeout: timedelta | Literal['default'] | None,
     ) -> HttpResponse:
         """Send a single HTTP request and return the response without reading its body.
 
         The client must neither follow redirects nor keep cookies of its own. `send_request` does both, and passes the
-        cookies in the `Cookie` header.
+        cookies in the `Cookie` header. The call, or a read of the returned response, can be cancelled, for example when
+        a timeout of the crawler runs out, so cancelling it must release the connection.
 
         Args:
             url: The URL to send the request to.
@@ -339,8 +341,9 @@ class HttpClient(ABC):
             headers: The headers to include in the request.
             payload: The data to be sent as the request body.
             proxy_info: The information about the proxy to be used.
-            timeout: Maximum time allowed to receive the response and read its body. Without it, the default timeout
-                of the client library applies. `send_request` also cancels the call when the time is up.
+            timeout: Maximum time allowed to receive the response and read its body. `send_request` also cancels the
+                call when the time is up. With `'default'`, the default timeout of the client library applies. With
+                `None`, apply no timeout and let the caller bound the request by cancelling it.
 
         Raises:
             ProxyError: Raised if a proxy-related error occurs.

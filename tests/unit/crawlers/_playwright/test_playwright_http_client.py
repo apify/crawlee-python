@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import Literal
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -51,6 +52,29 @@ async def test_send_request_converts_timeout_to_milliseconds() -> None:
         max_redirects=0,
     )
     from_playwright_response.assert_awaited_once_with(playwright_response, protocol='')
+
+
+@pytest.mark.parametrize(
+    ('timeout', 'expected_timeout'),
+    [
+        pytest.param('default', None, id='playwright-default'),
+        pytest.param(None, 0, id='no-timeout'),
+    ],
+)
+async def test_timeout_without_deadline(timeout: Literal['default'] | None, expected_timeout: int | None) -> None:
+    """Test that the default timeout reaches Playwright as `None`, and no timeout as 0, which disables it."""
+    page = mock_page()
+    client = PlaywrightHttpClient()
+
+    with patch.object(
+        PlaywrightHttpResponse,
+        'from_playwright_response',
+        new=AsyncMock(return_value=mock_response(200, 'https://example.com/')),
+    ):
+        async with browser_page_context(page):
+            await client.send_request('https://example.com', timeout=timeout)
+
+    assert page.request.fetch.call_args.kwargs['timeout'] == expected_timeout
 
 
 async def test_send_request_follows_redirects_hop_by_hop() -> None:

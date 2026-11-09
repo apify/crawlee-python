@@ -4,7 +4,7 @@ import asyncio
 import importlib
 import sys
 from datetime import timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -119,6 +119,27 @@ async def test_timeout_covers_redirect_chain(monkeypatch: pytest.MonkeyPatch) ->
 
     timeouts = [fetch_call.kwargs['timeout'] for fetch_call in fetch.call_args_list]
     assert timeouts == [timedelta(seconds=10), timedelta(seconds=6)]
+
+
+@pytest.mark.parametrize(
+    'timeout',
+    [
+        pytest.param('default', id='client-default'),
+        pytest.param(None, id='no-timeout'),
+    ],
+)
+async def test_timeout_without_deadline(monkeypatch: pytest.MonkeyPatch, timeout: Literal['default'] | None) -> None:
+    """Test that every request of a redirect chain gets the `'default'` or `None` timeout as it is."""
+    url = 'https://example.com/'
+    redirect = Mock(spec=HttpResponse, status_code=302, headers={'location': '/next'}, url=url, headers_set_cookie=[])
+    final = Mock(spec=HttpResponse, status_code=200, headers={}, url=f'{url}next', headers_set_cookie=[])
+    fetch = AsyncMock(side_effect=[redirect, final])
+    client = ImpitHttpClient()
+    monkeypatch.setattr(client, '_fetch', fetch)
+
+    assert await client.send_request(url, timeout=timeout) is final
+
+    assert [fetch_call.kwargs['timeout'] for fetch_call in fetch.call_args_list] == [timeout, timeout]
 
 
 async def test_redirect_responses_closed(monkeypatch: pytest.MonkeyPatch) -> None:

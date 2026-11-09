@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import warnings
+from datetime import timedelta
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from curl_cffi.const import CurlHttpVersion
 from curl_cffi.requests import AsyncSession
@@ -23,7 +24,6 @@ from crawlee.http_clients import HttpClient, HttpResponse
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
-    from datetime import timedelta
 
     from curl_cffi.requests import Request as CurlRequest
     from curl_cffi.requests import Response
@@ -209,16 +209,19 @@ class CurlImpersonateHttpClient(HttpClient):
         headers: HttpHeaders,
         payload: HttpPayload | None,
         proxy_info: ProxyInfo | None,
-        timeout: timedelta | None,
+        timeout: timedelta | Literal['default'] | None,
     ) -> _CurlImpersonateResponse:
         client = self._get_client(proxy_info.url if proxy_info else None)
-        deadline = asyncio.get_running_loop().time() + timeout.total_seconds() if timeout is not None else None
 
-        # Without a timeout of its own, the request gets the default timeout of the session.
+        # With `'default'`, the request gets the default timeout of the session.
+        deadline = None
         timeout_kwargs: dict[str, Any] = {}
-        if timeout is not None:
+        if isinstance(timeout, timedelta):
+            deadline = asyncio.get_running_loop().time() + timeout.total_seconds()
             # `curl_cffi` cuts the timeout down to whole milliseconds, and `libcurl` reads 0 as no timeout.
             timeout_kwargs['timeout'] = max(timeout.total_seconds(), 0.001)
+        elif timeout is None:
+            timeout_kwargs['timeout'] = None
 
         try:
             response = await client.request(

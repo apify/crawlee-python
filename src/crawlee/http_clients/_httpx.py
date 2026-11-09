@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import warnings
+from datetime import timedelta
 from functools import cached_property
 from http.cookiejar import CookieJar, DefaultCookiePolicy
 from logging import DEBUG, NOTSET, WARNING, getLogger
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 import httpx2
 from typing_extensions import override
@@ -21,7 +22,6 @@ from crawlee.http_clients import HttpClient, HttpResponse
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-    from datetime import timedelta
     from ssl import SSLContext
 
     from crawlee._types import HttpMethod, HttpPayload
@@ -187,7 +187,7 @@ class HttpxHttpClient(HttpClient):
         session: Session | None = None,
         cookies: SessionCookies | None = None,
         proxy_info: ProxyInfo | None = None,
-        timeout: timedelta | None = None,
+        timeout: timedelta | Literal['default'] | None = 'default',
     ) -> HttpResponse:
         # The headers are generated once per call, so that every request of a redirect chain carries the same browser
         # profile.
@@ -214,17 +214,25 @@ class HttpxHttpClient(HttpClient):
         headers: HttpHeaders,
         payload: HttpPayload | None,
         proxy_info: ProxyInfo | None,
-        timeout: timedelta | None,
+        timeout: timedelta | Literal['default'] | None,
     ) -> _HttpxResponse:
         client = self._get_client(proxy_info.url if proxy_info else None)
-        deadline = asyncio.get_running_loop().time() + timeout.total_seconds() if timeout is not None else None
+
+        # With `'default'`, the request gets the default timeout of the client.
+        deadline = None
+        timeout_kwargs: dict[str, Any] = {}
+        if isinstance(timeout, timedelta):
+            deadline = asyncio.get_running_loop().time() + timeout.total_seconds()
+            timeout_kwargs['timeout'] = httpx2.Timeout(timeout.total_seconds())
+        elif timeout is None:
+            timeout_kwargs['timeout'] = httpx2.Timeout(None)
 
         http_request = client.build_request(
             url=url,
             method=method,
             headers=dict(headers) or None,
             content=payload,
-            timeout=httpx2.Timeout(timeout.total_seconds()) if timeout is not None else httpx2.USE_CLIENT_DEFAULT,
+            **timeout_kwargs,
         )
 
         try:

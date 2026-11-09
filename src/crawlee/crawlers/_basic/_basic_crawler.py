@@ -1398,7 +1398,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             payload: HttpPayload | None = None,
             headers: HttpHeaders | dict[str, str] | None = None,
             cookies: SessionCookies | None = None,
-            timeout: timedelta | None = None,
+            timeout: timedelta | Literal['default'] | None = 'default',
         ) -> HttpResponse:
             response = await self._http_client.send_request(
                 url=url,

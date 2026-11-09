@@ -582,7 +582,7 @@ class SendRequestFunction(Protocol):
         payload: HttpPayload | None = None,
         headers: HttpHeaders | dict[str, str] | None = None,
         cookies: SessionCookies | None = None,
-        timeout: timedelta | None = None,
+        timeout: timedelta | Literal['default'] | None = 'default',
     ) -> Coroutine[None, None, HttpResponse]:
         """Call send request function.
 
@@ -595,7 +595,8 @@ class SendRequestFunction(Protocol):
                 the response cookies are stored in the browser context as well, and so in the session after the
                 request handler unless `save_response_cookies` is disabled.
             timeout: Maximum time allowed to receive the response, including all redirects, and to read its body.
-                Without it, the default timeout of the HTTP client applies.
+                With `'default'`, the default timeout of the HTTP client applies. `None` disables the timeout, so the
+                request runs until it's cancelled.
 
         Returns:
             The HTTP response received from the server.
