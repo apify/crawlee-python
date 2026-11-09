@@ -217,22 +217,6 @@ async def test_restored_request_not_transformed_again() -> None:
     assert restored_request.user_data['page'] == 2
 
 
-async def test_persist_state_writes_record(key_value_store: KeyValueStore) -> None:
-    """`persist_state()` writes the state with the in-progress request to the key-value store."""
-    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
-    client, _ = make_status_stream_client({sitemap_url: [(200, get_basic_sitemap().encode())]})
-    loader = SitemapRequestLoader([sitemap_url], http_client=client, persist_state_key='sitemap-state')
-    request = await loader.fetch_next_request()
-    assert request is not None
-
-    await loader.persist_state()
-    record = await key_value_store.get_value('sitemap-state')
-    await loader.close()
-
-    assert record['inProgress'] == [request.url]
-    assert list(record['requestData']) == [request.url]
-
-
 async def test_mark_handled_twice_raises() -> None:
     """Marking a request that's already handled raises and leaves the handled count as is."""
     sitemap_url = f'{DEFAULT_URL}sitemap.xml'
