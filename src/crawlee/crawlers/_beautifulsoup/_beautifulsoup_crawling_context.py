@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup
 from bs4.dammit import EncodingDetector
-from lxml.etree import ParserError  # ty: ignore[unresolved-import]
+from lxml.etree import ParserError  # ty: ignore[import-not-found]
 from lxml.html import HTMLParser, document_fromstring
 from soupsieve import SelectorSyntaxError
 
