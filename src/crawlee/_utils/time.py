@@ -91,7 +91,7 @@ def format_duration(duration: timedelta | None) -> str:
 
     # For very small durations, show in milliseconds
     if total_seconds < 1:
-        milliseconds = total_seconds * 1000
+        milliseconds = total_seconds * _MILLISECONDS_PER_SECOND
         if milliseconds < 1:
             microseconds = total_seconds * 1_000_000
             return f'{microseconds:.1f}μs'

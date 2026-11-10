@@ -24,14 +24,14 @@ from crawlee._utils.time import format_duration
         # segment, otherwise '1h 30.0s' misleadingly reads as 1h30m.
         (timedelta(hours=1, seconds=30), '1h 0min 30.0s'),
         (timedelta(hours=1, seconds=1), '1h 0min 1.0s'),
-        # A seconds component that rounds up to a full minute carries into the
-        # minutes, and a full minute into the hours.
-        (timedelta(seconds=119.96), '2min'),
-        (timedelta(seconds=3599.96), '1h'),
-        (timedelta(hours=1, seconds=59.96), '1h 1min'),
-        (timedelta(seconds=59.996), '1min'),
-        (timedelta(seconds=0.99996), '1.00s'),
-        (timedelta(seconds=60.04), '1min'),
+        # A leftover that rounds up to a full unit carries into the next unit.
+        pytest.param(timedelta(seconds=119.96), '2min', id='seconds carry into minutes'),
+        pytest.param(timedelta(seconds=3599.96), '1h', id='minutes carry into hours'),
+        pytest.param(timedelta(hours=1, seconds=59.96), '1h 1min', id='seconds carry with hours'),
+        pytest.param(timedelta(seconds=59.996), '1min', id='sub-minute rounds to a minute'),
+        pytest.param(timedelta(seconds=0.99996), '1.00s', id='milliseconds carry into seconds'),
+        # A leftover that rounds to 0.0s is dropped, as for an exact minute.
+        pytest.param(timedelta(seconds=60.04), '1min', id='rounded zero seconds dropped'),
     ],
 )
 def test_format_duration(duration: timedelta | None, expected: str) -> None:
