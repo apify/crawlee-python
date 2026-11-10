@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import subprocess
@@ -101,7 +102,7 @@ async def test_static_crawler_actor_at_apify(
     )
 
     build_process = subprocess.run(  # noqa: ASYNC221
-        ['apify', 'push'],  # noqa: S607
+        ['apify', 'push', '--json'],  # noqa: S607
         capture_output=True,
         check=False,
         cwd=tmp_path / actor_name,
@@ -110,13 +111,15 @@ async def test_static_crawler_actor_at_apify(
         env={**os.environ, 'GIT_CEILING_DIRECTORIES': str(tmp_path)},
         timeout=600,
     )
-    # Get actor ID from build log
-    actor_id_regexp = re.compile(r'https:\/\/console\.apify\.com\/actors\/(.*)#\/builds\/\d*\.\d*\.\d*')
-
-    if match := re.findall(actor_id_regexp, build_process.stderr.decode()):
-        actor_id = match[0]
-    else:
-        raise AssertionError(f'Failed to find actor id in build log: {build_process.stderr.decode()}')
+    # With `--json`, `apify push` prints the push result to stdout and the build log to stderr.
+    try:
+        actor_id = json.loads(build_process.stdout)['actor']['id']
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise AssertionError(
+            f'Failed to read actor id from the `apify push` output.\n'
+            f'stdout: {build_process.stdout.decode()}\n'
+            f'stderr: {build_process.stderr.decode()}'
+        ) from exc
 
     client = ApifyClientAsync(token=os.getenv('APIFY_TEST_USER_API_TOKEN'))
     actor = client.actor(actor_id)
