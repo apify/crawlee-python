@@ -141,7 +141,7 @@ async def test_static_crawler_actor_at_apify(
     try:
         assert push_result['ok'], f'`apify push` failed: {push_result.get("error")}'
 
-        started_run_data = await actor.start(memory_mbytes=8192)
+        started_run_data = await actor.start(memory_mbytes=8192, build=push_result['build']['number'])
         actor_run = client.run(started_run_data['id'])
 
         finished_run_data = await actor_run.wait_for_finish()
