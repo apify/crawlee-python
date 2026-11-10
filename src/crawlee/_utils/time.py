@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 _SECONDS_PER_MINUTE = 60
 _SECONDS_PER_HOUR = 3600
+_MILLISECONDS_PER_SECOND = 1000
 
 
 @dataclass
@@ -85,32 +86,36 @@ def format_duration(duration: timedelta | None) -> str:
     if total_seconds == 0:
         return '0s'
 
+    # Each unit is used only while the value, rounded to the precision it is shown with, stays
+    # below the next unit's boundary; otherwise it is shown in the larger unit it rounds up to.
+
     # For very small durations, show in milliseconds
     if total_seconds < 1:
         milliseconds = total_seconds * 1000
         if milliseconds < 1:
             microseconds = total_seconds * 1_000_000
             return f'{microseconds:.1f}μs'
-        return f'{milliseconds:.1f}ms'
+        if round(milliseconds, 1) < _MILLISECONDS_PER_SECOND:
+            return f'{milliseconds:.1f}ms'
 
     # For durations less than 60 seconds, show in seconds
-    if total_seconds < _SECONDS_PER_MINUTE:
+    if round(total_seconds, 2) < _SECONDS_PER_MINUTE:
         return f'{total_seconds:.2f}s'
 
+    # Split the value rounded to the shown 0.1 s precision, so a carry lands in minutes and hours
+    rounded = round(total_seconds, 1)
+    hours = int(rounded // _SECONDS_PER_HOUR)
+    remaining_seconds = rounded - hours * _SECONDS_PER_HOUR
+    minutes = int(remaining_seconds // _SECONDS_PER_MINUTE)
+    seconds = round(remaining_seconds - minutes * _SECONDS_PER_MINUTE, 1)
+
     # For durations less than 1 hour, show in minutes and seconds
-    if total_seconds < _SECONDS_PER_HOUR:
-        minutes = int(total_seconds // _SECONDS_PER_MINUTE)
-        seconds = total_seconds % _SECONDS_PER_MINUTE
+    if hours == 0:
         if seconds == 0:
             return f'{minutes}min'
         return f'{minutes}min {seconds:.1f}s'
 
     # For longer durations, show in hours, minutes, and seconds
-    hours = int(total_seconds // _SECONDS_PER_HOUR)
-    remaining_seconds = total_seconds % _SECONDS_PER_HOUR
-    minutes = int(remaining_seconds // _SECONDS_PER_MINUTE)
-    seconds = remaining_seconds % _SECONDS_PER_MINUTE
-
     result = f'{hours}h'
     if minutes > 0 or seconds > 0:
         result += f' {minutes}min'
