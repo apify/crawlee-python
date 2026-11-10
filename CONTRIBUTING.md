@@ -46,7 +46,7 @@ A test belongs here when it uses the `server_url` fixture (or another local serv
 
 Prerequisites:
 
-- [apify-cli](https://docs.apify.com/cli/docs/installation) installed and available in `PATH`
+- [apify-cli](https://docs.apify.com/cli/docs/installation) 1.11.0 or newer installed and available in `PATH`
 - Set `APIFY_TEST_USER_API_TOKEN` to your [Apify API token](https://docs.apify.com/platform/integrations/api#api-token)
 
 To run end-to-end tests:
