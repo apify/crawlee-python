@@ -226,3 +226,38 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
     assert record.value == test_value
 
     await reopened_client.drop()
+
+
+async def test_iterate_keys_uses_metadata_key(kvs_client: FileSystemKeyValueStoreClient) -> None:
+    """Record metadata supplies the logical key for ordering and cursor exclusion."""
+    await kvs_client.set_value(key='INPUT.json', value={'record': 'input'})
+    await kvs_client.set_value(key='INPUT-1', value='another record')
+    metadata_path = kvs_client.path_to_kvs / f'INPUT.json.{METADATA_FILENAME}'
+    metadata = json.loads(metadata_path.read_text(encoding='utf-8'))
+    metadata['key'] = 'INPUT'
+    metadata_path.write_text(json.dumps(metadata), encoding='utf-8')
+
+    first_page = [item async for item in kvs_client.iterate_keys(limit=1)]
+    assert [item.key for item in first_page] == ['INPUT']
+    second_page = [item async for item in kvs_client.iterate_keys(exclusive_start_key=first_page[-1].key, limit=1)]
+    assert [item.key for item in second_page] == ['INPUT-1']
+    assert [item async for item in kvs_client.iterate_keys(exclusive_start_key=second_page[-1].key, limit=1)] == []
+
+
+@pytest.mark.parametrize(
+    'metadata_content',
+    [
+        pytest.param('invalid json', id='invalid-json'),
+        pytest.param('{}', id='invalid-schema'),
+    ],
+)
+async def test_iterate_keys_skips_invalid_metadata(
+    kvs_client: FileSystemKeyValueStoreClient, metadata_content: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Invalid record metadata is logged and omitted from iteration."""
+    metadata_path = kvs_client.path_to_kvs / f'invalid.{METADATA_FILENAME}'
+    metadata_path.write_text(metadata_content, encoding='utf-8')
+    await kvs_client.set_value(key='valid', value='record')
+
+    assert [item.key async for item in kvs_client.iterate_keys()] == ['valid']
+    assert 'for key "invalid", skipping it.' in caplog.text

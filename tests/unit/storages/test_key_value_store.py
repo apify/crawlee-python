@@ -240,6 +240,26 @@ async def test_list_keys_with_exclusive_start_key(kvs: KeyValueStore) -> None:
         assert all_key_names.index(first_returned_key) > all_key_names.index(start_key)
 
 
+@pytest.mark.parametrize(
+    'keys',
+    [
+        pytest.param(['item', 'item-1'], id='prefix'),
+        pytest.param(['zebra', '\u00e9clair'], id='unicode'),
+        pytest.param(['a.b.json', 'a/b.json'], id='path'),
+        pytest.param(['alpha', 'zebra'], id='ascii'),
+    ],
+)
+async def test_list_keys_cursor_pages(kvs: KeyValueStore, keys: list[str]) -> None:
+    """Cursor pages visit every logical key once in sorted order."""
+    for key in keys:
+        await kvs.set_value(key, {'key': key})
+
+    first_page = await kvs.list_keys(limit=1)
+    second_page = await kvs.list_keys(exclusive_start_key=first_page[-1].key, limit=1)
+    assert [item.key for item in first_page + second_page] == sorted(keys)
+    assert await kvs.list_keys(exclusive_start_key=second_page[-1].key, limit=1) == []
+
+
 async def test_iterate_keys(kvs: KeyValueStore) -> None:
     """Test iterating over keys in the key-value store."""
     # Add some items
