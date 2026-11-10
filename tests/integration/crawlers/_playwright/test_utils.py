@@ -1,8 +1,31 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 from playwright.async_api import async_playwright
-from yarl import URL
 
 from crawlee.crawlers._playwright._utils import block_requests, infinite_scroll
+
+if TYPE_CHECKING:
+    from playwright.async_api import Page
+    from yarl import URL
+
+
+def track_requests(page: Page) -> tuple[set[str], set[str]]:
+    """Record the file names of all requests the page sends, and of the requests the browser blocked.
+
+    Chromium fails a request blocked by `Network.setBlockedURLs` with the `inspector` reason. Any other failure, such
+    as `net::ERR_NO_BUFFER_SPACE` on a loaded Windows runner, is a transport error and does not count as blocked.
+    """
+    requested: set[str] = set()
+    blocked: set[str] = set()
+    page.on('request', lambda req: requested.add(req.url.rsplit('/', 1)[-1]))
+    page.on(
+        'requestfailed',
+        lambda req: blocked.add(req.url.rsplit('/', 1)[-1]) if req.failure == 'inspector' else None,
+    )
+    return requested, blocked
 
 
 @pytest.mark.flaky(
@@ -91,20 +114,16 @@ async def test_block_requests_default(server_url: URL) -> None:
 
         target_url = str(server_url / 'resource_loading_page')
 
-        # Default behavior, all resources load
+        # Default behavior, nothing is blocked
         page = await browser.new_page()
-        loaded_urls_no_block = []
-
-        page.on('requestfinished', lambda req: loaded_urls_no_block.append(req.url.rsplit('/', 1)[-1]))
+        requested_no_block, blocked_no_block = track_requests(page)
         await page.goto(target_url)
         await page.wait_for_load_state('networkidle')
         await page.close()
 
-        # With blocking — collect loaded resources
+        # With blocking
         page = await browser.new_page()
-        loaded_urls_blocked = []
-
-        page.on('requestfinished', lambda req: loaded_urls_blocked.append(req.url.rsplit('/', 1)[-1]))
+        requested_blocked, blocked_blocked = track_requests(page)
         await block_requests(page)
         await page.goto(target_url)
         await page.wait_for_load_state('networkidle')
@@ -112,11 +131,13 @@ async def test_block_requests_default(server_url: URL) -> None:
 
         await browser.close()
 
-    # Without blocking, both resources should load
-    assert set(loaded_urls_no_block) == {'resource_loading_page', 'test.js', 'test.png'}
+    # The page requests both resources either way
+    assert requested_no_block == {'resource_loading_page', 'test.js', 'test.png'}
+    assert requested_blocked == {'resource_loading_page', 'test.js', 'test.png'}
 
-    # With blocking, only JS should load
-    assert set(loaded_urls_blocked) == {'resource_loading_page', 'test.js'}
+    # Without blocking nothing is blocked, with blocking only the image is
+    assert blocked_no_block == set()
+    assert blocked_blocked == {'test.png'}
 
 
 async def test_block_requests_with_extra_patterns(server_url: URL) -> None:
