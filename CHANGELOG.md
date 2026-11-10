@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Fit the default `desired_concurrency` within `min_concurrency` and `max_concurrency` ([#2397](https://github.com/apify/crawlee-python/pull/2397)) ([b71d5af](https://github.com/apify/crawlee-python/commit/b71d5afb8ee888b5d12d0a47519038d3040a10e5)) by [@PrashanthLande](https://github.com/PrashanthLande)
 - Pass the crawler state to the rendering type detection run of `AdaptivePlaywrightCrawler` ([#2417](https://github.com/apify/crawlee-python/pull/2417)) ([4d3f989](https://github.com/apify/crawlee-python/commit/4d3f989ed0c435a391a876b7fea1120dc9474646)) by [@Mantisus](https://github.com/Mantisus)
 - Accept `None` for `proxy_configuration` in `BasicCrawlerOptions` ([#2416](https://github.com/apify/crawlee-python/pull/2416)) ([16858fd](https://github.com/apify/crawlee-python/commit/16858fdeb87616b9db3d8c7bf6ea7f16d1d9f951)) by [@vdusek](https://github.com/vdusek)
+- **file-system:** Stop KVS pagination from skipping or repeating keys ([#2431](https://github.com/apify/crawlee-python/pull/2431)) ([7d271c0](https://github.com/apify/crawlee-python/commit/7d271c0db0e3e011d88effaeab5b3dc4d806ef4d)) by [@peterolkhov](https://github.com/peterolkhov)
 
 
 <!-- git-cliff-unreleased-end -->
