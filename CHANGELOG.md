@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 1.11.2 - **not yet released**
+## [1.11.2](https://github.com/apify/crawlee-python/releases/tag/v1.11.2) (2026-11-10)
 
 ### 🐛 Bug Fixes
 
@@ -14,7 +13,6 @@ All notable changes to this project will be documented in this file.
 - **file-system:** Stop KVS pagination from skipping or repeating keys ([#2431](https://github.com/apify/crawlee-python/pull/2431)) ([7d271c0](https://github.com/apify/crawlee-python/commit/7d271c0db0e3e011d88effaeab5b3dc4d806ef4d)) by [@peterolkhov](https://github.com/peterolkhov)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [1.11.1](https://github.com/apify/crawlee-python/releases/tag/v1.11.1) (2026-11-05)
 
 ### 🐛 Bug Fixes
