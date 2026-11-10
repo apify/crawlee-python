@@ -377,49 +377,20 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         async with self._lock:
             files = await asyncio.to_thread(lambda: list(self.path_to_kvs.glob('*')))
 
-        records: list[KeyValueStoreRecordMetadata] = []
+        # The logical key can differ from the filename (the SDK stores the `INPUT` key as `INPUT.json`), so
+        # read all record metadata before sorting and applying the cursor.
+        records = await asyncio.to_thread(self._read_records_metadata, files)
 
-        for file_path in files:
-            # Skip the main metadata file
-            if file_path.name == METADATA_FILENAME:
-                continue
+        if exclusive_start_key is not None:
+            records = [record for record in records if record.key > exclusive_start_key]
 
-            # Only process metadata files for records
-            if not file_path.name.endswith(f'.{METADATA_FILENAME}'):
-                continue
+        records.sort(key=lambda record: record.key)
 
-            # Extract the base key name from the metadata filename
-            key_name = self._decode_key(file_path.name[: -len(f'.{METADATA_FILENAME}')])
+        if limit:
+            records = records[:limit]
 
-            # Try to read and parse the metadata file
-            try:
-                metadata_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
-            except FileNotFoundError:
-                logger.warning(f'Metadata file disappeared for key "{key_name}", skipping it.')
-                continue
-
-            try:
-                metadata_dict = json.loads(metadata_content)
-            except json.JSONDecodeError:
-                logger.warning(f'Failed to decode metadata file for key "{key_name}", skipping it.')
-                continue
-
-            try:
-                record_metadata = KeyValueStoreRecordMetadata(**metadata_dict)
-            except ValidationError:
-                logger.warning(f'Invalid metadata schema for key "{key_name}", skipping it.')
-                continue
-
-            if exclusive_start_key is not None and record_metadata.key <= exclusive_start_key:
-                continue
-
-            records.append(record_metadata)
-
-        for count, record_metadata in enumerate(sorted(records, key=lambda record: record.key), start=1):
+        for record_metadata in records:
             yield record_metadata
-
-            if limit and count >= limit:
-                break
 
         # Update accessed_at timestamp
         async with self._lock:
@@ -484,6 +455,45 @@ class FileSystemKeyValueStoreClient(KeyValueStoreClient):
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump())
         await atomic_write(self.path_to_metadata, data)
+
+    def _read_records_metadata(self, files: list[Path]) -> list[KeyValueStoreRecordMetadata]:
+        """Read and validate the record metadata files among `files`, skipping unreadable or invalid ones."""
+        records: list[KeyValueStoreRecordMetadata] = []
+
+        for file_path in files:
+            # Skip the main metadata file
+            if file_path.name == METADATA_FILENAME:
+                continue
+
+            # Only process metadata files for records
+            if not file_path.name.endswith(f'.{METADATA_FILENAME}'):
+                continue
+
+            # Extract the base key name from the metadata filename
+            key_name = self._decode_key(file_path.name[: -len(f'.{METADATA_FILENAME}')])
+
+            # Try to read and parse the metadata file
+            try:
+                metadata_content = file_path.read_text(encoding='utf-8')
+            except FileNotFoundError:
+                logger.warning(f'Metadata file disappeared for key "{key_name}", skipping it.')
+                continue
+
+            try:
+                metadata_dict = json.loads(metadata_content)
+            except json.JSONDecodeError:
+                logger.warning(f'Failed to decode metadata file for key "{key_name}", skipping it.')
+                continue
+
+            try:
+                record_metadata = KeyValueStoreRecordMetadata(**metadata_dict)
+            except ValidationError:
+                logger.warning(f'Invalid metadata schema for key "{key_name}", skipping it.')
+                continue
+
+            records.append(record_metadata)
+
+        return records
 
     def _encode_key(self, key: str) -> str:
         """Encode a key to make it safe for use in a file path."""
