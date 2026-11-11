@@ -303,7 +303,10 @@ class SitemapRequestLoader(RequestLoader):
                 await self._loading_task
 
     async def persist_state(self) -> None:
-        """Persist the loader's state to the key-value store. Does nothing without a `persist_state_key`."""
+        """Persist the loader's state to the key-value store, raising if the write fails.
+
+        Does nothing without a `persist_state_key`.
+        """
         # Loads the persisted record first, so that a call before the first use writes the restored state.
         await self._get_state()
         await self._state.persist_state()
