@@ -456,13 +456,17 @@ class AdaptivePlaywrightCrawler(
                 static_run = await self._crawl_one('static', context=context, use_state=use_initial_state_copy)
 
                 static_exception = static_run.exception
-                if isinstance(static_exception, (ContextPipelineInitializationError, RequestHandlerError)):
-                    static_exception = static_exception.wrapped_exception
+                if isinstance(static_exception, ContextPipelineInitializationError):
+                    is_transient = True
+                elif isinstance(static_exception, RequestHandlerError):
+                    is_transient = isinstance(static_exception.wrapped_exception, _TRANSIENT_STATIC_ERRORS)
+                else:
+                    is_transient = isinstance(static_exception, _TRANSIENT_STATIC_ERRORS)
 
-                if static_exception is not None and isinstance(static_exception, _TRANSIENT_STATIC_ERRORS):
+                if static_exception is not None and is_transient:
                     context.log.debug(
                         f'Static run failed with {type(static_exception).__name__}; '
-                        f'skipping rendering type detection result for {context.request.url}.'
+                        f'discarding rendering type detection for {context.request.url}.'
                     )
                     detection_result = None
                 elif static_run.result and self.result_comparator(static_run.result, pw_run.result):
