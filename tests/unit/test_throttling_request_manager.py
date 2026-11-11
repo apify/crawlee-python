@@ -1157,7 +1157,7 @@ async def test_processing_time_reaches_default_inner(service_locator: ServiceLoc
 
 
 async def test_default_inner_gets_longest_time(service_locator: ServiceLocator) -> None:
-    """Test that a default `inner` opened late gets the longest processing time set before, as an open one keeps."""
+    """Test that a default `inner` opened late gets the longest processing time set before it opened."""
     manager = ThrottlingRequestManager(
         domains=TEST_DOMAINS,
         request_manager_opener=RequestQueue.open,
