@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Coroutine
 from copy import deepcopy
@@ -30,7 +31,13 @@ from crawlee.crawlers import (
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
 from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.crawlers._playwright._playwright_crawler import _PlaywrightCrawlerAdditionalOptions
-from crawlee.errors import ContextPipelineInitializationError, RequestHandlerError, RequestThrottledError
+from crawlee.errors import (
+    ContextPipelineInitializationError,
+    ProxyError,
+    RequestHandlerError,
+    RequestThrottledError,
+    SessionError,
+)
 from crawlee.statistics import Statistics, StatisticsState
 
 from ._adaptive_playwright_crawler_statistics import AdaptivePlaywrightCrawlerStatisticState
@@ -51,6 +58,16 @@ if TYPE_CHECKING:
     from crawlee._types import UseStateFunction
     from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
 
+
+# Infrastructure errors during static sub-crawler runs that do not indicate whether a page requires
+# client-side rendering.
+_TRANSIENT_STATIC_ERRORS: tuple[type[BaseException], ...] = (
+    SessionError,
+    ProxyError,
+    ConnectionError,
+    TimeoutError,
+    asyncio.TimeoutError,
+)
 
 TStaticParseResult = TypeVar('TStaticParseResult')
 TStaticSelectResult = TypeVar('TStaticSelectResult')
@@ -435,15 +452,27 @@ class AdaptivePlaywrightCrawler(
 
         if pw_run.result:
             if should_detect_rendering_type:
-                detection_result: RenderingType
+                detection_result: RenderingType | None
                 static_run = await self._crawl_one('static', context=context, use_state=use_initial_state_copy)
-                if static_run.result and self.result_comparator(static_run.result, pw_run.result):
+
+                static_exception = static_run.exception
+                if isinstance(static_exception, (ContextPipelineInitializationError, RequestHandlerError)):
+                    static_exception = static_exception.wrapped_exception
+
+                if static_exception is not None and isinstance(static_exception, _TRANSIENT_STATIC_ERRORS):
+                    context.log.debug(
+                        f'Static run failed with {type(static_exception).__name__}; '
+                        f'skipping rendering type detection result for {context.request.url}.'
+                    )
+                    detection_result = None
+                elif static_run.result and self.result_comparator(static_run.result, pw_run.result):
                     detection_result = 'static'
                 else:
                     detection_result = 'client only'
 
-                context.log.debug(f'Detected rendering type {detection_result} for {context.request.url}')
-                self.rendering_type_predictor.store_result(context.request, detection_result)
+                if detection_result is not None:
+                    context.log.debug(f'Detected rendering type {detection_result} for {context.request.url}')
+                    self.rendering_type_predictor.store_result(context.request, detection_result)
 
             self._context_result_map[context] = pw_run.result
 
