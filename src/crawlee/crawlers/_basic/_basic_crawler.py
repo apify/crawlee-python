@@ -610,7 +610,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """Stop dispatching new requests and wait until the ones in progress finish.
 
         Unlike `stop`, this doesn't end the run: `run` stays pending until `resume` is called. Awaited from a request
-        handler, it waits for that handler's own request too.
+        handler, it waits for that handler's own request too, so without a `timeout` it never returns.
 
         Args:
             timeout: How long to wait for the requests in progress. The crawler stays paused if they don't finish in
@@ -974,7 +974,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 await self._dispatching_run.pause(timeout=self._SAFE_MIGRATION_WAIT)
             except TimeoutError:
                 self._logger.error(  # noqa: TRY400
-                    'The crawler was paused due to migration to another host, but some requests did not finish in '
+                    'The crawler was paused due to a migration or an abort, but some requests did not finish in '
                     "time. Those requests' results may be duplicated."
                 )
 
