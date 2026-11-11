@@ -221,6 +221,8 @@ class CurlImpersonateHttpClient(HttpClient):
             # `curl_cffi` cuts the timeout down to whole milliseconds, and `libcurl` reads 0 as no timeout.
             timeout_kwargs['timeout'] = max(timeout.total_seconds(), 0.001)
         elif timeout is None:
+            # `curl_cffi` turns `None` into a connect timeout of 0, which `libcurl` reads as its built-in 300 seconds.
+            # Only the transfer after connecting has no limit.
             timeout_kwargs['timeout'] = None
 
         try:

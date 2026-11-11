@@ -142,6 +142,25 @@ async def test_timeout_without_deadline(monkeypatch: pytest.MonkeyPatch, timeout
     assert [fetch_call.kwargs['timeout'] for fetch_call in fetch.call_args_list] == [timeout, timeout]
 
 
+@pytest.mark.parametrize(
+    'timeout',
+    [
+        pytest.param(10, id='seconds-as-number'),
+        pytest.param('Default', id='capitalized-default'),
+    ],
+)
+async def test_invalid_timeout_raises(monkeypatch: pytest.MonkeyPatch, timeout: object) -> None:
+    """Test that a `timeout` other than a `timedelta`, `'default'` or `None` raises before any request is sent."""
+    fetch = AsyncMock()
+    client = ImpitHttpClient()
+    monkeypatch.setattr(client, '_fetch', fetch)
+
+    with pytest.raises(TypeError, match='`timeout` must be'):
+        await client.send_request('https://example.com/', timeout=timeout)  # ty: ignore[invalid-argument-type]
+
+    fetch.assert_not_called()
+
+
 async def test_redirect_responses_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that every response of a redirect chain is closed except the returned one."""
     url = 'https://example.com/'

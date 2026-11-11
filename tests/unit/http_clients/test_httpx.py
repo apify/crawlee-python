@@ -77,15 +77,17 @@ def test_follows_configured_log_level_of_later_client(monkeypatch: pytest.Monkey
 
 
 @pytest.mark.parametrize(
-    ('timeout', 'expected_kwargs'),
+    ('timeout', 'expected'),
     [
-        pytest.param('default', {}, id='client-default'),
-        pytest.param(None, {'timeout': httpx2.Timeout(None)}, id='no-timeout'),
-        pytest.param(timedelta(seconds=5), {'timeout': httpx2.Timeout(5.0)}, id='explicit'),
+        pytest.param('default', 'missing', id='client-default'),
+        pytest.param(None, httpx2.Timeout(None), id='no-timeout'),
+        pytest.param(timedelta(seconds=5), httpx2.Timeout(5.0), id='explicit'),
     ],
 )
 async def test_timeout_passed_to_httpx(
-    monkeypatch: pytest.MonkeyPatch, timeout: timedelta | Literal['default'] | None, expected_kwargs: dict[str, Any]
+    monkeypatch: pytest.MonkeyPatch,
+    timeout: timedelta | Literal['default'] | None,
+    expected: httpx2.Timeout | Literal['missing'],
 ) -> None:
     """Test that the timeout reaches `httpx2` as a `Timeout`, or not at all for the default of the client."""
     httpx_client = Mock(spec=httpx2.AsyncClient)
@@ -102,5 +104,4 @@ async def test_timeout_passed_to_httpx(
         timeout=timeout,
     )
 
-    request_kwargs = httpx_client.build_request.call_args.kwargs
-    assert {key: value for key, value in request_kwargs.items() if key == 'timeout'} == expected_kwargs
+    assert httpx_client.build_request.call_args.kwargs.get('timeout', 'missing') == expected

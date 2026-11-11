@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -75,15 +75,17 @@ async def test_sub_millisecond_timeout_not_rounded_to_zero(monkeypatch: pytest.M
 
 
 @pytest.mark.parametrize(
-    ('timeout', 'expected_kwargs'),
+    ('timeout', 'expected'),
     [
-        pytest.param('default', {}, id='client-default'),
-        pytest.param(None, {'timeout': None}, id='no-timeout'),
-        pytest.param(timedelta(seconds=5), {'timeout': 5.0}, id='explicit'),
+        pytest.param('default', 'missing', id='client-default'),
+        pytest.param(None, None, id='no-timeout'),
+        pytest.param(timedelta(seconds=5), 5.0, id='explicit'),
     ],
 )
 async def test_timeout_passed_to_curl(
-    monkeypatch: pytest.MonkeyPatch, timeout: timedelta | Literal['default'] | None, expected_kwargs: dict[str, Any]
+    monkeypatch: pytest.MonkeyPatch,
+    timeout: timedelta | Literal['default'] | None,
+    expected: float | Literal['missing'] | None,
 ) -> None:
     """Test that the timeout reaches `curl_cffi` in seconds, as `None`, or not at all for the default of the session."""
     curl_session = mock_curl_session()
@@ -99,8 +101,7 @@ async def test_timeout_passed_to_curl(
         timeout=timeout,
     )
 
-    request_kwargs = curl_session.request.call_args.kwargs
-    assert {key: value for key, value in request_kwargs.items() if key == 'timeout'} == expected_kwargs
+    assert curl_session.request.call_args.kwargs.get('timeout', 'missing') == expected
 
 
 async def test_timed_out_request_closes_connection() -> None:

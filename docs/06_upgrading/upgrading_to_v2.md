@@ -377,9 +377,13 @@ Responses returned by `context.send_request` are closed after the request is pro
 
 ### `timeout` covers the redirects and the body
 
-The `timeout` of `send_request` is one deadline for the whole redirect chain and for reading the body, the same as Crawlee JS. A body read past it raises `TimeoutError`. By default, `timeout` is `'default'` and the default of the underlying library applies. `ImpitHttpClient` allows 30 seconds, including reading the body. `CurlImpersonateHttpClient` allows 30 seconds to connect and 30 seconds without receiving data. `HttpxHttpClient` allows 5 seconds per operation. In v1, `ImpitHttpClient` and `CurlImpersonateHttpClient` disabled the timeout altogether when `timeout` wasn't passed. Now `timeout=None` disables it, with every client. To change the default, pass `timeout` when you create the client.
+The `timeout` of `send_request` is one deadline for the whole redirect chain and for reading the body, the same as Crawlee JS. A body read past it raises `TimeoutError`. By default, `timeout` is `'default'` and the default of the underlying library applies to each request of the chain. `ImpitHttpClient` allows 30 seconds, including reading the body. `CurlImpersonateHttpClient` allows 30 seconds to connect and 30 seconds without receiving data. `HttpxHttpClient` allows 5 seconds per operation. To change the default, pass `timeout` when you create the client.
 
 The crawlers pass the remaining `navigation_timeout` to the HTTP client, so it bounds reading the body too. With `FileDownloadCrawler(stream=True)`, the deadline also covers the body streamed in the request handler, with every HTTP client. In v1, only `ImpitHttpClient` bounded the streamed body, while `HttpxHttpClient` and `CurlImpersonateHttpClient` bounded only the connection. For long downloads, raise `navigation_timeout` together with `request_handler_timeout`.
+
+### `timeout=None` disables the timeout
+
+In v1, `ImpitHttpClient` and `CurlImpersonateHttpClient` disabled the timeout when `timeout` wasn't passed. Now `timeout=None` disables it, with every client. An explicit `timeout=None` changes meaning for `HttpxHttpClient`, which got the 5-second default of the client in v1. The same goes for `context.send_request` in `PlaywrightCrawler` with its default HTTP client, which got the 30-second default of Playwright in v1. `CurlImpersonateHttpClient` keeps the 300-second connect timeout built into `libcurl`, even with `timeout=None`.
 
 ### `send_request` follows at most 10 redirects
 

@@ -259,6 +259,10 @@ class HttpClient(ABC):
         """
         validate_http_url(url)
 
+        # The clients would treat any other value, such as a number of seconds, as `'default'` without a word.
+        if timeout is not None and timeout != 'default' and not isinstance(timeout, timedelta):
+            raise TypeError(f"`timeout` must be a `timedelta`, 'default' or `None`, got {timeout!r}.")
+
         # The headers of the client go through the redirect rules below too, so its credentials never leave the origin.
         headers = self._headers | HttpHeaders(headers or {})
 
@@ -267,7 +271,7 @@ class HttpClient(ABC):
 
         # `encoded=True` keeps the path and the query byte for byte, including a safe `%2F` in query.
         current_url = _with_ascii_host(URL(url, encoded=True))
-        deadline = monotonic() + timeout.total_seconds() if timeout not in (None, 'default') else None
+        deadline = monotonic() + timeout.total_seconds() if isinstance(timeout, timedelta) else None
 
         for _ in range(_MAX_REDIRECTS + 1):
             remaining = deadline - monotonic() if deadline is not None else None
