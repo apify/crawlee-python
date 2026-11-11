@@ -104,7 +104,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         Args:
             inner: The underlying request manager to wrap (typically a `RequestQueue`). Requests for non-throttled
-                domains are stored here. If omitted, `request_manager_opener` opens the default one on first use.
+                domains are stored here. If omitted, `request_manager_opener` opens the default one on first use,
+                which the whole process shares.
             domains: Domains to throttle, each given as a bare hostname such as `api.example.com`, or as any URL on
                 the domain, of which only the hostname is used. Blank entries are ignored, so a list built by
                 splitting a string needs no pruning. Only requests matching these domains will be routed to
@@ -138,6 +139,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             raise ValueError(f'max_domain_stall must be positive, got {max_domain_stall}.')
 
         self._inner = inner
+        self._owns_inner = inner is None
+        """Whether `inner` is the default store, which `drop()` forgets so the next use opens it again."""
         self._inner_lock = asyncio.Lock()
         self._service_locator = service_locator if service_locator is not None else global_service_locator
         self._base_delay = base_delay
@@ -166,28 +169,32 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     def inner(self) -> TRequestManager | None:
         """The wrapped request manager that stores requests for non-throttled domains.
 
-        `None` until the default one is opened on first use, if no `inner` was passed.
+        `None` until the default one is opened on first use, and again after `drop()`, if no `inner` was passed.
         """
         return self._inner
 
     @override
     async def drop(self) -> None:
         await self._ensure_sub_managers()
-        await asyncio.gather(*(manager.drop() for manager in self._opened_managers()))
+        inner = await self._get_inner()
+        await asyncio.gather(inner.drop(), *(sm.drop() for sm in self._sub_managers.values()))
         self._sub_managers.clear()
         self._sub_managers_ready = False
         self._in_flight_from_inner.clear()
+        if self._owns_inner:
+            self._inner = None
 
     @override
     async def purge(self) -> None:
-        """Empty the inner manager, if it's open, and all sub-managers, and reset transient per-domain throttle state.
+        """Empty the inner manager and all sub-managers, and reset transient per-domain throttle state.
 
         The configured domain list and any robots.txt-derived `crawl_delay` are preserved. Only the dynamic backoff
         state (consecutive 429 counter, the throttle clocks and the stall clock) is cleared. Sub-managers stay open;
         they're just emptied.
         """
         await self._ensure_sub_managers()
-        await asyncio.gather(*(manager.purge() for manager in self._opened_managers()))
+        inner = await self._get_inner()
+        await asyncio.gather(inner.purge(), *(sm.purge() for sm in self._sub_managers.values()))
         self._in_flight_from_inner.clear()
         self._migrated_from_inner = 0
         for state in self._domain_states.values():

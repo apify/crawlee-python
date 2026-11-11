@@ -1127,8 +1127,13 @@ async def test_default_inner_opened_once(service_locator: ServiceLocator) -> Non
         pytest.param('drop', id='drop'),
     ],
 )
-async def test_default_inner_not_opened_to_clear(service_locator: ServiceLocator, method: str) -> None:
-    """Test that purging or dropping doesn't open the default `inner` just to clear it."""
+async def test_clearing_reaches_unopened_default_inner(service_locator: ServiceLocator, method: str) -> None:
+    """Test that purging or dropping also clears a default `inner` the manager hasn't opened yet."""
+    queue = await RequestQueue.open(
+        storage_backend=service_locator.get_storage_backend(),
+        configuration=service_locator.get_configuration(),
+    )
+    await queue.add_request(f'https://{NON_THROTTLED_DOMAIN}/page1')
     manager = ThrottlingRequestManager(
         domains=TEST_DOMAINS,
         request_manager_opener=RequestQueue.open,
@@ -1137,7 +1142,39 @@ async def test_default_inner_not_opened_to_clear(service_locator: ServiceLocator
 
     await getattr(manager, method)()
 
+    reopened = await RequestQueue.open(
+        storage_backend=service_locator.get_storage_backend(),
+        configuration=service_locator.get_configuration(),
+    )
+    assert (await reopened.check_readiness()).status == 'finished'
+
+
+async def test_drop_reopens_default_inner(service_locator: ServiceLocator) -> None:
+    """Test that the default `inner` opens again after `drop()`, so new requests don't go into the dropped store."""
+    manager = ThrottlingRequestManager(
+        domains=TEST_DOMAINS,
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+    await manager.add_request(f'https://{NON_THROTTLED_DOMAIN}/page1')
+    dropped = manager.inner
+
+    await manager.drop()
     assert manager.inner is None
+
+    await manager.add_request(f'https://{NON_THROTTLED_DOMAIN}/page2')
+    assert manager.inner is not None
+    assert manager.inner is not dropped
+    assert await manager.get_pending_count() == 1
+
+
+async def test_drop_keeps_passed_inner(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """Test that `drop()` keeps an `inner` passed by the caller, since the manager can't open it again."""
+    inner = manager.inner
+
+    await manager.drop()
+
+    assert manager.inner is inner
 
 
 async def test_processing_time_reaches_default_inner(service_locator: ServiceLocator) -> None:
