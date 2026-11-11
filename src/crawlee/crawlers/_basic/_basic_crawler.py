@@ -609,8 +609,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     async def pause(self, *, timeout: timedelta | None = None) -> None:
         """Stop dispatching new requests and wait until the ones in progress finish.
 
-        Unlike `stop`, this doesn't end the run: `run` stays pending until `resume` is called. Awaited from a request
-        handler, it waits for that handler's own request too, so without a `timeout` it never returns.
+        Unlike `stop`, this doesn't end the run: `run` stays pending until `resume` is called. A run that is stopped or
+        aborted by `abort_on_error` still ends once the requests in progress finish. Awaited from a request handler, it
+        waits for that handler's own request too, so without a `timeout` it never returns.
 
         Args:
             timeout: How long to wait for the requests in progress. The crawler stays paused if they don't finish in
@@ -620,7 +621,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             TimeoutError: If the requests in progress don't finish within `timeout`.
         """
         if self._dispatching_run is None:
-            self._logger.warning('Cannot pause a crawler that is not running.')
+            self._logger.warning('Cannot pause a crawler that is not dispatching requests.')
             return
 
         await self._dispatching_run.pause(timeout=timeout)
@@ -628,7 +629,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     def resume(self) -> None:
         """Resume a crawler paused with `pause`, so that it dispatches requests again."""
         if self._dispatching_run is None:
-            self._logger.warning('Cannot resume a crawler that is not running.')
+            self._logger.warning('Cannot resume a crawler that is not dispatching requests.')
             return
 
         self._dispatching_run.resume()
@@ -1339,7 +1340,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if self._abort_on_error:
             self._logger.error('Aborting crawler run due to error (abort_on_error=True)', exc_info=error)
-            self._run.failed = True
+            self._run.fail()
 
         if self._should_retry_request(context, error):
             request.retry_count += 1

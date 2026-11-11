@@ -1986,6 +1986,198 @@ async def test_pause_holds_requests_until_resume() -> None:
     assert visited == urls
 
 
+async def test_stop_ends_paused_run() -> None:
+    """`stop()` ends a paused run without waiting for `resume()` and starts no new request."""
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1))
+    release = asyncio.Event()
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+        await release.wait()
+
+    urls = ['https://a.placeholder.com', 'https://b.placeholder.com']
+    run_task = asyncio.create_task(crawler.run(urls))
+    assert await poll_until_condition(lambda: len(visited) == 1)
+
+    pause_task = asyncio.create_task(crawler.pause())
+    await asyncio.sleep(0)
+    release.set()
+    await asyncio.wait_for(pause_task, timeout=10)
+
+    crawler.stop()
+    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
+    await asyncio.wait([run_task], timeout=10)
+    assert run_task.done()
+    await run_task
+
+    assert visited == urls[:1]
+
+
+async def test_pause_after_stop_ends_run() -> None:
+    """`pause()` after `stop()` waits for the request in progress, and the run still ends."""
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1))
+    release = asyncio.Event()
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+        await release.wait()
+
+    urls = ['https://a.placeholder.com', 'https://b.placeholder.com']
+    run_task = asyncio.create_task(crawler.run(urls))
+    assert await poll_until_condition(lambda: len(visited) == 1)
+
+    crawler.stop()
+    pause_task = asyncio.create_task(crawler.pause())
+    await asyncio.sleep(0)
+    assert not pause_task.done()
+
+    release.set()
+    await asyncio.wait_for(pause_task, timeout=10)
+    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
+    await asyncio.wait([run_task], timeout=10)
+    assert run_task.done()
+    await run_task
+
+    assert visited == urls[:1]
+
+
+async def test_pause_timeout_after_stop_ends_run() -> None:
+    """`pause()` after `stop()` that times out still lets the run end once the request in progress finishes."""
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1))
+    release = asyncio.Event()
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+        await release.wait()
+
+    urls = ['https://a.placeholder.com', 'https://b.placeholder.com']
+    run_task = asyncio.create_task(crawler.run(urls))
+    assert await poll_until_condition(lambda: len(visited) == 1)
+
+    crawler.stop()
+    with pytest.raises(TimeoutError):
+        await crawler.pause(timeout=timedelta(milliseconds=50))
+
+    release.set()
+    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
+    await asyncio.wait([run_task], timeout=10)
+    assert run_task.done()
+    await run_task
+
+    assert visited == urls[:1]
+
+
+async def test_migration_after_stop_ends_run() -> None:
+    """A migration after `stop()` still lets the run end once the request in progress finishes."""
+    crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1))
+    release = asyncio.Event()
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+        await release.wait()
+
+    urls = ['https://a.placeholder.com', 'https://b.placeholder.com']
+    run_task = asyncio.create_task(crawler.run(urls))
+    assert await poll_until_condition(lambda: len(visited) == 1)
+
+    crawler.stop()
+    event_manager = service_locator.get_event_manager()
+    event_manager.emit(event=Event.MIGRATING, event_data=EventMigratingData())
+    await asyncio.sleep(0)
+
+    release.set()
+    await event_manager.wait_for_all_listeners_to_complete()
+    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
+    await asyncio.wait([run_task], timeout=10)
+    assert run_task.done()
+    await run_task
+
+    assert visited == urls[:1]
+
+
+async def test_abort_on_error_ends_paused_run() -> None:
+    """A request that fails with `abort_on_error` on a paused crawler ends the run without `resume()`."""
+    crawler = BasicCrawler(
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+        abort_on_error=True,
+    )
+    release = asyncio.Event()
+    visited = list[str]()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+        await release.wait()
+        raise RuntimeError('Request failed')
+
+    urls = ['https://a.placeholder.com', 'https://b.placeholder.com']
+    run_task = asyncio.create_task(crawler.run(urls))
+    assert await poll_until_condition(lambda: len(visited) == 1)
+
+    # The pause gives up on the request in progress, so the request fails while the crawler is already paused.
+    with pytest.raises(TimeoutError):
+        await crawler.pause(timeout=timedelta(milliseconds=50))
+
+    release.set()
+    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
+    await asyncio.wait([run_task], timeout=10)
+    assert run_task.done()
+    await run_task
+
+    assert visited == urls[:1]
+
+
+async def test_pause_after_abort_on_error_ends_run() -> None:
+    """`pause()` after a request fails with `abort_on_error` waits for the request in progress, and the run ends."""
+    crawler = BasicCrawler(
+        concurrency_settings=ConcurrencySettings(desired_concurrency=2, max_concurrency=2),
+        abort_on_error=True,
+        max_request_retries=0,
+    )
+    second_started = asyncio.Event()
+    release = asyncio.Event()
+    visited = list[str]()
+    failed_request_handler = AsyncMock()
+    crawler.failed_request_handler(failed_request_handler)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        visited.append(context.request.url)
+
+        # The first request fails only once the second one is in progress, so that `pause()` has a request to wait for.
+        if len(visited) == 1:
+            await second_started.wait()
+            raise RuntimeError('Request failed')
+
+        second_started.set()
+        await release.wait()
+
+    urls = ['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com']
+    run_task = asyncio.create_task(crawler.run(urls))
+    assert await poll_until_condition(lambda: failed_request_handler.await_count == 1)
+
+    pause_task = asyncio.create_task(crawler.pause())
+    await asyncio.sleep(0)
+    assert not pause_task.done()
+
+    release.set()
+    await asyncio.wait_for(pause_task, timeout=10)
+    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
+    await asyncio.wait([run_task], timeout=10)
+    assert run_task.done()
+    await run_task
+
+    assert len(visited) == 2
+
+
 async def test_pause_and_resume_before_run_warn(caplog: pytest.LogCaptureFixture) -> None:
     """`pause()` and `resume()` before a run only log a warning."""
     crawler = BasicCrawler()
@@ -1994,8 +2186,8 @@ async def test_pause_and_resume_before_run_warn(caplog: pytest.LogCaptureFixture
         await crawler.pause()
         crawler.resume()
 
-    assert 'Cannot pause a crawler that is not running.' in caplog.text
-    assert 'Cannot resume a crawler that is not running.' in caplog.text
+    assert 'Cannot pause a crawler that is not dispatching requests.' in caplog.text
+    assert 'Cannot resume a crawler that is not dispatching requests.' in caplog.text
 
 
 async def test_pause_and_resume_after_run_warn(caplog: pytest.LogCaptureFixture) -> None:
@@ -2007,8 +2199,8 @@ async def test_pause_and_resume_after_run_warn(caplog: pytest.LogCaptureFixture)
         await crawler.pause()
         crawler.resume()
 
-    assert 'Cannot pause a crawler that is not running.' in caplog.text
-    assert 'Cannot resume a crawler that is not running.' in caplog.text
+    assert 'Cannot pause a crawler that is not dispatching requests.' in caplog.text
+    assert 'Cannot resume a crawler that is not dispatching requests.' in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -2083,8 +2275,17 @@ async def test_migration_timeout_logs_error(monkeypatch: pytest.MonkeyPatch, cap
     await asyncio.wait_for(run_task, timeout=10)
 
 
-async def test_run_stops_listening_for_migration() -> None:
-    """Once `run()` returns, a migration no longer reaches the crawler."""
+@pytest.mark.parametrize(
+    ('event', 'event_data'),
+    [
+        pytest.param(Event.MIGRATING, EventMigratingData(), id='migrating'),
+        pytest.param(Event.ABORTING, EventAbortingData(), id='aborting'),
+    ],
+)
+async def test_run_stops_listening_for_migration(
+    event: Event, event_data: EventMigratingData | EventAbortingData
+) -> None:
+    """Once `run()` returns, a migration or an abort no longer reaches the crawler."""
     event_manager = LocalEventManager()
     crawler = BasicCrawler(event_manager=event_manager, request_handler=AsyncMock())
 
@@ -2092,7 +2293,7 @@ async def test_run_stops_listening_for_migration() -> None:
         await crawler.run(['https://a.placeholder.com'])
 
         with patch.object(crawler.statistics, 'persist_state') as persist_state:
-            event_manager.emit(event=Event.MIGRATING, event_data=EventMigratingData())
+            event_manager.emit(event=event, event_data=event_data)
             await event_manager.wait_for_all_listeners_to_complete()
 
     persist_state.assert_not_called()

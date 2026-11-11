@@ -52,13 +52,11 @@ class CrawlerRun(Generic[TStatisticsState]):
         )
         self._logger_once = LoggerOnce(logger)
         self._stop_requested = False
+        self._failed = False
         self._dispatching = False
         self._finished = False
         self._wake_at: datetime | None = None
         self._wake_timer: asyncio.TimerHandle | None = None
-
-        self.failed = False
-        """Whether a request has failed while the crawler aborts on an error."""
 
         self.handled_request = False
         """Whether this run has marked any request as handled."""
@@ -81,6 +79,11 @@ class CrawlerRun(Generic[TStatisticsState]):
         """Whether a graceful shutdown of this run has been requested."""
         return self._stop_requested
 
+    @property
+    def failed(self) -> bool:
+        """Whether a request has failed while the crawler aborts on an error."""
+        return self._failed
+
     async def dispatch_requests(self) -> None:
         """Run the task loop until the crawl is over. The concurrency system has to be active by now."""
         self._dispatching = True
@@ -91,8 +94,14 @@ class CrawlerRun(Generic[TStatisticsState]):
             self._dispatching = False
 
     async def pause(self, *, timeout: timedelta | None = None) -> None:
-        """Stop dispatching new requests and wait until the ones in progress finish."""
-        await self._autoscaled_pool.pause(timeout=timeout)
+        """Stop dispatching new requests and wait until the ones in progress finish.
+
+        A stopped or failed run still ends.
+        """
+        try:
+            await self._autoscaled_pool.pause(timeout=timeout)
+        finally:
+            self._release_if_ending()
 
     def resume(self) -> None:
         """Resume dispatching after `pause`."""
@@ -119,8 +128,19 @@ class CrawlerRun(Generic[TStatisticsState]):
         self._autoscaled_pool.notify()
 
     def stop(self) -> None:
-        """Ask the run to stop taking new requests."""
+        """Ask the run to stop taking new requests. A paused run resumes, so that it can notice the stop and finish."""
         self._stop_requested = True
+        self._release_if_ending()
+
+    def fail(self) -> None:
+        """Mark the run as failed, so that it takes no new requests. A paused run resumes, so that it can finish."""
+        self._failed = True
+        self._release_if_ending()
+
+    def _release_if_ending(self) -> None:
+        """Lift a pause once the run is stopped or failed, since a paused pool never checks whether the run is over."""
+        if self._stop_requested or self._failed:
+            self._autoscaled_pool.resume()
 
     def log_once(self, message: str, key: str) -> None:
         """Log `message` the first time this run asks for it under `key`."""
