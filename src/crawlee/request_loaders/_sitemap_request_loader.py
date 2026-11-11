@@ -62,9 +62,10 @@ class SitemapRequestLoaderState(BaseModel):
     `processed_sitemap_urls`. If `pending_sitemap_urls` is empty, `completed` is set to `True`.
 
     When `fetch_next_request` is called, a URL is extracted from `url_queue`, and the request built from it is added
-    to `request_data` and its URL to `in_progress`. A URL that's already in `in_progress`, because another sitemap
-    lists it too, is skipped and `total_count` is decremented by 1. When `mark_request_as_handled` is called for the
-    request, it is removed from both and `handled_count` is incremented by 1.
+    to `request_data` and its URL to `in_progress`. A URL that another sitemap lists too is skipped while it's still
+    in `in_progress`, and `total_count` is decremented by 1. When `mark_request_as_handled` is called for the request,
+    it is removed from both and `handled_count` is incremented by 1. A URL that another sitemap lists after its
+    request is handled is served again.
 
     During initial startup or restart after persistence, state validation occurs in `_get_state`. If both
     `pending_sitemap_urls` and `in_progress_sitemap_url` are empty and `completed` is False, this indicates a
@@ -261,9 +262,13 @@ class SitemapRequestLoader(RequestLoader):
                 if len(state.url_queue) < self._max_buffer_size:
                     self._queue_has_capacity.set()
 
+                # The URL was listed again while its request is still being processed.
+                if url in state.in_progress:
+                    state.total_count -= 1
+                    continue
+
                 # A request restored as in progress is served again as it was.
-                restored_request = state.request_data.get(url)
-                if restored_request is not None and url not in state.in_progress:
+                if (restored_request := state.request_data.get(url)) is not None:
                     state.in_progress.add(url)
                     return restored_request
 
@@ -276,7 +281,7 @@ class SitemapRequestLoader(RequestLoader):
                         request_option = transform_request_option
 
                 request = Request.from_url(**request_option)
-                # The URL was listed again while its request is still being processed.
+                # `transform_request_function` returned the URL of a request that's still being processed.
                 if request.url in state.in_progress:
                     state.total_count -= 1
                     continue

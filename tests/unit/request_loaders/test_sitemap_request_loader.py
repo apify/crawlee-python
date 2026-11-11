@@ -249,6 +249,38 @@ async def test_duplicate_url_skipped_while_in_progress() -> None:
     assert await loader.get_handled_count() == 1
 
 
+async def test_duplicate_url_transformed_once_while_in_progress() -> None:
+    """A URL listed again while its request is in progress isn't passed to `transform_request_function` again."""
+    sitemap_body = f'<urlset><url><loc>{DEFAULT_URL}page</loc></url></urlset>'.encode()
+    sitemap_urls = [f'{DEFAULT_URL}sitemap-1.xml', f'{DEFAULT_URL}sitemap-2.xml']
+    client, _ = make_status_stream_client({url: [(200, sitemap_body)] for url in sitemap_urls})
+    transform = Mock(return_value='unchanged')
+    loader = SitemapRequestLoader(sitemap_urls, http_client=client, transform_request_function=transform)
+
+    request = await loader.fetch_next_request()
+    assert request is not None
+    duplicate = await loader.fetch_next_request()
+
+    assert duplicate is None
+    transform.assert_called_once()
+
+
+async def test_transformed_url_skipped_while_in_progress() -> None:
+    """A URL that `transform_request_function` turns into the URL of a request in progress is skipped."""
+    sitemap_body = f'<urlset><url><loc>{DEFAULT_URL}a</loc></url><url><loc>{DEFAULT_URL}b</loc></url></urlset>'
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    client, _ = make_status_stream_client({sitemap_url: [(200, sitemap_body.encode())]})
+    transform = Mock(return_value=RequestOptions(url=f'{DEFAULT_URL}page'))
+    loader = SitemapRequestLoader([sitemap_url], http_client=client, transform_request_function=transform)
+
+    request = await loader.fetch_next_request()
+    assert request is not None
+    duplicate = await loader.fetch_next_request()
+
+    assert duplicate is None
+    assert await loader.get_total_count() == 1
+
+
 async def test_restored_request_served_once_for_duplicate_url() -> None:
     """A request restored as in progress isn't served again for the same URL listed by another sitemap."""
     sitemap_body = f'<urlset><url><loc>{DEFAULT_URL}page</loc></url></urlset>'.encode()
