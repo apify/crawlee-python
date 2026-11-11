@@ -161,13 +161,20 @@ class HttpxHttpClient(HttpClient):
         # covers the requests that carry no `ProxyInfo` of their own.
         self._proxy = async_client_kwargs.pop('proxy', None)
 
-        for ignored_kwarg in ('mounts', 'transport', 'cookies', 'auth', 'params', 'max_redirects', 'verify'):
+        for ignored_kwarg in ('mounts', 'transport', 'cookies', 'auth', 'params', 'max_redirects'):
             if async_client_kwargs.pop(ignored_kwarg, None) is not None:
                 warnings.warn(
                     f'The `{ignored_kwarg}` argument of `HttpxHttpClient` is ignored.',
                     UserWarning,
                     stacklevel=2,
                 )
+
+        if async_client_kwargs.pop('verify', None) is not None:
+            warnings.warn(
+                'The `verify` argument of `HttpxHttpClient` is ignored. Use `ignore_tls_errors` instead.',
+                UserWarning,
+                stacklevel=2,
+            )
 
         self._async_client_kwargs = async_client_kwargs
         self._header_generator = header_generator
@@ -266,7 +273,7 @@ class HttpxHttpClient(HttpClient):
 
             # A client built with `proxy=` mounts its own transport and never calls the one given to `transport=`,
             # so the proxy goes on the transport.
-            transport = httpx2.AsyncHTTPTransport(
+            transport = self._create_transport(
                 http1=self._http1,
                 http2=self._http2,
                 verify=ssl_context,
@@ -298,10 +305,23 @@ class HttpxHttpClient(HttpClient):
                 }
             )
 
-            client = httpx2.AsyncClient(**kwargs)
-            self._clients[key] = client
+            self._clients[key] = self._create_client(**kwargs)
 
         return self._clients[key]
+
+    def _create_transport(self, **kwargs: Any) -> httpx2.AsyncHTTPTransport:
+        """Create the `httpx2.AsyncHTTPTransport` from the prepared keyword arguments.
+
+        The transport verifies the TLS certificates. A subclass can override it to change the arguments.
+        """
+        return httpx2.AsyncHTTPTransport(**kwargs)
+
+    def _create_client(self, **kwargs: Any) -> httpx2.AsyncClient:
+        """Create the `httpx2.AsyncClient` from the prepared keyword arguments.
+
+        A subclass can override it to change the arguments.
+        """
+        return httpx2.AsyncClient(**kwargs)
 
     def _combine_headers(self, explicit_headers: HttpHeaders) -> HttpHeaders:
         """Merge generated headers with the headers of the client and explicit headers for an HTTP request.

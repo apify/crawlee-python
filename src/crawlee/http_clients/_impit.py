@@ -138,13 +138,20 @@ class ImpitHttpClient(HttpClient):
         self._ignore_tls_errors = ignore_tls_errors
         self._browser = browser
 
-        for ignored_kwarg in ('cookies', 'cookie_jar', 'max_redirects', 'verify'):
+        for ignored_kwarg in ('cookies', 'cookie_jar', 'max_redirects'):
             if async_client_kwargs.pop(ignored_kwarg, None) is not None:
                 warnings.warn(
                     f'The `{ignored_kwarg}` argument of `ImpitHttpClient` is ignored.',
                     UserWarning,
                     stacklevel=2,
                 )
+
+        if async_client_kwargs.pop('verify', None) is not None:
+            warnings.warn(
+                'The `verify` argument of `ImpitHttpClient` is ignored. Use `ignore_tls_errors` instead.',
+                UserWarning,
+                stacklevel=2,
+            )
 
         self._async_client_kwargs = async_client_kwargs
 
@@ -218,11 +225,18 @@ class ImpitHttpClient(HttpClient):
         # Redirects are followed hop by hop by `send_request`.
         kwargs['follow_redirects'] = False
 
-        client = AsyncClient(**kwargs)
+        client = self._create_client(**kwargs)
 
         self._clients[key] = client
 
         return client
+
+    def _create_client(self, **kwargs: Any) -> AsyncClient:
+        """Create the `impit.AsyncClient` from the prepared keyword arguments.
+
+        A subclass can override it to change the arguments.
+        """
+        return AsyncClient(**kwargs)
 
     @staticmethod
     def _is_proxy_error(error: HTTPError) -> bool:

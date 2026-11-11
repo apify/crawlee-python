@@ -191,13 +191,20 @@ class CurlImpersonateHttpClient(HttpClient):
         )
         self._ignore_tls_errors = ignore_tls_errors
 
-        for ignored_kwarg in ('cookies', 'auth', 'params', 'allow_redirects', 'max_redirects', 'verify'):
+        for ignored_kwarg in ('cookies', 'auth', 'params', 'allow_redirects', 'max_redirects'):
             if async_session_kwargs.pop(ignored_kwarg, None) is not None:
                 warnings.warn(
                     f'The `{ignored_kwarg}` argument of `CurlImpersonateHttpClient` is ignored.',
                     UserWarning,
                     stacklevel=2,
                 )
+
+        if async_session_kwargs.pop('verify', None) is not None:
+            warnings.warn(
+                'The `verify` argument of `CurlImpersonateHttpClient` is ignored. Use `ignore_tls_errors` instead.',
+                UserWarning,
+                stacklevel=2,
+            )
 
         self._async_session_kwargs = async_session_kwargs
 
@@ -270,9 +277,17 @@ class CurlImpersonateHttpClient(HttpClient):
             kwargs.update(self._async_session_kwargs)
 
             # Create and store the new session with the specified kwargs.
-            self._clients[proxy_url] = _AsyncSession(**kwargs)
+            self._clients[proxy_url] = self._create_client(**kwargs)
 
         return self._clients[proxy_url]
+
+    def _create_client(self, **kwargs: Any) -> AsyncSession:
+        """Create the `curl_cffi.requests.AsyncSession` from the prepared keyword arguments.
+
+        A subclass can override it to change the arguments. A request that ignores TLS errors turns the verification off
+        on its own, whatever the session sets.
+        """
+        return _AsyncSession(**kwargs)
 
     def _convert_method(self, method: HttpMethod) -> CurlHttpMethod:
         """Convert from Crawlee HTTP method to curl-cffi HTTP method.

@@ -65,6 +65,20 @@ async def test_ignore_tls_errors_turns_off_verification(
     assert transport_class.call_args.kwargs['verify'].verify_mode == expected_verify_mode
 
 
+def test_client_gets_transport_from_create_transport(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that the client gets the transport from `_create_transport`, which verifies the certificates."""
+    client = HttpxHttpClient()
+    create_transport = Mock()
+    create_client = Mock()
+    monkeypatch.setattr(client, '_create_transport', create_transport)
+    monkeypatch.setattr(client, '_create_client', create_client)
+
+    client._get_client(None, ignore_tls_errors=False)
+
+    assert create_transport.call_args.kwargs['verify'].verify_mode == ssl.CERT_REQUIRED
+    assert create_client.call_args.kwargs['transport'] is create_transport.return_value
+
+
 def test_silences_httpx_request_logging(monkeypatch: pytest.MonkeyPatch) -> None:
     """Instantiating the client lowers the noisy per-request `httpx2` INFO logs to WARNING by default."""
     monkeypatch.setattr(HttpxHttpClient, '_httpx2_log_level', None)

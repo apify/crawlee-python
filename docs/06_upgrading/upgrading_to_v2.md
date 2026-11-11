@@ -423,7 +423,7 @@ With `BasicCrawler` and the HTTP crawlers, `context.send_request` always saves t
 
 ### `ignore_tls_errors` replaces `verify`
 
-`ImpitHttpClient` and `HttpxHttpClient` take `ignore_tls_errors` instead of `verify`, and `CurlImpersonateHttpClient` takes it too. TLS certificates are still verified by default. `HttpxHttpClient` no longer takes a CA bundle or an `SSLContext`.
+`ImpitHttpClient` and `HttpxHttpClient` take `ignore_tls_errors` instead of `verify`, and `CurlImpersonateHttpClient` takes it too. TLS certificates are still verified by default.
 
 ```python
 # v1
@@ -434,6 +434,8 @@ http_client = ImpitHttpClient(ignore_tls_errors=True)
 ```
 
 To ignore TLS errors for a single call, pass `ignore_tls_errors=True` to `send_request` of the client or to `context.send_request`.
+
+The clients no longer take your own CA. `HttpxHttpClient` doesn't take a CA bundle or an `SSLContext`, and `CurlImpersonateHttpClient` ignores a CA bundle path in `verify`. To pass your own CA to `httpx2` or `curl_cffi`, use the environment variables they read, such as `SSL_CERT_FILE`, or subclass the client.
 
 ### Some client arguments are ignored
 

@@ -4,7 +4,7 @@ import asyncio
 import importlib
 import sys
 from datetime import timedelta
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -64,21 +64,34 @@ async def test_cookies_of_non_ascii_host_sent_back(monkeypatch: pytest.MonkeyPat
     [
         pytest.param(ImpitHttpClient, 'cookies', id='impit_cookies'),
         pytest.param(ImpitHttpClient, 'cookie_jar', id='impit_cookie_jar'),
-        pytest.param(ImpitHttpClient, 'verify', id='impit_verify'),
         pytest.param(HttpxHttpClient, 'cookies', id='httpx_cookies'),
         pytest.param(HttpxHttpClient, 'auth', id='httpx_auth'),
         pytest.param(HttpxHttpClient, 'params', id='httpx_params'),
-        pytest.param(HttpxHttpClient, 'verify', id='httpx_verify'),
         pytest.param(CurlImpersonateHttpClient, 'cookies', id='curl_cookies'),
         pytest.param(CurlImpersonateHttpClient, 'auth', id='curl_auth'),
         pytest.param(CurlImpersonateHttpClient, 'params', id='curl_params'),
-        pytest.param(CurlImpersonateHttpClient, 'verify', id='curl_verify'),
     ],
 )
 def test_ignored_argument_warns(client_class: type[HttpClient], kwarg: str) -> None:
     """Test that an argument of the underlying library that the client ignores raises a warning."""
     with pytest.warns(UserWarning, match=f'`{kwarg}` argument'):
         client_class(**{kwarg: Mock()})
+
+
+@pytest.mark.parametrize(
+    'client_class',
+    [
+        pytest.param(ImpitHttpClient, id='impit'),
+        pytest.param(HttpxHttpClient, id='httpx'),
+        pytest.param(CurlImpersonateHttpClient, id='curl_impersonate'),
+    ],
+)
+def test_verify_argument_warns_with_ignore_tls_errors(
+    client_class: type[ImpitHttpClient | HttpxHttpClient | CurlImpersonateHttpClient],
+) -> None:
+    """Test that the ignored `verify` argument raises a warning that points to `ignore_tls_errors`."""
+    with pytest.warns(UserWarning, match='`verify` argument .* is ignored. Use `ignore_tls_errors` instead.'):
+        client_class(verify=False)
 
 
 @pytest.mark.parametrize(
@@ -234,6 +247,28 @@ async def test_clients_cached_per_tls_setting(client_class: type[ImpitHttpClient
         assert verified is not unverified
         assert client._get_client(None, ignore_tls_errors=False) is verified
         assert client._get_client(None, ignore_tls_errors=True) is unverified
+
+
+@pytest.mark.parametrize(
+    ('client_class', 'get_client_kwargs'),
+    [
+        pytest.param(ImpitHttpClient, {'ignore_tls_errors': False}, id='impit'),
+        pytest.param(HttpxHttpClient, {'ignore_tls_errors': False}, id='httpx'),
+        pytest.param(CurlImpersonateHttpClient, {}, id='curl_impersonate'),
+    ],
+)
+def test_create_client_gets_prepared_arguments(
+    client_class: type[ImpitHttpClient | HttpxHttpClient | CurlImpersonateHttpClient],
+    get_client_kwargs: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that the client of the library comes from `_create_client`, which gets the arguments of the user too."""
+    client = client_class(timeout=5)
+    create_client = Mock()
+    monkeypatch.setattr(client, '_create_client', create_client)
+
+    assert client._get_client(None, **get_client_kwargs) is create_client.return_value
+    assert create_client.call_args.kwargs['timeout'] == 5
 
 
 @pytest.mark.parametrize(
