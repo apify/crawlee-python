@@ -17,7 +17,13 @@ from crawlee.crawlers import (
     RenderingTypePredictor,
 )
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler import SubCrawlerRun
-from crawlee.errors import ContextPipelineInitializationError, ProxyError, RequestHandlerError, SessionError
+from crawlee.errors import (
+    ContextPipelineInitializationError,
+    ProxyError,
+    RequestHandlerError,
+    RequestThrottledError,
+    SessionError,
+)
 
 if TYPE_CHECKING:
     from crawlee._types import UseStateFunction
@@ -87,6 +93,7 @@ def test_import_error_handled(optional_module_name: str) -> None:
         pytest.param(ConnectionResetError('Connection reset by peer'), id='connection-error'),
         pytest.param(TimeoutError('Request timed out'), id='timeout-error'),
         pytest.param(asyncio.TimeoutError('Asyncio timeout'), id='asyncio-timeout-error'),
+        pytest.param(RequestThrottledError(), id='request-throttled-error'),
         pytest.param(
             ContextPipelineInitializationError(
                 ConnectionResetError('Connection reset by peer'),

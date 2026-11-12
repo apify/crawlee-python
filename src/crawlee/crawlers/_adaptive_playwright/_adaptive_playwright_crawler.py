@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Coroutine
 from copy import deepcopy
@@ -33,10 +32,10 @@ from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.crawlers._playwright._playwright_crawler import _PlaywrightCrawlerAdditionalOptions
 from crawlee.errors import (
     ContextPipelineInitializationError,
-    ProxyError,
     RequestHandlerError,
     RequestThrottledError,
     SessionError,
+    UserHandlerTimeoutError,
 )
 from crawlee.statistics import Statistics, StatisticsState
 
@@ -58,16 +57,6 @@ if TYPE_CHECKING:
     from crawlee._types import UseStateFunction
     from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
 
-
-# Infrastructure errors during static sub-crawler runs that do not indicate whether a page requires
-# client-side rendering.
-_TRANSIENT_STATIC_ERRORS: tuple[type[BaseException], ...] = (
-    SessionError,
-    ProxyError,
-    ConnectionError,
-    TimeoutError,
-    asyncio.TimeoutError,
-)
 
 TStaticParseResult = TypeVar('TStaticParseResult')
 TStaticSelectResult = TypeVar('TStaticSelectResult')
@@ -454,27 +443,20 @@ class AdaptivePlaywrightCrawler(
             if should_detect_rendering_type:
                 detection_result: RenderingType | None
                 static_run = await self._crawl_one('static', context=context, use_state=use_initial_state_copy)
-
-                static_exception = static_run.exception
-                if isinstance(static_exception, ContextPipelineInitializationError):
-                    is_transient = True
-                elif isinstance(static_exception, RequestHandlerError):
-                    is_transient = isinstance(static_exception.wrapped_exception, _TRANSIENT_STATIC_ERRORS)
-                else:
-                    is_transient = isinstance(static_exception, _TRANSIENT_STATIC_ERRORS)
-
-                if static_exception is not None and is_transient:
-                    context.log.debug(
-                        f'Static run failed with {type(static_exception).__name__}; '
-                        f'discarding rendering type detection for {context.request.url}.'
-                    )
+                if static_run.exception is not None and _is_inconclusive_static_failure(static_run.exception):
                     detection_result = None
                 elif static_run.result and self.result_comparator(static_run.result, pw_run.result):
                     detection_result = 'static'
                 else:
                     detection_result = 'client only'
 
-                if detection_result is not None:
+                if detection_result is None:
+                    context.log.debug(
+                        f'Static crawler failed during rendering type detection for {context.request.url}, '
+                        'the result is not used',
+                        exc_info=static_run.exception,
+                    )
+                else:
                     context.log.debug(f'Detected rendering type {detection_result} for {context.request.url}')
                     self.rendering_type_predictor.store_result(context.request, detection_result)
 
@@ -539,6 +521,32 @@ class AdaptivePlaywrightCrawler(
 
     def track_rendering_type_mispredictions(self) -> None:
         self.statistics.state.rendering_type_mispredictions += 1
+
+
+def _is_inconclusive_static_failure(exception: Exception) -> bool:
+    """Tell whether a failed static run says nothing about whether the page needs a browser.
+
+    Failures that happen before the request handler can process the response are inconclusive: the request could not
+    be fetched or the response could not be prepared (`ContextPipelineInitializationError`), the session was blocked
+    (`SessionError`), the request was throttled or it timed out. An exception raised by the request handler itself,
+    for example because an element is missing in the static content, is evidence that the page needs a browser.
+    """
+    if isinstance(exception, ContextPipelineInitializationError):
+        return True
+
+    if isinstance(exception, RequestHandlerError):
+        exception = exception.wrapped_exception
+
+    transient_errors: tuple[type[Exception], ...] = (
+        SessionError,
+        RequestThrottledError,
+        TimeoutError,
+        ConnectionError,
+    )
+    if 'UserHandlerTimeoutError' in globals():
+        transient_errors += (UserHandlerTimeoutError,)
+
+    return isinstance(exception, transient_errors)
 
 
 @dataclass(frozen=True)
