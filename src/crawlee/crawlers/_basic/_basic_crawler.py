@@ -284,6 +284,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     _request_handler_timeout_text = 'Request handler timed out after'
     __next_id = 0
 
+    _SAFE_MIGRATION_WAIT = timedelta(seconds=20)
+    """How long a migration or an abort waits for the requests in progress."""
+
     def __init__(
         self,
         *,
@@ -581,6 +584,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         """The run in progress, if any."""
         return self._last_run if self._last_run is not None and self._last_run.is_live else None
 
+    @property
+    def _dispatching_run(self) -> CrawlerRun[TStatisticsState] | None:
+        """The run whose task loop is dispatching, if any. Only that one can be paused and resumed."""
+        return self._live_run if self._live_run is not None and self._live_run.is_dispatching else None
+
     def stop(self, reason: str = 'Stop was called externally.') -> None:
         """Set flag to stop crawler.
 
@@ -597,6 +605,34 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         else:
             # A caller can stop a run it scheduled with `create_task(crawler.run())` before the task starts.
             self._stop_before_run = True
+
+    async def pause(self, *, timeout: timedelta | None = None) -> None:
+        """Stop dispatching new requests and wait until the ones in progress finish.
+
+        Unlike `stop`, this doesn't end the run: `run` stays pending until `resume` is called. A run that is stopped or
+        aborted by `abort_on_error` still ends once the requests in progress finish. Awaited from a request handler, it
+        waits for that handler's own request too, so without a `timeout` it never returns.
+
+        Args:
+            timeout: How long to wait for the requests in progress. The crawler stays paused if they don't finish in
+                time.
+
+        Raises:
+            TimeoutError: If the requests in progress don't finish within `timeout`.
+        """
+        if self._dispatching_run is None:
+            self._logger.warning('Cannot pause a crawler that is not dispatching requests.')
+            return
+
+        await self._dispatching_run.pause(timeout=timeout)
+
+    def resume(self) -> None:
+        """Resume a crawler paused with `pause`, so that it dispatches requests again."""
+        if self._dispatching_run is None:
+            self._logger.warning('Cannot resume a crawler that is not dispatching requests.')
+            return
+
+        self._dispatching_run.resume()
 
     def _wrap_handler_with_error_context(
         self, handler: Callable[[TCrawlingContext | BasicCrawlingContext, Exception], Awaitable[T]]
@@ -922,7 +958,29 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             for context in contexts_to_enter:
                 await exit_stack.enter_async_context(context)
 
-            await self._run.dispatch_requests()
+            event_manager = self._service_locator.get_event_manager()
+            event_manager.on(event=Event.MIGRATING, listener=self._pause_by_event)
+            event_manager.on(event=Event.ABORTING, listener=self._pause_by_event)
+
+            try:
+                await self._run.dispatch_requests()
+            finally:
+                event_manager.off(event=Event.MIGRATING, listener=self._pause_by_event)
+                event_manager.off(event=Event.ABORTING, listener=self._pause_by_event)
+
+    async def _pause_by_event(self) -> None:
+        """Pause the crawl before the process migrates or is aborted, so that no request is left half-done."""
+        if self._dispatching_run is not None:
+            try:
+                await self._dispatching_run.pause(timeout=self._SAFE_MIGRATION_WAIT)
+            except TimeoutError:
+                self._logger.error(  # noqa: TRY400
+                    'The crawler was paused due to a migration or an abort, but some requests did not finish in '
+                    "time. Those requests' results may be duplicated."
+                )
+
+        # The persist state event that comes with a migration doesn't wait for the requests drained above.
+        await self._statistics.persist_state()
 
     async def add_requests(
         self,
@@ -1282,7 +1340,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         if self._abort_on_error:
             self._logger.error('Aborting crawler run due to error (abort_on_error=True)', exc_info=error)
-            self._run.failed = True
+            self._run.fail()
 
         if self._should_retry_request(context, error):
             request.retry_count += 1
