@@ -13,7 +13,7 @@ from typing_extensions import override
 
 from crawlee._types import BasicCrawlingContext, ConcurrencySettings, JsonSerializable, RequestHandlerRunResult
 from crawlee._utils.docs import docs_group
-from crawlee._utils.wait import wait_for
+from crawlee._utils.wait import wait_for_extendable
 from crawlee.crawlers import (
     AbstractHttpCrawler,
     AbstractHttpParser,
@@ -336,18 +336,19 @@ class AdaptivePlaywrightCrawler(
             use_state=use_state_function,
             log=context.log,
             register_deferred_cleanup=context.register_deferred_cleanup,
+            extend_timeout=context.extend_timeout,
         )
 
+        request_handler_timeout = self._resolve_request_handler_timeout(context.request.label)
         try:
-            await wait_for(
+            await wait_for_extendable(
                 lambda: self._pipeline_call_factory(
                     rendering_type=rendering_type, context_linked_to_result=context_linked_to_result
                 ),
-                timeout=self._request_handler_timeout,
+                timeout=request_handler_timeout,
                 timeout_message=(
-                    f'{rendering_type=!s} timed out after {self._request_handler_timeout.total_seconds()}seconds'
+                    f'{rendering_type=!s} timed out after {request_handler_timeout.total_seconds()} seconds'
                 ),
-                logger=self._logger,
             )
             return SubCrawlerRun(result=result)
         except Exception as e:

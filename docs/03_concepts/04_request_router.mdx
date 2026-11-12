@@ -9,6 +9,7 @@ import CodeBlock from '@theme/CodeBlock';
 import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 
 import BasicRequestHandlers from '!!raw-loader!roa-loader!./code_examples/request_router/basic_request_handlers.py';
+import HandlerTimeouts from '!!raw-loader!roa-loader!./code_examples/request_router/handler_timeouts.py';
 import SimpleDefaultHandler from '!!raw-loader!roa-loader!./code_examples/request_router/simple_default_handler.py';
 import CustomRouterDefaultOnly from '!!raw-loader!roa-loader!./code_examples/request_router/custom_router_default_only.py';
 import HttpPreNavigation from '!!raw-loader!roa-loader!./code_examples/request_router/http_pre_navigation.py';
@@ -56,6 +57,16 @@ More complex crawling projects often require different processing logic for vari
 
 <RunnableCodeBlock className="language-python" language="python">
     {BasicRequestHandlers}
+</RunnableCodeBlock>
+
+### Handler timeouts
+
+The `request_handler_timeout` option of the crawler applies to every request handler. When one type of page needs more or less time than the others, pass `request_handler_timeout` to <ApiLink to="class/Router#handler">`router.handler()`</ApiLink> or <ApiLink to="class/Router#default_handler">`router.default_handler()`</ApiLink>. Handlers that don't set it keep the crawler's timeout.
+
+When the time a request needs only becomes clear while the handler runs, await <ApiLink to="class/BasicCrawlingContext#extend_timeout">`context.extend_timeout()`</ApiLink> to give the handler more time. It also keeps the request locked in the request queue for longer. Called from a pre-navigation or post-navigation hook, it extends the navigation timeout instead. Awaited on another event loop, such as one started in a separate thread, it raises an error. Callbacks that run outside the request processing, such as Playwright event handlers, can't extend the timeout.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {HandlerTimeouts}
 </RunnableCodeBlock>
 
 ## Middleware

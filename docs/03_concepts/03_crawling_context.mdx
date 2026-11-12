@@ -46,6 +46,7 @@ The context provides helpers that operate on the crawler's storages and request 
 - `get_key_value_store` opens a key-value store, the default one unless you pass `id`, `name` or `alias`.
 - `use_state` returns a dictionary shared by all handler calls of the crawler. The crawler keeps it in the default key-value store and saves it automatically. This helper is experimental and its interface may change.
 - `send_request` sends an extra HTTP request through the crawler's HTTP client, with the session and proxy of the current request. Its response isn't parsed, and the request doesn't go through the request queue.
+- `extend_timeout` gives the running request handler or navigation hook more time and keeps the request locked in the request queue for longer. For details, see [Handler timeouts](./request-router#handler-timeouts).
 
 The following example uses most of these helpers in a <ApiLink to="class/ParselCrawler">`ParselCrawler`</ApiLink> handler and reads the results back from the crawler once the run finishes.
 

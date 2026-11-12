@@ -643,6 +643,58 @@ async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: lis
     mocked_browser_handler.assert_called_once_with()
 
 
+async def test_route_timeout_in_sub_crawler(test_urls: list[str]) -> None:
+    """Test that the timeout of a router handler replaces the one of the crawler in the sub crawler runs."""
+    static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        max_request_retries=0,
+        rendering_type_predictor=static_only_predictor_no_detection,
+        request_handler_timeout=timedelta(seconds=0.5),
+    )
+    mocked_static_handler = Mock(name='static_handler')
+
+    @crawler.router.handler('SLOW', request_handler_timeout=timedelta(seconds=10))
+    async def slow_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        await asyncio.sleep(1)
+        with suppress(AdaptiveContextError):
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            return
+        mocked_static_handler()
+
+    stats = await crawler.run([Request.from_url(test_urls[0], label='SLOW')])
+
+    assert stats.requests_finished == 1
+    mocked_static_handler.assert_called_once_with()
+
+
+async def test_pre_nav_hook_extends_timeout(test_urls: list[str]) -> None:
+    """Test that `extend_timeout` from a pre-navigation hook lets the static sub crawler run past its timeout."""
+    static_only_predictor_no_detection = _SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0]))
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        max_request_retries=0,
+        rendering_type_predictor=static_only_predictor_no_detection,
+        request_handler_timeout=timedelta(seconds=0.5),
+    )
+    mocked_static_handler = Mock(name='static_handler')
+
+    @crawler.pre_navigation_hook
+    async def slow_hook(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+        await context.extend_timeout(timedelta(seconds=10))
+        await asyncio.sleep(1)
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        with suppress(AdaptiveContextError):
+            context.page  # noqa:B018 Intentionally "useless expression". Can trigger exception.
+            return
+        mocked_static_handler()
+
+    stats = await crawler.run(test_urls[:1])
+
+    assert stats.requests_finished == 1
+    mocked_static_handler.assert_called_once_with()
+
+
 async def test_adaptive_playwright_crawler_default_predictor(test_urls: list[str]) -> None:
     """Test default rendering type predictor integration into crawler."""
 

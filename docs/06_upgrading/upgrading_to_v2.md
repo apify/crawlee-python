@@ -180,7 +180,11 @@ The memory backend now handles values the same way as the file-system backend. I
 
 `SqlStorageBackend` and `RedisStorageBackend` now lock a fetched request for 3 minutes by default, the same as Crawlee JS. In v1, the lock lasted 5 minutes. When a lock expires before the request is handled or reclaimed, another client sharing the queue can fetch the request and process it again.
 
-If processing a request can take longer than 3 minutes, call `RequestQueue.set_expected_request_processing_time()` with the longest time you expect. Every request fetched after that call stays locked at least that long. To give a single request that's still being processed more time, call `RequestQueue.extend_request_processing_time()`.
+A crawler keeps the lock at least as long as its longest request handler timeout plus 5 seconds, counting the timeouts of its router handlers. If processing a request can take longer, call `RequestQueue.set_expected_request_processing_time()` with the longest time you expect. Every request fetched after that call stays locked at least that long. To give a single request that's still being processed more time, await `context.extend_timeout()` from the request handler. Outside a crawler, call `RequestQueue.extend_request_processing_time()`.
+
+## `BasicCrawlingContext` requires `extend_timeout`
+
+`BasicCrawlingContext` has a new required field, `extend_timeout`. If you build a crawling context yourself, such as in a test, pass it as well.
 
 ## Crawler `id` is a string
 
@@ -385,7 +389,7 @@ Responses returned by `context.send_request` are closed after the request is pro
 
 The `timeout` of `send_request` is one deadline for the whole redirect chain and for reading the body, the same as Crawlee JS. A body read past it raises `TimeoutError`. By default, `timeout` is `'default'` and the default of the underlying library applies to each request of the chain. `ImpitHttpClient` allows 30 seconds, including reading the body. `CurlImpersonateHttpClient` allows 30 seconds to connect and 30 seconds without receiving data. `HttpxHttpClient` allows 5 seconds per operation. To change the default, pass `timeout` when you create the client.
 
-The crawlers pass the remaining `navigation_timeout` to the HTTP client, so it bounds reading the body too. With `FileDownloadCrawler(stream=True)`, the deadline also covers the body streamed in the request handler, with every HTTP client. In v1, only `ImpitHttpClient` bounded the streamed body, while `HttpxHttpClient` and `CurlImpersonateHttpClient` bounded only the connection. For long downloads, raise `navigation_timeout` together with `request_handler_timeout`.
+The crawlers bound the navigation request and reading its body with `navigation_timeout` themselves and send the request with `timeout=None`, so `context.extend_timeout()` can extend it. With `FileDownloadCrawler(stream=True)`, the body streamed in the request handler counts towards `request_handler_timeout`, so a body that stalls fails as a request handler timeout. In v1, `ImpitHttpClient` bounded the streamed body by the remaining `navigation_timeout`, while `HttpxHttpClient` and `CurlImpersonateHttpClient` bounded only the connection. For long downloads, raise `request_handler_timeout` or extend it from the handler.
 
 ### `timeout=None` disables the timeout
 
@@ -558,6 +562,8 @@ The two DEBUG messages that `RequestQueue.is_finished` logged, "Background add r
 The warnings about an HTTP 429 that the request manager doesn't pace are reworded and logged once per domain. The warning `run()` logged at the start about `respect_robots_txt_file` without a `ThrottlingRequestManager` is replaced by a new one, logged once per domain whose robots.txt `Crawl-delay` the request manager doesn't pace. The warning about a `RequestThrottledError` handled as an ordinary error is reworded, and a new ERROR is logged when the request manager fails to record that rate limit. Another new ERROR is logged once per domain when the request manager fails to record a robots.txt `Crawl-delay`.
 
 The `ThrottlingRequestManager` warning about capping a delay now calls it a "requested wait" delay instead of a "Retry-After header" delay. Its DEBUG messages about a 429 ignored during an active backoff and about resetting a domain's rate limit state are removed, and its DEBUG message about a domain's crawl-delay shows the delay with one decimal place.
+
+The error of an `AdaptivePlaywrightCrawler` sub crawler that timed out now reads `rendering_type=static timed out after 60.0 seconds`, with a space before `seconds`.
 
 Log records hold the message template and its arguments separately. `record.msg` is the template, such as `Retrying request to %s due to: %s. %s`, and `record.args` holds the values. To read the final text, use `record.getMessage()`, which formatters and handlers already do.
 
