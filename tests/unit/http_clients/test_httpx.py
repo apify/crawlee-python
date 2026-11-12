@@ -152,6 +152,7 @@ async def test_timeout_passed_to_httpx(
         payload=None,
         proxy_info=None,
         timeout=timeout,
+        ignore_tls_errors=False,
     )
 
     assert httpx_client.build_request.call_args.kwargs.get('timeout', 'missing') == expected
