@@ -446,9 +446,6 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
 
         @crawler.router.default_handler
         async def handler(context: PlaywrightCrawlingContext) -> None:
-            if not context.session:
-                return
-
             sessions_ids.append(context.session.id)
             sessions[context.session.id] = context.session
             response_data = json.loads(await context.response.text())
@@ -530,8 +527,7 @@ async def test_save_cookies_after_handler_processing(server_url: URL) -> None:
             # Simulate cookies installed from an external source in the browser
             await context.page.context.add_cookies([{'name': 'check', 'value': 'test', 'url': str(server_url)}])
 
-            if context.session:
-                session_ids.append(context.session.id)
+            session_ids.append(context.session.id)
 
         await crawler.run([str(server_url)])
 
@@ -555,7 +551,7 @@ async def test_save_response_cookies_disabled(server_url: URL) -> None:
         async def request_handler(context: PlaywrightCrawlingContext) -> None:
             await context.page.context.add_cookies([{'name': 'check', 'value': 'test', 'url': str(server_url)}])
             handler_call(
-                session_id=context.session.id if context.session else None,
+                session_id=context.session.id,
                 page_cookies={cookie['name'] for cookie in await context.page.context.cookies()},
             )
 
@@ -658,9 +654,8 @@ async def test_read_write_cookies(server_url: URL) -> None:
             cookies = await context.page.context.cookies()
             playwright_cookies.extend(cookies)
 
-            if context.session:
-                context.session.cookies.set_cookies_from_playwright_format(cookies)
-                session_cookies.extend(context.session.cookies.get_cookies_as_dicts())
+            context.session.cookies.set_cookies_from_playwright_format(cookies)
+            session_cookies.extend(context.session.cookies.get_cookies_as_dicts())
 
         await crawler.run([str(server_url / 'set_complex_cookies')])
 
@@ -1521,5 +1516,4 @@ async def test_throttled_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> Non
     assert handled[0].request.retry_count == 0
     assert (handled[0].request.session_rotation_count or 0) == 0
     session = handled[0].session
-    assert session is not None
     assert session.error_score == 0

@@ -561,6 +561,27 @@ The `ThrottlingRequestManager` warning about capping a delay now calls it a "req
 
 Log records hold the message template and its arguments separately. `record.msg` is the template, such as `Retrying request to %s due to: %s. %s`, and `record.args` holds the values. To read the final text, use `record.getMessage()`, which formatters and handlers already do.
 
+## `use_session_pool` is removed
+
+The `use_session_pool` option is removed from the crawlers. Every crawler processes its requests with sessions from its `SessionPool`, the same as Crawlee JS v4. To configure the pool, pass your own `SessionPool` as `session_pool`.
+
+`context.session` is now a `Session` instead of `Session | None`, so you can drop the `if context.session` checks. A request bound by `session_id` to a session that's no longer available still fails with a `RequestCollisionError`, and its failed request handler gets a retired session with the bound id instead of `None`.
+
+Without the session pool, a 401, 403 or 429 response failed the request without a retry. Now it retires the session, and the request is retried with another one, up to `max_session_rotations` times. With `proxy_urls`, a session keeps its proxy, so the proxy changes when the session does, not on every request.
+
+To keep the response cookies out of the sessions, pass `save_response_cookies=False`. To retire every session after its first request, set `max_usage_count` to 1:
+
+```python
+# v1
+crawler = ParselCrawler(use_session_pool=False)
+
+# v2
+crawler = ParselCrawler(
+    save_response_cookies=False,
+    session_pool=SessionPool(create_session_settings={'max_usage_count': 1}),
+)
+```
+
 ## Session retirement is permanent
 
 In v1, `Session.retire()` only added `max_error_score` to the error score, so a later `mark_good()` could lower it again and make the retired session usable. In v2, a separate `retired` flag tracks retirement, exposed as the `Session.retired` property, and a retired session is never usable again. Create a new session to replace it.

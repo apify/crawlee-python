@@ -8,9 +8,6 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def handler(context: HttpCrawlingContext) -> None:
-        if context.session is None:
-            return
-
         # Set a cookie on the session. It's sent with every following
         # request that runs on this session.
         context.session.cookies.set(

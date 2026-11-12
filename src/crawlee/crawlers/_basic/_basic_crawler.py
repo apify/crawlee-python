@@ -70,7 +70,7 @@ from crawlee.events._types import Event, EventCrawlerStatusData
 from crawlee.http_clients import ImpitHttpClient
 from crawlee.request_loaders import MinIntervalSignal, RateLimitedSignal
 from crawlee.router import Router
-from crawlee.sessions import SessionPool
+from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import Statistics, StatisticsState
 from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 
@@ -101,7 +101,7 @@ if TYPE_CHECKING:
     from crawlee.http_clients import HttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.request_loaders import RequestManager
-    from crawlee.sessions import Session, SessionCookies
+    from crawlee.sessions import SessionCookies
     from crawlee.statistics import FinalStatistics
     from crawlee.storage_backends import StorageBackend
     from crawlee.storage_backends.models import DatasetItemsListPage
@@ -166,9 +166,6 @@ class _BasicCrawlerOptions(TypedDict):
     Requests at the maximum depth will still be processed, but no new links will be enqueued from those requests.
     If not set, crawling continues without depth restrictions.
     """
-
-    use_session_pool: NotRequired[bool]
-    """Enable the use of a session pool for managing sessions during crawling."""
 
     retry_on_blocked: NotRequired[bool]
     """If True, the crawler attempts to bypass bot protections automatically."""
@@ -302,7 +299,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         max_requests_per_crawl: int | None = None,
         max_session_rotations: int = 10,
         max_crawl_depth: int | None = None,
-        use_session_pool: bool = True,
         retry_on_blocked: bool = True,
         additional_http_error_status_codes: Iterable[int] | None = None,
         ignore_http_error_status_codes: Iterable[int] | None = None,
@@ -350,7 +346,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 this depth. The crawl depth starts at 0 for initial requests and increases with each subsequent level
                 of links. Requests at the maximum depth will still be processed, but no new links will be enqueued
                 from those requests. If not set, crawling continues without depth restrictions.
-            use_session_pool: Enable the use of a session pool for managing sessions during crawling.
             retry_on_blocked: If True, the crawler attempts to bypass bot protections automatically.
             additional_http_error_status_codes: Additional HTTP status codes to treat as errors,
                 triggering automatic retries when encountered.
@@ -465,7 +460,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
         # Retry and session settings
-        self._use_session_pool = use_session_pool
         self._retry_on_blocked = retry_on_blocked
 
         # Logging setup
@@ -662,11 +656,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 reason=f'The crawler has reached its limit of {self._max_requests_per_crawl} requests per crawl. '
             )
 
-    async def _get_session(self) -> Session | None:
-        """If session pool is being used, try to take a session from it."""
-        if not self._use_session_pool:
-            return None
-
+    async def _get_session(self) -> Session:
+        """Take a session from the session pool."""
         return await wait_for(
             self._session_pool.get_session,
             timeout=self._internal_timeout,
@@ -676,11 +667,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             logger=self._logger,
         )
 
-    async def _get_session_by_id(self, session_id: str | None) -> Session | None:
-        """If session pool is being used, try to take a session by id from it."""
-        if not self._use_session_pool or not session_id:
-            return None
-
+    async def _get_session_by_id(self, session_id: str) -> Session | None:
+        """Take the session with the given id from the session pool."""
         return await wait_for(
             partial(self._session_pool.get_session_by_id, session_id),
             timeout=self._internal_timeout,
@@ -690,13 +678,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             logger=self._logger,
         )
 
-    async def _get_proxy_info(self, request: Request, session: Session | None) -> ProxyInfo | None:
+    async def _get_proxy_info(self, request: Request, session: Session) -> ProxyInfo | None:
         """Retrieve a new ProxyInfo object based on crawler configuration and the current request and session."""
         if not self._proxy_configuration:
             return None
 
         return await self._proxy_configuration.new_proxy_info(
-            session_id=session.id if session else None,
+            session_id=session.id,
             request=request,
         )
 
@@ -798,9 +786,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 self._statistics.reset()
                 await self._statistics.reset_store()
 
-                if self._use_session_pool:
-                    self._session_pool.reset()
-                    await self._session_pool.reset_store()
+                self._session_pool.reset()
+                await self._session_pool.reset_store()
 
             if requests is not None:
                 await self.add_requests(requests)
@@ -945,7 +932,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 for cm in (
                     owned_concurrency_system,
                     self._statistics,
-                    self._session_pool if self._use_session_pool else None,
+                    self._session_pool,
                     self._http_client,
                     self._crawler_state_rec_task,
                     *self._additional_context_managers,
@@ -1322,7 +1309,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if context.request.session_rotation_count is not None:
             new_request.session_rotation_count = context.request.session_rotation_count
 
-        if retire_session and context.session:
+        if retire_session:
             context.session.retire()
 
         await request_manager.add_request(new_request)
@@ -1386,8 +1373,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             context.request.state = RequestState.ERROR
             raise
 
-        if context.session:
-            context.session.mark_bad()
+        context.session.mark_bad()
 
     async def _handle_failed_request(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
         self._logger.error(
@@ -1445,7 +1431,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     def _prepare_send_request_function(
         self,
-        session: Session | None,
+        session: Session,
         proxy_info: ProxyInfo | None,
         register_deferred_cleanup: Callable[[DeferredCleanupCallback], None],
     ) -> SendRequestFunction:
@@ -1628,8 +1614,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         self._logger.debug('Processing request', extra=request_log_extra(request))
 
+        bound_session_missing = False
         if request.session_id:
             session = await self._get_session_by_id(request.session_id)
+            if session is None:
+                bound_session_missing = True
+                # The bound session isn't available, so `_check_request_collision` fails the request. A retired
+                # stand-in with the bound id gives the failed request handler a session.
+                session = Session(id=request.session_id, retired=True)
         else:
             session = await self._get_session()
         proxy_info = await self._get_proxy_info(request, session)
@@ -1657,7 +1649,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request.state = RequestState.REQUEST_HANDLER
 
             try:
-                self._check_request_collision(request, session)
+                self._check_request_collision(request, bound_session_missing=bound_session_missing)
                 await self._run_request_handler(context=context)
             except TimeoutError as e:
                 raise RequestHandlerError(e, context) from e
@@ -1668,7 +1660,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
             await self._mark_request_as_handled(request)
 
-            if session and session.is_usable:
+            if session.is_usable:
                 session.mark_good()
 
             self._statistics.record_request_processing_finish(request.unique_key)
@@ -1696,9 +1688,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             await self._handle_request_error(primary_error.crawling_context, primary_error.wrapped_exception)
 
         except SessionError as session_error:
-            if not session:
-                raise RuntimeError('SessionError raised in a crawling context without a session') from session_error
-
             request.state = RequestState.ERROR_HANDLER
 
             if self._should_retry_request(context, session_error):
@@ -1900,33 +1889,33 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
         return False
 
-    def _raise_for_session_blocked_status_code(self, session: Session | None, status_code: int) -> None:
+    def _raise_for_session_blocked_status_code(self, session: Session, status_code: int) -> None:
         """Raise an exception if the given status code indicates the session is blocked.
 
         Args:
-            session: The session used for the request. If `None`, no check is performed.
+            session: The session used for the request.
             status_code: The HTTP status code to check.
 
         Raises:
             SessionError: If the status code indicates the session is blocked.
         """
-        if session is not None and session.is_blocked_status_code(
+        if session.is_blocked_status_code(
             status_code=status_code,
             ignore_http_error_status_codes=self._ignore_http_error_status_codes,
         ):
             raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
-    def _check_request_collision(self, request: Request, session: Session | None) -> None:
+    def _check_request_collision(self, request: Request, *, bound_session_missing: bool) -> None:
         """Raise an exception if a request cannot access required resources.
 
         Args:
             request: The `Request` that might require specific resources (like a session).
-            session: The `Session` that was retrieved for the request, or `None` if not available.
+            bound_session_missing: Whether the `Session` bound to the `Request` isn't available in the session pool.
 
         Raises:
             RequestCollisionError: If the `Session` referenced by the `Request` is not available.
         """
-        if self._use_session_pool and request.session_id and not session:
+        if bound_session_missing:
             raise RequestCollisionError(
                 f'The Session (id: {request.session_id}) bound to the Request is no longer available in SessionPool'
             )

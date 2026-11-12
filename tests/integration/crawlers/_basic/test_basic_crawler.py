@@ -83,7 +83,7 @@ async def test_session_rotation(server_url: URL) -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        session_ids.append(context.session.id if context.session else None)
+        session_ids.append(context.session.id)
         raise SessionError('Test error')
 
     await crawler.run([str(server_url)])

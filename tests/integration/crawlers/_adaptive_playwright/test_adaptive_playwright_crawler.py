@@ -897,9 +897,8 @@ async def test_change_context_state_after_handling(
         async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
             nonlocal used_session_id
 
-            if context.session is not None:
-                used_session_id = context.session.id
-                context.session.user_data['session_state'] = True
+            used_session_id = context.session.id
+            context.session.user_data['session_state'] = True
 
             try:
                 # `page` is only available in the browser sub crawler, static crawling raises here.

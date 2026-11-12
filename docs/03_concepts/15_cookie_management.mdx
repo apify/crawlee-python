@@ -31,12 +31,6 @@ Access the jar through <ApiLink to="class/Session#cookies">`context.session.cook
     {ReadWriteCookies}
 </RunnableCodeBlock>
 
-:::note
-
-`context.session` is `None` only when the crawler runs without a session pool (<ApiLink to="class/BasicCrawler#__init__">`use_session_pool`</ApiLink> set to `False`). With the default pool it's always set. The examples guard with `if context.session is None: return` to cover that case.
-
-:::
-
 A cookie has a `name`, a `value`, and optional parameters such as `domain`. If a cookie has no `domain`, it applies to any domain, so a login cookie set that way is sent to every host you crawl. Set `domain` on anything sensitive. For the full set of parameters, see <ApiLink to="class/CookieParam">`CookieParam`</ApiLink>. To dump the whole jar, use <ApiLink to="class/SessionCookies#get_cookies_as_dicts">`get_cookies_as_dicts()`</ApiLink>, and to load several cookies at once, use <ApiLink to="class/SessionCookies#set_cookies">`set_cookies()`</ApiLink>.
 
 ## Seeding cookies on new sessions

@@ -14,7 +14,7 @@ async def main() -> None:
     )
     crawler = BeautifulSoupCrawler(
         proxy_configuration=proxy_configuration,
-        use_session_pool=True,
+        save_response_cookies=True,
     )
 
     # ...

@@ -654,7 +654,7 @@ class BasicCrawlingContext:
     request: Request
     """Request object for the current page being processed."""
 
-    session: Session | None
+    session: Session
     """Session object for the current page being processed."""
 
     proxy_info: ProxyInfo | None
