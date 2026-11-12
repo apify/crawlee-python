@@ -454,6 +454,12 @@ class MyHttpClient(HttpClient):
 
 `RequestManagerTandem.get_total_count` no longer counts a request twice once it moves from the loader to the manager. In v1, it added up the totals of both, so the crawler's status message showed too many pages in total.
 
+## `SitemapRequestLoader` and requests in progress
+
+`SitemapRequestLoader.mark_request_as_handled` now raises a `ValueError` for a request that the loader isn't processing, such as one it never returned or one that's already handled. Crawlee JS raises in the same case. In v1, such a call did nothing.
+
+`SitemapRequestLoader.fetch_next_request` skips a URL while its request is still in progress, for example when another sitemap lists it too. In v1, it returned a request for the URL again, and `get_total_count` counted the URL twice.
+
 ## Resetting statistics and the session pool
 
 `Statistics.reset()` is now synchronous and resets only the in-memory statistics, the same as Crawlee JS. In v1, it also cleared the persisted record. To clear the record too, call the new `reset_store()` once the statistics are exited:
