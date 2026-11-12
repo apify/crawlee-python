@@ -435,7 +435,7 @@ http_client = ImpitHttpClient(ignore_tls_errors=True)
 
 To ignore TLS errors for a single call, pass `ignore_tls_errors=True` to `send_request` of the client or to `context.send_request`.
 
-The clients no longer take your own CA. `HttpxHttpClient` doesn't take a CA bundle or an `SSLContext`, and `CurlImpersonateHttpClient` ignores a CA bundle path in `verify`. To pass your own CA to `httpx2` or `curl_cffi`, use the environment variables they read, such as `SSL_CERT_FILE`, or subclass the client and override `HttpxHttpClient._create_transport` or `CurlImpersonateHttpClient._create_client`.
+The clients no longer take your own CA. `HttpxHttpClient` doesn't take a CA bundle or an `SSLContext`, and `CurlImpersonateHttpClient` ignores a CA bundle path in `verify`. To pass your own CA to `httpx2` or `curl_cffi`, use the environment variables they read, such as `SSL_CERT_FILE`, or subclass the client.
 
 ### Some client arguments are ignored
 
