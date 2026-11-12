@@ -23,9 +23,6 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def handler(context: HttpCrawlingContext) -> None:
-        if context.session is None:
-            return
-
         # First attempt: establish cookies, then raise to trigger a retry.
         if not context.session.cookies:
             await context.send_request('https://httpbingo.org/cookies/set?logged_in=1')

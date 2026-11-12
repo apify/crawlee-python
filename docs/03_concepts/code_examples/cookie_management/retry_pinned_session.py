@@ -9,9 +9,6 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def handler(context: HttpCrawlingContext) -> None:
-        if context.session is None:
-            return
-
         if context.request.user_data.get('prepared'):
             # Cookies from the setup step are on this pinned session.
             context.log.info(

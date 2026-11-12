@@ -12,9 +12,6 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def handler(context: HttpCrawlingContext) -> None:
-        if context.session is None:
-            return
-
         state = await context.use_state(default_value={})
         if not state.get('cookies'):
             # First pass: establish cookies once and store them for every session,
@@ -30,7 +27,7 @@ async def main() -> None:
         # Runs before navigation. Apply the shared cookies to whichever session
         # handles the request, so every session ends up with them.
         state = await context.use_state(default_value={})
-        if context.session and (cookies := state.get('cookies')):
+        if cookies := state.get('cookies'):
             context.session.cookies.set_cookies(cast('list[CookieParam]', cookies))
 
     await crawler.run(['https://httpbingo.org/cookies'])

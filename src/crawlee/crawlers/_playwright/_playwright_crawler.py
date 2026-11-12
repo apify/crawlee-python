@@ -372,9 +372,8 @@ class PlaywrightCrawler(
 
         context.register_deferred_cleanup(lambda: context.page.__aexit__(None, None, None))
 
-        if context.session:
-            session_cookies = context.session.cookies.get_cookies_as_playwright_format()
-            await self._update_cookies(context.page, session_cookies)
+        session_cookies = context.session.cookies.get_cookies_as_playwright_format()
+        await self._update_cookies(context.page, session_cookies)
 
         if context.request.method != 'GET':
             # Call the notification only once
@@ -592,7 +591,7 @@ class PlaywrightCrawler(
     async def _create_crawling_context(self, context: TPostNavContext) -> AsyncGenerator[TCrawlingContext, None]:
         yield self._build_crawling_context(context)
 
-        if context.session and self._save_response_cookies:
+        if self._save_response_cookies:
             pw_cookies = await self._get_cookies(context.page)
             context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
 

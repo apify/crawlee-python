@@ -121,22 +121,17 @@ async def test_handles_client_errors(
 
 
 @pytest.mark.parametrize(
-    ('ignore_http_error_status_codes', 'use_session_pool', 'expected_session_rotate', 'expected_number_error'),
+    ('ignore_http_error_status_codes', 'expected_session_rotate', 'expected_number_error'),
     [
         # change session and retry for no block 4xx statuses
-        pytest.param([], True, 4, 1, id='default_behavior'),
-        # error without retry for all 4xx statuses
-        pytest.param([], False, 0, 1, id='default_behavior_without_session_pool'),
-        # take as successful status codes from the `ignore_http_error_status_codes` list with Session Pool
-        pytest.param([403], True, 0, 0, id='ignore_error_status_codes'),
-        # take as successful status codes from the `ignore_http_error_status_codes` list without Session Pool
-        pytest.param([403], False, 0, 0, id='ignore_error_status_codes_without_session_pool'),
+        pytest.param([], 4, 1, id='default_behavior'),
+        # take as successful status codes from the `ignore_http_error_status_codes` list
+        pytest.param([403], 0, 0, id='ignore_error_status_codes'),
     ],
 )
 async def test_handles_session_block_errors(
     *,
     ignore_http_error_status_codes: list[int],
-    use_session_pool: bool,
     expected_session_rotate: int,
     expected_number_error: int,
     mock_request_handler: AsyncMock,
@@ -147,7 +142,6 @@ async def test_handles_session_block_errors(
         ignore_http_error_status_codes=ignore_http_error_status_codes,
         max_request_retries=3,
         max_session_rotations=5,
-        use_session_pool=use_session_pool,
     )
 
     await crawler.add_requests([str(server_url / 'status/403')])
@@ -185,7 +179,7 @@ async def test_stores_cookies(http_client: HttpClient, server_url: URL) -> None:
         @crawler.router.default_handler
         async def handler(context: HttpCrawlingContext) -> None:
             visit(context.request.url)
-            track_session_usage(context.session.id if context.session else None)
+            track_session_usage(context.session.id)
 
         await crawler.run(
             [
@@ -441,9 +435,6 @@ async def test_isolation_cookies(http_client: HttpClient, server_url: URL) -> No
 
     @crawler.router.default_handler
     async def handler(context: HttpCrawlingContext) -> None:
-        if not context.session:
-            return
-
         sessions_ids.append(context.session.id)
 
         if context.request.unique_key not in {'1', '2'}:
@@ -496,7 +487,7 @@ async def test_store_complex_cookies(server_url: URL) -> None:
         @crawler.router.default_handler
         async def handler(context: HttpCrawlingContext) -> None:
             visit(context.request.url)
-            track_session_usage(context.session.id if context.session else None)
+            track_session_usage(context.session.id)
 
         await crawler.run([str(server_url / 'set_complex_cookies')])
 
@@ -597,7 +588,7 @@ async def test_save_response_cookies_disabled(server_url: URL) -> None:
 
     @crawler.router.default_handler
     async def handler(context: HttpCrawlingContext) -> None:
-        session_cookies = context.session.cookies.get_cookies_as_dicts() if context.session else []
+        session_cookies = context.session.cookies.get_cookies_as_dicts()
         handler_call(
             sent_cookies=json.loads(await context.http_response.read())['cookies'],
             session_cookies={cookie['name'] for cookie in session_cookies},
@@ -617,7 +608,7 @@ async def test_context_send_request_saves_cookies(server_url: URL) -> None:
     @crawler.router.default_handler
     async def handler(context: HttpCrawlingContext) -> None:
         await context.send_request(str(server_url.with_path('set_cookies').extend_query(b=2)))
-        session_cookies = context.session.cookies.get_cookies_as_dicts() if context.session else []
+        session_cookies = context.session.cookies.get_cookies_as_dicts()
         handler_call(session_cookies={cookie['name'] for cookie in session_cookies})
 
     await crawler.run([str(server_url / 'cookies')])
