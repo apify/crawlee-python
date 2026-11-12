@@ -234,3 +234,64 @@ async def test_close_before_first_use_stops_listening(monkeypatch: pytest.Monkey
         await event_manager.wait_for_all_listeners_to_complete()
 
         set_value.assert_not_called()
+
+
+async def test_persist_state_writes_record(key_value_store: KeyValueStore) -> None:
+    """`persist_state()` writes the state with the in-progress request to the key-value store."""
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    client, _ = make_status_stream_client({sitemap_url: [(200, get_basic_sitemap().encode())]})
+    loader = SitemapRequestLoader([sitemap_url], http_client=client, persist_state_key='sitemap-state')
+    request = await loader.fetch_next_request()
+    assert request is not None
+
+    await loader.persist_state()
+    record = await key_value_store.get_value('sitemap-state')
+    await loader.close()
+
+    assert record['inProgress'] == [request.url]
+    assert list(record['requestData']) == [request.url]
+
+
+async def test_persist_state_before_first_use(key_value_store: KeyValueStore) -> None:
+    """`persist_state()` called before the loader is used writes the restored state."""
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    client, _ = make_status_stream_client({sitemap_url: [(200, get_basic_sitemap().encode())]})
+    loader = SitemapRequestLoader([sitemap_url], http_client=client, persist_state_key='sitemap-state')
+    request = await loader.fetch_next_request()
+    assert request is not None
+    await loader.close()
+
+    restored_loader = SitemapRequestLoader([sitemap_url], http_client=client, persist_state_key='sitemap-state')
+    await restored_loader.persist_state()
+    record = await key_value_store.get_value('sitemap-state')
+    await restored_loader.close()
+
+    assert record['inProgress'] == []
+    assert record['urlQueue'][0] == request.url
+
+
+async def test_persist_state_without_key_writes_nothing(
+    monkeypatch: pytest.MonkeyPatch, key_value_store: KeyValueStore
+) -> None:
+    """`persist_state()` writes nothing when the loader has no `persist_state_key`."""
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    client, _ = make_status_stream_client({sitemap_url: [(200, get_basic_sitemap().encode())]})
+    set_value = AsyncMock()
+    monkeypatch.setattr(key_value_store, 'set_value', set_value)
+    loader = SitemapRequestLoader([sitemap_url], http_client=client)
+
+    await loader.persist_state()
+    await loader.close()
+
+    set_value.assert_not_called()
+
+
+async def test_failed_persist_state_raises(monkeypatch: pytest.MonkeyPatch, key_value_store: KeyValueStore) -> None:
+    """A failed write in `persist_state()` raises."""
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    client, _ = make_status_stream_client({sitemap_url: [(200, get_basic_sitemap().encode())]})
+    loader = SitemapRequestLoader([sitemap_url], http_client=client, persist_state_key='sitemap-state')
+    monkeypatch.setattr(key_value_store, 'set_value', AsyncMock(side_effect=RuntimeError('store is on fire')))
+
+    with pytest.raises(RuntimeError, match='store is on fire'):
+        await loader.persist_state()
