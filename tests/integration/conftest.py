@@ -4,7 +4,9 @@ import socket
 from typing import TYPE_CHECKING
 
 import pytest
+from filelock import FileLock
 from proxy import Proxy
+from stagehand._custom.sea_binary import resolve_binary_path
 from uvicorn.config import Config
 
 from crawlee.proxy_configuration import ProxyInfo
@@ -24,6 +26,15 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
     from yarl import URL
+
+
+@pytest.fixture(scope='session')
+def stagehand_binary(tmp_path_factory: pytest.TempPathFactory) -> None:
+    """Populate Stagehand's per-user binary cache once, serialized across xdist workers."""
+    # Stagehand copies its server binary into the cache on first use without a lock, so concurrent first uses race on
+    # the copy (`WinError 32` on Windows, `FileNotFoundError` elsewhere).
+    with FileLock(tmp_path_factory.getbasetemp().parent / 'stagehand_binary.lock'):
+        resolve_binary_path()
 
 
 def _proxy_info(port: int) -> ProxyInfo:

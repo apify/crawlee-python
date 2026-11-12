@@ -24,7 +24,7 @@ def stagehand_client_mock() -> MagicMock:
 
 
 @pytest.fixture
-async def plugin() -> AsyncGenerator[StagehandBrowserPlugin, None]:
+async def plugin(stagehand_binary: None) -> AsyncGenerator[StagehandBrowserPlugin, None]:  # noqa: ARG001
     async with StagehandBrowserPlugin() as plugin:
         yield plugin
 

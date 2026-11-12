@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import subprocess
@@ -77,74 +78,70 @@ async def test_static_crawler_actor_at_apify(
         output_dir=str(tmp_path),
     )
 
+    project_path = tmp_path / actor_name
     patch_crawlee_version_in_project(
-        project_path=tmp_path / actor_name, wheel_path=crawlee_wheel_path, package_manager=package_manager
+        project_path=project_path, wheel_path=crawlee_wheel_path, package_manager=package_manager
     )
+
+    # Run the CLI with its own home directory, so the secrets file it reads lives in `tmp_path`. It authenticates
+    # through `APIFY_TOKEN` and never touches a stored login. `GIT_CEILING_DIRECTORIES` keeps git from walking up
+    # into the surrounding project's .git/ when running under a basetemp inside the repo (see --basetemp in the
+    # e2e-templates-tests poe task).
+    cli_home = tmp_path / 'apify_cli_home'
+    cli_home.mkdir()
+    cli_env = {
+        **os.environ,
+        'HOME': str(cli_home),
+        'APIFY_TOKEN': os.environ['APIFY_TEST_USER_API_TOKEN'],
+        'GIT_CEILING_DIRECTORIES': str(tmp_path),
+    }
+
+    def run_cli(*args: str) -> subprocess.CompletedProcess[bytes]:
+        return subprocess.run(  # noqa: S603
+            ['apify', *args],  # noqa: S607
+            capture_output=True,
+            check=False,
+            cwd=project_path,
+            env=cli_env,
+            timeout=600,
+        )
 
     # Print apify version for debugging purposes in rare cases of CLI failures
     subprocess.run(['apify', '--version'], check=True)  # noqa: ASYNC221, S607
 
-    # Build actor using sequence of cli commands as the user would.
-    subprocess.run(  # noqa: ASYNC221, S603
-        ['apify', 'login', '-t', os.environ['APIFY_TEST_USER_API_TOKEN']],  # noqa: S607
-        capture_output=True,
-        check=True,
-        cwd=tmp_path / actor_name,
-        timeout=600,
-    )
-    subprocess.run(  # noqa: ASYNC221, S603
-        ['apify', 'init', '-y', actor_name],  # noqa: S607
-        capture_output=True,
-        check=True,
-        cwd=tmp_path / actor_name,
-        timeout=600,
-    )
+    init_process = run_cli('init', '-y', actor_name)
+    assert init_process.returncode == 0, f'`apify init` failed: {init_process.stderr.decode()}'
 
-    build_process = subprocess.run(  # noqa: ASYNC221
-        ['apify', 'push'],  # noqa: S607
-        capture_output=True,
-        check=False,
-        cwd=tmp_path / actor_name,
-        # Prevent git from walking up into the surrounding project's .git/ when running under
-        # a basetemp inside the repo (see --basetemp in the e2e-templates-tests poe task).
-        env={**os.environ, 'GIT_CEILING_DIRECTORIES': str(tmp_path)},
-        timeout=600,
-    )
-    # Get actor ID from build log
-    actor_id_regexp = re.compile(r'https:\/\/console\.apify\.com\/actors\/(.*)#\/builds\/\d*\.\d*\.\d*')
+    # Stagehand reads the model API key from the environment at run time. `apify push` sets the env vars from
+    # `actor.json` on the Actor version before it starts the build, and sends `@`-prefixed values as secrets.
+    if crawler_type == 'stagehand':
+        secrets_process = run_cli('secrets', 'add', 'openaiApiKey', os.environ['OPENAI_API_KEY'])
+        assert secrets_process.returncode == 0, f'`apify secrets add` failed: {secrets_process.stderr.decode()}'
 
-    if match := re.findall(actor_id_regexp, build_process.stderr.decode()):
-        actor_id = match[0]
-    else:
-        raise AssertionError(f'Failed to find actor id in build log: {build_process.stderr.decode()}')
+        actor_json_path = project_path / '.actor' / 'actor.json'
+        actor_json = json.loads(actor_json_path.read_text(encoding='utf-8'))
+        actor_json['environmentVariables'] = {'OPENAI_API_KEY': '@openaiApiKey'}
+        actor_json_path.write_text(json.dumps(actor_json, indent=4), encoding='utf-8')
 
-    client = ApifyClientAsync(token=os.getenv('APIFY_TEST_USER_API_TOKEN'))
-    actor = client.actor(actor_id)
+    # With `--json`, `apify push` prints the push result to stdout and the build log to stderr.
+    push_process = run_cli('push', '--json')
+    try:
+        push_result = json.loads(push_process.stdout)
+    except json.JSONDecodeError as exc:
+        raise AssertionError(
+            f'`apify push` did not print a JSON result.\n'
+            f'stdout: {push_process.stdout.decode()}\n'
+            f'stderr: {push_process.stderr.decode()}'
+        ) from exc
+
+    client = ApifyClientAsync(token=os.environ['APIFY_TEST_USER_API_TOKEN'])
+    actor = client.actor(push_result['actor']['id'])
 
     # Run actor
     try:
-        assert build_process.returncode == 0
+        assert push_result['ok'], f'`apify push` failed: {push_result.get("error")}'
 
-        # Stagehand needs the model API key in `os.environ` at run time. Env vars are baked into the
-        # build at build creation time, so registering the env var on the version after `apify push`
-        # is not enough — we must trigger a fresh build for the env var to be included.
-        build_number: str | None = None
-        if crawler_type == 'stagehand':
-            env_vars = actor.version('0.0').env_vars()
-            await env_vars.create(name='OPENAI_API_KEY', value=os.environ['OPENAI_API_KEY'], is_secret=True)
-            # `ActorClientAsync.build`'s `wait_for_finish` parameter is capped server-side at 60s,
-            # which is shorter than a stagehand build (playwright + browser deps). Trigger the build,
-            # then poll client-side via `BuildClientAsync.wait_for_finish` until it reaches a terminal
-            # status, and assert it succeeded before starting the run.
-            rebuild = await actor.build(version_number='0.0')
-            finished_build = await client.build(rebuild['id']).wait_for_finish(wait_secs=900)
-            assert finished_build is not None, 'Stagehand rebuild did not reach a terminal status within 900s.'
-            assert finished_build['status'] == 'SUCCEEDED', (
-                f'Stagehand rebuild did not succeed: status={finished_build["status"]!r}, build={finished_build}'
-            )
-            build_number = finished_build['buildNumber']
-
-        started_run_data = await actor.start(memory_mbytes=8192, build=build_number)
+        started_run_data = await actor.start(memory_mbytes=8192, build=push_result['build']['number'])
         actor_run = client.run(started_run_data['id'])
 
         finished_run_data = await actor_run.wait_for_finish()

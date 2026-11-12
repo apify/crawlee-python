@@ -99,6 +99,10 @@ class HttpHeaders(RootModel, Mapping[str, str]):
         return len(self.root)
 
 
+_DEFAULT_DESIRED_CONCURRENCY = 10
+"""Default `ConcurrencySettings.desired_concurrency`, clamped to the `min_concurrency`/`max_concurrency` range."""
+
+
 @docs_group('Configuration')
 class ConcurrencySettings:
     """Concurrency settings for AutoscaledPool."""
@@ -108,7 +112,7 @@ class ConcurrencySettings:
         min_concurrency: int = 1,
         max_concurrency: int = 100,
         max_tasks_per_minute: float = float('inf'),
-        desired_concurrency: int = 10,
+        desired_concurrency: int | None = None,
     ) -> None:
         """Initialize a new instance.
 
@@ -119,13 +123,17 @@ class ConcurrencySettings:
             max_tasks_per_minute: The maximum number of tasks per minute the pool can run. By default, this is set
                 to infinity, but you can pass any positive, non-zero number.
             desired_concurrency: The desired number of tasks that should be running parallel on the start of the pool,
-                if there is a large enough supply of them.
+                if there is a large enough supply of them. The default is adjusted to fit between `min_concurrency` and
+                `max_concurrency`. An explicitly passed value outside that range raises a `ValueError`.
         """
         if min_concurrency < 1:
             raise ValueError('min_concurrency must be 1 or larger')
 
         if max_concurrency < min_concurrency:
             raise ValueError('max_concurrency cannot be less than min_concurrency')
+
+        if desired_concurrency is None:
+            desired_concurrency = min(max(_DEFAULT_DESIRED_CONCURRENCY, min_concurrency), max_concurrency)
 
         if desired_concurrency < min_concurrency:
             raise ValueError('desired_concurrency cannot be less than min_concurrency')

@@ -14,7 +14,7 @@ from bs4 import Tag
 from parsel import Selector
 from typing_extensions import override
 
-from crawlee import Request
+from crawlee import ConcurrencySettings, Request
 from crawlee.crawlers import (
     AdaptivePlaywrightCrawler,
     AdaptivePlaywrightCrawlingContext,
@@ -483,6 +483,45 @@ async def test_adaptive_crawling_result_use_state_isolation(
     assert request_handler_calls == 2
     # Increment of global state happened only once
     assert (await key_value_store.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0'))['counter'] == 1
+
+
+async def test_detection_run_gets_browser_run_state(test_urls: list[str]) -> None:
+    """Test that the static detection run gets the state the browser run started with, including unsaved changes."""
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(),
+        concurrency_settings=ConcurrencySettings(max_concurrency=1),
+    )
+    seen_counters: list[int] = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        state = cast('dict[str, int]', await context.use_state({'counter': 0}))
+        seen_counters.append(state['counter'])
+        state['counter'] += 1
+
+    await crawler.run(test_urls)
+
+    # Each request runs the browser handler first, then the static one.
+    assert seen_counters == [0, 0, 1, 1]
+
+
+async def test_detection_run_gets_state_copy_without_browser_use_state(test_urls: list[str]) -> None:
+    """Test that the static detection run can't modify the state when the browser run doesn't call `use_state`."""
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(),
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        try:
+            context.page  # noqa:B018 Intentionally "useless expression". Raises outside the browser sub crawler.
+        except AdaptiveContextError:
+            state = cast('dict[str, int]', await context.use_state({'counter': 0}))
+            state['counter'] += 1
+
+    await crawler.run(test_urls[:1])
+
+    assert await crawler.use_state() == {'counter': 0}
 
 
 async def test_adaptive_crawling_statistics(test_urls: list[str]) -> None:

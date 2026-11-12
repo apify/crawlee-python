@@ -96,7 +96,7 @@ def test_fingerprint_generator_all_options() -> None:
     assert fingerprint.mockWebRTC is True
     assert fingerprint.slim is True
     assert 'Firefox' in fingerprint.navigator.userAgent
-    assert 'Win' in fingerprint.navigator.oscpu
+    assert 'Win' in fingerprint.navigator.platform
     assert 'en-US' in fingerprint.navigator.languages
 
 
