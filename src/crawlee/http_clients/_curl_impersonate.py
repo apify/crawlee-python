@@ -170,23 +170,26 @@ class CurlImpersonateHttpClient(HttpClient):
     def __init__(
         self,
         *,
+        ignore_tls_errors: bool = False,
         follow_redirects: bool = True,
         **async_session_kwargs: Any,
     ) -> None:
         """Initialize a new instance.
 
         Args:
+            ignore_tls_errors: Whether to ignore TLS certificate errors for every request.
             follow_redirects: Whether to follow HTTP redirects.
             async_session_kwargs: Additional keyword arguments for `curl_cffi.requests.AsyncSession`. Some of them are
                 ignored with a warning. Cookies are kept in sessions, so `cookies` is ignored. The `auth` and `params`
                 arguments would reach every request of a redirect chain, so pass credentials in the `Authorization`
                 header and the query in the URL instead. Redirects are followed by `send_request`, so `allow_redirects`
-                and `max_redirects` are ignored.
+                and `max_redirects` are ignored. Use `ignore_tls_errors` instead of `verify`.
         """
         super().__init__(
             follow_redirects=follow_redirects,
             headers=async_session_kwargs.pop('headers', None),
         )
+        self._ignore_tls_errors = ignore_tls_errors
 
         for ignored_kwarg in ('cookies', 'auth', 'params', 'allow_redirects', 'max_redirects'):
             if async_session_kwargs.pop(ignored_kwarg, None) is not None:
@@ -196,9 +199,16 @@ class CurlImpersonateHttpClient(HttpClient):
                     stacklevel=2,
                 )
 
+        if async_session_kwargs.pop('verify', None) is not None:
+            warnings.warn(
+                'The `verify` argument of `CurlImpersonateHttpClient` is ignored. Use `ignore_tls_errors` instead.',
+                UserWarning,
+                stacklevel=2,
+            )
+
         self._async_session_kwargs = async_session_kwargs
 
-        self._client_by_proxy_url = dict[str | None, AsyncSession]()
+        self._clients = dict[str | None, AsyncSession]()
 
     @override
     async def _fetch(
@@ -210,6 +220,7 @@ class CurlImpersonateHttpClient(HttpClient):
         payload: HttpPayload | None,
         proxy_info: ProxyInfo | None,
         timeout: timedelta | Literal['default'] | None,
+        ignore_tls_errors: bool,
     ) -> _CurlImpersonateResponse:
         client = self._get_client(proxy_info.url if proxy_info else None)
 
@@ -233,6 +244,7 @@ class CurlImpersonateHttpClient(HttpClient):
                 data=payload,
                 # Redirects are followed hop by hop by `send_request`.
                 allow_redirects=False,
+                verify=not (ignore_tls_errors or self._ignore_tls_errors),
                 stream=True,
                 **timeout_kwargs,
             )
@@ -253,7 +265,7 @@ class CurlImpersonateHttpClient(HttpClient):
         Store the new session for future use.
         """
         # Check if a session for the given proxy URL has already been created.
-        if proxy_url not in self._client_by_proxy_url:
+        if proxy_url not in self._clients:
             # Prepare a default kwargs for the new session. A provided proxy URL and a chrome for impersonation
             # are set as default options.
             kwargs: dict[str, Any] = {
@@ -265,9 +277,17 @@ class CurlImpersonateHttpClient(HttpClient):
             kwargs.update(self._async_session_kwargs)
 
             # Create and store the new session with the specified kwargs.
-            self._client_by_proxy_url[proxy_url] = _AsyncSession(**kwargs)
+            self._clients[proxy_url] = self._create_client(**kwargs)
 
-        return self._client_by_proxy_url[proxy_url]
+        return self._clients[proxy_url]
+
+    def _create_client(self, **kwargs: Any) -> AsyncSession:
+        """Create the `curl_cffi.requests.AsyncSession` from the prepared keyword arguments.
+
+        A subclass can override it to change the arguments. A request that ignores TLS errors turns the verification off
+        on its own, whatever the session sets.
+        """
+        return _AsyncSession(**kwargs)
 
     def _convert_method(self, method: HttpMethod) -> CurlHttpMethod:
         """Convert from Crawlee HTTP method to curl-cffi HTTP method.
@@ -319,6 +339,6 @@ class CurlImpersonateHttpClient(HttpClient):
         return False
 
     async def cleanup(self) -> None:
-        for client in self._client_by_proxy_url.values():
+        for client in self._clients.values():
             await client.close()
-        self._client_by_proxy_url.clear()
+        self._clients.clear()

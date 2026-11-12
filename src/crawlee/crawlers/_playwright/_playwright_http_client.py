@@ -61,6 +61,7 @@ class PlaywrightHttpClient(HttpClient):
         cookies: SessionCookies | None = None,
         proxy_info: ProxyInfo | None = None,
         timeout: timedelta | Literal['default'] | None = 'default',
+        ignore_tls_errors: bool = False,
     ) -> HttpResponse:
         # TODO: Use `session` to restore all the fingerprint headers according to the `BrowserContext`, after resolved
         # https://github.com/apify/crawlee-python/issues/1055
@@ -88,6 +89,7 @@ class PlaywrightHttpClient(HttpClient):
                 cookies=cookies,
                 proxy_info=proxy_info,
                 timeout=timeout,
+                ignore_tls_errors=ignore_tls_errors,
             )
         finally:
             _caller_cookies_var.reset(token)
@@ -102,6 +104,7 @@ class PlaywrightHttpClient(HttpClient):
         payload: HttpPayload | None,
         proxy_info: ProxyInfo | None,
         timeout: timedelta | Literal['default'] | None,
+        ignore_tls_errors: bool,
     ) -> HttpResponse:
         # `proxy_info` are not used because `APIRequestContext` inherits the proxy from `BrowserContext`
         browser_context = _browser_page_context_var.get()
@@ -128,6 +131,8 @@ class PlaywrightHttpClient(HttpClient):
             headers=fetch_headers or None,
             data=payload,
             timeout=fetch_timeout,
+            # Without the flag, the TLS setting of the browser context applies.
+            ignore_https_errors=True if ignore_tls_errors else None,
             # Redirects are followed hop by hop by `send_request`.
             max_redirects=0,
         )

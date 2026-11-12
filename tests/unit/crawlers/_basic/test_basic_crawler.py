@@ -640,6 +640,7 @@ async def test_send_request_forwards_arguments_to_http_client() -> None:
             headers={'Content-Type': 'text/plain'},
             cookies=cookies,
             timeout=timeout,
+            ignore_tls_errors=True,
         )
 
     await crawler.run(['https://a.placeholder.com'])
@@ -654,6 +655,7 @@ async def test_send_request_forwards_arguments_to_http_client() -> None:
         cookies=cookies,
         proxy_info=None,
         timeout=timeout,
+        ignore_tls_errors=True,
     )
 
 
