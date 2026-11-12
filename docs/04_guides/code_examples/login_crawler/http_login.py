@@ -41,10 +41,6 @@ async def main() -> None:
     async def login_handler(context: HttpCrawlingContext) -> None:
         context.log.info('Processing login at %s ...', context.request.url)
 
-        # Verify that a session is available before proceeding
-        if not context.session:
-            raise RuntimeError('Session not found')
-
         # Parse the API response containing authentication tokens and user data
         data = json.loads(await context.http_response.read())
 

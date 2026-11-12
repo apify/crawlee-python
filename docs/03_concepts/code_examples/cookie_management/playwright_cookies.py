@@ -13,9 +13,6 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def handler(context: PlaywrightCrawlingContext) -> None:
-        if context.session is None:
-            return
-
         # The browser receives the `visited` cookie during the first navigation.
         # It's synced back onto the session after the handler returns, so on the
         # second request it's already on `context.session`.
