@@ -798,3 +798,17 @@ async def test_timeout_bounds_read_stream(http_client: HttpClient, server_url: U
         with pytest.raises(TimeoutError):
             async for _ in response.read_stream():
                 pass
+
+
+async def test_none_timeout_outlasts_default(
+    http_client_class: type[ImpitHttpClient | HttpxHttpClient | CurlImpersonateHttpClient], server_url: URL
+) -> None:
+    """Test that `timeout=None` lets a request outlast the default timeout of the client library."""
+    url = str((server_url / 'slow').with_query(delay=2))
+
+    async with http_client_class(timeout=0.3) as client:
+        with pytest.raises(TimeoutError):
+            await client.send_request(url)
+
+        async with await client.send_request(url, timeout=None) as response:
+            assert response.status_code == 200

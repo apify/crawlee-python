@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -74,8 +74,20 @@ async def test_sub_millisecond_timeout_not_rounded_to_zero(monkeypatch: pytest.M
     assert curl_session.request.call_args.kwargs['timeout'] == 0.001
 
 
-async def test_no_timeout_uses_session_default(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test that a request without a timeout gets the default timeout of the `curl_cffi` session, not none at all."""
+@pytest.mark.parametrize(
+    ('timeout', 'expected'),
+    [
+        pytest.param('default', 'missing', id='client-default'),
+        pytest.param(None, None, id='no-timeout'),
+        pytest.param(timedelta(seconds=5), 5.0, id='explicit'),
+    ],
+)
+async def test_timeout_passed_to_curl(
+    monkeypatch: pytest.MonkeyPatch,
+    timeout: timedelta | Literal['default'] | None,
+    expected: float | Literal['missing'] | None,
+) -> None:
+    """Test that the timeout reaches `curl_cffi` in seconds, as `None`, or not at all for the default of the session."""
     curl_session = mock_curl_session()
     client = CurlImpersonateHttpClient()
     monkeypatch.setattr(client, '_get_client', Mock(return_value=curl_session))
@@ -86,10 +98,10 @@ async def test_no_timeout_uses_session_default(monkeypatch: pytest.MonkeyPatch) 
         headers=HttpHeaders(),
         payload=None,
         proxy_info=None,
-        timeout=None,
+        timeout=timeout,
     )
 
-    assert 'timeout' not in curl_session.request.call_args.kwargs
+    assert curl_session.request.call_args.kwargs.get('timeout', 'missing') == expected
 
 
 async def test_timed_out_request_closes_connection() -> None:

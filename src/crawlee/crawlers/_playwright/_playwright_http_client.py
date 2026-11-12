@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import contextvars
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING
+from datetime import timedelta
+from typing import TYPE_CHECKING, Literal
 
 from typing_extensions import override
 
@@ -12,7 +13,6 @@ from crawlee.sessions._cookies import PlaywrightCookieParam, SessionCookies
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
-    from datetime import timedelta
 
     from playwright.async_api import Page
 
@@ -60,7 +60,7 @@ class PlaywrightHttpClient(HttpClient):
         session: Session | None = None,
         cookies: SessionCookies | None = None,
         proxy_info: ProxyInfo | None = None,
-        timeout: timedelta | None = None,
+        timeout: timedelta | Literal['default'] | None = 'default',
     ) -> HttpResponse:
         # TODO: Use `session` to restore all the fingerprint headers according to the `BrowserContext`, after resolved
         # https://github.com/apify/crawlee-python/issues/1055
@@ -101,7 +101,7 @@ class PlaywrightHttpClient(HttpClient):
         headers: HttpHeaders,
         payload: HttpPayload | None,
         proxy_info: ProxyInfo | None,
-        timeout: timedelta | None,
+        timeout: timedelta | Literal['default'] | None,
     ) -> HttpResponse:
         # `proxy_info` are not used because `APIRequestContext` inherits the proxy from `BrowserContext`
         browser_context = _browser_page_context_var.get()
@@ -114,13 +114,20 @@ class PlaywrightHttpClient(HttpClient):
             # Without a `Cookie` header, Playwright sends the cookies of the browser context.
             fetch_headers.setdefault('cookie', '')
 
+        # Playwright applies its default timeout to `None`, and reads 0 as no timeout.
+        fetch_timeout: float | None = None
+        if isinstance(timeout, timedelta):
+            fetch_timeout = timeout.total_seconds() * 1000
+        elif timeout is None:
+            fetch_timeout = 0
+
         # Proxies appropriate to the browser context are used
         response = await browser_context.request.fetch(
             url_or_request=url,
             method=method.lower(),
             headers=fetch_headers or None,
             data=payload,
-            timeout=timeout.total_seconds() * 1000 if timeout is not None else None,
+            timeout=fetch_timeout,
             # Redirects are followed hop by hop by `send_request`.
             max_redirects=0,
         )

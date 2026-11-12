@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from datetime import timedelta
+from typing import Any, Literal
+from unittest.mock import AsyncMock, Mock
 
 import httpx2
 import pytest
 
+from crawlee import HttpHeaders
 from crawlee.http_clients import HttpxHttpClient
 
 
@@ -71,3 +74,34 @@ def test_follows_configured_log_level_of_later_client(monkeypatch: pytest.Monkey
         assert httpx_logger.level == logging.DEBUG
     finally:
         httpx_logger.setLevel(original_level)
+
+
+@pytest.mark.parametrize(
+    ('timeout', 'expected'),
+    [
+        pytest.param('default', 'missing', id='client-default'),
+        pytest.param(None, httpx2.Timeout(None), id='no-timeout'),
+        pytest.param(timedelta(seconds=5), httpx2.Timeout(5.0), id='explicit'),
+    ],
+)
+async def test_timeout_passed_to_httpx(
+    monkeypatch: pytest.MonkeyPatch,
+    timeout: timedelta | Literal['default'] | None,
+    expected: httpx2.Timeout | Literal['missing'],
+) -> None:
+    """Test that the timeout reaches `httpx2` as a `Timeout`, or not at all for the default of the client."""
+    httpx_client = Mock(spec=httpx2.AsyncClient)
+    httpx_client.send = AsyncMock(return_value=Mock(spec=httpx2.Response))
+    client = HttpxHttpClient()
+    monkeypatch.setattr(client, '_get_client', Mock(return_value=httpx_client))
+
+    await client._fetch(
+        'https://example.com/',
+        method='GET',
+        headers=HttpHeaders(),
+        payload=None,
+        proxy_info=None,
+        timeout=timeout,
+    )
+
+    assert httpx_client.build_request.call_args.kwargs.get('timeout', 'missing') == expected

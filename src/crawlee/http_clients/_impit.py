@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import warnings
+from datetime import timedelta
 from functools import cached_property
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
-from impit import USE_CLIENT_DEFAULT, AsyncClient, Browser, HTTPError, Response, TimeoutException, TransportError
+from impit import AsyncClient, Browser, HTTPError, Response, TimeoutException, TransportError
 from impit import ProxyError as ImpitProxyError
 from typing_extensions import override
 
@@ -19,7 +20,6 @@ from crawlee.http_clients import HttpClient, HttpResponse
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-    from datetime import timedelta
 
     from crawlee._types import HttpMethod, HttpPayload
     from crawlee.proxy_configuration import ProxyInfo
@@ -159,10 +159,18 @@ class ImpitHttpClient(HttpClient):
         headers: HttpHeaders,
         payload: HttpPayload | None,
         proxy_info: ProxyInfo | None,
-        timeout: timedelta | None,
+        timeout: timedelta | Literal['default'] | None,
     ) -> _ImpitResponse:
         client = self._get_client(proxy_info.url if proxy_info else None)
-        deadline = asyncio.get_running_loop().time() + timeout.total_seconds() if timeout is not None else None
+
+        # With `'default'`, the request gets the default timeout of the client.
+        deadline = None
+        timeout_kwargs: dict[str, Any] = {}
+        if isinstance(timeout, timedelta):
+            deadline = asyncio.get_running_loop().time() + timeout.total_seconds()
+            timeout_kwargs['timeout'] = timeout.total_seconds()
+        elif timeout is None:
+            timeout_kwargs['timeout'] = None
 
         try:
             response = await client.request(
@@ -170,9 +178,8 @@ class ImpitHttpClient(HttpClient):
                 url=url,
                 content=payload,
                 headers=dict(headers) or None,
-                # `None` would disable the timeout, the client default applies instead.
-                timeout=timeout.total_seconds() if timeout is not None else USE_CLIENT_DEFAULT,
                 stream=True,
+                **timeout_kwargs,
             )
         except TimeoutException as exc:
             raise TimeoutError from exc

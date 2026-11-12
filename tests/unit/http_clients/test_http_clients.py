@@ -4,7 +4,7 @@ import asyncio
 import importlib
 import sys
 from datetime import timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -119,6 +119,46 @@ async def test_timeout_covers_redirect_chain(monkeypatch: pytest.MonkeyPatch) ->
 
     timeouts = [fetch_call.kwargs['timeout'] for fetch_call in fetch.call_args_list]
     assert timeouts == [timedelta(seconds=10), timedelta(seconds=6)]
+
+
+@pytest.mark.parametrize(
+    'timeout',
+    [
+        pytest.param('default', id='client-default'),
+        pytest.param(None, id='no-timeout'),
+    ],
+)
+async def test_timeout_without_deadline(monkeypatch: pytest.MonkeyPatch, timeout: Literal['default'] | None) -> None:
+    """Test that every request of a redirect chain gets the `'default'` or `None` timeout as it is."""
+    url = 'https://example.com/'
+    redirect = Mock(spec=HttpResponse, status_code=302, headers={'location': '/next'}, url=url, headers_set_cookie=[])
+    final = Mock(spec=HttpResponse, status_code=200, headers={}, url=f'{url}next', headers_set_cookie=[])
+    fetch = AsyncMock(side_effect=[redirect, final])
+    client = ImpitHttpClient()
+    monkeypatch.setattr(client, '_fetch', fetch)
+
+    assert await client.send_request(url, timeout=timeout) is final
+
+    assert [fetch_call.kwargs['timeout'] for fetch_call in fetch.call_args_list] == [timeout, timeout]
+
+
+@pytest.mark.parametrize(
+    'timeout',
+    [
+        pytest.param(10, id='seconds-as-number'),
+        pytest.param('Default', id='capitalized-default'),
+    ],
+)
+async def test_invalid_timeout_raises(monkeypatch: pytest.MonkeyPatch, timeout: object) -> None:
+    """Test that a `timeout` other than a `timedelta`, `'default'` or `None` raises before any request is sent."""
+    fetch = AsyncMock()
+    client = ImpitHttpClient()
+    monkeypatch.setattr(client, '_fetch', fetch)
+
+    with pytest.raises(TypeError, match='`timeout` must be'):
+        await client.send_request('https://example.com/', timeout=timeout)  # ty: ignore[invalid-argument-type]
+
+    fetch.assert_not_called()
 
 
 async def test_redirect_responses_closed(monkeypatch: pytest.MonkeyPatch) -> None:

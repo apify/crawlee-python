@@ -651,6 +651,21 @@ async def test_send_request_forwards_arguments_to_http_client() -> None:
     )
 
 
+async def test_send_request_default_timeout() -> None:
+    """Test that `context.send_request` without a `timeout` leaves the timeout to the default of the HTTP client."""
+    http_client = AsyncMock(spec=HttpClient)
+    http_client.send_request.return_value = Mock(spec=HttpResponse)
+    crawler = BasicCrawler(http_client=http_client, use_session_pool=False, max_requests_per_crawl=1)
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await context.send_request('https://example.com')
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    assert http_client.send_request.call_args.kwargs['timeout'] == 'default'
+
+
 @pytest.mark.parametrize(
     'handler_fails',
     [
