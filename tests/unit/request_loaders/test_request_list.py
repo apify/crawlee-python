@@ -457,12 +457,16 @@ async def test_persisted_state_wins_over_state_option() -> None:
     assert await drain(restored_list) == ['https://b.placeholder.com', 'https://c.placeholder.com']
 
 
-async def test_persist_state_without_key_raises() -> None:
-    """`persist_state` raises when the request list has no `persist_state_key`."""
-    request_list = RequestList(URLS)
+async def test_persist_state_without_key_writes_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`persist_state` without a `persist_state_key` writes nothing, not even the `persist_requests_key` record."""
+    kvs = await KeyValueStore.open()
+    set_value = AsyncMock()
+    monkeypatch.setattr(kvs, 'set_value', set_value)
+    request_list = RequestList(URLS, persist_requests_key='requests')
 
-    with pytest.raises(RuntimeError, match=r'`persist_state_key` is not set'):
-        await request_list.persist_state()
+    await request_list.persist_state()
+
+    set_value.assert_not_called()
 
 
 async def test_persist_state_before_first_use() -> None:
@@ -476,19 +480,15 @@ async def test_persist_state_before_first_use() -> None:
     assert (await kvs.get_value('state'))['nextIndex'] == 1
 
 
-async def test_failed_persist_state_is_logged(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    """A failed write in `persist_state` is logged instead of raised."""
+async def test_failed_persist_state_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failed write in `persist_state` raises."""
     request_list = RequestList(URLS, persist_state_key='state')
     await request_list.fetch_next_request()
     kvs = await KeyValueStore.open()
     monkeypatch.setattr(kvs, 'set_value', AsyncMock(side_effect=RuntimeError('store is on fire')))
 
-    with caplog.at_level(logging.ERROR):
+    with pytest.raises(RuntimeError, match='store is on fire'):
         await request_list.persist_state()
-
-    assert any(record.message == 'Attempted to persist state, but failed.' for record in caplog.records)
 
 
 async def test_close_persists_state_and_stops_listening() -> None:

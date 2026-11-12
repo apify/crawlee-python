@@ -265,21 +265,16 @@ class RequestList(RequestLoader):
         return state.model_copy(deep=True)
 
     async def persist_state(self) -> None:
-        """Persist the crawling position to the key-value store, logging a failed write.
+        """Persist the crawling position to the key-value store, raising if the write fails.
 
-        Raises:
-            RuntimeError: If the request list has no `persist_state_key`.
+        Does nothing without a `persist_state_key`.
         """
         if not self._persist_state_key:
-            raise RuntimeError('Cannot persist state. `persist_state_key` is not set.')
+            return
 
         # Loads the persisted record first, so that a call before the first use writes the restored position.
         await self._get_state()
-
-        try:
-            await self._state.persist_state()
-        except Exception:
-            logger.exception('Attempted to persist state, but failed.')
+        await self._state.persist_state()
 
     async def close(self) -> None:
         """Stop persisting the crawling position on PERSIST_STATE events and persist it one last time.
