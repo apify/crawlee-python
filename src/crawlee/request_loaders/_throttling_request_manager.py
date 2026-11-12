@@ -67,7 +67,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     The class is generic over the wrapped manager type. The first asynchronous operation opens one sub-manager per
     configured domain through `request_manager_opener`, so all of them share the subclass and backing store of `inner`;
     `record_pacing_signal` never opens anything. The opener must accept `alias`, `storage_backend`, and `configuration`
-    keyword arguments (as `RequestQueue.open` does) and return the same concrete subclass as `inner`.
+    keyword arguments (as `RequestQueue.open` does) and return the same concrete subclass as `inner`. Without `inner`,
+    the opener also opens the default store, such as the default request queue, on first use.
 
     Requests a previous run left in a persistent store become visible again at open. The default `purge_on_start=True`
     empties them; `purge_on_start=False` resumes them. Named stores are exempt from that purge and aliased ones are not,
@@ -80,9 +81,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     from crawlee.request_loaders import ThrottlingRequestManager
     from crawlee.storages import RequestQueue
 
-    queue = await RequestQueue.open()
     throttler = ThrottlingRequestManager(
-        inner=queue,
         domains=['api.example.com', 'slow-site.org'],
         request_manager_opener=RequestQueue.open,
     )
@@ -92,7 +91,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
     def __init__(
         self,
-        inner: TRequestManager,
+        inner: TRequestManager | None = None,
         *,
         domains: Sequence[str],
         request_manager_opener: _RequestManagerOpener[TRequestManager],
@@ -105,7 +104,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         Args:
             inner: The underlying request manager to wrap (typically a `RequestQueue`). Requests for non-throttled
-                domains are stored here.
+                domains are stored here. If omitted, `request_manager_opener` opens the default one on first use,
+                which the whole process shares.
             domains: Domains to throttle, each given as a bare hostname such as `api.example.com`, or as any URL on
                 the domain, of which only the hostname is used. Blank entries are ignored, so a list built by
                 splitting a string needs no pruning. Only requests matching these domains will be routed to
@@ -114,9 +114,10 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 supported — list each subdomain explicitly if needed.
             request_manager_opener: Async callable used to open one sub-manager per configured domain on first use.
                 Must accept `alias`, `storage_backend`, and `configuration` keyword arguments and return the same
-                concrete subclass as `inner` (e.g. `RequestQueue.open` when `inner` is a `RequestQueue`).
-            service_locator: Service locator for creating sub-managers. If not provided, defaults to the global service
-                locator, ensuring consistency with the crawler's storage backend.
+                concrete subclass as `inner` (e.g. `RequestQueue.open` when `inner` is a `RequestQueue`). Without
+                `inner`, it's also called without `alias` to open the default one.
+            service_locator: Service locator for creating sub-managers and the default `inner`. If not provided,
+                defaults to the global service locator, ensuring consistency with the crawler's storage backend.
             base_delay: Initial delay after the first 429 response from a domain. Must be positive.
             max_delay: Maximum delay between requests to a rate-limited domain. Must be positive.
             max_domain_stall: How long a domain may rate-limit every request before the crawler raises
@@ -137,7 +138,10 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         if max_domain_stall <= timedelta(0):
             raise ValueError(f'max_domain_stall must be positive, got {max_domain_stall}.')
 
-        self._inner: TRequestManager = inner
+        self._inner = inner
+        self._owns_inner = inner is None
+        """Whether `inner` is the default store, which `drop()` forgets so the next use opens it again."""
+        self._inner_lock = asyncio.Lock()
         self._service_locator = service_locator if service_locator is not None else global_service_locator
         self._base_delay = base_delay
         self._max_delay = max_delay
@@ -158,19 +162,27 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         self._migrated_from_inner = 0
         """Number of requests moved from `inner` into a sub-manager. Both stores count such a request, so the handled
         and total counts subtract it."""
+        self._expected_request_processing_time: timedelta | None = None
+        """The longest `set_expected_request_processing_time` value, kept for a default `inner` opened later."""
 
     @property
-    def inner(self) -> TRequestManager:
-        """The wrapped request manager that stores requests for non-throttled domains."""
+    def inner(self) -> TRequestManager | None:
+        """The wrapped request manager that stores requests for non-throttled domains.
+
+        `None` until the default one is opened on first use, and again after `drop()`, if no `inner` was passed.
+        """
         return self._inner
 
     @override
     async def drop(self) -> None:
         await self._ensure_sub_managers()
-        await asyncio.gather(self._inner.drop(), *(sm.drop() for sm in self._sub_managers.values()))
+        inner = await self._get_inner()
+        await asyncio.gather(inner.drop(), *(sm.drop() for sm in self._sub_managers.values()))
         self._sub_managers.clear()
         self._sub_managers_ready = False
         self._in_flight_from_inner.clear()
+        if self._owns_inner:
+            self._inner = None
 
     @override
     async def purge(self) -> None:
@@ -181,7 +193,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         they're just emptied.
         """
         await self._ensure_sub_managers()
-        await asyncio.gather(self._inner.purge(), *(sm.purge() for sm in self._sub_managers.values()))
+        inner = await self._get_inner()
+        await asyncio.gather(inner.purge(), *(sm.purge() for sm in self._sub_managers.values()))
         self._in_flight_from_inner.clear()
         self._migrated_from_inner = 0
         for state in self._domain_states.values():
@@ -189,16 +202,20 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
     @override
     async def set_expected_request_processing_time(self, processing_time: timedelta) -> None:
+        # A request queue keeps only the longest value, so the one kept for a later `inner` follows suit. Otherwise a
+        # shorter value set last would reach it alone and cut the locks of a consumer that holds requests longer.
+        kept = self._expected_request_processing_time
+        self._expected_request_processing_time = processing_time if kept is None else max(kept, processing_time)
         await self._ensure_sub_managers()
         await asyncio.gather(
-            self._inner.set_expected_request_processing_time(processing_time),
-            *(sm.set_expected_request_processing_time(processing_time) for sm in self._sub_managers.values()),
+            *(manager.set_expected_request_processing_time(processing_time) for manager in self._opened_managers())
         )
 
     @override
     async def extend_request_processing_time(self, request: Request, delta: timedelta) -> bool:
         await self._ensure_sub_managers()
-        return await self._fetch_owner(request).extend_request_processing_time(request, delta)
+        manager = await self._fetch_owner(request)
+        return await manager.extend_request_processing_time(request, delta)
 
     @override
     async def add_request(self, request: str | Request, *, forefront: bool = False) -> ProcessedRequest | None:
@@ -215,7 +232,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         if domain in self._domain_states:
             return await self._sub_managers[domain].add_request(request, forefront=forefront)
 
-        return await self._inner.add_request(request, forefront=forefront)
+        inner = await self._get_inner()
+        return await inner.add_request(request, forefront=forefront)
 
     @override
     async def add_requests(
@@ -244,7 +262,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 inner_requests.append(request)
 
         if inner_requests:
-            await self._inner.add_requests(
+            inner = await self._get_inner()
+            await inner.add_requests(
                 inner_requests,
                 forefront=forefront,
                 batch_size=batch_size,
@@ -290,7 +309,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     @override
     async def reclaim_request(self, request: Request, *, forefront: bool = False) -> ProcessedRequest | None:
         await self._ensure_sub_managers()
-        manager = self._fetch_owner(request)
+        manager = await self._fetch_owner(request)
         result = await manager.reclaim_request(request, forefront=forefront)
         self._clear_fetch_owner(request)
         return result
@@ -303,7 +322,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         state = self._get_domain_state(request.url)
         if state is not None:
             state.rate_limited_since = None
-        manager = self._fetch_owner(request)
+        manager = await self._fetch_owner(request)
         result = await manager.mark_request_as_handled(request)
         self._clear_fetch_owner(request)
         return result
@@ -311,24 +330,27 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     @override
     async def get_handled_count(self) -> int:
         await self._ensure_sub_managers()
+        inner = await self._get_inner()
         counts = await asyncio.gather(
-            self._inner.get_handled_count(), *(sm.get_handled_count() for sm in self._sub_managers.values())
+            inner.get_handled_count(), *(sm.get_handled_count() for sm in self._sub_managers.values())
         )
         return sum(counts) - self._migrated_from_inner
 
     @override
     async def get_total_count(self) -> int:
         await self._ensure_sub_managers()
+        inner = await self._get_inner()
         counts = await asyncio.gather(
-            self._inner.get_total_count(), *(sm.get_total_count() for sm in self._sub_managers.values())
+            inner.get_total_count(), *(sm.get_total_count() for sm in self._sub_managers.values())
         )
         return sum(counts) - self._migrated_from_inner
 
     @override
     async def get_pending_count(self) -> int:
         await self._ensure_sub_managers()
+        inner = await self._get_inner()
         counts = await asyncio.gather(
-            self._inner.get_pending_count(), *(sm.get_pending_count() for sm in self._sub_managers.values())
+            inner.get_pending_count(), *(sm.get_pending_count() for sm in self._sub_managers.values())
         )
         # `inner` counts a migrated request as handled, so it is pending only in its sub-manager and needs no fix-up.
         return sum(counts)
@@ -343,8 +365,9 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         requests in progress or still being added.
         """
         await self._ensure_sub_managers()
+        inner = await self._get_inner()
         now = datetime.now(UTC)
-        dispatchable: list[RequestManager] = [self._inner]
+        dispatchable: list[RequestManager] = [inner]
         cooling: list[str] = []
         candidates: list[str] = []
 
@@ -599,10 +622,37 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
             self._sub_managers_ready = True
 
+    async def _get_inner(self) -> TRequestManager:
+        """Return `inner`, opening the default one through `request_manager_opener` on first use."""
+        if self._inner is not None:
+            return self._inner
+
+        async with self._inner_lock:
+            inner = self._inner
+            if inner is None:
+                inner = await self._request_manager_opener(
+                    storage_backend=self._service_locator.get_storage_backend(),
+                    configuration=self._service_locator.get_configuration(),
+                )
+                # Set before the hint is applied, so a hint that arrives meanwhile reaches it directly.
+                self._inner = inner
+                if self._expected_request_processing_time is not None:
+                    await inner.set_expected_request_processing_time(self._expected_request_processing_time)
+
+        return inner
+
+    def _opened_managers(self) -> list[TRequestManager]:
+        """Return the opened sub-managers and `inner`, without opening the default `inner` just for this."""
+        managers = list(self._sub_managers.values())
+        if self._inner is not None:
+            managers.append(self._inner)
+        return managers
+
     async def _fetch_from_inner(self) -> Request | None:
         """Fetch the next request from `inner`, moving each one whose domain is in a cooldown into its sub-manager."""
+        inner = await self._get_inner()
         for _ in range(_MAX_INNER_MIGRATIONS):
-            request = await self._inner.fetch_next_request()
+            request = await inner.fetch_next_request()
             if request is None:
                 return None
 
@@ -610,11 +660,11 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             if state is None or datetime.now(UTC) >= state.throttled_until:
                 return request
 
-            await self._migrate_to_sub_manager(request)
+            await self._migrate_to_sub_manager(request, inner)
 
         return None
 
-    async def _migrate_to_sub_manager(self, request: Request) -> None:
+    async def _migrate_to_sub_manager(self, request: Request, inner: TRequestManager) -> None:
         """Move a request fetched from `inner` into its domain's sub-manager."""
         sub_manager = self._sub_managers[self._extract_domain(request.url)]
         try:
@@ -622,15 +672,15 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             processed = await sub_manager.add_request(request.model_copy(deep=True))
         # Includes cancellation, which would otherwise leave the request in progress in `inner`.
         except BaseException:
-            await self._inner.reclaim_request(request, forefront=True)
+            await inner.reclaim_request(request, forefront=True)
             raise
 
         # A storage that refuses the request returns `None` instead of raising.
         if processed is None:
-            await self._inner.reclaim_request(request, forefront=True)
+            await inner.reclaim_request(request, forefront=True)
             raise RuntimeError(f'The storage refused to move request {request.url} into its domain queue.')
 
-        await self._inner.mark_request_as_handled(request)
+        await inner.mark_request_as_handled(request)
         self._migrated_from_inner += 1
 
     def _fetchable_domains(self) -> list[str]:
@@ -649,14 +699,15 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         if state is not None:
             state.apply_crawl_delay(datetime.now(UTC))
 
-    def _fetch_owner(self, request: Request) -> TRequestManager:
+    async def _fetch_owner(self, request: Request) -> TRequestManager:
         """Return the manager the request must be given back to, leaving its in-flight record in place.
 
         `_clear_fetch_owner` drops the record only once the completion is accepted, so a retry resolves the same way.
         """
-        if (request.unique_key, request.url) in self._in_flight_from_inner:
-            return self._inner
-        return self._sub_managers.get(self._extract_domain(request.url), self._inner)
+        sub_manager = self._sub_managers.get(self._extract_domain(request.url))
+        if sub_manager is None or (request.unique_key, request.url) in self._in_flight_from_inner:
+            return await self._get_inner()
+        return sub_manager
 
     def _clear_fetch_owner(self, request: Request) -> None:
         """Drop the in-flight record of a request whose completion was accepted."""
@@ -668,7 +719,7 @@ class _RequestManagerOpener(Protocol[TRequestManager_co]):
 
     Matches the keyword-only signature shared by storage `open` classmethods such as `RequestQueue.open`.
     `ThrottlingRequestManager` invokes the opener at sub-manager creation time, so every sub-manager shares the same
-    backing type as `inner`.
+    backing type as `inner`. Without an `alias`, it opens the default `inner`.
     """
 
     async def __call__(

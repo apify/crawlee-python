@@ -3463,7 +3463,9 @@ async def test_stall_behind_tandem_raises() -> None:
 async def test_inner_held_429_is_deferred_and_stalls() -> None:
     """A rate-limited request held by `inner` moves into its domain's sub-manager and can stall the crawl."""
     throttler = await open_throttler()
-    await throttler.inner.add_request(THROTTLED_URL)
+    inner = throttler.inner
+    assert inner is not None
+    await inner.add_request(THROTTLED_URL)
     crawler = BasicCrawler(request_manager=throttler)
     calls = 0
 
@@ -3478,7 +3480,7 @@ async def test_inner_held_429_is_deferred_and_stalls() -> None:
     with pytest.raises(PersistentRateLimitError):
         await crawler.run()
 
-    assert (await throttler.inner.check_readiness()).status == 'finished'
+    assert (await inner.check_readiness()).status == 'finished'
     assert (await throttler.check_readiness()).status != 'finished'
 
 

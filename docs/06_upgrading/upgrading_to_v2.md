@@ -353,6 +353,12 @@ If you have a custom request manager, implement `record_pacing_signal`. Return `
 
 A `RequestThrottledError` you raise yourself now starts the domain's backoff, and the request is deferred if the request manager paces its domain. In v1, it was an ordinary error unless you had called `record_domain_delay` first. A deferred request never fails, so raise the error only when the server has refused the request. In `AdaptivePlaywrightCrawler`, such an error from the static run now defers the request instead of falling back to the browser.
 
+## `ThrottlingRequestManager.inner` is optional
+
+The `inner` argument of `ThrottlingRequestManager` is now optional, the same as in Crawlee JS. Without it, `request_manager_opener` opens the default store on first use, such as the default request queue for `RequestQueue.open`. Until then, the `inner` property returns `None`, so its type is now `TRequestManager | None`. If you pass `inner`, the property returns it as before.
+
+Every throttler without `inner` opens the process-wide default request queue. Crawlers with such a throttler share that queue and crawl each other's requests. So does the first crawler created in the process if it has no `request_manager`. Every later crawler without one opens a queue of its own, as described in [Only the first crawler uses the default request queue](#only-the-first-crawler-uses-the-default-request-queue). To keep crawlers apart, pass `inner`. Throttlers that list the same domain still share its queue, since they all open it under the alias `throttled-{domain}`.
+
 ## HTTP clients
 
 `HttpClient` follows the design of Crawlee JS v4. A client sends a single request, and the base class handles redirects and cookies the same way for every client.
