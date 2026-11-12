@@ -312,7 +312,9 @@ class HttpxHttpClient(HttpClient):
     def _create_transport(self, **kwargs: Any) -> httpx2.AsyncHTTPTransport:
         """Create the `httpx2.AsyncHTTPTransport` from the prepared keyword arguments.
 
-        The transport verifies the TLS certificates. A subclass can override it to change the arguments.
+        A subclass can override it to change the arguments, for example to pass its own CA in `verify`. For a request
+        that ignores TLS errors, `verify` is an `SSLContext` with `verify_mode` set to `ssl.CERT_NONE`. Keep that one,
+        or TLS errors are no longer ignored.
         """
         return httpx2.AsyncHTTPTransport(**kwargs)
 
