@@ -197,7 +197,7 @@ class PlaywrightBrowserController(BrowserController):
                 page = await self._browser_context.new_page()
 
             # Handle page close event
-            page.on(event='close', f=self._on_page_close)
+            page.on(event='close', f=self.register_page_closed)
 
             # Update internal state
             self._pages.append(page)
@@ -225,9 +225,10 @@ class PlaywrightBrowserController(BrowserController):
             await self._browser_context.close()
         await self._browser.close()
 
-    def _on_page_close(self, page: Page) -> None:
-        """Handle actions after a page is closed."""
-        self._pages.remove(page)
+    @override
+    def register_page_closed(self, page: Page) -> None:
+        if page in self._pages:
+            self._pages.remove(page)
 
     def _filter_context_options(self, options: dict[str, Any]) -> dict[str, Any]:
         """Filter browser context options based on the current mode (incognito vs persistent).

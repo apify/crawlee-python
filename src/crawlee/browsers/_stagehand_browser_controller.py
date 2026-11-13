@@ -16,7 +16,7 @@ from crawlee.fingerprint_suite._header_generator import fingerprint_browser_type
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from playwright.async_api import Browser, BrowserContext, Playwright
+    from playwright.async_api import Browser, BrowserContext, Page, Playwright
     from stagehand import AsyncSession, AsyncStagehand
 
     from crawlee.browsers._stagehand_types import StagehandOptions
@@ -162,7 +162,7 @@ class StagehandBrowserController(BrowserController):
 
             raw_page = await self._browser_context.new_page()
             page = StagehandPage(raw_page, self._session)
-            raw_page.on('close', lambda _: self._on_page_close(page))
+            raw_page.on('close', lambda _: self.register_page_closed(page))
 
             self._pages.append(page)
             self._last_page_opened_at = datetime.now(timezone.utc)
@@ -195,8 +195,9 @@ class StagehandBrowserController(BrowserController):
             self._session = None
             self._browser_context = None
 
-    def _on_page_close(self, page: StagehandPage) -> None:
-        if page in self._pages:
+    @override
+    def register_page_closed(self, page: Page) -> None:
+        if isinstance(page, StagehandPage) and page in self._pages:
             self._pages.remove(page)
 
     def _get_extra_http_headers(
