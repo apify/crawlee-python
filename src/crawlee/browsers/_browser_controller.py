@@ -100,3 +100,13 @@ class BrowserController(ABC):
         Raises:
             ValueError: If there are still open pages when trying to close the browser.
         """
+
+    def register_page_closed(self, page: Page) -> None:  # noqa: B027
+        """Stop tracking the page as open.
+
+        Called from the page's `close` event, and by the `BrowserPool` when closing the page never finishes, in which
+        case that event never arrives. It can be called more than once for the same page.
+
+        Args:
+            page: The page that is no longer open.
+        """
