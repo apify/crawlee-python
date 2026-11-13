@@ -1515,7 +1515,7 @@ async def test_crawler_multiple_stops_in_parallel() -> None:
     # Set concurrency to 2 to ensure two urls are being visited in parallel.
     crawler = BasicCrawler(concurrency_settings=ConcurrencySettings(desired_concurrency=2, max_concurrency=2))
 
-    both_handlers_started = asyncio.Barrier(2)  # ty:ignore[unresolved-attribute]  # Test is skipped in older Python versions.
+    both_handlers_started = asyncio.Barrier(2)  # ty:ignore[missing-attribute]  # Test is skipped in older Python versions.
     only_one_handler_at_a_time = asyncio.Semaphore(1)
 
     @crawler.router.default_handler
@@ -2482,7 +2482,7 @@ async def test_multiple_crawlers_with_global_event_manager() -> None:
         await started_event.wait()
         await crawler_2.run(['https://b.placeholder.com'])
 
-    handler_barrier = asyncio.Barrier(2)  # ty:ignore[unresolved-attribute]  # Test is skipped in older Python versions.
+    handler_barrier = asyncio.Barrier(2)  # ty:ignore[missing-attribute]  # Test is skipped in older Python versions.
 
     handler_call = AsyncMock()
 

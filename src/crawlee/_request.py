@@ -71,7 +71,7 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
 
     model_config = ConfigDict(extra='allow')
     # Pydantic's documented way to type extra fields; it rejects the `| None` the base declaration has.
-    __pydantic_extra__: dict[str, JsonSerializable] = Field(init=False)  # ty: ignore[invalid-mutable-override]
+    __pydantic_extra__: dict[str, JsonSerializable] = Field(init=False)  # ty: ignore[incompatible-mutable-override]
 
     crawlee_data: Annotated[CrawleeRequestData | None, Field(alias='__crawlee')] = None
     """Crawlee-specific configuration stored in the `user_data`."""
@@ -94,7 +94,7 @@ class UserData(BaseModel, MutableMapping[str, JsonSerializable]):
     def __delitem__(self, key: str) -> None:
         del self.__pydantic_extra__[key]
 
-    def __iter__(self) -> Iterator[str]:  # ty: ignore[invalid-method-override]
+    def __iter__(self) -> Iterator[str]:  # ty: ignore[incompatible-method-override]
         yield from self.__pydantic_extra__
 
     def __len__(self) -> int:

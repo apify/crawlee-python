@@ -178,7 +178,7 @@ class _SitemapExpatParser(ExpatParser):
     @override
     def reset(self) -> None:
         super().reset()
-        self._parser.EntityDeclHandler = self._reject_entity_declaration  # ty: ignore[unresolved-attribute]
+        self._parser.EntityDeclHandler = self._reject_entity_declaration  # ty: ignore[missing-attribute]
 
     def _reject_entity_declaration(self, name: str, *_args: object) -> None:
         raise ValueError(f'Entity declarations are not allowed in sitemaps, found {name!r}')
