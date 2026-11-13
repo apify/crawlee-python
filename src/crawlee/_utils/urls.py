@@ -48,7 +48,7 @@ def to_absolute_url_iterator(base_url: str, urls: Iterator[str], logger: Logger 
                 continue
             converted_url = convert_to_absolute_url(base_url, url)
         except ValueError:
-            # The URL cannot be parsed at all, for example because its port is not a number.
+            # The URL cannot be parsed at all, for example because its port is out of range.
             converted_url = ''
 
         # Skip the URL if conversion fails, probably due to an incorrect format, such as 'mailto:'.
