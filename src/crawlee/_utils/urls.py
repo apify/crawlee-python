@@ -42,16 +42,21 @@ def convert_to_absolute_url(base_url: str, relative_url: str) -> str:
 def to_absolute_url_iterator(base_url: str, urls: Iterator[str], logger: Logger | None = None) -> Iterator[str]:
     """Convert an iterator of relative URLs to absolute URLs using a base URL."""
     for url in urls:
-        if is_url_absolute(url):
-            yield url
-        else:
-            converted_url = convert_to_absolute_url(base_url, url)
-            # Skip the URL if conversion fails, probably due to an incorrect format, such as 'mailto:'.
-            if not is_url_absolute(converted_url):
-                if logger:
-                    logger.debug(f'Could not convert URL "{url}" to absolute using base URL "{base_url}". Skipping it.')
+        try:
+            if is_url_absolute(url):
+                yield url
                 continue
-            yield converted_url
+            converted_url = convert_to_absolute_url(base_url, url)
+        except ValueError:
+            # The URL cannot be parsed at all, for example because its port is out of range.
+            converted_url = ''
+
+        # Skip the URL if conversion fails, probably due to an incorrect format, such as 'mailto:'.
+        if not is_url_absolute(converted_url):
+            if logger:
+                logger.debug(f'Could not convert URL "{url}" to absolute using base URL "{base_url}". Skipping it.')
+            continue
+        yield converted_url
 
 
 def validate_http_url(value: str | None) -> str | None:

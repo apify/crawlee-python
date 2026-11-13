@@ -15,6 +15,7 @@ START_ENQUEUE = b"""\
     <a href="/sub_index" class="foo">Link 1</a>
     <a href="/page_1">Link 2</a>
     <a href="mailto:test@test.com">test@test.com</a>
+    <a href="http://tel:+911234567890">Phone</a>
 </body></html>"""
 
 START_ENQUEUE_NON_HREF = """\
