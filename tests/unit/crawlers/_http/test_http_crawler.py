@@ -51,7 +51,7 @@ async def test_navigation_response_closed_after_request(*, status_code: int, exp
     """Test that the response of the navigation request stays open in the handler and is closed after the request."""
     url = 'https://a.placeholder.com'
     response = mock_response(status_code, url)
-    http_client = AsyncMock(spec=HttpClient)
+    http_client = AsyncMock(spec=HttpClient, active=True)
     http_client.send_request.return_value = response
     crawler = HttpCrawler(http_client=http_client, max_request_retries=0)
     handler_call = Mock()
@@ -71,7 +71,7 @@ async def test_body_read_bound_by_navigation_timeout() -> None:
     url = 'https://a.placeholder.com'
     response = mock_response(200, url)
     response.read.side_effect = asyncio.Event().wait
-    http_client = AsyncMock(spec=HttpClient)
+    http_client = AsyncMock(spec=HttpClient, active=True)
     http_client.send_request.return_value = response
     crawler = HttpCrawler(
         http_client=http_client,
@@ -100,14 +100,15 @@ async def test_body_read_bound_by_navigation_timeout() -> None:
 async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
     """A throttled 429 is retried later without spending a retry, a session rotation or session reputation."""
     throttler = await open_throttler_held_until_reclaim(monkeypatch)
-    http_client = AsyncMock(spec=HttpClient)
+    http_client = AsyncMock(spec=HttpClient, active=True)
     url = 'https://throttled.placeholder.com/page'
     http_client.send_request.side_effect = [mock_response(429, url), mock_response(200, url)]
     failed_request_handler = AsyncMock()
+    session_pool = SessionPool(max_pool_size=1)
     crawler = HttpCrawler(
         http_client=http_client,
         request_manager=throttler,
-        session_pool=SessionPool(max_pool_size=1),
+        session_pool=session_pool,
         max_request_retries=0,
         max_session_rotations=0,
         **crawler_kwargs,
@@ -119,7 +120,8 @@ async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any], monkeyp
     async def handler(context: HttpCrawlingContext) -> None:
         handled.append(context)
 
-    await crawler.run([url])
+    async with session_pool:
+        await crawler.run([url])
 
     assert [context.http_response.status_code for context in handled] == [200]
     failed_request_handler.assert_not_called()
@@ -134,7 +136,7 @@ async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any], monkeyp
 async def test_tandem_429_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
     """A 429 reaches a throttler wrapped in a `RequestManagerTandem`, so the request is deferred without a retry."""
     throttler = await open_throttler_held_until_reclaim(monkeypatch)
-    http_client = AsyncMock(spec=HttpClient)
+    http_client = AsyncMock(spec=HttpClient, active=True)
     url = 'https://throttled.placeholder.com/page'
     http_client.send_request.side_effect = [mock_response(429, url), mock_response(200, url)]
     failed_request_handler = AsyncMock()
@@ -163,7 +165,7 @@ async def test_429_reported_once(monkeypatch: pytest.MonkeyPatch) -> None:
     throttler = await open_throttler_held_until_reclaim(monkeypatch)
     record_pacing_signal = Mock(wraps=throttler.record_pacing_signal)
     monkeypatch.setattr(throttler, 'record_pacing_signal', record_pacing_signal)
-    http_client = AsyncMock(spec=HttpClient)
+    http_client = AsyncMock(spec=HttpClient, active=True)
     url = 'https://throttled.placeholder.com/page'
     http_client.send_request.side_effect = [mock_response(429, url), mock_response(200, url)]
     crawler = HttpCrawler(http_client=http_client, request_manager=throttler)

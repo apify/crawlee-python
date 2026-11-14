@@ -7,6 +7,7 @@ from typing import Annotated, Protocol
 from pydantic import Field
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
+from crawlee._utils.context import Collaborator
 from crawlee._utils.docs import docs_group
 
 
@@ -104,12 +105,13 @@ class ConcurrencyConsumer:
 
 
 @docs_group('Autoscaling')
-class ConcurrencySystemInterface(Protocol):
+class ConcurrencySystemInterface(Collaborator, Protocol):
     """The contract between an `AutoscaledPool` and the component that governs its concurrency.
 
     The system answers whether there is free compute for one more task and tracks the budget that tasks are booked
     against. `ConcurrencySystem` is the default implementation. Anything matching this contract can take its place,
-    without depending on its internals.
+    without depending on its internals. An implementation is an async context manager, entered by whoever creates it.
+    `AutoscaledPool.run` refuses to run on a system that isn't entered.
 
     Every allocation method is told which `ConcurrencyConsumer` is asking, so an implementation may allocate per
     consumer. `ConcurrencySystem` does not, and serves whoever asks first, which can starve a consumer that joins
@@ -126,10 +128,6 @@ class ConcurrencySystemInterface(Protocol):
     @property
     def current_concurrency(self) -> int:
         """The number of parallel tasks currently booked against this system."""
-
-    @property
-    def active(self) -> bool:
-        """Whether the system is ready to be booked against. `AutoscaledPool.run` refuses to run when it is not."""
 
     def has_capacity_for_task(self, consumer: ConcurrencyConsumer) -> bool:
         """Report whether one more task may start right now on behalf of `consumer`.

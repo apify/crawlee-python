@@ -9,8 +9,10 @@ from crawlee import (
     service_locator,
 )
 from crawlee.autoscaling import ConcurrencySystem
+from crawlee.browsers import BrowserPool
 from crawlee.configuration import Configuration
 from crawlee.crawlers import (
+    BasicCrawler,
     PlaywrightCrawler,
 )
 
@@ -32,6 +34,25 @@ async def test_accepts_concurrency_system() -> None:
     crawler = PlaywrightCrawler(concurrency_system=concurrency_system)
 
     assert crawler.concurrency_system is concurrency_system
+
+
+async def test_run_needs_entered_browser_pool() -> None:
+    """A browser pool passed to the crawler has to be entered before the crawler runs."""
+    crawler = PlaywrightCrawler(browser_pool=BrowserPool())
+
+    with pytest.raises(RuntimeError, match='BrowserPool passed to the crawler is not active'):
+        await crawler.run(['https://a.placeholder.com'])
+
+
+def test_unsupported_browser_type_takes_no_id() -> None:
+    """A crawler with a browser type its default fingerprint generator doesn't support doesn't use up a crawler id."""
+    first_crawler = BasicCrawler()
+
+    with pytest.raises(ValueError, match='Unsupported browser type'):
+        PlaywrightCrawler(browser_type='edge')  # ty: ignore[invalid-argument-type]
+
+    second_crawler = BasicCrawler()
+    assert int(second_crawler._id) == int(first_crawler._id) + 1
 
 
 def test_import_error_handled() -> None:

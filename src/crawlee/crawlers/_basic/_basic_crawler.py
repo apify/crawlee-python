@@ -42,6 +42,7 @@ from crawlee._types import (
     SendRequestFunction,
     SkippedReason,
 )
+from crawlee._utils.context import Collaborator
 from crawlee._utils.docs import docs_group
 from crawlee._utils.file import atomic_write, export_csv_to_stream, export_json_to_stream
 from crawlee._utils.globs import check_url_patterns
@@ -111,6 +112,7 @@ TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=St
 TRequestIterator = TypeVar('TRequestIterator', str, Request)
 TParams = ParamSpec('TParams')
 T = TypeVar('T')
+TCollaborator = TypeVar('TCollaborator', bound=Collaborator)
 
 ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Request | None]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
@@ -133,13 +135,15 @@ class _BasicCrawlerOptions(TypedDict):
     """Manager of requests that should be processed by the crawler."""
 
     session_pool: NotRequired[SessionPool]
-    """A custom `SessionPool` instance, allowing the use of non-default configuration."""
+    """A custom `SessionPool` instance, allowing the use of non-default configuration. Keep it open with `async with`
+    until every crawler using it has finished."""
 
     proxy_configuration: NotRequired[ProxyConfiguration]
     """HTTP proxy configuration used when making requests."""
 
     http_client: NotRequired[HttpClient]
-    """HTTP client used by `BasicCrawlingContext.send_request` method."""
+    """HTTP client used by `BasicCrawlingContext.send_request` method. Keep it open with `async with` until every
+    crawler using it has finished."""
 
     max_request_retries: NotRequired[int]
     """Specifies the maximum number of retries allowed for a request if its processing fails.
@@ -175,7 +179,8 @@ class _BasicCrawlerOptions(TypedDict):
 
     concurrency_system: NotRequired[ConcurrencySystemInterface]
     """A concurrency system to use instead of the default one, e.g. one shared between crawlers to cap their combined
-    concurrency. Cannot be combined with `concurrency_settings`."""
+    concurrency. Keep it open with `async with` until every crawler using it has finished. Cannot be combined with
+    `concurrency_settings`."""
 
     request_handler_timeout: NotRequired[timedelta]
     """Maximum duration allowed for a single request handler to run."""
@@ -205,8 +210,9 @@ class _BasicCrawlerOptions(TypedDict):
     """HTTP status codes that are typically considered errors but should be treated as successful responses."""
 
     _additional_context_managers: NotRequired[Sequence[AbstractAsyncContextManager]]
-    """Additional context managers used throughout the crawler lifecycle. Intended for use by
-    subclasses rather than direct instantiation of `BasicCrawler`."""
+    """Additional context managers the crawler owns, entered and exited on every run. A subclass lists the defaults it
+    builds here, so that they aren't taken for objects passed in. Intended for use by subclasses rather than direct
+    instantiation of `BasicCrawler`."""
 
     respect_robots_txt_file: NotRequired[bool]
     """If set to `True`, the crawler will automatically try to fetch the robots.txt file for each domain,
@@ -238,7 +244,8 @@ class _BasicCrawlerOptionsGeneric(TypedDict, Generic[TCrawlingContext, TStatisti
     subclasses rather than direct instantiation of `BasicCrawler`."""
 
     statistics: NotRequired[Statistics[TStatisticsState]]
-    """A custom `Statistics` instance, allowing the use of non-default configuration."""
+    """A custom `Statistics` instance, allowing the use of non-default configuration. The crawler enters it on every
+    run, so don't enter it yourself. Crawlers can share it only when they run one after another."""
 
 
 class BasicCrawlerOptions(
@@ -326,9 +333,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             event_manager: The event manager for managing events for the crawler and all its components.
             storage_backend: The storage backend for managing storages for the crawler and all its components.
             request_manager: Manager of requests that should be processed by the crawler.
-            session_pool: A custom `SessionPool` instance, allowing the use of non-default configuration.
+            session_pool: A custom `SessionPool` instance, allowing the use of non-default configuration. Keep it open
+                with `async with` until every crawler using it has finished.
             proxy_configuration: HTTP proxy configuration used when making requests.
-            http_client: HTTP client used by `BasicCrawlingContext.send_request` method.
+            http_client: HTTP client used by `BasicCrawlingContext.send_request` method. Keep it open with `async with`
+                until every crawler using it has finished.
             request_handler: A callable responsible for handling requests.
             max_request_retries: Specifies the maximum number of retries allowed for a request if its processing fails.
                 This includes retries due to navigation errors or errors thrown from user-supplied functions
@@ -357,7 +366,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 crawlers to cap their combined concurrency. Keep it open with `async with` until every crawler using it
                 has finished. Cannot be combined with `concurrency_settings`.
             request_handler_timeout: Maximum duration allowed for a single request handler to run.
-            statistics: A custom `Statistics` instance, allowing the use of non-default configuration.
+            statistics: A custom `Statistics` instance, allowing the use of non-default configuration. The crawler
+                enters it on every run, so don't enter it yourself. Crawlers can share it only when they run one after
+                another.
             abort_on_error: If True, the crawler stops immediately when any request handler error occurs.
             keep_alive: If True, it will keep crawler alive even if there are no requests in queue.
                 Use `crawler.stop()` to exit the crawler.
@@ -378,7 +389,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 it, the ID follows the order in which crawlers are created.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
-            _additional_context_managers: Additional context managers used throughout the crawler lifecycle.
+            _additional_context_managers: Additional context managers the crawler owns, entered and exited on every
+                run. A subclass lists the defaults it builds here, so that they aren't taken for objects passed in.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
         self._id = str(BasicCrawler.__next_id) if id is None else id
@@ -404,9 +416,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         config = self._service_locator.get_configuration()
 
+        # The crawler enters and exits what it owns on every run, and only checks that the collaborators passed in are
+        # active.
+        self._owned_context_managers: list[AbstractAsyncContextManager] = [*(_additional_context_managers or [])]
+        self._borrowed_collaborators: list[Collaborator] = []
+
         # Core components
         self._request_manager = request_manager
-        self._session_pool = session_pool or SessionPool()
+        self._session_pool = self._own_or_borrow(session_pool, SessionPool)
         self._proxy_configuration = proxy_configuration
 
         self._additional_http_error_status_codes = (
@@ -416,7 +433,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             set(ignore_http_error_status_codes) if ignore_http_error_status_codes else set()
         )
 
-        self._http_client = http_client or ImpitHttpClient()
+        self._http_client = self._own_or_borrow(http_client, ImpitHttpClient)
 
         # Request router setup
         self._router: Router[TCrawlingContext] | None = None
@@ -497,9 +514,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 ),
             )
 
-        # Additional context managers to enter and exit
-        self._additional_context_managers = _additional_context_managers or []
-
         # Internal, not explicitly configurable components
         self._robots_txt_file_cache: LRUCache[str, RobotsTxtFile] = LRUCache(maxsize=1000)
         self._robots_txt_lock = asyncio.Lock()
@@ -513,6 +527,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         self._concurrency_settings = concurrency_settings
         self._borrowed_concurrency_system = concurrency_system
+        if concurrency_system is not None:
+            self._borrowed_collaborators.append(concurrency_system)
 
         # The default system is built per run, so that a run is not scaled on the load and concurrency of the previous
         # one. A supplied system is known up front.
@@ -530,6 +546,21 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         # The last run started on this instance, which stays readable after it finishes.
         self._last_run: CrawlerRun[TStatisticsState] | None = None
+
+    def _own_or_borrow(self, passed: TCollaborator | None, build_default: Callable[[], TCollaborator]) -> TCollaborator:
+        """Return the collaborator passed in, or build the default one, and record which of them the crawler owns.
+
+        A collaborator passed in that a subclass listed in `_additional_context_managers` counts as the crawler's own.
+        """
+        if passed is None:
+            default = build_default()
+            self._owned_context_managers.append(default)
+            return default
+
+        if passed not in self._owned_context_managers:
+            self._borrowed_collaborators.append(passed)
+
+        return passed
 
     @property
     def log(self) -> logging.Logger:
@@ -771,12 +802,27 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             requests: The requests to be enqueued before the crawler starts.
 
         Raises:
+            RuntimeError: If the crawler is already running, an object passed to it, such as a `SessionPool`, isn't
+                entered, or its statistics are already active.
             PersistentRateLimitError: If a domain throttled by a `ThrottlingRequestManager` has rate-limited every
                 request for longer than the manager's `max_domain_stall` and no other requests are left.
         """
         if self._live_run is not None:
             raise RuntimeError(
                 'This crawler instance is already running, you can add more requests to it via `crawler.add_requests()`'
+            )
+
+        for collaborator in self._borrowed_collaborators:
+            if not collaborator.active:
+                raise RuntimeError(
+                    f'The {type(collaborator).__name__} passed to the crawler is not active. Enter it with '
+                    '`async with` before running the crawler.'
+                )
+
+        if self._statistics.active:
+            raise RuntimeError(
+                "The statistics of the crawler are already active. The crawler enters them itself, so don't enter "
+                'them yourself. Crawlers can share statistics only when they run one after another.'
             )
 
         self._last_run = self._create_run()
@@ -786,8 +832,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 self._statistics.reset()
                 await self._statistics.reset_store()
 
-                self._session_pool.reset()
-                await self._session_pool.reset_store()
+                # A session pool passed in belongs to the caller, who may still use it in another crawler.
+                if self._session_pool in self._owned_context_managers:
+                    self._session_pool.reset()
+                    await self._session_pool.reset_store()
 
             if requests is not None:
                 await self.add_requests(requests)
@@ -922,24 +970,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         # A system supplied by the caller is only borrowed, and its lifecycle belongs to whoever created it. The one
         # the crawler builds for this run is entered and exited below.
-        owned_concurrency_system = self._concurrency_system if self._borrowed_concurrency_system is None else None
+        if self._borrowed_concurrency_system is None:
+            contexts_to_enter.append(self._concurrency_system)
 
-        # Collect the context managers to be entered. Context managers that are already active are excluded,
-        # as they were likely entered by the caller, who will also be responsible for exiting them.
-        contexts_to_enter.extend(
-            [
-                cm
-                for cm in (
-                    owned_concurrency_system,
-                    self._statistics,
-                    self._session_pool,
-                    self._http_client,
-                    self._crawler_state_rec_task,
-                    *self._additional_context_managers,
-                )
-                if cm and getattr(cm, 'active', False) is False
-            ]
-        )
+        # The statistics count only while they're entered, so the crawler enters them on every run, even when they
+        # were passed in.
+        contexts_to_enter.append(self._statistics)
+        contexts_to_enter.extend(self._owned_context_managers)
+
+        # The status messages of the recurring task read the statistics, so it starts after them and stops before them.
+        contexts_to_enter.append(self._crawler_state_rec_task)
 
         async with AsyncExitStack() as exit_stack:
             for context in contexts_to_enter:

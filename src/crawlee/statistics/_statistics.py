@@ -115,6 +115,9 @@ class Statistics(Generic[TStatisticsState]):
         # Flag to indicate the context state.
         self._active = False
 
+        # Set from the start of an entry to the end of the exit, so that a second entry can't overlap either of them.
+        self._claimed = False
+
     def replace_state_model(self, state_model: type[TNewStatisticsState]) -> Statistics[TNewStatisticsState]:
         """Create near copy of the `Statistics` with replaced `state_model`."""
         new_statistics: Statistics[TNewStatisticsState] = Statistics(
@@ -169,23 +172,34 @@ class Statistics(Generic[TStatisticsState]):
         Raises:
             RuntimeError: If the context manager is already active.
         """
-        if self._active:
+        if self._claimed:
             raise RuntimeError(f'The {self.__class__.__name__} is already active.')
 
-        await self._state.initialize()
+        # Claimed before the first await, so that no other entry can pass the check above.
+        self._claimed = True
+        initialized_state = False
 
-        # The timestamps belong to the previous run, restored or kept in memory. Fold that run into the accumulated
-        # runtime and clear them, so that the downtime since then (e.g. a migration or resurrection) doesn't count
-        # towards the runtime, and a clock that is behind the previous host's doesn't make `crawler_runtime` treat the
-        # new run as already checkpointed.
-        self.state.accumulated_runtime = self.state.crawler_runtime
-        self.state.crawler_last_started_at = None
-        self.state.crawler_finished_at = None
-        self.state.stats_persisted_at = None
+        try:
+            await self._state.initialize()
+            initialized_state = True
 
-        # Start periodic logging and let it print the restored state before the new run starts being measured.
-        self._periodic_logger.start()
-        await asyncio.sleep(0.01)
+            # The timestamps belong to the previous run, restored or kept in memory. Fold that run into the accumulated
+            # runtime and clear them, so that the downtime since then (e.g. a migration or resurrection) doesn't count
+            # towards the runtime, and a clock that is behind the previous host's doesn't make `crawler_runtime` treat
+            # the new run as already checkpointed.
+            self.state.accumulated_runtime = self.state.crawler_runtime
+            self.state.crawler_last_started_at = None
+            self.state.crawler_finished_at = None
+            self.state.stats_persisted_at = None
+
+            # Start periodic logging and let it print the restored state before the new run starts being measured.
+            self._periodic_logger.start()
+            await asyncio.sleep(0.01)
+        except BaseException:
+            # A failed or cancelled entry leaves the statistics free to be entered again.
+            await self._stop_capturing(teardown_state=initialized_state)
+            raise
+
         self._active = True
 
         self.state.crawler_last_started_at = datetime.now(UTC)
@@ -206,11 +220,10 @@ class Statistics(Generic[TStatisticsState]):
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        # Stop logging; the finish timestamp freezes the measured run before the final persist.
-        await self._periodic_logger.stop()
+        # Before the first await, so that a cancelled exit doesn't count the time until the next run as runtime.
         self.state.crawler_finished_at = datetime.now(UTC)
-        self._active = False
-        await self._state.teardown()
+
+        await self._stop_capturing(teardown_state=True)
 
     @property
     def state(self) -> TStatisticsState:
@@ -315,6 +328,18 @@ class Statistics(Generic[TStatisticsState]):
                 record straight back.
         """
         await self._state.reset_store()
+
+    async def _stop_capturing(self, *, teardown_state: bool) -> None:
+        # The state is torn down and the statistics released even when stopping the logger is cancelled.
+        try:
+            await self._periodic_logger.stop()
+        finally:
+            try:
+                if teardown_state:
+                    await self._state.teardown()
+            finally:
+                self._active = False
+                self._claimed = False
 
     def _log(self) -> None:
         stats = self.calculate()

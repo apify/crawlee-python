@@ -68,6 +68,11 @@ class RenderingTypePredictor(ABC):
         # Flag to indicate the state.
         self._active = False
 
+    @property
+    def active(self) -> bool:
+        """Whether the predictor is initialized and not cleared since."""
+        return self._active
+
     @abstractmethod
     def predict(self, request: Request) -> RenderingTypePrediction:
         """Get `RenderingTypePrediction` based on the input request.
@@ -164,7 +169,12 @@ class DefaultRenderingTypePredictor(RenderingTypePredictor):
         await super().initialize()
 
         if not self._state.is_initialized:
-            await self._state.initialize()
+            try:
+                await self._state.initialize()
+            except BaseException:
+                # A failed or cancelled entry leaves the predictor free to be entered again.
+                await super().clear()
+                raise
 
     @override
     async def clear(self) -> None:

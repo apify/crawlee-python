@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+from unittest.mock import AsyncMock
+
 import pytest
 
 from crawlee import Request
@@ -217,3 +220,26 @@ def test_url_similarity(url_1: str, url_2: str, expected_rounded_similarity: flo
         round(calculate_url_similarity(url_1=get_url_components(url_1), url_2=get_url_components(url_2)), 2)
         == expected_rounded_similarity
     )
+
+
+@pytest.mark.parametrize(
+    'error',
+    [
+        pytest.param(RuntimeError('initialize failed'), id='failed'),
+        pytest.param(asyncio.CancelledError(), id='cancelled'),
+    ],
+)
+async def test_failed_enter_frees_predictor(monkeypatch: pytest.MonkeyPatch, error: BaseException) -> None:
+    """A predictor whose entry fails or is cancelled stays inactive and can be entered again."""
+    predictor = DefaultRenderingTypePredictor()
+    monkeypatch.setattr(predictor._state, 'initialize', AsyncMock(side_effect=error))
+
+    with pytest.raises(type(error)):
+        async with predictor:
+            pass
+
+    assert not predictor.active
+    monkeypatch.undo()
+
+    async with predictor:
+        assert predictor.active

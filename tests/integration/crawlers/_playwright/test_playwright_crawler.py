@@ -434,12 +434,15 @@ async def test_isolation_cookies(*, use_incognito_pages: bool, server_url: URL) 
     sessions: dict[str, Session] = {}
     response_cookies: dict[str, dict[str, str]] = {}
 
-    async with BrowserPool(
-        plugins=[PlaywrightBrowserPlugin(use_incognito_pages=use_incognito_pages)],
-        browser_inactive_threshold=timedelta(minutes=10),
-    ) as browser_pool:
+    async with (
+        BrowserPool(
+            plugins=[PlaywrightBrowserPlugin(use_incognito_pages=use_incognito_pages)],
+            browser_inactive_threshold=timedelta(minutes=10),
+        ) as browser_pool,
+        SessionPool(max_pool_size=1) as session_pool,
+    ):
         crawler = PlaywrightCrawler(
-            session_pool=SessionPool(max_pool_size=1),
+            session_pool=session_pool,
             concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
             browser_pool=browser_pool,
         )
@@ -604,7 +607,8 @@ async def test_send_request_merges_cookie_header_with_page_cookies(server_url: U
 
 async def test_send_request_skips_cookies_deleted_by_page(server_url: URL) -> None:
     """Test that `context.send_request` doesn't send a session cookie that the page deleted in the handler."""
-    crawler = PlaywrightCrawler(session_pool=SessionPool(max_pool_size=1))
+    session_pool = SessionPool(max_pool_size=1)
+    crawler = PlaywrightCrawler(session_pool=session_pool)
     sent_cookies: list[dict[str, str]] = []
 
     @crawler.router.default_handler
@@ -617,7 +621,8 @@ async def test_send_request_skips_cookies_deleted_by_page(server_url: URL) -> No
         response = await context.send_request(str(server_url / 'cookies'))
         sent_cookies.append(json.loads(await response.read())['cookies'])
 
-    await crawler.run([str(server_url.with_path('set_cookies').extend_query(a=1))])
+    async with session_pool:
+        await crawler.run([str(server_url.with_path('set_cookies').extend_query(a=1))])
 
     assert sent_cookies == [{}]
 
@@ -983,7 +988,8 @@ async def test_send_request_with_client(server_url: URL) -> None:
     """Check that the persist context works with fingerprints."""
     check_data: dict[str, Any] = {}
 
-    crawler = PlaywrightCrawler(http_client=ImpitHttpClient(headers={'user-agent': 'My User-Agent'}))
+    http_client = ImpitHttpClient(headers={'user-agent': 'My User-Agent'})
+    crawler = PlaywrightCrawler(http_client=http_client)
 
     @crawler.router.default_handler
     async def request_handler(context: PlaywrightCrawlingContext) -> None:
@@ -992,7 +998,8 @@ async def test_send_request_with_client(server_url: URL) -> None:
         send_request_response = await context.send_request(str(server_url / 'user-agent'))
         check_data['send_request'] = dict(json.loads(await send_request_response.read()))
 
-    await crawler.run([str(server_url / 'user-agent')])
+    async with http_client:
+        await crawler.run([str(server_url / 'user-agent')])
 
     assert check_data['default'].get('user-agent') is not None
     assert check_data['send_request']['user-agent'] == 'My User-Agent'
@@ -1489,9 +1496,10 @@ async def test_throttled_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> Non
     record_pacing_signal = Mock(wraps=throttler.record_pacing_signal)
     monkeypatch.setattr(throttler, 'record_pacing_signal', record_pacing_signal)
     failed_request_handler = AsyncMock()
+    session_pool = SessionPool(max_pool_size=1)
     crawler = PlaywrightCrawler(
         request_manager=throttler,
-        session_pool=SessionPool(max_pool_size=1),
+        session_pool=session_pool,
         max_request_retries=0,
         max_session_rotations=0,
     )
@@ -1508,7 +1516,8 @@ async def test_throttled_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> Non
     async def handler(context: PlaywrightCrawlingContext) -> None:
         handled.append(context)
 
-    await crawler.run([url])
+    async with session_pool:
+        await crawler.run([url])
 
     assert [context.response.status for context in handled] == [200]
     failed_request_handler.assert_not_called()

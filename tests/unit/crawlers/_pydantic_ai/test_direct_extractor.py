@@ -159,3 +159,14 @@ async def test_raise_for_invalid_output() -> None:
 
     # The extractor's usage stats reflect the 3 failed attempts (1 initial + 2 retries).
     assert extractor.ai_usage.requests == 3
+
+
+async def test_enter_sets_active() -> None:
+    """Entering the extractor makes it active until it's exited."""
+    extractor = PydanticAiDirectExtractor(TestModel())
+    assert extractor.active is False
+
+    async with extractor:
+        assert extractor.active is True
+
+    assert extractor.active is False

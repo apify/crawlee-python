@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Protocol, TypeVar
 
 from pydantic import BaseModel
 
+from crawlee._utils.context import Collaborator
 from crawlee._utils.docs import docs_group
 
 if TYPE_CHECKING:
@@ -52,12 +53,13 @@ class PydanticAiUsageStats:
 
 
 @docs_group('Other')
-class PydanticAiHtmlExtractor(Protocol):
+class PydanticAiHtmlExtractor(Collaborator, Protocol):
     """Interface for HTML extractors.
 
     An extractor turns an HTML page into a validated Pydantic model using an LLM. The input format (cleaned HTML,
     skeleton, Markdown, ...) is decided by the `PydanticAiHtmlDistiller` an implementation composes. The model and base
-    instructions are set at construction. Each `extract` call runs one extraction. The built-in extractors are
+    instructions are set at construction. Each `extract` call runs one extraction. An extractor is an async context
+    manager, and `PydanticAiCrawler` refuses to run with one that isn't entered. The built-in extractors are
     `PydanticAiDirectExtractor` and `PydanticAiSelectorExtractor`.
     """
 

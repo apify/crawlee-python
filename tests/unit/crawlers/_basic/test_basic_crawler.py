@@ -44,7 +44,7 @@ from crawlee.events import (
     EventMigratingData,
     LocalEventManager,
 )
-from crawlee.http_clients import HttpClient, HttpResponse
+from crawlee.http_clients import HttpClient, HttpResponse, ImpitHttpClient
 from crawlee.request_loaders import (
     FinishedStatus,
     MinIntervalSignal,
@@ -622,7 +622,7 @@ async def test_handles_error_in_failed_request_handler() -> None:
 
 async def test_send_request_forwards_arguments_to_http_client() -> None:
     """Test that `context.send_request` passes all its arguments to the HTTP client."""
-    http_client = AsyncMock(spec=HttpClient)
+    http_client = AsyncMock(spec=HttpClient, active=True)
     response = Mock(spec=HttpResponse)
     http_client.send_request.return_value = response
     crawler = BasicCrawler(http_client=http_client, max_requests_per_crawl=1)
@@ -662,7 +662,7 @@ async def test_send_request_forwards_arguments_to_http_client() -> None:
 
 async def test_send_request_default_timeout() -> None:
     """Test that `context.send_request` without a `timeout` leaves the timeout to the default of the HTTP client."""
-    http_client = AsyncMock(spec=HttpClient)
+    http_client = AsyncMock(spec=HttpClient, active=True)
     http_client.send_request.return_value = Mock(spec=HttpResponse)
     crawler = BasicCrawler(http_client=http_client, max_requests_per_crawl=1)
 
@@ -684,7 +684,7 @@ async def test_send_request_default_timeout() -> None:
 )
 async def test_send_request_response_closed_after_request(*, handler_fails: bool) -> None:
     """Test that a response of `context.send_request` stays open in the handler and is closed after the request."""
-    http_client = AsyncMock(spec=HttpClient)
+    http_client = AsyncMock(spec=HttpClient, active=True)
     response = Mock(spec=HttpResponse)
     http_client.send_request.return_value = response
     crawler = BasicCrawler(http_client=http_client, max_request_retries=0, max_requests_per_crawl=1)
@@ -1471,6 +1471,152 @@ async def test_repeated_run_starts_with_fresh_statistics() -> None:
 
     assert stats.requests_finished == 1
     assert crawler.statistics.state.requests_finished == 1
+
+
+async def test_crawlers_share_stats_in_turn() -> None:
+    """Statistics passed to two crawlers that run one after the other add up the requests and the runtime of both."""
+    statistics = Statistics.with_default_state()
+    first_crawler = BasicCrawler(request_handler=AsyncMock(), statistics=statistics)
+    second_crawler = BasicCrawler(request_handler=AsyncMock(), statistics=statistics)
+
+    await first_crawler.run(['https://a.placeholder.com'])
+    started_at = statistics.state.crawler_started_at
+    first_runtime = statistics.state.crawler_runtime
+    stats = await second_crawler.run(['https://b.placeholder.com'])
+
+    assert stats.requests_finished == 2
+    assert statistics.state.crawler_started_at == started_at
+    assert statistics.state.accumulated_runtime == first_runtime
+
+
+async def test_shared_stats_concurrent_raises() -> None:
+    """Two crawlers can't run with the same statistics at the same time, since the first one has them entered."""
+    statistics = Statistics.with_default_state()
+    handler_started = asyncio.Event()
+    release_handler = asyncio.Event()
+
+    async def blocking_handler(_context: BasicCrawlingContext) -> None:
+        handler_started.set()
+        await release_handler.wait()
+
+    first_crawler = BasicCrawler(request_handler=blocking_handler, statistics=statistics)
+    second_crawler = BasicCrawler(request_handler=AsyncMock(), statistics=statistics)
+
+    first_run = asyncio.create_task(first_crawler.run(['https://a.placeholder.com']))
+    await handler_started.wait()
+
+    with pytest.raises(RuntimeError, match='statistics of the crawler are already active'):
+        await second_crawler.run(['https://b.placeholder.com'])
+
+    release_handler.set()
+    stats = await first_run
+
+    assert stats.requests_finished == 1
+
+
+async def test_shared_stats_started_together() -> None:
+    """Of two crawlers started together with the same statistics, one runs and the other raises."""
+    statistics = Statistics.with_default_state()
+    first_crawler = BasicCrawler(request_handler=AsyncMock(), statistics=statistics)
+    second_crawler = BasicCrawler(request_handler=AsyncMock(), statistics=statistics)
+
+    results = await asyncio.gather(
+        first_crawler.run(['https://a.placeholder.com']),
+        second_crawler.run(['https://b.placeholder.com']),
+        return_exceptions=True,
+    )
+
+    errors = [result for result in results if isinstance(result, BaseException)]
+    assert len(errors) == 1
+    assert isinstance(errors[0], RuntimeError)
+    assert 'already active' in str(errors[0])
+    assert not statistics.active
+
+
+async def test_run_after_failed_exit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failed exit of an object the crawler built doesn't keep it active, so the next run works."""
+    monkeypatch.setattr(ImpitHttpClient, 'cleanup', AsyncMock(side_effect=[RuntimeError('cleanup failed'), None]))
+    handler = AsyncMock()
+    crawler = BasicCrawler(request_handler=handler)
+
+    with pytest.raises(RuntimeError, match='cleanup failed'):
+        await crawler.run(['https://a.placeholder.com'])
+
+    await crawler.run(['https://b.placeholder.com'])
+
+    assert handler.await_count == 2
+
+
+async def test_run_rejects_entered_stats() -> None:
+    """Statistics the caller entered make `run()` raise, since the crawler enters them itself."""
+    async with Statistics.with_default_state() as statistics:
+        crawler = BasicCrawler(request_handler=AsyncMock(), statistics=statistics)
+
+        with pytest.raises(RuntimeError, match='statistics of the crawler are already active'):
+            await crawler.run(['https://a.placeholder.com'])
+
+
+async def test_repeated_run_keeps_sessions() -> None:
+    """A repeated `run()` keeps the sessions of a persisted session pool passed to the crawler, and leaves it open."""
+    async with SessionPool(max_pool_size=1, persistence_enabled=True) as session_pool:
+        session_ids = set(session_pool.get_state(as_dict=False).sessions)
+        crawler = BasicCrawler(request_handler=AsyncMock(), session_pool=session_pool)
+
+        await crawler.run(['https://a.placeholder.com'])
+        await crawler.run(['https://b.placeholder.com'])
+
+        assert set(session_pool.get_state(as_dict=False).sessions) == session_ids
+        assert session_pool.active
+
+
+async def test_repeated_run_resets_own_sessions() -> None:
+    """A repeated `run()` replaces the sessions of the session pool the crawler built."""
+    crawler = BasicCrawler()
+    session_ids = list[set[str]]()
+
+    @crawler.router.default_handler
+    async def handler(_context: BasicCrawlingContext) -> None:
+        session_ids.append(set(crawler._session_pool.get_state(as_dict=False).sessions))
+
+    await crawler.run(['https://a.placeholder.com'])
+    await crawler.run(['https://b.placeholder.com'])
+
+    first_ids, second_ids = session_ids
+    assert first_ids.isdisjoint(second_ids)
+
+
+async def test_run_needs_entered_session_pool() -> None:
+    """A session pool passed to the crawler has to be entered before the crawler runs."""
+    session_pool = SessionPool()
+    crawler = BasicCrawler(request_handler=AsyncMock(), session_pool=session_pool)
+
+    with pytest.raises(RuntimeError, match='SessionPool passed to the crawler is not active'):
+        await crawler.run(['https://a.placeholder.com'])
+
+    # The check comes before the run starts, so the crawler can run once the pool is entered.
+    async with session_pool:
+        stats = await crawler.run(['https://a.placeholder.com'])
+
+    assert stats.requests_finished == 1
+
+
+async def test_run_needs_entered_http_client() -> None:
+    """An HTTP client passed to the crawler has to be entered before the crawler runs."""
+    http_client = ImpitHttpClient()
+    crawler = BasicCrawler(request_handler=AsyncMock(), http_client=http_client)
+
+    with pytest.raises(RuntimeError, match='ImpitHttpClient passed to the crawler is not active'):
+        await crawler.run(['https://a.placeholder.com'])
+
+
+async def test_passed_http_client_left_open() -> None:
+    """The crawler doesn't close an HTTP client passed to it."""
+    http_client = ImpitHttpClient()
+    crawler = BasicCrawler(request_handler=AsyncMock(), http_client=http_client)
+
+    async with http_client:
+        await crawler.run(['https://a.placeholder.com'])
+        assert http_client.active
 
 
 def test_crawler_log() -> None:
@@ -2630,7 +2776,8 @@ async def test_keep_alive(
     ],
 )
 async def test_session_retire_in_user_handler(*, retire: bool) -> None:
-    crawler = BasicCrawler(session_pool=SessionPool(max_pool_size=1))
+    session_pool = SessionPool(max_pool_size=1)
+    crawler = BasicCrawler(session_pool=session_pool)
     sessions = list[str]()
 
     @crawler.router.default_handler
@@ -2642,7 +2789,8 @@ async def test_session_retire_in_user_handler(*, retire: bool) -> None:
 
         await context.add_requests(['https://b.placeholder.com'])
 
-    await crawler.run(['https://a.placeholder.com'])
+    async with session_pool:
+        await crawler.run(['https://a.placeholder.com'])
 
     # The session should differ if `retire` was called and match otherwise since pool size == 1
     if retire:
@@ -2686,7 +2834,8 @@ async def test_bound_sessions_to_same_request() -> None:
 
     check_sessions = [str(session_id) for session_id in range(10)]
     used_sessions = list[str]()
-    crawler = BasicCrawler(session_pool=SessionPool(create_session_function=create_session_function()))
+    session_pool = SessionPool(create_session_function=create_session_function())
+    crawler = BasicCrawler(session_pool=session_pool)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -2697,7 +2846,8 @@ async def test_bound_sessions_to_same_request() -> None:
         for session_id in range(10)
     ]
 
-    await crawler.run(requests)
+    async with session_pool:
+        await crawler.run(requests)
 
     assert len(used_sessions) == 10
     assert set(used_sessions) == set(check_sessions)
@@ -3542,16 +3692,18 @@ async def test_handler_raised_throttled_error_is_deferred(monkeypatch: pytest.Mo
     """A `RequestThrottledError` from the handler starts a backoff without costing a retry or session reputation."""
     throttler = await open_throttler_held_until_reclaim(monkeypatch)
     failed_request_handler = AsyncMock()
+    session_pool = SessionPool(max_pool_size=1)
     crawler = BasicCrawler(
         request_manager=throttler,
-        session_pool=SessionPool(max_pool_size=1),
+        session_pool=session_pool,
         max_request_retries=0,
     )
     crawler.failed_request_handler(failed_request_handler)
     handler = AsyncMock(side_effect=[RequestThrottledError, None])
     crawler.router.default_handler(handler)
 
-    stats = await crawler.run([THROTTLED_URL])
+    async with session_pool:
+        stats = await crawler.run([THROTTLED_URL])
 
     assert handler.await_count == 2
     failed_request_handler.assert_not_called()
