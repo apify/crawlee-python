@@ -489,6 +489,35 @@ class MyHttpClient(HttpClient):
 
 `SitemapRequestLoader.fetch_next_request` skips a URL while its request is still in progress, for example when another sitemap lists it too. In v1, it returned a request for the URL again, and `get_total_count` counted the URL twice.
 
+## Crawlers manage only what they create
+
+A crawler now enters and exits only the objects it creates, the same as Crawlee JS. An object you pass is yours to enter and exit. The `Statistics` and the event managers are the exceptions, since the crawler enters them on every run. You can enter an event manager yourself as well. In v1, the crawler entered a passed object that wasn't active yet and exited it when its run finished, even while another crawler still used it.
+
+What you do with an object you pass depends on its type:
+
+- `SessionPool`, `BrowserPool`, an HTTP client and the `rendering_type_predictor` of `AdaptivePlaywrightCrawler`: enter it with `async with` before you run the crawler, or `run()` raises a `RuntimeError`. Keep it open until every crawler using it has finished.
+- The `extractor` of `PydanticAiCrawler`: enter it the same way. `PydanticAiDirectExtractor` is now an async context manager, like `PydanticAiSelectorExtractor`. A selector extractor enters and exits its `fallback` itself, so don't enter the fallback yourself, and give each selector extractor its own. If your subclass of `BasePydanticAiHtmlExtractor` overrides `__aenter__` or `__aexit__`, call `super()`. A custom extractor that implements the `PydanticAiHtmlExtractor` protocol directly needs the new `active` property, `__aenter__` and `__aexit__`.
+- `Statistics`: don't enter it yourself, or `run()` raises a `RuntimeError`. In v1, the crawler left entered statistics alone. Crawlers that run one after another can share an instance, including another crawler's statistics. The instance adds up their runs, so the `max_requests_per_crawl` of the second crawler counts the requests of the first one too. When a crawler runs again, it resets the instance, including what the other crawlers counted. Two crawlers can't run with the same instance at the same time.
+
+For example:
+
+```python
+# v1
+crawler = ParselCrawler(session_pool=SessionPool(max_pool_size=10))
+await crawler.run(urls)
+
+# v2
+session_pool = SessionPool(max_pool_size=10)
+crawler = ParselCrawler(session_pool=session_pool)
+
+async with session_pool:
+    await crawler.run(urls)
+```
+
+When a crawler runs again, it resets only a session pool it created. A `SessionPool` you pass keeps its sessions. In v1, a repeated `run()` reset a passed pool too.
+
+`RenderingTypePredictor` has a new `active` property, which `initialize()` and `clear()` of the base class keep up to date. If your predictor overrides them, call `super()`.
+
 ## Resetting statistics and the session pool
 
 `Statistics.reset()` is now synchronous and resets only the in-memory statistics, the same as Crawlee JS. In v1, it also cleared the persisted record. To clear the record too, call the new `reset_store()` once the statistics are exited:
@@ -579,6 +608,27 @@ The warnings about an HTTP 429 that the request manager doesn't pace are reworde
 The `ThrottlingRequestManager` warning about capping a delay now calls it a "requested wait" delay instead of a "Retry-After header" delay. Its DEBUG messages about a 429 ignored during an active backoff and about resetting a domain's rate limit state are removed, and its DEBUG message about a domain's crawl-delay shows the delay with one decimal place.
 
 Log records hold the message template and its arguments separately. `record.msg` is the template, such as `Retrying request to %s due to: %s. %s`, and `record.args` holds the values. To read the final text, use `record.getMessage()`, which formatters and handlers already do.
+
+## `use_session_pool` is removed
+
+The `use_session_pool` option is removed from the crawlers. Every crawler processes its requests with sessions from its `SessionPool`, the same as Crawlee JS v4. To configure the pool, pass your own `SessionPool` as `session_pool`.
+
+`context.session` is now a `Session` instead of `Session | None`, so you can drop the `if context.session` checks. A request bound by `session_id` to a session that's no longer available still fails with a `RequestCollisionError`, and its failed request handler gets a retired session with the bound id instead of `None`.
+
+Without the session pool, a 401, 403 or 429 response failed the request without a retry. Now it retires the session, and the request is retried with another one, up to `max_session_rotations` times. With `proxy_urls`, a session keeps its proxy, so the proxy changes when the session does, not on every request.
+
+To keep the response cookies out of the sessions, pass `save_response_cookies=False`. To retire every session after its first request, set `max_usage_count` to 1:
+
+```python
+# v1
+crawler = ParselCrawler(use_session_pool=False)
+
+# v2
+crawler = ParselCrawler(
+    save_response_cookies=False,
+    session_pool=SessionPool(create_session_settings={'max_usage_count': 1}),
+)
+```
 
 ## Session retirement is permanent
 

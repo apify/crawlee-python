@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import warnings
-from contextlib import AbstractAsyncContextManager
 from typing import TYPE_CHECKING
 
 from parsel import Selector
+from pydantic_ai.models import infer_model
 
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers import AbstractHttpCrawler, HttpCrawlerOptions
@@ -90,7 +90,8 @@ class PydanticAiCrawler(AbstractHttpCrawler[PydanticAiCrawlingContext, Selector,
                 `model` nor `extractor` is given. Provide at most one of `model` or `extractor`.
             extractor: A pre-configured `PydanticAiHtmlExtractor`, for full control over the distiller, instructions,
                 caching, usage limits, and model fallback. Pass a `PydanticAiSelectorExtractor` here for
-                cached-selector extraction. Provide at most one of `model` or `extractor`.
+                cached-selector extraction. Keep it open with `async with` until every crawler using it has finished.
+                Provide at most one of `model` or `extractor`.
             kwargs: Additional keyword arguments to pass to the underlying `AbstractHttpCrawler`.
         """
         # Call the notification only once.
@@ -103,10 +104,11 @@ class PydanticAiCrawler(AbstractHttpCrawler[PydanticAiCrawlingContext, Selector,
         if model is not None and extractor is not None:
             raise ValueError('Provide at most one of `model` or `extractor`.')
 
+        # Resolved before `super().__init__()` takes up a crawler id, since an unknown model or a missing API key fails
+        # here.
+        default_model = model if model is not None else _DEFAULT_AI_MODEL
         if extractor is None:
-            extractor = PydanticAiDirectExtractor(model if model is not None else _DEFAULT_AI_MODEL)
-
-        self._extractor = extractor
+            default_model = infer_model(default_model)
 
         async def final_step(
             context: ParsedHttpCrawlingContext[Selector],
@@ -121,17 +123,12 @@ class PydanticAiCrawler(AbstractHttpCrawler[PydanticAiCrawlingContext, Selector,
 
         kwargs['_context_pipeline'] = self._create_static_content_crawler_pipeline().compose(final_step)
 
-        # If the extractor is an async context manager, add it to the crawler's additional context managers so it's
-        # properly entered and exited around the crawl.
-        if isinstance(extractor, AbstractAsyncContextManager):
-            kwargs['_additional_context_managers'] = [
-                *kwargs.get('_additional_context_managers', []),
-                extractor,
-            ]
         super().__init__(
             parser=ParselParser(),
             **kwargs,
         )
+
+        self._extractor = self._own_or_borrow(extractor, lambda: PydanticAiDirectExtractor(default_model))
 
     @property
     def extractor(self) -> PydanticAiHtmlExtractor:

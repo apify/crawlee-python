@@ -12,6 +12,9 @@ from crawlee._utils.docs import docs_group
 from ._types import PydanticAiUsageStats
 
 if TYPE_CHECKING:
+    from types import TracebackType
+    from typing import Self
+
     from pydantic_ai.models import Model
     from pydantic_ai.usage import UsageLimits
 
@@ -27,7 +30,7 @@ class BasePydanticAiHtmlExtractor(ABC):
 
     An HTML extractor turns a page into a validated Pydantic model with the help of an LLM. This abstract base
     implements the parts the built-in extractors share: resolving the model, composing the task instructions with
-    the distiller's prompt notes, and accumulating token usage.
+    the distiller's prompt notes, and accumulating token usage. It also provides a default `async with` lifecycle.
 
     The public interface is the `PydanticAiHtmlExtractor` protocol. The concrete extractors are
     `PydanticAiDirectExtractor` and `PydanticAiSelectorExtractor`.
@@ -56,6 +59,40 @@ class BasePydanticAiHtmlExtractor(ABC):
         self._base_instructions = self._compose_instructions(instructions, distiller)
         self._usage_limits = usage_limits
         self._ai_usage = PydanticAiUsageStats()
+        self._active = False
+
+    @property
+    def active(self) -> bool:
+        """Whether the extractor is entered and not exited yet."""
+        return self._active
+
+    async def __aenter__(self) -> Self:
+        """Prepare the extractor for extraction.
+
+        Raises:
+            RuntimeError: If the extractor is already active.
+        """
+        if self._active:
+            raise RuntimeError(f'The {type(self).__name__} is already active.')
+
+        self._active = True
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
+        """Release what the extractor holds.
+
+        Raises:
+            RuntimeError: If the extractor is not active.
+        """
+        if not self._active:
+            raise RuntimeError(f'The {type(self).__name__} is not active.')
+
+        self._active = False
 
     @property
     def ai_usage(self) -> PydanticAiUsageStats:

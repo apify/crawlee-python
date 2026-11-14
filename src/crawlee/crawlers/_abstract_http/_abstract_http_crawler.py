@@ -309,7 +309,7 @@ class AbstractHttpCrawler(
         """
         # Without saving, the session cookies are still sent, but the response cookies go to a copy.
         cookies = None
-        if context.session is not None and not self._save_response_cookies:
+        if not self._save_response_cookies:
             cookies = SessionCookies(context.session.cookies)
 
         async with self._shared_navigation_timeouts[id(context.request)] as remaining_timeout:

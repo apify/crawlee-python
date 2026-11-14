@@ -389,15 +389,17 @@ class HttpClient(ABC):
         return self
 
     async def __aexit__(
-        self, exc_type: BaseException | None, exc_value: BaseException | None, traceback: TracebackType | None
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, exc_traceback: TracebackType | None
     ) -> None:
         """Deinitialize the client and clean up resources when exiting the context manager.
 
         Raises:
-            RuntimeError: If the context manager is already active.
+            RuntimeError: If the context manager is not active.
         """
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        await self.cleanup()
-        self._active = False
+        try:
+            await self.cleanup()
+        finally:
+            self._active = False

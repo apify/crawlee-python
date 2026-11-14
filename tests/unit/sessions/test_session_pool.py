@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -275,3 +277,44 @@ async def test_methods_raise_error_when_not_active() -> None:
 
     async with session_pool:
         assert session_pool.active is True
+
+
+@pytest.mark.parametrize(
+    'error',
+    [
+        pytest.param(RuntimeError('fill failed'), id='failed'),
+        pytest.param(asyncio.CancelledError(), id='cancelled'),
+    ],
+)
+async def test_failed_enter_frees_pool(monkeypatch: pytest.MonkeyPatch, error: BaseException) -> None:
+    """A pool whose entry fails or is cancelled tears its state down, stays inactive and can be entered again."""
+    session_pool = SessionPool(max_pool_size=MAX_POOL_SIZE, persistence_enabled=False)
+    teardown = AsyncMock(wraps=session_pool._state.teardown)
+    monkeypatch.setattr(session_pool._state, 'teardown', teardown)
+    monkeypatch.setattr(session_pool, '_fill_sessions_to_max', AsyncMock(side_effect=error))
+
+    with pytest.raises(type(error)):
+        async with session_pool:
+            pass
+
+    assert not session_pool.active
+    teardown.assert_awaited_once()
+    monkeypatch.undo()
+
+    async with session_pool:
+        assert session_pool.active
+
+
+async def test_failed_exit_frees_pool(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A pool whose exit fails is no longer active, so it can be entered again."""
+    session_pool = SessionPool(max_pool_size=MAX_POOL_SIZE, persistence_enabled=False)
+
+    with pytest.raises(RuntimeError, match='teardown failed'):
+        async with session_pool:
+            monkeypatch.setattr(session_pool._state, 'teardown', AsyncMock(side_effect=RuntimeError('teardown failed')))
+
+    assert not session_pool.active
+    monkeypatch.undo()
+
+    async with session_pool:
+        assert session_pool.active
