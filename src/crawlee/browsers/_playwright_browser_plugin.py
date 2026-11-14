@@ -155,7 +155,21 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
             raise RuntimeError(f'The {self.__class__.__name__} is already active.')
 
         self._active = True
-        self._playwright = await self._playwright_context_manager.__aenter__()
+
+        try:
+            self._playwright = await self._playwright_context_manager.__aenter__()
+        except BaseException:
+            # The Playwright driver may already be running, so it's stopped too.
+            half_started_context_manager = self._playwright_context_manager
+            self._playwright_context_manager = async_playwright()
+            try:
+                await half_started_context_manager.__aexit__(None, None, None)
+            except Exception:
+                logger.warning('Stopping Playwright failed while rolling back the plugin entry.', exc_info=True)
+            finally:
+                self._active = False
+            raise
+
         return self
 
     @override
@@ -168,9 +182,11 @@ class PlaywrightBrowserPlugin(BrowserPlugin):
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
-        self._playwright_context_manager = async_playwright()
-        self._active = False
+        try:
+            await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
+        finally:
+            self._playwright_context_manager = async_playwright()
+            self._active = False
 
     @override
     @ensure_context

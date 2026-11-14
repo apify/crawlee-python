@@ -163,19 +163,33 @@ class StagehandBrowserPlugin(BrowserPlugin):
             raise RuntimeError(f'The {self.__class__.__name__} is already active.')
 
         self._active = True
-        self._playwright = await self._playwright_context_manager.__aenter__()
 
-        if self._stagehand_options.env == 'LOCAL':
-            if 'executable_path' not in self._browser_launch_options:
-                chrome_path = self._playwright.chromium.executable_path
-                self._browser_launch_options['executable_path'] = chrome_path
-                logger.debug('Resolved Chromium path from Playwright: %s', chrome_path)
+        try:
+            self._playwright = await self._playwright_context_manager.__aenter__()
 
-            self._stagehand_init_params['local_chrome_path'] = self._browser_launch_options['executable_path']
+            if self._stagehand_options.env == 'LOCAL':
+                if 'executable_path' not in self._browser_launch_options:
+                    chrome_path = self._playwright.chromium.executable_path
+                    self._browser_launch_options['executable_path'] = chrome_path
+                    logger.debug('Resolved Chromium path from Playwright: %s', chrome_path)
 
-        client = AsyncStagehand(**self._stagehand_init_params)
-        await client.__aenter__()
-        self._stagehand_client = client
+                self._stagehand_init_params['local_chrome_path'] = self._browser_launch_options['executable_path']
+
+            client = AsyncStagehand(**self._stagehand_init_params)
+            await client.__aenter__()
+            self._stagehand_client = client
+        except BaseException:
+            # The Playwright driver may already be running, so it's stopped too.
+            self._playwright = None
+            playwright_context_manager = self._playwright_context_manager
+            self._playwright_context_manager = async_playwright()
+            try:
+                await playwright_context_manager.__aexit__(None, None, None)
+            except Exception:
+                logger.warning('Stopping Playwright failed while rolling back the plugin entry.', exc_info=True)
+            finally:
+                self._active = False
+            raise
 
         return self
 
@@ -189,14 +203,17 @@ class StagehandBrowserPlugin(BrowserPlugin):
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        if self._stagehand_client is not None:
-            await self._stagehand_client.__aexit__(exc_type, exc_value, exc_traceback)
-            self._stagehand_client = None
-
-        await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
-        self._playwright_context_manager = async_playwright()
-        self._playwright = None
-        self._active = False
+        try:
+            if self._stagehand_client is not None:
+                await self._stagehand_client.__aexit__(exc_type, exc_value, exc_traceback)
+        finally:
+            try:
+                await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
+            finally:
+                self._stagehand_client = None
+                self._playwright = None
+                self._playwright_context_manager = async_playwright()
+                self._active = False
 
     @override
     @ensure_context

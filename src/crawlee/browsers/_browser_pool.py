@@ -214,12 +214,29 @@ class BrowserPool:
         self._close_inactive_browsers_task.start()
 
         timeout = self._operation_timeout.total_seconds()
+        entered_plugins: list[BrowserPlugin] = []
 
         try:
             for plugin in self._plugins:
                 await asyncio.wait_for(plugin.__aenter__(), timeout)
+                entered_plugins.append(plugin)
         except TimeoutError:
             logger.warning('Initializing of the browser plugin %s timed out, will be skipped.', plugin)
+        except BaseException:
+            try:
+                await self._stop_recurring_tasks()
+            finally:
+                try:
+                    plugin_exits = (entered_plugin.__aexit__(None, None, None) for entered_plugin in entered_plugins)
+                    plugin_results = await asyncio.gather(*plugin_exits, return_exceptions=True)
+                finally:
+                    self._active = False
+                for result in plugin_results:
+                    if isinstance(result, BaseException):
+                        logger.warning(
+                            'Exiting a browser plugin failed while rolling back the pool entry.', exc_info=result
+                        )
+            raise
 
         return self
 
@@ -237,18 +254,39 @@ class BrowserPool:
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        await self._identify_inactive_browsers_task.stop()
-        await self._close_inactive_browsers_task.stop()
+        # Every browser and plugin is closed even when another one fails, since an inactive pool can't be exited again.
+        failures: list[BaseException] = []
+        try:
+            try:
+                await self._stop_recurring_tasks()
 
-        for browser in self._active_browsers + self._inactive_browsers:
-            await browser.close(force=True)
-        self._active_browsers.clear()
-        self._inactive_browsers.clear()
+                browser_closes = (
+                    browser.close(force=True) for browser in self._active_browsers + self._inactive_browsers
+                )
+                browser_results = await asyncio.gather(*browser_closes, return_exceptions=True)
+                failures.extend(result for result in browser_results if isinstance(result, BaseException))
+            finally:
+                self._active_browsers.clear()
+                self._inactive_browsers.clear()
 
-        for plugin in self._plugins:
-            await plugin.__aexit__(exc_type, exc_value, exc_traceback)
+                try:
+                    # Plugins left inactive by a timed-out entry have nothing to exit.
+                    active_plugins = [plugin for plugin in self._plugins if plugin.active]
+                    plugin_exits = (plugin.__aexit__(exc_type, exc_value, exc_traceback) for plugin in active_plugins)
+                    plugin_results = await asyncio.gather(*plugin_exits, return_exceptions=True)
+                    failures.extend(result for result in plugin_results if isinstance(result, BaseException))
+                finally:
+                    self._active = False
+        except BaseException:
+            # A cancellation above is raised instead, so the failures are only logged.
+            for failure in failures:
+                logger.warning('Closing the browser pool failed.', exc_info=failure)
+            raise
 
-        self._active = False
+        for failure in failures[1:]:
+            logger.warning('Closing the browser pool failed.', exc_info=failure)
+        if failures:
+            raise failures[0]
 
     @ensure_context
     async def new_page(
@@ -391,6 +429,12 @@ class BrowserPool:
             if not browser.pages and not browser.is_opening_pages:
                 await browser.close()
                 self._inactive_browsers.remove(browser)
+
+    async def _stop_recurring_tasks(self) -> None:
+        try:
+            await self._identify_inactive_browsers_task.stop()
+        finally:
+            await self._close_inactive_browsers_task.stop()
 
     async def _execute_hooks(self, hooks: list[Callable[..., Awaitable[None]]], *args: Any) -> None:
         """Execute the provided hooks with the given arguments."""
