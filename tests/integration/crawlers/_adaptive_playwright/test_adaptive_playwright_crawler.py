@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import timedelta
@@ -591,33 +590,18 @@ async def test_passed_predictor_left_open(test_urls: list[str]) -> None:
         assert predictor.active
 
 
-async def test_adaptive_playwright_crawler_statistics_in_init() -> None:
-    """Tests that adaptive crawler uses created AdaptivePlaywrightCrawlerStatistics from inputted Statistics."""
-    persistence_enabled = True
-    persist_state_kvs_name = 'some-name'
-    persist_state_key = 'come key'
-    log_message = 'some message'
-    periodic_message_logger = logging.getLogger('some logger')
-    log_interval = timedelta(minutes=2)
-    statistics = Statistics.with_default_state(
-        persistence_enabled=persistence_enabled,
-        persist_state_kvs_name=persist_state_kvs_name,
-        persist_state_key=persist_state_key,
-        log_message=log_message,
-        periodic_message_logger=periodic_message_logger,
-        log_interval=log_interval,
+async def test_passed_stats_count_runs(test_urls: list[str]) -> None:
+    """Statistics passed to a factory method count the adaptive fields of the crawl."""
+    statistics = Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0])),
+        statistics=statistics,
     )
+    crawler.router.default_handler(AsyncMock())
 
-    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(statistics=statistics)
-    await crawler.run([])  # ensure that statistics get initialized
+    await crawler.run(test_urls[:1])
 
-    assert type(crawler._statistics.state) is AdaptivePlaywrightCrawlerStatisticState
-
-    assert crawler._statistics._state._persistence_enabled == persistence_enabled
-    assert crawler._statistics._state._persist_state_key == persist_state_key
-
-    assert crawler._statistics._log_message == log_message
-    assert crawler._statistics._periodic_message_logger == periodic_message_logger
+    assert statistics.state.http_only_request_handler_runs == 1
 
 
 async def test_adaptive_playwright_crawler_timeout_in_sub_crawler(test_urls: list[str]) -> None:

@@ -147,6 +147,9 @@ class AdaptivePlaywrightCrawler(
             statistics: A custom `Statistics[AdaptivePlaywrightCrawlerStatisticState]` instance, allowing the use of
                 non-default configuration. The crawler enters it on every run, so don't enter it yourself.
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
+
+        Raises:
+            ValueError: If the state model of `statistics` isn't `AdaptivePlaywrightCrawlerStatisticState`.
         """
         # Adaptive crawling related.
         self.result_checker = result_checker or (lambda _: True)
@@ -155,6 +158,13 @@ class AdaptivePlaywrightCrawler(
         # Lower the default concurrency for browser crawlers, unless the caller configured it themselves.
         if kwargs.get('concurrency_settings') is None and kwargs.get('concurrency_system') is None:
             kwargs['concurrency_settings'] = ConcurrencySettings(desired_concurrency=1)
+
+        # The crawler counts its own fields in the statistics, which would fail on every request with another model.
+        if statistics is not None and not issubclass(statistics._state_model, AdaptivePlaywrightCrawlerStatisticState):  # noqa: SLF001
+            raise ValueError(
+                'The `statistics` of `AdaptivePlaywrightCrawler` must use `AdaptivePlaywrightCrawlerStatisticState` as '
+                'their state model, e.g. `Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)`.'
+            )
 
         adaptive_statistics = statistics or Statistics(
             state_model=AdaptivePlaywrightCrawlerStatisticState,
@@ -258,13 +268,10 @@ class AdaptivePlaywrightCrawler(
         parser_type: BeautifulSoupParserType = 'lxml',
         playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
         save_response_cookies: bool = True,
-        statistics: Statistics[StatisticsState] | None = None,
+        statistics: Statistics[AdaptivePlaywrightCrawlerStatisticState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag]:
         """Create `AdaptivePlaywrightCrawler` that uses `BeautifulSoup` for parsing static content."""
-        adaptive_statistics = (
-            statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState) if statistics is not None else None
-        )
         return AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag](
             rendering_type_predictor=rendering_type_predictor,
             result_checker=result_checker,
@@ -272,7 +279,7 @@ class AdaptivePlaywrightCrawler(
             static_parser=BeautifulSoupParser(parser=parser_type),
             playwright_crawler_specific_kwargs=playwright_crawler_specific_kwargs,
             save_response_cookies=save_response_cookies,
-            statistics=adaptive_statistics,
+            statistics=statistics,
             **kwargs,
         )
 
@@ -285,13 +292,10 @@ class AdaptivePlaywrightCrawler(
         result_comparator: Callable[[RequestHandlerRunResult, RequestHandlerRunResult], bool] | None = None,
         playwright_crawler_specific_kwargs: _PlaywrightCrawlerAdditionalOptions | None = None,
         save_response_cookies: bool = True,
-        statistics: Statistics[StatisticsState] | None = None,
+        statistics: Statistics[AdaptivePlaywrightCrawlerStatisticState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector, Selector]:
         """Create `AdaptivePlaywrightCrawler` that uses `Parcel` for parsing static content."""
-        adaptive_statistics = (
-            statistics.replace_state_model(AdaptivePlaywrightCrawlerStatisticState) if statistics is not None else None
-        )
         return AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector, Selector](
             rendering_type_predictor=rendering_type_predictor,
             result_checker=result_checker,
@@ -299,7 +303,7 @@ class AdaptivePlaywrightCrawler(
             static_parser=ParselParser(),
             playwright_crawler_specific_kwargs=playwright_crawler_specific_kwargs,
             save_response_cookies=save_response_cookies,
-            statistics=adaptive_statistics,
+            statistics=statistics,
             **kwargs,
         )
 

@@ -24,7 +24,6 @@ if TYPE_CHECKING:
     from crawlee.storages import KeyValueStore
 
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
-TNewStatisticsState = TypeVar('TNewStatisticsState', bound=StatisticsState, default=StatisticsState)
 logger = getLogger(__name__)
 
 
@@ -97,6 +96,7 @@ class Statistics(Generic[TStatisticsState]):
         self.error_tracker_retry = ErrorTracker(save_error_snapshots=False)
 
         self._requests_in_progress = dict[str, RequestProcessingRecord]()
+        self._state_model = state_model
 
         self._state = RecoverableState(
             default_state=state_model(stats_id=self._id),
@@ -114,20 +114,6 @@ class Statistics(Generic[TStatisticsState]):
 
         # Flag to indicate the context state.
         self._active = False
-
-    def replace_state_model(self, state_model: type[TNewStatisticsState]) -> Statistics[TNewStatisticsState]:
-        """Create near copy of the `Statistics` with replaced `state_model`."""
-        new_statistics: Statistics[TNewStatisticsState] = Statistics(
-            persistence_enabled=self._state._persistence_enabled,  # noqa: SLF001
-            persist_state_key=self._state._persist_state_key,  # noqa: SLF001
-            persist_state_kvs_factory=self._state._persist_state_kvs_factory,  # noqa: SLF001
-            log_message=self._log_message,
-            periodic_message_logger=self._periodic_message_logger,
-            state_model=state_model,
-            id=self._id,
-        )
-        new_statistics._periodic_logger = self._periodic_logger  # Accessing private member to create copy like-object.
-        return new_statistics
 
     @staticmethod
     def with_default_state(

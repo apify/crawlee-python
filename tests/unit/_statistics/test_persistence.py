@@ -274,13 +274,6 @@ def test_id_defaults_to_counter() -> None:
     assert Statistics.with_default_state()._id == '2'
 
 
-def test_replace_state_model_keeps_id() -> None:
-    """`replace_state_model` keeps the ID of the original statistics."""
-    statistics = Statistics.with_default_state(id='custom')
-
-    assert statistics.replace_state_model(StatisticsState)._id == 'custom'
-
-
 async def test_reentering_keeps_counters_and_runtime() -> None:
     """Entering the statistics again keeps the counters and the runtime of the previous run."""
     statistics = Statistics.with_default_state()

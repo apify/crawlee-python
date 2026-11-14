@@ -11,7 +11,11 @@ import pytest
 from crawlee.autoscaling import ConcurrencySystem
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers import AdaptivePlaywrightCrawler
+from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statistics import (
+    AdaptivePlaywrightCrawlerStatisticState,
+)
 from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import DefaultRenderingTypePredictor
+from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
     from crawlee.crawlers import AdaptivePlaywrightCrawlingContext
@@ -43,6 +47,22 @@ async def test_run_needs_entered_browser_pool() -> None:
 
     with pytest.raises(RuntimeError, match='BrowserPool passed to the crawler is not active'):
         await crawler.run(['https://a.placeholder.com'])
+
+
+def test_factory_passes_stats_as_is() -> None:
+    """A factory method passes the given statistics to the crawler as they are."""
+    statistics = Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(statistics=statistics)
+
+    assert crawler.statistics is statistics
+
+
+def test_rejects_plain_statistics() -> None:
+    """Statistics without the adaptive state model are rejected when the crawler is created."""
+    with pytest.raises(ValueError, match='AdaptivePlaywrightCrawlerStatisticState'):
+        AdaptivePlaywrightCrawler.with_parsel_static_parser(
+            statistics=Statistics.with_default_state()  # ty: ignore[invalid-argument-type]
+        )
 
 
 @pytest.mark.parametrize(

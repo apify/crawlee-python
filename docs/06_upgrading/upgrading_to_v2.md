@@ -520,6 +520,24 @@ async with session_pool:
 
 When a crawler runs again, it resets only a session pool it created. A `SessionPool` you pass keeps its sessions. In v1, a repeated `run()` reset a passed pool too.
 
+The `with_beautifulsoup_static_parser` and `with_parsel_static_parser` factory methods of `AdaptivePlaywrightCrawler` pass `statistics` to the crawler as they are, instead of a copy built with `Statistics.replace_state_model`, so the instance you pass is the one that counts. The instance must use `AdaptivePlaywrightCrawlerStatisticState` as its state model:
+
+```python
+# v1
+crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+    statistics=Statistics.with_default_state(),
+)
+await crawler.run(urls)
+
+# v2
+crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
+    statistics=Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState),
+)
+await crawler.run(urls)
+```
+
+`Statistics.replace_state_model` is removed, since it existed only for that copy. To get statistics with another state model, create a new `Statistics` instance with the `state_model` you need.
+
 `RenderingTypePredictor` has a new `active` property, which `initialize()` and `clear()` of the base class keep up to date. If your predictor overrides them, call `super()`.
 
 `AdaptivePlaywrightCrawler.rendering_type_predictor` is now read-only. Pass your predictor to the constructor instead.
