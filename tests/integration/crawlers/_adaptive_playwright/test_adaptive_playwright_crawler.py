@@ -29,6 +29,7 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statisti
     AdaptivePlaywrightCrawlerStatisticState,
 )
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import AdaptiveContextError
+from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import DefaultRenderingTypePredictor
 from crawlee.errors import RequestThrottledError
 from crawlee.http_clients import HttpClient, HttpResponse
 from crawlee.sessions import SessionPool
@@ -122,6 +123,12 @@ class _SimpleRenderingTypePredictor(RenderingTypePredictor):
     @override
     def store_result(self, request: Request, rendering_type: RenderingType) -> None:
         pass
+
+    @property
+    @override
+    def active(self) -> bool:
+        # Lets the tests pass the predictor without entering it.
+        return True
 
 
 @dataclass(frozen=True)
@@ -573,6 +580,17 @@ async def test_adaptive_crawler_exceptions_in_sub_crawlers(*, error_in_pw_crawle
         assert stored_results == [saved_data]
 
 
+async def test_passed_predictor_left_open(test_urls: list[str]) -> None:
+    """A rendering type predictor passed to the crawler stays active after the run, for the caller to exit."""
+    async with DefaultRenderingTypePredictor() as predictor:
+        crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(rendering_type_predictor=predictor)
+        crawler.router.default_handler(AsyncMock())
+
+        await crawler.run(test_urls[:1])
+
+        assert predictor.active
+
+
 async def test_adaptive_playwright_crawler_statistics_in_init() -> None:
     """Tests that adaptive crawler uses created AdaptivePlaywrightCrawlerStatistics from inputted Statistics."""
     persistence_enabled = True
@@ -988,7 +1006,7 @@ async def test_throttled_static_429_is_deferred(monkeypatch: pytest.MonkeyPatch)
     throttler = await open_throttler_held_until_reclaim(monkeypatch)
     record_pacing_signal = Mock(wraps=throttler.record_pacing_signal)
     monkeypatch.setattr(throttler, 'record_pacing_signal', record_pacing_signal)
-    http_client = AsyncMock(spec=HttpClient)
+    http_client = AsyncMock(spec=HttpClient, active=True)
     http_client.send_request.side_effect = [
         Mock(
             spec=HttpResponse,
@@ -1038,7 +1056,7 @@ async def test_static_handler_raised_throttled_error_is_deferred(monkeypatch: py
     throttler = await open_throttler_held_until_reclaim(monkeypatch)
     record_pacing_signal = Mock(wraps=throttler.record_pacing_signal)
     monkeypatch.setattr(throttler, 'record_pacing_signal', record_pacing_signal)
-    http_client = AsyncMock(spec=HttpClient)
+    http_client = AsyncMock(spec=HttpClient, active=True)
     http_client.send_request.return_value = Mock(
         spec=HttpResponse,
         status_code=200,

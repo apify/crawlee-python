@@ -7,7 +7,9 @@ from unittest.mock import patch
 import pytest
 
 from crawlee.autoscaling import ConcurrencySystem
+from crawlee.browsers import BrowserPool
 from crawlee.crawlers import AdaptivePlaywrightCrawler
+from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import DefaultRenderingTypePredictor
 
 
 async def test_accepts_concurrency_system() -> None:
@@ -16,6 +18,26 @@ async def test_accepts_concurrency_system() -> None:
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(concurrency_system=concurrency_system)
 
     assert crawler.concurrency_system is concurrency_system
+
+
+async def test_run_needs_entered_predictor() -> None:
+    """A rendering type predictor passed to the crawler has to be entered before the crawler runs."""
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=DefaultRenderingTypePredictor()
+    )
+
+    with pytest.raises(RuntimeError, match='DefaultRenderingTypePredictor passed to the crawler is not active'):
+        await crawler.run(['https://a.placeholder.com'])
+
+
+async def test_run_needs_entered_browser_pool() -> None:
+    """A browser pool passed to the Playwright sub crawler has to be entered before the crawler runs."""
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        playwright_crawler_specific_kwargs={'browser_pool': BrowserPool()}
+    )
+
+    with pytest.raises(RuntimeError, match='BrowserPool passed to the crawler is not active'):
+        await crawler.run(['https://a.placeholder.com'])
 
 
 @pytest.mark.parametrize(
