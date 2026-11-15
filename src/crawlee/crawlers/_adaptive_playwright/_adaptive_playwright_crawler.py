@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from crawlee._types import UseStateFunction
+    from crawlee._types import SkippedReason, UseStateFunction
     from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
 
 
@@ -221,6 +221,13 @@ class AdaptivePlaywrightCrawler(
         static_crawler.post_navigation_hook(adaptive_post_navigation_hook_static)
         playwright_crawler.post_navigation_hook(adaptive_post_navigation_hook_pw)
 
+        # The sub crawlers check links against robots.txt in `enqueue_links`. They share the robots.txt cache of this
+        # crawler, so that each file is fetched once, and report the links they skip to its `on_skipped_request`.
+        for sub_crawler in (static_crawler, playwright_crawler):
+            sub_crawler._robots_txt_file_cache = self._robots_txt_file_cache  # noqa: SLF001
+            sub_crawler._robots_txt_lock = self._robots_txt_lock  # noqa: SLF001
+            sub_crawler.on_skipped_request(self._report_skipped_request)
+
         self._additional_context_managers = [
             *self._additional_context_managers,
             self.rendering_type_predictor,
@@ -284,6 +291,10 @@ class AdaptivePlaywrightCrawler(
             statistics=adaptive_statistics,
             **kwargs,
         )
+
+    async def _report_skipped_request(self, url: str, reason: SkippedReason) -> None:
+        if self._on_skipped_request:
+            await self._on_skipped_request(url, reason)
 
     async def _crawl_one(
         self,

@@ -15,6 +15,7 @@ from parsel import Selector
 from typing_extensions import override
 
 from crawlee import ConcurrencySettings, Request
+from crawlee._utils.robots import RobotsTxtFile
 from crawlee.crawlers import (
     AdaptivePlaywrightCrawler,
     AdaptivePlaywrightCrawlingContext,
@@ -42,6 +43,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from yarl import URL
+
+    from crawlee._types import SkippedReason
 
 
 _H1_TEXT = 'Static'
@@ -693,6 +696,54 @@ async def test_adaptive_playwright_crawler_default_predictor(test_urls: list[str
     # First prediction should trigger rendering type detection as the predictor does not have any data for prediction.
     mocked_static_handler.assert_called_once_with()
     mocked_browser_handler.assert_called_once_with()
+
+
+@pytest.mark.parametrize(
+    'rendering_type',
+    [
+        pytest.param('static', id='static'),
+        pytest.param('client only', id='browser'),
+    ],
+)
+async def test_on_skipped_request(server_url: URL, rendering_type: RenderingType) -> None:
+    """Links that a sub crawler skips in `enqueue_links` because of robots.txt reach the callback of the crawler."""
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(
+            rendering_types=cycle([rendering_type]), detection_probability_recommendation=cycle([0])
+        ),
+        respect_robots_txt_file=True,
+    )
+    skip = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        await context.enqueue_links()
+
+    @crawler.on_skipped_request
+    async def skipped_hook(url: str, _reason: SkippedReason) -> None:
+        skip(url)
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    skip.assert_has_calls([call(str(server_url / f'page_{index}')) for index in range(1, 5)], any_order=True)
+
+
+async def test_fetches_robots_txt_once(server_url: URL, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The crawler and its sub crawlers fetch the robots.txt file of a domain once, detection runs included."""
+    find = AsyncMock(wraps=RobotsTxtFile.find)
+    monkeypatch.setattr(RobotsTxtFile, 'find', find)
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([1])),
+        respect_robots_txt_file=True,
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        await context.enqueue_links()
+
+    await crawler.run([str(server_url / 'start_enqueue')])
+
+    find.assert_awaited_once()
 
 
 async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[str]) -> None:
