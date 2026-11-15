@@ -20,7 +20,7 @@ _STATISTICS_TABLE_WIDTH = 100
 @dataclass(frozen=True)
 @docs_group('Statistics')
 class FinalStatistics:
-    """Statistics about a crawler run."""
+    """Statistics about a crawl."""
 
     requests_finished: int
     requests_failed: int
@@ -56,7 +56,7 @@ class FinalStatistics:
 
 @docs_group('Statistics')
 class StatisticsState(BaseModel):
-    """Statistic data about a crawler run."""
+    """Statistic data about a crawl."""
 
     model_config = ConfigDict(
         alias_generator=to_camel, validate_by_name=True, validate_by_alias=True, ser_json_inf_nan='constants'

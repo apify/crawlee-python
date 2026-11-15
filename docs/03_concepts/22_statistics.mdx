@@ -20,7 +20,7 @@ The raw data lives in a <ApiLink to="class/StatisticsState">`StatisticsState`</A
 - `requests_retries` counts requests that needed at least one retry, and `request_retry_histogram` shows how many requests finished or failed after 0, 1, 2, and more retries.
 - `request_total_finished_duration`, `request_total_failed_duration`, `request_min_duration`, and `request_max_duration` measure request processing time.
 - `requests_with_status_code` maps HTTP status codes to the number of responses that returned them.
-- `crawler_started_at`, `crawler_finished_at`, and the computed `crawler_runtime` describe the run itself.
+- `crawler_started_at`, `crawler_finished_at`, and the computed `crawler_runtime` describe the crawl itself.
 
 From the state, <ApiLink to="class/Statistics#calculate">`Statistics.calculate`</ApiLink> derives a <ApiLink to="class/FinalStatistics">`FinalStatistics`</ApiLink> object. It's a frozen summary with the request counts, the retry histogram as a list, average finished and failed durations, total duration, per-minute rates for finished and failed requests, and the crawler runtime. The same summary appears in the periodic and final statistics logs.
 
@@ -28,7 +28,7 @@ From the state, <ApiLink to="class/Statistics#calculate">`Statistics.calculate`<
 
 There are two ways to get the statistics of a crawl:
 
-- <ApiLink to="class/BasicCrawler#run">`crawler.run()`</ApiLink> returns the `FinalStatistics` of the run once it ends.
+- <ApiLink to="class/BasicCrawler#run">`crawler.run()`</ApiLink> returns the `FinalStatistics` once the run ends.
 - <ApiLink to="class/BasicCrawler#statistics">`crawler.statistics`</ApiLink> gives you the `Statistics` instance, so you can read the full `state` or call `calculate()` at any time, including from a request handler while the crawl is running.
 
 The following example reads the summary returned by `run()`, then looks at state fields that `FinalStatistics` doesn't include, and the errors collected during the run.
@@ -37,7 +37,7 @@ The following example reads the summary returned by `run()`, then looks at state
     {ReadFinalStatisticsExample}
 </RunnableCodeBlock>
 
-A crawler that you run again with `run()` after a completed run resets its statistics at the start of the new run. To keep the numbers from a previous run, store the returned `FinalStatistics` before calling `run()` again.
+A crawler that you run again with `run()` continues the crawl, so its statistics add up the runs. The runtime counts only the time the runs took, not the time between them. The `FinalStatistics` that a later `run()` returns include the earlier runs too. To count from zero again, call `crawler.statistics.reset()` before the next `run()`.
 
 ## Periodic logging
 
@@ -50,7 +50,7 @@ The crawler's constructor also accepts `statistics_log_format`. When the crawler
 
 ## Persistence
 
-`Statistics` can save its state to a key-value store, so a crawl that gets migrated, aborted, or restarted continues counting from where it left off. When persistence is on, the state is loaded from the store when the crawl starts, saved on every `PERSIST_STATE` event, and saved once more when the crawl ends. For details about the event, see [Events](./events).
+`Statistics` can save its state to a key-value store, so a crawl that gets migrated, aborted, or restarted continues counting from where it left off. When persistence is on, the state is loaded from the store when the crawl starts, saved on every `PERSIST_STATE` event, and saved once more when a run ends. For details about the event, see [Events](./events).
 
 The following options control persistence:
 
@@ -74,6 +74,6 @@ A custom `Statistics` logs its periodic messages through the `crawlee.statistics
 
 ## Error tracking
 
-Each `Statistics` instance holds an `error_tracker`, which groups errors from failed request attempts by their type, the place in the code where they were raised, and a similar message. Its `total` and `unique_error_count` properties count all errors and the distinct groups, and `get_most_common_errors()` returns the most frequent groups with their counts. At the end of a run that had errors, the crawler logs both counts. A second tracker, `error_tracker_retry`, collects session errors that caused a retry with a new session.
+Each `Statistics` instance holds an `error_tracker`, which groups errors from failed request attempts by their type, the place in the code where they were raised, and a similar message. Its `total` and `unique_error_count` properties count all errors and the distinct groups, and `get_most_common_errors()` returns the most frequent groups with their counts. At the end of a run, the crawler logs both counts if there are any errors. A repeated `run()` keeps the errors of the earlier runs in the tracker, so the counts include them too. A second tracker, `error_tracker_retry`, collects session errors that caused a retry with a new session.
 
 With `save_error_snapshots=True`, the error tracker also saves a snapshot of the page on the first occurrence of each unique error. For details and examples, see [Capturing page snapshots on errors](./error-handling#capturing-page-snapshots-on-errors).

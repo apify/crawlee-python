@@ -326,11 +326,13 @@ crawler_1 = BasicCrawler(request_manager=queue)
 crawler_2 = BasicCrawler(request_manager=queue)
 ```
 
-## Repeated `run()` calls no longer purge the request queue
+## Repeated `run()` calls continue the crawl
 
 In v1, calling `crawler.run()` again on the same instance purged the request queue, unless the queue was named or the previous run had failed. In v2, nothing is purged between runs, the same as Crawlee JS. A repeated `run()` continues with the same request manager and skips the requests an earlier run handled, failed ones included.
 
-The `purge_request_queue` argument of `run()` is removed. If you passed `purge_request_queue=False`, drop the argument. To crawl the same requests again, purge the request manager yourself:
+The statistics and the session pool carry over too. A repeated `run()` adds to the statistics of the earlier runs, error trackers included, and keeps the sessions. In v1, it started both afresh. The `max_requests_per_crawl` limit counts the requests in the statistics, so it includes the earlier runs. A run that starts with the limit already reached stops right away. To count from zero, call `crawler.statistics.reset()` before the next `run()`. To start with fresh sessions, pass your own `SessionPool` and call its `reset()` between runs.
+
+The `purge_request_queue` argument of `run()` is removed. If you passed `purge_request_queue=False`, drop the argument. To crawl the same requests again, purge the request manager yourself. To also count from zero, as v1 did, reset the statistics:
 
 ```python
 # v1
@@ -341,6 +343,7 @@ await crawler.run(urls)
 await crawler.run(urls)
 request_manager = await crawler.get_request_manager()
 await request_manager.purge()
+crawler.statistics.reset()
 await crawler.run(urls)
 ```
 
@@ -583,7 +586,7 @@ What you do with an object you pass depends on its type:
 
 - `SessionPool`, `BrowserPool`, an HTTP client and the `rendering_type_predictor` of `AdaptivePlaywrightCrawler`: enter it with `async with` before you run the crawler, or `run()` raises a `RuntimeError`. Keep it open until every crawler using it has finished.
 - The `extractor` of `PydanticAiCrawler`: enter it the same way. `PydanticAiDirectExtractor` is now an async context manager, like `PydanticAiSelectorExtractor`. Used on its own, either extractor has to be entered before `extract()` too, or it raises a `RuntimeError`. A selector extractor enters and exits its `fallback` itself, so don't enter the fallback yourself, and don't share one fallback between selector extractors that are entered at the same time. If your subclass of `BasePydanticAiHtmlExtractor` overrides `__aenter__` or `__aexit__`, call `super()`. A custom extractor that implements the `PydanticAiHtmlExtractor` protocol directly needs the new `active` property, `__aenter__` and `__aexit__`.
-- `Statistics`: don't enter it yourself, or `run()` raises a `RuntimeError`. In v1, the crawler left entered statistics alone. Crawlers that run one after another can share an instance, including another crawler's statistics. The instance adds up their runs, so the `max_requests_per_crawl` of the second crawler counts the requests of the first one too. When a crawler runs again, it resets the instance, including what the other crawlers counted. Two crawlers can't run with the same instance at the same time.
+- `Statistics`: don't enter it yourself, or `run()` raises a `RuntimeError`. In v1, the crawler left entered statistics alone. Crawlers that run one after another can share an instance, including another crawler's statistics. The instance adds up their runs, so the `max_requests_per_crawl` of the second crawler counts the requests of the first one too. Two crawlers can't run with the same instance at the same time.
 
 For example:
 
@@ -599,8 +602,6 @@ crawler = ParselCrawler(session_pool=session_pool)
 async with session_pool:
     await crawler.run(urls)
 ```
-
-When a crawler runs again, it resets only a session pool it created. A `SessionPool` you pass keeps its sessions. In v1, a repeated `run()` reset a passed pool too.
 
 The `with_beautifulsoup_static_parser` and `with_parsel_static_parser` factory methods of `AdaptivePlaywrightCrawler` pass `statistics` to the crawler as they are, instead of a copy built with `Statistics.replace_state_model`, so the instance you pass is the one that counts. The instance must use `AdaptivePlaywrightCrawlerStatisticState` as its state model, or the crawler raises a `ValueError`:
 

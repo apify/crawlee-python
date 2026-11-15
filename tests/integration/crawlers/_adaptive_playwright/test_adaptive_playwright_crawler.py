@@ -747,6 +747,19 @@ async def test_static_sub_crawler_sends_through_crawler_http_client(test_urls: l
     assert closed_clients == {crawler._http_client}
 
 
+async def test_repeated_run_keeps_own_stats(test_urls: list[str]) -> None:
+    """A repeated `run()` adds to the default statistics of the crawler, since it continues the crawl."""
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0])),
+    )
+    crawler.router.default_handler(AsyncMock())
+
+    await crawler.run(test_urls[:1])
+    stats = await crawler.run(test_urls[1:])
+
+    assert stats.requests_finished == len(test_urls)
+
+
 async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[str]) -> None:
     """Test that `context.query_selector_one` works regardless of the crawl type for BeautifulSoup variant.
 

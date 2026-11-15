@@ -156,7 +156,8 @@ class _BasicCrawlerOptions(TypedDict):
     max_requests_per_crawl: NotRequired[int | None]
     """Maximum number of pages to open during a crawl. The crawl stops upon reaching this limit.
     Setting this value can help avoid infinite loops in misconfigured crawlers. `None` means no limit.
-    Due to concurrency settings, the actual number of pages visited may slightly exceed this value."""
+    Due to concurrency settings, the actual number of pages visited may slightly exceed this value. The limit counts
+    the requests in the statistics, so it includes earlier runs and other crawlers that share the statistics."""
 
     max_session_rotations: NotRequired[int]
     """Maximum number of session rotations per request. The crawler rotates the session if a proxy error occurs
@@ -356,7 +357,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 this limit. Setting this value can help avoid infinite loops in misconfigured crawlers. `None` means
                 no limit. Due to concurrency settings, the actual number of pages visited may slightly exceed
                 this value. If used together with `keep_alive`, then the crawler will be kept alive only until
-                `max_requests_per_crawl` is achieved.
+                `max_requests_per_crawl` is achieved. The limit counts the requests in the statistics, so it includes
+                earlier runs and other crawlers that share the statistics.
             max_session_rotations: Maximum number of session rotations per request. The crawler rotates the session
                 if a proxy error occurs or if the website blocks the request.
                 The session rotations are not counted towards the `max_request_retries` limit.
@@ -549,7 +551,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         # State flags
         self._keep_alive = keep_alive
-        self._has_finished_before = False
         self._stop_before_run = False
         self._logger_once = LoggerOnce(self._logger)
 
@@ -613,7 +614,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     @property
     def statistics(self) -> Statistics[TStatisticsState]:
-        """Statistics about the current (or last) crawler run."""
+        """Statistics of the crawler's runs, which add up from one run to the next."""
         return self._statistics
 
     @property
@@ -852,7 +853,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Calling `run()` again on the same instance keeps crawling the same request manager. Requests that a previous
         run handled, failed ones included, aren't processed again. To crawl them again, purge the request manager, or
-        create a new crawler with a freshly opened request queue.
+        create a new crawler with a freshly opened request queue. The statistics carry over too, so
+        `max_requests_per_crawl` includes the requests of the earlier runs.
 
         Cancelling the task that awaits `run()`, such as with a timeout around it, raises `CancelledError` once the
         requests in progress finish. A repeated cancellation, which anyio cancel scopes keep sending, cancels them.
@@ -888,15 +890,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._last_run = self._create_run()
 
         try:
-            if self._has_finished_before:
-                self._statistics.reset()
-                await self._statistics.reset_store()
-
-                # A session pool passed in belongs to the caller, who may still use it in another crawler.
-                if self._session_pool in self._owned_collaborators:
-                    self._session_pool.reset()
-                    await self._session_pool.reset_store()
-
             if requests is not None:
                 await self.add_requests(requests)
 
@@ -968,8 +961,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 self._logger.info(
                     'The crawl was interrupted. To resume, do: CRAWLEE_PURGE_ON_START=0 python %s', sys.argv[0]
                 )
-
-            self._has_finished_before = True
 
             await self._save_crawler_state()
 
