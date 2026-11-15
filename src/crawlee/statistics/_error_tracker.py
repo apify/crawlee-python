@@ -152,6 +152,10 @@ class ErrorTracker:
                     )
         return all_errors.most_common(n)
 
+    def reset(self) -> None:
+        """Forget the tracked errors, keeping the options of the tracker."""
+        self._errors.clear()
+
     def _get_error_repr(self, file_and_line: str | None, name: str | None, message: str | None) -> str:
         """Get the most specific error representation."""
         file_and_line_part = f'{file_and_line}:' if file_and_line else ''

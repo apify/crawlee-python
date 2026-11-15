@@ -288,8 +288,8 @@ class Statistics(Generic[TStatisticsState]):
     async def reset(self) -> None:
         """Reset the statistics to their defaults and remove any persistent state."""
         await self._state.reset()
-        self.error_tracker = ErrorTracker()
-        self.error_tracker_retry = ErrorTracker()
+        self.error_tracker.reset()
+        self.error_tracker_retry.reset()
         self._requests_in_progress.clear()
 
     def _log(self) -> None:
