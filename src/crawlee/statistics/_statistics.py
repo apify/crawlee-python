@@ -174,6 +174,9 @@ class Statistics(Generic[TStatisticsState]):
 
         self._active = True
 
+        # An attempt that an earlier run left in progress never finishes, so it must not count as a retry in this run.
+        self._requests_in_progress.clear()
+
         try:
             await self._state.initialize()
 
