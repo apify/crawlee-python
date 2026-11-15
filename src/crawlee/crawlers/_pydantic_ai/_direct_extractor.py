@@ -52,7 +52,9 @@ class PydanticAiDirectExtractor(BasePydanticAiHtmlExtractor):
 
     model = OpenAIChatModel('gpt-5.4-nano', provider=OpenAIProvider(api_key='...'))
     extractor = PydanticAiDirectExtractor(model=model)
-    product = await extractor.extract('<html>...</html>', Product)
+
+    async with extractor:
+        product = await extractor.extract('<html>...</html>', Product)
     ```
     """
 

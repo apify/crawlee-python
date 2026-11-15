@@ -6,7 +6,7 @@ import json
 import re
 import types
 from collections import defaultdict
-from contextlib import AbstractAsyncContextManager
+from contextlib import AsyncExitStack
 from enum import Enum
 from functools import lru_cache
 from logging import getLogger
@@ -18,6 +18,7 @@ from pydantic_ai import Agent, ModelRetry
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.usage import RunUsage
 
+from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recoverable_state import RecoverableState
 
@@ -27,7 +28,7 @@ from ._skeleton_distiller import PydanticAiSkeletonDistiller
 
 if TYPE_CHECKING:
     from types import TracebackType
-    from typing import Any
+    from typing import Any, Self
 
     from parsel import Selector
     from pydantic.fields import FieldInfo
@@ -254,8 +255,8 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
     asks the model for a new map, validates it against the live page, and caches it. A bucket keeps several maps,
     so A/B-tested markup variants can coexist.
 
-    The cache is a `RecoverableState` persisted to a `KeyValueStore`. As an async context manager it loads at
-    startup and saves at shutdown. Used standalone, it initializes lazily.
+    The cache is a `RecoverableState` persisted to a `KeyValueStore`. It loads when the extractor is entered with
+    `async with` and is saved when it's exited, so `extract` needs an entered extractor.
 
     With a `fallback` extractor, unsupported schemas and generation failures degrade to it. Infrastructure errors
     such as credentials, HTTP, and usage limits propagate.
@@ -280,7 +281,9 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
 
     model = OpenAIChatModel('gpt-5.4-nano', provider=OpenAIProvider(api_key='...'))
     extractor = PydanticAiSelectorExtractor(model=model, fallback=PydanticAiDirectExtractor(model=model))
-    product = await extractor.extract('<html>...</html>', Product, cache_tag='product')
+
+    async with extractor:
+        product = await extractor.extract('<html>...</html>', Product, cache_tag='product')
     ```
     """
 
@@ -310,7 +313,8 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
                 automatically.
             retries: How many times the model may fix failing selectors within one generation.
             max_variants: Cap on cached selector maps per bucket.
-            fallback: Extractor to degrade to when generation fails or the schema shape is unsupported.
+            fallback: Extractor to degrade to when generation fails or the schema shape is unsupported. The selector
+                extractor enters and exits it together with itself, so don't enter it yourself.
             usage_limits: Optional pydantic-ai `UsageLimits` applied to every generation run.
             persistence: Whether the selector cache is persisted. Disable for ephemeral runs or tests.
         """
@@ -327,7 +331,7 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
         self._max_variants = max_variants
         self._fallback = fallback
         self._persistence = persistence
-        self._share_usage_with_fallback()
+        self._exit_stack = AsyncExitStack()
 
         self._selector_cache: RecoverableState[SelectorCacheState] = RecoverableState(
             default_state=SelectorCacheState(),
@@ -336,8 +340,6 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
             logger=logger,
         )
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
-        self._init_lock = asyncio.Lock()
-        self._active = False
 
     def set_ai_usage(self, value: PydanticAiUsageStats) -> None:
         """Adopt `value` and re-share it with the fallback chain."""
@@ -349,23 +351,26 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
         if self._fallback is not None:
             self._fallback.set_ai_usage(self._ai_usage)
 
-    @property
-    def active(self) -> bool:
-        """Whether the extractor is in its async context-manager scope."""
-        return self._active
+    async def __aenter__(self) -> Self:
+        """Enter the fallback chain and initialize the selector cache.
 
-    async def __aenter__(self) -> PydanticAiSelectorExtractor:
-        """Initialize the selector cache eagerly and enter the fallback chain."""
-        if self._active:
-            raise RuntimeError(f'The {type(self).__name__} is already active.')
+        Raises:
+            RuntimeError: If the extractor or its fallback is already active.
+        """
+        await super().__aenter__()
 
-        if not self._selector_cache.is_initialized:
+        async with AsyncExitStack() as stack:
+            stack.push_async_callback(super().__aexit__, None, None, None)
+
+            if self._fallback is not None:
+                await stack.enter_async_context(self._fallback)
+                # Shared after a successful entry, so the fallback counts into whichever extractor holds it.
+                self._share_usage_with_fallback()
+
             await self._selector_cache.initialize()
+            stack.push_async_callback(self._selector_cache.teardown)
+            self._exit_stack = stack.pop_all()
 
-        if isinstance(self._fallback, AbstractAsyncContextManager):
-            await self._fallback.__aenter__()
-
-        self._active = True
         return self
 
     async def __aexit__(
@@ -374,17 +379,17 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Persist the selector cache one final time, detach from events, and exit the fallback chain."""
-        if not self._active:
+        """Persist the selector cache one final time, detach from events, and exit the fallback chain.
+
+        Raises:
+            RuntimeError: If the extractor is not active.
+        """
+        if not self.active:
             raise RuntimeError(f'The {type(self).__name__} is not active.')
 
-        try:
-            if isinstance(self._fallback, AbstractAsyncContextManager):
-                await self._fallback.__aexit__(exc_type, exc_value, exc_traceback)
-        finally:
-            await self._selector_cache.teardown()
-            self._active = False
+        await self._exit_stack.__aexit__(exc_type, exc_value, exc_traceback)
 
+    @ensure_context
     async def extract(
         self,
         content: str | Selector,
@@ -405,6 +410,7 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
             additional_instructions: Extra instructions appended for this call only.
 
         Raises:
+            RuntimeError: If the extractor isn't entered with `async with`.
             ValueError: When the schema shape is unsupported and no fallback is configured, or when `scope` matches
                 nothing.
         """
@@ -428,12 +434,6 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
                 f'PydanticAiSelectorExtractor does not support this schema shape: {reason}. '
                 'Configure a fallback extractor or use PydanticAiDirectExtractor for it.'
             )
-
-        if not self._selector_cache.is_initialized:
-            async with self._init_lock:
-                if not self._selector_cache.is_initialized:
-                    # Lazy init for standalone use. Under `PydanticAiCrawler` the context manager inits it at startup.
-                    await self._selector_cache.initialize()
 
         cache_digest = _build_cache_digest(schema, scope, cache_tag)
         variants = self._selector_cache.current_value.selectors.setdefault(cache_digest, [])
