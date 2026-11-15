@@ -169,6 +169,11 @@ class AdaptivePlaywrightCrawler(
         # Sub crawlers related.
         playwright_crawler_specific_kwargs = playwright_crawler_specific_kwargs or _PlaywrightCrawlerAdditionalOptions()
 
+        # The sub crawlers never run, so they would never enter or close defaults of their own. The client of the
+        # adaptive crawler already serves `send_request` in their contexts.
+        kwargs['session_pool'] = self._session_pool
+        kwargs['http_client'] = self._http_client
+
         # The sub crawlers log under the adaptive crawler's logger, and only errors, since the adaptive crawler reports
         # the outcome of each request itself.
         static_logger = self._logger.getChild('static')

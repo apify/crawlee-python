@@ -31,7 +31,7 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statisti
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import AdaptiveContextError
 from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import DefaultRenderingTypePredictor
 from crawlee.errors import RequestThrottledError
-from crawlee.http_clients import HttpClient, HttpResponse
+from crawlee.http_clients import HttpClient, HttpResponse, ImpitHttpClient
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
 from crawlee.storage_backends import SqlStorageBackend
@@ -734,6 +734,41 @@ async def test_adaptive_playwright_crawler_default_predictor(test_urls: list[str
     # First prediction should trigger rendering type detection as the predictor does not have any data for prediction.
     mocked_static_handler.assert_called_once_with()
     mocked_browser_handler.assert_called_once_with()
+
+
+@pytest.mark.parametrize(
+    'rendering_type',
+    [
+        pytest.param('static', id='static'),
+        pytest.param('client only', id='browser'),
+    ],
+)
+async def test_closes_shared_default_client(test_urls: list[str], rendering_type: RenderingType) -> None:
+    """Both sub crawlers send through the default HTTP client of the crawler, which closes only that client."""
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(
+            rendering_types=cycle([rendering_type]), detection_probability_recommendation=cycle([0])
+        ),
+        respect_robots_txt_file=True,
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        # The sub crawler fetches robots.txt with its HTTP client to filter the links.
+        await context.enqueue_links()
+
+    with (
+        patch.object(
+            ImpitHttpClient, 'send_request', autospec=True, side_effect=ImpitHttpClient.send_request
+        ) as send_request,
+        patch.object(ImpitHttpClient, 'cleanup', autospec=True, side_effect=ImpitHttpClient.cleanup) as cleanup,
+    ):
+        await crawler.run(test_urls[:1])
+
+    sending_clients = {send_call.args[0] for send_call in send_request.await_args_list}
+    closed_clients = {cleanup_call.args[0] for cleanup_call in cleanup.await_args_list}
+    assert sending_clients == {crawler._http_client}
+    assert closed_clients == {crawler._http_client}
 
 
 async def test_adaptive_context_query_selector_beautiful_soup(test_urls: list[str]) -> None:
