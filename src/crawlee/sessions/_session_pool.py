@@ -118,12 +118,20 @@ class SessionPool:
 
         self._active = True
 
-        state = await self._state.initialize()
-        state.max_pool_size = self._max_pool_size
-        self._remove_retired_sessions()
+        try:
+            state = await self._state.initialize()
+            state.max_pool_size = self._max_pool_size
+            self._remove_retired_sessions()
 
-        if not state.sessions:
-            await self._fill_sessions_to_max()
+            if not state.sessions:
+                await self._fill_sessions_to_max()
+        except BaseException:
+            try:
+                if self._state.is_initialized:
+                    await self._state.teardown()
+            finally:
+                self._active = False
+            raise
 
         return self
 
@@ -141,9 +149,10 @@ class SessionPool:
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        await self._state.teardown()
-
-        self._active = False
+        try:
+            await self._state.teardown()
+        finally:
+            self._active = False
 
     @overload
     def get_state(self, *, as_dict: Literal[True]) -> dict: ...
