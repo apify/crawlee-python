@@ -28,14 +28,16 @@ def create_session_function() -> Callable[[], Session]:
 
 
 async def main() -> None:
+    session_pool = SessionPool(
+        max_pool_size=10, create_session_function=create_session_function()
+    )
+
     crawler = HttpCrawler(
         # Adjust request limits according to your pool size
         concurrency_settings=ConcurrencySettings(max_tasks_per_minute=500),
         # Requests are bound to specific sessions, no rotation needed
         max_session_rotations=0,
-        session_pool=SessionPool(
-            max_pool_size=10, create_session_function=create_session_function()
-        ),
+        session_pool=session_pool,
     )
 
     @crawler.router.default_handler
@@ -74,7 +76,8 @@ async def main() -> None:
         for session_id in range(1, 11)
     ]
 
-    await crawler.run(init_requests)
+    async with session_pool:
+        await crawler.run(init_requests)
 
 
 if __name__ == '__main__':

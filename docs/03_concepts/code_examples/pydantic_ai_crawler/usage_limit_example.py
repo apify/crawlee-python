@@ -28,14 +28,12 @@ async def main() -> None:
         'gpt-5.4-nano',
         provider=OpenAIProvider(api_key='your-openai-api-key'),
     )
-    crawler = PydanticAiCrawler(
-        # Cap each extraction so an oversized page cannot consume LLM resources.
-        extractor=PydanticAiDirectExtractor(
-            model=model,
-            usage_limits=UsageLimits(total_tokens_limit=10_000),
-        ),
-        max_requests_per_crawl=5,
+    # Cap each extraction so an oversized page cannot consume LLM resources.
+    extractor = PydanticAiDirectExtractor(
+        model=model,
+        usage_limits=UsageLimits(total_tokens_limit=10_000),
     )
+    crawler = PydanticAiCrawler(extractor=extractor, max_requests_per_crawl=5)
 
     @crawler.router.default_handler
     async def handler(context: PydanticAiCrawlingContext) -> None:
@@ -54,7 +52,8 @@ async def main() -> None:
 
         await context.push_data(article.model_dump())
 
-    await crawler.run(['https://crawlee.dev/'])
+    async with extractor:
+        await crawler.run(['https://crawlee.dev/'])
 
 
 if __name__ == '__main__':

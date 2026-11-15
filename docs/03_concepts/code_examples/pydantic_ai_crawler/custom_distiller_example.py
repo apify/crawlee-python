@@ -44,11 +44,9 @@ async def main() -> None:
         # Set the provider with the API key explicitly.
         provider=OpenAIProvider(api_key='your-openai-api-key'),
     )
-    crawler = PydanticAiCrawler(
-        # Use the custom distiller to convert the page to Markdown before extraction.
-        extractor=PydanticAiDirectExtractor(model=model, distiller=MarkdownDistiller()),
-        max_requests_per_crawl=5,
-    )
+    # Use the custom distiller to convert the page to Markdown before extraction.
+    extractor = PydanticAiDirectExtractor(model=model, distiller=MarkdownDistiller())
+    crawler = PydanticAiCrawler(extractor=extractor, max_requests_per_crawl=5)
 
     @crawler.router.default_handler
     async def handler(context: PydanticAiCrawlingContext) -> None:
@@ -60,7 +58,8 @@ async def main() -> None:
         # the rest of the crawling logic.
         await context.enqueue_links()
 
-    await crawler.run(['https://crawlee.dev/'])
+    async with extractor:
+        await crawler.run(['https://crawlee.dev/'])
 
 
 if __name__ == '__main__':

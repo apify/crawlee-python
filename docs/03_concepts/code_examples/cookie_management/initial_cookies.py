@@ -5,16 +5,18 @@ from crawlee.sessions import SessionPool
 
 
 async def main() -> None:
+    session_pool = SessionPool(
+        # Seed every new session in the pool with these cookies.
+        create_session_settings={
+            'cookies': [
+                {'name': 'consent', 'value': 'accepted', 'domain': 'httpbingo.org'},
+                {'name': 'locale', 'value': 'en_US', 'domain': 'httpbingo.org'},
+            ],
+        },
+    )
+
     crawler = HttpCrawler(
-        session_pool=SessionPool(
-            # Seed every new session in the pool with these cookies.
-            create_session_settings={
-                'cookies': [
-                    {'name': 'consent', 'value': 'accepted', 'domain': 'httpbingo.org'},
-                    {'name': 'locale', 'value': 'en_US', 'domain': 'httpbingo.org'},
-                ],
-            },
-        ),
+        session_pool=session_pool,
     )
 
     @crawler.router.default_handler
@@ -23,7 +25,8 @@ async def main() -> None:
         response = await context.http_response.read()
         context.log.info(response.decode())
 
-    await crawler.run(['https://httpbingo.org/cookies'])
+    async with session_pool:
+        await crawler.run(['https://httpbingo.org/cookies'])
 
 
 if __name__ == '__main__':

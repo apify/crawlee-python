@@ -11,24 +11,26 @@ from crawlee.sessions import SessionPool
 
 
 async def main() -> None:
+    session_pool = SessionPool(
+        max_pool_size=1,
+        create_session_settings={
+            # Set high value to ensure the session isn't replaced during crawling
+            'max_usage_count': 999_999,
+            # Set high value to prevent session expiration during crawling
+            'max_age': timedelta(hours=999_999),
+            # Higher error tolerance before the session is considered blocked
+            # Make sure you implement proper error handling in your code
+            'max_error_score': 100,
+        },
+    )
+
     crawler = HttpCrawler(
         max_requests_per_crawl=10,
         # Configure to use a single persistent session throughout the crawl
         max_session_rotations=0,
         # Limit request rate to avoid triggering anti-scraping measures
         concurrency_settings=ConcurrencySettings(max_tasks_per_minute=30),
-        session_pool=SessionPool(
-            max_pool_size=1,
-            create_session_settings={
-                # Set high value to ensure the session isn't replaced during crawling
-                'max_usage_count': 999_999,
-                # Set high value to prevent session expiration during crawling
-                'max_age': timedelta(hours=999_999),
-                # Higher error tolerance before the session is considered blocked
-                # Make sure you implement proper error handling in your code
-                'max_error_score': 100,
-            },
-        ),
+        session_pool=session_pool,
     )
 
     # Default request handler for normal page processing
@@ -74,7 +76,8 @@ async def main() -> None:
     )
 
     # Start the crawling process with the login request
-    await crawler.run([request])
+    async with session_pool:
+        await crawler.run([request])
 
 
 if __name__ == '__main__':

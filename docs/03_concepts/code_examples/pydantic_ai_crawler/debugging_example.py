@@ -30,13 +30,11 @@ async def main() -> None:
     # Build the distiller once so the extractor and the handler below share
     # the same instance.
     distiller = PydanticAiCleanHtmlDistiller()
+    # Create a direct extractor with your distiller.
+    extractor = PydanticAiDirectExtractor(model, distiller=distiller)
     crawler = PydanticAiCrawler(
         max_requests_per_crawl=10,
-        # Create a direct extractor with your distiller.
-        extractor=PydanticAiDirectExtractor(
-            model,
-            distiller=distiller,
-        ),
+        extractor=extractor,
         # Set concurrency to 1, which ensures only one request is processed at a time.
         concurrency_settings=ConcurrencySettings(
             desired_concurrency=1, max_concurrency=1
@@ -67,7 +65,8 @@ async def main() -> None:
 
         await context.push_data(article.model_dump())
 
-    await crawler.run(['https://crawlee.dev/'])
+    async with extractor:
+        await crawler.run(['https://crawlee.dev/'])
 
 
 if __name__ == '__main__':

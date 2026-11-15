@@ -87,7 +87,11 @@ from crawlee.crawlers import HttpCrawler
 from crawlee.http_clients import ImpitHttpClient
 
 # Send plain requests with no browser-like headers.
-crawler = HttpCrawler(http_client=ImpitHttpClient(browser=None))
+http_client = ImpitHttpClient(browser=None)
+crawler = HttpCrawler(http_client=http_client)
+
+async with http_client:
+    await crawler.run(['https://httpbin.org/headers'])
 ```
 
 The opt-out is named differently on each client:

@@ -164,6 +164,9 @@ class CurlImpersonateHttpClient(HttpClient):
 
     http_client = CurlImpersonateHttpClient()
     crawler = HttpCrawler(http_client=http_client)
+
+    async with http_client:
+        await crawler.run(['https://crawlee.dev/'])
     ```
     """
 

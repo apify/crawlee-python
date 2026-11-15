@@ -106,6 +106,9 @@ class HttpxHttpClient(HttpClient):
 
     http_client = HttpxHttpClient()
     crawler = HttpCrawler(http_client=http_client)
+
+    async with http_client:
+        await crawler.run(['https://crawlee.dev/'])
     ```
     """
 

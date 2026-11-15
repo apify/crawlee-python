@@ -26,7 +26,8 @@ async def main() -> None:
         unique_key='set-headers-example',
     )
 
-    await crawler.run(['https://httpbin.org/headers', request])
+    async with http_client:
+        await crawler.run(['https://httpbin.org/headers', request])
 
 
 if __name__ == '__main__':

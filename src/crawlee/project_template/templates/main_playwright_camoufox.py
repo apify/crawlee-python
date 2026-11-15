@@ -9,6 +9,9 @@ from crawlee.browsers import PlaywrightBrowserPlugin, PlaywrightBrowserControlle
 from crawlee.crawlers import PlaywrightCrawler
 # % endblock
 
+# % block http_client_import
+# % endblock
+
 # % block pre_main
 class CamoufoxPlugin(PlaywrightBrowserPlugin):
     """Example browser plugin that uses Camoufox Browser, but otherwise keeps the functionality of
@@ -27,10 +30,14 @@ class CamoufoxPlugin(PlaywrightBrowserPlugin):
         )
 # % endblock
 
+# % block context_manager
+BrowserPool(plugins=[CamoufoxPlugin()]) as browser_pool
+# % endblock
+
 # % block instantiation
 crawler = PlaywrightCrawler(
     max_requests_per_crawl=10,
     request_handler=router,
-    browser_pool=BrowserPool(plugins=[CamoufoxPlugin()])
+    browser_pool=browser_pool,
 )
 # % endblock

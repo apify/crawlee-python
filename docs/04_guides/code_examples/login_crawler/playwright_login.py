@@ -10,6 +10,21 @@ from crawlee.sessions import SessionPool
 
 
 async def main() -> None:
+    session_pool = SessionPool(
+        # Limit the pool to one session
+        max_pool_size=1,
+        create_session_settings={
+            # High value for session usage limit
+            'max_usage_count': 999_999,
+            # High value for session lifetime
+            'max_age': timedelta(hours=999_999),
+            # High score allows the session to encounter more errors
+            # before crawlee decides the session is blocked
+            # Make sure you know how to handle these errors
+            'max_error_score': 100,
+        },
+    )
+
     crawler = PlaywrightCrawler(
         max_requests_per_crawl=10,
         headless=True,
@@ -18,20 +33,7 @@ async def main() -> None:
         max_session_rotations=0,
         # Limit crawling intensity to avoid blocking
         concurrency_settings=ConcurrencySettings(max_tasks_per_minute=30),
-        session_pool=SessionPool(
-            # Limit the pool to one session
-            max_pool_size=1,
-            create_session_settings={
-                # High value for session usage limit
-                'max_usage_count': 999_999,
-                # High value for session lifetime
-                'max_age': timedelta(hours=999_999),
-                # High score allows the session to encounter more errors
-                # before crawlee decides the session is blocked
-                # Make sure you know how to handle these errors
-                'max_error_score': 100,
-            },
-        ),
+        session_pool=session_pool,
     )
 
     # The main handler for processing requests
@@ -59,7 +61,8 @@ async def main() -> None:
         await context.add_requests(['https://demoqa.com/books'])
 
     # We start crawling with login. This is necessary to access the rest of the pages
-    await crawler.run([Request.from_url('https://demoqa.com/login', label='login')])
+    async with session_pool:
+        await crawler.run([Request.from_url('https://demoqa.com/login', label='login')])
 
 
 if __name__ == '__main__':
