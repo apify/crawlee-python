@@ -43,6 +43,7 @@ from ._result_comparator import create_default_comparator
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
+    from datetime import timedelta
     from types import TracebackType
     from typing import Unpack
 
@@ -296,6 +297,12 @@ class AdaptivePlaywrightCrawler(
             **kwargs,
         )
 
+    @override
+    def _get_max_processing_time(self) -> timedelta:
+        # A request can run both sub crawlers one after another, each under the request handler timeout, which also
+        # covers its navigation.
+        return 2 * super()._get_max_processing_time()
+
     async def _crawl_one(
         self,
         rendering_type: RenderingType,
@@ -346,8 +353,8 @@ class AdaptivePlaywrightCrawler(
                     rendering_type=rendering_type, context_linked_to_result=context_linked_to_result
                 ),
                 timeout=request_handler_timeout,
-                timeout_message=(
-                    f'{rendering_type=!s} timed out after {request_handler_timeout.total_seconds()} seconds'
+                timeout_message=lambda timeout: (
+                    f'{rendering_type=!s} timed out after {timeout.total_seconds()} seconds'
                 ),
             )
             return SubCrawlerRun(result=result)

@@ -49,7 +49,7 @@ from crawlee._utils.http import parse_retry_after_header
 from crawlee._utils.log import LoggerOnce, request_log_extra
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.robots import RobotsTxtFile
-from crawlee._utils.time import context_without_active_timeouts, extend_active_timeouts
+from crawlee._utils.time import context_without_active_timeouts, extend_active_timeouts, format_duration
 from crawlee._utils.urls import UNSUPPORTED_SCHEME_MESSAGE, convert_to_absolute_url, filter_url, is_url_absolute
 from crawlee._utils.wait import wait_for, wait_for_extendable
 from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
@@ -288,6 +288,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     _SAFE_MIGRATION_WAIT = timedelta(seconds=20)
     """How long a migration or an abort waits for the requests in progress."""
+
+    _MAX_EXPECTED_PROCESSING_TIME = timedelta(days=1)
+    """The longest time the crawler asks the request manager to keep a fetched request locked."""
 
     def __init__(
         self,
@@ -715,10 +718,32 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         return self._request_manager
 
     def _get_expected_processing_time(self) -> timedelta:
-        """Get how long the request manager should keep a fetched request locked.
+        """Get how long the request manager should keep a fetched request locked."""
+        try:
+            processing_time = self._get_max_processing_time() + timedelta(seconds=5)
+        except OverflowError:
+            # A timeout such as `timedelta.max`, given to mean no timeout at all.
+            processing_time = timedelta.max
+
+        if processing_time > self._MAX_EXPECTED_PROCESSING_TIME:
+            self._logger_once.log(
+                'Processing a request may take longer than %s, the longest time the crawler asks to keep a fetched '
+                'request locked. With a storage backend that several clients share, another client can then fetch the '
+                'request and process it too.',
+                format_duration(self._MAX_EXPECTED_PROCESSING_TIME),
+                key='expected_processing_time_capped',
+                level=logging.WARNING,
+            )
+            return self._MAX_EXPECTED_PROCESSING_TIME
+
+        return max(processing_time, timedelta(minutes=1))
+
+    def _get_max_processing_time(self) -> timedelta:
+        """Get the longest time the crawler may spend on a request, not counting `context.extend_timeout()` calls.
 
         A route may hold a request longer than the crawler's own timeout, and which routes a run hits isn't known up
-        front, so the longest timeout of any route counts.
+        front, so the longest timeout of any route counts. Subclasses add the phases they run outside the request
+        handler timeout.
         """
         handler_timeout = self._request_handler_timeout
         # Not `self.router`, which would create an empty router, and the `router` setter would then refuse the user's.
@@ -726,7 +751,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if max_route_timeout is not None:
             handler_timeout = max(handler_timeout, max_route_timeout)
 
-        return max(handler_timeout + timedelta(seconds=5), timedelta(minutes=1))
+        return handler_timeout
 
     async def get_dataset(
         self,
@@ -1393,8 +1418,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             await wait_for_extendable(
                 partial(self._handle_request_retries, context, error),
                 timeout=self._internal_timeout,
-                timeout_message='Handling request failure timed out after '
-                f'{self._internal_timeout.total_seconds()} seconds',
+                timeout_message=lambda timeout: (
+                    f'Handling request failure timed out after {timeout.total_seconds()} seconds'
+                ),
             )
         except UserDefinedErrorHandlerError:
             context.request.state = RequestState.ERROR
@@ -1500,7 +1526,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         loop = asyncio.get_running_loop()
 
         async def extend_timeout(delta: timedelta) -> None:
-            # A thread started without the context of the request would find no timeout to extend, so check it here.
+            if delta <= timedelta(0):
+                raise ValueError(f'The timeout extension must be positive, got {delta.total_seconds()} seconds.')
+
+            # The timeouts can only be extended on their own event loop. A thread started without the context of the
+            # request would also find no timeout to extend.
             if asyncio.get_running_loop() is not loop:
                 raise RuntimeError('The timeout can only be extended from the event loop the crawler runs on.')
 
@@ -1875,7 +1905,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         await wait_for_extendable(
             lambda: self.router(context),
             timeout=request_handler_timeout,
-            timeout_message=f'{self._request_handler_timeout_text} {request_handler_timeout.total_seconds()} seconds',
+            timeout_message=lambda timeout: f'{self._request_handler_timeout_text} {timeout.total_seconds()} seconds',
         )
 
     def _resolve_request_handler_timeout(self, label: str | None) -> timedelta:

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Generic, NotRequired
 
 from more_itertools import partition
 from pydantic import ValidationError
-from typing_extensions import TypeVar
+from typing_extensions import TypeVar, override
 
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._utils.docs import docs_group
@@ -146,6 +146,11 @@ class AbstractHttpCrawler(
             yield context
         finally:
             self._shared_navigation_timeouts.pop(request_id, None)
+
+    @override
+    def _get_max_processing_time(self) -> timedelta:
+        # The navigation phase runs before the request handler, under its own timeout.
+        return self._navigation_timeout + super()._get_max_processing_time()
 
     async def _execute_pre_navigation_hooks(
         self, context: BasicCrawlingContext

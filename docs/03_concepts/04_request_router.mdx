@@ -61,9 +61,9 @@ More complex crawling projects often require different processing logic for vari
 
 ### Handler timeouts
 
-The `request_handler_timeout` option of the crawler applies to every request handler. When one type of page needs more or less time than the others, pass `request_handler_timeout` to <ApiLink to="class/Router#handler">`router.handler()`</ApiLink> or <ApiLink to="class/Router#default_handler">`router.default_handler()`</ApiLink>. Handlers that don't set it keep the crawler's timeout.
+The `request_handler_timeout` option of the crawler applies to every request handler. When one type of page needs more or less time than the others, pass `request_handler_timeout` to <ApiLink to="class/Router#handler">`router.handler()`</ApiLink> or <ApiLink to="class/Router#default_handler">`router.default_handler()`</ApiLink>. Handlers that don't set it keep the crawler's timeout. The timeout follows the label the request has before the [middlewares](#middleware) run. If a middleware changes the label, the new handler runs with the timeout of the old one.
 
-When the time a request needs only becomes clear while the handler runs, await <ApiLink to="class/BasicCrawlingContext#extend_timeout">`context.extend_timeout()`</ApiLink> to give the handler more time. It also keeps the request locked in the request queue for longer. Called from a pre-navigation or post-navigation hook, it extends the navigation timeout instead. Awaited on another event loop, such as one started in a separate thread, it raises an error. Callbacks that run outside the request processing, such as Playwright event handlers, can't extend the timeout.
+When the time a request needs only becomes clear while the handler runs, await <ApiLink to="class/BasicCrawlingContext#extend_timeout">`context.extend_timeout()`</ApiLink> to give the handler more time. It also keeps the request locked in the request queue for longer. Called from a pre-navigation or post-navigation hook, it extends the navigation timeout instead. It raises an error when the delta isn't positive or when it's awaited on another event loop, such as one started in a separate thread. Callbacks that run outside the request processing, such as Playwright event handlers, can't extend the timeout.
 
 <RunnableCodeBlock className="language-python" language="python">
     {HandlerTimeouts}

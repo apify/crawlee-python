@@ -472,6 +472,7 @@ class ExtendTimeoutFunction(Protocol):
             delta: How much more time to give.
 
         Raises:
+            ValueError: If `delta` isn't positive.
             RuntimeError: If awaited on another event loop, such as one started in a separate thread.
         """
 

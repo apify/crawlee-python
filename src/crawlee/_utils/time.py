@@ -52,10 +52,16 @@ class SharedTimeout:
     """
 
     def __init__(self, timeout: timedelta) -> None:
+        self._total_timeout = timeout
         self._remaining_timeout = timeout
         self._active_timeout: asyncio.Timeout | None = None
         self._activation_timestamp: float | None = None
         self._extenders_token: Token[tuple[_TimeoutExtender, ...]] | None = None
+
+    @property
+    def total_timeout(self) -> timedelta:
+        """The whole time budget, including extensions."""
+        return self._total_timeout
 
     async def __aenter__(self) -> timedelta:
         if self._active_timeout is not None or self._activation_timestamp is not None:
@@ -66,7 +72,7 @@ class SharedTimeout:
         await new_timeout.__aenter__()
 
         # Entering and exiting must run in the same context. Otherwise, resetting the token fails.
-        extender = partial(self._extend, new_timeout, asyncio.get_running_loop())
+        extender = partial(self._extend, new_timeout)
         self._extenders_token = _active_timeout_extenders.set((*_active_timeout_extenders.get(), extender))
         return self._remaining_timeout
 
@@ -91,36 +97,36 @@ class SharedTimeout:
             self._extenders_token = None
             _active_timeout_extenders.reset(extenders_token)
 
-    def _extend(self, entered_timeout: asyncio.Timeout, loop: asyncio.AbstractEventLoop, delta: timedelta) -> bool:
+    def _extend(self, entered_timeout: asyncio.Timeout, delta: timedelta) -> bool:
         """Extend the budget by `delta` and return whether the enclosing timeouts should be extended as well."""
-        try:
-            running_loop = asyncio.get_running_loop()
-        except RuntimeError:
-            running_loop = None
-
-        if running_loop is not loop:
-            raise RuntimeError('A timeout can only be extended from the event loop it runs on, not from other threads.')
-
-        # The timeout has been exited since, so only its later uses get the extra time.
-        if entered_timeout is not self._active_timeout:
-            self._remaining_timeout += delta
+        # A timeout that has been exited since only gives its later uses the extra time.
+        is_running = entered_timeout is self._active_timeout
+        if is_running and entered_timeout.expired():
             return False
 
-        if entered_timeout.expired():
-            return False
+        if is_running:
+            deadline = entered_timeout.when()
+            if deadline is not None:
+                entered_timeout.reschedule(deadline + delta.total_seconds())
 
-        deadline = entered_timeout.when()
-        if deadline is not None:
-            entered_timeout.reschedule(deadline + delta.total_seconds())
+        self._total_timeout = _add_saturating(self._total_timeout, delta)
+        self._remaining_timeout = _add_saturating(self._remaining_timeout, delta)
+        return is_running
 
-        self._remaining_timeout += delta
-        return True
+
+def _add_saturating(duration: timedelta, delta: timedelta) -> timedelta:
+    """Add `delta` to `duration`, staying at `timedelta.max` when the sum doesn't fit."""
+    try:
+        return duration + delta
+    except OverflowError:
+        return timedelta.max
 
 
 def extend_active_timeouts(delta: timedelta) -> None:
     """Extend the `SharedTimeout`s entered in the current context by `delta`, from the innermost outwards.
 
-    Stops at a timeout that is no longer running, so the ones that still bound the caller stay as they are.
+    Stops at a timeout that is no longer running, so the ones that still bound the caller stay as they are. Must be
+    called on the event loop the timeouts run on.
     """
     for extend in reversed(_active_timeout_extenders.get()):
         if not extend(delta):

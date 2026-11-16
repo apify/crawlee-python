@@ -52,14 +52,18 @@ async def wait_for_extendable(
     operation: Callable[[], Awaitable[T]],
     *,
     timeout: timedelta,
-    timeout_message: str,
+    timeout_message: Callable[[timedelta], str],
 ) -> T:
-    """Wait for an async operation like `wait_for`, but under a timeout that `extend_active_timeouts` can extend."""
+    """Wait for an async operation like `wait_for`, but under a timeout that `extend_active_timeouts` can extend.
+
+    The `timeout_message` function gets the whole timeout, including extensions.
+    """
+    shared_timeout = SharedTimeout(timeout)
     try:
-        async with SharedTimeout(timeout):
+        async with shared_timeout:
             return await operation()
     except TimeoutError as ex:
-        raise TimeoutError(timeout_message) from ex
+        raise TimeoutError(timeout_message(shared_timeout.total_timeout)) from ex
 
 
 async def wait_for_all_tasks_to_finish(

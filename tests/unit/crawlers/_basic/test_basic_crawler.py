@@ -2594,6 +2594,25 @@ async def test_extend_timeout_from_handler() -> None:
     assert stats.requests_finished == 1
 
 
+async def test_message_counts_extension() -> None:
+    """Test that the timeout message of an extended request handler states the extended timeout."""
+    crawler = BasicCrawler(request_handler_timeout=timedelta(seconds=0.2), max_request_retries=0)
+    failed_request_handler = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        await context.extend_timeout(timedelta(seconds=0.2))
+        await asyncio.sleep(1)
+
+    @crawler.failed_request_handler
+    async def failed_handler(_context: BasicCrawlingContext, error: Exception) -> None:
+        failed_request_handler(str(error))
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    failed_request_handler.assert_called_once_with('Request handler timed out after 0.4 seconds')
+
+
 async def test_extend_timeout_from_middleware() -> None:
     """Test that `extend_timeout` from a router middleware extends the timeout of the request handler."""
     crawler = BasicCrawler(request_handler_timeout=timedelta(seconds=0.5), max_request_retries=0)
@@ -2667,8 +2686,15 @@ async def test_extend_timeout_extends_lock() -> None:
     assert extend_call.args[0].url == 'https://a.placeholder.com'
 
 
-async def test_extend_timeout_off_loop_raises() -> None:
-    """Test that awaiting `extend_timeout` on another event loop raises, even in a thread without the context."""
+@pytest.mark.parametrize(
+    'copy_context',
+    [
+        pytest.param(True, id='thread-with-context'),
+        pytest.param(False, id='thread-without-context'),
+    ],
+)
+async def test_extend_timeout_off_loop_raises(*, copy_context: bool) -> None:
+    """Test that awaiting `extend_timeout` on another event loop raises, with or without the context of the request."""
     crawler = BasicCrawler(max_request_retries=0)
     extend_error = Mock()
 
@@ -2680,12 +2706,42 @@ async def test_extend_timeout_off_loop_raises() -> None:
             except RuntimeError as error:
                 extend_error(error)
 
-        # Unlike `asyncio.to_thread`, `run_in_executor` doesn't copy the context to the thread.
-        await asyncio.get_running_loop().run_in_executor(None, extend_in_thread)
+        if copy_context:
+            await asyncio.to_thread(extend_in_thread)
+        else:
+            # Unlike `asyncio.to_thread`, `run_in_executor` doesn't copy the context to the thread.
+            await asyncio.get_running_loop().run_in_executor(None, extend_in_thread)
 
     await crawler.run(['https://a.placeholder.com'])
 
     extend_error.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    'delta',
+    [
+        pytest.param(timedelta(0), id='zero'),
+        pytest.param(timedelta(seconds=-1), id='negative'),
+    ],
+)
+async def test_extend_rejects_non_positive(delta: timedelta) -> None:
+    """Test that `extend_timeout` raises for a delta that isn't positive and leaves the request lock as it is."""
+    queue = await RequestQueue.open()
+    crawler = BasicCrawler(request_manager=queue, max_request_retries=0)
+    extend_error = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        try:
+            await context.extend_timeout(delta)
+        except ValueError as error:
+            extend_error(error)
+
+    with patch.object(queue, 'extend_request_processing_time', AsyncMock()) as extend_lock:
+        await crawler.run(['https://a.placeholder.com'])
+
+    extend_error.assert_called_once()
+    extend_lock.assert_not_awaited()
 
 
 async def test_lock_extension_failure_ignored() -> None:
@@ -2731,6 +2787,38 @@ async def test_expected_processing_time(
         await crawler.run(['https://a.placeholder.com'])
 
     set_mock.assert_awaited_once_with(expected_processing_time)
+
+
+@pytest.mark.parametrize(
+    'route_timeout',
+    [
+        pytest.param(timedelta(days=2), id='over-a-day'),
+        pytest.param(timedelta.max, id='timedelta-max'),
+    ],
+)
+async def test_lock_time_capped_at_a_day(route_timeout: timedelta, caplog: pytest.LogCaptureFixture) -> None:
+    """Test that the expected processing time is capped at a day, with one warning per crawler, for a longer route."""
+    queue = await RequestQueue.open()
+    crawler = BasicCrawler(request_manager=queue)
+
+    @crawler.router.handler('SLOW', request_handler_timeout=route_timeout)
+    async def slow_handler(_context: BasicCrawlingContext) -> None:
+        pass
+
+    @crawler.router.default_handler
+    async def default_handler(_context: BasicCrawlingContext) -> None:
+        pass
+
+    with (
+        patch.object(queue, 'set_expected_request_processing_time', AsyncMock()) as set_mock,
+        caplog.at_level(logging.WARNING),
+    ):
+        await crawler.run(['https://a.placeholder.com'])
+        await crawler.run(['https://b.placeholder.com'])
+
+    assert set_mock.await_args_list == [call(timedelta(days=1)), call(timedelta(days=1))]
+    cap_warnings = [record for record in caplog.records if 'the longest time the crawler asks' in record.message]
+    assert len(cap_warnings) == 1
 
 
 async def test_router_set_after_empty_run() -> None:

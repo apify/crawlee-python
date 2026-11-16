@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import logging
 import sys
+from datetime import timedelta
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 
 from crawlee.autoscaling import ConcurrencySystem
 from crawlee.crawlers import AdaptivePlaywrightCrawler
+
+if TYPE_CHECKING:
+    from crawlee.crawlers import AdaptivePlaywrightCrawlingContext
 
 
 async def test_accepts_concurrency_system() -> None:
@@ -66,3 +71,14 @@ def test_default_statistics_log_to_default_crawler_logger() -> None:
     crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser()
 
     assert crawler.statistics._periodic_message_logger is crawler.log
+
+
+def test_lock_time_counts_both_runs() -> None:
+    """Test that the expected processing time counts the request handler timeout once for each sub crawler."""
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser()
+
+    @crawler.router.handler('SLOW', request_handler_timeout=timedelta(minutes=3))
+    async def slow_handler(_context: AdaptivePlaywrightCrawlingContext) -> None:
+        pass
+
+    assert crawler._get_expected_processing_time() == timedelta(minutes=6, seconds=5)

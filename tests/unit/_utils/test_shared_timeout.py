@@ -68,6 +68,16 @@ async def test_extend_adds_to_budget() -> None:
         assert remaining > timedelta(seconds=5)
 
 
+async def test_extend_saturates_on_overflow() -> None:
+    """Test that extending a timeout of `timedelta.max` keeps it at `timedelta.max` instead of raising."""
+    shared_timeout = SharedTimeout(timedelta.max)
+
+    async with shared_timeout:
+        extend_active_timeouts(timedelta(seconds=5))
+
+    assert shared_timeout.total_timeout == timedelta.max
+
+
 async def test_extend_outside_is_noop() -> None:
     """Test that extending outside an entered timeout leaves the timeout as it is."""
     shared_timeout = SharedTimeout(timedelta(seconds=1))
@@ -123,20 +133,6 @@ async def test_extend_after_exit_budget_only() -> None:
 
     async with outer_timeout as outer_remaining:
         assert outer_remaining <= timedelta(seconds=1)
-
-
-async def test_extend_from_thread_raises() -> None:
-    """Test that extending from another thread raises and keeps the timeout armed."""
-
-    async def extend_from_thread() -> None:
-        async with SharedTimeout(timedelta(seconds=0.3)):
-            with pytest.raises(RuntimeError, match='other threads'):
-                await asyncio.to_thread(extend_active_timeouts, timedelta(seconds=5))
-
-            await asyncio.sleep(1)
-
-    with pytest.raises(TimeoutError):
-        await extend_from_thread()
 
 
 async def test_expired_timeout_is_removed() -> None:

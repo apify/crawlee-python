@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from datetime import timedelta
-from typing import Generic, TypeVar, overload
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Generic, TypeVar, overload
 
 from crawlee._request import RequestState
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
+
+if TYPE_CHECKING:
+    from datetime import timedelta
 
 __all__ = ['Router']
 
@@ -14,6 +17,12 @@ from crawlee.errors import UserHandlerTimeoutError
 
 TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext)
 RequestHandler = Callable[[TCrawlingContext], Awaitable[None]]
+
+
+@dataclass(frozen=True)
+class _Route(Generic[TCrawlingContext]):
+    handler: RequestHandler[TCrawlingContext]
+    request_handler_timeout: timedelta | None
 
 
 @docs_group('Other')
@@ -64,10 +73,8 @@ class Router(Generic[TCrawlingContext]):
     """
 
     def __init__(self) -> None:
-        self._default_handler: RequestHandler[TCrawlingContext] | None = None
-        self._default_handler_timeout: timedelta | None = None
-        self._handlers_by_label = dict[str, RequestHandler[TCrawlingContext]]()
-        self._handler_timeouts_by_label = dict[str, timedelta]()
+        self._default_route: _Route[TCrawlingContext] | None = None
+        self._routes_by_label = dict[str, _Route[TCrawlingContext]]()
         self._middlewares = list[RequestHandler[TCrawlingContext]]()
 
     @overload
@@ -98,12 +105,12 @@ class Router(Generic[TCrawlingContext]):
             handler: The request handler to register.
             request_handler_timeout: Overrides the `request_handler_timeout` of the crawler for this handler.
         """
-        if self._default_handler is not None:
-            raise RuntimeError('A default handler is already configured')
 
         def wrapper(handler: RequestHandler[TCrawlingContext]) -> RequestHandler[TCrawlingContext]:
-            self._default_handler = handler
-            self._default_handler_timeout = request_handler_timeout
+            if self._default_route is not None:
+                raise RuntimeError('A default handler is already configured')
+
+            self._default_route = _Route(handler, request_handler_timeout)
             return handler
 
         if handler is None:
@@ -126,13 +133,12 @@ class Router(Generic[TCrawlingContext]):
             label: The label of the requests to handle.
             request_handler_timeout: Overrides the `request_handler_timeout` of the crawler for this handler.
         """
-        if label in self._handlers_by_label:
-            raise RuntimeError(f'A handler for label `{label}` is already registered')
 
         def wrapper(handler: Callable[[TCrawlingContext], Awaitable]) -> Callable[[TCrawlingContext], Awaitable]:
-            self._handlers_by_label[label] = handler
-            if request_handler_timeout is not None:
-                self._handler_timeouts_by_label[label] = request_handler_timeout
+            if label in self._routes_by_label:
+                raise RuntimeError(f'A handler for label `{label}` is already registered')
+
+            self._routes_by_label[label] = _Route(handler, request_handler_timeout)
             return handler
 
         return wrapper
@@ -142,17 +148,16 @@ class Router(Generic[TCrawlingContext]):
 
         Returns `None` when the handler doesn't override the timeout of the crawler.
         """
-        if label is not None and label in self._handlers_by_label:
-            return self._handler_timeouts_by_label.get(label)
-
-        return self._default_handler_timeout
+        route = self._get_route(label)
+        return None if route is None else route.request_handler_timeout
 
     def get_max_request_handler_timeout(self) -> timedelta | None:
         """Get the longest `request_handler_timeout` of all handlers, or `None` when no handler overrides it."""
-        timeouts = list(self._handler_timeouts_by_label.values())
-        if self._default_handler_timeout is not None:
-            timeouts.append(self._default_handler_timeout)
+        routes = list(self._routes_by_label.values())
+        if self._default_route is not None:
+            routes.append(self._default_route)
 
+        timeouts = [route.request_handler_timeout for route in routes if route.request_handler_timeout is not None]
         return max(timeouts, default=None)
 
     def use(self, middleware: RequestHandler[TCrawlingContext]) -> RequestHandler[TCrawlingContext]:
@@ -169,18 +174,21 @@ class Router(Generic[TCrawlingContext]):
             await middleware(context)
 
         context.request.state = RequestState.REQUEST_HANDLER
-        if context.request.label is None or context.request.label not in self._handlers_by_label:
-            if self._default_handler is None:
-                raise RuntimeError(
-                    f'No handler matches label `{context.request.label}` and no default handler is configured'
-                )
-
-            user_defined_handler = self._default_handler
-        else:
-            user_defined_handler = self._handlers_by_label[context.request.label]
+        route = self._get_route(context.request.label)
+        if route is None:
+            raise RuntimeError(
+                f'No handler matches label `{context.request.label}` and no default handler is configured'
+            )
 
         try:
-            return await user_defined_handler(context)
+            return await route.handler(context)
         except TimeoutError as e:
             # Timeout in handler, but not timeout of handler.
             raise UserHandlerTimeoutError('Timeout raised by user defined handler') from e
+
+    def _get_route(self, label: str | None) -> _Route[TCrawlingContext] | None:
+        """Get the route for requests with the given label, falling back to the default one."""
+        if label is not None and label in self._routes_by_label:
+            return self._routes_by_label[label]
+
+        return self._default_route

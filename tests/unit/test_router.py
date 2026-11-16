@@ -249,6 +249,32 @@ async def test_default_handler_with_timeout() -> None:
 
 
 @pytest.mark.parametrize(
+    'label',
+    [
+        pytest.param(None, id='default-handler'),
+        pytest.param('LABEL', id='label-handler'),
+    ],
+)
+async def test_reused_decorator_raises(label: str | None) -> None:
+    """Test that applying a registering decorator a second time raises and keeps the first handler."""
+    router = Router[MockContext]()
+    if label is None:
+        decorator = router.default_handler(request_handler_timeout=timedelta(seconds=30))
+    else:
+        decorator = router.handler(label, request_handler_timeout=timedelta(seconds=30))
+
+    first_handler = AsyncMock()
+    decorator(first_handler)
+
+    with pytest.raises(RuntimeError, match='already'):
+        decorator(AsyncMock())
+
+    await router(MockContext(label=label))
+
+    first_handler.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
     ('label', 'expected_timeout'),
     [
         pytest.param('SLOW', timedelta(seconds=10), id='handler-with-timeout'),
