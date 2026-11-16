@@ -43,13 +43,15 @@ def to_absolute_url_iterator(base_url: str, urls: Iterator[str], logger: Logger 
     """Convert an iterator of relative URLs to absolute URLs using a base URL."""
     for url in urls:
         try:
-            if is_url_absolute(url):
-                yield url
-                continue
-            converted_url = convert_to_absolute_url(base_url, url)
-        except ValueError:
-            # The URL cannot be parsed at all, for example because its port is out of range.
-            converted_url = ''
+            converted_url = url if is_url_absolute(url) else convert_to_absolute_url(base_url, url)
+            # Reading the host decodes an IDNA host such as `xn--a.com`, which raises for an invalid one, so the URL
+            # would fail later when it is filtered or enqueued.
+            _ = URL(converted_url).host
+        except ValueError as error:
+            # The URL cannot be parsed, for example because its port is out of range or its host is invalid.
+            if logger:
+                logger.debug(f'Could not parse URL "{url}": {error}. Skipping it.')
+            continue
 
         # Skip the URL if conversion fails, probably due to an incorrect format, such as 'mailto:'.
         if not is_url_absolute(converted_url):
