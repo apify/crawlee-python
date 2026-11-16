@@ -12,10 +12,7 @@ async def main() -> None:
             'http://proxy-2.com/',
         ]
     )
-    crawler = PlaywrightCrawler(
-        proxy_configuration=proxy_configuration,
-        save_response_cookies=True,
-    )
+    crawler = PlaywrightCrawler(proxy_configuration=proxy_configuration)
 
     # ...
 

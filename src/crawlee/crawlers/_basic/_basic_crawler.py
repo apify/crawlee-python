@@ -1614,17 +1614,22 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         self._logger.debug('Processing request', extra=request_log_extra(request))
 
-        bound_session_missing = False
+        # TODO: Revisit the session binding with the error handling sync and the session reuse strategies.
+        # https://github.com/apify/crawlee-python/issues/1739
+        # https://github.com/apify/crawlee-python/issues/2135
+        bound_session_unusable = False
         if request.session_id:
             session = await self._get_session_by_id(request.session_id)
             if session is None:
-                bound_session_missing = True
-                # The bound session isn't available, so `_check_request_collision` fails the request. A retired
-                # stand-in with the bound id gives the failed request handler a session.
-                session = Session(id=request.session_id, retired=True)
+                bound_session_unusable = True
+                # The failed request handler gets the pool's unusable session, or a retired stand-in once it's dropped.
+                session = self._session_pool._state.current_value.sessions.get(request.session_id)  # noqa: SLF001
+                if session is None:
+                    session = Session(id=request.session_id, retired=True)
         else:
             session = await self._get_session()
-        proxy_info = await self._get_proxy_info(request, session)
+        # A request bound to an unusable session fails before it's sent, so it gets no proxy.
+        proxy_info = None if bound_session_unusable else await self._get_proxy_info(request, session)
         result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
 
         deferred_cleanup: list[Callable[[], Awaitable[None]]] = []
@@ -1649,7 +1654,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request.state = RequestState.REQUEST_HANDLER
 
             try:
-                self._check_request_collision(request, bound_session_missing=bound_session_missing)
+                if bound_session_unusable:
+                    raise RequestCollisionError(
+                        f'The Session (id: {request.session_id}) bound to the Request is no longer available in '
+                        'SessionPool'
+                    )
                 await self._run_request_handler(context=context)
             except TimeoutError as e:
                 raise RequestHandlerError(e, context) from e
@@ -1904,21 +1913,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             ignore_http_error_status_codes=self._ignore_http_error_status_codes,
         ):
             raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
-
-    def _check_request_collision(self, request: Request, *, bound_session_missing: bool) -> None:
-        """Raise an exception if a request cannot access required resources.
-
-        Args:
-            request: The `Request` that might require specific resources (like a session).
-            bound_session_missing: Whether the `Session` bound to the `Request` isn't available in the session pool.
-
-        Raises:
-            RequestCollisionError: If the `Session` referenced by the `Request` is not available.
-        """
-        if bound_session_missing:
-            raise RequestCollisionError(
-                f'The Session (id: {request.session_id}) bound to the Request is no longer available in SessionPool'
-            )
 
     async def _is_allowed_based_on_robots_txt_file(self, url: str) -> bool:
         """Check if the URL is allowed based on the robots.txt file.

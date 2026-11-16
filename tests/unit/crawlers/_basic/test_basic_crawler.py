@@ -45,6 +45,7 @@ from crawlee.events import (
     LocalEventManager,
 )
 from crawlee.http_clients import HttpClient, HttpResponse
+from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.request_loaders import (
     FinishedStatus,
     MinIntervalSignal,
@@ -2732,9 +2733,13 @@ async def test_handle_error_bound_session_to_request() -> None:
 
 
 async def test_missing_bound_session_gives_retired_stand_in() -> None:
-    """Test that a request bound to a missing session reaches the failed request handler with a retired session."""
+    """Test that the failed request handler gets a retired session and no proxy for a missing bound session."""
     failed_request_handler = AsyncMock()
-    crawler = BasicCrawler(request_handler=AsyncMock())
+    new_url_function = Mock(side_effect=RuntimeError('Unknown session'))
+    crawler = BasicCrawler(
+        request_handler=AsyncMock(),
+        proxy_configuration=ProxyConfiguration(new_url_function=new_url_function),
+    )
     crawler.failed_request_handler(failed_request_handler)
 
     await crawler.run([Request.from_url('https://a.placeholder.com', session_id='missing')])
@@ -2744,6 +2749,26 @@ async def test_missing_bound_session_gives_retired_stand_in() -> None:
     assert isinstance(error, RequestCollisionError)
     assert context.session.id == 'missing'
     assert context.session.retired
+    assert context.proxy_info is None
+    new_url_function.assert_not_called()
+
+
+async def test_unusable_bound_session_reaches_failed_request_handler() -> None:
+    """Test that a request bound to an unusable session in the pool reaches the failed request handler with it."""
+    failed_request_handler = AsyncMock()
+
+    async with SessionPool() as session_pool:
+        session = await session_pool.get_session()
+        session.retire()
+        crawler = BasicCrawler(session_pool=session_pool, request_handler=AsyncMock())
+        crawler.failed_request_handler(failed_request_handler)
+
+        await crawler.run([Request.from_url('https://a.placeholder.com', session_id=session.id)])
+
+    failed_request_handler.assert_awaited_once()
+    context, error = failed_request_handler.call_args.args
+    assert isinstance(error, RequestCollisionError)
+    assert context.session is session
 
 
 async def test_handles_session_error_in_failed_request_handler() -> None:
