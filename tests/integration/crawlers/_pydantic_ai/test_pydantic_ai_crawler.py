@@ -71,7 +71,8 @@ async def test_context_extractor_forwards_arguments(server_url: URL, http_client
         await context.extract(_Article, scope='article', additional_instructions='hint')
 
     with patch.object(extractor, 'extract', extract_mock):
-        await crawler.run([Request.from_url(str(server_url), label='detail')])
+        async with extractor:
+            await crawler.run([Request.from_url(str(server_url), label='detail')])
 
     first_call, second_call, third_call = extract_mock.call_args_list
 

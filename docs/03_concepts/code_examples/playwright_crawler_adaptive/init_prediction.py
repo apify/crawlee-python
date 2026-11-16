@@ -59,13 +59,18 @@ def result_comparator(
 
 
 async def main() -> None:
+    predictor = CustomRenderingTypePredictor()
+
     crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(
-        rendering_type_predictor=CustomRenderingTypePredictor(),
+        rendering_type_predictor=predictor,
         result_checker=result_checker,
         result_comparator=result_comparator,
     )
 
     # ...
+
+    async with predictor:
+        await crawler.run(['https://crawlee.dev/'])
 
 
 if __name__ == '__main__':

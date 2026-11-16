@@ -3,9 +3,40 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable
 from functools import wraps
-from typing import Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 T = TypeVar('T', bound=Callable[..., Any])
+
+
+class Collaborator(Protocol):
+    """An async context manager that reports through `active` whether it's entered."""
+
+    @property
+    def active(self) -> bool:
+        """Whether the object is entered and not exited yet."""
+
+    async def __aenter__(self) -> Any:
+        """Prepare the object for use.
+
+        Raises:
+            RuntimeError: If the object is already active.
+        """
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+        /,
+    ) -> Any:
+        """Release what the object holds.
+
+        Raises:
+            RuntimeError: If the object is not active.
+        """
 
 
 def ensure_context(method: T) -> T:

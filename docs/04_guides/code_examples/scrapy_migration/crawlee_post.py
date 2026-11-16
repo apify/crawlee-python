@@ -8,10 +8,6 @@ async def main() -> None:
 
     @crawler.router.default_handler
     async def login_page(context: ParselCrawlingContext) -> None:
-        # The CSRF token is tied to the session cookie issued for this GET.
-        if not context.session:
-            raise RuntimeError('Session not found')
-
         # highlight-start
         # Like Scrapy's `FormRequest.from_response`, the helper keeps the hidden
         # `csrf_token` field, encodes the data and sets the `Content-Type` header.

@@ -25,12 +25,13 @@ async def main() -> None:
         'gpt-5.4-nano',
         provider=OpenAIProvider(api_key='your-openai-api-key'),
     )
+    extractor = PydanticAiSelectorExtractor(
+        model=model,
+        # Pages the cached selectors cannot handle fall back to direct extraction.
+        fallback=PydanticAiDirectExtractor(model=model),
+    )
     crawler = PydanticAiCrawler(
-        extractor=PydanticAiSelectorExtractor(
-            model=model,
-            # Pages the cached selectors cannot handle fall back to direct extraction.
-            fallback=PydanticAiDirectExtractor(model=model),
-        ),
+        extractor=extractor,
         max_requests_per_crawl=10,
     )
 
@@ -49,7 +50,8 @@ async def main() -> None:
 
         await context.push_data(article.model_dump())
 
-    await crawler.run(['https://crawlee.dev/blog'])
+    async with extractor:
+        await crawler.run(['https://crawlee.dev/blog'])
 
 
 if __name__ == '__main__':

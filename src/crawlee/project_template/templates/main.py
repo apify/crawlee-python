@@ -3,6 +3,7 @@ from apify import Actor
 # % endif
 # % block import required
 # % endblock
+# % block http_client_import
 # % if cookiecutter.http_client == 'curl-impersonate'
 from crawlee.http_clients import CurlImpersonateHttpClient
 # % elif cookiecutter.http_client == 'httpx'
@@ -10,17 +11,23 @@ from crawlee.http_clients import HttpxHttpClient
 # % elif cookiecutter.http_client == 'impit'
 from crawlee.http_clients import ImpitHttpClient
 # % endif
+# % endblock
 
 from .routes import router
 
 # % filter truncate(0, end='')
 # % block http_client_instantiation
+http_client=http_client,
+# % endblock
+# % endfilter
+# % filter truncate(0, end='')
+# % block context_manager
 # % if cookiecutter.http_client == 'curl-impersonate'
-http_client=CurlImpersonateHttpClient(),
+CurlImpersonateHttpClient() as http_client
 # % elif cookiecutter.http_client == 'httpx'
-http_client=HttpxHttpClient(),
+HttpxHttpClient() as http_client
 # % elif cookiecutter.http_client == 'impit'
-http_client=ImpitHttpClient(),
+ImpitHttpClient() as http_client
 # % endif
 # % endblock
 # % endfilter
@@ -37,14 +44,12 @@ async def main() -> None:
     # % endfilter
 
     # % if cookiecutter.enable_apify_integration
-    async with Actor:
-    # % set indent_width = 8
+    async with Actor, {{ self.context_manager() | trim }}:
     # % else
-    # % set indent_width = 4
+    async with {{ self.context_manager() | trim }}:
     # % endif
-# % filter indent(width=indent_width, first=True)
+# % filter indent(width=8, first=True)
 {{self.instantiation()}}
-
 await crawler.run(
     [
         '{{ cookiecutter.start_url }}',

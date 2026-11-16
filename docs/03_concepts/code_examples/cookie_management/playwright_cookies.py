@@ -6,16 +6,15 @@ from crawlee.sessions import SessionPool
 
 
 async def main() -> None:
+    # A single session, so both requests run on the same one.
+    session_pool = SessionPool(max_pool_size=1)
+
     crawler = PlaywrightCrawler(
-        # A single session, so both requests run on the same one.
-        session_pool=SessionPool(max_pool_size=1),
+        session_pool=session_pool,
     )
 
     @crawler.router.default_handler
     async def handler(context: PlaywrightCrawlingContext) -> None:
-        if context.session is None:
-            return
-
         # The browser receives the `visited` cookie during the first navigation.
         # It's synced back onto the session after the handler returns, so on the
         # second request it's already on `context.session`.
@@ -33,7 +32,8 @@ async def main() -> None:
                 ]
             )
 
-    await crawler.run(['https://httpbingo.org/cookies/set?visited=1'])
+    async with session_pool:
+        await crawler.run(['https://httpbingo.org/cookies/set?visited=1'])
 
 
 if __name__ == '__main__':

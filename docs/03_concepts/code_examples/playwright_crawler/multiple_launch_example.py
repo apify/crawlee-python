@@ -13,8 +13,10 @@ async def main() -> None:
         browser_type='firefox', max_open_pages_per_browser=1
     )
 
+    browser_pool = BrowserPool(plugins=[plugin_chromium, plugin_firefox])
+
     crawler = PlaywrightCrawler(
-        browser_pool=BrowserPool(plugins=[plugin_chromium, plugin_firefox]),
+        browser_pool=browser_pool,
         # Limit the crawl to max requests. Remove or increase it for crawling all links.
         max_requests_per_crawl=10,
     )
@@ -31,7 +33,8 @@ async def main() -> None:
         await context.enqueue_links()
 
     # Run the crawler with the initial list of URLs.
-    await crawler.run(['https://crawlee.dev', 'https://apify.com/'])
+    async with browser_pool:
+        await crawler.run(['https://crawlee.dev', 'https://apify.com/'])
 
 
 if __name__ == '__main__':

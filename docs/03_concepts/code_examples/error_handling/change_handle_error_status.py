@@ -12,10 +12,12 @@ UNAUTHORIZED_CODE = 401
 
 
 async def main() -> None:
+    # Only treat 403 as a blocking status code, not 401
+    session_pool = SessionPool(create_session_settings={'blocked_status_codes': [403]})
+
     crawler = HttpCrawler(
         max_request_retries=2,
-        # Only treat 403 as a blocking status code, not 401
-        session_pool=SessionPool(create_session_settings={'blocked_status_codes': [403]}),
+        session_pool=session_pool,
         # Don't treat 401 responses as errors
         ignore_http_error_status_codes=[UNAUTHORIZED_CODE],
     )
@@ -38,7 +40,8 @@ async def main() -> None:
             # Trigger a retry with our updated headers
             raise HttpStatusCodeError('Unauthorized', status_code=UNAUTHORIZED_CODE)
 
-    await crawler.run(['http://httpbingo.org/status/401'])
+    async with session_pool:
+        await crawler.run(['http://httpbingo.org/status/401'])
 
 
 if __name__ == '__main__':

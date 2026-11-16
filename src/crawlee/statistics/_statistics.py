@@ -172,21 +172,26 @@ class Statistics(Generic[TStatisticsState]):
         if self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is already active.')
 
-        await self._state.initialize()
-
-        # The timestamps belong to the previous run, restored or kept in memory. Fold that run into the accumulated
-        # runtime and clear them, so that the downtime since then (e.g. a migration or resurrection) doesn't count
-        # towards the runtime, and a clock that is behind the previous host's doesn't make `crawler_runtime` treat the
-        # new run as already checkpointed.
-        self.state.accumulated_runtime = self.state.crawler_runtime
-        self.state.crawler_last_started_at = None
-        self.state.crawler_finished_at = None
-        self.state.stats_persisted_at = None
-
-        # Start periodic logging and let it print the restored state before the new run starts being measured.
-        self._periodic_logger.start()
-        await asyncio.sleep(0.01)
         self._active = True
+
+        try:
+            await self._state.initialize()
+
+            # The timestamps belong to the previous run, restored or kept in memory. Fold that run into the accumulated
+            # runtime and clear them, so that the downtime since then (e.g. a migration or resurrection) doesn't count
+            # towards the runtime, and a clock that is behind the previous host's doesn't make `crawler_runtime` treat
+            # the new run as already checkpointed.
+            self.state.accumulated_runtime = self.state.crawler_runtime
+            self.state.crawler_last_started_at = None
+            self.state.crawler_finished_at = None
+            self.state.stats_persisted_at = None
+
+            # Start periodic logging and let it print the restored state before the new run starts being measured.
+            self._periodic_logger.start()
+            await asyncio.sleep(0.01)
+        except BaseException:
+            await self._stop_capturing()
+            raise
 
         self.state.crawler_last_started_at = datetime.now(UTC)
         self.state.crawler_started_at = self.state.crawler_started_at or self.state.crawler_last_started_at
@@ -206,11 +211,10 @@ class Statistics(Generic[TStatisticsState]):
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        # Stop logging; the finish timestamp freezes the measured run before the final persist.
-        await self._periodic_logger.stop()
+        # Before the first await, so that a cancelled exit doesn't count the time until the next run as runtime.
         self.state.crawler_finished_at = datetime.now(UTC)
-        self._active = False
-        await self._state.teardown()
+
+        await self._stop_capturing()
 
     @property
     def state(self) -> TStatisticsState:
@@ -315,6 +319,16 @@ class Statistics(Generic[TStatisticsState]):
                 record straight back.
         """
         await self._state.reset_store()
+
+    async def _stop_capturing(self) -> None:
+        try:
+            await self._periodic_logger.stop()
+        finally:
+            try:
+                if self._state.is_initialized:
+                    await self._state.teardown()
+            finally:
+                self._active = False
 
     def _log(self) -> None:
         stats = self.calculate()

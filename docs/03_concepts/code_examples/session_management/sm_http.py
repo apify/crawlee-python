@@ -12,14 +12,14 @@ async def main() -> None:
         # options
     )
 
+    session_pool = SessionPool(max_pool_size=100)
+
     # Initialize crawler with a custom SessionPool configuration
     # to manage concurrent sessions and proxy rotation
     crawler = HttpCrawler(
         proxy_configuration=proxy_configuration,
-        # Activates the Session pool (default is true).
-        use_session_pool=True,
         # Overrides default Session pool configuration.
-        session_pool=SessionPool(max_pool_size=100),
+        session_pool=session_pool,
     )
 
     # Define the default request handler that manages session states
@@ -29,15 +29,17 @@ async def main() -> None:
         page_content = (await context.http_response.read()).decode()
         title_match = re.search(r'<title(?:.*?)>(.*?)</title>', page_content)
 
-        if context.session and (title := title_match.group(1) if title_match else None):
-            if title == 'Blocked':
-                context.session.retire()
-            elif title == 'Not sure if blocked, might also be a connection error':
-                context.session.mark_bad()
-            else:
-                context.session.mark_good()  # BasicCrawler handles this automatically.
+        title = title_match.group(1) if title_match else None
 
-    await crawler.run(['https://crawlee.dev/'])
+        if title == 'Blocked':
+            context.session.retire()
+        elif title == 'Not sure if blocked, might also be a connection error':
+            context.session.mark_bad()
+        else:
+            context.session.mark_good()  # BasicCrawler handles this automatically.
+
+    async with session_pool:
+        await crawler.run(['https://crawlee.dev/'])
 
 
 if __name__ == '__main__':

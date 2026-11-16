@@ -46,11 +46,13 @@ class CloakBrowserPlugin(PlaywrightBrowserPlugin):
 
 
 async def main() -> None:
+    browser_pool = BrowserPool(plugins=[CloakBrowserPlugin()])
+
     crawler = PlaywrightCrawler(
         # Limit the crawl to max requests. Remove or increase it for crawling all links.
         max_requests_per_crawl=10,
         # Custom browser pool. Gives users full control over browsers used by the crawler.
-        browser_pool=BrowserPool(plugins=[CloakBrowserPlugin()]),
+        browser_pool=browser_pool,
     )
 
     # Define the default request handler, which will be called for every request.
@@ -74,7 +76,8 @@ async def main() -> None:
         await context.enqueue_links(selector='.morelink')
 
     # Run the crawler with the initial list of URLs.
-    await crawler.run(['https://news.ycombinator.com/'])
+    async with browser_pool:
+        await crawler.run(['https://news.ycombinator.com/'])
 
 
 if __name__ == '__main__':

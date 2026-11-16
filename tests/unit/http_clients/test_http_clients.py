@@ -312,3 +312,25 @@ async def test_ignore_tls_errors_reaches_fetch(
     await client.send_request(url, proxy_info=proxy_info, ignore_tls_errors=request_flag)
 
     assert fetch.call_args.kwargs['ignore_tls_errors'] is expected_flag
+
+
+async def test_enter_during_exit_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A client can't be entered again until its exit has cleaned it up."""
+    http_client = ImpitHttpClient()
+    cleanup_started = asyncio.Event()
+    release_cleanup = asyncio.Event()
+
+    async def wait_for_release() -> None:
+        cleanup_started.set()
+        await release_cleanup.wait()
+
+    await http_client.__aenter__()
+    monkeypatch.setattr(http_client, 'cleanup', AsyncMock(side_effect=wait_for_release))
+    exit_task = asyncio.create_task(http_client.__aexit__(None, None, None))
+    await cleanup_started.wait()
+
+    with pytest.raises(RuntimeError, match='already active'):
+        await http_client.__aenter__()
+
+    release_cleanup.set()
+    await exit_task

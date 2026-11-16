@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -39,6 +39,20 @@ def test_init_raises_with_mixed_plugins_in_browser_pool() -> None:
 def test_init_with_valid_browser_pool() -> None:
     pool = BrowserPool(plugins=[StagehandBrowserPlugin()])
     StagehandCrawler(browser_pool=pool)
+
+
+async def test_owns_default_browser_pool(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The crawler enters and exits the browser pool it builds itself."""
+    pool_enter = AsyncMock()
+    pool_exit = AsyncMock()
+    monkeypatch.setattr(BrowserPool, '__aenter__', pool_enter)
+    monkeypatch.setattr(BrowserPool, '__aexit__', pool_exit)
+    crawler = StagehandCrawler()
+
+    await crawler.run()
+
+    pool_enter.assert_awaited_once()
+    pool_exit.assert_awaited_once()
 
 
 def test_forwards_save_response_cookies() -> None:

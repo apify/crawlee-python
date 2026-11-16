@@ -80,7 +80,7 @@ crawler = PydanticAiCrawler(model=model)
 
 ## Extractors
 
-An extractor turns a page into your schema. Extractors implement different strategies for working with the LLM, and each one uses a <ApiLink to="class/PydanticAiHtmlDistiller">`PydanticAiHtmlDistiller`</ApiLink> to shape the model's input. Crawlee ships two.
+An extractor turns a page into your schema. Extractors implement different strategies for working with the LLM, and each one uses a <ApiLink to="class/PydanticAiHtmlDistiller">`PydanticAiHtmlDistiller`</ApiLink> to shape the model's input. Crawlee ships two. An extractor you pass to the crawler is yours to enter, so run the crawler inside `async with extractor`. The crawler enters only the default extractor it builds from `model`.
 
 ### PydanticAiDirectExtractor
 
@@ -96,7 +96,7 @@ To focus the model on the data you want, use `additional_instructions`:
 
 ### PydanticAiSelectorExtractor
 
-<ApiLink to="class/PydanticAiSelectorExtractor">`PydanticAiSelectorExtractor`</ApiLink> asks the model for reusable CSS selectors on the first page of a route, caches them, and reuses them with no model call on later pages of the same layout, so it scales to large sites. When a page matches none of the cached selectors (a different markup variant), it generates and caches a new set, so one bucket can hold several variants. If selector generation fails, or the schema shape is unsupported, it degrades to the `fallback` extractor when one is set, and raises otherwise. Selectors are bucketed by `cache_tag`, that defaults to the request label, so each route keeps its own set. The cache is persisted to a <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, so a later run reuses selectors learned earlier.
+<ApiLink to="class/PydanticAiSelectorExtractor">`PydanticAiSelectorExtractor`</ApiLink> asks the model for reusable CSS selectors on the first page of a route, caches them, and reuses them with no model call on later pages of the same layout, so it scales to large sites. When a page matches none of the cached selectors (a different markup variant), it generates and caches a new set, so one bucket can hold several variants. If selector generation fails, or the schema shape is unsupported, it degrades to the `fallback` extractor when one is set, and raises otherwise. Selectors are bucketed by `cache_tag`, that defaults to the request label, so each route keeps its own set. The cache is persisted to a <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>, so a later run reuses selectors learned earlier. Entering the extractor also enters its `fallback`. An extractor can be entered only once at a time, so give each selector extractor a fallback of its own.
 
 <CodeBlock className="language-python">
     {SelectorExtractorExample}

@@ -34,7 +34,8 @@ async def main() -> None:
         await context.push_data(data)
 
     # Run the crawler with the initial list of URLs.
-    await crawler.run(['https://crawlee.dev'])
+    async with http_client:
+        await crawler.run(['https://crawlee.dev'])
 
 
 if __name__ == '__main__':

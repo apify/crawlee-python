@@ -80,7 +80,7 @@ In the following example you can see how to create and configure <ApiLink to="cl
 
 To control which pages are crawled by which method you can use following arguments:
 
-<ApiLink to="class/RenderingTypePredictor">`RenderingTypePredictor`</ApiLink> - Class that can give recommendations about which sub crawler should be used for specific url. Predictor will also recommend to use both sub crawlers for some page from time to time, to check that the given recommendation was correct. Predictor should be able to learn from previous results and gradually give more reliable recommendations.
+<ApiLink to="class/RenderingTypePredictor">`RenderingTypePredictor`</ApiLink> - Class that can give recommendations about which sub crawler should be used for specific url. Predictor will also recommend to use both sub crawlers for some page from time to time, to check that the given recommendation was correct. Predictor should be able to learn from previous results and gradually give more reliable recommendations. If you pass in a predictor, enter it with `async with` before you run the crawler.
 
 `result_checker` - Is a function that checks result created from crawling a page. By default, it always returns `True`.
 
