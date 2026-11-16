@@ -699,18 +699,24 @@ async def test_adaptive_playwright_crawler_default_predictor(test_urls: list[str
 
 
 @pytest.mark.parametrize(
-    'rendering_type',
+    ('rendering_type', 'detection_probability', 'static_result_valid'),
     [
-        pytest.param('static', id='static'),
-        pytest.param('client only', id='browser'),
+        pytest.param('static', 0, True, id='static'),
+        pytest.param('client only', 0, True, id='browser'),
+        pytest.param('static', 0, False, id='static result rejected'),
+        pytest.param('static', 1, True, id='detection'),
     ],
 )
-async def test_on_skipped_request(server_url: URL, rendering_type: RenderingType) -> None:
-    """Links that a sub crawler skips in `enqueue_links` because of robots.txt reach the callback of the crawler."""
+async def test_on_skipped_request(
+    server_url: URL, rendering_type: RenderingType, detection_probability: float, *, static_result_valid: bool
+) -> None:
+    """Links skipped because of robots.txt reach the callback once, from the sub crawler run that is committed."""
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         rendering_type_predictor=_SimpleRenderingTypePredictor(
-            rendering_types=cycle([rendering_type]), detection_probability_recommendation=cycle([0])
+            rendering_types=cycle([rendering_type]),
+            detection_probability_recommendation=cycle([detection_probability]),
         ),
+        result_checker=lambda _: static_result_valid,
         respect_robots_txt_file=True,
     )
     skip = Mock()
@@ -725,7 +731,29 @@ async def test_on_skipped_request(server_url: URL, rendering_type: RenderingType
 
     await crawler.run([str(server_url / 'start_enqueue')])
 
+    assert skip.call_count == 4
     skip.assert_has_calls([call(str(server_url / f'page_{index}')) for index in range(1, 5)], any_order=True)
+
+
+async def test_on_skipped_request_error_fails_request(server_url: URL) -> None:
+    """An error in the skipped request callback fails the request and the crawl goes on."""
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=_SimpleRenderingTypePredictor(detection_probability_recommendation=cycle([0])),
+        respect_robots_txt_file=True,
+        max_request_retries=0,
+    )
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        await context.enqueue_links()
+
+    @crawler.on_skipped_request
+    async def skipped_hook(_url: str, _reason: SkippedReason) -> None:
+        raise RuntimeError('Skipped request callback failed')
+
+    stats = await crawler.run([str(server_url / 'start_enqueue')])
+
+    assert stats.requests_failed == 1
 
 
 async def test_fetches_robots_txt_once(server_url: URL, monkeypatch: pytest.MonkeyPatch) -> None:
