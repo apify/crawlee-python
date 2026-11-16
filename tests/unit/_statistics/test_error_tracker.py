@@ -138,10 +138,13 @@ async def test_reset_keeps_options() -> None:
     await error_tracker.add(ValueError('Some value error'))
 
     error_tracker.reset()
-
     assert error_tracker.total == 0
-    assert error_tracker.show_error_name is False
-    assert error_tracker.error_snapshotter is not None
+
+    # Without the error name in the group, two errors with the same message share one group.
+    await error_tracker.add(ValueError('Some error'))
+    await error_tracker.add(TypeError('Some error'))
+    assert error_tracker.total == 2
+    assert error_tracker.unique_error_count == 1
 
 
 async def test_statistics_reset_keeps_error_snapshots(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -149,12 +152,10 @@ async def test_statistics_reset_keeps_error_snapshots(monkeypatch: pytest.Monkey
     capture_snapshot = AsyncMock()
     monkeypatch.setattr(ErrorSnapshotter, 'capture_snapshot', capture_snapshot)
     statistics = Statistics.with_default_state(save_error_snapshots=True)
-    error_tracker = statistics.error_tracker
-    await error_tracker.add(ValueError('Some value error'), context=Mock())
+    await statistics.error_tracker.add(ValueError('Some value error'), context=Mock())
 
     await statistics.reset()
-    await error_tracker.add(ValueError('Some value error'), context=Mock())
+    await statistics.error_tracker.add(ValueError('Some value error'), context=Mock())
 
-    assert statistics.error_tracker is error_tracker
-    assert error_tracker.total == 1
+    assert statistics.error_tracker.total == 1
     assert capture_snapshot.await_count == 2
