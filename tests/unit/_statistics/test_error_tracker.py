@@ -1,7 +1,10 @@
 import traceback
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from crawlee.statistics import Statistics
+from crawlee.statistics._error_snapshotter import ErrorSnapshotter
 from crawlee.statistics._error_tracker import ErrorTracker
 
 
@@ -127,3 +130,32 @@ async def test_error_tracker_error_without_traceback() -> None:
     assert error_tracker.unique_error_count == 1
     # With no traceback there is no file and line, so the group has just the name and message.
     assert error_tracker.get_most_common_errors()[0][0] == 'ValueError:Some value error'
+
+
+async def test_reset_keeps_options() -> None:
+    """Resetting the tracker forgets the errors and keeps its options."""
+    error_tracker = ErrorTracker(show_error_name=False, save_error_snapshots=True)
+    await error_tracker.add(ValueError('Some value error'))
+
+    error_tracker.reset()
+    assert error_tracker.total == 0
+
+    # Without the error name in the group, two errors with the same message share one group.
+    await error_tracker.add(ValueError('Some error'))
+    await error_tracker.add(TypeError('Some error'))
+    assert error_tracker.total == 2
+    assert error_tracker.unique_error_count == 1
+
+
+async def test_statistics_reset_keeps_error_snapshots(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resetting the statistics forgets the errors and keeps saving error snapshots."""
+    capture_snapshot = AsyncMock()
+    monkeypatch.setattr(ErrorSnapshotter, 'capture_snapshot', capture_snapshot)
+    statistics = Statistics.with_default_state(save_error_snapshots=True)
+    await statistics.error_tracker.add(ValueError('Some value error'), context=Mock())
+
+    await statistics.reset()
+    await statistics.error_tracker.add(ValueError('Some value error'), context=Mock())
+
+    assert statistics.error_tracker.total == 1
+    assert capture_snapshot.await_count == 2
