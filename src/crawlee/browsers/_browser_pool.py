@@ -46,10 +46,7 @@ class BrowserPool:
     """The length of the newly generated page ID."""
 
     _PAGE_CLOSE_TIMEOUT = timedelta(seconds=5)
-    """The time limit for the page close hooks and for the page close itself.
-
-    Closing a page can take up to twice this long before the pool releases the page anyway.
-    """
+    """The time limit for closing a page, after which the pool releases the page anyway."""
 
     def __init__(
         self,
@@ -404,48 +401,33 @@ class BrowserPool:
             await hook(*args)
 
     def _override_page_close(self, crawlee_page: CrawleePage, browser_controller: BrowserController) -> None:
-        """Override the page's close method to execute pre and post close hooks within a time limit.
+        """Override the page's close method to execute pre and post close hooks and bound the close itself.
 
         A browser can acknowledge the close and then never destroy the page, so neither the close call nor the page's
-        `close` event ever finishes. The page is then released from its browser anyway, and the browser is retired, so
-        it gets no new pages and is closed once its remaining pages are closed.
+        `close` event ever finishes. When the close does not finish within `_PAGE_CLOSE_TIMEOUT`, the page is released
+        from its browser anyway, and the browser is retired, so it gets no new pages and is closed once its remaining
+        pages are closed. The hooks themselves run without a time limit.
         """
         original_close = crawlee_page.page.close
 
-        async def close_with_hooks(*args: Any, **kwargs: Any) -> None:
+        async def close_page(*args: Any, **kwargs: Any) -> None:
             timeout = self._PAGE_CLOSE_TIMEOUT.total_seconds()
-
-            # Tracked separately from the whole sequence finishing, so a slow post page close hook does not retire a
-            # browser that closed its page.
-            page_closed = False
-
-            async def close_sequence() -> None:
-                nonlocal page_closed
-                try:
-                    await self._execute_hooks(self._pre_page_close_hooks, crawlee_page, browser_controller)
-                finally:
-                    # Bounded on its own, because a timed out pre page close hook leaves the close to run here, inside
-                    # the already cancelled sequence.
-                    await asyncio.wait_for(original_close(*args, **kwargs), timeout)
-                    page_closed = True
-                await self._execute_hooks(self._post_page_close_hooks, crawlee_page.id, browser_controller)
-
             try:
-                await asyncio.wait_for(close_sequence(), timeout)
+                await asyncio.wait_for(original_close(*args, **kwargs), timeout)
             except asyncio.TimeoutError:
-                if page_closed:
-                    logger.warning(
-                        f'The page close hooks for the page {crawlee_page.id} did not finish within {timeout} seconds '
-                        'and were cancelled.'
-                    )
-                else:
-                    logger.warning(
-                        f'Closing the page {crawlee_page.id} did not finish within {timeout} seconds, releasing it '
-                        'from the pool anyway.'
-                    )
-                    self._retire_browser(browser_controller)
-            finally:
+                logger.warning(
+                    f'Closing the page {crawlee_page.id} did not finish within {timeout} seconds, releasing it from '
+                    'the pool anyway.'
+                )
                 browser_controller.register_page_closed(crawlee_page.page)
+                self._retire_browser(browser_controller)
+
+        async def close_with_hooks(*args: Any, **kwargs: Any) -> None:
+            try:
+                await self._execute_hooks(self._pre_page_close_hooks, crawlee_page, browser_controller)
+            finally:
+                await close_page(*args, **kwargs)
+            await self._execute_hooks(self._post_page_close_hooks, crawlee_page.id, browser_controller)
 
         # `Page.close` is a regular method, so type checkers reject reassigning it directly.
         # Install the wrapped version through an untyped reference to the page.
