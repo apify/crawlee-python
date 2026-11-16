@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Carry rounded-up units in `format_duration` (e.g. `2min`, not `1min 60.0s`) ([#2435](https://github.com/apify/crawlee-python/pull/2435)) ([9793879](https://github.com/apify/crawlee-python/commit/97938790f40a4dfdb6ce2688d94c9a9e66e5e3f8)) by [@goranai](https://github.com/goranai)
+- **statistics:** Keep saving error snapshots on repeated `run()` calls ([#2450](https://github.com/apify/crawlee-python/pull/2450)) ([16c127d](https://github.com/apify/crawlee-python/commit/16c127dee81aff18c40397d2d24af92b71919d08)) by [@Mantisus](https://github.com/Mantisus)
 
 
 <!-- git-cliff-unreleased-end -->
