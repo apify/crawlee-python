@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import timedelta
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
@@ -365,17 +366,24 @@ async def test_post_page_close_hook() -> None:
     assert isinstance(controller, BrowserController)
 
 
-async def test_page_close_that_never_finishes_releases_page(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A page whose close never finishes is released from its browser, and the browser is retired."""
+async def test_page_close_that_never_finishes_releases_page(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A page whose close never finishes is released, its browser is retired, and the post close hooks still run."""
     monkeypatch.setattr(BrowserPool, '_PAGE_CLOSE_TIMEOUT', timedelta(milliseconds=100))
     monkeypatch.setattr(Page, 'close', AsyncMock(side_effect=asyncio.Event().wait))
+    post_hook = AsyncMock()
 
     async with BrowserPool() as browser_pool:
+        browser_pool.post_page_close_hook(post_hook)
         test_page = await browser_pool.new_page()
         controller = browser_pool.active_browsers[0]
 
-        await asyncio.wait_for(test_page.page.close(), timeout=10)
+        with caplog.at_level(logging.WARNING):
+            await asyncio.wait_for(test_page.page.close(), timeout=10)
 
+        assert f'Closing the page {test_page.id} did not finish' in caplog.text
+        post_hook.assert_awaited_once_with(test_page.id, controller)
         assert controller.pages_count == 0
         assert controller in browser_pool.inactive_browsers
 
@@ -386,7 +394,7 @@ async def test_page_close_that_never_finishes_releases_page(monkeypatch: pytest.
 
 async def test_slow_page_close_hooks_are_not_cancelled(monkeypatch: pytest.MonkeyPatch) -> None:
     """Page close hooks that outlast the close time limit finish, and the browser is not retired."""
-    monkeypatch.setattr(BrowserPool, '_PAGE_CLOSE_TIMEOUT', timedelta(milliseconds=100))
+    monkeypatch.setattr(BrowserPool, '_PAGE_CLOSE_TIMEOUT', timedelta(seconds=1))
     pre_hook_finished = Mock()
     post_hook_finished = Mock()
 
@@ -394,12 +402,12 @@ async def test_slow_page_close_hooks_are_not_cancelled(monkeypatch: pytest.Monke
 
         @browser_pool.pre_page_close_hook
         async def pre_hook(_crawlee_page: CrawleePage, _controller: BrowserController) -> None:
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(1.2)
             pre_hook_finished()
 
         @browser_pool.post_page_close_hook
         async def post_hook(_page_id: str, _controller: BrowserController) -> None:
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(1.2)
             post_hook_finished()
 
         test_page = await browser_pool.new_page()
