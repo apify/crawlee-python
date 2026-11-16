@@ -1869,8 +1869,8 @@ async def test_crawler_multiple_stops_in_parallel() -> None:
     ]
     processed_urls = []
 
-    # Set concurrency to 2 to ensure two urls are being visited in parallel. An overloaded machine still runs
-    # `min_concurrency` tasks.
+    # Set concurrency to 2 so two URLs are visited in parallel. An overloaded system still runs `min_concurrency` tasks,
+    # so this holds on a busy machine too.
     crawler = BasicCrawler(
         concurrency_settings=ConcurrencySettings(min_concurrency=2, desired_concurrency=2, max_concurrency=2)
     )
@@ -2158,7 +2158,7 @@ async def test_abort_on_error_ends_paused_run() -> None:
 async def test_pause_after_abort_on_error_ends_run() -> None:
     """`pause()` after a request fails with `abort_on_error` waits for the request in progress, and the run ends."""
     crawler = BasicCrawler(
-        # An overloaded machine still runs `min_concurrency` tasks, so the second request starts on a busy machine too.
+        # An overloaded system still runs `min_concurrency` tasks, so the second request starts on a busy machine too.
         concurrency_settings=ConcurrencySettings(min_concurrency=2, desired_concurrency=2, max_concurrency=2),
         abort_on_error=True,
         max_request_retries=0,
@@ -2482,7 +2482,7 @@ async def test_context_use_state_race_condition_in_handlers(key_value_store: Key
 
     Result should be incremented by 2.
     Method `use_state` must be implemented in a way that prevents race conditions in such scenario."""
-    # An overloaded machine still runs `min_concurrency` tasks, so both handlers run in parallel on a busy machine too.
+    # An overloaded system still runs `min_concurrency` tasks, so both handlers run in parallel on a busy machine too.
     crawler = BasicCrawler(
         concurrency_settings=ConcurrencySettings(min_concurrency=2, desired_concurrency=2, max_concurrency=2)
     )
