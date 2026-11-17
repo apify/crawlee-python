@@ -124,7 +124,7 @@ class RecoverableState(Generic[TStateModel]):
 
             # Registered only after a successful load, so that a failed one leaves no listener behind.
             if self._persistence_enabled:
-                self._event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state_quietly)
+                self._event_manager.on(event=Event.PERSIST_STATE, listener=self._persist_state_on_event)
 
             self._initialized = True
             return self.current_value
@@ -142,7 +142,7 @@ class RecoverableState(Generic[TStateModel]):
             if not self._persistence_enabled:
                 return
 
-            self._event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state_quietly)
+            self._event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state_on_event)
             await self._persist_state_quietly()
 
     @property
@@ -227,6 +227,15 @@ class RecoverableState(Generic[TStateModel]):
         from crawlee import service_locator  # noqa: PLC0415
 
         return service_locator.get_event_manager()
+
+    async def _persist_state_on_event(self, event_data: EventPersistStateData) -> None:
+        # An event emitted before `teardown` can run this listener after it, when the record may already be cleared.
+        # The lock makes `teardown` wait for a save in progress, and the check skips a save that starts later.
+        async with self._lock:
+            if not self._initialized:
+                return
+
+            await self._persist_state_quietly(event_data)
 
     async def _persist_state_quietly(self, event_data: EventPersistStateData | None = None) -> None:
         try:

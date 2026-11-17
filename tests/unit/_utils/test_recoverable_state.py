@@ -516,3 +516,49 @@ async def test_teardown_during_load_waits_for_it(event_manager: EventManager, mo
     recoverable_state.current_value.counter = 1
     await _emit_persist_state(event_manager)
     assert await get_value(KEY) == {'counter': 42, 'message': 'hello'}
+
+
+async def test_persist_state_event_before_teardown_saves_nothing_after_it(
+    event_manager: EventManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A PERSIST_STATE event emitted right before `teardown` adds no save to the one `teardown` makes."""
+    kvs = await KeyValueStore.open()
+    set_value = AsyncMock(side_effect=kvs.set_value)
+    monkeypatch.setattr(kvs, 'set_value', set_value)
+    recoverable_state = _build_state()
+    await recoverable_state.initialize()
+
+    event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
+    await recoverable_state.teardown()
+    await event_manager.wait_for_all_listeners_to_complete()
+
+    set_value.assert_awaited_once()
+
+
+async def test_teardown_waits_for_save_in_progress(
+    event_manager: EventManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`teardown` waits for a save that a PERSIST_STATE event started, so the save can't finish after it."""
+    kvs = await KeyValueStore.open()
+    set_value = kvs.set_value
+    save_started = asyncio.Event()
+    finish_save = asyncio.Event()
+
+    async def slow_set_value(key: str, value: object, *, content_type: str | None = None) -> None:
+        save_started.set()
+        await finish_save.wait()
+        await set_value(key, value, content_type=content_type)
+
+    monkeypatch.setattr(kvs, 'set_value', AsyncMock(side_effect=slow_set_value))
+    recoverable_state = _build_state()
+    await recoverable_state.initialize()
+
+    event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
+    await save_started.wait()
+    monkeypatch.setattr(kvs, 'set_value', set_value)
+    teardown_task = asyncio.create_task(recoverable_state.teardown())
+    done, _ = await asyncio.wait([teardown_task], timeout=0.1)
+    finish_save.set()
+    await teardown_task
+
+    assert not done
