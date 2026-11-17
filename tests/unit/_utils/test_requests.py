@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 
-from crawlee import Request
 from crawlee._types import HttpHeaders
 from crawlee._utils.requests import compute_unique_key, normalize_url
 
@@ -154,22 +153,24 @@ def test_compute_unique_key_with_whitespace_in_headers() -> None:
 
 
 @pytest.mark.parametrize(
-    ('path', 'other_path'),
+    ('path', 'expected_output'),
     [
-        pytest.param('/items/a%2Fb', '/items/a/b', id='encoded-slash'),
-        pytest.param('/items/a%2fb', '/items/a/b', id='lowercase-encoded-slash'),
-        pytest.param('/items/a%2F', '/items/a', id='encoded-trailing-slash'),
-        pytest.param('/items/a%2f', '/items/a', id='lowercase-encoded-trailing-slash'),
-        pytest.param('/items/a%2F/', '/items/a', id='encoded-before-literal-trailing-slash'),
-        pytest.param('/items/a%252Fb', '/items/a%2Fb', id='double-encoded-slash'),
+        pytest.param('/items/a%2Fb', 'https://example.com/items/a%2fb', id='encoded-slash'),
+        pytest.param('/items/a%2fb', 'https://example.com/items/a%2fb', id='lowercase-encoded-slash'),
+        pytest.param('/items/a%2F', 'https://example.com/items/a%2f', id='encoded-trailing-slash'),
+        pytest.param('/items/a%2f', 'https://example.com/items/a%2f', id='lowercase-encoded-trailing-slash'),
+        pytest.param('/items/a%2F/', 'https://example.com/items/a%2f', id='encoded-before-literal-trailing-slash'),
+        pytest.param('/items/a%252Fb', 'https://example.com/items/a%252fb', id='double-encoded-slash'),
+        pytest.param('/items/a%2Bb', 'https://example.com/items/a%2bb', id='encoded-plus'),
+        pytest.param('/items/a%2bb', 'https://example.com/items/a%2bb', id='lowercase-encoded-plus'),
+        pytest.param('/items/a+b', 'https://example.com/items/a+b', id='literal-plus'),
+        pytest.param('/items/a/b', 'https://example.com/items/a/b', id='literal-separator'),
+        pytest.param('/items/a', 'https://example.com/items/a', id='literal-path'),
     ],
 )
-def test_request_unique_key_preserves_encoded_slashes(path: str, other_path: str) -> None:
-    """Keep escaped resource identifiers distinct from path separators in request keys."""
-    request = Request.from_url(f'https://example.com{path}')
-    other_request = Request.from_url(f'https://example.com{other_path}')
-
-    assert request.unique_key != other_request.unique_key
+def test_compute_unique_key_encoded_path(path: str, expected_output: str) -> None:
+    """Keep encoded slashes and plus signs distinct from their literal forms in request keys."""
+    assert compute_unique_key(f'https://example.com{path}') == expected_output
 
 
 @pytest.mark.parametrize(
