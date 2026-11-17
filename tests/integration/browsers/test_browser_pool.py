@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import timedelta
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
+from playwright.async_api import Page
 
 from crawlee.browsers import BrowserPool, PlaywrightBrowserController, PlaywrightBrowserPlugin
 from crawlee.browsers._browser_controller import BrowserController
@@ -15,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from typing import Any
 
-    from playwright.async_api import BrowserContext, Page
+    from playwright.async_api import BrowserContext
     from yarl import URL
 
     from crawlee.browsers._browser_plugin import BrowserPlugin
@@ -362,6 +364,62 @@ async def test_post_page_close_hook() -> None:
     call_mock.assert_awaited_once()
     assert test_page.id == page_id
     assert isinstance(controller, BrowserController)
+
+
+async def test_page_close_that_never_finishes_releases_page(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A page whose close never finishes is released, its browser is retired, and the post close hooks still run."""
+    monkeypatch.setattr(BrowserPool, '_PAGE_CLOSE_TIMEOUT', timedelta(milliseconds=100))
+    monkeypatch.setattr(Page, 'close', AsyncMock(side_effect=asyncio.Event().wait))
+    post_hook = AsyncMock()
+
+    async with BrowserPool() as browser_pool:
+        browser_pool.post_page_close_hook(post_hook)
+        test_page = await browser_pool.new_page()
+        controller = browser_pool.active_browsers[0]
+
+        with caplog.at_level(logging.WARNING):
+            await asyncio.wait_for(test_page.page.close(), timeout=10)
+
+        assert f'Closing the page {test_page.id} did not finish' in caplog.text
+        post_hook.assert_awaited_once_with(test_page.id, controller)
+        assert controller.pages_count == 0
+        assert controller in browser_pool.inactive_browsers
+
+        # The page's own `close` event can still arrive later, when the browser is closed. It must be a no-op.
+        controller.register_page_closed(test_page.page)
+        assert controller.pages_count == 0
+
+
+async def test_slow_page_close_hooks_are_not_cancelled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Page close hooks that outlast the close time limit finish, and the browser is not retired."""
+    monkeypatch.setattr(BrowserPool, '_PAGE_CLOSE_TIMEOUT', timedelta(seconds=1))
+    pre_hook_finished = Mock()
+    post_hook_finished = Mock()
+
+    async with BrowserPool() as browser_pool:
+
+        @browser_pool.pre_page_close_hook
+        async def pre_hook(_crawlee_page: CrawleePage, _controller: BrowserController) -> None:
+            await asyncio.sleep(1.2)
+            pre_hook_finished()
+
+        @browser_pool.post_page_close_hook
+        async def post_hook(_page_id: str, _controller: BrowserController) -> None:
+            await asyncio.sleep(1.2)
+            post_hook_finished()
+
+        test_page = await browser_pool.new_page()
+        controller = browser_pool.active_browsers[0]
+
+        await asyncio.wait_for(test_page.page.close(), timeout=10)
+
+        pre_hook_finished.assert_called_once()
+        post_hook_finished.assert_called_once()
+        assert test_page.page.is_closed()
+        assert controller.pages_count == 0
+        assert controller in browser_pool.active_browsers
 
 
 async def test_hooks_execution_order() -> None:
