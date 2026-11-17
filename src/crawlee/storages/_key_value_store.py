@@ -18,7 +18,7 @@ from ._base import Storage
 from ._utils import validate_storage_name
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Awaitable, Callable
 
     from crawlee.configuration import Configuration
     from crawlee.storage_backends import StorageBackend
@@ -141,12 +141,11 @@ class KeyValueStore(Storage):
         storage_instance_manager = service_locator.storage_instance_manager
         storage_instance_manager.remove_from_cache(self)
 
-        await self._clear_cache()  # Clear cache with persistent values.
-        await self._backend.drop()
+        await self._clear_store_and_cache(self._backend.drop)
 
     @override
     async def purge(self) -> None:
-        await self._backend.purge()
+        await self._clear_store_and_cache(self._backend.purge)
 
     @overload
     async def get_value(self, key: str) -> Any: ...
@@ -370,11 +369,23 @@ class KeyValueStore(Storage):
                 for value in cache.values():
                     await value.persist_state()
 
-    async def _clear_cache(self) -> None:
-        """Clear cache with autosaved values."""
-        if self.id in self._autosaved_values:
-            async with self._autosave_lock:
-                cache = self._autosaved_values[self.id]
-                for value in cache.values():
+    async def _clear_store_and_cache(self, clear_method: Callable[[], Awaitable[None]]) -> None:
+        """Clear the store with the backend's `clear_method`, and the cache of autosaved values with it."""
+        # The autosaved values go with the records, or their next save would write them back. The lock is held until
+        # the records are gone, so that a concurrent `get_auto_saved_value` can't load one of them.
+        async with self._autosave_lock:
+            cache = self._autosaved_values.get(self.id, {})
+            initialized_values = [value for value in cache.values() if value.is_initialized]
+
+            try:
+                for value in initialized_values:
                     await value.teardown()
-                cache.clear()
+
+                await clear_method()
+            except (Exception, asyncio.CancelledError):
+                # A failed call keeps the values, so they listen for `PERSIST_STATE` events again.
+                for value in initialized_values:
+                    await value.initialize()
+                raise
+
+            cache.clear()
