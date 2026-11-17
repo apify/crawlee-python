@@ -41,6 +41,14 @@ def test_init_with_valid_browser_pool() -> None:
     StagehandCrawler(browser_pool=pool)
 
 
+async def test_run_needs_entered_browser_pool() -> None:
+    """A browser pool passed to the crawler has to be entered before the crawler runs."""
+    crawler = StagehandCrawler(browser_pool=BrowserPool(plugins=[StagehandBrowserPlugin()]))
+
+    with pytest.raises(RuntimeError, match='BrowserPool passed to the crawler is not active'):
+        await crawler.run(['https://a.placeholder.com'])
+
+
 async def test_owns_default_browser_pool(monkeypatch: pytest.MonkeyPatch) -> None:
     """The crawler enters and exits the browser pool it builds itself."""
     pool_enter = AsyncMock()

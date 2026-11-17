@@ -219,10 +219,8 @@ class PlaywrightCrawler(
         self._pre_navigation_hooks: list[Callable[[TPreNavContext], Awaitable[None]]] = []
         self._post_navigation_hooks: list[Callable[[TPostNavContext], Awaitable[None]]] = []
 
-        if kwargs.get('http_client') is None:
-            http_client = PlaywrightHttpClient()
-            kwargs['http_client'] = http_client
-            kwargs['_additional_context_managers'] = [*kwargs.get('_additional_context_managers', []), http_client]
+        # Before `super().__init__()`, which would otherwise build the default `ImpitHttpClient`.
+        kwargs['http_client'] = self._own_or_borrow(kwargs.get('http_client'), PlaywrightHttpClient)
 
         # Lower the default concurrency for browser crawlers, unless the caller configured it themselves.
         if kwargs.get('concurrency_settings') is None and kwargs.get('concurrency_system') is None:

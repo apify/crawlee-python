@@ -164,7 +164,7 @@ class AdaptivePlaywrightCrawler(
 
         super().__init__(statistics=adaptive_statistics, **kwargs)
 
-        self.rendering_type_predictor = self._own_or_borrow(rendering_type_predictor, DefaultRenderingTypePredictor)
+        self._rendering_type_predictor = self._own_or_borrow(rendering_type_predictor, DefaultRenderingTypePredictor)
 
         # Sub crawlers related.
         playwright_crawler_specific_kwargs = playwright_crawler_specific_kwargs or _PlaywrightCrawlerAdditionalOptions()
@@ -182,15 +182,16 @@ class AdaptivePlaywrightCrawler(
         # Initialize sub crawlers to create their pipelines.
         static_crawler_class = AbstractHttpCrawler.create_parsed_http_crawler_class(static_parser=static_parser)
 
+        # The sub crawlers never run themselves, so this crawler enters and exits their statistics.
         static_crawler = static_crawler_class(
             parser=static_parser,
             save_response_cookies=save_response_cookies,
-            statistics=_NonPersistentStatistics(),
+            statistics=self._own_or_borrow(None, _NonPersistentStatistics),
             **basic_crawler_kwargs_for_static_crawler,
         )
         playwright_crawler = PlaywrightCrawler(
             save_response_cookies=save_response_cookies,
-            statistics=_NonPersistentStatistics(),
+            statistics=self._own_or_borrow(None, _NonPersistentStatistics),
             **playwright_crawler_specific_kwargs,
             **basic_crawler_kwargs_for_pw_crawler,
         )
@@ -231,9 +232,6 @@ class AdaptivePlaywrightCrawler(
         static_crawler.post_navigation_hook(adaptive_post_navigation_hook_static)
         playwright_crawler.post_navigation_hook(adaptive_post_navigation_hook_pw)
 
-        # The sub crawlers never run themselves, so this crawler enters and exits their statistics.
-        self._owned_context_managers.extend([static_crawler.statistics, playwright_crawler.statistics])
-
         # The default pool is the one the browser sub crawler built.
         self._own_or_borrow(
             playwright_crawler_specific_kwargs.get('browser_pool'),
@@ -244,6 +242,11 @@ class AdaptivePlaywrightCrawler(
         self._pw_context_pipeline = playwright_crawler._context_pipeline  # noqa:SLF001  # Intentional access to private member.
         self._static_context_pipeline = static_crawler._context_pipeline  # noqa:SLF001  # Intentional access to private member.
         self._static_parser = static_parser
+
+    @property
+    def rendering_type_predictor(self) -> RenderingTypePredictor:
+        """The predictor that decides which sub crawler processes a request."""
+        return self._rendering_type_predictor
 
     @classmethod
     def with_beautifulsoup_static_parser(

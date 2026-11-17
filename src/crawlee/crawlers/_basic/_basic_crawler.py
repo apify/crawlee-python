@@ -13,7 +13,7 @@ from asyncio import CancelledError
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Sequence
 from contextlib import AsyncExitStack
 from datetime import timedelta
-from functools import partial
+from functools import cached_property, partial
 from http import HTTPStatus
 from io import StringIO
 from pathlib import Path
@@ -85,7 +85,6 @@ from ._logging_utils import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping, MutableMapping
-    from contextlib import AbstractAsyncContextManager
 
     from crawlee._types import (
         ConcurrencySettings,
@@ -211,11 +210,6 @@ class _BasicCrawlerOptions(TypedDict):
     ignore_http_error_status_codes: NotRequired[Iterable[int]]
     """HTTP status codes that are typically considered errors but should be treated as successful responses."""
 
-    _additional_context_managers: NotRequired[Sequence[AbstractAsyncContextManager]]
-    """Additional context managers the crawler owns, entered and exited on every run. A subclass lists the defaults it
-    builds here, so that they aren't taken for objects passed in. Intended for use by subclasses rather than direct
-    instantiation of `BasicCrawler`."""
-
     respect_robots_txt_file: NotRequired[bool]
     """If set to `True`, the crawler will automatically try to fetch the robots.txt file for each domain,
     and skip those that are not allowed. This also prevents disallowed URLs to be added via `EnqueueLinksFunction`."""
@@ -332,7 +326,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         | None = None,
         id: str | None = None,
         _context_pipeline: ContextPipeline[TCrawlingContext] | None = None,
-        _additional_context_managers: Sequence[AbstractAsyncContextManager] | None = None,
     ) -> None:
         """Initialize a new instance.
 
@@ -398,9 +391,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 it, the ID follows the order in which crawlers are created.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
-            _additional_context_managers: Additional context managers the crawler owns, entered and exited on every
-                run. A subclass lists the defaults it builds here, so that they aren't taken for objects passed in.
-                Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
         self._id = str(BasicCrawler.__next_id) if id is None else id
         self._default_rq_alias = None if BasicCrawler.__next_id == 0 else f'__default_{self._id}__'
@@ -424,11 +414,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
         config = self._service_locator.get_configuration()
-
-        # The crawler enters and exits what it owns on every run, and only checks that the collaborators passed in are
-        # active.
-        self._owned_context_managers: list[AbstractAsyncContextManager] = [*(_additional_context_managers or [])]
-        self._borrowed_collaborators: list[Collaborator] = []
 
         # Core components
         self._request_manager = request_manager
@@ -556,17 +541,28 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # The last run started on this instance, which stays readable after it finishes.
         self._last_run: CrawlerRun[TStatisticsState] | None = None
 
+    @cached_property
+    def _owned_collaborators(self) -> list[Collaborator]:
+        """The collaborators the crawler owns, which it enters and exits on every run."""
+        return []
+
+    @cached_property
+    def _borrowed_collaborators(self) -> list[Collaborator]:
+        """The collaborators passed in, which the caller enters and exits, so `run()` only checks they're active."""
+        return []
+
     def _own_or_borrow(self, passed: TCollaborator | None, build_default: Callable[[], TCollaborator]) -> TCollaborator:
         """Return the collaborator passed in, or build the default one, and record which of them the crawler owns.
 
-        A collaborator passed in that a subclass listed in `_additional_context_managers` counts as the crawler's own.
+        It needs nothing that `BasicCrawler.__init__` sets, so a subclass can call it before `super().__init__()` and
+        pass the result down. A parent class that gets an already recorded collaborator leaves its record as is.
         """
         if passed is None:
             default = build_default()
-            self._owned_context_managers.append(default)
+            self._owned_collaborators.append(default)
             return default
 
-        if passed not in self._owned_context_managers:
+        if passed not in self._owned_collaborators and passed not in self._borrowed_collaborators:
             self._borrowed_collaborators.append(passed)
 
         return passed
@@ -878,7 +874,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 await self._statistics.reset_store()
 
                 # A session pool passed in belongs to the caller, who may still use it in another crawler.
-                if self._session_pool in self._owned_context_managers:
+                if self._session_pool in self._owned_collaborators:
                     self._session_pool.reset()
                     await self._session_pool.reset_store()
 
@@ -1027,7 +1023,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # The statistics count only while they're entered, so the crawler enters them on every run, even when they
         # were passed in.
         contexts_to_enter.append(self._statistics)
-        contexts_to_enter.extend(self._owned_context_managers)
+        contexts_to_enter.extend(self._owned_collaborators)
 
         # The status messages of the recurring task read the statistics, so it starts after them and stops before them.
         contexts_to_enter.append(self._crawler_state_rec_task)

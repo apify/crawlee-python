@@ -4,7 +4,6 @@ import warnings
 from typing import TYPE_CHECKING
 
 from parsel import Selector
-from pydantic_ai.models import infer_model
 
 from crawlee._utils.docs import docs_group
 from crawlee.crawlers import AbstractHttpCrawler, HttpCrawlerOptions
@@ -106,8 +105,7 @@ class PydanticAiCrawler(AbstractHttpCrawler[PydanticAiCrawlingContext, Selector,
 
         # Before `super().__init__()`, so that a failure here doesn't take up a crawler id.
         default_model = model if model is not None else _DEFAULT_AI_MODEL
-        if extractor is None:
-            default_model = infer_model(default_model)
+        self._extractor = self._own_or_borrow(extractor, lambda: PydanticAiDirectExtractor(default_model))
 
         async def final_step(
             context: ParsedHttpCrawlingContext[Selector],
@@ -126,8 +124,6 @@ class PydanticAiCrawler(AbstractHttpCrawler[PydanticAiCrawlingContext, Selector,
             parser=ParselParser(),
             **kwargs,
         )
-
-        self._extractor = self._own_or_borrow(extractor, lambda: PydanticAiDirectExtractor(default_model))
 
     @property
     def extractor(self) -> PydanticAiHtmlExtractor:

@@ -144,12 +144,13 @@ class StagehandCrawler(
                     'Cannot specify `stagehand_options`, `user_data_dir`, `headless`, '
                     '`browser_launch_options`, `browser_new_context_options` when `browser_pool` is provided.'
                 )
-        else:
+
+        def build_browser_pool() -> BrowserPool:
             launch_options = dict(browser_launch_options or {})
             if headless is not None:
                 launch_options['headless'] = headless
 
-            browser_pool = BrowserPool(
+            return BrowserPool(
                 plugins=[
                     StagehandBrowserPlugin(
                         stagehand_options=stagehand_options,
@@ -159,7 +160,8 @@ class StagehandCrawler(
                     )
                 ]
             )
-            kwargs['_additional_context_managers'] = [*kwargs.get('_additional_context_managers', []), browser_pool]
+
+        browser_pool = self._own_or_borrow(browser_pool, build_browser_pool)
 
         super().__init__(
             browser_pool=browser_pool,

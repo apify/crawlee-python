@@ -522,6 +522,10 @@ When a crawler runs again, it resets only a session pool it created. A `SessionP
 
 `RenderingTypePredictor` has a new `active` property, which `initialize()` and `clear()` of the base class keep up to date. If your predictor overrides them, call `super()`.
 
+`AdaptivePlaywrightCrawler.rendering_type_predictor` is now read-only. Pass your predictor to the constructor instead.
+
+The private `_additional_context_managers` argument of `BasicCrawler` is removed. To have the crawler enter and exit an object on every run, a subclass builds the object with `self._own_or_borrow()`. A subclass that gives its parent class a default object, such as an HTTP client, builds it this way before it calls `super().__init__()`.
+
 ## Resetting statistics and the session pool
 
 `Statistics.reset()` is now synchronous and resets only the in-memory statistics, the same as Crawlee JS. In v1, it also cleared the persisted record. To clear the record too, call the new `reset_store()` once the statistics are exited:
