@@ -29,6 +29,7 @@ def _get_filtered_traceback_parts_for_asyncio_timeout_error(traceback_parts: lis
     """Extract only the most relevant traceback parts from stack trace."""
     ignore_pattern = (
         r'([\\/]{1}asyncio[\\/]{1})|'  # internal asyncio parts
+        r'([\\/]{1}crawlee[\\/]{1}_utils[\\/]{1}wait\.py)|'  # crawlee wrapper that applies the timeout
         r'(Traceback \(most recent call last\))|'  # common part of the stack trace formatting
         r'(asyncio\.exceptions\.CancelledError)'  # internal asyncio exception
     )

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Generic, Literal, NotRequired, TypedDict,
 import playwright.async_api
 from more_itertools import partition
 from pydantic import ValidationError
-from typing_extensions import TypeVar
+from typing_extensions import TypeVar, override
 
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._types import BasicCrawlingContext, ConcurrencySettings
@@ -243,6 +243,11 @@ class PlaywrightCrawler(
         finally:
             self._shared_navigation_timeouts.pop(request_id, None)
 
+    @override
+    def _get_max_processing_time(self) -> timedelta:
+        # The navigation phase runs before the request handler, under its own timeout.
+        return self._navigation_timeout + super()._get_max_processing_time()
+
     def _build_pre_nav_context(
         self,
         context: BasicCrawlingContext,
@@ -262,6 +267,7 @@ class PlaywrightCrawler(
                 get_key_value_store=context.get_key_value_store,
                 log=context.log,
                 register_deferred_cleanup=context.register_deferred_cleanup,
+                extend_timeout=context.extend_timeout,
                 page=page,
                 block_requests=cast('BlockRequestsFunction', partial(block_requests, page=page)),
                 goto_options=GotoOptions(**self._goto_options),
@@ -287,6 +293,7 @@ class PlaywrightCrawler(
                 get_key_value_store=context.get_key_value_store,
                 log=context.log,
                 register_deferred_cleanup=context.register_deferred_cleanup,
+                extend_timeout=context.extend_timeout,
                 page=context.page,
                 block_requests=context.block_requests,
                 goto_options=context.goto_options,
@@ -314,6 +321,7 @@ class PlaywrightCrawler(
                 get_key_value_store=context.get_key_value_store,
                 log=context.log,
                 register_deferred_cleanup=context.register_deferred_cleanup,
+                extend_timeout=context.extend_timeout,
                 page=context.page,
                 goto_options=context.goto_options,
                 response=context.response,

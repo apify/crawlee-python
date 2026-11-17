@@ -29,7 +29,7 @@ async def test_internal_session_cookie_jar_stays_empty(server_url: URL) -> None:
             async with await client.send_request(str(url), session=session):
                 pass
 
-        curl_session = client._client_by_proxy_url[None]
+        curl_session = client._clients[None]
         assert list(curl_session._cookies.jar) == []
 
     # The cookies are stored by `send_request`, so they still reach the crawlee session.
@@ -69,6 +69,7 @@ async def test_sub_millisecond_timeout_not_rounded_to_zero(monkeypatch: pytest.M
         payload=None,
         proxy_info=None,
         timeout=timedelta(microseconds=100),
+        ignore_tls_errors=False,
     )
 
     assert curl_session.request.call_args.kwargs['timeout'] == 0.001
@@ -99,9 +100,43 @@ async def test_timeout_passed_to_curl(
         payload=None,
         proxy_info=None,
         timeout=timeout,
+        ignore_tls_errors=False,
     )
 
     assert curl_session.request.call_args.kwargs.get('timeout', 'missing') == expected
+
+
+@pytest.mark.parametrize(
+    ('client_flag', 'request_flag', 'expected_verify'),
+    [
+        pytest.param(False, False, True, id='verified'),
+        pytest.param(True, False, False, id='client'),
+        pytest.param(False, True, False, id='request'),
+    ],
+)
+async def test_ignore_tls_errors_turns_off_verification(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    client_flag: bool,
+    request_flag: bool,
+    expected_verify: bool,
+) -> None:
+    """Test that the `curl_cffi` request skips verification when the client or the request ignores TLS errors."""
+    curl_session = mock_curl_session()
+    client = CurlImpersonateHttpClient(ignore_tls_errors=client_flag)
+    monkeypatch.setattr(client, '_get_client', Mock(return_value=curl_session))
+
+    await client._fetch(
+        'https://example.com/',
+        method='GET',
+        headers=HttpHeaders(),
+        payload=None,
+        proxy_info=None,
+        timeout=None,
+        ignore_tls_errors=request_flag,
+    )
+
+    assert curl_session.request.call_args.kwargs['verify'] is expected_verify
 
 
 async def test_timed_out_request_closes_connection() -> None:

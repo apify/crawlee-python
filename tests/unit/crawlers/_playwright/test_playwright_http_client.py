@@ -49,6 +49,7 @@ async def test_send_request_converts_timeout_to_milliseconds() -> None:
         headers=None,
         data=None,
         timeout=pytest.approx(12_000, abs=100),
+        ignore_https_errors=None,
         max_redirects=0,
     )
     from_playwright_response.assert_awaited_once_with(playwright_response, protocol='')
@@ -112,6 +113,33 @@ async def test_send_request_sends_cookies_argument_instead_of_context_cookies() 
 
     page.context.cookies.assert_not_awaited()
     assert page.request.fetch.call_args.kwargs['headers'] == {'cookie': 'from_argument=1'}
+
+
+@pytest.mark.parametrize(
+    ('ignore_tls_errors', 'expected_ignore_https_errors'),
+    [
+        pytest.param(False, None, id='browser_context_setting'),
+        pytest.param(True, True, id='ignored'),
+    ],
+)
+async def test_ignore_tls_errors_reaches_browser_request(
+    *,
+    ignore_tls_errors: bool,
+    expected_ignore_https_errors: bool | None,
+) -> None:
+    """Test that `ignore_tls_errors` turns on `ignore_https_errors`, and the browser context decides without it."""
+    page = mock_page()
+    client = PlaywrightHttpClient()
+
+    with patch.object(
+        PlaywrightHttpResponse,
+        'from_playwright_response',
+        new=AsyncMock(return_value=mock_response(200, 'https://example.com/')),
+    ):
+        async with browser_page_context(page):
+            await client.send_request('https://example.com/', ignore_tls_errors=ignore_tls_errors)
+
+    assert page.request.fetch.call_args.kwargs['ignore_https_errors'] is expected_ignore_https_errors
 
 
 async def test_cookies_argument_keeps_context_cookies_out() -> None:

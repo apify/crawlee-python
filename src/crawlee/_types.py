@@ -455,6 +455,29 @@ class EnqueueLinksFunction(Protocol):
 
 
 @docs_group('Functions')
+class ExtendTimeoutFunction(Protocol):
+    """A function for giving the running part of the request processing more time.
+
+    Called from a navigation hook, it extends the navigation timeout. Called from the request handler or an error
+    handler, it extends the timeout of that handler. It also keeps the request locked in the request manager for longer.
+    Use it when the time a request needs only becomes apparent while it runs. Otherwise, set `request_handler_timeout`
+    on the crawler or on the router handler. It doesn't extend a timeout that has already expired, or any timeout when
+    called from a callback that runs outside the request processing, such as a Playwright event callback.
+    """
+
+    def __call__(self, delta: timedelta) -> Coroutine[None, None, None]:
+        """Call dunder method.
+
+        Args:
+            delta: How much more time to give.
+
+        Raises:
+            ValueError: If `delta` isn't positive.
+            RuntimeError: If awaited on another event loop, such as one started in a separate thread.
+        """
+
+
+@docs_group('Functions')
 class ExtractLinksFunction(Protocol):
     """A function for extracting URLs to crawl based on elements selected by a given selector.
 
@@ -583,6 +606,7 @@ class SendRequestFunction(Protocol):
         headers: HttpHeaders | dict[str, str] | None = None,
         cookies: SessionCookies | None = None,
         timeout: timedelta | Literal['default'] | None = 'default',
+        ignore_tls_errors: bool = False,
     ) -> Coroutine[None, None, HttpResponse]:
         """Call send request function.
 
@@ -597,6 +621,7 @@ class SendRequestFunction(Protocol):
             timeout: Maximum time allowed to receive the response, including all redirects, and to read its body.
                 With `'default'`, the default timeout of the HTTP client applies. `None` disables the timeout, so the
                 request runs until it's cancelled.
+            ignore_tls_errors: Whether to ignore TLS certificate errors for this request.
 
         Returns:
             The HTTP response received from the server.
@@ -680,6 +705,9 @@ class BasicCrawlingContext:
 
     register_deferred_cleanup: Callable[[DeferredCleanupCallback], None]
     """Register an async callback to be called after request processing completes (including error handlers)."""
+
+    extend_timeout: ExtendTimeoutFunction
+    """Give the running part of the request processing more time."""
 
     async def get_snapshot(self) -> PageSnapshot:
         """Get snapshot of crawled page."""

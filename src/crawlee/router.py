@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Generic, TypeVar
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Generic, TypeVar, overload
 
 from crawlee._request import RequestState
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
+
+if TYPE_CHECKING:
+    from datetime import timedelta
 
 __all__ = ['Router']
 
@@ -15,17 +19,26 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext)
 RequestHandler = Callable[[TCrawlingContext], Awaitable[None]]
 
 
+@dataclass(frozen=True)
+class _Route(Generic[TCrawlingContext]):
+    handler: RequestHandler[TCrawlingContext]
+    request_handler_timeout: timedelta | None
+
+
 @docs_group('Other')
 class Router(Generic[TCrawlingContext]):
     """A request dispatching system that routes requests to registered handlers based on their labels.
 
     The `Router` allows you to define and register request handlers for specific labels. When a request is received,
     the router invokes the corresponding `request_handler` based on the request's `label`. If no matching handler
-    is found, the default handler is used.
+    is found, the default handler is used. A handler can get its own `request_handler_timeout`, overriding the
+    crawler's.
 
     ### Usage
 
     ```python
+    from datetime import timedelta
+
     from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
     from crawlee.router import Router
 
@@ -42,8 +55,8 @@ class Router(Generic[TCrawlingContext]):
         context.log.info('Request without label %s ...', context.request.url)
 
 
-    # Handler for category requests
-    @router.handler(label='category')
+    # Handler for category requests, which take longer than the rest
+    @router.handler(label='category', request_handler_timeout=timedelta(minutes=2))
     async def category_handler(context: HttpCrawlingContext) -> None:
         context.log.info('Category request %s ...', context.request.url)
 
@@ -60,40 +73,92 @@ class Router(Generic[TCrawlingContext]):
     """
 
     def __init__(self) -> None:
-        self._default_handler: RequestHandler[TCrawlingContext] | None = None
-        self._handlers_by_label = dict[str, RequestHandler[TCrawlingContext]]()
+        self._default_route: _Route[TCrawlingContext] | None = None
+        self._routes_by_label = dict[str, _Route[TCrawlingContext]]()
         self._middlewares = list[RequestHandler[TCrawlingContext]]()
 
-    def default_handler(self: Router, handler: RequestHandler[TCrawlingContext]) -> RequestHandler[TCrawlingContext]:
+    @overload
+    def default_handler(
+        self, handler: RequestHandler[TCrawlingContext], *, request_handler_timeout: timedelta | None = None
+    ) -> RequestHandler[TCrawlingContext]: ...
+
+    @overload
+    def default_handler(
+        self, *, request_handler_timeout: timedelta | None = None
+    ) -> Callable[[RequestHandler[TCrawlingContext]], RequestHandler[TCrawlingContext]]: ...
+
+    def default_handler(
+        self,
+        handler: RequestHandler[TCrawlingContext] | None = None,
+        *,
+        request_handler_timeout: timedelta | None = None,
+    ) -> (
+        RequestHandler[TCrawlingContext]
+        | Callable[[RequestHandler[TCrawlingContext]], RequestHandler[TCrawlingContext]]
+    ):
         """Register a default request handler.
 
         The default request handler is invoked for requests that have either no label or a label for which we have
-        no matching handler.
+        no matching handler. Use it as a decorator, either directly or called with `request_handler_timeout`.
+
+        Args:
+            handler: The request handler to register.
+            request_handler_timeout: Overrides the `request_handler_timeout` of the crawler for this handler.
         """
-        if self._default_handler is not None:
-            raise RuntimeError('A default handler is already configured')
 
-        self._default_handler = handler
+        def wrapper(handler: RequestHandler[TCrawlingContext]) -> RequestHandler[TCrawlingContext]:
+            if self._default_route is not None:
+                raise RuntimeError('A default handler is already configured')
 
-        return handler
+            self._default_route = _Route(handler, request_handler_timeout)
+            return handler
+
+        if handler is None:
+            return wrapper
+
+        return wrapper(handler)
 
     def handler(
         self,
         label: str,
+        *,
+        request_handler_timeout: timedelta | None = None,
     ) -> Callable[[RequestHandler[TCrawlingContext]], Callable[[TCrawlingContext], Awaitable]]:
         """Register a request handler based on a label.
 
         This decorator registers a request handler for a specific label. The handler will be invoked only for requests
         that have the exact same label.
+
+        Args:
+            label: The label of the requests to handle.
+            request_handler_timeout: Overrides the `request_handler_timeout` of the crawler for this handler.
         """
-        if label in self._handlers_by_label:
-            raise RuntimeError(f'A handler for label `{label}` is already registered')
 
         def wrapper(handler: Callable[[TCrawlingContext], Awaitable]) -> Callable[[TCrawlingContext], Awaitable]:
-            self._handlers_by_label[label] = handler
+            if label in self._routes_by_label:
+                raise RuntimeError(f'A handler for label `{label}` is already registered')
+
+            self._routes_by_label[label] = _Route(handler, request_handler_timeout)
             return handler
 
         return wrapper
+
+    def get_request_handler_timeout(self, label: str | None) -> timedelta | None:
+        """Get the `request_handler_timeout` of the handler for requests with the given label.
+
+        Returns `None` when the handler doesn't override the timeout of the crawler.
+        """
+        route = self._get_route(label)
+        return None if route is None else route.request_handler_timeout
+
+    def get_max_request_handler_timeout(self) -> timedelta | None:
+        """Get the longest `request_handler_timeout` of all handlers, or `None` when no handler overrides it."""
+        routes = list(self._routes_by_label.values())
+        if self._default_route is not None:
+            routes.append(self._default_route)
+
+        timeouts = [route.request_handler_timeout for route in routes if route.request_handler_timeout is not None]
+        return max(timeouts, default=None)
 
     def use(self, middleware: RequestHandler[TCrawlingContext]) -> RequestHandler[TCrawlingContext]:
         """Register a middleware.
@@ -109,18 +174,21 @@ class Router(Generic[TCrawlingContext]):
             await middleware(context)
 
         context.request.state = RequestState.REQUEST_HANDLER
-        if context.request.label is None or context.request.label not in self._handlers_by_label:
-            if self._default_handler is None:
-                raise RuntimeError(
-                    f'No handler matches label `{context.request.label}` and no default handler is configured'
-                )
-
-            user_defined_handler = self._default_handler
-        else:
-            user_defined_handler = self._handlers_by_label[context.request.label]
+        route = self._get_route(context.request.label)
+        if route is None:
+            raise RuntimeError(
+                f'No handler matches label `{context.request.label}` and no default handler is configured'
+            )
 
         try:
-            return await user_defined_handler(context)
+            return await route.handler(context)
         except TimeoutError as e:
             # Timeout in handler, but not timeout of handler.
             raise UserHandlerTimeoutError('Timeout raised by user defined handler') from e
+
+    def _get_route(self, label: str | None) -> _Route[TCrawlingContext] | None:
+        """Get the route for requests with the given label, falling back to the default one."""
+        if label is not None and label in self._routes_by_label:
+            return self._routes_by_label[label]
+
+        return self._default_route

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import sys
+from datetime import timedelta
+from typing import TYPE_CHECKING
 from unittest import mock
 
 import pytest
@@ -13,6 +15,9 @@ from crawlee.configuration import Configuration
 from crawlee.crawlers import (
     PlaywrightCrawler,
 )
+
+if TYPE_CHECKING:
+    from crawlee.crawlers import PlaywrightCrawlingContext
 
 
 async def test_passing_configuration() -> None:
@@ -32,6 +37,17 @@ async def test_accepts_concurrency_system() -> None:
     crawler = PlaywrightCrawler(concurrency_system=concurrency_system)
 
     assert crawler.concurrency_system is concurrency_system
+
+
+def test_lock_time_counts_navigation() -> None:
+    """Test that the expected processing time adds the navigation timeout to the longest request handler timeout."""
+    crawler = PlaywrightCrawler(navigation_timeout=timedelta(minutes=1))
+
+    @crawler.router.handler('SLOW', request_handler_timeout=timedelta(minutes=3))
+    async def slow_handler(_context: PlaywrightCrawlingContext) -> None:
+        pass
+
+    assert crawler._get_expected_processing_time() == timedelta(minutes=5)
 
 
 def test_import_error_handled() -> None:

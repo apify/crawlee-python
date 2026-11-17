@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock, call
 
@@ -115,6 +116,53 @@ async def test_partially_consumed_body(server_url: URL, http_client: HttpClient)
     assert stats.requests_failed == 0
     assert stats.requests_finished == 1
     handler_call.assert_called_once()
+
+
+async def test_stream_extension_reaches_body(server_url: URL, http_client: HttpClient) -> None:
+    """A handler that extends its timeout can stream a body that arrives after both timeouts."""
+    crawler = FileDownloadCrawler(
+        stream=True,
+        http_client=http_client,
+        navigation_timeout=timedelta(seconds=1),
+        request_handler_timeout=timedelta(seconds=0.5),
+        max_request_retries=0,
+    )
+    handler_call = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: FileDownloadCrawlingContext) -> None:
+        await context.extend_timeout(timedelta(seconds=10))
+        handler_call(body=b''.join([chunk async for chunk in context.http_response.read_stream()]))
+
+    # `curl_cffi` returns the response only with the first chunk of the body, so it arrives within the timeout.
+    stats = await crawler.run([str((server_url / 'slow_body').with_query(chunks=3, delay=0.5))])
+
+    assert stats.requests_finished == 1
+    handler_call.assert_called_once_with(body=b'xxx')
+
+
+async def test_stream_body_bounded_by_handler(server_url: URL, http_client: HttpClient) -> None:
+    """A streamed body counts towards the request handler timeout, not the navigation timeout."""
+    crawler = FileDownloadCrawler(
+        stream=True,
+        http_client=http_client,
+        navigation_timeout=timedelta(seconds=1),
+        request_handler_timeout=timedelta(seconds=2),
+        max_request_retries=0,
+    )
+    handler_call = Mock()
+    failed_request_handler = AsyncMock()
+    crawler.failed_request_handler(failed_request_handler)
+
+    @crawler.router.default_handler
+    async def request_handler(context: FileDownloadCrawlingContext) -> None:
+        handler_call(body=b''.join([chunk async for chunk in context.http_response.read_stream()]))
+
+    await crawler.run([str((server_url / 'slow_body').with_query(chunks=8, delay=0.5))])
+
+    handler_call.assert_not_called()
+    failed_request_handler.assert_called_once()
+    assert 'Request handler timed out' in str(failed_request_handler.call_args.args[1])
 
 
 async def test_retry_failed_download(server_url: URL, http_client: HttpClient) -> None:
