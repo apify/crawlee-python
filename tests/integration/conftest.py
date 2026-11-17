@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 from filelock import FileLock
 from proxy import Proxy
+from stagehand import __version__ as stagehand_version
 from stagehand._custom.sea_binary import _cache_dir, resolve_binary_path
 from uvicorn.config import Config
 
@@ -33,11 +34,12 @@ def stagehand_binary() -> None:
     """Populate Stagehand's per-user binary cache once, serialized across xdist workers and pytest sessions."""
     # Stagehand copies its server binary into the cache on first use without a lock, so concurrent first uses race on
     # the copy (`WinError 32` on Windows, `FileNotFoundError` elsewhere). The lock sits next to the cache, so it also
-    # covers concurrent pytest sessions of the same user.
+    # covers concurrent pytest sessions of the same user. The version matches the one `AsyncStagehand` resolves, so a
+    # set `STAGEHAND_VERSION` can't make the fixture fill a different cache directory.
     cache_dir = _cache_dir()
     cache_dir.mkdir(parents=True, exist_ok=True)
     with FileLock(cache_dir / 'populate.lock'):
-        resolve_binary_path()
+        resolve_binary_path(version=stagehand_version)
 
 
 def _proxy_info(port: int) -> ProxyInfo:
