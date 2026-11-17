@@ -15,8 +15,6 @@ async def main() -> None:
     # to manage concurrent sessions and proxy rotation
     crawler = ParselCrawler(
         proxy_configuration=proxy_configuration,
-        # Activates the Session pool (default is true).
-        use_session_pool=True,
         # Overrides default Session pool configuration.
         session_pool=SessionPool(max_pool_size=100),
     )
@@ -27,13 +25,12 @@ async def main() -> None:
     async def default_handler(context: ParselCrawlingContext) -> None:
         title = context.selector.css('title::text').get()
 
-        if context.session:
-            if title == 'Blocked':
-                context.session.retire()
-            elif title == 'Not sure if blocked, might also be a connection error':
-                context.session.mark_bad()
-            else:
-                context.session.mark_good()  # BasicCrawler handles this automatically.
+        if title == 'Blocked':
+            context.session.retire()
+        elif title == 'Not sure if blocked, might also be a connection error':
+            context.session.mark_bad()
+        else:
+            context.session.mark_good()  # BasicCrawler handles this automatically.
 
     await crawler.run(['https://crawlee.dev/'])
 

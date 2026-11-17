@@ -44,10 +44,6 @@ async def main() -> None:
     async def login_handler(context: PlaywrightCrawlingContext) -> None:
         context.log.info('Processing login %s ...', context.request.url)
 
-        # Check if the session is available
-        if not context.session:
-            raise RuntimeError('Session not found')
-
         # Entering data into the form, `delay` to simulate human typing
         # Without this, the data will be entered instantly
         await context.page.type('#userName', 'crawlee_test', delay=100)

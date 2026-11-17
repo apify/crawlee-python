@@ -46,6 +46,7 @@ from crawlee.events import (
     LocalEventManager,
 )
 from crawlee.http_clients import HttpClient, HttpResponse
+from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.request_loaders import (
     FinishedStatus,
     MinIntervalSignal,
@@ -627,14 +628,16 @@ async def test_send_request_forwards_arguments_to_http_client() -> None:
     http_client = AsyncMock(spec=HttpClient)
     response = Mock(spec=HttpResponse)
     http_client.send_request.return_value = response
-    crawler = BasicCrawler(http_client=http_client, use_session_pool=False, max_requests_per_crawl=1)
+    crawler = BasicCrawler(http_client=http_client, max_requests_per_crawl=1)
     timeout = timedelta(seconds=12)
     cookies = SessionCookies({'name': 'value'})
     result = None
+    session = None
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        nonlocal result
+        nonlocal result, session
+        session = context.session
         result = await context.send_request(
             'https://example.com',
             method='POST',
@@ -648,12 +651,13 @@ async def test_send_request_forwards_arguments_to_http_client() -> None:
     await crawler.run(['https://a.placeholder.com'])
 
     assert result is response
+    assert session is not None
     http_client.send_request.assert_awaited_once_with(
         url='https://example.com',
         method='POST',
         payload=b'Hello, world!',
         headers={'Content-Type': 'text/plain'},
-        session=None,
+        session=session,
         cookies=cookies,
         proxy_info=None,
         timeout=timeout,
@@ -665,7 +669,7 @@ async def test_send_request_default_timeout() -> None:
     """Test that `context.send_request` without a `timeout` leaves the timeout to the default of the HTTP client."""
     http_client = AsyncMock(spec=HttpClient)
     http_client.send_request.return_value = Mock(spec=HttpResponse)
-    crawler = BasicCrawler(http_client=http_client, use_session_pool=False, max_requests_per_crawl=1)
+    crawler = BasicCrawler(http_client=http_client, max_requests_per_crawl=1)
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -2969,10 +2973,10 @@ async def test_session_retire_in_user_handler(*, retire: bool) -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        if context.session:
-            sessions.append(context.session.id)
+        sessions.append(context.session.id)
 
-            context.session.retire() if retire else None
+        if retire:
+            context.session.retire()
 
         await context.add_requests(['https://b.placeholder.com'])
 
@@ -2993,8 +2997,7 @@ async def test_bound_session_to_request() -> None:
 
         @crawler.router.default_handler
         async def handler(context: BasicCrawlingContext) -> None:
-            if context.session:
-                used_sessions.append(context.session.id)
+            used_sessions.append(context.session.id)
 
         requests = [
             Request.from_url('https://a.placeholder.com', session_id=check_session.id, always_enqueue=True)
@@ -3025,8 +3028,7 @@ async def test_bound_sessions_to_same_request() -> None:
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        if context.session:
-            used_sessions.append(context.session.id)
+        used_sessions.append(context.session.id)
 
     requests = [
         Request.from_url('https://a.placeholder.com', session_id=str(session_id), use_extended_unique_key=True)
@@ -3065,6 +3067,48 @@ async def test_handle_error_bound_session_to_request() -> None:
     await crawler.run(requests)
 
     assert error_handler_mock.call_count == 1
+
+
+async def test_missing_bound_session_gives_retired_stand_in() -> None:
+    """Test that the failed request handler gets a retired session and a proxy not tied to a missing bound session."""
+    failed_request_handler = AsyncMock()
+    new_url_function = Mock(return_value='http://proxy.placeholder.com:8000')
+    crawler = BasicCrawler(
+        request_handler=AsyncMock(),
+        proxy_configuration=ProxyConfiguration(new_url_function=new_url_function),
+    )
+    crawler.failed_request_handler(failed_request_handler)
+
+    await crawler.run([Request.from_url('https://a.placeholder.com', session_id='missing')])
+
+    failed_request_handler.assert_awaited_once()
+    context, error = failed_request_handler.call_args.args
+    assert isinstance(error, RequestCollisionError)
+    assert context.session.id == 'missing'
+    assert context.session.retired
+    assert context.proxy_info is not None
+    assert context.proxy_info.url == 'http://proxy.placeholder.com:8000'
+    assert context.proxy_info.session_id is None
+    new_url_function.assert_called_once()
+    assert new_url_function.call_args.args[0] is None
+
+
+async def test_unusable_bound_session_reaches_failed_request_handler() -> None:
+    """Test that a request bound to an unusable session in the pool reaches the failed request handler with it."""
+    failed_request_handler = AsyncMock()
+
+    async with SessionPool() as session_pool:
+        session = await session_pool.get_session()
+        session.retire()
+        crawler = BasicCrawler(session_pool=session_pool, request_handler=AsyncMock())
+        crawler.failed_request_handler(failed_request_handler)
+
+        await crawler.run([Request.from_url('https://a.placeholder.com', session_id=session.id)])
+
+    failed_request_handler.assert_awaited_once()
+    context, error = failed_request_handler.call_args.args
+    assert isinstance(error, RequestCollisionError)
+    assert context.session is session
 
 
 async def test_handles_session_error_in_failed_request_handler() -> None:
@@ -3524,7 +3568,7 @@ async def test_request_and_session_mutations_persist() -> None:
             if isinstance(context.request.user_data['request_state'], list):
                 context.request.user_data['request_state'].append('error')
 
-            if context.session and isinstance(context.session.user_data['session_state'], list):
+            if isinstance(context.session.user_data['session_state'], list):
                 context.session.user_data['session_state'].append('error')
                 context.session.cookies['error'] = 'yes'
 
@@ -3532,7 +3576,7 @@ async def test_request_and_session_mutations_persist() -> None:
         async def handler(context: BasicCrawlingContext) -> None:
             if isinstance(context.request.user_data['request_state'], list):
                 context.request.user_data['request_state'].append(f'modified_{context.request.retry_count}')
-            if context.session and isinstance(context.session.user_data['session_state'], list):
+            if isinstance(context.session.user_data['session_state'], list):
                 context.session.user_data['session_state'].append(f'modified_{context.request.retry_count}')
                 context.session.cookies[f'modified_{context.request.retry_count}'] = 'yes'
 
@@ -3902,7 +3946,6 @@ async def test_handler_raised_throttled_error_is_deferred(monkeypatch: pytest.Mo
     assert context.request.retry_count == 0
     assert stats.requests_finished == 1
     assert stats.requests_failed == 0
-    assert context.session is not None
     assert context.session.error_score == 0
     assert throttler._domain_states['throttled.placeholder.com'].consecutive_429_count == 1
 

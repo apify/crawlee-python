@@ -72,7 +72,7 @@ The crawler's `max_crawl_depth` option limits how deep the crawl goes. Requests 
 
 ## Binding to a session
 
-Pass `session_id` to `from_url` to bind a request to one session from the crawler's <ApiLink to="class/SessionPool">`SessionPool`</ApiLink>. The crawler then processes the request with that session only. If the session isn't available anymore, the request fails with a <ApiLink to="class/RequestCollisionError">`RequestCollisionError`</ApiLink> and isn't retried. For details on sessions, see [Session management](./session-management).
+Pass `session_id` to `from_url` to bind a request to one session from the crawler's <ApiLink to="class/SessionPool">`SessionPool`</ApiLink>. The crawler then processes the request with that session only. If the session isn't usable anymore, the request fails with a <ApiLink to="class/RequestCollisionError">`RequestCollisionError`</ApiLink> and isn't retried. In the failed request handler, `context.session` is then that session while the pool still holds it, otherwise a retired session with the bound id. For details on sessions, see [Session management](./session-management).
 
 ## Request lifecycle
 

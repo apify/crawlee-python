@@ -127,7 +127,6 @@ async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any], monkeyp
     assert request.retry_count == 0
     assert (request.session_rotation_count or 0) == 0
     session = handled[0].session
-    assert session is not None
     assert session.error_score == 0
     assert session.is_usable
 

@@ -30,7 +30,7 @@ For details on the crawler-specific attributes, see [HTTP crawlers](./http-crawl
 
 The `request` attribute is the <ApiLink to="class/Request">`Request`</ApiLink> being processed. It carries the URL, the label used for routing, user data and the retry count. For details, see [Requests](./requests).
 
-The `session` attribute is the <ApiLink to="class/Session">`Session`</ApiLink> assigned to the request, or `None` when the crawler runs without a session pool. You can call `mark_bad()` or `retire()` on it from the handler when a page shows signs of blocking. For details, see [Session management](./session-management).
+The `session` attribute is the <ApiLink to="class/Session">`Session`</ApiLink> assigned to the request. You can call `mark_bad()` or `retire()` on it from the handler when a page shows signs of blocking. For details, see [Session management](./session-management).
 
 The `proxy_info` attribute is a <ApiLink to="class/ProxyInfo">`ProxyInfo`</ApiLink> describing the proxy used for the request, or `None` when no proxy is configured. For details, see [Proxy management](./proxy-management).
 

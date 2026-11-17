@@ -12,10 +12,7 @@ async def main() -> None:
             'http://proxy-2.com/',
         ]
     )
-    crawler = BeautifulSoupCrawler(
-        proxy_configuration=proxy_configuration,
-        use_session_pool=True,
-    )
+    crawler = BeautifulSoupCrawler(proxy_configuration=proxy_configuration)
 
     # ...
 
