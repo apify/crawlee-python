@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlencode
 
@@ -377,6 +378,69 @@ async def test_http_crawler_post_navigation_hook_execution(server_url: URL) -> N
 
     # `post_navigation_hook` is called after the request is made, so the loaded URL should be the result URL.
     call_mock.assert_called_once_with(str(server_url))
+
+
+@pytest.mark.parametrize(
+    'hook_type',
+    [
+        pytest.param('pre', id='pre-navigation-hook'),
+        pytest.param('post', id='post-navigation-hook'),
+    ],
+)
+async def test_extend_timeout_from_nav_hook(server_url: URL, hook_type: Literal['pre', 'post']) -> None:
+    """Test that `extend_timeout` from a navigation hook lets the navigation phase run past its timeout."""
+    crawler = HttpCrawler(request_handler=AsyncMock(), navigation_timeout=timedelta(seconds=0.5), max_request_retries=0)
+
+    async def slow_hook(context: BasicCrawlingContext) -> None:
+        await context.extend_timeout(timedelta(seconds=10))
+        await asyncio.sleep(1)
+
+    if hook_type == 'pre':
+        crawler.pre_navigation_hook(slow_hook)
+    else:
+        crawler.post_navigation_hook(slow_hook)
+
+    stats = await crawler.run([str(server_url)])
+
+    assert stats.requests_finished == 1
+
+
+async def test_extension_reaches_slow_body(http_client: HttpClient, server_url: URL) -> None:
+    """Test that `extend_timeout` from a post-navigation hook gives a body that arrives late more time."""
+    crawler = HttpCrawler(
+        http_client=http_client,
+        request_handler=AsyncMock(),
+        navigation_timeout=timedelta(seconds=1),
+        max_request_retries=0,
+    )
+
+    @crawler.post_navigation_hook
+    async def extend(context: BasicCrawlingContext) -> None:
+        await context.extend_timeout(timedelta(seconds=10))
+
+    # `curl_cffi` returns the response only with the first chunk of the body, so it arrives within the timeout.
+    stats = await crawler.run([str((server_url / 'slow_body').with_query(chunks=3, delay=0.5))])
+
+    assert stats.requests_finished == 1
+
+
+async def test_nav_timeout_bounds_slow_body(http_client: HttpClient, server_url: URL) -> None:
+    """Test that the navigation timeout bounds reading a body that arrives late."""
+    request_handler = AsyncMock()
+    failed_request_handler = AsyncMock()
+    crawler = HttpCrawler(
+        http_client=http_client,
+        request_handler=request_handler,
+        navigation_timeout=timedelta(seconds=1),
+        max_request_retries=0,
+    )
+    crawler.failed_request_handler(failed_request_handler)
+
+    await crawler.run([str((server_url / 'slow_body').with_query(chunks=3, delay=0.5))])
+
+    request_handler.assert_not_called()
+    failed_request_handler.assert_called_once()
+    assert isinstance(failed_request_handler.call_args.args[1], TimeoutError)
 
 
 async def test_http_crawler_navigation_hooks_order(server_url: URL) -> None:

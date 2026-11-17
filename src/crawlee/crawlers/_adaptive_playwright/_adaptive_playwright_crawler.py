@@ -13,7 +13,7 @@ from typing_extensions import override
 
 from crawlee._types import BasicCrawlingContext, ConcurrencySettings, JsonSerializable, RequestHandlerRunResult
 from crawlee._utils.docs import docs_group
-from crawlee._utils.wait import wait_for
+from crawlee._utils.wait import wait_for_extendable
 from crawlee.crawlers import (
     AbstractHttpCrawler,
     AbstractHttpParser,
@@ -43,6 +43,7 @@ from ._result_comparator import create_default_comparator
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
+    from datetime import timedelta
     from types import TracebackType
     from typing import Unpack
 
@@ -296,6 +297,12 @@ class AdaptivePlaywrightCrawler(
             **kwargs,
         )
 
+    @override
+    def _get_max_processing_time(self) -> timedelta:
+        # A request can run both sub crawlers one after another, each under the request handler timeout, which also
+        # covers its navigation.
+        return 2 * super()._get_max_processing_time()
+
     async def _crawl_one(
         self,
         rendering_type: RenderingType,
@@ -336,18 +343,19 @@ class AdaptivePlaywrightCrawler(
             use_state=use_state_function,
             log=context.log,
             register_deferred_cleanup=context.register_deferred_cleanup,
+            extend_timeout=context.extend_timeout,
         )
 
+        request_handler_timeout = self._resolve_request_handler_timeout(context.request.label)
         try:
-            await wait_for(
+            await wait_for_extendable(
                 lambda: self._pipeline_call_factory(
                     rendering_type=rendering_type, context_linked_to_result=context_linked_to_result
                 ),
-                timeout=self._request_handler_timeout,
-                timeout_message=(
-                    f'{rendering_type=!s} timed out after {self._request_handler_timeout.total_seconds()}seconds'
+                timeout=request_handler_timeout,
+                timeout_message=lambda timeout: (
+                    f'{rendering_type=!s} timed out after {timeout.total_seconds()} seconds'
                 ),
-                logger=self._logger,
             )
             return SubCrawlerRun(result=result)
         except Exception as e:

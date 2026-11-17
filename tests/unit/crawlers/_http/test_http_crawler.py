@@ -173,3 +173,14 @@ async def test_429_reported_once(monkeypatch: pytest.MonkeyPatch) -> None:
     await crawler.run([url])
 
     record_pacing_signal.assert_called_once_with(RateLimitedSignal(url))
+
+
+def test_lock_time_counts_navigation() -> None:
+    """Test that the expected processing time adds the navigation timeout to the longest request handler timeout."""
+    crawler = HttpCrawler(navigation_timeout=timedelta(minutes=1))
+
+    @crawler.router.handler('SLOW', request_handler_timeout=timedelta(minutes=3))
+    async def slow_handler(_context: HttpCrawlingContext) -> None:
+        pass
+
+    assert crawler._get_expected_processing_time() == timedelta(minutes=5)

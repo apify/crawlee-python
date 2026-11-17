@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Generic, NotRequired
 
 from more_itertools import partition
 from pydantic import ValidationError
-from typing_extensions import TypeVar
+from typing_extensions import TypeVar, override
 
 from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._utils.docs import docs_group
@@ -146,6 +146,11 @@ class AbstractHttpCrawler(
             yield context
         finally:
             self._shared_navigation_timeouts.pop(request_id, None)
+
+    @override
+    def _get_max_processing_time(self) -> timedelta:
+        # The navigation phase runs before the request handler, under its own timeout.
+        return self._navigation_timeout + super()._get_max_processing_time()
 
     async def _execute_pre_navigation_hooks(
         self, context: BasicCrawlingContext
@@ -312,7 +317,7 @@ class AbstractHttpCrawler(
         if context.session is not None and not self._save_response_cookies:
             cookies = SessionCookies(context.session.cookies)
 
-        async with self._shared_navigation_timeouts[id(context.request)] as remaining_timeout:
+        async with self._shared_navigation_timeouts[id(context.request)]:
             response = await self._http_client.send_request(
                 context.request.url,
                 method=context.request.method,
@@ -321,7 +326,8 @@ class AbstractHttpCrawler(
                 session=context.session,
                 cookies=cookies,
                 proxy_info=context.proxy_info,
-                timeout=remaining_timeout,
+                # The crawler's timeouts, which `extend_timeout` can extend, bound the request and reading its body.
+                timeout=None,
             )
 
         try:

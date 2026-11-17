@@ -1261,6 +1261,35 @@ async def test_navigation_timeout_applies_to_hooks(server_url: URL) -> None:
     assert request_handler.call_count == 0
 
 
+@pytest.mark.parametrize(
+    'hook_type',
+    [
+        pytest.param('pre', id='pre-navigation-hook'),
+        pytest.param('post', id='post-navigation-hook'),
+    ],
+)
+async def test_extend_timeout_from_nav_hook(server_url: URL, hook_type: Literal['pre', 'post']) -> None:
+    """Test that `extend_timeout` from a navigation hook lets the navigation phase run past its timeout."""
+    crawler = PlaywrightCrawler(navigation_timeout=timedelta(seconds=1), max_request_retries=0)
+
+    request_handler = AsyncMock()
+    crawler.router.default_handler(request_handler)
+
+    async def slow_hook(context: BasicCrawlingContext) -> None:
+        await context.extend_timeout(timedelta(seconds=10))
+        await asyncio.sleep(1.5)
+
+    if hook_type == 'pre':
+        crawler.pre_navigation_hook(slow_hook)
+    else:
+        crawler.post_navigation_hook(slow_hook)
+
+    result = await crawler.run([str(server_url)])
+
+    assert result.requests_finished == 1
+    assert request_handler.call_count == 1
+
+
 async def test_slow_navigation_does_not_count_toward_handler_timeout(server_url: URL) -> None:
     crawler = PlaywrightCrawler(request_handler_timeout=timedelta(seconds=0.5))
 
