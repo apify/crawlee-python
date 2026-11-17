@@ -567,7 +567,7 @@ The `use_session_pool` option is removed from the crawlers. Every crawler proces
 
 `context.session` is now a `Session` instead of `Session | None`, so you can drop the `if context.session` checks. A request bound by `session_id` to a session that's no longer usable still fails with a `RequestCollisionError`. Its failed request handler gets that session while the pool still holds it, or a retired session with the bound id, instead of `None`.
 
-Without the session pool, a 401, 403 or 429 response failed the request without a retry. Now it retires the session, and the request is retried with another one, up to `max_session_rotations` times. With `proxy_urls`, a session keeps its proxy, so the proxy changes when the session does, not on every request.
+Without the session pool, a 401, 403 or 429 response failed the request without a retry. Now it retires the session, and the request is retried with another one, up to `max_session_rotations` times. To fail the request without a retry, as in v1, pass `retry_on_blocked=False`. This option also turns off the check of the response content for blocking. With `proxy_urls`, a session keeps its proxy, so the proxy changes when the session does, not on every request.
 
 To keep the response cookies out of the sessions, pass `save_response_cookies=False`. With `BasicCrawler`, which doesn't take this option, and with the HTTP crawlers, `context.send_request` still saves its response cookies to the session. To keep them out, pass `cookies=SessionCookies()` to `context.send_request`. To retire every session after its first request, set `max_usage_count` to 1:
 
@@ -579,6 +579,7 @@ crawler = ParselCrawler(use_session_pool=False)
 from crawlee.sessions import SessionCookies, SessionPool
 
 crawler = ParselCrawler(
+    retry_on_blocked=False,
     save_response_cookies=False,
     session_pool=SessionPool(create_session_settings={'max_usage_count': 1}),
 )
