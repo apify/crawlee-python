@@ -2733,9 +2733,9 @@ async def test_handle_error_bound_session_to_request() -> None:
 
 
 async def test_missing_bound_session_gives_retired_stand_in() -> None:
-    """Test that the failed request handler gets a retired session and no proxy for a missing bound session."""
+    """Test that the failed request handler gets a retired session and a proxy not tied to a missing bound session."""
     failed_request_handler = AsyncMock()
-    new_url_function = Mock(side_effect=RuntimeError('Unknown session'))
+    new_url_function = Mock(return_value='http://proxy.placeholder.com:8000')
     crawler = BasicCrawler(
         request_handler=AsyncMock(),
         proxy_configuration=ProxyConfiguration(new_url_function=new_url_function),
@@ -2749,8 +2749,11 @@ async def test_missing_bound_session_gives_retired_stand_in() -> None:
     assert isinstance(error, RequestCollisionError)
     assert context.session.id == 'missing'
     assert context.session.retired
-    assert context.proxy_info is None
-    new_url_function.assert_not_called()
+    assert context.proxy_info is not None
+    assert context.proxy_info.url == 'http://proxy.placeholder.com:8000'
+    assert context.proxy_info.session_id is None
+    new_url_function.assert_called_once()
+    assert new_url_function.call_args.args[0] is None
 
 
 async def test_unusable_bound_session_reaches_failed_request_handler() -> None:

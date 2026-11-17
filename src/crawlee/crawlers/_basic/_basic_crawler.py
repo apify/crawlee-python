@@ -678,13 +678,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             logger=self._logger,
         )
 
-    async def _get_proxy_info(self, request: Request, session: Session) -> ProxyInfo | None:
+    async def _get_proxy_info(self, request: Request, session: Session | None) -> ProxyInfo | None:
         """Retrieve a new ProxyInfo object based on crawler configuration and the current request and session."""
         if not self._proxy_configuration:
             return None
 
         return await self._proxy_configuration.new_proxy_info(
-            session_id=session.id,
+            session_id=session.id if session is not None else None,
             request=request,
         )
 
@@ -1628,8 +1628,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     session = Session(id=request.session_id, retired=True)
         else:
             session = await self._get_session()
-        # A request bound to an unusable session fails before it's sent, so it gets no proxy.
-        proxy_info = None if bound_session_unusable else await self._get_proxy_info(request, session)
+        # A request bound to an unusable session fails before it's sent. Its proxy isn't tied to that session, so a
+        # `send_request` call in the failed request handler still goes through the proxy configuration.
+        proxy_info = await self._get_proxy_info(request, None if bound_session_unusable else session)
         result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
 
         deferred_cleanup: list[Callable[[], Awaitable[None]]] = []
