@@ -1657,8 +1657,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             try:
                 if bound_session_unusable:
                     raise RequestCollisionError(
-                        f'The Session (id: {request.session_id}) bound to the Request is no longer available in '
-                        'SessionPool'
+                        f'The Session (id: {request.session_id}) bound to the Request is no longer usable'
                     )
                 await self._run_request_handler(context=context)
             except TimeoutError as e:

@@ -51,8 +51,7 @@ async def main() -> None:
         )
         await context.add_requests([next_request])
 
-    # Handle errors when a session is blocked and no longer available in the pool
-    # when attempting to execute requests bound to it
+    # Handle errors when the session bound to a request is no longer usable
     @crawler.failed_request_handler
     async def error_processing(context: BasicCrawlingContext, error: Exception) -> None:
         if isinstance(error, RequestCollisionError):

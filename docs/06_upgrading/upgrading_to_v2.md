@@ -565,7 +565,7 @@ Log records hold the message template and its arguments separately. `record.msg`
 
 The `use_session_pool` option is removed from the crawlers. Every crawler processes its requests with sessions from its `SessionPool`, the same as Crawlee JS v4. To configure the pool, pass your own `SessionPool` as `session_pool`.
 
-`context.session` is now a `Session` instead of `Session | None`, so you can drop the `if context.session` checks. A request bound by `session_id` to a session that's no longer usable still fails with a `RequestCollisionError`. Its failed request handler gets that session while the pool still holds it, or a retired session with the bound id, instead of `None`.
+`context.session` is now a `Session` instead of `Session | None`, so you can drop the `if context.session` checks. A request bound by `session_id` to a session that's no longer usable still fails with a `RequestCollisionError`, now with the message `The Session (id: <id>) bound to the Request is no longer usable`. Its failed request handler gets that session while the pool still holds it, or a retired session with the bound id, instead of `None`.
 
 Without the session pool, a 401, 403 or 429 response failed the request without a retry. Now it retires the session, and the request is retried with another one, up to `max_session_rotations` times. To fail the request without a retry, as in v1, pass `retry_on_blocked=False`. This option also turns off the check of the response content for blocking. With `proxy_urls`, a session keeps its proxy, so the proxy changes when the session does, not on every request.
 
