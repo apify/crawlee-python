@@ -81,4 +81,4 @@ def test_lock_time_counts_both_runs() -> None:
     async def slow_handler(_context: AdaptivePlaywrightCrawlingContext) -> None:
         pass
 
-    assert crawler._get_expected_processing_time() == timedelta(minutes=6, seconds=5)
+    assert crawler._get_expected_processing_time() == timedelta(minutes=7)

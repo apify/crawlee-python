@@ -292,6 +292,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     _MAX_EXPECTED_PROCESSING_TIME = timedelta(days=1)
     """The longest time the crawler asks the request manager to keep a fetched request locked."""
 
+    _ERROR_HANDLING_LOCK_MARGIN = timedelta(minutes=1)
+    """How much longer than its timeouts the crawler keeps a request locked, so the error handling still holds it."""
+
     def __init__(
         self,
         *,
@@ -720,7 +723,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     def _get_expected_processing_time(self) -> timedelta:
         """Get how long the request manager should keep a fetched request locked."""
         try:
-            processing_time = self._get_max_processing_time() + timedelta(seconds=5)
+            processing_time = self._get_max_processing_time() + self._ERROR_HANDLING_LOCK_MARGIN
         except OverflowError:
             # A timeout such as `timedelta.max`, given to mean no timeout at all.
             processing_time = timedelta.max
@@ -736,7 +739,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             )
             return self._MAX_EXPECTED_PROCESSING_TIME
 
-        return max(processing_time, timedelta(minutes=1))
+        return processing_time
 
     def _get_max_processing_time(self) -> timedelta:
         """Get the longest time the crawler may spend on a request, not counting `context.extend_timeout()` calls.

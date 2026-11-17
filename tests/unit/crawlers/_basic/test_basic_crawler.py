@@ -2762,16 +2762,15 @@ async def test_lock_extension_failure_ignored() -> None:
 @pytest.mark.parametrize(
     ('crawler_timeout', 'route_timeout', 'expected_processing_time'),
     [
-        pytest.param(timedelta(seconds=10), None, timedelta(minutes=1), id='at-least-a-minute'),
-        pytest.param(timedelta(minutes=2), None, timedelta(minutes=2, seconds=5), id='crawler-timeout'),
-        pytest.param(timedelta(minutes=2), timedelta(minutes=1), timedelta(minutes=2, seconds=5), id='shorter-route'),
-        pytest.param(timedelta(seconds=10), timedelta(minutes=3), timedelta(minutes=3, seconds=5), id='longer-route'),
+        pytest.param(timedelta(seconds=10), None, timedelta(minutes=1, seconds=10), id='crawler-timeout'),
+        pytest.param(timedelta(minutes=2), timedelta(minutes=1), timedelta(minutes=3), id='shorter-route'),
+        pytest.param(timedelta(seconds=10), timedelta(minutes=3), timedelta(minutes=4), id='longer-route'),
     ],
 )
 async def test_expected_processing_time(
     crawler_timeout: timedelta, route_timeout: timedelta | None, expected_processing_time: timedelta
 ) -> None:
-    """Test that the request manager learns how long the crawler holds a request, including the longest route."""
+    """Test that the lock time is the longest request handler timeout plus a minute for the error handling."""
     queue = await RequestQueue.open()
     crawler = BasicCrawler(request_manager=queue, request_handler_timeout=crawler_timeout)
 
@@ -2856,7 +2855,7 @@ async def test_late_route_extends_lock_time() -> None:
     with patch.object(queue, 'set_expected_request_processing_time', AsyncMock()) as set_mock:
         await crawler.run()
 
-    set_mock.assert_awaited_once_with(timedelta(minutes=10, seconds=5))
+    set_mock.assert_awaited_once_with(timedelta(minutes=11))
 
 
 async def test_nested_run_cannot_extend_outer() -> None:
