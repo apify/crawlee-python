@@ -1508,6 +1508,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             headers: HttpHeaders | dict[str, str] | None = None,
             cookies: SessionCookies | None = None,
             timeout: timedelta | Literal['default'] | None = 'default',
+            ignore_tls_errors: bool = False,
         ) -> HttpResponse:
             response = await self._http_client.send_request(
                 url=url,
@@ -1518,6 +1519,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 cookies=cookies,
                 proxy_info=proxy_info,
                 timeout=timeout,
+                ignore_tls_errors=ignore_tls_errors,
             )
             # A response whose body the handler never read would hold its connection open.
             register_deferred_cleanup(response.aclose)

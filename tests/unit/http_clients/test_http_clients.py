@@ -4,7 +4,7 @@ import asyncio
 import importlib
 import sys
 from datetime import timedelta
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -15,6 +15,7 @@ from crawlee.http_clients import CurlImpersonateHttpClient, HttpResponse, HttpxH
 from crawlee.http_clients._base import _is_cross_origin, _redirect_method
 from crawlee.http_clients._httpx import _HttpxResponse
 from crawlee.http_clients._impit import _ImpitResponse
+from crawlee.proxy_configuration import ProxyInfo
 from crawlee.sessions import Session
 
 if TYPE_CHECKING:
@@ -75,6 +76,22 @@ def test_ignored_argument_warns(client_class: type[HttpClient], kwarg: str) -> N
     """Test that an argument of the underlying library that the client ignores raises a warning."""
     with pytest.warns(UserWarning, match=f'`{kwarg}` argument'):
         client_class(**{kwarg: Mock()})
+
+
+@pytest.mark.parametrize(
+    'client_class',
+    [
+        pytest.param(ImpitHttpClient, id='impit'),
+        pytest.param(HttpxHttpClient, id='httpx'),
+        pytest.param(CurlImpersonateHttpClient, id='curl_impersonate'),
+    ],
+)
+def test_verify_argument_warns_with_ignore_tls_errors(
+    client_class: type[ImpitHttpClient | HttpxHttpClient | CurlImpersonateHttpClient],
+) -> None:
+    """Test that the ignored `verify` argument raises a warning that points to `ignore_tls_errors`."""
+    with pytest.warns(UserWarning, match='`verify` argument .* is ignored. Use `ignore_tls_errors` instead.'):
+        client_class(verify=False)
 
 
 @pytest.mark.parametrize(
@@ -210,3 +227,88 @@ def test_see_other_keeps_head() -> None:
 def test_is_cross_origin(url: str, other: str, *, expected: bool) -> None:
     """Test that a redirect leaves the origin when the scheme, host or port changes."""
     assert _is_cross_origin(URL(url, encoded=True), URL(other, encoded=True)) is expected
+
+
+@pytest.mark.parametrize(
+    'client_class',
+    [
+        pytest.param(ImpitHttpClient, id='impit'),
+        pytest.param(HttpxHttpClient, id='httpx'),
+    ],
+)
+async def test_clients_cached_per_tls_setting(client_class: type[ImpitHttpClient | HttpxHttpClient]) -> None:
+    """Test that the requests ignoring TLS errors get a client of their own, while the others share one."""
+    client = client_class()
+
+    async with client:
+        verified = client._get_client(None, ignore_tls_errors=False)
+        unverified = client._get_client(None, ignore_tls_errors=True)
+
+        assert verified is not unverified
+        assert client._get_client(None, ignore_tls_errors=False) is verified
+        assert client._get_client(None, ignore_tls_errors=True) is unverified
+
+
+@pytest.mark.parametrize(
+    ('client_class', 'get_client_kwargs'),
+    [
+        pytest.param(ImpitHttpClient, {'ignore_tls_errors': False}, id='impit'),
+        pytest.param(HttpxHttpClient, {'ignore_tls_errors': False}, id='httpx'),
+        pytest.param(CurlImpersonateHttpClient, {}, id='curl_impersonate'),
+    ],
+)
+def test_create_client_gets_prepared_arguments(
+    client_class: type[ImpitHttpClient | HttpxHttpClient | CurlImpersonateHttpClient],
+    get_client_kwargs: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that the client of the library comes from `_create_client`, which gets the arguments of the user too."""
+    client = client_class(timeout=5)
+    create_client = Mock()
+    monkeypatch.setattr(client, '_create_client', create_client)
+
+    assert client._get_client(None, **get_client_kwargs) is create_client.return_value
+    assert create_client.call_args.kwargs['timeout'] == 5
+
+
+@pytest.mark.parametrize(
+    'client_class',
+    [
+        pytest.param(ImpitHttpClient, id='impit'),
+        pytest.param(HttpxHttpClient, id='httpx'),
+        pytest.param(CurlImpersonateHttpClient, id='curl'),
+    ],
+)
+@pytest.mark.parametrize(
+    ('request_flag', 'proxy_flag', 'expected_flag'),
+    [
+        pytest.param(False, False, False, id='verified'),
+        pytest.param(True, False, True, id='request'),
+        pytest.param(False, True, True, id='proxy'),
+    ],
+)
+async def test_ignore_tls_errors_reaches_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+    client_class: type[HttpClient],
+    *,
+    request_flag: bool,
+    proxy_flag: bool,
+    expected_flag: bool,
+) -> None:
+    """Test that `send_request` asks `_fetch` to ignore TLS errors when the call or its proxy sets the flag."""
+    url = 'https://example.com/'
+    response = Mock(spec=HttpResponse, status_code=200, headers={}, url=url, headers_set_cookie=[])
+    fetch = AsyncMock(return_value=response)
+    client = client_class()
+    monkeypatch.setattr(client, '_fetch', fetch)
+    proxy_info = ProxyInfo(
+        url='http://proxy.com:8000',
+        scheme='http',
+        hostname='proxy.com',
+        port=8000,
+        ignore_tls_errors=proxy_flag,
+    )
+
+    await client.send_request(url, proxy_info=proxy_info, ignore_tls_errors=request_flag)
+
+    assert fetch.call_args.kwargs['ignore_tls_errors'] is expected_flag

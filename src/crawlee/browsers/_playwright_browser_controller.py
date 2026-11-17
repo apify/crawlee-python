@@ -287,6 +287,9 @@ class PlaywrightBrowserController(BrowserController):
                 password=proxy_info.password,
             )
 
+            if proxy_info.ignore_tls_errors:
+                filtered_options['ignore_https_errors'] = True
+
         if self._fingerprint_generator:
             return await AsyncNewContext(
                 browser=self._browser,

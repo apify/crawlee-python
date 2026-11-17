@@ -103,7 +103,7 @@ Crawlee provides an abstract base class, <ApiLink to="class/HttpClient">`HttpCli
 
 To create a custom HTTP client, inherit from <ApiLink to="class/HttpClient">`HttpClient`</ApiLink> and implement two methods:
 
-- `_fetch` sends a single request, through the proxy from `proxy_info` if there is one, and returns the response without reading its body. It doesn't follow redirects or keep cookies of its own. Its `timeout` bounds both receiving the response and reading the body. With `'default'`, the default timeout of the underlying library applies. With `None`, there's no timeout, and the caller stops the request by cancelling it.
+- `_fetch` sends a single request, through the proxy from `proxy_info` if there is one, and returns the response without reading its body. It doesn't follow redirects or keep cookies of its own. Its `timeout` bounds both receiving the response and reading the body. With `'default'`, the default timeout of the underlying library applies. With `None`, there's no timeout, and the caller stops the request by cancelling it. With `ignore_tls_errors`, it doesn't verify the TLS certificate of the server.
 - `cleanup` closes the connections and other resources the client holds.
 
 The response is a subclass of the abstract <ApiLink to="class/HttpResponse">`HttpResponse`</ApiLink> class. Its body is read on `read` or `read_stream`, and `aclose` releases the connection when the body isn't needed. The base class provides the async context manager, which closes the response on exit. Crawlers stop a request by cancelling it, so a cancelled `_fetch`, `read` or `read_stream` must release the connection.
