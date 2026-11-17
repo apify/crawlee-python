@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 
 _PATCH_MODULE = 'crawlee.browsers._stagehand_browser_plugin'
 
+pytestmark = pytest.mark.usefixtures('stagehand_binary')
+
 
 @pytest.fixture
 def stagehand_client_mock() -> MagicMock:
@@ -24,7 +26,7 @@ def stagehand_client_mock() -> MagicMock:
 
 
 @pytest.fixture
-async def plugin(stagehand_binary: None) -> AsyncGenerator[StagehandBrowserPlugin, None]:  # noqa: ARG001
+async def plugin() -> AsyncGenerator[StagehandBrowserPlugin, None]:
     async with StagehandBrowserPlugin() as plugin:
         yield plugin
 
@@ -69,7 +71,6 @@ async def test_stagehand_called_with_browserbase_params(stagehand_client_mock: M
     assert 'local_chrome_path' not in call_kwargs
 
 
-@pytest.mark.usefixtures('stagehand_binary')
 async def test_methods_raise_error_when_not_active() -> None:
     plugin = StagehandBrowserPlugin()
 
