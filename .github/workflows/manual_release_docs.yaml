@@ -27,14 +27,10 @@ env:
   PYTHON_VERSION: 3.14
 
 jobs:
-  release_docs:
-    name: Release docs
-    environment:
-      name: github-pages
+  build_docs:
+    name: Build docs
     permissions:
-      contents: write
-      pages: write
-      id-token: write
+      contents: read
       checks: read
     runs-on: ubuntu-latest
 
@@ -52,7 +48,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
-          token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+          persist-credentials: false
 
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -83,13 +79,25 @@ jobs:
           APIFY_SIGNING_TOKEN: ${{ secrets.APIFY_SIGNING_TOKEN }}
           SEGMENT_TOKEN: ${{ secrets.SEGMENT_TOKEN }}
 
-      - name: Set up GitHub Pages
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: ./website/build
+
+  # The service account token is only used in a job that does not run the docs toolchain.
+  deploy_docs:
+    name: Deploy docs
+    needs: [build_docs]
+    environment:
+      name: github-pages
+    permissions:
+      pages: write
+      id-token: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up GitHub Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
       - name: Deploy artifact to GitHub Pages
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
