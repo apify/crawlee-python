@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import sys
 from typing import TYPE_CHECKING
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from crawlee.configuration import Configuration
 from crawlee.storage_backends import SqlStorageBackend
+from crawlee.storages import Dataset
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -52,6 +53,74 @@ async def test_sqlite_wal_mode_not_applied_with_custom_engine(tmp_path: Path) ->
         async with engine.begin() as conn:
             result = await conn.execute(text('PRAGMA journal_mode'))
             assert result.scalar() != 'wal'
+
+    await engine.dispose()
+
+
+async def test_closed_backend_raises(tmp_path: Path) -> None:
+    """A closed backend refuses to open storages and to serve the ones opened before."""
+    configuration = Configuration(storage_dir=str(tmp_path))
+
+    async with SqlStorageBackend() as storage_backend:
+        kvs_backend = await storage_backend.create_kvs_backend(configuration=configuration)
+
+    with pytest.raises(RuntimeError, match=r'SqlStorageBackend is closed'):
+        await kvs_backend.set_value(key='key', value='value')
+
+    with pytest.raises(RuntimeError, match=r'SqlStorageBackend is closed'):
+        await storage_backend.create_kvs_backend(configuration=configuration)
+
+    with pytest.raises(RuntimeError, match=r'SqlStorageBackend is closed'):
+        _ = storage_backend.engine
+
+
+async def test_backend_closed_before_first_use_refuses_initialization(tmp_path: Path) -> None:
+    """A backend closed before its first use doesn't create an engine afterwards."""
+    async with SqlStorageBackend() as storage_backend:
+        pass
+
+    with pytest.raises(RuntimeError, match=r'SqlStorageBackend is closed'):
+        await storage_backend.initialize(Configuration(storage_dir=str(tmp_path)))
+
+
+async def test_close_keeps_passed_engine(tmp_path: Path) -> None:
+    """An engine passed in belongs to the caller, so the backend doesn't dispose it."""
+    engine = create_async_engine(f'sqlite+aiosqlite:///{tmp_path / "test.db"}')
+
+    with patch.object(AsyncEngine, 'dispose', AsyncMock()) as dispose:
+        async with SqlStorageBackend(engine=engine):
+            pass
+
+    dispose.assert_not_awaited()
+    await engine.dispose()
+
+
+async def test_close_disposes_own_engine(tmp_path: Path) -> None:
+    """An engine created from the connection string is disposed with the backend, and only once."""
+    storage_backend = SqlStorageBackend(connection_string=f'sqlite+aiosqlite:///{tmp_path / "test.db"}')
+    await storage_backend.initialize(Configuration(storage_dir=str(tmp_path)))
+    engine = storage_backend.engine
+
+    with patch.object(AsyncEngine, 'dispose', AsyncMock()) as dispose:
+        await storage_backend.close()
+        await storage_backend.close()
+
+    dispose.assert_awaited_once()
+    await engine.dispose()
+
+
+async def test_new_backend_skips_storages_of_closed_one(tmp_path: Path) -> None:
+    """A new backend opens its own storage instead of the cached one bound to a closed backend."""
+    configuration = Configuration(storage_dir=str(tmp_path), purge_on_start=False)
+
+    async with SqlStorageBackend() as storage_backend:
+        old_dataset = await Dataset.open(name='results', storage_backend=storage_backend, configuration=configuration)
+
+    async with SqlStorageBackend() as storage_backend:
+        dataset = await Dataset.open(name='results', storage_backend=storage_backend, configuration=configuration)
+        await dataset.push_data({'key': 'value'})
+
+    assert dataset is not old_dataset
 
 
 def test_import_error_handled() -> None:

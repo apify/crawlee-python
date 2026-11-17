@@ -85,6 +85,8 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
             assert 'key_value_stores' in tables
             assert 'key_value_store_records' in tables
 
+    await engine.dispose()
+
 
 async def test_tables_and_metadata_record(configuration: Configuration) -> None:
     """Test that SQL key-value store creates proper tables and metadata records."""

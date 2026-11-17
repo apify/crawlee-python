@@ -83,6 +83,8 @@ async def test_create_tables_with_engine(configuration: Configuration, tmp_path:
             assert 'dataset_records' in tables
             assert 'datasets' in tables
 
+    await engine.dispose()
+
 
 async def test_tables_and_metadata_record(configuration: Configuration) -> None:
     """Test that SQL dataset creates proper tables and metadata records."""
