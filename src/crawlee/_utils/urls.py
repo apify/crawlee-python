@@ -42,16 +42,23 @@ def convert_to_absolute_url(base_url: str, relative_url: str) -> str:
 def to_absolute_url_iterator(base_url: str, urls: Iterator[str], logger: Logger | None = None) -> Iterator[str]:
     """Convert an iterator of relative URLs to absolute URLs using a base URL."""
     for url in urls:
-        if is_url_absolute(url):
-            yield url
-        else:
-            converted_url = convert_to_absolute_url(base_url, url)
-            # Skip the URL if conversion fails, probably due to an incorrect format, such as 'mailto:'.
-            if not is_url_absolute(converted_url):
-                if logger:
-                    logger.debug(f'Could not convert URL "{url}" to absolute using base URL "{base_url}". Skipping it.')
-                continue
-            yield converted_url
+        try:
+            converted_url = url if is_url_absolute(url) else convert_to_absolute_url(base_url, url)
+            # Reading the host decodes an IDNA host such as `xn--a.com`, which raises for an invalid one, so the URL
+            # would fail later when it is filtered or enqueued.
+            _ = URL(converted_url).host
+        except ValueError as error:
+            # The URL cannot be parsed, for example because its port is out of range or its host is invalid.
+            if logger:
+                logger.debug(f'Could not parse URL "{url}": {error}. Skipping it.')
+            continue
+
+        # Skip the URL if conversion fails, probably due to an incorrect format, such as 'mailto:'.
+        if not is_url_absolute(converted_url):
+            if logger:
+                logger.debug(f'Could not convert URL "{url}" to absolute using base URL "{base_url}". Skipping it.')
+            continue
+        yield converted_url
 
 
 def validate_http_url(value: str | None) -> str | None:

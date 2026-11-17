@@ -9,6 +9,7 @@ from crawlee._utils.urls import (
     convert_to_absolute_url,
     filter_url,
     is_url_absolute,
+    to_absolute_url_iterator,
     validate_http_url,
 )
 
@@ -41,6 +42,22 @@ def test_convert_to_absolute_url() -> None:
     relative_url = '../path/to/resource'
     absolute_url = convert_to_absolute_url(base_url, relative_url)
     assert absolute_url == 'http://example.com/path/to/resource'
+
+
+@pytest.mark.parametrize(
+    ('url', 'expected'),
+    [
+        pytest.param('https://example.com/page', ['https://example.com/page'], id='absolute'),
+        pytest.param('/page', ['https://base.com/page'], id='relative'),
+        pytest.param('mailto:test@test.com', [], id='mailto'),
+        pytest.param('http://tel:+911234567890', [], id='port_out_of_range'),
+        pytest.param('http://[::1', [], id='unclosed_ipv6_bracket'),
+        pytest.param('http://xn--a.com/', [], id='invalid_idna_host'),
+    ],
+)
+def test_to_absolute_url_iterator(url: str, expected: list[str]) -> None:
+    """Relative URLs are resolved against the base URL, and URLs that cannot be used are skipped."""
+    assert list(to_absolute_url_iterator('https://base.com/dir/', iter([url]))) == expected
 
 
 def test_validate_http_url() -> None:
