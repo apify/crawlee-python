@@ -182,6 +182,34 @@ The memory backend now handles values the same way as the file-system backend. I
 
 If processing a request can take longer than 3 minutes, call `RequestQueue.set_expected_request_processing_time()` with the longest time you expect. Every request fetched after that call stays locked at least that long. To give a single request that's still being processed more time, call `RequestQueue.extend_request_processing_time()`.
 
+## Each `RedisStorageBackend` opens its own storages
+
+In v1, all `RedisStorageClient` instances in a process shared the storages opened through any of them, even when they connected to different Redis servers. Now each `RedisStorageBackend` instance opens its own storages. With `purge_on_start` enabled, a new instance purges the unnamed storages, such as the default dataset, when it opens them. When it connects to the same database as an earlier instance, the data the earlier one wrote to these storages is lost. To read what a crawler stored in them, open them through the crawler's backend.
+
+Use `RedisStorageBackend` as an async context manager. On exit, it closes the Redis client it created from the connection string. In v1, nothing closed that client. A client you pass in stays open, so close it yourself. Storages opened through a closed backend stop working.
+
+For example:
+
+```python
+# v1
+storage_client = RedisStorageClient(connection_string='redis://localhost:6379')
+crawler = ParselCrawler(storage_client=storage_client)
+await crawler.run(['https://crawlee.dev'])
+
+dataset = await Dataset.open(
+    storage_client=RedisStorageClient(connection_string='redis://localhost:6379')
+)
+
+# v2
+async with RedisStorageBackend(
+    connection_string='redis://localhost:6379'
+) as storage_backend:
+    crawler = ParselCrawler(storage_backend=storage_backend)
+    await crawler.run(['https://crawlee.dev'])
+
+    dataset = await Dataset.open(storage_backend=storage_backend)
+```
+
 ## Crawler `id` is a string
 
 The `id` argument of `BasicCrawler` and its subclasses is now a `str`, so pass a string wherever you passed an integer. `StatisticsState.stats_id` and `EventCrawlerStatusData.crawler_id` are strings too, and `crawler_id` holds the crawler's `id`. In v1, it held the Python object ID of the crawler.
@@ -291,7 +319,7 @@ for urls in batches:
     await crawler.run(urls)
 ```
 
-`Configuration.purge_on_start` isn't affected. Unnamed storages are still purged once per process, when they're first opened.
+`Configuration.purge_on_start` isn't affected. Unnamed storages are still purged when a storage backend first opens them.
 
 ## `RequestQueue.purge` raises when the storage backend can't purge
 

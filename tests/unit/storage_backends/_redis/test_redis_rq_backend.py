@@ -455,3 +455,23 @@ async def test_extend_rejects_non_positive_delta(rq_backend: RedisRequestQueueBa
     """Test that a lock extension must be positive."""
     with pytest.raises(ValueError, match='must be positive'):
         await rq_backend.extend_request_processing_time(Request.from_url('https://example.com/1'), delta)
+
+
+async def test_closed_backend_skips_scripts(
+    redis_client: FakeAsyncRedis,
+    suppress_user_warning: None,  # noqa: ARG001
+) -> None:
+    """A queue of a closed backend raises before its scripts lock or extend any request."""
+    request = Request.from_url('https://example.com/1')
+
+    async with RedisStorageBackend(redis=redis_client) as storage_backend:
+        rq_backend = await storage_backend.create_rq_backend(name='test_request_queue')
+        await rq_backend.add_batch_of_requests([request])
+
+    with pytest.raises(RuntimeError, match=r'RedisStorageBackend is closed'):
+        await rq_backend.fetch_next_request()
+
+    with pytest.raises(RuntimeError, match=r'RedisStorageBackend is closed'):
+        await rq_backend.extend_request_processing_time(request, timedelta(minutes=10))
+
+    assert await await_redis_response(redis_client.hlen(rq_backend._in_progress_key)) == 0

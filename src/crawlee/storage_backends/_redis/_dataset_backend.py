@@ -17,11 +17,12 @@ from ._utils import await_redis_response
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Mapping
 
-    from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
     from redis.commands.json._util import JsonType
 
     from crawlee._types import JsonSerializable
+
+    from ._storage_backend import RedisStorageBackend
 
 logger = getLogger(__name__)
 
@@ -57,7 +58,7 @@ class RedisDatasetBackend(DatasetBackend, RedisBackendMixin):
     _STORAGE_TYPE = 'Dataset'
     """Human-readable storage type for error messages."""
 
-    def __init__(self, storage_name: str, storage_id: str, redis: Redis) -> None:
+    def __init__(self, storage_name: str, storage_id: str, storage_backend: RedisStorageBackend) -> None:
         """Initialize a new instance.
 
         Preferably use the `RedisDatasetBackend.open` class method to create a new instance.
@@ -65,9 +66,9 @@ class RedisDatasetBackend(DatasetBackend, RedisBackendMixin):
         Args:
             storage_name: Internal storage name used for Redis keys.
             storage_id: Unique identifier for the dataset.
-            redis: Redis client instance.
+            storage_backend: The storage backend providing the Redis client.
         """
-        super().__init__(storage_name=storage_name, storage_id=storage_id, redis=redis)
+        super().__init__(storage_name=storage_name, storage_id=storage_id, storage_backend=storage_backend)
 
     @property
     def _items_key(self) -> str:
@@ -81,7 +82,7 @@ class RedisDatasetBackend(DatasetBackend, RedisBackendMixin):
         id: str | None,
         name: str | None,
         alias: str | None,
-        redis: Redis,
+        storage_backend: RedisStorageBackend,
     ) -> RedisDatasetBackend:
         """Open or create a new Redis dataset backend.
 
@@ -93,7 +94,7 @@ class RedisDatasetBackend(DatasetBackend, RedisBackendMixin):
             id: The ID of the dataset. If not provided, a random ID will be generated.
             name: The name of the dataset for named (global scope) storages.
             alias: The alias of the dataset for unnamed (run scope) storages.
-            redis: Redis client instance.
+            storage_backend: The storage backend providing the Redis client.
 
         Returns:
             An instance for the opened or created storage backend.
@@ -102,7 +103,7 @@ class RedisDatasetBackend(DatasetBackend, RedisBackendMixin):
             id=id,
             name=name,
             alias=alias,
-            redis=redis,
+            storage_backend=storage_backend,
             metadata_model=DatasetMetadata,
             extra_metadata_fields={'item_count': 0},
             instance_kwargs={},
@@ -207,7 +208,7 @@ class RedisDatasetBackend(DatasetBackend, RedisBackendMixin):
         if json_path == '$':
             json_path = '$[*]'
 
-        data = await await_redis_response(self._redis.json().get(self._items_key, json_path))
+        data = await await_redis_response(self.redis.json().get(self._items_key, json_path))
 
         if not isinstance(data, list):
             data = []
@@ -295,7 +296,7 @@ class RedisDatasetBackend(DatasetBackend, RedisBackendMixin):
                 json_path = f'$[{batch_start}:{batch_end}]'
 
             # Get batch of items
-            batch_items = await await_redis_response(self._redis.json().get(self._items_key, json_path))
+            batch_items = await await_redis_response(self.redis.json().get(self._items_key, json_path))
 
             # Handle case where batch_items might be None or not a list
             if batch_items is None or not isinstance(batch_items, list):

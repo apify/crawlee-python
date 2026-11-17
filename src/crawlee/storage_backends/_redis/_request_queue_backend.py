@@ -21,9 +21,10 @@ from ._utils import await_redis_response
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
     from redis.commands.core import AsyncScript
+
+    from ._storage_backend import RedisStorageBackend
 
 logger = getLogger(__name__)
 
@@ -90,7 +91,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
         self,
         storage_name: str,
         storage_id: str,
-        redis: Redis,
+        storage_backend: RedisStorageBackend,
         dedup_strategy: Literal['default', 'bloom'] = 'default',
         bloom_error_rate: float = 1e-7,
     ) -> None:
@@ -98,7 +99,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
 
         Preferably use the `RedisRequestQueueBackend.open` class method to create a new instance.
         """
-        super().__init__(storage_name=storage_name, storage_id=storage_id, redis=redis)
+        super().__init__(storage_name=storage_name, storage_id=storage_id, storage_backend=storage_backend)
 
         self._dedup_strategy = dedup_strategy
         """Deduplication strategy for the queue."""
@@ -173,7 +174,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
         id: str | None,
         name: str | None,
         alias: str | None,
-        redis: Redis,
+        storage_backend: RedisStorageBackend,
         dedup_strategy: Literal['default', 'bloom'] = 'default',
         bloom_error_rate: float = 1e-7,
     ) -> RedisRequestQueueBackend:
@@ -187,7 +188,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
             id: The ID of the request queue. If not provided, a random ID will be generated.
             name: The name of the dataset for named (global scope) storages.
             alias: The alias of the dataset for unnamed (run scope) storages.
-            redis: Redis client instance.
+            storage_backend: The storage backend providing the Redis client.
             dedup_strategy: Strategy for request queue deduplication. Options are:
                 - 'default': Uses Redis sets for exact deduplication.
                 - 'bloom': Uses Redis Bloom filters for probabilistic deduplication with lower memory usage. When using
@@ -202,7 +203,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
             id=id,
             name=name,
             alias=alias,
-            redis=redis,
+            storage_backend=storage_backend,
             metadata_model=RequestQueueMetadata,
             extra_metadata_fields={
                 'had_multiple_clients': False,
@@ -325,6 +326,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
                     self._data_key,
                 ],
                 args=[int(forefront), json.dumps(new_unique_keys), json.dumps(new_request_data)],
+                client=self.redis,
             )
             actually_added = set(json.loads(script_results))
 
@@ -373,6 +375,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
         requests_json = await self._fetch_script(
             keys=[self._queue_key, self._in_progress_key, self._data_key],
             args=[self.client_key, blocked_until_timestamp, self._MAX_BATCH_FETCH_SIZE],
+            client=self.redis,
         )
 
         async with self._get_pipeline() as pipe:
@@ -390,7 +393,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
     @retry_on_error(RedisError)
     @override
     async def get_request(self, unique_key: str) -> Request | None:
-        request_data = await await_redis_response(self._redis.hget(self._data_key, unique_key))
+        request_data = await await_redis_response(self.redis.hget(self._data_key, unique_key))
 
         if isinstance(request_data, (str, bytes, bytearray)):
             return Request.model_validate_json(request_data)
@@ -402,7 +405,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
         # `hdel` is an atomic operation, so we can be sure that if it returns 1, the request was in progress and is now
         # removed from `in_progress`.
-        deleted = await await_redis_response(self._redis.hdel(self._in_progress_key, request.unique_key))
+        deleted = await await_redis_response(self.redis.hdel(self._in_progress_key, request.unique_key))
 
         # If not deleted, the request was not in progress.
         if not deleted:
@@ -445,7 +448,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
             # If we fail to mark the request as handled after removing it from in_progress, we restore request in
             # `in_progress` hash.
             await await_redis_response(
-                self._redis.hset(
+                self.redis.hset(
                     self._in_progress_key,
                     request.unique_key,
                     json.dumps({'client_id': self.client_key, 'blocked_until_timestamp': blocked_until}),
@@ -461,7 +464,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
         *,
         forefront: bool = False,
     ) -> ProcessedRequest | None:
-        check_in_progress = await await_redis_response(self._redis.hexists(self._in_progress_key, request.unique_key))
+        check_in_progress = await await_redis_response(self.redis.hexists(self._in_progress_key, request.unique_key))
         if not check_in_progress:
             logger.info('Reclaiming request %s that is not in progress.', request.unique_key)
             return None
@@ -514,7 +517,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
             self._next_reclaim_stale = datetime.now(tz=UTC) + self._RECLAIM_INTERVAL
 
         # Check if there are any requests in the queue.
-        requests_in_queue = await await_redis_response(self._redis.llen(self._queue_key))
+        requests_in_queue = await await_redis_response(self.redis.llen(self._queue_key))
         return requests_in_queue == 0
 
     @retry_on_error(RedisError)
@@ -545,6 +548,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
         extended = await self._extend_lock_script(
             keys=[self._in_progress_key],
             args=[request.unique_key, self.client_key, current_time, delta_ms],
+            client=self.redis,
         )
         return extended == 1
 
@@ -581,7 +585,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
         current_time = int(datetime.now(tz=UTC).timestamp() * 1000)
 
         await self._reclaim_stale_script(
-            keys=[self._in_progress_key, self._queue_key, self._data_key], args=[current_time]
+            keys=[self._in_progress_key, self._queue_key, self._data_key], args=[current_time], client=self.redis
         )
 
     @override

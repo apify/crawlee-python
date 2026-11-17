@@ -19,7 +19,7 @@ from ._utils import await_redis_response, expect_bytes
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-    from redis.asyncio import Redis
+    from ._storage_backend import RedisStorageBackend
 
 logger = getLogger(__name__)
 
@@ -64,12 +64,12 @@ class RedisKeyValueStoreBackend(KeyValueStoreBackend, RedisBackendMixin):
     A single record larger than this is still fetched, but alone in its batch.
     """
 
-    def __init__(self, storage_name: str, storage_id: str, redis: Redis) -> None:
+    def __init__(self, storage_name: str, storage_id: str, storage_backend: RedisStorageBackend) -> None:
         """Initialize a new instance.
 
         Preferably use the `RedisKeyValueStoreBackend.open` class method to create a new instance.
         """
-        super().__init__(storage_name=storage_name, storage_id=storage_id, redis=redis)
+        super().__init__(storage_name=storage_name, storage_id=storage_id, storage_backend=storage_backend)
 
     @property
     def _items_key(self) -> str:
@@ -88,7 +88,7 @@ class RedisKeyValueStoreBackend(KeyValueStoreBackend, RedisBackendMixin):
         id: str | None,
         name: str | None,
         alias: str | None,
-        redis: Redis,
+        storage_backend: RedisStorageBackend,
     ) -> RedisKeyValueStoreBackend:
         """Open or create a new Redis key-value store backend.
 
@@ -100,7 +100,7 @@ class RedisKeyValueStoreBackend(KeyValueStoreBackend, RedisBackendMixin):
             id: The ID of the key-value store. If not provided, a random ID will be generated.
             name: The name of the key-value store for named (global scope) storages.
             alias: The alias of the key-value store for unnamed (run scope) storages.
-            redis: Redis client instance.
+            storage_backend: The storage backend providing the Redis client.
 
         Returns:
             An instance for the opened or created storage backend.
@@ -109,7 +109,7 @@ class RedisKeyValueStoreBackend(KeyValueStoreBackend, RedisBackendMixin):
             id=id,
             name=name,
             alias=alias,
-            redis=redis,
+            storage_backend=storage_backend,
             metadata_model=KeyValueStoreMetadata,
             extra_metadata_fields={},
             instance_kwargs={},
@@ -175,7 +175,7 @@ class RedisKeyValueStoreBackend(KeyValueStoreBackend, RedisBackendMixin):
     @retry_on_error(RedisError)
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
-        serialized_metadata_item = await await_redis_response(self._redis.hget(self._metadata_items_key, key))
+        serialized_metadata_item = await await_redis_response(self.redis.hget(self._metadata_items_key, key))
 
         async with self._get_pipeline() as pipe:
             await self._update_metadata(pipe, **MetadataUpdateParams(update_accessed_at=True))
@@ -191,7 +191,7 @@ class RedisKeyValueStoreBackend(KeyValueStoreBackend, RedisBackendMixin):
             return KeyValueStoreRecord(value=None, **metadata_item.model_dump())
 
         # Query the record by key
-        value_bytes = expect_bytes(await await_redis_response(self._redis.hget(self._items_key, key)))
+        value_bytes = expect_bytes(await await_redis_response(self.redis.hget(self._items_key, key)))
 
         return self._build_record(metadata_item, value_bytes)
 
@@ -248,7 +248,7 @@ class RedisKeyValueStoreBackend(KeyValueStoreBackend, RedisBackendMixin):
         exclusive_start_key: str | None = None,
         limit: int | None = None,
     ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
-        items_data = await await_redis_response(self._redis.hgetall(self._metadata_items_key))
+        items_data = await await_redis_response(self.redis.hgetall(self._metadata_items_key))
 
         if not items_data:
             return  # No items to iterate over
@@ -309,7 +309,7 @@ class RedisKeyValueStoreBackend(KeyValueStoreBackend, RedisBackendMixin):
     async def _fetch_records(self, batch: list[KeyValueStoreRecordMetadata]) -> list[KeyValueStoreRecord]:
         """Fetch the values of the given records with a single HMGET call and return the deserialized records."""
         keys = [item.key for item in batch]
-        values = [expect_bytes(v) for v in await await_redis_response(self._redis.hmget(self._items_key, keys))]
+        values = [expect_bytes(v) for v in await await_redis_response(self.redis.hmget(self._items_key, keys))]
 
         # A missing value means the record was deleted after its metadata was listed, so it is skipped silently.
         records = (
