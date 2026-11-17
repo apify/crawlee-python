@@ -69,6 +69,7 @@ async def test_stagehand_called_with_browserbase_params(stagehand_client_mock: M
     assert 'local_chrome_path' not in call_kwargs
 
 
+@pytest.mark.usefixtures('stagehand_binary')
 async def test_methods_raise_error_when_not_active() -> None:
     plugin = StagehandBrowserPlugin()
 
