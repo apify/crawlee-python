@@ -82,7 +82,7 @@ async def wait_for_all_tasks_to_finish(
     if not tasks:
         return
 
-    timeout_secs = timeout.total_seconds() if timeout else None
+    timeout_secs = timeout.total_seconds() if timeout is not None else None
     try:
         _, pending = await asyncio.wait(tasks, timeout=timeout_secs)
         if pending:
