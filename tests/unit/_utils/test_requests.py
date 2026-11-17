@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from crawlee import Request
 from crawlee._types import HttpHeaders
 from crawlee._utils.requests import compute_unique_key, normalize_url
 
@@ -150,3 +151,49 @@ def test_compute_unique_key_with_whitespace_in_headers() -> None:
 
     uk_2 = compute_unique_key(url, headers=headers_with_whitespaces, use_extended_unique_key=True)
     assert uk_2 == expected_output
+
+
+@pytest.mark.parametrize(
+    ('path', 'other_path'),
+    [
+        pytest.param('/items/a%2Fb', '/items/a/b', id='encoded-slash'),
+        pytest.param('/items/a%2fb', '/items/a/b', id='lowercase-encoded-slash'),
+        pytest.param('/items/a%2F', '/items/a', id='encoded-trailing-slash'),
+        pytest.param('/items/a%2f', '/items/a', id='lowercase-encoded-trailing-slash'),
+        pytest.param('/items/a%2F/', '/items/a', id='encoded-before-literal-trailing-slash'),
+        pytest.param('/items/a%252Fb', '/items/a%2Fb', id='double-encoded-slash'),
+    ],
+)
+def test_request_unique_key_preserves_encoded_slashes(path: str, other_path: str) -> None:
+    """Keep escaped resource identifiers distinct from path separators in request keys."""
+    request = Request.from_url(f'https://example.com{path}')
+    other_request = Request.from_url(f'https://example.com{other_path}')
+
+    assert request.unique_key != other_request.unique_key
+
+
+@pytest.mark.parametrize(
+    ('url', 'expected_output', 'keep_url_fragment'),
+    [
+        pytest.param('https://example.com/a%2fb', 'https://example.com/a%2fb', False, id='escape-spelling'),
+        pytest.param('https://example.com/a%252fb', 'https://example.com/a%252fb', False, id='no-double-quoting'),
+        pytest.param('https://example.com/%61%7E', 'https://example.com/a~', False, id='unreserved-escapes'),
+        pytest.param('https://example.com/a%3Fb', 'https://example.com/a%3fb', False, id='escaped-question-mark'),
+        pytest.param('https://example.com/a/', 'https://example.com/a', False, id='literal-trailing-slash'),
+        pytest.param(
+            'https://example.com/a%2F/?z=2&utm_source=test&a=1#fragment',
+            'https://example.com/a%2f?a=1&z=2',
+            False,
+            id='query-filter-sort-drop-fragment',
+        ),
+        pytest.param(
+            'https://example.com/a%2F/?z=2&utm_source=test&a=1#fragment',
+            'https://example.com/a%2f?a=1&z=2#fragment',
+            True,
+            id='query-filter-sort-keep-fragment',
+        ),
+    ],
+)
+def test_normalize_url_encoded_path(url: str, expected_output: str, *, keep_url_fragment: bool) -> None:
+    """Preserve path escapes while retaining URL canonicalization and fragment controls."""
+    assert normalize_url(url, keep_url_fragment=keep_url_fragment) == expected_output
