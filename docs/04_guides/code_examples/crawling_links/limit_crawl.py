@@ -7,8 +7,8 @@ from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 
 async def main() -> None:
     crawler = BeautifulSoupCrawler(
-        # Stop the crawl after 50 requests.
-        max_requests_per_crawl=50,
+        # Stop the crawl after about 10 requests.
+        max_requests_per_crawl=10,
         # Follow links at most 2 levels away from the start URL.
         max_crawl_depth=2,
     )
