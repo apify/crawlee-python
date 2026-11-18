@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from typing_extensions import override
+
 from crawlee._utils.docs import docs_group
 from crawlee.browsers import BrowserPool
 from crawlee.browsers._stagehand_browser_plugin import StagehandBrowserPlugin
@@ -18,6 +20,7 @@ if TYPE_CHECKING:
     from datetime import timedelta
     from pathlib import Path
 
+    from playwright.async_api import Page
     from typing_extensions import Unpack
 
     from crawlee.browsers import StagehandOptions
@@ -167,6 +170,12 @@ class StagehandCrawler(
             navigation_timeout=navigation_timeout,
             **kwargs,
         )
+
+    @override
+    def _can_fetch_navigation_request(self, page: Page) -> bool:
+        # Playwright attaches to the Stagehand browser over CDP and does not know its proxy, so a request that
+        # Playwright sends itself would not go through that proxy.
+        return False
 
     @staticmethod
     def _validate_browser_pool(pool: BrowserPool) -> None:

@@ -455,6 +455,25 @@ async def test_authorization_header_request_fails_fast_on_refused_connection(
     assert not isinstance(errors[0], asyncio.TimeoutError)
 
 
+async def test_authorization_header_request_continued_when_not_fetchable(
+    monkeypatch: pytest.MonkeyPatch, server_url: URL
+) -> None:
+    """Where Playwright cannot send the navigation request, the browser sends it and redirect hops get the header."""
+    monkeypatch.setattr(PlaywrightCrawler, '_can_fetch_navigation_request', Mock(return_value=False))
+    crawler = PlaywrightCrawler()
+    received_headers = dict[str, str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        received_headers.update(json.loads(await context.response.text()))
+
+    target_url = str(server_url / 'headers')
+    start_url = str((server_url / 'redirect').with_query(url=target_url))
+    await crawler.run([Request.from_url(start_url, headers={'Authorization': 'Bearer secret-token'})])
+
+    assert received_headers.get('authorization') == 'Bearer secret-token'
+
+
 @pytest.mark.parametrize(
     'request_headers',
     [

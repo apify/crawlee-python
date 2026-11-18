@@ -48,10 +48,10 @@ class NavigationRequestInterceptor:
     fingerprint headers), with the custom ones winning.
 
     Redirect hops bypass routing, and a continued request passes its header overrides to them, also to a redirect
-    target on another origin. So a request with a custom `Authorization` header is not continued: `Route.fetch`
-    sends it without following redirects, and its response is fulfilled. The browser then follows any redirect on
-    its own, without the custom headers, so the credentials never reach another origin. Without an `Authorization`
-    header, the request is continued and redirect hops carry the custom headers.
+    target on another origin. So with `fetch_authorized_request`, a request with a custom `Authorization` header
+    is not continued: `Route.fetch` sends it without following redirects, and its response is fulfilled. The browser
+    then follows any redirect on its own, without the custom headers, so the credentials never reach another origin.
+    Any other request is continued, and redirect hops carry its custom headers.
     """
 
     def __init__(
@@ -62,6 +62,7 @@ class NavigationRequestInterceptor:
         headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
         timeout: timedelta | None = None,
+        fetch_authorized_request: bool = False,
     ) -> None:
         """Initialize a new instance.
 
@@ -71,12 +72,16 @@ class NavigationRequestInterceptor:
             headers: Custom headers of the navigation request.
             payload: Payload of the navigation request.
             timeout: Time limit for a request sent with `Route.fetch`. If None, the Playwright default applies.
+            fetch_authorized_request: Whether `Route.fetch` sends a request with a custom `Authorization` header.
+                Playwright then sends the request in place of the browser, so it needs the proxy of the browser
+                in its own options, and the browser has to accept a fulfilled redirect response.
         """
         self._page = page
         self._method = method
         self._headers = headers
         self._payload = payload
         self._timeout = timeout
+        self._fetch_authorized_request = fetch_authorized_request
         self._applied = False
 
     async def register(self) -> None:
@@ -95,7 +100,9 @@ class NavigationRequestInterceptor:
         self._applied = True
         merged_headers = {**request.headers, **dict(self._headers)} if self._headers else None
 
-        if merged_headers and any(name.lower() == 'authorization' for name in self._headers or ()):
+        has_authorization = any(name.lower() == 'authorization' for name in self._headers or ())
+
+        if merged_headers and has_authorization and self._fetch_authorized_request:
             await self._fetch_and_fulfill(route, merged_headers)
             return
 

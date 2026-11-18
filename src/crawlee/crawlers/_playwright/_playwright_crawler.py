@@ -394,6 +394,7 @@ class PlaywrightCrawler(
                         headers=context.request.headers,
                         payload=context.request.payload,
                         timeout=remaining_timeout,
+                        fetch_authorized_request=self._can_fetch_navigation_request(context.page),
                     )
                     await interceptor.register()
 
@@ -411,6 +412,14 @@ class PlaywrightCrawler(
         context.request.loaded_url = context.page.url
 
         yield self._build_post_nav_context(context, response=response)
+
+    def _can_fetch_navigation_request(self, page: Page) -> bool:
+        """Check whether Playwright can send the navigation request of the page in place of the browser.
+
+        The browser has to accept a fulfilled redirect response, which WebKit does not.
+        """
+        browser = page.context.browser
+        return browser is not None and browser.browser_type.name in {'chromium', 'firefox'}
 
     def _create_extract_links_function(self, context: TPostNavContext) -> ExtractLinksFunction:
         """Create a callback function for extracting links from context.
