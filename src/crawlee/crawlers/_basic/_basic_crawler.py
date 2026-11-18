@@ -274,7 +274,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     """
 
     _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
-    # The fetch holds a lock that every robots.txt lookup waits for, so a stalled origin must not hold it for long.
+    # Limits the whole robots.txt fetch, including the proxy lookup. The fetch holds a lock that every robots.txt
+    # lookup waits for, so a stalled origin must not hold it for long.
     _ROBOTS_TXT_TIMEOUT = timedelta(seconds=30)
     _request_handler_timeout_text = 'Request handler timed out after'
     __next_id = 0
@@ -1829,7 +1830,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 return robots_txt_file
 
             # If not cached, fetch the robots.txt file
-            robots_txt_file = await self._find_txt_file_for_url(url)
+            try:
+                robots_txt_file = await asyncio.wait_for(
+                    self._find_txt_file_for_url(url), timeout=self._ROBOTS_TXT_TIMEOUT.total_seconds()
+                )
+            except asyncio.TimeoutError:
+                self._logger.warning(
+                    f'Fetching the robots.txt file of {origin_url} timed out, so all its URLs are allowed.'
+                )
+                robots_txt_file = await RobotsTxtFile.from_content(url, 'User-agent: *\nAllow: /')
+
             self._robots_txt_file_cache[origin_url] = robots_txt_file
             return robots_txt_file
 
@@ -1843,12 +1853,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # lets tiered proxies pick the tier of the URL's domain.
         proxy_info = await self._get_proxy_info(Request.from_url(url), None)
 
-        return await RobotsTxtFile.find(
-            url,
-            self._robots_txt_http_client,
-            proxy_info=proxy_info,
-            timeout=self._ROBOTS_TXT_TIMEOUT,
-        )
+        return await RobotsTxtFile.find(url, self._robots_txt_http_client, proxy_info=proxy_info)
 
     def _log_status_message(self, message: str, level: LogLevel = 'DEBUG') -> None:
         """Log a status message for the crawler.

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-from datetime import timedelta
 from unittest import mock
 
 import pytest
@@ -40,22 +39,22 @@ def test_import_error_handled() -> None:
             from crawlee.crawlers._playwright import PlaywrightCrawler  # noqa: F401 PLC0415
 
 
-async def test_robots_txt_fetched_through_proxy() -> None:
-    """The robots.txt file is fetched through the configured proxy, with a bounded timeout."""
+async def test_robots_txt_fetched_through_proxy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The robots.txt file is fetched through the configured proxy."""
     proxy_url = 'http://proxy.placeholder.com:8000'
+    response = mock.Mock(status_code=200, read=mock.AsyncMock(return_value=b'User-agent: *\nDisallow: /private'))
+    send_request = mock.AsyncMock(return_value=response)
+    monkeypatch.setattr(ImpitHttpClient, 'send_request', send_request)
     crawler = PlaywrightCrawler(
         proxy_configuration=ProxyConfiguration(proxy_urls=[proxy_url]),
         respect_robots_txt_file=True,
     )
-    send_request = mock.AsyncMock(side_effect=RuntimeError('No network in this test.'))
 
-    with mock.patch.object(ImpitHttpClient, 'send_request', send_request):
-        await crawler._get_robots_txt_file_for_url('https://site.placeholder.com/page')
+    assert await crawler._is_allowed_based_on_robots_txt_file('https://site.placeholder.com/private') is False
 
     send_request.assert_awaited_once()
     assert send_request.call_args.args == ('https://site.placeholder.com/robots.txt',)
     assert send_request.call_args.kwargs['proxy_info'].url == proxy_url
-    assert send_request.call_args.kwargs['timeout'] == timedelta(seconds=30)
 
 
 def test_robots_txt_http_client_is_cleaned_up_with_crawler() -> None:

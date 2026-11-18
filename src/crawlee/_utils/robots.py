@@ -11,8 +11,6 @@ from crawlee._utils.urls import filter_url
 from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
 
 if TYPE_CHECKING:
-    from datetime import timedelta
-
     from typing_extensions import Self
 
     from crawlee._types import EnqueueStrategy
@@ -48,23 +46,16 @@ class RobotsTxtFile:
         return cls(url, robots)
 
     @classmethod
-    async def load(
-        cls,
-        url: str,
-        http_client: HttpClient,
-        proxy_info: ProxyInfo | None = None,
-        timeout: timedelta | None = None,
-    ) -> Self:
+    async def load(cls, url: str, http_client: HttpClient, proxy_info: ProxyInfo | None = None) -> Self:
         """Load the robots.txt file for a given URL.
 
         Args:
             url: The direct URL of the robots.txt file to be loaded.
             http_client: The `HttpClient` instance used to perform the network request for fetching the robots.txt file.
             proxy_info: Optional `ProxyInfo` to be used when fetching the robots.txt file. If None, no proxy is used.
-            timeout: Maximum time allowed for fetching the robots.txt file. If None, the HTTP client's default applies.
         """
         try:
-            response = await http_client.send_request(url, proxy_info=proxy_info, timeout=timeout)
+            response = await http_client.send_request(url, proxy_info=proxy_info)
 
             status_code = response.status_code
             if is_status_code_client_error(status_code):
@@ -86,23 +77,16 @@ class RobotsTxtFile:
         return cls(url, robots, http_client=http_client, proxy_info=proxy_info)
 
     @classmethod
-    async def find(
-        cls,
-        url: str,
-        http_client: HttpClient,
-        proxy_info: ProxyInfo | None = None,
-        timeout: timedelta | None = None,
-    ) -> Self:
+    async def find(cls, url: str, http_client: HttpClient, proxy_info: ProxyInfo | None = None) -> Self:
         """Determine the location of a robots.txt file for a URL and fetch it.
 
         Args:
             url: The URL whose domain will be used to find the corresponding robots.txt file.
             http_client: The `HttpClient` instance used to perform the network request for fetching the robots.txt file.
             proxy_info: Optional `ProxyInfo` to be used when fetching the robots.txt file. If None, no proxy is used.
-            timeout: Maximum time allowed for fetching the robots.txt file. If None, the HTTP client's default applies.
         """
         robots_url = URL(url).with_path('/robots.txt')
-        return await cls.load(str(robots_url), http_client, proxy_info, timeout)
+        return await cls.load(str(robots_url), http_client, proxy_info)
 
     def is_allowed(self, url: str, user_agent: str = '*') -> bool:
         """Check if the given URL is allowed for the given user agent.
