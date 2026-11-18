@@ -123,6 +123,21 @@ async def test_new_backend_skips_storages_of_closed_one(tmp_path: Path) -> None:
     assert dataset is not old_dataset
 
 
+async def test_new_backend_purges_default_dataset(tmp_path: Path) -> None:
+    """A new backend with `purge_on_start` enabled purges the default dataset an earlier backend wrote."""
+    configuration = Configuration(storage_dir=str(tmp_path), purge_on_start=True)
+
+    async with SqlStorageBackend() as storage_backend:
+        dataset = await Dataset.open(storage_backend=storage_backend, configuration=configuration)
+        await dataset.push_data({'key': 'value'})
+
+    async with SqlStorageBackend() as storage_backend:
+        dataset = await Dataset.open(storage_backend=storage_backend, configuration=configuration)
+        data = await dataset.get_data()
+
+    assert data.items == []
+
+
 def test_import_error_handled() -> None:
     blocked = {
         mod_name: None for mod_name in sys.modules if mod_name == 'sqlalchemy' or mod_name.startswith('sqlalchemy.')

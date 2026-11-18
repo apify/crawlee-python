@@ -318,7 +318,7 @@ for urls in batches:
     await crawler.run(urls)
 ```
 
-`Configuration.purge_on_start` isn't affected. Unnamed storages are still purged when a storage backend first opens them.
+`Configuration.purge_on_start` isn't affected. Unnamed storages are still purged once per process, when they're first opened. With `SqlStorageBackend` and `RedisStorageBackend`, each instance now opens its own storages, so it purges them once per instance.
 
 ## `RequestQueue.purge` raises when the storage backend can't purge
 
