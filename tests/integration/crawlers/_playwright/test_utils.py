@@ -114,11 +114,13 @@ async def test_block_requests_default(server_url: URL) -> None:
 
         target_url = str(server_url / 'resource_loading_page')
 
+        # `goto` returns on the `load` event, which the browser fires only after the script and image requests have
+        # finished or failed, so the tracked sets are complete once it returns.
+
         # Default behavior, nothing is blocked
         page = await browser.new_page()
         requested_no_block, blocked_no_block = track_requests(page)
         await page.goto(target_url)
-        await page.wait_for_load_state('networkidle')
         await page.close()
 
         # With blocking
@@ -126,7 +128,6 @@ async def test_block_requests_default(server_url: URL) -> None:
         requested_blocked, blocked_blocked = track_requests(page)
         await block_requests(page)
         await page.goto(target_url)
-        await page.wait_for_load_state('networkidle')
         await page.close()
 
         await browser.close()
