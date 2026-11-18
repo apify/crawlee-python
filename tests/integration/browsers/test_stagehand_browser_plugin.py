@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 
 _PATCH_MODULE = 'crawlee.browsers._stagehand_browser_plugin'
 
+pytestmark = pytest.mark.usefixtures('stagehand_binary')
+
 
 @pytest.fixture
 def stagehand_client_mock() -> MagicMock:
@@ -24,7 +26,7 @@ def stagehand_client_mock() -> MagicMock:
 
 
 @pytest.fixture
-async def plugin(stagehand_binary: None) -> AsyncGenerator[StagehandBrowserPlugin, None]:  # noqa: ARG001
+async def plugin() -> AsyncGenerator[StagehandBrowserPlugin, None]:
     async with StagehandBrowserPlugin() as plugin:
         yield plugin
 
