@@ -363,8 +363,8 @@ async def test_close_emits_final_persist_state_and_keeps_listeners(
 ) -> None:
     """`close` emits the final `PersistState` once, and events emitted after it still reach their listeners."""
     calls: list[str] = []
-    persist_state_listener = AsyncMock(side_effect=lambda _: calls.append('persist_state'))
-    exit_listener = AsyncMock(side_effect=lambda _: calls.append('exit'))
+    persist_state_listener = AsyncMock(side_effect=lambda *_: calls.append('persist_state'))
+    exit_listener = AsyncMock(side_effect=lambda *_: calls.append('exit'))
     event_manager = EventManager(persist_state_interval=timedelta(hours=1))
 
     async with event_manager:
@@ -454,7 +454,7 @@ async def test_close_raises_error_when_not_active() -> None:
 async def test_concurrent_close_emits_final_persist_state_once() -> None:
     """Two overlapping `close` calls emit the final `PersistState` only once."""
     received = asyncio.Event()
-    persist_state_listener = AsyncMock(side_effect=lambda _: received.set())
+    persist_state_listener = AsyncMock(side_effect=lambda *_: received.set())
     event_manager = EventManager(persist_state_interval=timedelta(hours=1))
 
     async with event_manager:
@@ -720,7 +720,7 @@ async def test_exit_waits_at_most_close_timeout_in_total(
 async def test_exit_emits_final_persist_state_after_failed_close(monkeypatch: pytest.MonkeyPatch) -> None:
     """When `close` fails before the final `PersistState`, leaving the context still emits it."""
     received = asyncio.Event()
-    persist_state_listener = AsyncMock(side_effect=lambda _: received.set())
+    persist_state_listener = AsyncMock(side_effect=lambda *_: received.set())
     event_manager = EventManager(persist_state_interval=timedelta(hours=1))
     persist_state_rec_task = event_manager._emit_persist_state_event_rec_task
     real_stop = persist_state_rec_task.stop
