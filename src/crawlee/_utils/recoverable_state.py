@@ -115,6 +115,10 @@ class RecoverableState(Generic[TStateModel]):
             ValidationError: If the persisted record is invalid. The record is kept, and every call raises again until
                 it's fixed or cleared by `reset_store`.
         """
+        # Checked without the lock first, so that a call on an initialized state doesn't wait for a save in progress.
+        if self._initialized:
+            return self.current_value
+
         async with self._lock:
             if self._initialized:
                 return self.current_value

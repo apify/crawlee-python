@@ -562,3 +562,29 @@ async def test_teardown_waits_for_save_in_progress(
     await teardown_task
 
     assert not done
+
+
+async def test_initialize_skips_wait_for_save_in_progress(
+    event_manager: EventManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`initialize` on an initialized state doesn't wait for a save that a PERSIST_STATE event started."""
+    kvs = await KeyValueStore.open()
+    save_started = asyncio.Event()
+    finish_save = asyncio.Event()
+
+    async def slow_set_value(*_args: object, **_kwargs: object) -> None:
+        save_started.set()
+        await finish_save.wait()
+
+    monkeypatch.setattr(kvs, 'set_value', AsyncMock(side_effect=slow_set_value))
+    recoverable_state = _build_state()
+    await recoverable_state.initialize()
+
+    event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
+    await save_started.wait()
+    initialize_task = asyncio.create_task(recoverable_state.initialize())
+    done, _ = await asyncio.wait([initialize_task], timeout=1)
+    finish_save.set()
+    await recoverable_state.teardown()
+
+    assert initialize_task in done
