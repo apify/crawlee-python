@@ -56,3 +56,20 @@ async def test_robots_txt_fetched_through_proxy() -> None:
     assert send_request.call_args.args == ('https://site.placeholder.com/robots.txt',)
     assert send_request.call_args.kwargs['proxy_info'].url == proxy_url
     assert send_request.call_args.kwargs['timeout'] == timedelta(seconds=30)
+
+
+def test_robots_txt_http_client_is_cleaned_up_with_crawler() -> None:
+    """The HTTP client that replaces `PlaywrightHttpClient` for robots.txt is managed by the crawler."""
+    crawler = PlaywrightCrawler(respect_robots_txt_file=True)
+
+    assert isinstance(crawler._robots_txt_http_client, ImpitHttpClient)
+    assert crawler._robots_txt_http_client in crawler._additional_context_managers
+
+
+def test_robots_txt_uses_custom_http_client() -> None:
+    """A custom HTTP client of the crawler also fetches robots.txt."""
+    http_client = ImpitHttpClient()
+    crawler = PlaywrightCrawler(http_client=http_client, respect_robots_txt_file=True)
+
+    assert crawler._robots_txt_http_client is http_client
+    assert http_client not in crawler._additional_context_managers

@@ -410,6 +410,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
         self._http_client = http_client or ImpitHttpClient()
+        self._robots_txt_http_client: HttpClient = self._http_client
 
         # Request router setup
         self._router: Router[TCrawlingContext] | None = None
@@ -1838,26 +1839,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Args:
             url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
         """
+        # The fetch is not tied to a session, because all sessions that crawl the origin share the file. The request
+        # lets tiered proxies pick the tier of the URL's domain.
+        proxy_info = await self._get_proxy_info(Request.from_url(url), None)
+
         return await RobotsTxtFile.find(
             url,
-            self._http_client,
-            proxy_info=await self._get_robots_txt_proxy_info(url),
+            self._robots_txt_http_client,
+            proxy_info=proxy_info,
             timeout=self._ROBOTS_TXT_TIMEOUT,
-        )
-
-    async def _get_robots_txt_proxy_info(self, url: str) -> ProxyInfo | None:
-        """Get a `ProxyInfo` for fetching the robots.txt file of the given URL's origin.
-
-        No session ID is passed, because the robots.txt file is fetched once per origin and keeps no session state.
-        The request lets tiered proxies pick the current tier for the URL's domain.
-        """
-        if not self._proxy_configuration:
-            return None
-
-        return await self._proxy_configuration.new_proxy_info(
-            session_id=None,
-            request=Request.from_url(url),
-            proxy_tier=None,
         )
 
     def _log_status_message(self, message: str, level: LogLevel = 'DEBUG') -> None:
