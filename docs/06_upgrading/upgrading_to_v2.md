@@ -190,6 +190,34 @@ A crawler keeps the lock at least as long as its longest request handler timeout
 
 `BasicCrawlingContext` has a new required field, `extend_timeout`. If you build a crawling context yourself, such as in a test, pass it as well.
 
+## Each `RedisStorageBackend` opens its own storages
+
+In v1, all `RedisStorageClient` instances in a process shared the storages opened through any of them, even when they connected to different Redis servers. Now each `RedisStorageBackend` instance opens its own storages. With `purge_on_start` enabled, a new instance purges the unnamed storages, such as the default dataset, when it opens them. When it connects to the same database as an earlier instance, the data the earlier one wrote to these storages is lost. To read what a crawler stored in them, open them through the crawler's backend.
+
+Use `RedisStorageBackend` as an async context manager. On exit, it closes the Redis client it created from the connection string. In v1, nothing closed that client. A client you pass in stays open, so close it yourself. Storages opened through a closed backend stop working.
+
+For example:
+
+```python
+# v1
+storage_client = RedisStorageClient(connection_string='redis://localhost:6379')
+crawler = ParselCrawler(storage_client=storage_client)
+await crawler.run(['https://crawlee.dev'])
+
+dataset = await Dataset.open(
+    storage_client=RedisStorageClient(connection_string='redis://localhost:6379')
+)
+
+# v2
+async with RedisStorageBackend(
+    connection_string='redis://localhost:6379'
+) as storage_backend:
+    crawler = ParselCrawler(storage_backend=storage_backend)
+    await crawler.run(['https://crawlee.dev'])
+
+    dataset = await Dataset.open(storage_backend=storage_backend)
+```
+
 ## Crawler `id` is a string
 
 The `id` argument of `BasicCrawler` and its subclasses is now a `str`, so pass a string wherever you passed an integer. `StatisticsState.stats_id` and `EventCrawlerStatusData.crawler_id` are strings too, and `crawler_id` holds the crawler's `id`. In v1, it held the Python object ID of the crawler.

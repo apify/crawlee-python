@@ -383,6 +383,10 @@ Data persistence in Redis depends on your [database configuration](https://redis
 
 The backend requires either a Redis connection string or a pre-configured Redis client instance. Use a pre-configured client when you need custom Redis settings such as connection pooling, timeouts, or SSL/TLS encryption.
 
+Use the backend as an async context manager, so that its connections are closed when you're done. It closes a client it created from the connection string, but not one you pass in. Storages opened through a backend stop working once it's closed.
+
+Each backend opens its own storages. With `purge_on_start` enabled, it purges the unnamed storages, such as the default dataset, when it opens them. As a result, a new backend connected to the same database wipes the data an earlier one wrote to these storages.
+
 <CodeBlock className="language-python" language="python">
     {RedisStorageBackendBasicExample}
 </CodeBlock>

@@ -9,13 +9,13 @@ import pytest
 from fakeredis import FakeAsyncRedis
 from redis.exceptions import RedisError
 
+from crawlee.configuration import Configuration
 from crawlee.storage_backends import RedisStorageBackend
+from crawlee.storage_backends._redis import RedisKeyValueStoreBackend
 from crawlee.storage_backends._redis._utils import await_redis_response
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterator
-
-    from crawlee.storage_backends._redis import RedisKeyValueStoreBackend
 
 
 @pytest.fixture
@@ -372,3 +372,46 @@ async def test_decoding_redis_client_is_rejected(suppress_user_warning: None) ->
 
     with pytest.raises(TypeError, match='decode_responses'):
         _ = [record async for record in kvs_backend.iterate_entries()]
+
+
+async def test_lost_race_uses_existing_id(
+    redis_client: FakeAsyncRedis,
+    monkeypatch: pytest.MonkeyPatch,
+    suppress_user_warning: None,  # noqa: ARG001
+) -> None:
+    """A client that loses the race to create a store opens it under the ID of the store that won."""
+    configuration = Configuration(purge_on_start=False)
+    storage_backend = RedisStorageBackend(redis=redis_client)
+    winner = await storage_backend.create_kvs_backend(name='raced', configuration=configuration)
+    winner_id = (await winner.get_metadata()).id
+
+    original_lookup = RedisKeyValueStoreBackend._get_metadata_by_name
+
+    async def lookup(name: str, redis: FakeAsyncRedis, *, with_wait: bool = False) -> dict | None:
+        # The first lookup comes before the other client created the store, so it finds nothing.
+        if lookup_mock.await_count == 1:
+            return None
+        return await original_lookup(name, redis, with_wait=with_wait)
+
+    lookup_mock = AsyncMock(side_effect=lookup)
+    monkeypatch.setattr(RedisKeyValueStoreBackend, '_get_metadata_by_name', staticmethod(lookup_mock))
+    loser = await storage_backend.create_kvs_backend(name='raced', configuration=configuration)
+    await loser.drop()
+
+    assert await await_redis_response(redis_client.hget('key_value_stores:id_to_name', winner_id)) is None
+
+
+async def test_lost_race_without_metadata_raises(
+    redis_client: FakeAsyncRedis,
+    monkeypatch: pytest.MonkeyPatch,
+    suppress_user_warning: None,  # noqa: ARG001
+) -> None:
+    """A client that loses the race to create a store raises when the metadata of the store that won never appears."""
+    configuration = Configuration(purge_on_start=False)
+    storage_backend = RedisStorageBackend(redis=redis_client)
+    await storage_backend.create_kvs_backend(name='raced', configuration=configuration)
+
+    monkeypatch.setattr(RedisKeyValueStoreBackend, '_get_metadata_by_name', staticmethod(AsyncMock(return_value=None)))
+
+    with pytest.raises(RuntimeError, match=r'did not appear in time'):
+        await storage_backend.create_kvs_backend(name='raced', configuration=configuration)

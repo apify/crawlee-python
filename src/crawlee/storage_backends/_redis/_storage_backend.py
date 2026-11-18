@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from redis.asyncio import Redis
 from typing_extensions import override
@@ -13,6 +13,11 @@ from crawlee.storage_backends._base import StorageBackend
 from ._dataset_backend import RedisDatasetBackend
 from ._key_value_store_backend import RedisKeyValueStoreBackend
 from ._request_queue_backend import RedisRequestQueueBackend
+
+if TYPE_CHECKING:
+    from collections.abc import Hashable
+    from types import TracebackType
+    from typing import Self
 
 
 @docs_group('Storage backends')
@@ -51,7 +56,7 @@ class RedisStorageBackend(StorageBackend):
         Args:
             connection_string: Redis connection string (e.g., "redis://localhost:6379").
                 Supports standard Redis URL format with optional database selection.
-            redis: Pre-configured Redis client instance.
+            redis: Pre-configured Redis client instance. The backend doesn't close it.
             queue_dedup_strategy: Strategy for request queue deduplication. Options are:
                 - 'default': Uses Redis sets for exact deduplication.
                 - 'bloom': Uses Redis Bloom filters for probabilistic deduplication with lower memory usage. When using
@@ -72,6 +77,8 @@ class RedisStorageBackend(StorageBackend):
             self._redis = Redis.from_url(connection_string)
 
         self._redis: Redis  # to help type checker
+        self._owns_redis = redis is None
+        self._closed = False
         self._queue_dedup_strategy = queue_dedup_strategy
         self._queue_bloom_error_rate = queue_bloom_error_rate
 
@@ -84,6 +91,50 @@ class RedisStorageBackend(StorageBackend):
             category=UserWarning,
             stacklevel=2,
         )
+
+    async def __aenter__(self) -> Self:
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
+        """Async context manager exit."""
+        await self.close()
+
+    @property
+    def redis(self) -> Redis:
+        """The Redis client of the storage backend.
+
+        Raises:
+            RuntimeError: If the storage backend is closed.
+        """
+        # A closed client would silently open new connections that nobody closes.
+        if self._closed:
+            raise RuntimeError(f'The {self.__class__.__name__} is closed.')
+
+        return self._redis
+
+    async def close(self) -> None:
+        """Close the Redis client, unless it was passed in.
+
+        The storage backend and the storages opened with it can't be used afterwards.
+        """
+        if self._closed:
+            return
+
+        self._closed = True
+
+        if self._owns_redis:
+            await self._redis.aclose()
+
+    @override
+    def get_storage_backend_cache_key(self, configuration: Configuration) -> Hashable:
+        # Storages stop working when their backend closes, so a different backend instance must not get them.
+        return super().get_storage_backend_cache_key(configuration), id(self)
 
     @override
     async def create_dataset_backend(
@@ -100,7 +151,7 @@ class RedisStorageBackend(StorageBackend):
             id=id,
             name=name,
             alias=alias,
-            redis=self._redis,
+            storage_backend=self,
         )
 
         await self._purge_if_needed(backend, configuration)
@@ -121,7 +172,7 @@ class RedisStorageBackend(StorageBackend):
             id=id,
             name=name,
             alias=alias,
-            redis=self._redis,
+            storage_backend=self,
         )
 
         await self._purge_if_needed(backend, configuration)
@@ -142,7 +193,7 @@ class RedisStorageBackend(StorageBackend):
             id=id,
             name=name,
             alias=alias,
-            redis=self._redis,
+            storage_backend=self,
             dedup_strategy=self._queue_dedup_strategy,
             bloom_error_rate=self._queue_bloom_error_rate,
         )

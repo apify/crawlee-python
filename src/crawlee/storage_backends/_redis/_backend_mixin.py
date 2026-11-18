@@ -20,6 +20,8 @@ if TYPE_CHECKING:
 
     from crawlee.storage_backends.models import DatasetMetadata, KeyValueStoreMetadata, RequestQueueMetadata
 
+    from ._storage_backend import RedisStorageBackend
+
 
 logger = getLogger(__name__)
 
@@ -46,17 +48,17 @@ class RedisBackendMixin:
     _STORAGE_TYPE: ClassVar[str]
     """Human-readable storage type for error messages."""
 
-    def __init__(self, storage_name: str, storage_id: str, redis: Redis) -> None:
+    def __init__(self, storage_name: str, storage_id: str, storage_backend: RedisStorageBackend) -> None:
         self._storage_name = storage_name
         self._storage_id = storage_id
-        self._redis = redis
+        self._storage_backend = storage_backend
 
         self._scripts_loaded = False
 
     @property
     def redis(self) -> Redis:
         """Return the Redis client instance."""
-        return self._redis
+        return self._storage_backend.redis
 
     @property
     def metadata_key(self) -> str:
@@ -107,7 +109,7 @@ class RedisBackendMixin:
         name: str | None,
         alias: str | None,
         metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata],
-        redis: Redis,
+        storage_backend: RedisStorageBackend,
         extra_metadata_fields: dict[str, Any],
         instance_kwargs: dict[str, Any],
     ) -> Self:
@@ -117,7 +119,7 @@ class RedisBackendMixin:
             id: The ID of the storage. If not provided, a random ID will be generated.
             name: The name of the storage for named (global scope) storages.
             alias: The alias of the storage for unnamed (run scope) storages.
-            redis: Redis client instance.
+            storage_backend: The storage backend providing the Redis client.
             metadata_model: Pydantic model for metadata validation.
             extra_metadata_fields: Storage-specific metadata fields.
             instance_kwargs: Additional arguments for the backend constructor.
@@ -129,17 +131,19 @@ class RedisBackendMixin:
         storage_id: str | None = None
         # Determine if storage exists by ID or name
         if id:
-            storage_name = await cls._get_metadata_name_by_id(id=id, redis=redis)
+            storage_name = await cls._get_metadata_name_by_id(id=id, redis=storage_backend.redis)
             storage_id = id
             if storage_name is None:
                 raise ValueError(f'{cls._STORAGE_TYPE} with ID "{id}" does not exist.')
         else:
-            metadata_data = await cls._get_metadata_by_name(name=internal_name, redis=redis)
+            metadata_data = await cls._get_metadata_by_name(name=internal_name, redis=storage_backend.redis)
             storage_name = internal_name if metadata_data is not None else None
             storage_id = metadata_data['id'] if metadata_data is not None else None
         # If both storage_name and storage_id are found, open existing storage
         if storage_name and storage_id:
-            backend = cls(storage_name=storage_name, storage_id=storage_id, redis=redis, **instance_kwargs)
+            backend = cls(
+                storage_name=storage_name, storage_id=storage_id, storage_backend=storage_backend, **instance_kwargs
+            )
             async with backend._get_pipeline() as pipe:
                 await backend._update_metadata(pipe, update_accessed_at=True)
         # Otherwise, create a new storage
@@ -153,12 +157,28 @@ class RedisBackendMixin:
                 modified_at=now,
                 **extra_metadata_fields,
             )
-            backend = cls(storage_name=internal_name, storage_id=metadata.id, redis=redis, **instance_kwargs)
+            backend = cls(
+                storage_name=internal_name, storage_id=metadata.id, storage_backend=storage_backend, **instance_kwargs
+            )
             created = await backend._create_metadata_and_storage(internal_name, metadata.model_dump())
             # The storage was probably not created due to a race condition. Let's try to open it using the name.
             if not created:
-                metadata_data = await cls._get_metadata_by_name(name=internal_name, redis=redis, with_wait=True)
-                backend = cls(storage_name=internal_name, storage_id=metadata.id, redis=redis, **instance_kwargs)
+                metadata_data = await cls._get_metadata_by_name(
+                    name=internal_name, redis=storage_backend.redis, with_wait=True
+                )
+                if metadata_data is None:
+                    raise RuntimeError(
+                        f'{cls._STORAGE_TYPE} "{internal_name}" is being created by another client, but its metadata '
+                        'did not appear in time.'
+                    )
+
+                # The storage that won the race has its own ID, which the backend must use to drop it.
+                backend = cls(
+                    storage_name=internal_name,
+                    storage_id=metadata_data['id'],
+                    storage_backend=storage_backend,
+                    **instance_kwargs,
+                )
 
         # Ensure Lua scripts are loaded
         await backend._ensure_scripts_loaded()
@@ -177,7 +197,7 @@ class RedisBackendMixin:
     @asynccontextmanager
     async def _get_pipeline(self, *, with_execute: bool = True) -> AsyncGenerator[Pipeline]:
         """Create a new Redis pipeline."""
-        async with self._redis.pipeline() as pipe:
+        async with self.redis.pipeline() as pipe:
             try:
                 pipe.multi()
                 yield pipe
@@ -192,7 +212,7 @@ class RedisBackendMixin:
         """Load a Lua script from a file and return a Script object."""
         script_content = await asyncio.to_thread(read_lua_script, script_name)
 
-        return self._redis.register_script(script_content)
+        return self.redis.register_script(script_content)
 
     async def _create_metadata_and_storage(self, storage_name: str, metadata: dict) -> bool:
         index_id_to_name = f'{self._MAIN_KEY}:id_to_name'
@@ -202,7 +222,7 @@ class RedisBackendMixin:
         metadata['modified_at'] = metadata['modified_at'].isoformat()
 
         # Try to create name_to_id index entry, if it already exists, return False.
-        name_to_id = await await_redis_response(self._redis.hsetnx(index_name_to_id, storage_name, metadata['id']))
+        name_to_id = await await_redis_response(self.redis.hsetnx(index_name_to_id, storage_name, metadata['id']))
         # If name already exists, return False. Probably an attempt at parallel creation.
         if not name_to_id:
             return False
@@ -244,7 +264,7 @@ class RedisBackendMixin:
         self, metadata_model: type[DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata]
     ) -> DatasetMetadata | KeyValueStoreMetadata | RequestQueueMetadata:
         """Retrieve the storage metadata."""
-        metadata_dict = await self._get_metadata_by_name(name=self._storage_name, redis=self._redis)
+        metadata_dict = await self._get_metadata_by_name(name=self._storage_name, redis=self.redis)
         if metadata_dict is None:
             raise ValueError(f'{self._STORAGE_TYPE} with name "{self._storage_name}" does not exist.')
         async with self._get_pipeline() as pipe:
