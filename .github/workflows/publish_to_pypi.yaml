@@ -40,13 +40,32 @@ jobs:
       name: pypi
       url: https://pypi.org/project/crawlee
     steps:
+      # Also pins the ref to a commit, so the checked commit is the one that gets built.
+      - name: Check that the ref is on a release branch
+        id: ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ inputs.ref }}
+        run: |
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$REF" --jq .sha)
+          branches=$(gh api --paginate "repos/$GITHUB_REPOSITORY/branches" --jq '.[].name' | grep -E '^(master|release-v.+)$')
+          for branch in $branches; do
+            status=$(gh api "repos/$GITHUB_REPOSITORY/compare/$branch...$sha" --jq .status || true)
+            if [[ "$status" == "identical" || "$status" == "behind" ]]; then
+              echo "sha=$sha" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo "::error::$sha is not on a release branch"
+          exit 1
+
       - name: Prepare distribution
         uses: apify/actions/prepare-pypi-distribution@v1.6.2
         with:
           package_name: crawlee
           is_prerelease: ${{ inputs.is_prerelease && 'yes' || '' }}
           version_number: ${{ inputs.version_number }}
-          ref: ${{ inputs.ref }}
+          ref: ${{ steps.ref.outputs.sha }}
 
       - name: Verify built package
         uses: apify/actions/python-package-check@v1.6.2
