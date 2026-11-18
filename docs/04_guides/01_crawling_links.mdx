@@ -148,7 +148,7 @@ A crawl that follows links can grow much larger than you need. The following opt
 
 - `max_requests_per_crawl` - A crawler option. The crawler stops after this number of requests finish or fail. A retried request counts once. Requests that are already in progress still finish, so the crawler can process a few more requests than the limit.
 - `max_crawl_depth` - A crawler option. Start requests have depth 0, and each followed link adds one. Requests at the maximum depth are still processed, but links found on their pages aren't enqueued. For details, see [Crawl depth](../concepts/requests#crawl-depth).
-- `limit` - An argument of <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink>. It sets the maximum number of links enqueued from one page. Only links that pass the `strategy`, `include`, and `exclude` filters count towards it.
+- `limit` - An argument of <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink>. It sets the maximum number of links that one call adds. Links that the filters, robots.txt, or `transform_request_function` skip don't count towards it, but links that are already in the queue do.
 
 <RunnableCodeBlock className="language-python" language="python">
     {LimitCrawlExample}
