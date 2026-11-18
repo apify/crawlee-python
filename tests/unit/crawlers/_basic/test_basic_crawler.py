@@ -36,6 +36,7 @@ from crawlee.errors import (
 )
 from crawlee.events import Event, EventCrawlerStatusData, LocalEventManager
 from crawlee.http_clients import HttpClient
+from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.request_loaders import RequestList, RequestManagerTandem, ThrottlingRequestManager
 from crawlee.sessions import Session, SessionPool
 from crawlee.statistics import FinalStatistics, StatisticsState
@@ -2918,3 +2919,22 @@ async def test_sigint_without_loop_signal_handlers(caplog: pytest.LogCaptureFixt
     assert 'Pausing...' in caplog.text
     assert 'The crawl was interrupted' in caplog.text
     assert signal.getsignal(signal.SIGINT) is sigint_handler_before_run
+
+
+async def test_robots_txt_fetched_through_proxy() -> None:
+    """The robots.txt file is fetched through the configured proxy, with a bounded timeout."""
+    proxy_url = 'http://proxy.placeholder.com:8000'
+    http_client = Mock(spec=HttpClient)
+    http_client.send_request = AsyncMock(side_effect=RuntimeError('No network in this test.'))
+    crawler = BasicCrawler(
+        http_client=http_client,
+        proxy_configuration=ProxyConfiguration(proxy_urls=[proxy_url]),
+        respect_robots_txt_file=True,
+    )
+
+    await crawler._get_robots_txt_file_for_url('https://site.placeholder.com/page')
+
+    http_client.send_request.assert_awaited_once()
+    assert http_client.send_request.call_args.args == ('https://site.placeholder.com/robots.txt',)
+    assert http_client.send_request.call_args.kwargs['proxy_info'].url == proxy_url
+    assert http_client.send_request.call_args.kwargs['timeout'] == timedelta(seconds=30)

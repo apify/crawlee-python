@@ -274,6 +274,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     """
 
     _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
+    # The fetch holds a lock that every robots.txt lookup waits for, so a stalled origin must not hold it for long.
+    _ROBOTS_TXT_TIMEOUT = timedelta(seconds=30)
     _request_handler_timeout_text = 'Request handler timed out after'
     __next_id = 0
 
@@ -1836,7 +1838,27 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Args:
             url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
         """
-        return await RobotsTxtFile.find(url, self._http_client)
+        return await RobotsTxtFile.find(
+            url,
+            self._http_client,
+            proxy_info=await self._get_robots_txt_proxy_info(url),
+            timeout=self._ROBOTS_TXT_TIMEOUT,
+        )
+
+    async def _get_robots_txt_proxy_info(self, url: str) -> ProxyInfo | None:
+        """Get a `ProxyInfo` for fetching the robots.txt file of the given URL's origin.
+
+        No session ID is passed, because the robots.txt file is fetched once per origin and keeps no session state.
+        The request lets tiered proxies pick the current tier for the URL's domain.
+        """
+        if not self._proxy_configuration:
+            return None
+
+        return await self._proxy_configuration.new_proxy_info(
+            session_id=None,
+            request=Request.from_url(url),
+            proxy_tier=None,
+        )
 
     def _log_status_message(self, message: str, level: LogLevel = 'DEBUG') -> None:
         """Log a status message for the crawler.

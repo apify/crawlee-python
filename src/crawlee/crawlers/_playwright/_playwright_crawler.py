@@ -229,6 +229,11 @@ class PlaywrightCrawler(
 
         super().__init__(**kwargs)
 
+        # `PlaywrightHttpClient` sends requests from a browser page, which is not available for robots.txt fetching.
+        self._robots_txt_http_client = (
+            ImpitHttpClient() if isinstance(self._http_client, PlaywrightHttpClient) else self._http_client
+        )
+
     async def _manage_shared_navigation_timeout(
         self, context: BasicCrawlingContext
     ) -> AsyncGenerator[BasicCrawlingContext, None]:
@@ -600,9 +605,12 @@ class PlaywrightCrawler(
         Args:
             url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
         """
-        http_client = ImpitHttpClient() if isinstance(self._http_client, PlaywrightHttpClient) else self._http_client
-
-        return await RobotsTxtFile.find(url, http_client=http_client)
+        return await RobotsTxtFile.find(
+            url,
+            http_client=self._robots_txt_http_client,
+            proxy_info=await self._get_robots_txt_proxy_info(url),
+            timeout=self._ROBOTS_TXT_TIMEOUT,
+        )
 
 
 class _PlaywrightCrawlerAdditionalOptions(TypedDict):
