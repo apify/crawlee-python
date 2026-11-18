@@ -398,11 +398,36 @@ async def test_context_emits_final_persist_state_again_after_close_and_reentry()
         await event_manager.close()
 
     async with event_manager:
+        persist_state_task = event_manager._emit_persist_state_event_rec_task.task
+        assert persist_state_task is not None
+        assert not persist_state_task.done()
+
         event_manager.on(event=Event.PERSIST_STATE, listener=persist_state_listener)
         await event_manager.wait_for_all_listeners_to_complete()
         persist_state_listener.reset_mock()
 
     persist_state_listener.assert_awaited_once()
+
+
+async def test_nested_context_after_close_reopens_the_manager() -> None:
+    """A nested context entered after `close` restarts the periodic `PersistState` and saves the state on each exit."""
+    persist_state_listener = AsyncMock()
+    event_manager = EventManager(persist_state_interval=timedelta(hours=1))
+
+    async with event_manager:
+        await event_manager.close()
+        event_manager.on(event=Event.PERSIST_STATE, listener=persist_state_listener)
+
+        async with event_manager:
+            persist_state_task = event_manager._emit_persist_state_event_rec_task.task
+            assert persist_state_task is not None
+            assert not persist_state_task.done()
+
+        exits_after_nested = persist_state_listener.await_count
+
+    # Both the nested exit and the outer exit emit a `PersistState`, on top of any periodic one.
+    assert exits_after_nested >= 1
+    assert persist_state_listener.await_count >= exits_after_nested + 1
 
 
 async def test_close_raises_error_when_not_active() -> None:

@@ -78,9 +78,11 @@ class LocalEventManager(EventManager):
 
         It starts emitting system info events at regular intervals.
         """
+        # Read before the parent call, which resets the closed flag when it reopens the manager.
+        opening = self._active_ref_count == 0 or self._closed
         await super().__aenter__()
 
-        if self._active_ref_count == 1:
+        if opening:
             # A reading kept from a previous session would report the average load over the idle gap since then.
             self._cpu_load = proclimits.CpuLoad()
             self._emit_system_info_event_rec_task.start()

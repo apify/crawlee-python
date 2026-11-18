@@ -108,7 +108,10 @@ class EventManager:
         """Initialize the event manager upon entering the async context."""
         self._active_ref_count += 1
 
-        if self._active_ref_count == 1:
+        # A nested context entered after `close` reopens the manager, so that its work is saved periodically and on
+        # the final exit again.
+        if self._active_ref_count == 1 or self._closed:
+            self._closed = False
             self._emit_persist_state_event_rec_task.start()
 
         return self
@@ -155,7 +158,8 @@ class EventManager:
 
         It also stops the periodic `PersistState` emission. The listeners stay registered and the context stays
         active, so more events can be emitted after the final state save, such as `Exit`. Leaving the outermost
-        context calls this method, unless it was called already. Calling it more than once has no effect.
+        context calls this method, unless it was called already. Calling it more than once has no effect. Entering
+        a nested context afterwards reopens the manager and starts the periodic emission again.
 
         Raises:
             RuntimeError: If the context manager is not active.
