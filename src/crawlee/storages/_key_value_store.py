@@ -138,10 +138,10 @@ class KeyValueStore(Storage):
 
     @override
     async def drop(self) -> None:
+        await self._clear_store_and_cache(self._backend.drop)
+
         storage_instance_manager = service_locator.storage_instance_manager
         storage_instance_manager.remove_from_cache(self)
-
-        await self._clear_store_and_cache(self._backend.drop)
 
     @override
     async def purge(self) -> None:
