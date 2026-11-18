@@ -1264,17 +1264,19 @@ async def test_navigation_timeout_applies_to_hooks(server_url: URL) -> None:
 
 
 @pytest.mark.parametrize(
-    'hook_type',
+    ('hook_type', 'navigation_timeout'),
     [
-        pytest.param('pre', id='pre-navigation-hook'),
-        pytest.param('post', id='post-navigation-hook'),
+        # A pre-navigation hook extends the budget before `goto` starts, so a tight budget is enough.
+        pytest.param('pre', timedelta(seconds=1), id='pre-navigation-hook'),
+        # A post-navigation hook can extend the budget only after `goto` finishes, so the budget leaves room for a
+        # slow `goto` on a loaded runner.
+        pytest.param('post', timedelta(seconds=5), id='post-navigation-hook'),
     ],
 )
-async def test_extend_timeout_from_nav_hook(server_url: URL, hook_type: Literal['pre', 'post']) -> None:
+async def test_extend_timeout_from_nav_hook(
+    server_url: URL, hook_type: Literal['pre', 'post'], navigation_timeout: timedelta
+) -> None:
     """Test that `extend_timeout` from a navigation hook lets the navigation phase run past its timeout."""
-    # A post-navigation hook can extend the budget only after `goto` finishes, so the budget leaves room for a slow
-    # `goto` on a loaded runner. The hook then sleeps past the whole budget.
-    navigation_timeout = timedelta(seconds=5)
     crawler = PlaywrightCrawler(navigation_timeout=navigation_timeout, max_request_retries=0)
 
     request_handler = AsyncMock()
