@@ -383,19 +383,20 @@ class PlaywrightCrawler(
                 stacklevel=2,
             )
 
-        # Apply the custom method, headers, and payload to the navigation request only; the details of doing
-        # that correctly live in `NavigationRequestInterceptor`.
-        if context.request.headers or context.request.method != 'GET':
-            interceptor = NavigationRequestInterceptor(
-                context.page,
-                method=context.request.method,
-                headers=context.request.headers,
-                payload=context.request.payload,
-            )
-            await interceptor.register()
-
         try:
             async with self._shared_navigation_timeouts[id(context.request)] as remaining_timeout:
+                # Apply the custom method, headers, and payload to the navigation request only; the details of doing
+                # that correctly live in `NavigationRequestInterceptor`.
+                if context.request.headers or context.request.method != 'GET':
+                    interceptor = NavigationRequestInterceptor(
+                        context.page,
+                        method=context.request.method,
+                        headers=context.request.headers,
+                        payload=context.request.payload,
+                        timeout=remaining_timeout,
+                    )
+                    await interceptor.register()
+
                 response = await context.page.goto(
                     context.request.url, timeout=remaining_timeout.total_seconds() * 1000, **context.goto_options
                 )

@@ -428,6 +428,34 @@ async def test_authorization_header_sent_with_navigation_request(server_url: URL
 
 
 @pytest.mark.parametrize(
+    'browser_type',
+    [
+        pytest.param('chromium', id='chromium'),
+        pytest.param('firefox', id='firefox'),
+    ],
+)
+async def test_authorization_header_request_fails_fast_on_refused_connection(
+    browser_type: BrowserType, unreachable_url: str
+) -> None:
+    """A refused connection fails a request with a custom `Authorization` header at once, with a connection error."""
+    crawler = PlaywrightCrawler(browser_type=browser_type, max_request_retries=0)
+    errors = list[Exception]()
+
+    @crawler.failed_request_handler
+    async def failed_request_handler(_context: BasicCrawlingContext, error: Exception) -> None:
+        errors.append(error)
+
+    @crawler.router.default_handler
+    async def request_handler(_context: PlaywrightCrawlingContext) -> None:
+        pass
+
+    await crawler.run([Request.from_url(unreachable_url, headers={'Authorization': 'Bearer secret-token'})])
+
+    assert len(errors) == 1
+    assert not isinstance(errors[0], asyncio.TimeoutError)
+
+
+@pytest.mark.parametrize(
     'request_headers',
     [
         pytest.param({'Cookie': 'custom=1', 'Proxy-Authorization': 'Basic secret'}, id='continued_request'),

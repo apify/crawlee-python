@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
+from logging import getLogger
 from typing import TYPE_CHECKING
 
+from playwright.async_api import Error as PlaywrightError
+
 if TYPE_CHECKING:
+    from datetime import timedelta
+
     from playwright.async_api import Page, Route
     from playwright.async_api import Request as PlaywrightRequest
 
     from crawlee._types import HttpHeaders, HttpMethod, HttpPayload
+
+logger = getLogger(__name__)
 
 _DEFAULT_BLOCK_REQUEST_URL_PATTERNS = [
     '.css',
@@ -54,11 +61,22 @@ class NavigationRequestInterceptor:
         method: HttpMethod = 'GET',
         headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
+        timeout: timedelta | None = None,
     ) -> None:
+        """Initialize a new instance.
+
+        Args:
+            page: The page whose navigation request gets the overrides.
+            method: HTTP method of the navigation request.
+            headers: Custom headers of the navigation request.
+            payload: Payload of the navigation request.
+            timeout: Time limit for a request sent with `Route.fetch`. If None, the Playwright default applies.
+        """
         self._page = page
         self._method = method
         self._headers = headers
         self._payload = payload
+        self._timeout = timeout
         self._applied = False
 
     async def register(self) -> None:
@@ -88,11 +106,21 @@ class NavigationRequestInterceptor:
         # Without these overrides, the request has the same headers as a continued one.
         headers = {name: value for name, value in headers.items() if name.lower() not in _BROWSER_MANAGED_HEADERS}
 
-        # The navigation timeout of `Page.goto` covers this request, so `Route.fetch` gets no timeout of its own.
-        response = await route.fetch(
-            method=self._method, headers=headers, post_data=self._payload, max_redirects=0, timeout=0
-        )
-        await route.fulfill(response=response)
+        try:
+            response = await route.fetch(
+                method=self._method,
+                headers=headers,
+                post_data=self._payload,
+                max_redirects=0,
+                timeout=self._timeout.total_seconds() * 1000 if self._timeout else None,
+            )
+            await route.fulfill(response=response)
+        except PlaywrightError as exc:
+            # A route that stays unresolved keeps `Page.goto` waiting for its whole timeout, and Playwright raises
+            # the error of the route handler from the next call on any of its objects.
+            logger.debug(f'Sending the navigation request to {route.request.url} failed: {exc}')
+            with suppress(PlaywrightError):
+                await route.abort()
 
 
 async def infinite_scroll(page: Page) -> None:
