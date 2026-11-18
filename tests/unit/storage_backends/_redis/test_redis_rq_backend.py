@@ -475,3 +475,24 @@ async def test_closed_backend_skips_scripts(
         await rq_backend.extend_request_processing_time(request, timedelta(minutes=10))
 
     assert await await_redis_response(redis_client.hlen(rq_backend._in_progress_key)) == 0
+
+
+async def test_closed_backend_skips_fetch_cache(
+    redis_client: FakeAsyncRedis,
+    suppress_user_warning: None,  # noqa: ARG001
+) -> None:
+    """A queue of a closed backend raises instead of serving the requests it fetched earlier."""
+    requests = [Request.from_url('https://example.com/1'), Request.from_url('https://example.com/2')]
+
+    async with RedisStorageBackend(redis=redis_client) as storage_backend:
+        rq_backend = await storage_backend.create_rq_backend(name='test_request_queue')
+        await rq_backend.add_batch_of_requests(requests)
+        await rq_backend.fetch_next_request()
+
+    assert len(rq_backend._pending_fetch_cache) == 1
+
+    with pytest.raises(RuntimeError, match=r'RedisStorageBackend is closed'):
+        await rq_backend.fetch_next_request()
+
+    with pytest.raises(RuntimeError, match=r'RedisStorageBackend is closed'):
+        await rq_backend.is_empty()

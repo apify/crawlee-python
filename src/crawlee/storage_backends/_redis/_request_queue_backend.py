@@ -363,6 +363,9 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
     @retry_on_error(RedisError)
     @override
     async def fetch_next_request(self) -> Request | None:
+        # Cached requests are served only while the storage backend is open.
+        redis = self.redis
+
         if self._pending_fetch_cache:
             return self._pending_fetch_cache.popleft()
 
@@ -375,7 +378,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
         requests_json = await self._fetch_script(
             keys=[self._queue_key, self._in_progress_key, self._data_key],
             args=[self.client_key, blocked_until_timestamp, self._MAX_BATCH_FETCH_SIZE],
-            client=self.redis,
+            client=redis,
         )
 
         async with self._get_pipeline() as pipe:
@@ -507,6 +510,9 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
     @retry_on_error(RedisError)
     @override
     async def is_empty(self) -> bool:
+        # Cached requests are reported only while the storage backend is open.
+        redis = self.redis
+
         # Requests buffered for fetching mean the queue is not empty.
         if self._pending_fetch_cache:
             return False
@@ -517,7 +523,7 @@ class RedisRequestQueueBackend(RequestQueueBackend, RedisBackendMixin):
             self._next_reclaim_stale = datetime.now(tz=UTC) + self._RECLAIM_INTERVAL
 
         # Check if there are any requests in the queue.
-        requests_in_queue = await await_redis_response(self.redis.llen(self._queue_key))
+        requests_in_queue = await await_redis_response(redis.llen(self._queue_key))
         return requests_in_queue == 0
 
     @retry_on_error(RedisError)

@@ -27,3 +27,6 @@ async def main() -> None:
             storage_backend=storage_backend,
             configuration=configuration,
         )
+
+        # Run the crawler inside the block, while the storage backend is open.
+        await crawler.run(['https://crawlee.dev'])

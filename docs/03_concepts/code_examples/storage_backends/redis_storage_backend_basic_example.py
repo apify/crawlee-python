@@ -12,3 +12,6 @@ async def main() -> None:
     ) as storage_backend:
         # And pass it to the crawler.
         crawler = ParselCrawler(storage_backend=storage_backend)
+
+        # Run the crawler inside the block, while the storage backend is open.
+        await crawler.run(['https://crawlee.dev'])
