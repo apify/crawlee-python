@@ -80,3 +80,21 @@ async def test_new_backend_skips_storages_of_closed_one(
         await dataset.push_data({'key': 'value'})
 
     assert dataset is not old_dataset
+
+
+async def test_new_backend_purges_default_dataset(
+    redis_client: FakeAsyncRedis,
+    suppress_user_warning: None,  # noqa: ARG001
+) -> None:
+    """A new backend with `purge_on_start` enabled purges the default dataset an earlier backend wrote."""
+    configuration = Configuration(purge_on_start=True)
+
+    async with RedisStorageBackend(redis=redis_client) as storage_backend:
+        dataset = await Dataset.open(storage_backend=storage_backend, configuration=configuration)
+        await dataset.push_data({'key': 'value'})
+
+    async with RedisStorageBackend(redis=redis_client) as storage_backend:
+        dataset = await Dataset.open(storage_backend=storage_backend, configuration=configuration)
+        data = await dataset.get_data()
+
+    assert data.items == []
