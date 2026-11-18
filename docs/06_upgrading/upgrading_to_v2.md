@@ -301,6 +301,10 @@ for urls in batches:
 
 In v1, `RequestQueue.purge()` worked around a storage backend that didn't support purging. It dropped an unnamed queue and opened the default queue in its place, and it skipped a named queue with a warning. In v2, it raises the backend's `NotImplementedError`, the same as Crawlee JS. The Apify platform's storage backend doesn't support purging, so on the platform, call `drop()` or open a new queue instead.
 
+## `KeyValueStore.purge` drops autosaved values
+
+`KeyValueStore.purge()` now also drops the values that `get_auto_saved_value()` and `use_state()` keep in memory for the store, the same as `drop()`. Their later changes aren't saved, and the next `get_auto_saved_value()` or `use_state()` call starts from the default value. In v1, a later save could write them back into the purged store.
+
 ## `check_readiness` replaces `is_empty` and `is_finished`
 
 `RequestLoader` and `RequestManager` no longer have `is_empty` and `is_finished`. A single `check_readiness` method replaces them and returns one of four statuses:

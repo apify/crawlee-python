@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
+from crawlee.events import Event, EventPersistStateData
 from crawlee.storage_backends import FileSystemStorageBackend, MemoryStorageBackend, SqlStorageBackend, StorageBackend
 from crawlee.storage_backends._memory import MemoryKeyValueStoreBackend
 from crawlee.storage_backends.models import KeyValueStoreRecord
@@ -1322,40 +1323,41 @@ async def test_persist_autosaved_values_with_concurrent_new_key(
     await asyncio.wait_for(asyncio.gather(persist_task, insert_task), timeout=5)
 
 
-async def test_clear_cache_with_concurrent_new_autosaved_key(
+async def test_purge_with_concurrent_new_autosaved_key(
     kvs: KeyValueStore,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test clearing the cache while adding a new autosaved key."""
+    """An autosaved key added during a purge stays cached after it."""
     await kvs.get_auto_saved_value('existing')
 
-    # Park the clear loop mid-iteration by blocking the underlying write, then insert a new key.
-    clear_entered = asyncio.Event()
-    release_clear = asyncio.Event()
+    # Park the purge in the last save of the existing value by blocking the underlying write, then insert a new key.
+    purge_entered = asyncio.Event()
+    release_purge = asyncio.Event()
     original_set_value = kvs.set_value
 
     async def blocking_set_value(*args: Any, **kwargs: Any) -> None:
-        clear_entered.set()
-        await asyncio.wait_for(release_clear.wait(), timeout=5)
+        purge_entered.set()
+        await asyncio.wait_for(release_purge.wait(), timeout=5)
         await original_set_value(*args, **kwargs)
 
     monkeypatch.setattr(kvs, 'set_value', blocking_set_value)
 
-    clear_task = asyncio.create_task(kvs._clear_cache())
-    await asyncio.wait_for(clear_entered.wait(), timeout=5)
+    purge_task = asyncio.create_task(kvs.purge())
+    await asyncio.wait_for(purge_entered.wait(), timeout=5)
 
     insert_started = asyncio.Event()
 
-    async def insert_autosaved_value() -> None:
+    async def insert_autosaved_value() -> Any:
         insert_started.set()
-        await kvs.get_auto_saved_value('added-during-clear')
+        return await kvs.get_auto_saved_value('added-during-purge')
 
     insert_task = asyncio.create_task(insert_autosaved_value())
     await asyncio.wait_for(insert_started.wait(), timeout=5)
-    release_clear.set()
+    release_purge.set()
 
-    # Should not raise `RuntimeError: dictionary changed size during iteration`.
-    await asyncio.wait_for(asyncio.gather(clear_task, insert_task), timeout=5)
+    _, added_value = await asyncio.wait_for(asyncio.gather(purge_task, insert_task), timeout=5)
+
+    assert await kvs.get_auto_saved_value('added-during-purge') is added_value
 
 
 async def test_get_auto_saved_value_retries_cancelled_load(kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1413,3 +1415,138 @@ async def test_mutating_read_value_does_not_change_stored_value(kvs: KeyValueSto
     value['key'] = 'changed'
 
     assert await kvs.get_value('test-key') == {'key': 'value'}
+
+
+async def _emit_persist_state() -> None:
+    event_manager = service_locator.get_event_manager()
+    async with event_manager:
+        event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
+        await event_manager.wait_for_all_listeners_to_complete()
+
+
+async def test_purge_drops_autosaved_values(kvs: KeyValueStore) -> None:
+    """A purge drops the autosaved values, so neither the next save nor the next read brings them back."""
+    autosaved_value = await kvs.get_auto_saved_value('state', {'count': 0})
+    autosaved_value['count'] = 1
+
+    await kvs.purge()
+    await kvs.persist_autosaved_values()
+    await _emit_persist_state()
+
+    assert await kvs.get_value('state') is None
+    assert await kvs.get_auto_saved_value('state', {'count': 0}) == {'count': 0}
+
+
+async def test_drop_drops_autosaved_values(storage_backend: StorageBackend, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A drop drops the autosaved values, so no later save writes them to the dropped store."""
+    kvs = await KeyValueStore.open(name='drop-test', storage_backend=storage_backend)
+    autosaved_value = await kvs.get_auto_saved_value('state', {'count': 0})
+    await kvs.drop()
+
+    set_value = AsyncMock()
+    monkeypatch.setattr(kvs, 'set_value', set_value)
+    autosaved_value['count'] = 1
+    await kvs.persist_autosaved_values()
+    await _emit_persist_state()
+
+    set_value.assert_not_called()
+
+
+async def test_purge_with_concurrent_get_auto_saved_value(kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A `get_auto_saved_value` call made during a purge doesn't load the value that is being purged."""
+    autosaved_value = await kvs.get_auto_saved_value('state', {'count': 0})
+    autosaved_value['count'] = 1
+
+    purge_started = asyncio.Event()
+    release_purge = asyncio.Event()
+    backend_purge = kvs._backend.purge
+
+    async def blocking_purge() -> None:
+        purge_started.set()
+        await asyncio.wait_for(release_purge.wait(), timeout=5)
+        await backend_purge()
+
+    monkeypatch.setattr(kvs._backend, 'purge', AsyncMock(side_effect=blocking_purge))
+
+    purge_task = asyncio.create_task(kvs.purge())
+    await asyncio.wait_for(purge_started.wait(), timeout=5)
+
+    # The read gets time to load the record while the purge is parked.
+    read_task = asyncio.create_task(kvs.get_auto_saved_value('state', {'count': 0}))
+    await asyncio.wait([read_task], timeout=0.1)
+    assert not read_task.done()
+    release_purge.set()
+    await purge_task
+
+    assert await read_task == {'count': 0}
+
+
+@pytest.mark.parametrize('operation', [pytest.param('purge', id='purge'), pytest.param('drop', id='drop')])
+async def test_failed_purge_or_drop_keeps_autosaved_values(
+    kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch, operation: str
+) -> None:
+    """A purge or drop that the storage backend rejects leaves the autosaved values saved on `PERSIST_STATE`."""
+    autosaved_value = await kvs.get_auto_saved_value('state', {'count': 0})
+    purge_or_drop = getattr(kvs, operation)
+
+    with monkeypatch.context() as failing_backend:
+        failing_backend.setattr(kvs._backend, operation, AsyncMock(side_effect=NotImplementedError))
+        with pytest.raises(NotImplementedError):
+            await purge_or_drop()
+
+    autosaved_value['count'] = 1
+    await _emit_persist_state()
+
+    assert await kvs.get_value('state') == {'count': 1}
+    assert await kvs.get_auto_saved_value('state') is autosaved_value
+
+
+async def test_failed_drop_keeps_store_cached(
+    kvs: KeyValueStore, storage_backend: StorageBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A drop that the storage backend rejects leaves the store cached, so opening it again returns the same store."""
+    with monkeypatch.context() as failing_backend:
+        failing_backend.setattr(kvs._backend, 'drop', AsyncMock(side_effect=NotImplementedError))
+        with pytest.raises(NotImplementedError):
+            await kvs.drop()
+
+    assert await KeyValueStore.open(storage_backend=storage_backend) is kvs
+
+
+async def test_failed_purge_with_invalid_autosaved_record(kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failed purge raises the storage backend's error when an autosaved value with an invalid record is cached."""
+    await kvs.set_value('state', [1, 2, 3])
+    with pytest.raises(ValidationError):
+        await kvs.get_auto_saved_value('state')
+
+    monkeypatch.setattr(kvs._backend, 'purge', AsyncMock(side_effect=NotImplementedError))
+    with pytest.raises(NotImplementedError):
+        await kvs.purge()
+
+
+@pytest.mark.parametrize('operation', [pytest.param('purge', id='purge'), pytest.param('drop', id='drop')])
+async def test_cancelled_purge_or_drop_keeps_autosaved_values(
+    kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch, operation: str
+) -> None:
+    """A purge or drop cancelled during the last save of an autosaved value leaves it saved on `PERSIST_STATE`."""
+    autosaved_value = await kvs.get_auto_saved_value('state', {'count': 0})
+    save_started = asyncio.Event()
+
+    async def hanging_set_value(*_args: Any, **_kwargs: Any) -> None:
+        save_started.set()
+        await asyncio.sleep(3600)
+
+    purge_or_drop = getattr(kvs, operation)
+
+    with monkeypatch.context() as hanging_save:
+        hanging_save.setattr(kvs, 'set_value', AsyncMock(side_effect=hanging_set_value))
+        task = asyncio.create_task(purge_or_drop())
+        await asyncio.wait_for(save_started.wait(), timeout=5)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    autosaved_value['count'] = 1
+    await _emit_persist_state()
+
+    assert await kvs.get_value('state') == {'count': 1}
