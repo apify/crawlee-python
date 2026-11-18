@@ -411,6 +411,22 @@ async def test_close_raises_error_when_not_active() -> None:
         await EventManager().close()
 
 
+async def test_concurrent_close_emits_final_persist_state_once() -> None:
+    """Two overlapping `close` calls emit the final `PersistState` only once."""
+    received = asyncio.Event()
+    persist_state_listener = AsyncMock(side_effect=lambda _: received.set())
+    event_manager = EventManager(persist_state_interval=timedelta(hours=1))
+
+    async with event_manager:
+        event_manager.on(event=Event.PERSIST_STATE, listener=persist_state_listener)
+        # Ignore the persist state emitted by the first run of the periodic task.
+        await asyncio.wait_for(received.wait(), timeout=5)
+        persist_state_listener.reset_mock()
+
+        await asyncio.gather(event_manager.close(), event_manager.close())
+        persist_state_listener.assert_awaited_once()
+
+
 async def test_wait_for_all_listeners_cancelled_error(
     monkeypatch: pytest.MonkeyPatch,
     event_system_info_data: EventSystemInfoData,
