@@ -52,6 +52,13 @@ class NavigationRequestInterceptor:
     is not continued: `Route.fetch` sends it without following redirects, and its response is fulfilled. The browser
     then follows any redirect on its own, without the custom headers, so the credentials never reach another origin.
     Any other request is continued, and redirect hops carry its custom headers.
+
+    A request sent with `Route.fetch` differs from a continued one:
+
+    - Playwright sends it over HTTP/1.1 with its own TLS stack, header order, and no `sec-fetch-*` headers, so its
+      fingerprint is not the fingerprint of the browser.
+    - A redirect target on the same origin gets no custom header either.
+    - After a 307 or 308 redirect, the browser sends a `GET` without a payload, whatever the custom method is.
     """
 
     def __init__(
