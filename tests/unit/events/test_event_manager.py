@@ -676,3 +676,27 @@ async def test_event_manager_in_context_persistence() -> None:
             pass
 
     assert mocked_emit_persist_state_event.call_count >= 1
+
+
+@pytest.mark.parametrize(
+    ('elapsed_secs', 'expected_second_timeout'),
+    [
+        pytest.param(0.4, timedelta(seconds=0.6), id='time left'),
+        pytest.param(5, timedelta.resolution, id='time used up'),
+    ],
+)
+async def test_exit_waits_at_most_close_timeout_in_total(
+    monkeypatch: pytest.MonkeyPatch,
+    elapsed_secs: float,
+    expected_second_timeout: timedelta,
+) -> None:
+    """The final wait on exit gets only the part of `close_timeout` that the wait in `close` left."""
+    monkeypatch.setattr('crawlee.events._event_manager.monotonic', Mock(side_effect=[100.0, 100.0 + elapsed_secs]))
+    wait = AsyncMock()
+    event_manager = EventManager(close_timeout=timedelta(seconds=1))
+
+    async with event_manager:
+        monkeypatch.setattr(event_manager, 'wait_for_all_listeners_to_complete', wait)
+
+    timeouts = [call.kwargs['timeout'] for call in wait.await_args_list]
+    assert timeouts == [timedelta(seconds=1), expected_second_timeout]

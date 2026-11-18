@@ -5,6 +5,7 @@ import inspect
 from collections import defaultdict
 from datetime import timedelta
 from logging import getLogger
+from time import monotonic
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast, overload
 
 from crawlee._utils.context import ensure_context
@@ -131,6 +132,7 @@ class EventManager:
             RuntimeError: If the context manager is not active.
         """
         last_exit = self._active_ref_count == 1
+        exit_started_at = monotonic()
 
         try:
             if last_exit:
@@ -139,8 +141,15 @@ class EventManager:
                 # Emit a persist state event to ensure the latest state is saved before leaving the nested context.
                 await self._emit_persist_state_event()
 
-            # Listeners of the events emitted after `close` have to finish as well.
-            await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
+            # The wait in `close` and this one share a single `close_timeout`.
+            timeout = self._close_timeout
+            if timeout is not None:
+                elapsed = timedelta(seconds=monotonic() - exit_started_at)
+                # A zero timeout means no limit for the wait, so a used-up timeout becomes the smallest positive one.
+                timeout = max(timeout - elapsed, timedelta.resolution)
+
+            # Wait for the listeners of all events emitted so far, including those emitted after `close`.
+            await self.wait_for_all_listeners_to_complete(timeout=timeout)
         finally:
             # The context has to be left even if closing fails, be it a cancellation or a failed emission. Staying
             # active would mean never emitting `PersistState` again, as re-entering the context would be a no-op.
