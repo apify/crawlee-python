@@ -2971,3 +2971,47 @@ async def test_robots_txt_fetch_timeout_allows_all_urls(monkeypatch: pytest.Monk
     assert await crawler._is_allowed_based_on_robots_txt_file('https://site.placeholder.com/other') is True
 
     assert http_client.send_request.call_count == 1
+
+
+async def test_robots_txt_fetch_retried_with_new_proxy() -> None:
+    """A failed robots.txt fetch is repeated with the next proxy."""
+    proxy_urls: list[str | None] = ['http://proxy-1.placeholder.com:8000', 'http://proxy-2.placeholder.com:8000']
+    http_client = _create_robots_txt_http_client()
+    http_client.send_request.side_effect = [RuntimeError('The proxy failed.'), http_client.send_request.return_value]
+    crawler = BasicCrawler(
+        http_client=http_client,
+        proxy_configuration=ProxyConfiguration(proxy_urls=proxy_urls),
+        respect_robots_txt_file=True,
+    )
+
+    assert await crawler._is_allowed_based_on_robots_txt_file('https://site.placeholder.com/private') is False
+
+    assert [call.kwargs['proxy_info'].url for call in http_client.send_request.call_args_list] == proxy_urls
+
+
+async def test_robots_txt_failed_fetch_allows_all_urls() -> None:
+    """When every robots.txt fetch attempt fails, all URLs of the origin are allowed, and the fetch is not repeated."""
+    http_client = Mock(spec=HttpClient)
+    http_client.send_request = AsyncMock(side_effect=RuntimeError('No network in this test.'))
+    crawler = BasicCrawler(http_client=http_client, respect_robots_txt_file=True)
+
+    assert await crawler._is_allowed_based_on_robots_txt_file('https://site.placeholder.com/private') is True
+    assert await crawler._is_allowed_based_on_robots_txt_file('https://site.placeholder.com/other') is True
+
+    assert http_client.send_request.await_count == BasicCrawler._ROBOTS_TXT_MAX_ATTEMPTS
+
+
+async def test_robots_txt_proxy_lookup_error_allows_all_urls() -> None:
+    """An error from `new_url_function` stays inside the robots.txt check, and nothing is fetched without a proxy."""
+    http_client = _create_robots_txt_http_client()
+    new_url_function = Mock(side_effect=RuntimeError('No proxy for this request.'))
+    crawler = BasicCrawler(
+        http_client=http_client,
+        proxy_configuration=ProxyConfiguration(new_url_function=new_url_function),
+        respect_robots_txt_file=True,
+    )
+
+    assert await crawler._is_allowed_based_on_robots_txt_file('https://site.placeholder.com/private') is True
+
+    assert new_url_function.call_count == BasicCrawler._ROBOTS_TXT_MAX_ATTEMPTS
+    http_client.send_request.assert_not_awaited()
