@@ -21,6 +21,7 @@ from ._key_value_store_backend import SqlKeyValueStoreBackend
 from ._request_queue_backend import SqlRequestQueueBackend
 
 if TYPE_CHECKING:
+    from collections.abc import Hashable
     from types import TracebackType
 
     from sqlalchemy.engine.interfaces import DBAPIConnection
@@ -65,14 +66,16 @@ class SqlStorageBackend(StorageBackend):
         Args:
             connection_string: Database connection string (e.g., "sqlite+aiosqlite:///crawlee.db").
                 If not provided, defaults to SQLite database in the storage directory.
-            engine: Pre-configured AsyncEngine instance. If provided, connection_string is ignored.
+            engine: Pre-configured AsyncEngine instance. The backend doesn't dispose it.
         """
         if engine is not None and connection_string is not None:
             raise ValueError('Either connection_string or engine must be provided, not both.')
 
         self._connection_string = connection_string
         self._engine = engine
+        self._owns_engine = engine is None
         self._initialized = False
+        self._closed = False
         self.session_maker: async_sessionmaker[AsyncSession] | None = None
 
         self._listeners_registered = False
@@ -100,7 +103,13 @@ class SqlStorageBackend(StorageBackend):
 
     @property
     def engine(self) -> AsyncEngine:
-        """Get the SQLAlchemy AsyncEngine instance."""
+        """Get the SQLAlchemy AsyncEngine instance.
+
+        Raises:
+            RuntimeError: If the storage backend is closed.
+        """
+        self._raise_if_closed()
+
         if self._engine is None:
             raise ValueError('Engine is not initialized. Call initialize() before accessing the engine.')
         return self._engine
@@ -114,7 +123,12 @@ class SqlStorageBackend(StorageBackend):
 
         This method creates all necessary tables if they don't exist.
         Should be called before using the storage backend.
+
+        Raises:
+            RuntimeError: If the storage backend is closed.
         """
+        self._raise_if_closed()
+
         if not self._initialized:
             engine = self._get_or_create_engine(configuration)
 
@@ -155,8 +169,17 @@ class SqlStorageBackend(StorageBackend):
             self._initialized = True
 
     async def close(self) -> None:
-        """Close the database connection pool."""
-        if self._engine is not None:
+        """Close the database connection pool, unless the engine was passed in.
+
+        The storage backend and the storages opened with it can't be used afterwards.
+        """
+        if self._closed:
+            return
+
+        self._closed = True
+        self.session_maker = None
+
+        if self._engine is not None and self._owns_engine:
             if self._listeners_registered:
                 event.remove(self._engine.sync_engine, 'connect', self._on_connect)
                 self._listeners_registered = False
@@ -169,10 +192,20 @@ class SqlStorageBackend(StorageBackend):
 
         Returns:
             A new AsyncSession instance.
+
+        Raises:
+            RuntimeError: If the storage backend is closed.
         """
+        self._raise_if_closed()
+
         if self.session_maker is None:
             self.session_maker = async_sessionmaker(self._engine, expire_on_commit=False, autoflush=False)
         return self.session_maker()
+
+    @override
+    def get_storage_backend_cache_key(self, configuration: Configuration) -> Hashable:
+        # Storages stop working when their backend closes, so a different backend instance must not get them.
+        return super().get_storage_backend_cache_key(configuration), id(self)
 
     @override
     async def create_dataset_backend(
@@ -239,6 +272,11 @@ class SqlStorageBackend(StorageBackend):
 
         await self._purge_if_needed(backend, configuration)
         return backend
+
+    def _raise_if_closed(self) -> None:
+        # Without this check, `initialize()` would create a new engine that nobody disposes.
+        if self._closed:
+            raise RuntimeError(f'The {self.__class__.__name__} is closed.')
 
     def _get_or_create_engine(self, configuration: Configuration) -> AsyncEngine:
         """Get or create the database engine based on configuration."""

@@ -162,6 +162,10 @@ To use it, you need to install Crawlee with the appropriate extra dependency:
 By default, <ApiLink to="class/SqlStorageBackend">SqlStorageBackend</ApiLink> uses SQLite.
 To use a different database, just provide the appropriate connection string via the `connection_string` parameter. No other code changes are needed—the same backend works for all supported databases.
 
+Use the backend as an async context manager, so that its connections are closed when you're done. It disposes an engine it created, but not one you pass in. Storages opened through a backend stop working once it's closed.
+
+Each backend opens its own storages. With `purge_on_start` enabled, it purges the unnamed storages, such as the default dataset, when it opens them. As a result, a new backend connected to the same database wipes the data an earlier one wrote to these storages.
+
 <RunnableCodeBlock className="language-python" language="python">
     {SQLStorageBackendBasicExample}
 </RunnableCodeBlock>

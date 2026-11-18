@@ -218,6 +218,33 @@ async with RedisStorageBackend(
     dataset = await Dataset.open(storage_backend=storage_backend)
 ```
 
+## Each `SqlStorageBackend` opens its own storages
+
+In v1, all `SqlStorageClient` instances in a process shared the storages opened through any of them, even when they connected to different databases. Now each `SqlStorageBackend` instance opens its own storages. With `purge_on_start` enabled, a new instance purges the unnamed storages, such as the default dataset, when it opens them. When it connects to the same database as an earlier instance, the data the earlier one wrote to these storages is lost. To read what a crawler stored in them, open them through the crawler's backend.
+
+Use `SqlStorageBackend` as an async context manager. On exit, it disposes the engine it created from the connection string or for the default SQLite database. In v1, it also disposed an engine you passed in. Now it leaves that engine open, so dispose it yourself. Storages opened through a closed backend stop working. In v1, they silently opened a new connection pool that nobody closed.
+
+For example:
+
+```python
+# v1
+async with SqlStorageClient(engine=engine) as storage_client:
+    crawler = ParselCrawler(storage_client=storage_client)
+    await crawler.run(['https://crawlee.dev'])
+
+    dataset = await Dataset.open(storage_client=SqlStorageClient(engine=engine))
+
+# v2
+try:
+    async with SqlStorageBackend(engine=engine) as storage_backend:
+        crawler = ParselCrawler(storage_backend=storage_backend)
+        await crawler.run(['https://crawlee.dev'])
+
+        dataset = await Dataset.open(storage_backend=storage_backend)
+finally:
+    await engine.dispose()
+```
+
 ## Crawler `id` is a string
 
 The `id` argument of `BasicCrawler` and its subclasses is now a `str`, so pass a string wherever you passed an integer. `StatisticsState.stats_id` and `EventCrawlerStatusData.crawler_id` are strings too, and `crawler_id` holds the crawler's `id`. In v1, it held the Python object ID of the crawler.
@@ -327,7 +354,7 @@ for urls in batches:
     await crawler.run(urls)
 ```
 
-`Configuration.purge_on_start` isn't affected. Unnamed storages are still purged once per process, when they're first opened.
+`Configuration.purge_on_start` isn't affected. Unnamed storages are still purged once per process, when they're first opened. With `SqlStorageBackend` and `RedisStorageBackend`, each instance now opens its own storages, so it purges them once per instance.
 
 ## `RequestQueue.purge` raises when the storage backend can't purge
 
