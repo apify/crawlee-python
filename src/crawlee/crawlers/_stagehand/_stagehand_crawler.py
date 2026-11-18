@@ -109,7 +109,8 @@ class StagehandCrawler(
             stagehand_options: Stagehand-specific configuration (model, API key, env, etc.).
                 Cannot be specified if `browser_pool` is provided.
             browser_pool: A pre-configured `BrowserPool`. All plugins must be instances of `StagehandBrowserPlugin`.
-                If omitted, a pool is created automatically from the other browser arguments.
+                If omitted, a pool is created automatically from the other browser arguments. Keep a pool passed in
+                open with `async with` until every crawler using it has finished.
             user_data_dir: Path to a user data directory, which stores browser session data like cookies and
                 local storage. Cannot be specified if `browser_pool` is provided.
             headless: Whether to run the browser in headless mode. Defaults to the value from Crawlee's
@@ -143,12 +144,13 @@ class StagehandCrawler(
                     'Cannot specify `stagehand_options`, `user_data_dir`, `headless`, '
                     '`browser_launch_options`, `browser_new_context_options` when `browser_pool` is provided.'
                 )
-        else:
+
+        def build_browser_pool() -> BrowserPool:
             launch_options = dict(browser_launch_options or {})
             if headless is not None:
                 launch_options['headless'] = headless
 
-            browser_pool = BrowserPool(
+            return BrowserPool(
                 plugins=[
                     StagehandBrowserPlugin(
                         stagehand_options=stagehand_options,
@@ -158,6 +160,8 @@ class StagehandCrawler(
                     )
                 ]
             )
+
+        browser_pool = self._own_or_borrow(browser_pool, build_browser_pool)
 
         super().__init__(
             browser_pool=browser_pool,

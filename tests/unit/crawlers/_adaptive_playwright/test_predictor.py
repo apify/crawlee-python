@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+from unittest.mock import AsyncMock
+
 import pytest
 
 from crawlee import Request
@@ -217,3 +220,63 @@ def test_url_similarity(url_1: str, url_2: str, expected_rounded_similarity: flo
         round(calculate_url_similarity(url_1=get_url_components(url_1), url_2=get_url_components(url_2)), 2)
         == expected_rounded_similarity
     )
+
+
+@pytest.mark.parametrize(
+    'error',
+    [
+        pytest.param(RuntimeError('initialize failed'), id='failed'),
+        pytest.param(asyncio.CancelledError(), id='cancelled'),
+    ],
+)
+async def test_failed_enter_frees_predictor(monkeypatch: pytest.MonkeyPatch, error: BaseException) -> None:
+    """A predictor whose entry fails or is cancelled stays inactive and can be entered again."""
+    predictor = DefaultRenderingTypePredictor()
+    monkeypatch.setattr(predictor._state, 'initialize', AsyncMock(side_effect=error))
+
+    with pytest.raises(type(error)):
+        async with predictor:
+            pass
+
+    assert not predictor.active
+    monkeypatch.undo()
+
+    async with predictor:
+        assert predictor.active
+
+
+async def test_failed_exit_frees_predictor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A predictor whose exit fails is no longer active, so it can be entered again."""
+    predictor = DefaultRenderingTypePredictor()
+
+    with pytest.raises(RuntimeError, match='teardown failed'):
+        async with predictor:
+            monkeypatch.setattr(predictor._state, 'teardown', AsyncMock(side_effect=RuntimeError('teardown failed')))
+
+    assert not predictor.active
+    monkeypatch.undo()
+
+    async with predictor:
+        assert predictor.active
+
+
+async def test_enter_during_exit_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A predictor can't be entered again until its exit has torn the state down."""
+    predictor = DefaultRenderingTypePredictor()
+    teardown_started = asyncio.Event()
+    release_teardown = asyncio.Event()
+
+    async def wait_for_release() -> None:
+        teardown_started.set()
+        await release_teardown.wait()
+
+    await predictor.__aenter__()
+    monkeypatch.setattr(predictor._state, 'teardown', AsyncMock(side_effect=wait_for_release))
+    exit_task = asyncio.create_task(predictor.__aexit__(None, None, None))
+    await teardown_started.wait()
+
+    with pytest.raises(RuntimeError, match='already active'):
+        await predictor.__aenter__()
+
+    release_teardown.set()
+    await exit_task

@@ -129,7 +129,8 @@ class PlaywrightCrawler(
         """Initialize a new instance.
 
         Args:
-            browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages.
+            browser_pool: A `BrowserPool` instance to be used for launching the browsers and getting pages. Keep it
+                open with `async with` until every crawler using it has finished.
             user_data_dir: Path to a user data directory, which stores browser session data like cookies
                 and local storage.
             browser_type: The type of browser to launch:
@@ -162,48 +163,47 @@ class PlaywrightCrawler(
         self._shared_navigation_timeouts: dict[int, SharedTimeout] = {}
         self._save_response_cookies = save_response_cookies
 
-        if browser_pool:
-            # Raise an exception if browser_pool is provided together with other browser-related arguments.
-            if any(
-                param not in [None, 'default']
-                for param in (
-                    user_data_dir,
-                    use_incognito_pages,
-                    headless,
-                    browser_type,
-                    browser_launch_options,
-                    browser_new_context_options,
-                    fingerprint_generator,
-                )
-            ):
-                raise ValueError(
-                    'You cannot provide `headless`, `browser_type`, `browser_launch_options`, '
-                    '`browser_new_context_options`, `use_incognito_pages`, `user_data_dir` or '
-                    '`fingerprint_generator` arguments when `browser_pool` is provided.'
-                )
+        if browser_pool and any(
+            param not in [None, 'default']
+            for param in (
+                user_data_dir,
+                use_incognito_pages,
+                headless,
+                browser_type,
+                browser_launch_options,
+                browser_new_context_options,
+                fingerprint_generator,
+            )
+        ):
+            raise ValueError(
+                'You cannot provide `headless`, `browser_type`, `browser_launch_options`, '
+                '`browser_new_context_options`, `use_incognito_pages`, `user_data_dir` or '
+                '`fingerprint_generator` arguments when `browser_pool` is provided.'
+            )
 
-        # If browser_pool is not provided, create a new instance of BrowserPool with specified arguments.
-        else:
-            if fingerprint_generator == 'default':
-                generator_browser_type: list[Literal['chrome', 'firefox', 'safari', 'edge']] | None = (
-                    [fingerprint_browser_type_from_playwright_browser_type(browser_type)] if browser_type else None
-                )
+        # Before `super().__init__()`, so that a failure here doesn't take up a crawler id.
+        generator: FingerprintGenerator | None = None
+        if fingerprint_generator != 'default':
+            generator = fingerprint_generator
+        elif browser_pool is None:
+            generator_browser_type: list[Literal['chrome', 'firefox', 'safari', 'edge']] | None = (
+                [fingerprint_browser_type_from_playwright_browser_type(browser_type)] if browser_type else None
+            )
 
-                fingerprint_generator = DefaultFingerprintGenerator(
-                    header_options=HeaderGeneratorOptions(browsers=generator_browser_type)
-                )
+            generator = DefaultFingerprintGenerator(
+                header_options=HeaderGeneratorOptions(browsers=generator_browser_type)
+            )
 
-            browser_pool = BrowserPool.with_default_plugin(
+        def build_browser_pool() -> BrowserPool:
+            return BrowserPool.with_default_plugin(
                 headless=headless,
                 browser_type=browser_type,
                 user_data_dir=user_data_dir,
                 browser_launch_options=browser_launch_options,
                 browser_new_context_options=browser_new_context_options,
                 use_incognito_pages=use_incognito_pages,
-                fingerprint_generator=fingerprint_generator,
+                fingerprint_generator=generator,
             )
-
-        self._browser_pool = browser_pool
 
         # Compose the context pipeline with the Playwright-specific context enhancer.
         kwargs['_context_pipeline'] = (
@@ -216,11 +216,11 @@ class PlaywrightCrawler(
             .compose(self._handle_blocked_request_by_content)
             .compose(self._create_crawling_context)
         )
-        kwargs['_additional_context_managers'] = [self._browser_pool]
         self._pre_navigation_hooks: list[Callable[[TPreNavContext], Awaitable[None]]] = []
         self._post_navigation_hooks: list[Callable[[TPostNavContext], Awaitable[None]]] = []
 
-        kwargs['http_client'] = PlaywrightHttpClient() if not kwargs.get('http_client') else kwargs['http_client']
+        # Before `super().__init__()`, which would otherwise build the default `ImpitHttpClient`.
+        kwargs['http_client'] = self._own_or_borrow(kwargs.get('http_client'), PlaywrightHttpClient)
 
         # Lower the default concurrency for browser crawlers, unless the caller configured it themselves.
         if kwargs.get('concurrency_settings') is None and kwargs.get('concurrency_system') is None:
@@ -230,6 +230,8 @@ class PlaywrightCrawler(
         self._goto_options = goto_options or GotoOptions()
 
         super().__init__(**kwargs)
+
+        self._browser_pool = self._own_or_borrow(browser_pool, build_browser_pool)
 
     async def _manage_shared_navigation_timeout(
         self, context: BasicCrawlingContext
@@ -647,7 +649,8 @@ class _PlaywrightCrawlerAdditionalOptions(TypedDict):
     """
 
     browser_pool: NotRequired[BrowserPool]
-    """A `BrowserPool` instance to be used for launching the browsers and getting pages."""
+    """A `BrowserPool` instance to be used for launching the browsers and getting pages. Keep it open with `async with`
+    until every crawler using it has finished."""
 
     browser_type: NotRequired[BrowserType]
     """The type of browser to launch:
