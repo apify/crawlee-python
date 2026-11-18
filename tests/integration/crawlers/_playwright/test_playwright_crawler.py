@@ -1272,14 +1272,17 @@ async def test_navigation_timeout_applies_to_hooks(server_url: URL) -> None:
 )
 async def test_extend_timeout_from_nav_hook(server_url: URL, hook_type: Literal['pre', 'post']) -> None:
     """Test that `extend_timeout` from a navigation hook lets the navigation phase run past its timeout."""
-    crawler = PlaywrightCrawler(navigation_timeout=timedelta(seconds=1), max_request_retries=0)
+    # A post-navigation hook can extend the budget only after `goto` finishes, so the budget leaves room for a slow
+    # `goto` on a loaded runner. The hook then sleeps past the whole budget.
+    navigation_timeout = timedelta(seconds=5)
+    crawler = PlaywrightCrawler(navigation_timeout=navigation_timeout, max_request_retries=0)
 
     request_handler = AsyncMock()
     crawler.router.default_handler(request_handler)
 
     async def slow_hook(context: BasicCrawlingContext) -> None:
         await context.extend_timeout(timedelta(seconds=10))
-        await asyncio.sleep(1.5)
+        await asyncio.sleep(navigation_timeout.total_seconds() + 0.5)
 
     if hook_type == 'pre':
         crawler.pre_navigation_hook(slow_hook)
