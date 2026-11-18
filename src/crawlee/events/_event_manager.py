@@ -96,6 +96,9 @@ class EventManager:
         self._active_ref_count = 0
         """Reference count of the active contexts."""
 
+        self._closed = False
+        """Whether `close` has emitted the final `PersistState` event in the current context."""
+
     @property
     def active(self) -> bool:
         """Indicate whether the context is active."""
@@ -127,12 +130,13 @@ class EventManager:
         last_exit = self._active_ref_count == 1
 
         try:
-            # Stop the periodic emission first, so that the event emitted below really is the last one.
             if last_exit:
-                await self._emit_persist_state_event_rec_task.stop()
+                await self.close()
+            elif not self._closed:
+                # Emit a persist state event to ensure the latest state is saved before leaving the nested context.
+                await self._emit_persist_state_event()
 
-            # Emit a persist state event to ensure the latest state is saved before closing the context.
-            await self._emit_persist_state_event()
+            # Listeners of the events emitted after `close` have to finish as well.
             await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
         finally:
             # The context has to be left even if closing fails, be it a cancellation or a failed emission. Staying
@@ -141,8 +145,32 @@ class EventManager:
                 self._listener_tasks.clear()
                 self._listeners_to_wrappers.clear()
                 self._waiting_listener_tasks.clear()
+                self._closed = False
 
             self._active_ref_count -= 1
+
+    @ensure_context
+    async def close(self) -> None:
+        """Emit the final `PersistState` event and wait for all the event listeners to complete.
+
+        It also stops the periodic `PersistState` emission. The listeners stay registered and the context stays
+        active, so more events can be emitted after the final state save, such as `Exit`. Leaving the outermost
+        context calls this method, unless it was called already. Calling it more than once has no effect.
+
+        Raises:
+            RuntimeError: If the context manager is not active.
+        """
+        if self._closed:
+            return
+
+        # Stop the periodic emission first, so that the event emitted below really is the last one.
+        await self._emit_persist_state_event_rec_task.stop()
+
+        # Emit a persist state event to ensure the latest state is saved before closing.
+        await self._emit_persist_state_event()
+        self._closed = True
+
+        await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
 
     @overload
     def on(self, *, event: Literal[Event.PERSIST_STATE], listener: EventListener[EventPersistStateData]) -> None: ...

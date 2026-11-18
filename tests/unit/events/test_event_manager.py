@@ -8,7 +8,7 @@ from datetime import timedelta
 from functools import update_wrapper
 from typing import TYPE_CHECKING, Any
 from unittest import mock
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
@@ -356,6 +356,59 @@ async def test_context_is_left_even_if_closing_fails(monkeypatch: pytest.MonkeyP
         await event_manager.__aexit__(None, None, None)
 
     assert event_manager.active is False
+
+
+async def test_close_emits_final_persist_state_and_keeps_listeners(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`close` emits the final `PersistState` once, and events emitted after it still reach their listeners."""
+    calls: list[str] = []
+    persist_state_listener = AsyncMock(side_effect=lambda _: calls.append('persist_state'))
+    exit_listener = AsyncMock(side_effect=lambda _: calls.append('exit'))
+    event_manager = EventManager(persist_state_interval=timedelta(hours=1))
+
+    async with event_manager:
+        event_manager.on(event=Event.PERSIST_STATE, listener=persist_state_listener)
+        event_manager.on(event=Event.EXIT, listener=exit_listener)
+        # Ignore the persist state emitted right on entering the context.
+        await event_manager.wait_for_all_listeners_to_complete()
+        calls.clear()
+
+        await event_manager.close()
+        assert calls == ['persist_state']
+
+        stop = Mock(side_effect=AssertionError('The periodic emission is already stopped.'))
+        monkeypatch.setattr(event_manager._emit_persist_state_event_rec_task, 'stop', stop)
+        await event_manager.close()
+
+        event_manager.emit(event=Event.EXIT, event_data=Mock())
+
+    assert calls == ['persist_state', 'exit']
+    assert event_manager.active is False
+    assert len(event_manager._listeners_to_wrappers) == 0
+    stop.assert_not_called()
+
+
+async def test_context_emits_final_persist_state_again_after_close_and_reentry() -> None:
+    """After leaving a closed context, the next one emits its own final `PersistState` again."""
+    persist_state_listener = AsyncMock()
+    event_manager = EventManager(persist_state_interval=timedelta(hours=1))
+
+    async with event_manager:
+        await event_manager.close()
+
+    async with event_manager:
+        event_manager.on(event=Event.PERSIST_STATE, listener=persist_state_listener)
+        await event_manager.wait_for_all_listeners_to_complete()
+        persist_state_listener.reset_mock()
+
+    persist_state_listener.assert_awaited_once()
+
+
+async def test_close_raises_error_when_not_active() -> None:
+    """`close` requires an active context."""
+    with pytest.raises(RuntimeError, match=r'is not active'):
+        await EventManager().close()
 
 
 async def test_wait_for_all_listeners_cancelled_error(
