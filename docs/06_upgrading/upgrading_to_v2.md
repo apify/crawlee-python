@@ -54,6 +54,10 @@ A custom storage backend has more names to update. The `StorageBackend` methods 
 
 `RequestQueueBackend.is_finished` is now an abstract method. In v1, it fell back to `is_empty`, which ignores requests still being processed and could report the queue as finished too early. A subclass that doesn't implement it raises `TypeError` on instantiation. If you have a custom request queue backend, implement `is_finished` so that it returns `True` only when the queue is empty and no requests are in progress. The built-in backends already implement it.
 
+## A zero timeout cancels right away
+
+A zero `close_timeout` of an event manager, or a zero `timeout` passed to `EventManager.wait_for_all_listeners_to_complete()`, cancels the running listeners right away. A zero `wait_for_all_requests_to_be_added_timeout` in `add_requests()` does the same for the requests still being added. In v1, a zero timeout meant no limit. To wait without a limit, pass `None`.
+
 ## Keyword-only arguments
 
 Secondary arguments of the public API are now keyword-only. The main argument of each call, such as a key, a value, a selector or a path, stays positional. A call that passes any of the following arguments positionally raises `TypeError`, so pass them by name:

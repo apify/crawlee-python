@@ -42,7 +42,9 @@ class EventManagerOptions(TypedDict):
     """Interval between emitted `PersistState` events to maintain state persistence."""
 
     close_timeout: NotRequired[timedelta | None]
-    """Optional timeout for canceling pending event listeners if they exceed this duration."""
+    """Optional timeout for canceling pending event listeners if they exceed this duration. `None` waits without
+    a limit, zero cancels them right away.
+    """
 
 
 @docs_group('Event managers')
@@ -65,6 +67,7 @@ class EventManager:
         Args:
             persist_state_interval: Interval between emitted `PersistState` events to maintain state persistence.
             close_timeout: Optional timeout for canceling pending event listeners if they exceed this duration.
+                `None` waits without a limit, zero cancels them right away.
         """
         self._persist_state_interval = persist_state_interval
         """Interval between the emitted `PersistState` events."""
@@ -226,7 +229,8 @@ class EventManager:
 
         Args:
             timeout: The maximum time to wait for the event listeners to finish. If they do not complete within
-                the specified timeout, they will be canceled.
+                the specified timeout, they will be canceled. `None` waits without a limit, zero cancels them right
+                away.
         """
         # A waiter can't finish until the listeners it awaits do, so waiters must never await each other or
         # themselves - this is what happens when a listener waits or closes from within itself. Only a waiter

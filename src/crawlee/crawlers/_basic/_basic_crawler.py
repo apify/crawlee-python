@@ -1074,7 +1074,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             batch_size: The number of requests to add in one batch.
             wait_time_between_batches: Time to wait between adding batches.
             wait_for_all_requests_to_be_added: If True, wait for all requests to be added before returning.
-            wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added.
+            wait_for_all_requests_to_be_added_timeout: Timeout for waiting for all requests to be added. `None` waits
+                without a limit, zero cancels the requests still being added right away.
         """
         allowed_requests = []
         skipped = list[Request]()
