@@ -74,7 +74,7 @@ class FileDownloadCrawler(AbstractHttpCrawler[FileDownloadCrawlingContext, bytes
 
     @crawler.router.default_handler
     async def request_handler(context: FileDownloadCrawlingContext) -> None:
-        # The decoded URL name can contain path separators, so keep only its last component.
+        # The decoded URL name can contain path separators (e.g. from `%2F`), so keep only its last component.
         file_name = Path(URL(context.request.url).name).name
 
         # Write chunks to disk as they arrive.
