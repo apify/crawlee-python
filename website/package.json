@@ -22,8 +22,7 @@
         "lint:code:fix": "oxlint --type-aware --fix",
         "format": "oxfmt",
         "format:check": "oxfmt --check",
-        "opt:images": "pnx --config.onlyBuiltDependencies=* @343dev/optimizt --webp",
-        "preinstall": "npx only-allow pnpm"
+        "opt:images": "pnx --config.onlyBuiltDependencies=* @343dev/optimizt --webp"
     },
     "dependencies": {
         "@apify/docusaurus-plugin-typedoc-api": "^5.1.16",
