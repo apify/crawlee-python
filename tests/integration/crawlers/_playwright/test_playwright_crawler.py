@@ -389,10 +389,10 @@ async def test_custom_headers_survive_redirect(server_url: URL) -> None:
         pytest.param('firefox', id='firefox'),
     ],
 )
-async def test_credential_headers_not_sent_on_cross_origin_redirect(
+async def test_authorization_header_not_sent_on_cross_origin_redirect(
     browser_type: BrowserType, server_url: URL, redirect_server_url: URL
 ) -> None:
-    """Credential headers are not sent to a redirect target on another origin."""
+    """A custom `Authorization` header is not sent to a redirect target on another origin."""
     crawler = PlaywrightCrawler(browser_type=browser_type)
     received_headers = dict[str, str]()
 
@@ -403,21 +403,14 @@ async def test_credential_headers_not_sent_on_cross_origin_redirect(
 
     target_url = str(server_url / 'headers')
     start_url = str((redirect_server_url / 'redirect').with_query(url=target_url))
-    request_headers = {
-        'Authorization': 'Bearer secret-token',
-        'Cookie': 'session=secret',
-        'Proxy-Authorization': 'Basic secret',
-    }
-    await crawler.run([Request.from_url(start_url, headers=request_headers)])
+    await crawler.run([Request.from_url(start_url, headers={'Authorization': 'Bearer secret-token'})])
 
     assert received_headers
     assert 'authorization' not in received_headers
-    assert 'cookie' not in received_headers
-    assert 'proxy-authorization' not in received_headers
 
 
-async def test_credential_headers_sent_with_navigation_request(server_url: URL) -> None:
-    """Credential headers reach the server with the navigation request."""
+async def test_authorization_header_sent_with_navigation_request(server_url: URL) -> None:
+    """A custom `Authorization` header reaches the server with the navigation request."""
     crawler = PlaywrightCrawler()
     received_headers = dict[str, str]()
 
@@ -432,6 +425,35 @@ async def test_credential_headers_sent_with_navigation_request(server_url: URL) 
     assert received_headers.get('x-custom-header') == 'custom-value'
     # Custom headers are merged into the browser-generated ones, not replacing them.
     assert 'user-agent' in received_headers
+
+
+@pytest.mark.parametrize(
+    'request_headers',
+    [
+        pytest.param({'Cookie': 'custom=1', 'Proxy-Authorization': 'Basic secret'}, id='continued_request'),
+        pytest.param(
+            {'Authorization': 'Bearer secret-token', 'Cookie': 'custom=1', 'Proxy-Authorization': 'Basic secret'},
+            id='fetched_request',
+        ),
+    ],
+)
+async def test_browser_managed_headers_not_overridden(server_url: URL, request_headers: dict[str, str]) -> None:
+    """Cookies come from the browser and proxy credentials stay away from the site, whatever the custom headers are."""
+    crawler = PlaywrightCrawler()
+    received_headers = dict[str, str]()
+
+    @crawler.pre_navigation_hook
+    async def add_browser_cookie(context: PlaywrightPreNavCrawlingContext) -> None:
+        await context.page.context.add_cookies([{'name': 'session', 'value': 'browser', 'url': str(server_url)}])
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        received_headers.update(json.loads(await context.response.text()))
+
+    await crawler.run([Request.from_url(str(server_url / 'headers'), headers=request_headers)])
+
+    assert received_headers.get('cookie') == 'session=browser'
+    assert 'proxy-authorization' not in received_headers
 
 
 async def test_pre_navigation_hook() -> None:

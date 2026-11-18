@@ -23,7 +23,9 @@ _DEFAULT_BLOCK_REQUEST_URL_PATTERNS = [
     '.zip',
 ]
 
-_CREDENTIAL_HEADERS = frozenset({'authorization', 'cookie', 'proxy-authorization'})
+# The browser ignores these overrides on a continued request: it loads cookies from its own store and keeps proxy
+# credentials away from the site.
+_BROWSER_MANAGED_HEADERS = frozenset({'cookie', 'proxy-authorization'})
 
 
 class NavigationRequestInterceptor:
@@ -38,11 +40,11 @@ class NavigationRequestInterceptor:
     Custom headers are merged into the headers the browser would send on its own (e.g. `User-Agent` or
     fingerprint headers), with the custom ones winning.
 
-    Redirect hops bypass routing, and a continued request passes its header overrides to them. So when the custom
-    headers include credentials (`Authorization`, `Cookie`, `Proxy-Authorization`), the navigation request is sent
-    by `Route.fetch` without following redirects, and its response is fulfilled. The browser then follows any
-    redirect on its own, without the custom headers, so the credentials never reach another origin. Without
-    credential headers, the request is continued and redirect hops carry the custom headers.
+    Redirect hops bypass routing, and a continued request passes its header overrides to them, also to a redirect
+    target on another origin. So a request with a custom `Authorization` header is not continued: `Route.fetch`
+    sends it without following redirects, and its response is fulfilled. The browser then follows any redirect on
+    its own, without the custom headers, so the credentials never reach another origin. Without an `Authorization`
+    header, the request is continued and redirect hops carry the custom headers.
     """
 
     def __init__(
@@ -75,15 +77,22 @@ class NavigationRequestInterceptor:
         self._applied = True
         merged_headers = {**request.headers, **dict(self._headers)} if self._headers else None
 
-        if self._headers and _CREDENTIAL_HEADERS.intersection(name.lower() for name in self._headers):
-            # The navigation timeout of `Page.goto` covers this request, so `Route.fetch` gets no timeout of its own.
-            response = await route.fetch(
-                method=self._method, headers=merged_headers, post_data=self._payload, max_redirects=0, timeout=0
-            )
-            await route.fulfill(response=response)
+        if merged_headers and any(name.lower() == 'authorization' for name in self._headers or ()):
+            await self._fetch_and_fulfill(route, merged_headers)
             return
 
         await route.continue_(method=self._method, headers=merged_headers, post_data=self._payload)
+
+    async def _fetch_and_fulfill(self, route: Route, headers: dict[str, str]) -> None:
+        """Send the request with `Route.fetch` without following redirects, and fulfill the route with the response."""
+        # Without these overrides, the request has the same headers as a continued one.
+        headers = {name: value for name, value in headers.items() if name.lower() not in _BROWSER_MANAGED_HEADERS}
+
+        # The navigation timeout of `Page.goto` covers this request, so `Route.fetch` gets no timeout of its own.
+        response = await route.fetch(
+            method=self._method, headers=headers, post_data=self._payload, max_redirects=0, timeout=0
+        )
+        await route.fulfill(response=response)
 
 
 async def infinite_scroll(page: Page) -> None:
