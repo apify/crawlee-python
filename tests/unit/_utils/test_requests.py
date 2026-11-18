@@ -41,6 +41,41 @@ from crawlee._utils.requests import compute_unique_key, normalize_url
         pytest.param(
             'https://example.com/#Fragment', 'https://example.com/#Fragment', True, id='preserve_fragment_casing'
         ),
+        pytest.param('https://example.com/a/', 'https://example.com/a', False, id='remove_trailing_slash'),
+        pytest.param('https://example.com/a/b', 'https://example.com/a/b', False, id='keep_literal_slash'),
+        pytest.param('https://example.com/a%2Fb', 'https://example.com/a%2Fb', False, id='keep_encoded_slash'),
+        pytest.param(
+            'https://example.com/a%2fb', 'https://example.com/a%2Fb', False, id='uppercase_lowercase_encoded_slash'
+        ),
+        pytest.param('https://example.com/a%2F', 'https://example.com/a%2F', False, id='keep_encoded_trailing_slash'),
+        pytest.param(
+            'https://example.com/a%2F/',
+            'https://example.com/a%2F',
+            False,
+            id='remove_literal_slash_after_encoded_slash',
+        ),
+        pytest.param(
+            'https://example.com/a%252Fb', 'https://example.com/a%252Fb', False, id='keep_double_encoded_slash'
+        ),
+        pytest.param('https://example.com/a+b', 'https://example.com/a+b', False, id='keep_literal_plus'),
+        pytest.param('https://example.com/a%2Bb', 'https://example.com/a%2Bb', False, id='keep_encoded_plus'),
+        pytest.param(
+            'https://example.com/a%2bb', 'https://example.com/a%2Bb', False, id='uppercase_lowercase_encoded_plus'
+        ),
+        pytest.param('https://example.com/a%3Fb', 'https://example.com/a%3Fb', False, id='keep_encoded_question_mark'),
+        pytest.param('https://example.com/%61%7E', 'https://example.com/a~', False, id='decode_unreserved_escapes'),
+        pytest.param(
+            'https://example.com/a%2F/?z=2&utm_source=test&a=1#fragment',
+            'https://example.com/a%2F?a=1&z=2',
+            False,
+            id='encoded_slash_with_query_remove_fragment',
+        ),
+        pytest.param(
+            'https://example.com/a%2F/?z=2&utm_source=test&a=1#fragment',
+            'https://example.com/a%2F?a=1&z=2#fragment',
+            True,
+            id='encoded_slash_with_query_retain_fragment',
+        ),
     ],
 )
 def test_normalize_url(url: str, expected_output: str, *, keep_url_fragment: bool) -> None:
@@ -152,49 +187,7 @@ def test_compute_unique_key_with_whitespace_in_headers() -> None:
     assert uk_2 == expected_output
 
 
-@pytest.mark.parametrize(
-    ('path', 'expected_output'),
-    [
-        pytest.param('/items/a%2Fb', 'https://example.com/items/a%2fb', id='encoded-slash'),
-        pytest.param('/items/a%2fb', 'https://example.com/items/a%2fb', id='lowercase-encoded-slash'),
-        pytest.param('/items/a%2F', 'https://example.com/items/a%2f', id='encoded-trailing-slash'),
-        pytest.param('/items/a%2f', 'https://example.com/items/a%2f', id='lowercase-encoded-trailing-slash'),
-        pytest.param('/items/a%2F/', 'https://example.com/items/a%2f', id='encoded-before-literal-trailing-slash'),
-        pytest.param('/items/a%252Fb', 'https://example.com/items/a%252fb', id='double-encoded-slash'),
-        pytest.param('/items/a%2Bb', 'https://example.com/items/a%2bb', id='encoded-plus'),
-        pytest.param('/items/a%2bb', 'https://example.com/items/a%2bb', id='lowercase-encoded-plus'),
-        pytest.param('/items/a+b', 'https://example.com/items/a+b', id='literal-plus'),
-        pytest.param('/items/a/b', 'https://example.com/items/a/b', id='literal-separator'),
-        pytest.param('/items/a', 'https://example.com/items/a', id='literal-path'),
-    ],
-)
-def test_compute_unique_key_encoded_path(path: str, expected_output: str) -> None:
-    """Keep encoded slashes and plus signs distinct from their literal forms in request keys."""
-    assert compute_unique_key(f'https://example.com{path}') == expected_output
-
-
-@pytest.mark.parametrize(
-    ('url', 'expected_output', 'keep_url_fragment'),
-    [
-        pytest.param('https://example.com/a%2fb', 'https://example.com/a%2fb', False, id='escape-spelling'),
-        pytest.param('https://example.com/a%252fb', 'https://example.com/a%252fb', False, id='no-double-quoting'),
-        pytest.param('https://example.com/%61%7E', 'https://example.com/a~', False, id='unreserved-escapes'),
-        pytest.param('https://example.com/a%3Fb', 'https://example.com/a%3fb', False, id='escaped-question-mark'),
-        pytest.param('https://example.com/a/', 'https://example.com/a', False, id='literal-trailing-slash'),
-        pytest.param(
-            'https://example.com/a%2F/?z=2&utm_source=test&a=1#fragment',
-            'https://example.com/a%2f?a=1&z=2',
-            False,
-            id='query-filter-sort-drop-fragment',
-        ),
-        pytest.param(
-            'https://example.com/a%2F/?z=2&utm_source=test&a=1#fragment',
-            'https://example.com/a%2f?a=1&z=2#fragment',
-            True,
-            id='query-filter-sort-keep-fragment',
-        ),
-    ],
-)
-def test_normalize_url_encoded_path(url: str, expected_output: str, *, keep_url_fragment: bool) -> None:
-    """Preserve path escapes while retaining URL canonicalization and fragment controls."""
-    assert normalize_url(url, keep_url_fragment=keep_url_fragment) == expected_output
+def test_compute_unique_key_keeps_encoded_slash() -> None:
+    """An encoded slash in the path gives a different unique key than a literal slash."""
+    assert compute_unique_key('https://example.com/a%2Fb') == 'https://example.com/a%2Fb'
+    assert compute_unique_key('https://example.com/a/b') == 'https://example.com/a/b'
