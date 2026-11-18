@@ -715,3 +715,31 @@ async def test_exit_waits_at_most_close_timeout_in_total(
 
     timeouts = [call.kwargs['timeout'] for call in wait.await_args_list]
     assert timeouts == [timedelta(seconds=1), expected_second_timeout]
+
+
+async def test_exit_emits_final_persist_state_after_failed_close(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When `close` fails before the final `PersistState`, leaving the context still emits it."""
+    received = asyncio.Event()
+    persist_state_listener = AsyncMock(side_effect=lambda _: received.set())
+    event_manager = EventManager(persist_state_interval=timedelta(hours=1))
+    persist_state_rec_task = event_manager._emit_persist_state_event_rec_task
+    real_stop = persist_state_rec_task.stop
+
+    try:
+        async with event_manager:
+            event_manager.on(event=Event.PERSIST_STATE, listener=persist_state_listener)
+            # Ignore the persist state emitted by the first run of the periodic task.
+            await asyncio.wait_for(received.wait(), timeout=5)
+            persist_state_listener.reset_mock()
+
+            stop = AsyncMock(side_effect=[RuntimeError('Stopping failed.'), None])
+            monkeypatch.setattr(persist_state_rec_task, 'stop', stop)
+
+            with pytest.raises(RuntimeError, match=r'Stopping failed'):
+                await event_manager.close()
+
+            persist_state_listener.assert_not_awaited()
+
+        persist_state_listener.assert_awaited_once()
+    finally:
+        await real_stop()

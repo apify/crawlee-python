@@ -179,11 +179,16 @@ class EventManager:
         # Set before the first await, so that a concurrent call returns early and emits no second final event.
         self._closed = True
 
-        # Stop the periodic emission first, so that the event emitted below really is the last one.
-        await self._emit_persist_state_event_rec_task.stop()
+        try:
+            # Stop the periodic emission first, so that the event emitted below really is the last one.
+            await self._emit_persist_state_event_rec_task.stop()
 
-        # Emit a persist state event to ensure the latest state is saved before closing.
-        await self._emit_persist_state_event()
+            # Emit a persist state event to ensure the latest state is saved before closing.
+            await self._emit_persist_state_event()
+        except BaseException:
+            # The final event was not emitted, so leaving the context has to emit it.
+            self._closed = False
+            raise
 
         await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
 
