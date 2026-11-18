@@ -1282,6 +1282,9 @@ async def test_extend_timeout_from_nav_hook(
     request_handler = AsyncMock()
     crawler.router.default_handler(request_handler)
 
+    failed_request_handler = AsyncMock()
+    crawler.failed_request_handler(failed_request_handler)
+
     async def slow_hook(context: BasicCrawlingContext) -> None:
         await context.extend_timeout(timedelta(seconds=10))
         await asyncio.sleep(navigation_timeout.total_seconds() + 0.5)
@@ -1293,6 +1296,7 @@ async def test_extend_timeout_from_nav_hook(
 
     result = await crawler.run([str(server_url)])
 
+    failed_request_handler.assert_not_called()
     assert result.requests_finished == 1
     assert request_handler.call_count == 1
 
