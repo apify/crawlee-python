@@ -42,7 +42,7 @@ def normalize_url(url: str, *, keep_url_fragment: bool = False) -> str:
     # Construct the final URL
     yarl_new_url = parsed_url.with_query(sorted_search_params)
     yarl_new_url = yarl_new_url.with_path(
-        yarl_new_url.path.removesuffix('/'), keep_query=True, keep_fragment=keep_url_fragment
+        yarl_new_url.raw_path.removesuffix('/'), encoded=True, keep_query=True, keep_fragment=keep_url_fragment
     )
 
     return str(yarl_new_url)
