@@ -430,6 +430,21 @@ async def test_nested_context_after_close_reopens_the_manager() -> None:
     assert persist_state_listener.await_count >= exits_after_nested + 1
 
 
+async def test_nested_exit_after_close_emits_no_persist_state() -> None:
+    """Leaving a nested context entered before `close` emits no further `PersistState`."""
+    persist_state_listener = AsyncMock()
+    event_manager = EventManager(persist_state_interval=timedelta(hours=1))
+
+    async with event_manager:
+        async with event_manager:
+            await event_manager.close()
+            event_manager.on(event=Event.PERSIST_STATE, listener=persist_state_listener)
+
+        persist_state_listener.assert_not_awaited()
+
+    persist_state_listener.assert_not_awaited()
+
+
 async def test_close_raises_error_when_not_active() -> None:
     """`close` requires an active context."""
     with pytest.raises(RuntimeError, match=r'is not active'):
