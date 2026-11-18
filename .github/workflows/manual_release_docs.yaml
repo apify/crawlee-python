@@ -18,6 +18,11 @@ on:
         required: false
         type: string
         default: ""
+      skip_checks:
+        description: Skip the release branch and `Checks` gate for the built commit. The calling workflows run their own gate.
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -35,20 +40,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Gate manual dispatches on the `Checks` workflow already succeeding on this commit (run by `on_master.yaml`);
-      # skipped when called from another workflow.
-      - name: Wait for checks
-        if: github.event_name == 'workflow_dispatch'
-        uses: apify/actions/wait-for-checks@v1.6.2
-        with:
-          ref: ${{ github.sha }}
-          check-regexp: ^Checks
-
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
+
+      - name: Record the built commit
+        id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # A manual dispatch builds only a commit that is on a release branch and passed the `Checks` workflow (run by
+      # `on_master.yaml`). Calling workflows skip both steps through `skip_checks`.
+      - name: Check that the commit is on a release branch
+        if: ${{ !inputs.skip_checks }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          branches=$(gh api --paginate "repos/$GITHUB_REPOSITORY/branches" --jq '.[].name' | grep -E '^(master|release-v.+)$')
+          for branch in $branches; do
+            status=$(gh api "repos/$GITHUB_REPOSITORY/compare/$branch...$SHA" --jq .status || true)
+            if [[ "$status" == "identical" || "$status" == "behind" ]]; then
+              exit 0
+            fi
+          done
+          echo "::error::$SHA is not on a release branch"
+          exit 1
+
+      - name: Wait for checks
+        if: ${{ !inputs.skip_checks }}
+        uses: apify/actions/wait-for-checks@v1.6.2
+        with:
+          ref: ${{ steps.sha.outputs.sha }}
+          check-regexp: ^Checks
 
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
