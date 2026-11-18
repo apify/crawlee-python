@@ -340,13 +340,13 @@ async def test_custom_headers_not_sent_with_cross_origin_requests(server_url: UR
         await context.page.wait_for_load_state()
         navigation_headers.update(await context.response.request.all_headers())
 
-    await crawler.run([Request.from_url(start_url, headers={'authorization': 'Bearer secret-token'})])
+    await crawler.run([Request.from_url(start_url, headers={'x-custom-header': 'custom-value'})])
 
-    assert navigation_headers.get('authorization') == 'Bearer secret-token'
+    assert navigation_headers.get('x-custom-header') == 'custom-value'
     # Custom headers are merged into the browser-generated ones, not replacing them.
     assert 'user-agent' in navigation_headers
     assert subresource_headers
-    assert 'authorization' not in subresource_headers
+    assert 'x-custom-header' not in subresource_headers
 
 
 async def test_custom_headers_sent_when_browser_normalizes_url(server_url: URL) -> None:
@@ -360,13 +360,13 @@ async def test_custom_headers_sent_when_browser_normalizes_url(server_url: URL) 
 
     # A bare origin without the trailing slash; the browser requests `/`.
     bare_url = f'http://{server_url.host}:{server_url.port}'
-    await crawler.run([Request.from_url(bare_url, headers={'authorization': 'Bearer secret-token'})])
+    await crawler.run([Request.from_url(bare_url, headers={'x-custom-header': 'custom-value'})])
 
-    assert navigation_headers.get('authorization') == 'Bearer secret-token'
+    assert navigation_headers.get('x-custom-header') == 'custom-value'
 
 
 async def test_custom_headers_survive_redirect(server_url: URL) -> None:
-    """Custom headers applied to the navigation request are inherited by redirect hops."""
+    """Custom headers without credentials applied to the navigation request are inherited by redirect hops."""
     crawler = PlaywrightCrawler()
     received_headers = dict[str, str]()
 
@@ -377,9 +377,61 @@ async def test_custom_headers_survive_redirect(server_url: URL) -> None:
 
     target_url = str(server_url / 'headers')
     start_url = str((server_url / 'redirect').with_query(url=target_url))
-    await crawler.run([Request.from_url(start_url, headers={'authorization': 'Bearer secret-token'})])
+    await crawler.run([Request.from_url(start_url, headers={'x-custom-header': 'custom-value'})])
+
+    assert received_headers.get('x-custom-header') == 'custom-value'
+
+
+@pytest.mark.parametrize(
+    'browser_type',
+    [
+        pytest.param('chromium', id='chromium'),
+        pytest.param('firefox', id='firefox'),
+    ],
+)
+async def test_credential_headers_not_sent_on_cross_origin_redirect(
+    browser_type: BrowserType, server_url: URL, redirect_server_url: URL
+) -> None:
+    """Credential headers are not sent to a redirect target on another origin."""
+    crawler = PlaywrightCrawler(browser_type=browser_type)
+    received_headers = dict[str, str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        # The `/headers` endpoint echoes what the server on the other origin received after the redirect hop.
+        received_headers.update(json.loads(await context.response.text()))
+
+    target_url = str(server_url / 'headers')
+    start_url = str((redirect_server_url / 'redirect').with_query(url=target_url))
+    request_headers = {
+        'Authorization': 'Bearer secret-token',
+        'Cookie': 'session=secret',
+        'Proxy-Authorization': 'Basic secret',
+    }
+    await crawler.run([Request.from_url(start_url, headers=request_headers)])
+
+    assert received_headers
+    assert 'authorization' not in received_headers
+    assert 'cookie' not in received_headers
+    assert 'proxy-authorization' not in received_headers
+
+
+async def test_credential_headers_sent_with_navigation_request(server_url: URL) -> None:
+    """Credential headers reach the server with the navigation request."""
+    crawler = PlaywrightCrawler()
+    received_headers = dict[str, str]()
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        received_headers.update(json.loads(await context.response.text()))
+
+    request_headers = {'Authorization': 'Bearer secret-token', 'X-Custom-Header': 'custom-value'}
+    await crawler.run([Request.from_url(str(server_url / 'headers'), headers=request_headers)])
 
     assert received_headers.get('authorization') == 'Bearer secret-token'
+    assert received_headers.get('x-custom-header') == 'custom-value'
+    # Custom headers are merged into the browser-generated ones, not replacing them.
+    assert 'user-agent' in received_headers
 
 
 async def test_pre_navigation_hook() -> None:

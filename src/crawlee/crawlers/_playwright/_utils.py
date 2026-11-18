@@ -23,6 +23,8 @@ _DEFAULT_BLOCK_REQUEST_URL_PATTERNS = [
     '.zip',
 ]
 
+_CREDENTIAL_HEADERS = frozenset({'authorization', 'cookie', 'proxy-authorization'})
+
 
 class NavigationRequestInterceptor:
     """One-shot page route that applies a custom method, headers, and payload to the main-frame navigation request.
@@ -31,10 +33,16 @@ class NavigationRequestInterceptor:
     `Page.set_extra_http_headers` would leak sensitive values like `Authorization` to every subresource request
     the page makes, including cross-origin ones. The navigation request is matched by its role (a main-frame
     navigation) rather than by its URL, because the browser normalizes URLs (adds the root path, strips
-    fragments), so a URL comparison can silently miss. Redirect hops bypass routing and inherit the overrides.
+    fragments), so a URL comparison can silently miss.
 
     Custom headers are merged into the headers the browser would send on its own (e.g. `User-Agent` or
     fingerprint headers), with the custom ones winning.
+
+    Redirect hops bypass routing, and a continued request passes its header overrides to them. So when the custom
+    headers include credentials (`Authorization`, `Cookie`, `Proxy-Authorization`), the navigation request is sent
+    by `Route.fetch` without following redirects, and its response is fulfilled. The browser then follows any
+    redirect on its own, without the custom headers, so the credentials never reach another origin. Without
+    credential headers, the request is continued and redirect hops carry the custom headers.
     """
 
     def __init__(
@@ -66,6 +74,15 @@ class NavigationRequestInterceptor:
 
         self._applied = True
         merged_headers = {**request.headers, **dict(self._headers)} if self._headers else None
+
+        if self._headers and _CREDENTIAL_HEADERS.intersection(name.lower() for name in self._headers):
+            # The navigation timeout of `Page.goto` covers this request, so `Route.fetch` gets no timeout of its own.
+            response = await route.fetch(
+                method=self._method, headers=merged_headers, post_data=self._payload, max_redirects=0, timeout=0
+            )
+            await route.fulfill(response=response)
+            return
+
         await route.continue_(method=self._method, headers=merged_headers, post_data=self._payload)
 
 
