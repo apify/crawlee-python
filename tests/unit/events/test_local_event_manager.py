@@ -97,3 +97,17 @@ async def test_cpu_sampler_restarts_with_each_session(monkeypatch: pytest.Monkey
 
     assert len(samplers) == 2
     assert samplers[0] is not samplers[1]
+
+
+async def test_close_stops_system_info_emission(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`close` stops the periodic `SystemInfo` emission while the context is still active."""
+    monkeypatch.setattr('crawlee.events._local_event_manager.get_cpu_info', lambda _: MagicMock(spec=CpuInfo))
+    monkeypatch.setattr('crawlee.events._local_event_manager.get_memory_info', lambda: MagicMock(spec=MemoryInfo))
+
+    async with LocalEventManager(system_info_interval=timedelta(milliseconds=10)) as event_manager:
+        await event_manager.close()
+
+        system_info_task = event_manager._emit_system_info_event_rec_task.task
+        assert system_info_task is not None
+        assert system_info_task.done()
+        assert event_manager.active is True

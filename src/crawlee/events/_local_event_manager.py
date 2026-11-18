@@ -103,6 +103,17 @@ class LocalEventManager(EventManager):
         finally:
             await super().__aexit__(exc_type, exc_value, exc_traceback)
 
+    async def close(self) -> None:
+        """Emit the final `PersistState` event, wait for all the event listeners, and stop emitting `SystemInfo`.
+
+        See `EventManager.close` for details.
+
+        Raises:
+            RuntimeError: If the context manager is not active.
+        """
+        await super().close()
+        await self._emit_system_info_event_rec_task.stop()
+
     async def _emit_system_info_event(self) -> None:
         """Emit a system info event with the current CPU and memory usage."""
         # Both readings block the thread they run in - `get_cpu_info` may sample the CPU utilization over a short
