@@ -368,15 +368,29 @@ async def test_fallback_shares_usage_accumulator() -> None:
         assert fallback.ai_usage is extractor.ai_usage
 
 
-def test_set_ai_usage_reshares_with_fallback() -> None:
+async def test_set_ai_usage_reshares_with_fallback() -> None:
+    """An entered extractor shares the usage accumulator it adopts with its fallback."""
     fallback = PydanticAiDirectExtractor(TestModel())
     extractor = _extractor(fallback=fallback)
     new_usage = PydanticAiUsageStats()
 
-    extractor.set_ai_usage(new_usage)
+    async with extractor:
+        extractor.set_ai_usage(new_usage)
 
-    assert extractor.ai_usage is new_usage
-    assert fallback.ai_usage is new_usage
+        assert extractor.ai_usage is new_usage
+        assert fallback.ai_usage is new_usage
+
+
+async def test_set_ai_usage_leaves_held_fallback() -> None:
+    """An extractor that isn't entered adopts a usage accumulator without taking a fallback another one holds."""
+    fallback = PydanticAiDirectExtractor(TestModel())
+    first = _extractor(fallback=fallback)
+    second = _extractor(fallback=fallback)
+
+    async with first:
+        second.set_ai_usage(PydanticAiUsageStats())
+
+        assert fallback.ai_usage is first.ai_usage
 
 
 async def test_active_state() -> None:
@@ -443,7 +457,7 @@ async def test_fallback_exit_failure(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def test_fallback_held_by_another_extractor() -> None:
-    """A fallback another extractor holds can't be entered again, and its usage still counts into the holder."""
+    """Entering an extractor whose fallback another one holds fails and leaves the fallback with the holder."""
     fallback = PydanticAiDirectExtractor(TestModel())
     first = _extractor(fallback=fallback)
     second = _extractor(fallback=fallback)
@@ -453,6 +467,7 @@ async def test_fallback_held_by_another_extractor() -> None:
             await second.__aenter__()
 
         assert second.active is False
+        assert fallback.active is True
         assert fallback.ai_usage is first.ai_usage
 
 
@@ -484,6 +499,19 @@ async def test_exit_without_enter_raises() -> None:
 
     with pytest.raises(RuntimeError, match='not active'):
         await extractor.__aexit__(None, None, None)
+
+
+async def test_reenter_keeps_cached_selectors() -> None:
+    """An extractor entered a second time keeps its cached selectors and closes the cache on exit again."""
+    extractor = _extractor(_model(NAME_SELECTORS))
+
+    async with extractor:
+        await extractor.extract(NAME_HTML, _Item, cache_tag='test')
+    async with extractor:
+        assert await extractor.extract(NAME_HTML, _Item, cache_tag='test') == _Item(name='X')
+
+    assert extractor.ai_usage.requests == 1
+    assert extractor._selector_cache.is_initialized is False
 
 
 async def test_cache_persists_across_instances() -> None:

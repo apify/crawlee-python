@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from pydantic_ai import Agent
 from pydantic_ai.usage import RunUsage
 
+from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 
 from ._base_extractor import BasePydanticAiHtmlExtractor
@@ -85,6 +86,7 @@ class PydanticAiDirectExtractor(BasePydanticAiHtmlExtractor):
         )
         self._retries = retries
 
+    @ensure_context
     async def extract(
         self,
         content: str | Selector,
@@ -102,6 +104,9 @@ class PydanticAiDirectExtractor(BasePydanticAiHtmlExtractor):
             scope: Optional CSS selector restricting extraction to the first matching subtree.
             cache_tag: Ignored in direct extraction.
             additional_instructions: Extra instructions appended for this call only.
+
+        Raises:
+            RuntimeError: If the extractor isn't entered with `async with`.
         """
         if scope is not None:
             # Scope resolution requires a parsed tree. Serializing the matched subtree also keeps the distiller input

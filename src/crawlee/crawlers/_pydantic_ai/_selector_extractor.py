@@ -255,8 +255,8 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
     asks the model for a new map, validates it against the live page, and caches it. A bucket keeps several maps,
     so A/B-tested markup variants can coexist.
 
-    The cache is a `RecoverableState` persisted to a `KeyValueStore`. It loads when the extractor is entered with
-    `async with` and is saved when it's exited, so `extract` needs an entered extractor.
+    The cache is a `RecoverableState` persisted to a `KeyValueStore`. It loads when the extractor is first entered
+    with `async with` and is saved when it's exited, so `extract` needs an entered extractor.
 
     With a `fallback` extractor, unsupported schemas and generation failures degrade to it. Infrastructure errors
     such as credentials, HTTP, and usage limits propagate.
@@ -342,9 +342,10 @@ class PydanticAiSelectorExtractor(BasePydanticAiHtmlExtractor):
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     def set_ai_usage(self, value: PydanticAiUsageStats) -> None:
-        """Adopt `value` and re-share it with the fallback chain."""
+        """Adopt `value` and, while the extractor is entered, share it with the fallback chain."""
         super().set_ai_usage(value)
-        self._share_usage_with_fallback()
+        if self.active:
+            self._share_usage_with_fallback()
 
     def _share_usage_with_fallback(self) -> None:
         """Make the fallback chain accumulate into this extractor's `ai_usage`."""
