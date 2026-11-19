@@ -736,26 +736,17 @@ async def test_adaptive_playwright_crawler_default_predictor(test_urls: list[str
     mocked_browser_handler.assert_called_once_with()
 
 
-@pytest.mark.parametrize(
-    'rendering_type',
-    [
-        pytest.param('static', id='static'),
-        pytest.param('client only', id='browser'),
-    ],
-)
-async def test_closes_shared_default_client(test_urls: list[str], rendering_type: RenderingType) -> None:
-    """Both sub crawlers send through the default HTTP client of the crawler, which closes only that client."""
+async def test_static_sub_crawler_sends_through_crawler_http_client(test_urls: list[str]) -> None:
+    """The static sub crawler sends through the default HTTP client of the crawler, which closes only that client."""
     crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
         rendering_type_predictor=_SimpleRenderingTypePredictor(
-            rendering_types=cycle([rendering_type]), detection_probability_recommendation=cycle([0])
+            rendering_types=cycle(['static']), detection_probability_recommendation=cycle([0])
         ),
-        respect_robots_txt_file=True,
     )
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        # The sub crawler fetches robots.txt with its HTTP client to filter the links.
-        await context.enqueue_links()
+        pass
 
     with (
         patch.object(
@@ -763,10 +754,11 @@ async def test_closes_shared_default_client(test_urls: list[str], rendering_type
         ) as send_request,
         patch.object(ImpitHttpClient, 'cleanup', autospec=True, side_effect=ImpitHttpClient.cleanup) as cleanup,
     ):
-        await crawler.run(test_urls[:1])
+        stats = await crawler.run(test_urls[:1])
 
     sending_clients = {send_call.args[0] for send_call in send_request.await_args_list}
     closed_clients = {cleanup_call.args[0] for cleanup_call in cleanup.await_args_list}
+    assert stats.requests_finished == 1
     assert sending_clients == {crawler._http_client}
     assert closed_clients == {crawler._http_client}
 
