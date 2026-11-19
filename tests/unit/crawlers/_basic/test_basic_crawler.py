@@ -1467,15 +1467,54 @@ async def test_abort_on_error_applies_to_one_run() -> None:
     assert handled_urls == ['https://a.placeholder.com', 'https://b.placeholder.com']
 
 
-async def test_repeated_run_starts_with_fresh_statistics() -> None:
-    """A repeated `run()` starts from fresh statistics instead of adding to the previous run's."""
-    crawler = BasicCrawler(request_handler=AsyncMock())
+async def test_request_limit_spans_runs() -> None:
+    """`max_requests_per_crawl` counts the earlier runs, so a run that starts at the limit handles no request."""
+    handler = AsyncMock()
+    crawler = BasicCrawler(request_handler=handler, max_requests_per_crawl=1)
+
+    await crawler.run(['https://a.placeholder.com'])
+    await crawler.run(['https://b.placeholder.com'])
+
+    handler.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    'statistics',
+    [
+        pytest.param(None, id='own'),
+        pytest.param(Statistics.with_default_state(), id='passed'),
+    ],
+)
+async def test_repeated_run_keeps_stats(statistics: Statistics[StatisticsState] | None) -> None:
+    """A repeated `run()` adds to the statistics of the crawler, built by it or passed to it."""
+    crawler = BasicCrawler(request_handler=AsyncMock(), statistics=statistics)
 
     await crawler.run(['https://a.placeholder.com'])
     stats = await crawler.run(['https://b.placeholder.com'])
 
+    assert stats.requests_finished == 2
+
+
+async def test_repeated_run_keeps_errors() -> None:
+    """A repeated `run()` adds to the errors that the error tracker collected in the earlier runs."""
+    crawler = BasicCrawler(max_request_retries=0)
+    crawler.router.default_handler(AsyncMock(side_effect=RuntimeError('Handler failed')))
+
+    await crawler.run(['https://a.placeholder.com'])
+    await crawler.run(['https://b.placeholder.com'])
+
+    assert crawler.statistics.error_tracker.total == 2
+
+
+async def test_stats_reset_between_runs() -> None:
+    """Statistics reset between runs make the next run count from zero, although the crawler persists them."""
+    crawler = BasicCrawler(request_handler=AsyncMock())
+
+    await crawler.run(['https://a.placeholder.com'])
+    crawler.statistics.reset()
+    stats = await crawler.run(['https://b.placeholder.com'])
+
     assert stats.requests_finished == 1
-    assert crawler.statistics.state.requests_finished == 1
 
 
 async def test_crawlers_share_stats_in_turn() -> None:
@@ -1587,20 +1626,20 @@ async def test_repeated_run_keeps_sessions() -> None:
         assert session_pool.active
 
 
-async def test_repeated_run_resets_own_sessions() -> None:
-    """A repeated `run()` replaces the sessions of the session pool the crawler built."""
+async def test_repeated_run_keeps_own_pool() -> None:
+    """A repeated `run()` keeps the sessions of the session pool the crawler built, since it continues the crawl."""
     crawler = BasicCrawler()
-    session_ids = list[set[str]]()
+    pool_session_ids = list[set[str]]()
 
     @crawler.router.default_handler
     async def handler(_context: BasicCrawlingContext) -> None:
-        session_ids.append(set(crawler._session_pool.get_state(as_dict=False).sessions))
+        pool_session_ids.append(set(crawler._session_pool.get_state(as_dict=False).sessions))
 
     await crawler.run(['https://a.placeholder.com'])
     await crawler.run(['https://b.placeholder.com'])
 
-    first_ids, second_ids = session_ids
-    assert first_ids.isdisjoint(second_ids)
+    first_run_ids, second_run_ids = pool_session_ids
+    assert first_run_ids <= second_run_ids
 
 
 async def test_run_needs_entered_session_pool() -> None:
@@ -1847,14 +1886,14 @@ async def test_handled_count_error_does_not_fail_the_run(
     queue = await RequestQueue.open()
     crawler = BasicCrawler(request_manager=queue)
     crawler.router.default_handler(AsyncMock())
-    await crawler.run(['https://a.placeholder.com'])
+    first_stats = await crawler.run(['https://a.placeholder.com'])
 
     get_handled_count = AsyncMock(side_effect=RuntimeError('Handled count unavailable'))
     monkeypatch.setattr(queue, 'get_handled_count', get_handled_count)
     with caplog.at_level(logging.WARNING):
         stats = await crawler.run(['https://a.placeholder.com'])
 
-    assert stats.requests_total == 0
+    assert stats.requests_total == first_stats.requests_total
     get_handled_count.assert_awaited_once()
     assert processed_no_requests_warnings(caplog) == []
 
@@ -1897,12 +1936,12 @@ async def test_aborted_crawl_with_pending_requests_does_not_warn(caplog: pytest.
     )
     handler = AsyncMock(side_effect=[None, RuntimeError('Handler failed')])
     crawler.router.default_handler(handler)
-    await crawler.run(['https://a.placeholder.com'])
+    first_stats = await crawler.run(['https://a.placeholder.com'])
 
     with caplog.at_level(logging.WARNING):
         stats = await crawler.run(['https://b.placeholder.com'])
 
-    assert stats.requests_total == 0
+    assert stats.requests_total == first_stats.requests_total
     assert processed_no_requests_warnings(caplog) == []
 
 
