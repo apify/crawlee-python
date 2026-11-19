@@ -271,7 +271,7 @@ crawler_2 = BasicCrawler(request_manager=queue)
 
 In v1, calling `crawler.run()` again on the same instance purged the request queue, unless the queue was named or the previous run had failed. In v2, nothing is purged between runs, the same as Crawlee JS. A repeated `run()` continues with the same request manager and skips the requests an earlier run handled, failed ones included.
 
-The statistics and the session pool carry over too. A repeated `run()` adds to the statistics of the earlier runs, error trackers included, and keeps the sessions. In v1, it started both afresh. The `max_requests_per_crawl` limit counts the requests in the statistics, so it includes the earlier runs. A run that starts with the limit already reached stops right away. To count from zero, call `crawler.statistics.reset()` before the next `run()`. To start with fresh sessions, pass your own `SessionPool` and call its `reset()` between runs.
+The statistics and the session pool carry over too. A repeated `run()` adds to the statistics of the earlier runs, error trackers included, and keeps the sessions. In v1, it reset both. The `max_requests_per_crawl` limit counts the requests in the statistics, so it includes the earlier runs. A run that starts with the limit already reached stops right away. To count from zero, call `crawler.statistics.reset()` before the next `run()`. To start with fresh sessions, pass your own `SessionPool` and call its `reset()` between runs.
 
 The `purge_request_queue` argument of `run()` is removed. If you passed `purge_request_queue=False`, drop the argument. To crawl the same requests again, purge the request manager yourself. To also count from zero, as v1 did, reset the statistics:
 
@@ -285,6 +285,7 @@ await crawler.run(urls)
 request_manager = await crawler.get_request_manager()
 await request_manager.purge()
 crawler.statistics.reset()
+await crawler.statistics.reset_store()
 await crawler.run(urls)
 ```
 
